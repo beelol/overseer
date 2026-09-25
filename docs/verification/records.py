@@ -74,13 +74,15 @@ rec(7, "Persistent sessions", "verified",
     actual="Live Codex turn continued and completed while VS Code was closed; the reopened UI showed it. Crash tests reattach without relaunch; lost sessions are reported as disconnected.",
     evidence="`evidence/ui/codex-live/05-turn3-before-close.png`, `06-reopened.png`, `result.json`; protocol tests", live="Live Codex + fixtures.")
 
-rec(8, "Local access boundary", "verified",
+rec(8, "Local access boundary", "blocked",
     steps=f"""1. {T}: `ac08_socket_is_owner_only_and_requests_are_not_shell` — socket mode 0600, socket directory 0700; malformed JSON → `parse_error`; non-object params → `invalid_params`; non-string method → `invalid_request`; >1 MiB request → `request_too_large`; shell fragments in `repo`/`path` rejected; argv with `$(touch …)`/`; rm -rf /` passed literally (no file created); unknown methods rejected.
 2. Every accepted connection is checked with `getpeereid` against the daemon's uid (`daemon/src/server.rs`); shim control sockets do the same.
 3. Packaged UI [trust](evidence/ui/trust/): an untrusted window (VS Code Restricted Mode via `security.workspace.trust.emptyWindow=false`) — the trust editor shows "You are in Restricted Mode", **Overseer: New Task** is not offered in the command palette, the Agents view explains that launching requires trust, and no task exists afterwards.""",
     expected="Only the local user can command the daemon; untrusted workspaces cannot launch; malformed requests cannot execute shell fragments.",
-    actual="All pass.", evidence="protocol test; `evidence/ui/trust/`",
+    actual="Untrusted-workspace, malformed-request and shell-injection checks pass; socket/directory modes are owner-only. **Not verified:** an actual connection attempt from a different local user being rejected (no second macOS account is available to the agent), so the access-rejection part of the Verify clause is unproven.",
+    evidence="protocol test; `evidence/ui/trust/`",
     live="Real VS Code workspace trust.",
+    blocker="Needs a second local macOS user (owner creates a standard test account). Next: as that user, `nc -U <socket>` / `overseerd ctl hello` with the owner's `OVERSEER_HOME` must fail with a permission error, and a relaxed-permission socket must still be refused by the peer-uid check (log line `rejected connection from uid …`).",
     limits="Rejection of a different local uid is enforced by filesystem permissions plus the peer-uid check but was not exercised with a second macOS user account. On this machine the VS Code trust list trusts `/` for folders, so the untrusted case uses an empty window; folder-level Restricted Mode uses the same `isWorkspaceTrusted` gating.")
 
 rec(9, "Complete task controls", "verified",
@@ -214,16 +216,25 @@ rec(28, "No cancellation blind spot", "verified",
     actual="All pass.", evidence="protocol test", live="Fixtures.")
 
 rec(29, "Follow across and within files", "verified",
-    harness="OpenCode 1.15.13 real harness process with the deterministic mock model (paced edits); Codex live for a single reported edit",
-    steps="Packaged UI [main](evidence/ui/main/): a live OpenCode run alternates `a.txt`/`b.txt` at distant lines (20/280/60/240/150/200…); Follow reveals each reported edit across files and within the already-open file. [review](evidence/ui/review/): a user-written file during the run is listed but never followed or attributed; a generic (filesystem-only) run shows 'Filesystem evidence only…'. [codex-live](evidence/ui/codex-live/): Follow reports 'agent-reported edit'.",
-    expected="Follow navigates to agent edits across/within files; unrelated user edits cannot claim agent attribution; filesystem-only limitation visible.",
-    actual="All pass. Attribution comes only from harness-reported file activity (`reported` for Codex, `tool-input` for OpenCode/Claude).",
-    evidence="`evidence/ui/main/03-following.png`, result.json; `evidence/ui/review/`", live="OpenCode runtime with mock model; Codex live.")
+    commit="b5693b8",
+    harness="Codex 0.155 (app-server transport), owner's existing ChatGPT login, gpt-5.6-luna, one small turn; plus OpenCode 1.15.13 driven by the mock model for sustained edits",
+    steps="""1. **Live**: [codex-follow-live](evidence/ui/codex-follow-live/) (`node test/ui/scenario-codex-follow.js`): New Task from the command palette asks Codex to edit `a.txt`/`b.txt` alternately at lines 20/280/60/240/150/200/100/30. Follow reveals `a.txt:60 → b.txt:240 → a.txt:100 → b.txt:30` (across files and to new hunks within the already-open file), each labelled "agent-reported edit".
+2. Sustained: [main](evidence/ui/main/) (OpenCode with the mock model, 8 paced edits) shows the same behaviour over a longer run.
+3. Attribution: [review](evidence/ui/review/) writes an unrelated file during a run — it is listed in the live review but never followed or attributed; a generic (filesystem-only) run shows "Filesystem evidence only… cannot attribute or jump to them".""",
+    expected="Follow navigates to observed agent edits including new hunks in the open file; unrelated user edits cannot claim agent attribution; filesystem-only limitation visible.",
+    actual="All pass. Attribution comes only from harness-reported file activity (`reported` for Codex, `tool-input` for OpenCode/Claude); the first edit of a run can precede the review opening and is then shown in the list but not jumped to.",
+    evidence="`evidence/ui/codex-follow-live/` (screenshots, result.json with reveals and usage), `evidence/ui/main/`, `evidence/ui/review/`", live="Live Codex; OpenCode mock for sustained runs.")
 
 rec(30, "Navigation ownership", "verified",
-    steps="Packaged UI [main](evidence/ui/main/): scroll (mouse wheel) pauses Follow with visible Resume and the view stays put for 6 s of continued edits; selecting another file in the navigator also pauses; Resume restarts; unchecking Follow preserves position during edits. [review](evidence/ui/review/): selecting an existing run does not turn Follow on; switching to another agent does not inherit Follow and its view does not jump during live edits.",
-    expected="Follow off preserves position; manual navigation pauses with Resume; review/agent switching do not jump.",
-    actual="All pass (scrollTop unchanged in paused/off states).", evidence="`evidence/ui/main/04-paused.png`, result.json; `evidence/ui/review/`", live="OpenCode runtime with mock model.")
+    commit="b5693b8",
+    harness="Codex 0.155 live (scroll/pause/resume); OpenCode mock-model runs for the longer sequences",
+    steps="""1. **Live** [codex-follow-live](evidence/ui/codex-follow-live/): while Codex keeps editing, a mouse-wheel scroll pauses Follow with a visible **Resume**; the view stays at the same scrollTop while the agent makes further edits (edit count rose 4 → 6 while paused); **Resume** jumps to the latest edit and following continues.
+2. [main](evidence/ui/main/) during continuous edits: scroll pause (view unchanged for 6 s), selecting another file in the navigator also pauses, Resume, unchecking Follow preserves position for 6 s of edits.
+3. [review](evidence/ui/review/): selecting an existing run does not turn Follow on; switching to another agent during its live edits neither inherits Follow nor jumps (scrollTop unchanged).
+4. [perf](evidence/ui/perf/): the file navigator no longer scrolls under a user who is pointing at it during live refreshes (fixed in this session).""",
+    expected="Follow off preserves position; manual navigation pauses with visible Resume; review and agent switching do not unexpectedly jump.",
+    actual="All pass (scrollTop unchanged in paused/off/switched states; caret stays where the user clicked when editing, see AC-32).",
+    evidence="`evidence/ui/codex-follow-live/`, `evidence/ui/main/`, `evidence/ui/review/`", live="Live Codex + mock-driven sustained edits.")
 
 rec(31, "Live Review refresh", "verified",
     steps="Packaged UI [review](evidence/ui/review/): with the review open and no manual refresh, time from the filesystem change to the updated file list: new file, atomic replace (write + rename), staging (Workspace Dirty), rename, delete, branch switch, and a write in a folder excluded from the watcher (`files.watcherExclude`) that only the reconciliation poll can see. Navigator selection before/after compared. Drafts preserved (AC-33). Load behaviour in AC-35.",
@@ -252,7 +263,7 @@ rec(35, "Responsive review", "__PERF__",
     steps="Packaged UI [perf](evidence/ui/perf/) (`PERF_MINUTES=10 node test/ui/scenario-perf.js`): 10,000 tracked files; four generic fixture runs each editing its own 100 files every 0.4 s and emitting output for 10 minutes; review open on a run with 100 changed files. Samples every 30 s: extension-host RSS, daemon RSS, renderer RSS, webview JS heap, retained events per run. Navigation latency = real click in the navigator → target diff in view; refresh latency = new file write → listed.",
     expected="Navigation p95 < 250 ms; refresh within AC-31 bounds; memory/queues stabilise after draining.",
     actual="__PERFRESULT__", evidence="`evidence/ui/perf/result.json`, screenshots", live="Fixture load; no paid-model work.",
-    limits="A load bug found here was fixed first: continuous writes starved the vendored comparison (it restarted on every change); it now publishes after one restart and catches up, and Overseer sessions skip the Git extension's status rescan.")
+    limits="Two load bugs found here were fixed before the passing run: continuous writes starved the vendored comparison (it restarted on every change; it now publishes after one restart and catches up, and Overseer sessions skip the Git extension's status rescan), and live refreshes scrolled the file navigator under the user's pointer (it no longer auto-scrolls while the user is pointing at or scrolling it). Renderer memory (all VS Code renderer processes) grew ~24% during the load, mostly the open run panel's event log (capped at 4,000 rows), and stopped growing once the runs were drained; extension-host memory was flat for the second half and the daemon shrank after draining. The measured fixture is generic-harness load, not model runs.")
 
 rec(36, "Packaged macOS UI", "verified",
     steps="`node extension/scripts/package.js` → `extension/overseer-0.1.0.vsix`; each scenario installs it with `code --user-data-dir <isolated> --extensions-dir <isolated> --install-extension overseer-0.1.0.vsix` (see `install.log` in each evidence folder) and launches stable VS Code 1.139.0; the flow task → follow → edit → review is driven by keyboard/mouse input through the real UI (command palette, quick picks, tree, webviews) with screenshots captured from the workbench.",
@@ -268,7 +279,7 @@ rec(37, "Automated regression coverage", "verified",
     limits="Linux not run (AC-41).")
 
 rec(38, "Reproducible acceptance ledger", "verified",
-    steps="Audited every AC record against the implementation and evidence before handoff (see the audit table in the ledger README); reopened or left unchecked everything lacking live evidence (AC-11–14, 16, 19, 41).",
+    steps="Audited every AC record against the implementation and evidence before handoff (see the audit table in the ledger README); reopened AC-08 (foreign-user rejection unproven) and AC-29/30 until a live-model Follow run existed; left unchecked everything lacking live or complete evidence (AC-08, AC-11–14, AC-19, AC-41).",
     expected="Every checked criterion links to evidence with commit, environment, steps, expected/actual and limitations; failures reopen; missing credentials/hardware remain blocked.",
     actual="Done for this handoff.", evidence="docs/verification/README.md", live="n/a")
 
@@ -332,7 +343,7 @@ def main():
 EXTRA_FOLLOWUPS = [
     "Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.",
     "Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.",
-    "Consider the Codex `app-server` transport for approvals and `subAgentActivity` (would strengthen [AC-16](docs/verification/AC-16.md) and [AC-19](docs/verification/AC-19.md)).",
+    "Map the Codex app-server `subAgentActivity` / child-thread notifications so Codex grandchildren and child output stream live (would strengthen [AC-19](docs/verification/AC-19.md)); approvals already use the app-server transport.",
     "Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.",
     "VS Code on this machine trusts `/` in its workspace-trust list, so folders never open in Restricted Mode; the trust test uses an empty window ([AC-08](docs/verification/AC-08.md)). Owner environment note.",
 ]

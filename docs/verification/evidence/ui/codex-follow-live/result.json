@@ -1,0 +1,141 @@
+{
+  "checks": [
+    {
+      "name": "follow on for launched run",
+      "ok": true
+    },
+    {
+      "name": "scroll pauses Follow during live edits",
+      "ok": true,
+      "detail": {
+        "text": "Follow paused by your navigation",
+        "top": 48,
+        "resume": true
+      }
+    },
+    {
+      "name": "paused view stays put while the agent keeps editing",
+      "ok": true,
+      "detail": {
+        "pausedTop": 48,
+        "top": 48,
+        "editsAtPause": 4,
+        "editsNow": 6
+      }
+    },
+    {
+      "name": "Resume jumps to the latest agent edit",
+      "ok": true,
+      "detail": {
+        "text": "Following: a.txt:100 (agent-reported edit)",
+        "top": 145.5
+      }
+    },
+    {
+      "name": "live run completed",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reason": "turn completed; exit 0"
+      }
+    },
+    {
+      "name": "Follow crossed files on live edits",
+      "ok": true,
+      "detail": [
+        "Following: a.txt:60 (agent-reported edit)",
+        "Following: b.txt:240 (agent-reported edit)",
+        "Following: a.txt:100 (agent-reported edit)",
+        "Following: b.txt:30 (agent-reported edit)"
+      ]
+    },
+    {
+      "name": "Follow revealed distant lines within files",
+      "ok": true,
+      "detail": [
+        "60",
+        "240",
+        "100",
+        "30"
+      ]
+    },
+    {
+      "name": "attribution is agent-reported",
+      "ok": true,
+      "detail": "Following: a.txt:60 (agent-reported edit)"
+    },
+    {
+      "name": "pause/resume exercised during the live run",
+      "ok": true,
+      "detail": {
+        "paused": true,
+        "resumed": true
+      }
+    }
+  ],
+  "reveals": [
+    "Following: a.txt:60 (agent-reported edit)",
+    "Following: b.txt:240 (agent-reported edit)",
+    "Following: a.txt:100 (agent-reported edit)",
+    "Following: b.txt:30 (agent-reported edit)"
+  ],
+  "editsAtPause": 4,
+  "appliedEdits": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "identity": {
+    "plan": "pro",
+    "account": "2e1fa92158bacc71",
+    "version": "codex-cli 0.155.0-alpha.16.4"
+  },
+  "usage": [
+    {
+      "last": {
+        "cacheWriteInputTokens": 0,
+        "cachedInputTokens": 17152,
+        "inputTokens": 18270,
+        "outputTokens": 5,
+        "reasoningOutputTokens": 0,
+        "totalTokens": 18275
+      },
+      "modelContextWindow": 258400,
+      "total": {
+        "cacheWriteInputTokens": 0,
+        "cachedInputTokens": 142080,
+        "inputTokens": 161586,
+        "outputTokens": 501,
+        "reasoningOutputTokens": 70,
+        "totalTokens": 162087
+      }
+    },
+    {
+      "rate_limits": {
+        "credits": {
+          "balance": "0",
+          "hasCredits": false,
+          "unlimited": false
+        },
+        "individualLimit": null,
+        "limitId": "codex",
+        "limitName": null,
+        "normalModelSlug": null,
+        "planType": "pro",
+        "primary": {
+          "resetsAt": 1790411599,
+          "usedPercent": 49,
+          "windowDurationMins": 10080
+        },
+        "rateLimitReachedType": null,
+        "secondary": null,
+        "spendControlReached": null
+      }
+    }
+  ]
+}

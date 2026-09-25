@@ -1,0 +1,17 @@
+[2026-09-25T07:50:56.444Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T07:51:05.891Z] PASS follow on for launched run
+[2026-09-25T07:51:14.949Z] follow "Following: a.txt:60 (agent-reported edit)"
+[2026-09-25T07:51:16.838Z] follow "Following: b.txt:240 (agent-reported edit)"
+[2026-09-25T07:51:16.960Z] screenshot docs/verification/evidence/ui/codex-follow-live/01-following.png
+[2026-09-25T07:51:17.448Z] PASS scroll pauses Follow during live edits {"text":"Follow paused by your navigation","top":48,"resume":true}
+[2026-09-25T07:51:17.601Z] screenshot docs/verification/evidence/ui/codex-follow-live/02-paused.png
+[2026-09-25T07:51:22.647Z] PASS paused view stays put while the agent keeps editing {"pausedTop":48,"top":48,"editsAtPause":4,"editsNow":6}
+[2026-09-25T07:51:23.940Z] PASS Resume jumps to the latest agent edit {"text":"Following: a.txt:100 (agent-reported edit)","top":145.5}
+[2026-09-25T07:51:24.144Z] follow "Following: a.txt:100 (agent-reported edit)"
+[2026-09-25T07:51:24.977Z] follow "Following: b.txt:30 (agent-reported edit)"
+[2026-09-25T07:51:27.956Z] PASS live run completed {"status":"completed","reason":"turn completed; exit 0"}
+[2026-09-25T07:51:27.956Z] PASS Follow crossed files on live edits ["Following: a.txt:60 (agent-reported edit)","Following: b.txt:240 (agent-reported edit)","Following: a.txt:100 (agent-reported edit)","Following: b.txt:30 (agent-reported edit)"]
+[2026-09-25T07:51:27.956Z] PASS Follow revealed distant lines within files ["60","240","100","30"]
+[2026-09-25T07:51:27.956Z] PASS attribution is agent-reported "Following: a.txt:60 (agent-reported edit)"
+[2026-09-25T07:51:27.956Z] PASS pause/resume exercised during the live run {"paused":true,"resumed":true}
+[2026-09-25T07:51:28.080Z] screenshot docs/verification/evidence/ui/codex-follow-live/03-completed.png
