@@ -1,0 +1,11 @@
+[2026-09-25T07:08:33.008Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T07:08:47.721Z] PASS codex-app run waits for permission (not auto-approved) {"status":"waiting_for_user","attention":"command: /bin/zsh -lc 'touch approved.txt'","reason":null}
+[2026-09-25T07:08:47.804Z] screenshot docs/verification/evidence/ui/codex-approval-live/01-permission-request.png
+[2026-09-25T07:12:52.016Z] FAIL Allow runs the command {"status":"waiting_for_user","reason":null}
+[2026-09-25T07:12:52.100Z] screenshot docs/verification/evidence/ui/codex-approval-live/02-allowed.png
+[2026-09-25T07:12:59.612Z] PASS deny: waiting for permission {"status":"waiting_for_user"}
+[2026-09-25T07:13:03.599Z] PASS Deny: command not run, harness told {"status":"completed","reason":"turn completed; exit 0","output":["2026-09-25T07:13:00.960958Z ERROR codex_core::tools::router: error=exec_command failed: CreateProcess { message: \"Rejected(\\\"rejected by user\\\")\" }","declined"]}
+[2026-09-25T07:13:03.725Z] screenshot docs/verification/evidence/ui/codex-approval-live/03-deny.png
+[2026-09-25T07:13:10.661Z] PASS interrupt: waiting for permission {"status":"waiting_for_user"}
+[2026-09-25T07:13:11.671Z] PASS Interrupt while waiting for permission {"status":"interrupted","reason":"interrupted by user (exit code 0)"}
+[2026-09-25T07:13:11.802Z] screenshot docs/verification/evidence/ui/codex-approval-live/04-interrupt.png

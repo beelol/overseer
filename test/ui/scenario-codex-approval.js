@@ -41,9 +41,11 @@ const PROMPT = 'Run exactly this shell command in the workspace: touch approved.
     check('codex-app run waits for permission (not auto-approved)', w1.status === 'waiting_for_user', { status: w1.status, attention: w1.attention && w1.attention.tool, reason: w1.exit_reason });
     const output = await cdp.webview(`!!document.querySelector('.perm button')`, 30000);
     await s.screenshot('permission-request');
-    await output.eval(`[...document.querySelectorAll('.perm button')].find(b => /Allow/.test(b.textContent)).id = 'allow-btn'`);
+    await output.eval(`(() => { const b = [...document.querySelectorAll('.perm button')].find(b => /Allow/.test(b.textContent)); b.id = 'allow-btn'; b.scrollIntoView({ block: 'center' }); })()`);
     const allow = await s.webviewPoint(output, '#allow-btn');
     await cdp.click(allow.x, allow.y);
+    const answered = await waitFor(r1.id, r => r.status !== 'waiting_for_user', 20);
+    check('Allow click reached the run', answered.status !== 'waiting_for_user', { status: answered.status });
     const d1 = await waitFor(r1.id, r => !['queued', 'starting', 'running', 'waiting_for_user'].includes(r.status));
     const ws1 = s.ctl('state').workspaces.find(w => w.id === r1.workspace_id).path;
     check('Allow runs the command', d1.status === 'completed' && fs.existsSync(path.join(ws1, 'approved.txt')), { status: d1.status, reason: d1.exit_reason });
@@ -58,7 +60,7 @@ const PROMPT = 'Run exactly this shell command in the workspace: touch approved.
       await cdp.click(row.x, row.y);
       const panel = await cdp.webview(`document.getElementById('title')?.textContent.includes(${JSON.stringify(`approval ${mode}`)}) && !!document.querySelector('.perm button')`, 30000);
       if (mode === 'deny') {
-        await panel.eval(`[...document.querySelectorAll('.perm button')].find(b => /Deny/.test(b.textContent)).id = 'deny-btn'`);
+        await panel.eval(`(() => { const b = [...document.querySelectorAll('.perm button')].find(b => /Deny/.test(b.textContent)); b.id = 'deny-btn'; b.scrollIntoView({ block: 'center' }); })()`);
         const p = await s.webviewPoint(panel, '#deny-btn');
         await cdp.click(p.x, p.y);
       } else {
