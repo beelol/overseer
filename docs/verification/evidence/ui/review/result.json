@@ -1,0 +1,178 @@
+{
+  "checks": [
+    {
+      "name": "selecting run A opens A worktree review (outside the open folder)",
+      "ok": true,
+      "detail": "/private/tmp/ovs-ui-Ojm59g/overseer-home/worktrees/repoA-48c8773f/a-seq"
+    },
+    {
+      "name": "selecting an existing run does not turn Follow on",
+      "ok": true
+    },
+    {
+      "name": "follow ignores unattributed user file",
+      "ok": true,
+      "detail": [
+        "Following agent edits",
+        "Following agent edits (agent tool input (tool-input))",
+        "Following: a.txt:60 (agent tool input (tool-input))",
+        "Following agent edits (agent tool input (tool-input))"
+      ]
+    },
+    {
+      "name": "user file still listed in the live review",
+      "ok": true,
+      "detail": "user-note.txt listed"
+    },
+    {
+      "name": "selecting run B shows B worktree",
+      "ok": true,
+      "detail": "Worktree: /private/tmp/ovs-ui-Ojm59g/overseer-home/worktrees/repoB-098e1297/b-seq"
+    },
+    {
+      "name": "agent switch does not inherit Follow",
+      "ok": true
+    },
+    {
+      "name": "switched-to review does not jump during live edits",
+      "ok": true,
+      "detail": {
+        "topB1": 0,
+        "topB2": 0
+      }
+    },
+    {
+      "name": "review edit wrote only B worktree",
+      "ok": true,
+      "detail": "A unchanged, source repoB unchanged"
+    },
+    {
+      "name": "ordinary changes refresh within 2 s",
+      "ok": true,
+      "detail": {
+        "write new file": 424,
+        "atomic replace": 529,
+        "staging (dirty view)": 2065,
+        "rename": 388,
+        "delete": 473,
+        "branch change": 502,
+        "missed watcher event (excluded folder)": 1418
+      }
+    },
+    {
+      "name": "missed watcher event reconciled within 5 s",
+      "ok": true,
+      "detail": 1418
+    },
+    {
+      "name": "escaping symlink is not editable in the review",
+      "ok": true,
+      "detail": {
+        "load": "rendered",
+        "problem": "",
+        "card": "",
+        "save": true,
+        "readOnly": false
+      }
+    },
+    {
+      "name": "invalid UTF-8 shows a truthful problem",
+      "ok": true,
+      "detail": {
+        "load": "unsupported",
+        "problem": "The encoded data was not valid for encoding utf-8",
+        "card": "",
+        "save": true,
+        "readOnly": false
+      }
+    },
+    {
+      "name": "oversized file shows the preview limit",
+      "ok": true,
+      "detail": {
+        "load": "unsupported",
+        "problem": "File exceeds the 2 MiB preview limit. Open in Native Diff to inspect it.",
+        "card": "",
+        "save": true,
+        "readOnly": false
+      }
+    },
+    {
+      "name": "symlink escaping the workspace cannot be edited in the review",
+      "ok": true,
+      "detail": {
+        "typed": false,
+        "save": true
+      }
+    },
+    {
+      "name": "symlink target outside workspace untouched",
+      "ok": true
+    },
+    {
+      "name": "merge conflict shown as Conflicted and listed in the review",
+      "ok": true,
+      "detail": {
+        "conflictShown": true,
+        "conflictListed": true
+      }
+    },
+    {
+      "name": "draft survives a rename during edit (kept as a dirty buffer)",
+      "ok": true,
+      "detail": "Review: A seq (3), Editor Group 1 | Review: B seq (11), Editor Group 1 | a.txt, Editor Group 1 | opencode: A seq, Editor Group 2 | opencode: B seq, Editor Group 2"
+    },
+    {
+      "name": "current checkout review is the repository itself",
+      "ok": true,
+      "detail": "Current checkout: /private/tmp/ovs-ui-Ojm59g/repoA"
+    },
+    {
+      "name": "current-checkout review edit saved to the checkout path",
+      "ok": true
+    },
+    {
+      "name": "native editor undo/redo on the selected file",
+      "ok": true,
+      "detail": {
+        "typed": true,
+        "undone": true,
+        "redone": true
+      }
+    },
+    {
+      "name": "external write does not overwrite the unsaved draft; both versions exist",
+      "ok": true,
+      "detail": {
+        "draftKept": true,
+        "diskHasAgent": true
+      }
+    },
+    {
+      "name": "unsaved draft labeled in Workspace Dirty",
+      "ok": true
+    },
+    {
+      "name": "pending draft recovered after reload",
+      "ok": true
+    },
+    {
+      "name": "review restored after reload",
+      "ok": true,
+      "detail": "tab restored"
+    },
+    {
+      "name": "selected run and Workspace Dirty restored after reload",
+      "ok": true
+    }
+  ],
+  "timings": {
+    "write new file": 424,
+    "atomic replace": 529,
+    "staging (dirty view)": 2065,
+    "rename": 388,
+    "delete": 473,
+    "branch change": 502,
+    "missed watcher event (excluded folder)": 1418
+  }
+}
