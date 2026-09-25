@@ -539,6 +539,12 @@ rec(51, "Worktree file hierarchy", "not started",
     evidence="—", live="—",
     blocker="Not blocked; not started. Next: a file tree for the selected run's worktree inside the Overseer view (AC-48).")
 
+rec(52, "Native Overseer notifications (macOS)", "not started",
+    expected="See the RFC criterion and the [native notifications RFC](../rfcs/native-notifications.md) (added by the owner on 2026-09-25).",
+    actual="Not implemented. Background-agent notifications (AC-45, verified) are posted with `osascript`, so macOS shows them as Script Editor's: its icon, clicking opens Script Editor, and the switch is under Script Editor in Notifications settings.",
+    evidence="—", live="—",
+    blocker="Not blocked; not started. Next: a bundled `Overseer Notifier.app` (Swift, UNUserNotificationCenter, ad-hoc signed) used by overseerd with osascript as the fallback, a `vscode://beelol.overseer/open-center` URI handler, and an Overseer: Test Notification command.")
+
 HEAD = """# AC-{n:02d} — {title}
 Status: {status}{partial}
 Tested implementation commit: {commit}
@@ -599,8 +605,9 @@ SHORT_BLOCKERS = {
     49: "not started (added by the owner on 2026-09-25)",
     50: "not started (coming soon; added by the owner on 2026-09-25)",
     51: "not started (added by the owner on 2026-09-25)",
+    52: "not started (added by the owner on 2026-09-25; see docs/rfcs/native-notifications.md)",
 }
-TOTAL = 51
+TOTAL = 52
 
 EXTRA_FOLLOWUPS = [
     "Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.",

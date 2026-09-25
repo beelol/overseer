@@ -5,12 +5,13 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **46 / 51** · **2** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-11, AC-13, AC-41, AC-50, AC-51. The biggest gaps are owner actions, not
+criteria: **46 / 52** · **2** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-11, AC-13, AC-41, AC-50, AC-51, AC-52. The biggest gaps are owner actions, not
 code. Two criteria are partial, each with its proven part and the remaining step in
 [Follow-ups](#follow-ups): live Claude sign-in and re-sign-in (AC-11) and a live sign-in cycle of a
-disposable account while another works (AC-13), both skipped by the owner for now. Linux (AC-41) is out of scope for now; opening PRs (AC-50)
-and a worktree file tree (AC-51) are future work. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
+disposable account while another works (AC-13), both skipped by the owner for now. Linux (AC-41) is out of scope for now; opening PRs (AC-50),
+a worktree file tree (AC-51) and native Overseer-branded notifications (AC-52,
+[design](docs/rfcs/native-notifications.md)) are future work. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
 ## Acceptance criteria
 
@@ -71,6 +72,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-49** Restore the open session — [evidence](docs/verification/AC-49.md)
 - [ ] **AC-50** Open a pull request from a run (coming soon) — not started (coming soon; added by the owner on 2026-09-25) — [evidence](docs/verification/AC-50.md)
 - [ ] **AC-51** Worktree file hierarchy — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-51.md)
+- [ ] **AC-52** Native Overseer notifications (macOS) — not started (added by the owner on 2026-09-25; see docs/rfcs/native-notifications.md) — [evidence](docs/verification/AC-52.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -198,6 +200,7 @@ the owner action or decision each one needs.
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
 - [ ] [AC-50](docs/verification/AC-50.md) (Open a pull request from a run (coming soon)): Not blocked; deferred by the owner (coming soon). Next: use VS Code's `github` authentication session to push and create the PR.
 - [ ] [AC-51](docs/verification/AC-51.md) (Worktree file hierarchy): Not blocked; not started. Next: a file tree for the selected run's worktree inside the Overseer view (AC-48).
+- [ ] [AC-52](docs/verification/AC-52.md) (Native Overseer notifications (macOS)): Not blocked; not started. Next: a bundled `Overseer Notifier.app` (Swift, UNUserNotificationCenter, ad-hoc signed) used by overseerd with osascript as the fallback, a `vscode://beelol.overseer/open-center` URI handler, and an Overseer: Test Notification command.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
@@ -209,6 +212,7 @@ the owner action or decision each one needs.
 - [Verification ledger and evidence](docs/verification/README.md)
 - [Harness compatibility](docs/compatibility.md)
 - [Side RFC: simple account governance](docs/rfcs/account-governance.md)
+- [Side RFC: native Overseer notifications on macOS](docs/rfcs/native-notifications.md)
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 
 Design targets macOS and Linux; only macOS is verified. Auto routing, a TUI, VSCodium,
