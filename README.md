@@ -97,14 +97,35 @@ and Verify clauses. Both lists are generated from the records by
   earlier turns, **Since task start**, **Original fork**, and any branch (merge-base or tip).
   A separate **Workspace Dirty** view always shows staged, unstaged, untracked, conflicted
   and unsaved work. **Follow** jumps to agent-reported edits across and within files and
-  pauses when you scroll or select a file until you press **Resume**.
+  pauses when you scroll or select a file until you press **Resume**. Each hunk has
+  **Accept** (marks it reviewed, no Git staging) and **Reject** (restores the comparison
+  base through a native edit you can undo in the editor); concurrent agent edits are
+  conflicts, never overwritten.
+- **Conversation** — each run panel reads as a conversation: turns, collapsible tool calls
+  with inputs and results, file edits that open the review at the hunk, inline permission
+  requests, native children nested under the tool call that spawned them, errors (with
+  **Sign in again** for expired logins) and per-turn usage; the raw event log is one tab away.
+- **Overseer view** — **Open Overseer View** lays out an agents column (every repository,
+  not just the open folder) beside the selected run's review and conversation; it works with
+  the native sidebar closed.
+- **Merge back** — never automatic: Overseer commits the worktree, merges the target into
+  the run's branch in the worktree (conflicts go back to the same agent session), shows you
+  exactly what lands, and merges into the target only after you confirm; a dirty target
+  checkout is refused and left untouched.
+- **Accounts** — accounts by provider (OpenAI/ChatGPT, Anthropic/Claude, OpenCode local);
+  desktop-app logins are labeled as following the app; New Task offers only compatible
+  accounts. Account login only, never API keys.
+- **Session restore and background agents** — reviews, run panels, comparisons, Follow
+  (paused), scroll positions and the Agents tree return after reloads and restarts. Closing
+  VS Code with agents running posts a macOS notification naming them;
+  **Stop Agents and Daemon** stops everything on request.
 
 ## Build and install (macOS)
 
 Requirements: Rust 1.89+ (`cargo`), Node 24, Git, and the VS Code `code` CLI.
 
 ```bash
-git clone https://github.com/beelol/overseer.git && cd overseer   # until PR #1 merges: add --branch claude/overseer-macos-app-2d3d20
+git clone https://github.com/beelol/overseer.git && cd overseer
 npm ci --prefix extension/branch-diff/tooling/review --ignore-scripts
 npm ci --prefix extension/tooling/vsce --ignore-scripts
 node extension/scripts/package.js
@@ -123,7 +144,10 @@ Run the checks:
 cargo test
 ```
 
-Packaged-UI scenarios (open a real, isolated VS Code window; see [test/ui](test/ui)):
+Packaged-UI scenarios (open a real, isolated VS Code window; see [test/ui](test/ui)). The
+free ones use fixtures and mocks: `trust`, `main`, `review`, `restore`, `conversation`,
+`hunks`, `accounts`, `signin`, `center`, `theme` and `perf` (10 minutes). Scenarios whose
+header says LIVE spend a few tiny paid prompts.
 
 ```bash
 node test/ui/scenario-main.js
@@ -131,21 +155,24 @@ node test/ui/scenario-main.js
 
 ## Using it
 
-1. **Accounts**: the Accounts view lists *existing login* profiles per harness and any
-   isolated profiles you add (**Add Account Profile…**, then **Sign In…**, which runs the
-   harness's own login in a terminal with that profile's credential home). Overseer never
-   asks for API keys and never logs out an existing login.
-2. **New Task** (+ in the Agents view): pick the repository, harness, account profile,
-   *New worktree* or *Current checkout*, the start ref, an optional model, and the prompt.
-3. The run opens its **Review** (Follow on for runs you launch) and an **output panel** with
-   the event stream, capabilities, **Send follow-up**, **Interrupt**, and permission
-   **Allow/Deny** when a harness asks. Controls a harness cannot support are disabled with
-   the reason.
-4. Click the comparison label (base icon) in the review to switch comparisons; hover it to
-   see the snapshot id or SHAs and their provenance.
-5. Edit in the review's working-tree side and press **Save**, or **Open in Native Diff** for
-   full editor features including undo/redo. Unsaved drafts are labeled and survive reloads
-   and external writes.
+1. **Accounts**: **Add Account…** picks a provider and a name, then **Sign In** runs that
+   provider's own login in a terminal (ChatGPT in the browser or with a device code). Existing
+   desktop logins appear as accounts that follow the app. Overseer never asks for API keys
+   and never signs out a desktop login; **Remove Account…** deletes only that account's folder.
+2. **New Task…**: a form of tiles: repository (any repository, not only the open folder),
+   harness with capability hints, a compatible signed-in account, *New worktree* or *Current
+   checkout*, start branch, optional model and approval policy, and the prompt (⌘Enter
+   starts). **Start Task with Quick Picks…** does the same with pickers.
+3. **Open Overseer View** for the full-page layout, or use the Agents tree. Selecting a run
+   opens its **Review** and its **conversation** with **Send follow-up**, **Interrupt**,
+   permission **Allow/Deny**, **Raw output** and **Merge back…**. Controls a harness cannot
+   support are disabled with the reason.
+4. In the review, click the comparison label (base icon) to switch comparisons; use each
+   hunk's **✓ Accept** / **↶ Reject**, or edit the working-tree side and **Save**. **Open in
+   Native Diff** gives full editor features including undo/redo.
+5. **Merge back…** when a run is done: prepare, review exactly what lands, confirm.
+6. Agents keep running when VS Code closes (you get a notification). **Stop Agents and
+   Daemon** (Agents view menu) stops them all after confirmation.
 
 ## Recovery
 

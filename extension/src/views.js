@@ -93,7 +93,10 @@ class AgentsProvider {
   }
   taskNode(task) {
     const ws = this.model.workspace(task.workspace_id);
-    const item = new vscode.TreeItem(task.title, this.expansion('task:' + task.id));
+    // A task whose run is not recorded yet is not expandable: VS Code would otherwise cache it
+    // as an empty expanded node and not ask for its children again when the run appears.
+    const hasRuns = this.model.state.runs.some(r => r.task_id === task.id);
+    const item = new vscode.TreeItem(task.title, this.expansion('task:' + task.id, hasRuns));
     item.id = 'task:' + task.id;
     item.iconPath = new vscode.ThemeIcon(ws?.kind === 'current' ? 'repo' : 'git-branch');
     item.description = ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}${ws.removed_ms ? ' · removed' : ''}` : '';

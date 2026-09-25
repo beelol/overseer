@@ -1,28 +1,28 @@
-[2026-09-25T07:33:36.302Z] fixture {"tracked":10000}
-[2026-09-25T07:33:36.827Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-25T07:33:56.898Z] processes ["245584 /Applications/Visual Studio Code.app/Contents/MacOS/Code --remote-debugging-port=0 --disable-renderer-backgrounding --disable-backgro","93568 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=gpu-process --user-data-dir","53712 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type=","586320 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app/Contents/MacOS/Code Helper (Renderer) --type=rend","205200 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type","92128 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type=","175136 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin) --type=utility "]
-[2026-09-25T07:34:32.852Z] PASS review lists the 100 changed files of the selected run (10k tracked) 100
-[2026-09-25T07:34:32.970Z] screenshot docs/verification/evidence/ui/perf/01-load-review.png
-[2026-09-25T07:35:04.793Z] sample {"t":32,"exthostKB":170992,"daemonKB":94656,"rendererKB":1165952,"webviewHeapMB":48,"retainedEventsRun1":200}
-[2026-09-25T07:35:35.318Z] sample {"t":62,"exthostKB":160768,"daemonKB":95072,"rendererKB":1245872,"webviewHeapMB":57,"retainedEventsRun1":273}
-[2026-09-25T07:36:06.246Z] sample {"t":93,"exthostKB":174400,"daemonKB":95360,"rendererKB":1291952,"webviewHeapMB":45,"retainedEventsRun1":348}
-[2026-09-25T07:36:36.705Z] sample {"t":124,"exthostKB":174832,"daemonKB":95728,"rendererKB":1284000,"webviewHeapMB":50,"retainedEventsRun1":421}
-[2026-09-25T07:37:07.609Z] sample {"t":155,"exthostKB":189232,"daemonKB":96192,"rendererKB":1322544,"webviewHeapMB":47,"retainedEventsRun1":496}
-[2026-09-25T07:37:38.074Z] sample {"t":185,"exthostKB":191728,"daemonKB":96512,"rendererKB":1334400,"webviewHeapMB":46,"retainedEventsRun1":569}
-[2026-09-25T07:38:08.962Z] sample {"t":216,"exthostKB":193200,"daemonKB":96816,"rendererKB":1314224,"webviewHeapMB":47,"retainedEventsRun1":644}
-[2026-09-25T07:38:39.867Z] sample {"t":247,"exthostKB":217696,"daemonKB":97136,"rendererKB":1335920,"webviewHeapMB":34,"retainedEventsRun1":718}
-[2026-09-25T07:39:11.211Z] sample {"t":278,"exthostKB":221008,"daemonKB":97488,"rendererKB":1347632,"webviewHeapMB":44,"retainedEventsRun1":794}
-[2026-09-25T07:39:41.662Z] sample {"t":309,"exthostKB":222992,"daemonKB":97792,"rendererKB":1361664,"webviewHeapMB":52,"retainedEventsRun1":868}
-[2026-09-25T07:40:11.900Z] sample {"t":339,"exthostKB":223008,"daemonKB":98144,"rendererKB":1361632,"webviewHeapMB":43,"retainedEventsRun1":941}
-[2026-09-25T07:40:43.108Z] sample {"t":370,"exthostKB":223632,"daemonKB":98464,"rendererKB":1387984,"webviewHeapMB":56,"retainedEventsRun1":1016}
-[2026-09-25T07:41:13.162Z] sample {"t":400,"exthostKB":224560,"daemonKB":98816,"rendererKB":1399856,"webviewHeapMB":41,"retainedEventsRun1":1089}
-[2026-09-25T07:41:44.077Z] sample {"t":431,"exthostKB":224608,"daemonKB":99136,"rendererKB":1404560,"webviewHeapMB":50,"retainedEventsRun1":1164}
-[2026-09-25T07:42:14.356Z] sample {"t":461,"exthostKB":225248,"daemonKB":99392,"rendererKB":1393600,"webviewHeapMB":55,"retainedEventsRun1":1237}
-[2026-09-25T07:42:44.971Z] sample {"t":492,"exthostKB":225232,"daemonKB":99696,"rendererKB":1421632,"webviewHeapMB":51,"retainedEventsRun1":1311}
-[2026-09-25T07:43:15.472Z] sample {"t":522,"exthostKB":226000,"daemonKB":100000,"rendererKB":1439856,"webviewHeapMB":58,"retainedEventsRun1":1385}
-[2026-09-25T07:43:33.484Z] screenshot docs/verification/evidence/ui/perf/02-load-end.png
-[2026-09-25T07:43:53.624Z] PASS navigation p95 under 250 ms {"p95":36.5,"p50":34.19999998807907,"n":276,"misclicks":6}
-[2026-09-25T07:43:53.624Z] PASS misclicks are rare (probe validity) 6
-[2026-09-25T07:43:53.624Z] PASS ordinary file refresh within 2 s under load {"p95":813,"max":816,"missed":0}
-[2026-09-25T07:43:53.624Z] PASS daemon retention bounds per-run events {"max":1385}
-[2026-09-25T07:43:53.624Z] PASS extension host memory stabilizes (<25% growth late vs early) {"early":[174400,174832,189232,191728],"late":[224608,225248,225232,226000],"growth":"18%"}
+[2026-09-25T20:39:52.923Z] fixture {"tracked":10000}
+[2026-09-25T20:39:53.382Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T20:40:13.446Z] processes ["274448 /Applications/Visual Studio Code.app/Contents/MacOS/Code --remote-debugging-port=0 --disable-renderer-backgrounding --disable-backgro","96192 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=gpu-process --user-data-dir","53760 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type=","686912 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app/Contents/MacOS/Code Helper (Renderer) --type=rend","175088 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type","92192 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type=","178416 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin) --type=utility "]
+[2026-09-25T20:40:50.850Z] PASS review lists the 100 changed files of the selected run (10k tracked) 100
+[2026-09-25T20:40:50.931Z] screenshot docs/verification/evidence/ui/perf/01-load-review.png
+[2026-09-25T20:41:22.830Z] sample {"t":32,"exthostKB":173584,"daemonKB":29200,"rendererKB":1427136,"webviewHeapMB":31,"retainedEventsRun1":203}
+[2026-09-25T20:41:54.444Z] sample {"t":63,"exthostKB":169232,"daemonKB":29792,"rendererKB":1529920,"webviewHeapMB":42,"retainedEventsRun1":279}
+[2026-09-25T20:42:25.843Z] sample {"t":95,"exthostKB":178032,"daemonKB":30160,"rendererKB":1623520,"webviewHeapMB":45,"retainedEventsRun1":355}
+[2026-09-25T20:42:56.994Z] sample {"t":126,"exthostKB":191872,"daemonKB":30544,"rendererKB":1652784,"webviewHeapMB":40,"retainedEventsRun1":430}
+[2026-09-25T20:43:26.896Z] sample {"t":156,"exthostKB":194832,"daemonKB":30848,"rendererKB":1688032,"webviewHeapMB":40,"retainedEventsRun1":502}
+[2026-09-25T20:43:57.698Z] sample {"t":187,"exthostKB":195456,"daemonKB":31232,"rendererKB":1710016,"webviewHeapMB":39,"retainedEventsRun1":577}
+[2026-09-25T20:44:29.258Z] sample {"t":218,"exthostKB":220128,"daemonKB":31696,"rendererKB":1743664,"webviewHeapMB":40,"retainedEventsRun1":654}
+[2026-09-25T20:44:59.535Z] sample {"t":248,"exthostKB":222800,"daemonKB":32016,"rendererKB":1752272,"webviewHeapMB":45,"retainedEventsRun1":727}
+[2026-09-25T20:45:30.428Z] sample {"t":279,"exthostKB":222848,"daemonKB":32432,"rendererKB":1772512,"webviewHeapMB":41,"retainedEventsRun1":802}
+[2026-09-25T20:46:01.654Z] sample {"t":311,"exthostKB":224192,"daemonKB":32768,"rendererKB":1795104,"webviewHeapMB":36,"retainedEventsRun1":878}
+[2026-09-25T20:46:32.746Z] sample {"t":342,"exthostKB":224336,"daemonKB":33200,"rendererKB":1812944,"webviewHeapMB":35,"retainedEventsRun1":954}
+[2026-09-25T20:47:03.620Z] sample {"t":373,"exthostKB":225728,"daemonKB":33568,"rendererKB":1765168,"webviewHeapMB":42,"retainedEventsRun1":1028}
+[2026-09-25T20:47:35.263Z] sample {"t":404,"exthostKB":226240,"daemonKB":33904,"rendererKB":1823632,"webviewHeapMB":44,"retainedEventsRun1":1105}
+[2026-09-25T20:48:06.921Z] sample {"t":436,"exthostKB":227040,"daemonKB":34320,"rendererKB":1862560,"webviewHeapMB":46,"retainedEventsRun1":1182}
+[2026-09-25T20:48:37.340Z] sample {"t":466,"exthostKB":227952,"daemonKB":34608,"rendererKB":1916816,"webviewHeapMB":42,"retainedEventsRun1":1256}
+[2026-09-25T20:49:07.868Z] sample {"t":497,"exthostKB":229120,"daemonKB":35136,"rendererKB":1942080,"webviewHeapMB":44,"retainedEventsRun1":1330}
+[2026-09-25T20:49:38.830Z] sample {"t":528,"exthostKB":229040,"daemonKB":35568,"rendererKB":1919024,"webviewHeapMB":43,"retainedEventsRun1":1405}
+[2026-09-25T20:49:51.792Z] screenshot docs/verification/evidence/ui/perf/02-load-end.png
+[2026-09-25T20:50:11.968Z] PASS navigation p95 under 250 ms {"p95":117.60000002384186,"p50":65.89999997615814,"n":256,"misclicks":6}
+[2026-09-25T20:50:11.968Z] PASS misclicks are rare (probe validity) 6
+[2026-09-25T20:50:11.968Z] PASS ordinary file refresh within 2 s under load {"p95":1467,"max":1847,"missed":0}
+[2026-09-25T20:50:11.968Z] PASS daemon retention bounds per-run events {"max":1405}
+[2026-09-25T20:50:11.968Z] PASS extension host memory stabilizes (<25% growth late vs early) {"early":[178032,191872,194832,195456],"late":[227040,227952,229120,229040],"growth":"17%"}

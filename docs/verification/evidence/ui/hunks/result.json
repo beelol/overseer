@@ -118,16 +118,6 @@
         "l20": "L20: original",
         "l30": "L30: agent edit"
       }
-    },
-    {
-      "name": "LIVE Codex run: Reject one hunk, Accept another; disk matches",
-      "ok": true,
-      "detail": {
-        "status": "completed",
-        "l40": "L40: codex edit",
-        "l140": "L140: original",
-        "l90": "L90: codex edit"
-      }
     }
   ]
 }

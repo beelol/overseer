@@ -1,18 +1,18 @@
-[2026-09-25T20:09:22.941Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-25T20:09:30.085Z] PASS conversation shows the turn with its prompt {"turns":1,"prompt":"spawn a child, then touch approved.txt","spawn":true,"child":"child task","childText":"child output","grand":"grandchild task"}
-[2026-09-25T20:09:30.085Z] PASS native child nested under the spawning tool call, grandchild under the child, with their own output {"turns":1,"prompt":"spawn a child, then touch approved.txt","spawn":true,"child":"child task","childText":"child output","grand":"grandchild task"}
-[2026-09-25T20:09:30.086Z] PASS permission request inline in the conversation with Allow/Deny {"head":"⚠ Waiting for your permission: command: touch approved.txt","buttons":["Allow once","Deny"]}
-[2026-09-25T20:09:30.139Z] screenshot docs/verification/evidence/ui/conversation/01-codex-app-pending.png
-[2026-09-25T20:09:30.639Z] PASS decision recorded inline, turn completed with usage, file edit listed {"decision":["✔ Allowed: command: touch approved.txt"],"done":"■ Turn completed","usage":"∑ 1 in · 1 out","edits":["approved.txt"]}
-[2026-09-25T20:09:31.190Z] screenshot docs/verification/evidence/ui/conversation/02-tool-expanded.png
-[2026-09-25T20:09:31.675Z] PASS tool call expands to its input and status, and collapses again {"open":{"open":true,"input":"{\n  \"command\": \"touch approved.txt\",\n  \"cwd\": null\n}","status":"completed"},"closed":true}
-[2026-09-25T20:09:32.175Z] PASS clicking a file edit opens that hunk in the run's worktree review "/private/tmp/ovs-ui-7KctSU/overseer-home/worktrees/conv-demo-9a4ef665/app-tree"
-[2026-09-25T20:09:32.217Z] screenshot docs/verification/evidence/ui/conversation/03-edit-opened-in-review.png
-[2026-09-25T20:09:33.814Z] PASS Claude Write tool call shown before its permission request {"summary":"{\"content\":\"allowed\\n\",\"file_path\":\"/private/tmp/ovs-ui-7KctSU/overseer-home/worktrees/conv-demo-9a4ef665/claude-write/perm.txt\"}"}
-[2026-09-25T20:09:35.109Z] PASS Claude tool call shows input and result {"pres":["{\n  \"content\": \"allowed\\n\",\n  \"file_path\": \"/private/tmp/ovs-ui-7KctSU/overseer-home/worktrees/conv-demo-9a4ef665/claude-write/perm.txt\"\n}","File created successfully at: /private/tmp/ovs-ui-7KctSU/overseer-home/worktrees/conv-demo-9a4ef665/claude-write/perm.txt"],"status":"completed"}
-[2026-09-25T20:09:35.611Z] PASS Claude file edit opens the Claude worktree review (not the codex-app one) "/private/tmp/ovs-ui-7KctSU/overseer-home/worktrees/conv-demo-9a4ef665/claude-write"
-[2026-09-25T20:09:36.152Z] screenshot docs/verification/evidence/ui/conversation/04-event-log-tab.png
-[2026-09-25T20:09:36.638Z] PASS Event log tab lists the raw events; conversation returns 18
-[2026-09-25T20:09:38.239Z] PASS history at the retention bound renders within 1.5 s with truncation visible {"last":"burst line 5999","ms":62,"events":5002,"banner":"Older history was truncated by the retention bound. The raw output keeps the full stream.","msgs":5000}
-[2026-09-25T20:09:45.318Z] PASS live burst keeps the panel responsive (event-loop lag p95 under 250 ms, the AC-35 bound) and shows the newest output {"n":96,"p95":2,"max":129,"msgs":6000}
-[2026-09-25T20:09:45.373Z] screenshot docs/verification/evidence/ui/conversation/05-burst.png
+[2026-09-25T20:25:28.425Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T20:25:35.386Z] PASS conversation shows the turn with its prompt {"turns":1,"prompt":"spawn a child, then touch approved.txt","spawn":true,"child":"child task","childText":"child output","grand":"grandchild task"}
+[2026-09-25T20:25:35.386Z] PASS native child nested under the spawning tool call, grandchild under the child, with their own output {"turns":1,"prompt":"spawn a child, then touch approved.txt","spawn":true,"child":"child task","childText":"child output","grand":"grandchild task"}
+[2026-09-25T20:25:35.386Z] PASS permission request inline in the conversation with Allow/Deny {"head":"⚠ Waiting for your permission: command: touch approved.txt","buttons":["Allow once","Deny"]}
+[2026-09-25T20:25:35.451Z] screenshot docs/verification/evidence/ui/conversation/01-codex-app-pending.png
+[2026-09-25T20:25:35.950Z] PASS decision recorded inline, turn completed with usage, file edit listed {"decision":["✔ Allowed: command: touch approved.txt"],"done":"■ Turn completed","usage":"∑ 1 in · 1 out","edits":["approved.txt"]}
+[2026-09-25T20:25:36.533Z] screenshot docs/verification/evidence/ui/conversation/02-tool-expanded.png
+[2026-09-25T20:25:37.019Z] PASS tool call expands to its input and status, and collapses again {"open":{"open":true,"input":"{\n  \"command\": \"touch approved.txt\",\n  \"cwd\": null\n}","status":"completed"},"closed":true}
+[2026-09-25T20:25:37.524Z] PASS clicking a file edit opens that hunk in the run's worktree review "/private/tmp/ovs-ui-8lVP9P/overseer-home/worktrees/conv-demo-097bdd9c/app-tree"
+[2026-09-25T20:25:37.583Z] screenshot docs/verification/evidence/ui/conversation/03-edit-opened-in-review.png
+[2026-09-25T20:25:39.182Z] PASS Claude Write tool call shown before its permission request {"summary":"{\"content\":\"allowed\\n\",\"file_path\":\"/private/tmp/ovs-ui-8lVP9P/overseer-home/worktrees/conv-demo-097bdd9c/claude-write/perm.txt\"}"}
+[2026-09-25T20:25:40.473Z] PASS Claude tool call shows input and result {"pres":["{\n  \"content\": \"allowed\\n\",\n  \"file_path\": \"/private/tmp/ovs-ui-8lVP9P/overseer-home/worktrees/conv-demo-097bdd9c/claude-write/perm.txt\"\n}","File created successfully at: /private/tmp/ovs-ui-8lVP9P/overseer-home/worktrees/conv-demo-097bdd9c/claude-write/perm.txt"],"status":"completed"}
+[2026-09-25T20:25:40.976Z] PASS Claude file edit opens the Claude worktree review (not the codex-app one) "/private/tmp/ovs-ui-8lVP9P/overseer-home/worktrees/conv-demo-097bdd9c/claude-write"
+[2026-09-25T20:25:41.545Z] screenshot docs/verification/evidence/ui/conversation/04-event-log-tab.png
+[2026-09-25T20:25:42.031Z] PASS Event log tab lists the raw events; conversation returns 18
+[2026-09-25T20:25:43.637Z] PASS history at the retention bound renders within 1.5 s with truncation visible {"last":"burst line 5999","ms":54,"events":5002,"banner":"Older history was truncated by the retention bound. The raw output keeps the full stream.","msgs":5000}
+[2026-09-25T20:25:50.746Z] PASS live burst keeps the panel responsive (event-loop lag p95 under 250 ms, the AC-35 bound) and shows the newest output {"n":96,"p95":2,"max":110,"msgs":5064}
+[2026-09-25T20:25:50.826Z] screenshot docs/verification/evidence/ui/conversation/05-burst.png

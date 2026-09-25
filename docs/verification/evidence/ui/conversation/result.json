@@ -64,13 +64,13 @@
     {
       "name": "clicking a file edit opens that hunk in the run's worktree review",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-7KctSU/overseer-home/worktrees/conv-demo-9a4ef665/app-tree"
+      "detail": "/private/tmp/ovs-ui-8lVP9P/overseer-home/worktrees/conv-demo-097bdd9c/app-tree"
     },
     {
       "name": "Claude Write tool call shown before its permission request",
       "ok": true,
       "detail": {
-        "summary": "{\"content\":\"allowed\\n\",\"file_path\":\"/private/tmp/ovs-ui-7KctSU/overseer-home/worktrees/conv-demo-9a4ef665/claude-write/perm.txt\"}"
+        "summary": "{\"content\":\"allowed\\n\",\"file_path\":\"/private/tmp/ovs-ui-8lVP9P/overseer-home/worktrees/conv-demo-097bdd9c/claude-write/perm.txt\"}"
       }
     },
     {
@@ -78,8 +78,8 @@
       "ok": true,
       "detail": {
         "pres": [
-          "{\n  \"content\": \"allowed\\n\",\n  \"file_path\": \"/private/tmp/ovs-ui-7KctSU/overseer-home/worktrees/conv-demo-9a4ef665/claude-write/perm.txt\"\n}",
-          "File created successfully at: /private/tmp/ovs-ui-7KctSU/overseer-home/worktrees/conv-demo-9a4ef665/claude-write/perm.txt"
+          "{\n  \"content\": \"allowed\\n\",\n  \"file_path\": \"/private/tmp/ovs-ui-8lVP9P/overseer-home/worktrees/conv-demo-097bdd9c/claude-write/perm.txt\"\n}",
+          "File created successfully at: /private/tmp/ovs-ui-8lVP9P/overseer-home/worktrees/conv-demo-097bdd9c/claude-write/perm.txt"
         ],
         "status": "completed"
       }
@@ -87,7 +87,7 @@
     {
       "name": "Claude file edit opens the Claude worktree review (not the codex-app one)",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-7KctSU/overseer-home/worktrees/conv-demo-9a4ef665/claude-write"
+      "detail": "/private/tmp/ovs-ui-8lVP9P/overseer-home/worktrees/conv-demo-097bdd9c/claude-write"
     },
     {
       "name": "Event log tab lists the raw events; conversation returns",
@@ -99,7 +99,7 @@
       "ok": true,
       "detail": {
         "last": "burst line 5999",
-        "ms": 62,
+        "ms": 54,
         "events": 5002,
         "banner": "Older history was truncated by the retention bound. The raw output keeps the full stream.",
         "msgs": 5000
@@ -111,8 +111,8 @@
       "detail": {
         "n": 96,
         "p95": 2,
-        "max": 129,
-        "msgs": 6000
+        "max": 110,
+        "msgs": 5064
       }
     }
   ]

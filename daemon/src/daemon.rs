@@ -388,9 +388,8 @@ impl Daemon {
             fork_provenance: fork_prov,
             created_ms: now(),
         };
-        self.store.lock().unwrap().insert_task(&task)?;
         let start = self.take_snapshot(&ws, "task-start")?;
-        self.store.lock().unwrap().set_task_start_snapshot(&task.id, &start.id)?;
+        let task = Task { start_snapshot: Some(start.id.clone()), ..task };
         let program = p["program"].as_str().map(str::to_string);
         let version = match harness {
             "generic" => None,
@@ -417,8 +416,13 @@ impl Daemon {
             process_generation: 0,
             attention: None,
         };
-        self.store.lock().unwrap().insert_run(&run)?;
-        self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(&run.id))?;
+        {
+            // Task and run appear together: a state snapshot never shows a task without its run.
+            let store = self.store.lock().unwrap();
+            store.insert_task(&task)?;
+            store.insert_run(&run)?;
+            store.set_workspace_owner(&ws.id, Some(&run.id))?;
+        }
         let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "extra_args": p["extra_args"].clone()});
         {
             let store = self.store.lock().unwrap();
