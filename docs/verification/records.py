@@ -131,12 +131,18 @@ rec(15, "Generic harness fallback", "verified",
     expected="Configured executable with cwd/profile env and interactive control, truthful unknown capabilities.",
     actual="All pass.", evidence="protocol test; `evidence/ui/review/`", live="Fixture executables.")
 
-rec(16, "Permissions and limits", "blocked",
-    steps=f"{T}: `ac16_fixture_permission_allow_deny_and_interrupt_waiting_run` (synthetic Claude `can_use_tool` request stays waiting — never auto-approved — then Allow writes the file, Deny does not, Interrupt stops a waiting run), `ac16_fixture_error_classes_stay_distinct` (auth / rate_limit / quota). The real Claude auth-expired transcript is classified `auth`.",
-    expected="Native permission requests actionable in UI; sign-in/rate-limit/quota distinguishable; replay actual error formats; no silent approval or account switch.",
-    actual="Fixture behaviour passes and the UI renders Allow/Deny for pending requests, but no live harness produced a permission request: Claude (the harness with stdio permissions) cannot log in here; Codex `exec` has no approval round-trip (sandbox policy); OpenCode `run` auto-rejects asks. Rate-limit/quota formats are synthetic.",
-    evidence="protocol tests; `fixtures/fake-harness/claude-fixture.js`", live="Fixture only.",
-    blocker="Claude login (owner) for live allow/deny/interrupt; optionally Codex app-server approvals (not implemented). Next: rerun the permission flow against live Claude with a Write request in a disposable repo.")
+rec(16, "Permissions and limits", "verified",
+    commit="7036cd6 (live approvals), final commit (fixtures)",
+    harness="Codex 0.155 through the app-server transport (`codex-app`), owner's existing ChatGPT login (plan `pro`), model gpt-5.6-luna, approval policy `untrusted`; 3 tiny turns (~17k tokens each)",
+    steps=f"""1. Packaged UI [codex-approval-live](evidence/ui/codex-approval-live/) (`node test/ui/scenario-codex-approval.js`): task 1 created from the command palette (harness `codex-app`, policy `untrusted`, prompt asking to `touch approved.txt`). The run waits in `waiting_for_user` (checked again after a delay: not auto-approved), a VS Code notification appears, and the run panel shows the command with **Allow once** / **Deny**. Allow → Codex runs the command, `approved.txt` exists, run completes. Task 2 → **Deny** → Codex reports `Rejected("rejected by user")`, replies "declined", no file. Task 3 → **Interrupt** while waiting → run `interrupted`, no file.
+2. Earlier live run (same build family): a pending live approval survived a daemon restart (reattached) and was then answered through the daemon API; the command ran ([AC-07](AC-07.md) related).
+3. Error classes with actual formats: the live Claude Code transcript "Failed to authenticate: OAuth session expired…" → `auth`; strings from the pinned codex 0.155 binary "Usage limit reached", "You've reached your workspace credit limit", "Your workspace is out of credits…" → `quota`, "exceeded retry limit, last status: 429 Too Many Requests" → `rate_limit` (unit test `classify_errors`); live `account/rateLimits/updated` credit/limit state is recorded as usage. Fixtures `ac16_fixture_*` cover Claude's stdio permission protocol and the app-server protocol.
+4. No switch to an API key or another account: harness env is allow-listed (API keys stripped, `forbidden_env`), profile status treats API-key logins as not signed in, and runs keep their profile.""",
+    expected="Native permission requests actionable in UI; sign-in failures, rate limits and quota distinguishable; allow/deny/interrupt a waiting run; actual error formats; no silent approval or API-key/account switch.",
+    actual="All pass. Claude Code's permission path (stdio) is implemented and fixture-tested only, because its login is expired (tracked in AC-14/AC-19).",
+    evidence="`evidence/ui/codex-approval-live/` (screenshots `permission-request`, `allowed`, `deny`, `interrupt`; result.json with usage and identity fingerprint), unit/protocol tests",
+    live="Codex live (app-server). Claude fixture only.",
+    limits="Rate-limit/quota states were not provoked live (that would require exhausting a paid account); their actual message formats come from the live Claude transcript and the pinned Codex binary.")
 
 rec(17, "Compatibility truthfulness", "verified",
     steps="Compared [docs/compatibility.md](../compatibility.md) and the UI capability strings (`daemon/src/adapters.rs` `capabilities`, shown by **Overseer: Show Harness Capabilities** and in each output panel) against the evidence records.",

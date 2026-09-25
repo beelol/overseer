@@ -152,7 +152,7 @@ pub fn capabilities(harness: &str) -> Value {
             "transport": "codex exec --json (one process per turn)",
             "launch": "supported", "output": "supported", "follow_up": "supported (codex exec resume <thread>)",
             "interrupt": "supported (SIGINT to process group)", "resume": "supported",
-            "approvals": "unsupported in exec transport: sandbox policy decides; requests are never auto-approved by Overseer",
+            "approvals": "unsupported in exec transport (sandbox policy decides); use the codex-app transport for approvals",
             "file_activity": "supported (file_change items)", "children": "supported (collab_tool_call spawn_agent/wait; child output limited to final message)",
             "usage": "supported (turn.completed usage)", "quota": "unknown (error text classification only)",
             "account_login": "ChatGPT account via codex login (CODEX_HOME per profile)",
@@ -166,7 +166,7 @@ pub fn capabilities(harness: &str) -> Value {
             "file_activity": "supported (fileChange items)", "children": "supported (collabAgentToolCall spawnAgent/wait)",
             "usage": "supported (thread/tokenUsage/updated)", "quota": "partial (account/rateLimits/updated when the server sends it)",
             "account_login": "ChatGPT account via codex login (CODEX_HOME per profile)",
-            "verification": "see docs/compatibility.md (codex-app row)"
+            "verification": "live-verified on macOS: approvals Allow/Deny/Interrupt with one ChatGPT account (codex 0.155)"
         }),
         "claude" => json!({
             "transport": "claude -p stream-json (stdin/stdout)",
