@@ -32,19 +32,19 @@
       "detail": {
         "before": 1200,
         "after": 1200,
-        "restore": "reached",
+        "restore": "pending",
         "rows": [
           [
             "a.txt",
             0,
-            6013,
-            "rendered"
+            263,
+            "reading"
           ],
           [
             "b.txt",
-            6013,
             263,
-            "reading"
+            3379,
+            "rendered"
           ]
         ]
       }
@@ -57,17 +57,17 @@
           [
             "a.txt",
             0,
-            6013,
-            "rendered"
+            263,
+            "reading"
           ],
           [
             "b.txt",
-            6013,
             263,
-            "reading"
+            3379,
+            "rendered"
           ]
         ],
-        "restore": "reached",
+        "restore": "pending",
         "top": 1200,
         "comparison": "Since task start",
         "follow": true,
@@ -89,7 +89,7 @@
     {
       "name": "after-reload: review for a run in another repository (not open in the window) restored",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-MWhO13/overseer-home/worktrees/repoB-3cb4505b/r2-other-repo"
+      "detail": "/private/tmp/ovs-ui-enNN7a/overseer-home/worktrees/repoB-c19e7e0f/r2-other-repo"
     },
     {
       "name": "after-reload: active run kept running",
@@ -99,7 +99,7 @@
     {
       "name": "R3 worktree removed before restart",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-MWhO13/overseer-home/worktrees/repoA-b6269d26/r3-removed-later"
+      "detail": "/private/tmp/ovs-ui-enNN7a/overseer-home/worktrees/repoA-c2b5fe90/r3-removed-later"
     },
     {
       "name": "after-restart: review and run panels reopened",
@@ -133,19 +133,19 @@
       "detail": {
         "before": 1200,
         "after": 1200,
-        "restore": "pending",
+        "restore": "reached",
         "rows": [
           [
             "a.txt",
             0,
-            263,
-            "reading"
+            6013,
+            "rendered"
           ],
           [
             "b.txt",
+            6013,
             263,
-            3379,
-            "rendered"
+            "reading"
           ]
         ]
       }
@@ -158,17 +158,17 @@
           [
             "a.txt",
             0,
-            263,
-            "reading"
+            6013,
+            "rendered"
           ],
           [
             "b.txt",
+            6013,
             263,
-            3379,
-            "rendered"
+            "reading"
           ]
         ],
-        "restore": "pending",
+        "restore": "reached",
         "top": 1200,
         "comparison": "Since task start",
         "follow": true,
@@ -190,7 +190,7 @@
     {
       "name": "after-restart: review for a run in another repository (not open in the window) restored",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-MWhO13/overseer-home/worktrees/repoB-3cb4505b/r2-other-repo"
+      "detail": "/private/tmp/ovs-ui-enNN7a/overseer-home/worktrees/repoB-c19e7e0f/r2-other-repo"
     },
     {
       "name": "after-restart: active run kept running",
@@ -202,7 +202,7 @@
       "ok": true,
       "detail": {
         "tab": "Review: R3 removed later (1), Editor Group 1",
-        "text": "The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-MWhO13/overseer-home/worktrees/repoA-b6269d26/r3-removed-later) was removed on 9/25/2026, 11:54:36 AM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."
+        "text": "The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-enNN7a/overseer-home/worktrees/repoA-c2b5fe90/r3-removed-later) was removed on 9/25/2026, 12:22:50 PM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."
       }
     }
   ]

@@ -309,11 +309,33 @@ rec(41, "Linux verification (deferred by owner)", "blocked",
     expected="Linux build/install/regressions/account isolation/UI flow.", actual="Not attempted: no Linux environment (owner decision).",
     evidence="—", live="None.", blocker="Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.")
 
-rec(42, "Hunk accept and reject", "not started",
-    expected="See the RFC criterion (added by the owner on 2026-09-25).",
-    actual="Not implemented yet. Today the review supports editing and saving the working-tree side and native undo; there are no per-hunk accept/reject actions.",
-    evidence="—", live="—",
-    blocker="Not blocked; not started. Next: add per-hunk actions to the vendored review (reject = write the base hunk through a VS Code edit, accept = reviewed marker keyed by hunk content), then run the Verify clause.")
+rec(42, "Hunk accept and reject", "verified", commit="af98cce", date="2026-09-25",
+    harness="Fixture generic runs (deterministic edits); LIVE: Codex exec (`codex (existing login)`, gpt-5.6-luna), one tiny prompt",
+    steps="""1. `node extension/scripts/package.js`, then `LIVE=1 node test/ui/scenario-hunks.js` (isolated profile, packaged VSIX, CDP clicks on the hunk toolbar).
+2. A worktree run edits a.txt (3 hunks) and b.txt (2 hunks), adds new.txt and scratch.txt; b.txt is then staged with `git add`.
+3. Reject a.txt L100, Accept a.txt L10; open a.txt in the native editor, Cmd+Z then Cmd+Shift+Z; Reject staged b.txt L50; Accept new.txt, Reject scratch.txt.
+4. Agent-write races: the file is rewritten right before the Reject click reaches VS Code (and again for Accept).
+5. Refresh; change the accepted hunk again; reload the window.
+6. A current-checkout run: Reject L20, Accept L30.
+7. LIVE: a Codex run edits a.txt L40/L140 and b.txt L90; Reject L140, Accept L90.
+8. Reran `scenario-review.js`, `scenario-main.js`, `scenario-restore.js`; `cargo test`.""",
+    expected="Per-hunk Accept (reviewed, no staging) and Reject (base restored in that workspace) with native undo; no effect on other hunks/files/drafts/workspaces; concurrent agent edits are conflicts; reviewed state survives refresh and reload and clears when the hunk changes; worktree and current checkout.",
+    actual="""- Reject a.txt L100 → disk "L100: original" while L10/L200 and b.txt keep their agent edits (4 hunks remain).
+- Accept L10 → hunk marked ✓ reviewed; a.txt bytes and `git diff --cached` unchanged.
+- Native editor Cmd+Z → the rejected hunk returns as an unsaved change (tab dirty, review shows 3 hunks); Cmd+Shift+Z → gone again; disk keeps the saved Reject.
+- Staged b.txt: Reject restores L50 in the working tree; the index still has the staged edit (`git diff --cached` identical).
+- Untracked: new.txt Accept → reviewed; scratch.txt Reject → empty file (a new file's base content is empty).
+- Agent write during Reject → "Reject was not applied: this file changed while the hunk was being rejected (conflict). Nothing was overwritten…"; disk keeps "L200: agent edit v2". During Accept → "Not marked reviewed: a.txt changed while you were accepting this hunk (conflict)…".
+- Reviewed state survives Refresh and a window reload (workspace state); editing the accepted hunk again unmarks it.
+- Current checkout: L20 rejected on disk, L30 accepted; nothing staged.
+- LIVE Codex: the run completed; L140 rejected (disk "L140: original"), L40 still "codex edit", b.txt L90 accepted.
+- Found on the way:
+  - The vendored editing path trusted a clean VS Code document that had not yet reloaded an external write, so a Reject could have overwritten the agent's newer text. Clean documents are now compared with disk.
+  - Conflict notices were cleared by the next live refresh within milliseconds; they now persist for 10 s.
+  - The first toolbar design overlapped code in narrow editors and caught a click meant for the text; it is now a compact icon toolbar on the right edge (✓ Accept, ○ Unmark, ↶ Reject, with labels and tooltips).""",
+    evidence="[hunks scenario](evidence/ui/hunks/) (screenshots before, accepted and rejected, after conflicts, after reload, current checkout, live Codex; result.json)",
+    live="Live Codex run for the several-hunks case; the other cases use deterministic generic-harness edits (same review path).",
+    limits="Reject on a new (untracked) file leaves it empty rather than deleting it. Undo is in the native editor (the review's own editor defers undo to it, as before).")
 
 rec(43, "Structured run conversation view", "verified", commit="80112ee", date="2026-09-25",
     harness="LIVE: Codex exec and Codex app-server (`codex (existing login)`, model gpt-5.6-luna), Claude Code (`claude (existing login)`, haiku); one tiny prompt each. Fixtures: codex-app and Claude fixtures, generic bursts",

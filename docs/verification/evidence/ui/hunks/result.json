@@ -1,0 +1,133 @@
+{
+  "checks": [
+    {
+      "name": "review shows several hunks across two files",
+      "ok": true,
+      "detail": {
+        "a": {
+          "hunks": 3,
+          "reviewed": 0,
+          "load": "rendered"
+        },
+        "b": {
+          "hunks": 2,
+          "reviewed": 0,
+          "load": "rendered"
+        }
+      }
+    },
+    {
+      "name": "Reject restores only that hunk on disk (other hunks and files untouched)",
+      "ok": true,
+      "detail": {
+        "l10": "L10: agent edit",
+        "l100": "L100: original",
+        "l200": "L200: agent edit"
+      }
+    },
+    {
+      "name": "Accept marks the hunk reviewed without writing or staging",
+      "ok": true,
+      "detail": {
+        "hunks": 2,
+        "reviewed": 1,
+        "load": "rendered"
+      }
+    },
+    {
+      "name": "native undo brings the rejected hunk back (unsaved), redo removes it again; disk keeps the saved Reject",
+      "ok": true,
+      "detail": {
+        "afterUndo": true,
+        "dirtyUndo": true,
+        "afterRedo": true
+      }
+    },
+    {
+      "name": "staged file: Reject restores the working tree hunk and leaves the index unchanged",
+      "ok": true,
+      "detail": {
+        "l50": "L50: original"
+      }
+    },
+    {
+      "name": "untracked files: Accept marks reviewed; Reject restores the (empty) base content",
+      "ok": true,
+      "detail": {
+        "scratch": "\"\""
+      }
+    },
+    {
+      "name": "concurrent agent edit during Reject is a conflict and is not overwritten",
+      "ok": true,
+      "detail": {
+        "note": "Reject was not applied: this file changed while the hunk was being rejected (conflict). Nothing was overwritten; review the current content.",
+        "disk": "L200: agent edit v2"
+      }
+    },
+    {
+      "name": "concurrent agent edit during Accept is a conflict (not marked reviewed)",
+      "ok": true,
+      "detail": {
+        "acceptConflict": "Not marked reviewed: a.txt changed while you were accepting this hunk (conflict). Review the current content.",
+        "aState": {
+          "hunks": 2,
+          "reviewed": 1,
+          "load": "rendered"
+        }
+      }
+    },
+    {
+      "name": "reviewed state survives a refresh",
+      "ok": true,
+      "detail": {
+        "a": {
+          "hunks": 2,
+          "reviewed": 1,
+          "load": "rendered"
+        },
+        "n": {
+          "hunks": 1,
+          "reviewed": 1,
+          "load": "rendered"
+        }
+      }
+    },
+    {
+      "name": "a reviewed hunk that changes again is no longer reviewed",
+      "ok": true,
+      "detail": {
+        "hunks": 2,
+        "reviewed": 0,
+        "load": "rendered"
+      }
+    },
+    {
+      "name": "reviewed state survives a window reload",
+      "ok": true,
+      "detail": {
+        "hunks": 1,
+        "reviewed": 1,
+        "load": "rendered"
+      }
+    },
+    {
+      "name": "current-checkout mode: Reject writes the checkout, Accept marks reviewed",
+      "ok": true,
+      "detail": {
+        "l20": "L20: original",
+        "l30": "L30: agent edit"
+      }
+    },
+    {
+      "name": "LIVE Codex run: Reject one hunk, Accept another; disk matches",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "l40": "L40: codex edit",
+        "l140": "L140: original",
+        "l90": "L90: codex edit"
+      }
+    }
+  ]
+}
