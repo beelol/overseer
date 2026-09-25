@@ -1,0 +1,12 @@
+$ OVERSEER_HOME="$HOME/Library/Application Support/Overseer" sudo -u nobody "$HOME/.vscode/extensions/beelol.overseer-0.1.0/bin/overseerd-darwin-arm64" ctl hello
+(run by the owner, 2026-09-25; nobody = uid 4294967294)
+cannot connect to /Users/bilal/Library/Application Support/Overseer/run/overseerd.sock: Permission denied (os error 13)
+
+$ ls -ld run run/overseerd.sock
+drwx------@ 3 bilal  staff  96 Sep 25 13:51 ~/Library/Application Support/Overseer/run
+srw-------@ 1 bilal  staff   0 Sep 25 13:51 ~/Library/Application Support/Overseer/run/overseerd.sock
+
+$ tail -3 overseerd.log   (no connection reached the daemon)
+1790369489901 [76365] overseerd 0.1.0 starting, data dir /Users/bilal/Library/Application Support/Overseer
+1790369489901 [76365] reconcile: []
+1790369489902 [76365] listening on /Users/bilal/Library/Application Support/Overseer/run/overseerd.sock
