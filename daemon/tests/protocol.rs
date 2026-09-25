@@ -712,3 +712,33 @@ fn ac09_follow_up_reaches_only_the_selected_run() {
     let err = d.try_call("run.follow_up", json!({"run_id": "r-missing", "prompt": "x"})).unwrap_err();
     assert!(err.contains("unknown run"));
 }
+
+#[test]
+fn ac16_fixture_codex_app_server_approvals_interrupt_and_unsupported_requests() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js"))]);
+    for mode in ["allow", "deny", "interrupt"] {
+        let created = d.call("task.create", json!({"repo": repo, "harness": "codex-app", "prompt": "touch approved.txt", "title": mode, "approval_policy": "untrusted"}));
+        let run = run_id(&created);
+        let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
+        assert!(waiting["attention"]["tool"].as_str().unwrap().contains("touch approved.txt"));
+        std::thread::sleep(Duration::from_millis(400));
+        assert_eq!(d.run(&run)["status"], "waiting_for_user", "never auto-approved");
+        let req = waiting["attention"]["request_id"].as_str().unwrap().to_string();
+        match mode {
+            "allow" => { d.call("run.permission", json!({"run_id": run, "request_id": req, "allow": true})); }
+            "deny" => { d.call("run.permission", json!({"run_id": run, "request_id": req, "allow": false})); }
+            _ => { d.call("run.interrupt", json!({"run_id": run})); }
+        }
+        let done = d.wait_done(&run, 20);
+        let expect = if mode == "interrupt" { "interrupted" } else { "completed" };
+        assert_eq!(done["status"], expect, "{mode}: {done}");
+        assert_eq!(ws_path(&d, &created).join("approved.txt").exists(), mode == "allow", "{mode}");
+        let text: Vec<String> = d.events(&run).iter().filter(|e| e["kind"] == "output").map(|e| e["payload"]["text"].as_str().unwrap_or_default().to_string()).collect();
+        if mode != "interrupt" {
+            assert!(text.iter().any(|t| t.contains("unsupported request was refused")), "{text:?}");
+        }
+        assert_eq!(done["native_id"], "thr-fixture-1");
+    }
+}
