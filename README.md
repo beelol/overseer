@@ -4,7 +4,7 @@ A local agent orchestration daemon in Rust, with a VS Code UI for account-based 
 runs, recursive subagent visibility, and live editable worktree review built on Branch Diff.
 
 **Status: specification drafted; implementation has not started. Verified acceptance
-criteria: 0 / 40.** The first usable release targets macOS and Linux, including two
+criteria: 0 / 41.** Design targets macOS and Linux; verification currently targets macOS only, including two
 simultaneous ChatGPT subscription accounts. There is no runnable Overseer build yet.
 
 ## Project plan
@@ -24,11 +24,18 @@ Update this summary and the ledger together when criteria are verified.
 2. Build the durable daemon and VS Code controls (AC-04–10).
 3. Integrate accounts/harnesses and recursive visibility (AC-11–20).
 4. Implement safe workspaces and live editable review (AC-21–35).
-5. Verify packaged behavior on macOS/Linux and dogfood it (AC-36–40).
+5. Verify packaged behavior on macOS and dogfood it (AC-36–40); leave Linux AC-41 unchecked.
 
-Live verification requires two distinct ChatGPT subscription accounts, supported account
-access for the other initial harnesses, and both target platforms. Devin's account-only
-integration remains a feasibility question. No product tests have run or passed yet.
+Codex and Claude Code must use account login. OpenCode may initially be verified with
+mock responses or a very small local Qwen Coder through Ollama. Paid verification prompts
+must be tiny and use minimal tokens. Two OpenAI accounts exist, but agent login access is
+unproven. Skip Devin if account login is unavailable. Missing native child telemetry stays
+visible and unchecked without making an otherwise usable harness inaccessible.
 
-Auto routing and a terminal UI are later milestones. The current task completed the
-project specification; it did not start an overnight implementation goal.
+New agent runs default to changes since that run started; task-start, original fork and
+other-branch comparisons remain selectable. Follow pauses on navigation until resumed.
+
+**Planning only: explicit confirmation is required before implementation or harness tests.**
+The proposed eight-hour future implementation session is separate from runs inside Overseer;
+confirm that interpretation at start. No goal or overnight run is active. Auto routing and a
+terminal UI remain later milestones. No product tests have run or passed yet.

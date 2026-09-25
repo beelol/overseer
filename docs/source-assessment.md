@@ -35,8 +35,10 @@ scope; it does not prove concurrent profile isolation or native child telemetry.
 integration with service-user credentials and personal access tokens. It does not establish
 a local CLI/account-login adapter. The current no-API-keys constraint therefore leaves the
 integration unresolved; do not equate a subscription with a usable account-only control API.
-If the owner later allows personal access tokens for remote services, record that separately
-from model-provider API keys and define remote workspace review/edit semantics.
+Owner decision in the planning revision: skip Devin unless account login is available;
+do not request API keys or personal access tokens for this release. OpenCode initial
+verification may use mock responses or a very small Qwen Coder through Ollama, with coverage
+labeled accordingly; this does not establish OpenCode subscription-login isolation.
 
 Codex, Claude Code, OpenCode and Gemini CLI still need version-pinned live capability probes.
 “100% feedback” cannot be verified by looking at a terminal screenshot or fabricated tree.

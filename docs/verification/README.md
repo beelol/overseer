@@ -4,7 +4,8 @@ No product acceptance criterion has been implemented or verified in Overseer.
 The RFC reconstruction and publication are documentation work, not product test evidence.
 
 The authoritative checkboxes are in [the RFC](../overseer-rfc.md). Create an evidence
-record named `AC-NN.md` when work starts; until then every AC is `not started`.
+record named `AC-NN.md` when work starts; until then an AC is `not started`, except explicitly deferred AC-41 (Linux), which
+is `blocked` by the unavailable environment. All checkboxes remain open.
 Do not duplicate checkboxes here.
 
 ## Record template
@@ -37,11 +38,13 @@ criteria on regressions. Keep README's verified count synchronized in the same u
 
 ## Initial prerequisites and unresolved feasibility
 
-- Two distinct ChatGPT subscriptions available for live concurrent and isolation tests.
-- Supported account sign-in access for Claude Code and OpenCode.
-- A macOS and a Linux environment with a real VS Code UI for packaged-flow verification.
-- Harness-native child event and deeper-delegation probes; capabilities not yet tested.
-- Devin's account-only integration path remains unresolved; documented API access uses tokens.
+- The owner has two OpenAI accounts; agent access/login and distinct subscription identity verification remain unproven. Use tiny hello-world-style prompts only.
+- Codex and Claude Code require live account-login integration. OpenCode AC-14 permits mock responses or a very small Qwen Coder via Ollama, clearly labeled.
+- Verify the real VS Code UI on macOS. No Linux environment is available: AC-41 is deferred/blocked and stays unchecked.
+- Native child probes remain untested. Keep limited harnesses usable while retaining the unverified child AC.
+- Skip Devin if no account-login path is available; do not introduce keys or personal access tokens.
+- The implementer may check ACs with reproducible evidence; a separate review follows later.
+- Sustained/volume testing uses fixtures, not paid prompts. Do not launch any tests while planning; explicit start confirmation is required.
 
-These are prerequisites for future implementation testing, not failures observed in a
-running Overseer product. No product exists yet.
+These are prerequisites for future testing, not failures observed in a running product.
+No product exists yet. All 41 criteria remain unchecked.
