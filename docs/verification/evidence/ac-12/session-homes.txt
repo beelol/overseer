@@ -1,0 +1,6 @@
+profile p-f262c1bc4958 home has native session 01a0da36-40a3-70e3-ad32-3488c717d517: 1
+profile p-f262c1bc4958 home has native session 01a0da36-44cc-74b3-8e06-dc3c0ee15bb1: 0
+profile p-52fb6421edd2 home has native session 01a0da36-40a3-70e3-ad32-3488c717d517: 0
+profile p-52fb6421edd2 home has native session 01a0da36-44cc-74b3-8e06-dc3c0ee15bb1: 1
+run r-f88a1aed83b5 CODEX_HOME=<Overseer>/profiles/p-f262c1bc4958/codex (ChatGPT A)
+run r-b8a9602ceec7 CODEX_HOME=<Overseer>/profiles/p-52fb6421edd2/codex (ChatGPT B)

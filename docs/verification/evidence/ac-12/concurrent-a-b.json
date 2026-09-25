@@ -1,0 +1,65 @@
+{
+  "repo": "/tmp/ovs-ac12-5BVtIM",
+  "identities": {
+    "p-f262c1bc4958": {
+      "logged_in": true,
+      "method": "chatgpt-account",
+      "plan": "team",
+      "account": "2bb3fae1",
+      "user": "676d42e6",
+      "api_key": false
+    },
+    "p-52fb6421edd2": {
+      "logged_in": true,
+      "method": "chatgpt-account",
+      "plan": "plus",
+      "account": "27e64e3a",
+      "user": "76880f38",
+      "api_key": false
+    }
+  },
+  "runs": {
+    "A": {
+      "run": "r-f88a1aed83b5",
+      "workspace": "/Users/bilal/Library/Application Support/Overseer/worktrees/ovs-ac12-5BVtIM-304998ec/ac-12-from-a-txt",
+      "branch": "overseer/ac-12-from-a-txt",
+      "status": "completed",
+      "reason": "turn completed; exit 0",
+      "created_ms": 1790367382958,
+      "ended_ms": 1790367411882,
+      "native": "01a0da36-40a3-70e3-ad32-3488c717d517",
+      "running_ts": 1790367383175,
+      "done_ts": 1790367411173,
+      "tools": [
+        "/Users/bilal/Library/Application Support/Overseer/worktrees/",
+        "/bin/zsh -lc 'sleep 20' [in_progress]",
+        "/bin/zsh -lc 'sleep 20' [completed, exit 0]"
+      ]
+    },
+    "B": {
+      "run": "r-b8a9602ceec7",
+      "workspace": "/Users/bilal/Library/Application Support/Overseer/worktrees/ovs-ac12-5BVtIM-304998ec/ac-12-from-b-txt",
+      "branch": "overseer/ac-12-from-b-txt",
+      "status": "completed",
+      "reason": "turn completed; exit 0",
+      "created_ms": 1790367383332,
+      "ended_ms": 1790367417954,
+      "native": "01a0da36-44cc-74b3-8e06-dc3c0ee15bb1",
+      "running_ts": 1790367383547,
+      "done_ts": 1790367417212,
+      "tools": [
+        "/Users/bilal/Library/Application Support/Overseer/worktrees/",
+        "/bin/zsh -lc 'sleep 20' [in_progress]",
+        "/bin/zsh -lc 'sleep 20' [completed, exit 0]"
+      ]
+    }
+  },
+  "overlap_ms": 27626,
+  "both_running_polls_ms": 28000,
+  "files": {
+    "a": "written with ChatGPT account A",
+    "b": "written with ChatGPT account B.",
+    "aHasB": false,
+    "bHasA": false
+  }
+}

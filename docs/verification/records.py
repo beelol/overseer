@@ -122,11 +122,25 @@ rec(11, "Account profiles", "partial", commit="1c4c856", date="2026-09-25",
     live="Live ChatGPT sign-ins (A browser, B device code). Claude live sign-in and live re-sign-in: deferred.",
     blocker="Owner action: in Overseer, Accounts → Add Account → Anthropic → Sign In, then Sign Out and Sign In again on that account (and optionally the same with a throwaway ChatGPT account).")
 
-rec(12, "Two simultaneous ChatGPT subscriptions", "blocked",
-    expected="Two distinct paid ChatGPT profiles run Codex tasks concurrently in separate worktrees with overlapping timestamps and distinct identities.",
-    actual="Not run. Only one ChatGPT login is available to the agent (the shared `~/.codex`); a second isolated profile is not signed in. Concurrent separate-worktree execution itself is covered by AC-21 fixtures and the four concurrent runs in AC-35.",
-    evidence="AC-02 record", live="None.",
-    blocker="Owner signs in two isolated Codex profiles in Overseer (Accounts → Add Account Profile → Sign In, one per OpenAI account). Next: launch two tiny tasks concurrently and record `profile.status` identity fingerprints, overlapping run timestamps and both edits.")
+rec(12, "Two simultaneous ChatGPT subscriptions", "verified", commit="1c4c856", date="2026-09-25",
+    harness="LIVE: Codex 0.155 exec, model gpt-5.6-luna, on the owner's daemon with two fixed accounts: ChatGPT A (Team) and ChatGPT B (Plus), each signed in through Overseer into its own profile folder",
+    fixture="Disposable repository `/tmp/ovs-ac12-5BVtIM`; one tiny prompt per account",
+    steps="""1. `node docs/verification/evidence/ac-12/run-ac12.js`: `profile.status` for both accounts; two `task.create` calls back to back (codex, account A / account B, separate worktrees), each asking the agent to write its own file and run `sleep 20` before replying; poll until both finish; read events, worktrees and files.
+2. Check where each run's native Codex session was stored ([session-homes.txt](evidence/ac-12/session-homes.txt)) and each run's launch `CODEX_HOME`. No token is read or printed.""",
+    expected="Overlapping live timestamps, redacted distinct account identities, successful independent file edits from both; not two processes under one account and not subscription-plus-API-key.",
+    actual="""- **Distinct accounts:** A is `chatgpt-account`, plan team, account fingerprint `2bb3fae1`, user `676d42e6`. B is `chatgpt-account`, plan plus, account `27e64e3a`, user `76880f38`. Neither has an API key.
+- **Overlap:**
+  - A was running 1790367383175 → turn done 1790367411173.
+  - B was running 1790367383547 → turn done 1790367417212.
+  - That is 27.6 s of overlap, and both runs showed `running` together in 28 one-second polls.
+- **Independent edits:**
+  - A's worktree `overseer/ac-12-from-a-txt` has from-a.txt "written with ChatGPT account A".
+  - B's worktree `overseer/ac-12-from-b-txt` has from-b.txt "written with ChatGPT account B.".
+  - Neither worktree has the other's file. Both runs completed with exit 0.
+- **Account routing:** run A launched with `CODEX_HOME=<Overseer>/profiles/p-f262c1bc4958/codex` and run B with `…/p-52fb6421edd2/codex`. A's native thread `01a0da36-40a3…` is stored only in A's home, and B's `01a0da36-44cc…` only in B's.""",
+    evidence="[concurrent-a-b.json](evidence/ac-12/concurrent-a-b.json) (identities redacted to fingerprints, timestamps, files), [session-homes.txt](evidence/ac-12/session-homes.txt), [run-ac12.js](evidence/ac-12/run-ac12.js)",
+    live="Live, two paid ChatGPT subscriptions (Team and Plus).",
+    limits="Codex exec transport; the same accounts work with codex-app (shared profile folder).")
 
 rec(13, "Credential isolation on macOS", "blocked",
     steps="Implemented: per-profile `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, `XDG_*` homes (0700), no credential values stored by Overseer (only one-way fingerprints of account ids), system logins never logged out. Protocol test `ac13_isolated_profiles_have_separate_homes_and_no_keys`.",
