@@ -426,10 +426,8 @@ rec(44, "Merge back", "verified", commit="75c7375", date="2026-09-25",
     live="Live Codex for both merges and the conflict resolution; the refusal cases use generic runs (harness-independent daemon logic).",
     limits="The final merge uses the user's Git identity from the repository's config. Opening a PR instead is AC-50 (coming soon). Generic runs cannot take the conflict follow-up, so the user resolves those files and runs Merge back again.")
 
-rec(45, "Visible background agents", "partial", commit="1e2f24e", date="2026-09-25",
+rec(45, "Visible background agents", "verified", commit="1e2f24e", date="2026-09-25",
     harness="Claude Code 2.1.x with the owner's existing claude.ai login (`system-claude`), model haiku, one tiny turn",
-    proven="live Claude run kept running after Cmd+Q; daemon posted the notice through macOS `osascript` (exit 0) naming the agent and the stop command; reopen showed it; Stop Agents and Daemon confirmed, interrupted it and left no daemon, shim or harness process; no notice with nothing running",
-    deferred="a screenshot of the macOS banner itself (screen recording and the notification database are not accessible to the agent)",
     steps="""1. `cargo test` — `ac45_last_vscode_window_closing_with_active_runs_posts_a_notice_but_a_reload_does_not`, `ac45_no_notice_when_nothing_is_running`, `ac45_stop_all_interrupts_runs_forces_stragglers_and_exits_the_daemon` (fixture notifier via `OVERSEER_NOTIFY_COMMAND`; a SIGINT-ignoring run proves the SIGTERM fallback).
 2. `node test/ui/scenario-background.js` (LIVE, isolated profile and OVERSEER_HOME, real `osascript` notifier, grace shortened to 3 s via `OVERSEER_BACKGROUND_NOTICE_MS`): a Claude Haiku run executes a 2-minute `echo`/`sleep` loop (Bash permission allowed); quit VS Code with Cmd+Q; wait; relaunch; run **Overseer: Stop Agents and Daemon…** and confirm; start the daemon again with nothing running and quit VS Code again.""",
     expected="A notification naming running agents when the last window closes (none for a reload or with nothing running); reopening shows them; Stop Agents and Daemon confirms, interrupts and stops everything with no Overseer or harness processes left.",
@@ -438,11 +436,11 @@ rec(45, "Visible background agents", "partial", commit="1e2f24e", date="2026-09-
 - Reopening VS Code showed "Overseer agents kept running while VS Code was closed: claude: tick loop. 1 still active." with **Show Agents** / **Stop Agents and Daemon**, and the Agents view listed the running run.
 - **Stop Agents and Daemon…** showed a modal "Stop 1 running agent and the Overseer daemon?" listing `claude: tick loop (running)`. Confirming interrupted the run (`interrupted`), and afterwards no daemon, shim or Claude process remained. The window showed "Overseer stopped" and did not respawn the daemon; other windows get `daemon_stopping` and stay stopped too.
 - With nothing running, quitting VS Code logged "no active agents, no notice" and posted nothing.
-- Not observed directly: the banner on screen. `screencapture` fails ("could not create image from display") and the Notification Center database is protected, so only the `osascript` exit status proves delivery.""",
-    evidence="[background scenario](evidence/ui/background/) (scenario.log, result.json, screenshots: running before close, reopened, confirm stop, stopped; `overseerd.log` excerpt); `cargo test` ac45_* tests",
+- **Banner on screen:** the agent cannot capture the screen, so the owner watched. Two notifications were fired from an isolated daemon with the same code path (a VS Code client disconnects while an agent runs, then the real `osascript` notifier), at 22:29 and 22:33 UTC. The owner confirmed "yes banner showed up" ([banner-confirmed.txt](evidence/ac-45/banner-confirmed.txt)).""",
+    evidence="[banner confirmation](evidence/ac-45/banner-confirmed.txt), [fire-banner.js](evidence/ac-45/fire-banner.js), [background scenario](evidence/ui/background/) (scenario.log, result.json, screenshots: running before close, reopened, confirm stop, stopped; `overseerd.log` excerpt); `cargo test` ac45_* tests",
     live="Live Claude Code run (tiny Haiku turn); real macOS `osascript` notifier. Protocol tests use fixture runs and a fixture notifier.",
     limits="`osascript` notifications appear under Script Editor; if its notifications are turned off in System Settings, macOS drops the banner silently (the reopen message still appears).",
-    blocker="Owner action: close VS Code while an agent runs and confirm the \"Overseer: N agents still running\" banner appears (allow Script Editor notifications if it does not).")
+    blocker="not blocked"Overseer: N agents still running\" banner appears (allow Script Editor notifications if it does not).")
 
 rec(46, "Simple account governance", "verified", commit="5dce9f5", date="2026-09-25",
     harness="Synthetic account CLI (`fixtures/fake-harness/account-cli.js`) standing in for `codex`/`claude` login commands, plus a read-only check of the owner's real accounts on the updated daemon",

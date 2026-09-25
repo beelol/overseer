@@ -7,10 +7,9 @@ review built on [Branch Diff](https://github.com/beelol/branch-diff).
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
 criteria: **45 / 51** · **3** partial (see [ledger](docs/verification/README.md)). Unverified:
 AC-11, AC-13, AC-41, AC-45, AC-50, AC-51. The biggest gaps are owner actions, not
-code. Three criteria are partial, each with its proven part and the remaining step in
+code. Two criteria are partial, each with its proven part and the remaining step in
 [Follow-ups](#follow-ups): live Claude sign-in and re-sign-in (AC-11) and a live sign-in cycle of a
-disposable account while another works (AC-13), both skipped by the owner for now; and a screenshot
-of the macOS banner (AC-45). Linux (AC-41) is out of scope for now; opening PRs (AC-50)
+disposable account while another works (AC-13), both skipped by the owner for now. Linux (AC-41) is out of scope for now; opening PRs (AC-50)
 and a worktree file tree (AC-51) are future work. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
 ## Acceptance criteria
