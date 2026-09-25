@@ -8,7 +8,58 @@ review built on [Branch Diff](https://github.com/beelol/branch-diff).
 criteria: **34 / 41** (see [ledger](docs/verification/README.md)). Unverified:
 AC-08, AC-11, AC-12, AC-13, AC-14, AC-19, AC-41. The biggest gaps are live Claude Code (its login on the test machine is
 expired), two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
-a foreign-user socket rejection test (needs a second macOS account), and Linux (no environment). Details and next actions are in [Follow-ups](#follow-ups).
+a foreign-user socket rejection test (needs a second macOS account), and Linux (no environment). The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
+
+## Acceptance criteria
+
+Checked means verified with evidence; each item links to its evidence record. The same
+checkboxes appear in the [RFC](docs/overseer-rfc.md), which holds the full criterion text
+and Verify clauses. Both lists are generated from the records by
+`python3 docs/verification/records.py <commit>`, so they cannot disagree.
+
+<!-- ac-list:start -->
+- [x] **AC-01** Harness capability survey — [evidence](docs/verification/AC-01.md)
+- [x] **AC-02** Account and child feasibility spikes — [evidence](docs/verification/AC-02.md)
+- [x] **AC-03** Reuse decision — [evidence](docs/verification/AC-03.md)
+- [x] **AC-04** Installable macOS foundation with portable design — [evidence](docs/verification/AC-04.md)
+- [x] **AC-05** Independent durable state — [evidence](docs/verification/AC-05.md)
+- [x] **AC-06** Honest process lifecycle — [evidence](docs/verification/AC-06.md)
+- [x] **AC-07** Persistent sessions — [evidence](docs/verification/AC-07.md)
+- [ ] **AC-08** Local access boundary — blocked: rejecting a different local user was never exercised (needs a second macOS account) — [evidence](docs/verification/AC-08.md)
+- [x] **AC-09** Complete task controls — [evidence](docs/verification/AC-09.md)
+- [x] **AC-10** Event replay and bounded output — [evidence](docs/verification/AC-10.md)
+- [ ] **AC-11** Account profiles — blocked: sign-in and reauthentication flows need the owner's logins — [evidence](docs/verification/AC-11.md)
+- [ ] **AC-12** Two simultaneous ChatGPT subscriptions — blocked: the second ChatGPT account is not signed in to an Overseer profile — [evidence](docs/verification/AC-12.md)
+- [ ] **AC-13** Credential isolation on macOS — blocked: needs two dedicated, signed-in test profiles — [evidence](docs/verification/AC-13.md)
+- [ ] **AC-14** Initial adapters — blocked: Claude Code's login is expired on this Mac (Codex and OpenCode parts pass) — [evidence](docs/verification/AC-14.md)
+- [x] **AC-15** Generic harness fallback — [evidence](docs/verification/AC-15.md)
+- [x] **AC-16** Permissions and limits — [evidence](docs/verification/AC-16.md)
+- [x] **AC-17** Compatibility truthfulness — [evidence](docs/verification/AC-17.md)
+- [x] **AC-18** Recursive run tree — [evidence](docs/verification/AC-18.md)
+- [ ] **AC-19** Actual native children — blocked: Claude Code's login is expired (Codex and OpenCode children captured) — [evidence](docs/verification/AC-19.md)
+- [x] **AC-20** Evidence-backed inference — [evidence](docs/verification/AC-20.md)
+- [x] **AC-21** Worktrees by default — [evidence](docs/verification/AC-21.md)
+- [x] **AC-22** Current dirty checkout — [evidence](docs/verification/AC-22.md)
+- [x] **AC-23** Shared workspace ownership — [evidence](docs/verification/AC-23.md)
+- [x] **AC-24** Safe workspace retention — [evidence](docs/verification/AC-24.md)
+- [x] **AC-25** Correct repository selection — [evidence](docs/verification/AC-25.md)
+- [x] **AC-26** Run snapshots and selectable bases — [evidence](docs/verification/AC-26.md)
+- [x] **AC-27** Complete change and dirty views — [evidence](docs/verification/AC-27.md)
+- [x] **AC-28** No cancellation blind spot — [evidence](docs/verification/AC-28.md)
+- [x] **AC-29** Follow across and within files — [evidence](docs/verification/AC-29.md)
+- [x] **AC-30** Navigation ownership — [evidence](docs/verification/AC-30.md)
+- [x] **AC-31** Live Review refresh — [evidence](docs/verification/AC-31.md)
+- [x] **AC-32** Edit selected workspace — [evidence](docs/verification/AC-32.md)
+- [x] **AC-33** Preserve conflicting drafts — [evidence](docs/verification/AC-33.md)
+- [x] **AC-34** Safe file boundaries — [evidence](docs/verification/AC-34.md)
+- [x] **AC-35** Responsive review — [evidence](docs/verification/AC-35.md)
+- [x] **AC-36** Packaged macOS UI — [evidence](docs/verification/AC-36.md)
+- [x] **AC-37** Automated regression coverage — [evidence](docs/verification/AC-37.md)
+- [x] **AC-38** Reproducible acceptance ledger — [evidence](docs/verification/AC-38.md)
+- [x] **AC-39** Minimal dogfood flow — [evidence](docs/verification/AC-39.md)
+- [x] **AC-40** Repository handoff — [evidence](docs/verification/AC-40.md)
+- [ ] **AC-41** Linux verification (deferred by owner) — deferred: no Linux environment — [evidence](docs/verification/AC-41.md)
+<!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
 

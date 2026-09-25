@@ -345,6 +345,16 @@ def main():
     sync(out)
 
 
+SHORT_BLOCKERS = {
+    8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
+    11: "blocked: sign-in and reauthentication flows need the owner's logins",
+    12: "blocked: the second ChatGPT account is not signed in to an Overseer profile",
+    13: "blocked: needs two dedicated, signed-in test profiles",
+    14: "blocked: Claude Code's login is expired on this Mac (Codex and OpenCode parts pass)",
+    19: "blocked: Claude Code's login is expired (Codex and OpenCode children captured)",
+    41: "deferred: no Linux environment",
+}
+
 EXTRA_FOLLOWUPS = [
     "Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.",
     "Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.",
@@ -383,6 +393,15 @@ def sync(out):
     audit = [f"- Verified: {len(verified)} / 41 ({', '.join(f'AC-{n:02d}' for n in verified)}).",
              f"- Not verified: {', '.join(f'AC-{n:02d}' for n in unverified)} — each record states the exact blocker and next action.",
              "- Every verified record was re-read against its evidence folder/test before checking; anything that relied only on fixtures where the criterion demands live evidence stays unchecked."]
+    items = []
+    for n in range(1, 42):
+        title = titles.get(f"{n:02d}", "")
+        link = f"[evidence](docs/verification/AC-{n:02d}.md)"
+        if n in verified:
+            items.append(f"- [x] **AC-{n:02d}** {title} — {link}")
+        else:
+            items.append(f"- [ ] **AC-{n:02d}** {title} — {SHORT_BLOCKERS.get(n, statuses[n])} — {link}")
+    rows = ["See the [acceptance criteria list in the README](../../README.md#acceptance-criteria) for every criterion's checkbox, status and evidence link."]
     ledger = out / "README.md"
     lt = ledger.read_text()
     if "__TABLE__" in lt:
@@ -399,6 +418,7 @@ def sync(out):
     follow += [f"- [ ] {x}" for x in EXTRA_FOLLOWUPS]
     readme = root / "README.md"
     rt = readme.read_text()
+    rt = re.sub(r"(<!-- ac-list:start -->\n)(.*?)(<!-- ac-list:end -->)", lambda m: m.group(1) + "\n".join(items) + "\n" + m.group(3), rt, flags=re.S)
     rt = re.sub(r"Verified acceptance\ncriteria: \*\*[^*]+\*\*", f"Verified acceptance\ncriteria: **{len(verified)} / 41**", rt)
     rt = rt.replace("__VERIFIED__ / 41", f"{len(verified)} / 41")
     rt = rt.replace("__UNVERIFIED__", ", ".join(f"AC-{n:02d}" for n in unverified))
