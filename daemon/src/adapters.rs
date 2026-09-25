@@ -23,6 +23,12 @@ pub enum Norm {
     Permission { request_id: String, tool: String, input: Value },
     Error { class: String, message: String },
     TurnDone { ok: bool, summary: Option<String> },
+    /// JSON-RPC response to one of Overseer's requests (app-server transport).
+    RpcResult { id: String, result: Value, error: Option<Value> },
+    /// Text to write to the harness's stdin once the current batch is committed.
+    Send(String),
+    /// The harness reported its current turn id (needed to interrupt that turn).
+    TurnId(String),
     /// Line was recognized structurally but carries no user-visible content.
     Ignored,
     /// Line not understood by this parser version; retained as raw output.
@@ -107,12 +113,14 @@ fn which(name: &str) -> Option<PathBuf> {
 /// Resolve the harness executable. Explicit overrides win; for Codex prefer the
 /// ChatGPT app bundle because stale package-manager installs are common.
 pub fn resolve_program(harness: &str) -> Option<PathBuf> {
-    let env_key = format!("OVERSEER_{}_PATH", harness.to_ascii_uppercase());
+    // codex-app is a transport of the Codex binary: it shares OVERSEER_CODEX_PATH.
+    let family = if harness == "codex-app" { "codex" } else { harness };
+    let env_key = format!("OVERSEER_{}_PATH", family.to_ascii_uppercase());
     if let Ok(p) = std::env::var(&env_key) {
         return Some(PathBuf::from(p));
     }
     match harness {
-        "codex" => {
+        "codex" | "codex-app" => {
             let bundled = PathBuf::from("/Applications/ChatGPT.app/Contents/Resources/codex");
             if bundled.is_file() {
                 return Some(bundled);
@@ -149,6 +157,16 @@ pub fn capabilities(harness: &str) -> Value {
             "usage": "supported (turn.completed usage)", "quota": "unknown (error text classification only)",
             "account_login": "ChatGPT account via codex login (CODEX_HOME per profile)",
             "verification": "live-verified on macOS with one ChatGPT account (codex 0.155); two simultaneous accounts not yet verified"
+        }),
+        "codex-app" => json!({
+            "transport": "codex app-server (JSON-RPC over stdio)",
+            "launch": "supported", "output": "supported", "follow_up": "supported (thread/resume + turn/start)",
+            "interrupt": "supported (turn/interrupt, then SIGINT)", "resume": "supported",
+            "approvals": "supported (command/file-change approval requests answered Allow/Deny in Overseer; never auto-approved)",
+            "file_activity": "supported (fileChange items)", "children": "supported (collabAgentToolCall spawnAgent/wait)",
+            "usage": "supported (thread/tokenUsage/updated)", "quota": "partial (account/rateLimits/updated when the server sends it)",
+            "account_login": "ChatGPT account via codex login (CODEX_HOME per profile)",
+            "verification": "see docs/compatibility.md (codex-app row)"
         }),
         "claude" => json!({
             "transport": "claude -p stream-json (stdin/stdout)",
@@ -213,6 +231,11 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             args.push(req.prompt.to_string());
             (args, None, true)
         }
+        "codex-app" => {
+            let init = json!({"id": "ovs-init", "method": "initialize", "params": {"clientInfo": {"name": "overseer", "title": "Overseer", "version": env!("CARGO_PKG_VERSION")}, "capabilities": null}});
+            let initialized = json!({"method": "initialized"});
+            (vec!["app-server".to_string()], Some(format!("{init}\n{initialized}\n")), false)
+        }
         "claude" => {
             let mut args: Vec<String> = ["-p", "--output-format", "stream-json", "--input-format", "stream-json", "--verbose", "--permission-prompt-tool", "stdio"]
                 .iter()
@@ -266,6 +289,11 @@ pub fn follow_up_via_stdin(harness: &str, prompt: &str) -> Option<String> {
 
 pub fn permission_reply(harness: &str, request_id: &str, allow: bool, input: &Value, message: &str) -> Option<String> {
     match harness {
+        "codex-app" => {
+            let id: Value = serde_json::from_str(request_id).unwrap_or(Value::String(request_id.to_string()));
+            let decision = if allow { "accept" } else { "decline" };
+            Some(format!("{}\n", json!({"id": id, "result": {"decision": decision}})))
+        }
         "claude" => {
             let response = if allow { json!({"behavior": "allow", "updatedInput": input}) } else { json!({"behavior": "deny", "message": message}) };
             Some(format!("{}\n", json!({"type": "control_response", "response": {"subtype": "success", "request_id": request_id, "response": response}})))
@@ -277,7 +305,7 @@ pub fn permission_reply(harness: &str, request_id: &str, allow: bool, input: &Va
 /// Classify an error message into auth / rate_limit / quota / other.
 pub fn classify_error(message: &str) -> &'static str {
     let m = message.to_ascii_lowercase();
-    if m.contains("usage limit") || m.contains("quota") || m.contains("exceeded your") || m.contains("out of credits") || m.contains("insufficient_quota") {
+    if m.contains("usage limit") || m.contains("quota") || m.contains("exceeded your") || m.contains("out of credits") || m.contains("credit limit") || m.contains("insufficient_quota") {
         "quota"
     } else if m.contains("rate limit") || m.contains("rate_limit") || m.contains("429") || m.contains("too many requests") {
         "rate_limit"
@@ -308,7 +336,7 @@ pub fn parse(harness: &str, stream: &str, line: &str) -> Vec<Norm> {
     }
     if stream == "e" {
         let class = classify_error(line);
-        if class != "other" && harness != "opencode" {
+        if class != "other" && harness != "opencode" && harness != "codex-app" {
             return vec![Norm::Error { class: class.into(), message: truncate(line, 2000) }];
         }
         return vec![Norm::Text { role: "stderr".into(), text: truncate(line, 8192) }];
@@ -318,6 +346,7 @@ pub fn parse(harness: &str, stream: &str, line: &str) -> Vec<Norm> {
     };
     match harness {
         "codex" => parse_codex(&v),
+        "codex-app" => parse_codex_app(&v),
         "claude" => parse_claude(&v),
         "opencode" => parse_opencode(&v),
         _ => vec![Norm::Unparsed(truncate(line, 8192))],
@@ -414,6 +443,88 @@ fn parse_codex_collab(item: &Value, done: bool) -> Vec<Norm> {
         });
     }
     out
+}
+
+/// Codex app-server (JSON-RPC 2.0 over stdio). Responses to Overseer's own requests are
+/// surfaced as `RpcResult`; server requests for approval become `Permission`; any other
+/// server request is answered with a JSON-RPC error so the server never waits silently.
+pub fn parse_codex_app(v: &Value) -> Vec<Norm> {
+    let method = v["method"].as_str();
+    let has_id = v.get("id").map(|i| !i.is_null()).unwrap_or(false);
+    if has_id && method.is_none() {
+        return vec![Norm::RpcResult { id: v["id"].as_str().map(str::to_string).unwrap_or_else(|| v["id"].to_string()), result: v["result"].clone(), error: v.get("error").cloned().filter(|e| !e.is_null()) }];
+    }
+    let params = &v["params"];
+    if has_id {
+        let id = v["id"].to_string();
+        return match method.unwrap_or_default() {
+            "item/commandExecution/requestApproval" | "execCommandApproval" => vec![Norm::Permission {
+                request_id: id,
+                tool: format!("command: {}", params["command"].as_str().map(str::to_string).unwrap_or_else(|| params["command"].to_string())),
+                input: params.clone(),
+            }],
+            "item/fileChange/requestApproval" | "applyPatchApproval" => vec![Norm::Permission { request_id: id, tool: "file change".into(), input: params.clone() }],
+            "item/permissions/requestApproval" => vec![Norm::Permission { request_id: id, tool: "permissions".into(), input: params.clone() }],
+            other => vec![
+                Norm::Text { role: "system".into(), text: format!("harness request {other} is not supported by Overseer; declined") },
+                Norm::Send(format!("{}\n", json!({"id": v["id"], "error": {"code": -32601, "message": format!("{other} not supported by Overseer")}}))),
+            ],
+        };
+    }
+    match method.unwrap_or_default() {
+        "thread/started" => {
+            let t = &params["thread"];
+            if t["parentThreadId"].is_string() { vec![Norm::Ignored] } else { vec![Norm::Session(s(&t["id"]))] }
+        }
+        "turn/started" => vec![Norm::TurnId(s(&params["turn"]["id"])), Norm::Running],
+        "turn/completed" => {
+            let turn = &params["turn"];
+            let status = s(&turn["status"]);
+            let mut out = Vec::new();
+            if let Some(msg) = turn["error"]["message"].as_str() {
+                out.push(Norm::Error { class: classify_error(msg).into(), message: truncate(msg, 2000) });
+            }
+            out.push(Norm::TurnDone { ok: status == "completed", summary: Some(status) });
+            out
+        }
+        "thread/tokenUsage/updated" => vec![Norm::Usage(params["tokenUsage"].clone())],
+        "account/rateLimits/updated" => vec![Norm::Usage(json!({"rate_limits": params["rateLimits"]}))],
+        "error" => {
+            let msg = s(&params["error"]["message"]);
+            vec![Norm::Error { class: classify_error(&msg).into(), message: truncate(&format!("{msg}{}", if params["willRetry"] == true { " (will retry)" } else { "" }), 2000) }]
+        }
+        "item/started" | "item/completed" => {
+            let item = &params["item"];
+            let done = method == Some("item/completed");
+            let id = item["id"].as_str().map(str::to_string);
+            match item["type"].as_str().unwrap_or_default() {
+                "agentMessage" if done => vec![Norm::Text { role: "assistant".into(), text: truncate(&s(&item["text"]), 16384) }],
+                "reasoning" if done => {
+                    let text = item["summary"].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join("\n")).unwrap_or_default();
+                    if text.is_empty() { vec![Norm::Ignored] } else { vec![Norm::Text { role: "reasoning".into(), text: truncate(&text, 4096) }] }
+                }
+                "commandExecution" => vec![Norm::Tool { name: "shell".into(), id, summary: truncate(&format!("{} [{}{}]", s(&item["command"]), s(&item["status"]), item["exitCode"].as_i64().map(|c| format!(", exit {c}")).unwrap_or_default()), 2000) }],
+                "fileChange" => {
+                    let paths: Vec<String> = item["changes"].as_array().map(|a| a.iter().map(|c| s(&c["path"])).collect()).unwrap_or_default();
+                    if done && item["status"] == "completed" {
+                        vec![Norm::FileChange { paths, kind: "patch".into(), confidence: "reported" }]
+                    } else {
+                        vec![Norm::Tool { name: "apply_patch".into(), id, summary: truncate(&format!("{} [{}]", paths.join(", "), s(&item["status"])), 2000) }]
+                    }
+                }
+                "collabAgentToolCall" => {
+                    let mut legacy = item.clone();
+                    legacy["receiver_thread_ids"] = item["receiverThreadIds"].clone();
+                    legacy["agents_states"] = item["agentsStates"].clone();
+                    legacy["tool"] = json!(match item["tool"].as_str().unwrap_or_default() { "spawnAgent" => "spawn_agent", "wait" => "wait", "sendInput" => "send_input", "closeAgent" => "close_agent", o => o });
+                    parse_codex_collab(&legacy, done)
+                }
+                "mcpToolCall" | "dynamicToolCall" | "webSearch" => vec![Norm::Tool { name: s(&item["type"]), id, summary: truncate(&item.to_string(), 1000) }],
+                _ => vec![Norm::Ignored],
+            }
+        }
+        _ => vec![Norm::Ignored],
+    }
 }
 
 pub fn parse_claude(v: &Value) -> Vec<Norm> {
@@ -624,6 +735,13 @@ mod tests {
         assert_eq!(classify_error("stream error: 429 Too Many Requests"), "rate_limit");
         assert_eq!(classify_error("You've hit your usage limit. Upgrade to Pro"), "quota");
         assert_eq!(classify_error("file not found"), "other");
+        // Real message formats found in the pinned codex 0.155 binary (strings probe).
+        assert_eq!(classify_error("Usage limit reached"), "quota");
+        assert_eq!(classify_error("You've reached your workspace credit limit"), "quota");
+        assert_eq!(classify_error("Your workspace is out of credits. Ask your workspace owner to add more."), "quota");
+        assert_eq!(classify_error("exceeded retry limit, last status: 429 Too Many Requests"), "rate_limit");
+        // Real Claude Code 2.1.246 message captured live.
+        assert_eq!(classify_error("Failed to authenticate: OAuth session expired and could not be refreshed"), "auth");
     }
 
     #[test]

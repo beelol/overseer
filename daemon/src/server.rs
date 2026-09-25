@@ -191,7 +191,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
         "state" => d.state()?,
         "harness.list" => {
-            let list: Vec<Value> = ["codex", "claude", "opencode", "generic"]
+            let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "generic"]
                 .iter()
                 .map(|h| {
                     let program = crate::adapters::resolve_program(h);

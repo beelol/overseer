@@ -102,7 +102,8 @@ async function activate(context) {
       if (argText === undefined) return;
       args = JSON.parse(argText);
     } else {
-      const profiles = model.state.profiles.filter(p => p.harness === harness);
+      const family = harness === 'codex-app' ? 'codex' : harness;
+      const profiles = model.state.profiles.filter(p => p.harness === family);
       const statuses = await Promise.all(profiles.map(p => client.request('profile.status', { id: p.id }).catch(() => undefined)));
       statuses.forEach((s, i) => s && model.profileStatus.set(profiles[i].id, s));
       const pPick = await vscode.window.showQuickPick(profiles.map((p, i) => ({ label: p.name, description: statuses[i]?.logged_in ? 'signed in' : 'not signed in', detail: statuses[i]?.detail, p, ok: statuses[i]?.logged_in })), { title: 'New task: account profile (account login only; no API keys)' });
@@ -134,11 +135,21 @@ async function activate(context) {
     }
     const model_ = harness === 'generic' ? '' : await vscode.window.showInputBox({ title: 'Model (optional)', prompt: 'Leave empty for the harness default.' });
     if (model_ === undefined) return;
+    let approvalPolicy;
+    if (harness === 'codex-app') {
+      const pick = await vscode.window.showQuickPick([
+        { label: 'on-request', detail: 'The model asks when it needs to leave the sandbox (recommended).' },
+        { label: 'untrusted', detail: 'Ask before running anything that is not a known read-only command.' },
+        { label: 'never', detail: 'Never ask; sandbox limits apply.' },
+      ], { title: 'Codex approval policy (requests appear in the run panel; never auto-approved)' });
+      if (!pick) return;
+      approvalPolicy = pick.label;
+    }
     const prompt = await vscode.window.showInputBox({ title: 'Task prompt', prompt: harness === 'generic' ? 'Optional first line sent to stdin' : 'What should the agent do?', ignoreFocusOut: true });
     if (prompt === undefined || (!prompt && harness !== 'generic')) return;
     const title = (prompt || path.basename(program || 'task')).slice(0, 60);
     const created = await client.request('task.create', { repo, harness, profile_id: profileId, workspace_mode: mode.mode, target_ref: targetRef, model: model_ || undefined,
-      prompt, title, program, args, unsaved: unsaved.map(d => path.relative(repo, d.uri.fsPath)) });
+      prompt, title, program, args, approval_policy: approvalPolicy, unsaved: unsaved.map(d => path.relative(repo, d.uri.fsPath)) });
     if (created.launch_error) vscode.window.showErrorMessage(`Overseer could not launch ${harness}: ${created.launch_error}`);
     await model.refresh();
     await selectRun(created.run.id, { follow: vscode.workspace.getConfiguration('overseer').get('followNewRuns', true) });

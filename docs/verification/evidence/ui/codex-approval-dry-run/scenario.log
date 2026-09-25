@@ -1,0 +1,11 @@
+[2026-09-25T07:08:08.263Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T07:08:17.890Z] PASS codex-app run waits for permission (not auto-approved) {"status":"waiting_for_user","attention":"command: touch approved.txt","reason":null}
+[2026-09-25T07:08:17.973Z] screenshot docs/verification/evidence/ui/codex-approval-dry-run/01-permission-request.png
+[2026-09-25T07:08:18.579Z] PASS Allow runs the command {"status":"completed","reason":"turn completed; exit 0"}
+[2026-09-25T07:08:18.676Z] screenshot docs/verification/evidence/ui/codex-approval-dry-run/02-allowed.png
+[2026-09-25T07:08:19.527Z] PASS deny: waiting for permission {"status":"waiting_for_user"}
+[2026-09-25T07:08:21.450Z] PASS Deny: command not run, harness told {"status":"completed","reason":"turn completed; exit 0","output":["harness request currentTime/read is not supported by Overseer; declined","declined (unsupported request was refused)"]}
+[2026-09-25T07:08:21.563Z] screenshot docs/verification/evidence/ui/codex-approval-dry-run/03-deny.png
+[2026-09-25T07:08:22.432Z] PASS interrupt: waiting for permission {"status":"waiting_for_user"}
+[2026-09-25T07:08:22.934Z] PASS Interrupt while waiting for permission {"status":"interrupted","reason":"interrupted by user (exit code 0)"}
+[2026-09-25T07:08:23.019Z] screenshot docs/verification/evidence/ui/codex-approval-dry-run/04-interrupt.png

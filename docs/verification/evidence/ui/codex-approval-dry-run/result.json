@@ -1,0 +1,86 @@
+{
+  "checks": [
+    {
+      "name": "codex-app run waits for permission (not auto-approved)",
+      "ok": true,
+      "detail": {
+        "status": "waiting_for_user",
+        "attention": "command: touch approved.txt",
+        "reason": null
+      }
+    },
+    {
+      "name": "Allow runs the command",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reason": "turn completed; exit 0"
+      }
+    },
+    {
+      "name": "deny: waiting for permission",
+      "ok": true,
+      "detail": {
+        "status": "waiting_for_user"
+      }
+    },
+    {
+      "name": "Deny: command not run, harness told",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reason": "turn completed; exit 0",
+        "output": [
+          "harness request currentTime/read is not supported by Overseer; declined",
+          "declined (unsupported request was refused)"
+        ]
+      }
+    },
+    {
+      "name": "interrupt: waiting for permission",
+      "ok": true,
+      "detail": {
+        "status": "waiting_for_user"
+      }
+    },
+    {
+      "name": "Interrupt while waiting for permission",
+      "ok": true,
+      "detail": {
+        "status": "interrupted",
+        "reason": "interrupted by user (exit code 0)"
+      }
+    }
+  ],
+  "identity": {
+    "plan": "pro",
+    "account": "2e1fa92158bacc71",
+    "version": "codex-app-fixture 0.0.0 (synthetic)"
+  },
+  "usage": [
+    {
+      "run": "r-81cff352b2ab",
+      "status": "completed",
+      "usage": {
+        "total": {
+          "inputTokens": 1,
+          "outputTokens": 1
+        }
+      }
+    },
+    {
+      "run": "r-e394ddab9293",
+      "status": "completed",
+      "usage": {
+        "total": {
+          "inputTokens": 1,
+          "outputTokens": 1
+        }
+      }
+    },
+    {
+      "run": "r-a1a27358057e",
+      "status": "interrupted"
+    }
+  ]
+}

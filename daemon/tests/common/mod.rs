@@ -24,7 +24,14 @@ pub struct Daemon {
 impl Daemon {
     pub fn start(env: &[(&str, &str)]) -> Daemon {
         let home = tempfile::Builder::new().prefix("ovs-t").tempdir_in("/tmp").unwrap();
-        let mut d = Daemon { home, child: None, env: env.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect() };
+        let mut env: Vec<(String, String)> = env.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        // Tests must never reach a real (paid) harness: unset overrides point nowhere.
+        for key in ["OVERSEER_CODEX_PATH", "OVERSEER_CLAUDE_PATH", "OVERSEER_OPENCODE_PATH"] {
+            if !env.iter().any(|(k, _)| k == key) {
+                env.push((key.to_string(), "/nonexistent/harness-disabled-in-tests".to_string()));
+            }
+        }
+        let mut d = Daemon { home, child: None, env };
         d.spawn();
         d
     }

@@ -130,6 +130,15 @@ class Session {
     fs.writeFileSync(path.join(this.evidence, 'scenario.log'), this.log.join('\n') + '\n');
   }
 
+  /** Shows the Overseer view container (clicking the activity icon only when it is not already visible). */
+  async openOverseerView() {
+    const visible = await this.cdp.evalWorkbench(`[...document.querySelectorAll('.pane-header')].some(h => h.offsetParent && /Agents/.test(h.textContent))`);
+    if (visible) return;
+    const icon = await this.cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.activitybar .action-item a, .activitybar .action-label')].find(a => /^Overseer/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const b = a.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000);
+    await this.cdp.click(icon.x, icon.y);
+    await delay(800);
+  }
+
   /** Absolute page coordinates of an element inside a webview frame. */
   async webviewPoint(frame, selector) {
     const inner = await frame.eval(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 40), y: r.top + Math.min(r.height / 2, 12), w: innerWidth, h: innerHeight }; })()`);

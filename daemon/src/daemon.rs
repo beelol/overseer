@@ -274,7 +274,7 @@ impl Daemon {
     pub fn create_task(self: &Arc<Self>, p: &Value) -> Result<Value> {
         let repo_in = p["repo"].as_str().ok_or_else(|| anyhow!("repo is required"))?;
         let harness = p["harness"].as_str().unwrap_or("codex");
-        if !["codex", "claude", "opencode", "generic"].contains(&harness) {
+        if !["codex", "codex-app", "claude", "opencode", "generic"].contains(&harness) {
             bail!("unknown harness {harness}");
         }
         let prompt = p["prompt"].as_str().unwrap_or_default().to_string();
@@ -287,11 +287,11 @@ impl Daemon {
         let common = git::common_dir(&repo)?;
         let profile = match p["profile_id"].as_str() {
             Some(id) => Some(self.profile(id)?),
-            None if harness != "generic" => Some(self.profile(&format!("system-{harness}"))?),
+            None if harness != "generic" => Some(self.profile(&format!("system-{}", profile_harness(harness)))?),
             None => None,
         };
         if let Some(prof) = &profile {
-            if prof.harness != harness {
+            if prof.harness != profile_harness(harness) {
                 bail!("profile {} belongs to {}, not {harness}", prof.name, prof.harness);
             }
         }
@@ -401,7 +401,7 @@ impl Daemon {
         };
         self.store.lock().unwrap().insert_run(&run)?;
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(&run.id))?;
-        let generic = json!({"program": program, "args": p["args"].clone()});
+        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request")});
         {
             let store = self.store.lock().unwrap();
             store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![run.id, generic.to_string()])?;
@@ -476,7 +476,8 @@ impl Daemon {
             },
         )?;
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(run_id))?;
-        self.spawn_process(&run, &ws, launch, json!({"generic": generic_meta}))?;
+        let app = json!({"prompt": prompt, "cwd": ws.path, "model": run.model, "resume": resume, "approval": generic_meta["approval"].as_str().unwrap_or("on-request")});
+        self.spawn_process(&run, &ws, launch, json!({"generic": generic_meta, "app": app}))?;
         Ok(turn)
     }
 
@@ -554,7 +555,16 @@ impl Daemon {
         std::fs::write(Path::new(&dir).join("interrupt.requested"), now().to_string())?;
         self.emit(Some(&run.task_id), Some(run_id), "interrupt_requested", "user", "exact", json!({}))?;
         let sock = self.control_socket(&run)?;
-        match adapters::interrupt_plan(&run.harness) {
+        let plan = if run.harness == "codex-app" {
+            let turn = std::fs::read_to_string(Path::new(&dir).join("turn.id")).unwrap_or_default();
+            match (&run.native_id, turn.is_empty()) {
+                (Some(thread), false) => InterruptPlan::StdinThenSignal(format!("{}\n", json!({"id": "ovs-interrupt", "method": "turn/interrupt", "params": {"threadId": thread, "turnId": turn}}))),
+                _ => InterruptPlan::Signal,
+            }
+        } else {
+            adapters::interrupt_plan(&run.harness)
+        };
+        match plan {
             InterruptPlan::Signal => {
                 shim::control(&sock, &json!({"op": "signal", "sig": libc::SIGINT}))?;
             }
@@ -759,6 +769,14 @@ impl Daemon {
         for e in emitted {
             let _ = self.events.send(e);
         }
+        let sends = std::mem::take(&mut state.sends);
+        if !sends.is_empty() {
+            if let Ok(sock) = self.control_socket(run) {
+                for text in sends {
+                    let _ = shim::control(&sock, &json!({"op": "stdin", "data": text}));
+                }
+            }
+        }
         if std::mem::take(&mut state.close_stdin) {
             if let Ok(sock) = self.control_socket(run) {
                 let _ = shim::control(&sock, &json!({"op": "close_stdin"}));
@@ -906,10 +924,53 @@ impl Daemon {
                 state.turn_done = Some(ok);
                 store.finish_open_turns(&run.id, if ok { "completed" } else { "failed" }, now())?;
                 ev("turn_done", "harness", "exact", json!({"ok": ok, "summary": summary}), None)?;
-                if run.harness == "claude" {
+                if run.harness == "claude" || run.harness == "codex-app" {
                     // One turn per process: closing stdin lets the session end cleanly.
                     // Done after the store lock is released (see apply_lines).
                     state.close_stdin = true;
+                }
+            }
+            Norm::Send(text) => state.sends.push(text),
+            Norm::TurnId(id) => {
+                if let Some((dir, _, _)) = store.run_process(&run.id)? {
+                    let _ = std::fs::write(Path::new(&dir).join("turn.id"), &id);
+                }
+            }
+            Norm::RpcResult { id, result, error } => {
+                if let Some(err) = error {
+                    let msg = err["message"].as_str().map(str::to_string).unwrap_or_else(|| err.to_string());
+                    state.last_error = Some((classify(&msg), msg.clone()));
+                    ev("error", "harness", "exact", json!({"class": classify(&msg), "message": msg, "request": id}), None)?;
+                    state.turn_done = Some(false);
+                    state.close_stdin = true;
+                    return Ok(());
+                }
+                let meta: Value = store.conn.query_row("SELECT launch FROM runs WHERE id=?1", [&run.id], |r| r.get::<_, Option<String>>(0))?.and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null);
+                let app = &meta["app"];
+                match id.as_str() {
+                    "ovs-init" => {
+                        let msg = match app["resume"].as_str() {
+                            Some(thread) => json!({"id": "ovs-thread", "method": "thread/resume", "params": {"threadId": thread, "cwd": app["cwd"], "approvalPolicy": app["approval"], "sandbox": "workspace-write"}}),
+                            None => {
+                                let mut params = json!({"cwd": app["cwd"], "approvalPolicy": app["approval"], "sandbox": "workspace-write"});
+                                if let Some(m) = app["model"].as_str() {
+                                    params["model"] = json!(m);
+                                }
+                                json!({"id": "ovs-thread", "method": "thread/start", "params": params})
+                            }
+                        };
+                        state.sends.push(format!("{msg}\n"));
+                    }
+                    "ovs-thread" => {
+                        let thread = result["thread"]["id"].as_str().unwrap_or_default().to_string();
+                        if !thread.is_empty() && store.run(&run.id)?.and_then(|r| r.native_id).is_none() {
+                            store.set_run_native(&run.id, &thread)?;
+                            ev("session", "harness", "exact", json!({"native_id": thread}), None)?;
+                        }
+                        let turn = json!({"id": "ovs-turn", "method": "turn/start", "params": {"threadId": thread, "input": [{"type": "text", "text": app["prompt"], "text_elements": []}]}});
+                        state.sends.push(format!("{turn}\n"));
+                    }
+                    _ => {}
                 }
             }
             Norm::Ignored => {}
@@ -1226,11 +1287,12 @@ struct TailState {
     store_polled: std::time::Instant,
     store_seen: std::collections::HashMap<String, String>,
     close_stdin: bool,
+    sends: Vec<String>,
 }
 
 impl Default for TailState {
     fn default() -> Self {
-        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false }
+        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new() }
     }
 }
 
@@ -1266,6 +1328,15 @@ fn find_in_tree(store: &Store, root: &str, native: &str) -> Result<Option<Run>> 
         }
     }
     Ok(None)
+}
+
+/// Account profiles belong to the harness family (codex-app shares Codex logins).
+fn profile_harness(harness: &str) -> &str {
+    if harness == "codex-app" { "codex" } else { harness }
+}
+
+fn classify(msg: &str) -> String {
+    adapters::classify_error(msg).to_string()
 }
 
 fn describe_exit(exit: &ExitInfo) -> String {
