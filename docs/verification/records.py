@@ -304,6 +304,18 @@ rec(41, "Linux verification (deferred by owner)", "blocked",
     expected="Linux build/install/regressions/account isolation/UI flow.", actual="Not attempted: no Linux environment (owner decision).",
     evidence="—", live="None.", blocker="Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.")
 
+rec(42, "Hunk accept and reject", "not started",
+    expected="See the RFC criterion (added by the owner on 2026-09-25).",
+    actual="Not implemented yet. Today the review supports editing and saving the working-tree side and native undo; there are no per-hunk accept/reject actions.",
+    evidence="—", live="—",
+    blocker="Not blocked; not started. Next: add per-hunk actions to the vendored review (reject = write the base hunk through a VS Code edit, accept = reviewed marker keyed by hunk content), then run the Verify clause.")
+
+rec(43, "Structured run conversation view", "not started",
+    expected="See the RFC criterion (added by the owner on 2026-09-25).",
+    actual="Not implemented yet. The run panel is a flat, ordered event log with an optional raw-output view.",
+    evidence="—", live="—",
+    blocker="Not blocked; not started. Next: group events by turn in the daemon or panel, render tool calls collapsibly, link file_activity to the review, nest child output, then run the Verify clause.")
+
 HEAD = """# AC-{n:02d} — {title}
 Status: {status}
 Tested implementation commit: {commit}
@@ -353,7 +365,10 @@ SHORT_BLOCKERS = {
     14: "blocked: Claude Code's login is expired on this Mac (Codex and OpenCode parts pass)",
     19: "blocked: Claude Code's login is expired (Codex and OpenCode children captured)",
     41: "deferred: no Linux environment",
+    42: "not started (added by the owner on 2026-09-25)",
+    43: "not started (added by the owner on 2026-09-25)",
 }
+TOTAL = 43
 
 EXTRA_FOLLOWUPS = [
     "Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.",
@@ -377,24 +392,26 @@ def sync(out):
     rfc = root / "docs/overseer-rfc.md"
     text = rfc.read_text()
     titles = dict(re.findall(r"\*\*AC-(\d\d) — ([^*]+?)\.\*\*", text))
+    global TOTAL
+    TOTAL = max(int(n) for n in titles)
     statuses = {}
-    for n in range(1, 42):
+    for n in range(1, TOTAL + 1):
         f = out / f"AC-{n:02d}.md"
         statuses[n] = status_of(f) if f.exists() else "not started"
     verified = [n for n, st in statuses.items() if st.startswith("verified")]
-    for n in range(1, 42):
+    for n in range(1, TOTAL + 1):
         box = "[x]" if n in verified else "[ ]"
         text = re.sub(r"- \[[ x]\] \*\*AC-%02d " % n, f"- {box} **AC-{n:02d} ", text)
     rfc.write_text(text)
     rows = ["| AC | Criterion | Status | Record |", "| --- | --- | --- | --- |"]
-    for n in range(1, 42):
+    for n in range(1, TOTAL + 1):
         rows.append(f"| AC-{n:02d} | {titles.get(f'{n:02d}', '')} | {statuses[n]} | [AC-{n:02d}.md](AC-{n:02d}.md) |")
-    unverified = [n for n in range(1, 42) if n not in verified]
-    audit = [f"- Verified: {len(verified)} / 41 ({', '.join(f'AC-{n:02d}' for n in verified)}).",
+    unverified = [n for n in range(1, TOTAL + 1) if n not in verified]
+    audit = [f"- Verified: {len(verified)} / {TOTAL} ({', '.join(f'AC-{n:02d}' for n in verified)}).",
              f"- Not verified: {', '.join(f'AC-{n:02d}' for n in unverified)} — each record states the exact blocker and next action.",
              "- Every verified record was re-read against its evidence folder/test before checking; anything that relied only on fixtures where the criterion demands live evidence stays unchecked."]
     items = []
-    for n in range(1, 42):
+    for n in range(1, TOTAL + 1):
         title = titles.get(f"{n:02d}", "")
         link = f"[evidence](docs/verification/AC-{n:02d}.md)"
         if n in verified:
@@ -419,8 +436,8 @@ def sync(out):
     readme = root / "README.md"
     rt = readme.read_text()
     rt = re.sub(r"(<!-- ac-list:start -->\n)(.*?)(<!-- ac-list:end -->)", lambda m: m.group(1) + "\n".join(items) + "\n" + m.group(3), rt, flags=re.S)
-    rt = re.sub(r"Verified acceptance\ncriteria: \*\*[^*]+\*\*", f"Verified acceptance\ncriteria: **{len(verified)} / 41**", rt)
-    rt = rt.replace("__VERIFIED__ / 41", f"{len(verified)} / 41")
+    rt = re.sub(r"Verified acceptance\ncriteria: \*\*[^*]+\*\*", f"Verified acceptance\ncriteria: **{len(verified)} / {TOTAL}**", rt)
+    rt = rt.replace("__VERIFIED__ / 41", f"{len(verified)} / {TOTAL}")
     rt = rt.replace("__UNVERIFIED__", ", ".join(f"AC-{n:02d}" for n in unverified))
     rt = re.sub(r"(Unverified:\n)AC-[0-9, AC-]+(\. The biggest gaps)", lambda m: m.group(1) + ", ".join(f"AC-{n:02d}" for n in unverified) + m.group(2), rt)
     rt = re.sub(r"(## Follow-ups\n\n.*?\n\n)(.*?)(\n\n## Project documents)", lambda m: m.group(1) + "\n".join(follow) + m.group(3), rt, flags=re.S)

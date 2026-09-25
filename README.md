@@ -5,10 +5,12 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **34 / 41** (see [ledger](docs/verification/README.md)). Unverified:
-AC-08, AC-11, AC-12, AC-13, AC-14, AC-19, AC-41. The biggest gaps are live Claude Code (its login on the test machine is
+criteria: **34 / 43** (see [ledger](docs/verification/README.md)). Unverified:
+AC-08, AC-11, AC-12, AC-13, AC-14, AC-19, AC-41, AC-42, AC-43. The biggest gaps are live Claude Code (its login on the test machine is
 expired), two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
-a foreign-user socket rejection test (needs a second macOS account), and Linux (no environment). The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
+a foreign-user socket rejection test (needs a second macOS account), and Linux (no environment).
+AC-42 (hunk accept/reject) and AC-43 (structured run conversation view) were added afterwards
+and are not started. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
 ## Acceptance criteria
 
@@ -59,6 +61,8 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-39** Minimal dogfood flow — [evidence](docs/verification/AC-39.md)
 - [x] **AC-40** Repository handoff — [evidence](docs/verification/AC-40.md)
 - [ ] **AC-41** Linux verification (deferred by owner) — deferred: no Linux environment — [evidence](docs/verification/AC-41.md)
+- [ ] **AC-42** Hunk accept and reject — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-42.md)
+- [ ] **AC-43** Structured run conversation view — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-43.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -161,6 +165,8 @@ the owner action or decision each one needs.
 - [ ] [AC-14](docs/verification/AC-14.md) (Initial adapters): Claude Code login (owner). Next: after `claude auth login`, run a tiny stream-json task through Overseer: edit, follow-up, interrupt.
 - [ ] [AC-19](docs/verification/AC-19.md) (Actual native children): Claude login (owner); Codex grandchild needs a prompt that makes the child delegate (small extra paid run) and possibly the app-server transport's `subAgentActivity`. Next: after Claude login, run a Task-delegation prompt with a nested Agent.
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
+- [ ] [AC-42](docs/verification/AC-42.md) (Hunk accept and reject): Not blocked; not started. Next: add per-hunk actions to the vendored review (reject = write the base hunk through a VS Code edit, accept = reviewed marker keyed by hunk content), then run the Verify clause.
+- [ ] [AC-43](docs/verification/AC-43.md) (Structured run conversation view): Not blocked; not started. Next: group events by turn in the daemon or panel, render tool calls collapsibly, link file_activity to the review, nest child output, then run the Verify clause.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Map the Codex app-server `subAgentActivity` / child-thread notifications so Codex grandchildren and child output stream live (would strengthen [AC-19](docs/verification/AC-19.md)); approvals already use the app-server transport.
@@ -175,4 +181,4 @@ the owner action or decision each one needs.
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 
 Design targets macOS and Linux; only macOS is verified. Auto routing, a TUI, VSCodium,
-Windows/Remote SSH and hunk actions are later milestones.
+Windows/Remote SSH and review comments sent to agents are later milestones.

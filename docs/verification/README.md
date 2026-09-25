@@ -70,6 +70,6 @@ criteria on regressions. Keep README's verified count synchronized in the same u
 
 ## Audit notes (handoff)
 
-- Verified: 34 / 41 (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-09, AC-10, AC-15, AC-16, AC-17, AC-18, AC-20, AC-21, AC-22, AC-23, AC-24, AC-25, AC-26, AC-27, AC-28, AC-29, AC-30, AC-31, AC-32, AC-33, AC-34, AC-35, AC-36, AC-37, AC-38, AC-39, AC-40).
-- Not verified: AC-08, AC-11, AC-12, AC-13, AC-14, AC-19, AC-41 — each record states the exact blocker and next action.
+- Verified: 34 / 43 (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-09, AC-10, AC-15, AC-16, AC-17, AC-18, AC-20, AC-21, AC-22, AC-23, AC-24, AC-25, AC-26, AC-27, AC-28, AC-29, AC-30, AC-31, AC-32, AC-33, AC-34, AC-35, AC-36, AC-37, AC-38, AC-39, AC-40).
+- Not verified: AC-08, AC-11, AC-12, AC-13, AC-14, AC-19, AC-41, AC-42, AC-43 — each record states the exact blocker and next action.
 - Every verified record was re-read against its evidence folder/test before checking; anything that relied only on fixtures where the criterion demands live evidence stays unchecked.

@@ -61,8 +61,9 @@ Changing them requires a recorded RFC revision, not a hidden implementation shor
   off preserves file, selection, and scroll as far as the changing text permits.
 - Review and Follow use the same live data. Review disables automatic navigation.
   Switching to another agent does not inherit Follow accidentally.
-- Hunk accept/discard, review comments sent to agents, automatic merges, and automatic
-  worktree deletion are later work. Editing and native editor undo are required now.
+- Review comments sent to agents, automatic merges, and automatic worktree deletion are
+  later work. Editing and native editor undo are required now. Hunk accept/reject was
+  moved into scope by the owner on 2026-09-25 (AC-42).
 - Stable VS Code on macOS is the current verification target. Keep platform-dependent
   paths, processes and credential stores behind portable boundaries for Linux; Linux
   verification is deferred under AC-41. VSCodium, Windows and Remote SSH are later qualifications.
@@ -208,6 +209,11 @@ Evidence and blockers live in [the verification ledger](verification/README.md).
 - [x] **AC-39 — Minimal dogfood flow.** Use Overseer for a tiny hello-world-style change in an isolated Overseer worktree, follow edits, edit from review, run checks and preserve the result. **Verify:** minimal live session and diff/test evidence; record native delegation where observed and keep unverified child coverage in AC-19. Use fixture output for sustained/high-volume tests. Product changes may only be pushed to the confirmed project repo after implementation start is authorized; no automatic merge.
 - [x] **AC-40 — Repository handoff.** README shows accurate current progress and links to this canonical checklist; docs explain install, accounts, capabilities, recovery and known blockers. Implementation/evidence intended for handoff reaches GitHub with no credentials. **Verify:** remote revision/file readback plus a fresh reader following setup instructions. Publishing this draft alone does not complete this release criterion.
 
+### Gate H — review actions and run readability (added by the owner, 2026-09-25)
+
+- [ ] **AC-42 — Hunk accept and reject.** In the live review, each change against the selected comparison can be accepted (kept and marked reviewed) or rejected (restored to the comparison base in the selected run's workspace) one hunk at a time, with native undo. Rejecting never alters other hunks, other files, unsaved drafts or a different workspace, and a hunk the agent changes while it is being accepted or rejected is detected as a conflict, not silently overwritten. Reviewed state survives refreshes and window reloads and is cleared when the hunk changes again. **Verify:** a live run with several hunks across two files; reject one and accept another; confirm disk contents and native undo/redo; staged/unstaged and untracked-file cases; a concurrent agent edit to the same region during accept/reject; reload keeps reviewed state; works in worktree and current-checkout modes.
+- [ ] **AC-43 — Structured run conversation view.** A run's panel reads as a conversation rather than a flat event log: prompts and agent messages as turns, tool calls collapsible with their inputs and results, file edits linked to the review (opening the file at the edited hunk), permission requests inline with their decision, native children nested under the tool call that spawned them with their own output, errors and exit reasons highlighted, and usage per turn. The raw event log and raw output stay available. **Verify:** live Codex (exec and app-server) and Claude Code runs, including a native child and a permission request; expanding/collapsing tool calls; clicking a file edit opens that hunk in the correct worktree review; a fixture burst at the retention bound stays responsive (AC-35 bound) and truncation remains visible.
+
 ### Deferred platform qualification
 
 - [ ] **AC-41 — Linux verification (deferred by owner).** Build/install daemon and VSIX, run regression checks, verify account isolation and complete the real VS Code flow on Linux. **Verify:** actual Linux OS/editor/harness versions, build/test logs, credential-backend evidence and UI recording. No Linux environment is currently available; leave unchecked. Portable design, macOS passes or cross-compilation do not satisfy it.
@@ -223,8 +229,8 @@ The owner authorizes the implementer to record reproducible evidence and mark cr
 verified; a separate review pass can follow. No separate reviewer is required now.
 Claims of complete feedback require known coverage, with gaps explicitly disclosed.
 
-AC-01–03 are research gates. AC-04–40 describe the macOS implementation and evidence scope;
-AC-41 retains Linux qualification as deferred and unchecked. A usable macOS milestone may
+AC-01–03 are research gates. AC-04–40 and AC-42–43 describe the macOS implementation and
+evidence scope; AC-41 retains Linux qualification as deferred and unchecked. A usable macOS milestone may
 be delivered with documented unavailable native telemetry (AC-19) and inaccessible account
 verification left unchecked. Codex/Claude account integration and OpenCode integration remain
 required; two-account verification is never passed by simulation. Do not call partial
@@ -237,11 +243,15 @@ permits mocks/Ollama for OpenCode AC-14, permits usable harnesses with incomplet
 telemetry, and moves Linux evidence from AC-04/13/36/37 into AC-41. These are explicit owner
 changes, not implementation waivers. No acceptance box was checked by this revision.
 
+Revision of 2026-09-25 (owner, after the first macOS milestone): hunk accept/reject (AC-42)
+and a structured run conversation view (AC-43) are added as acceptance criteria. Existing
+IDs are unchanged; both new criteria start unchecked.
+
 ## Later roadmap (not hidden first-release acceptance criteria)
 
 Auto target selection, provider/subscription quota-aware routing, escalation/review policies,
 Overseer-launched delegation, remote workspace synchronization, TUI, VSCodium qualification,
-Windows/Remote SSH, hunk actions/comments and marketplace distribution. Reassess each with
+Windows/Remote SSH, review comments sent to agents and marketplace distribution. Reassess each with
 its own bounded acceptance criteria. Do not silently expand an overnight run to include these.
 
 ## Draft implementation goal (not started by this RFC revision)
