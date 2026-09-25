@@ -421,11 +421,24 @@ rec(47, "Polished, theme-compatible UI", "not started",
     evidence="—", live="—",
     blocker="Not blocked; not started. Next: a New Task webview with harness/account tiles and a design pass on the run panel and review toolbar, verified in light/dark/high-contrast.")
 
-rec(48, "Overseer view (command center)", "not started",
-    expected="See the RFC criterion (added by the owner on 2026-09-25).",
-    actual="The hierarchy is a sidebar tree; review and run panels open as editor tabs in two groups.",
-    evidence="—", live="—",
-    blocker="Not blocked; not started. Next: a full-page Overseer view (agents column, review, conversation + event log) independent of the native sidebar and the window's folder, respecting AC-30.")
+rec(48, "Overseer view (command center)", "verified", commit="83ed5b6", date="2026-09-25",
+    harness="Claude fixture (`CLAUDE_FIXTURE_MODE=nested`: native child and grandchild) and generic runs; no paid tokens",
+    steps="""1. `node test/ui/scenario-center.js` (packaged UI). The window opens `open-folder`; runs live in `repo-x` and `repo-y`, which are never opened: a nested Claude fixture run and a generic edit in X, a still-running generic edit in Y.
+2. Close the primary sidebar (Cmd+B until hidden); **Overseer: Open Overseer View**.
+3. Expand/collapse at repository, task and native-child level; select runs in X and Y; keyboard navigation; reload the window; emulate a 1024×760 and a 1900×1100 window.
+4. Reran `scenario-restore.js` and `scenario-main.js`.""",
+    expected="Works with the native sidebar closed and independent of the window's folder; agents column (tasks → runs → descendants across repositories, expand/collapse, live status); the selected run's live review to its right plus its conversation and event log; switching runs switches both without jumps; narrow and wide windows.",
+    actual="""- With the primary sidebar hidden, the view opened as three editor columns (Overseer | review | conversation). It listed `repo-y` and `repo-x` but not the window's `open-folder`.
+- Tree levels: repository → task → run → "child task" (level 4) → "grandchild task" (level 5). Collapsing the child hid the grandchild, collapsing the task hid its runs, collapsing `repo-y` hid its task, and expanding restored each.
+- Selecting "X edits" put "Review: X edits" in column 2 (X's worktree, with its diff) and "generic: X edits" in column 3. Selecting "Y live" switched to Y's worktree review and Y's conversation.
+- Live status: the Y run shows a running (pulsing) dot and repo-y a "1 active" badge.
+- Keyboard: arrows move between treeitems (role/aria-level/aria-label). Left collapses a task and then moves to its repository; Right expands again. Selecting keeps focus in the agents column.
+- After a window reload the view came back with the same run selected.
+- 1024 px window: columns 220/463/283 px; 1900 px window: 405/884/553 px. The agents column never overflows horizontally.
+- Found on the way: live re-renders dropped keyboard focus, and selecting a run moved focus into the review. Both are fixed.""",
+    evidence="[center scenario](evidence/ui/center/) (screenshots: wide view, X selected, Y selected, narrow and wide windows; result.json)",
+    live="Fixture and generic runs (the view reads the daemon's run tree; it is harness-independent). Live runs appear the same way (see AC-43/AC-44 screenshots).",
+    limits="The three-column layout replaces the window's current editor layout when the view opens. A worktree file hierarchy in the view is AC-51.")
 
 rec(49, "Restore the open session", "verified", commit="8103a2e", date="2026-09-25",
     steps="""1. `node extension/scripts/package.js` then `node test/ui/scenario-restore.js` (isolated VS Code profile, VSIX installed with the `code` CLI, CDP; generic-harness runs, no paid tokens).

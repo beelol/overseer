@@ -1,0 +1,18 @@
+[2026-09-25T19:54:13.196Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T19:54:18.956Z] PASS Overseer view works with the native sidebar closed and lists repositories not open in the window {"sidebarHidden":true,"repos":["repo-y","repo-x"]}
+[2026-09-25T19:54:18.956Z] PASS opens as three columns (agents | review | conversation) 3
+[2026-09-25T19:54:19.025Z] screenshot docs/verification/evidence/ui/center/01-center-wide.png
+[2026-09-25T19:54:19.026Z] PASS agents column shows task → run → native child → grandchild [["X nested agents",2],["child task",4],["grandchild task",5]]
+[2026-09-25T19:54:24.207Z] PASS expand/collapse at repository, task and native-child levels {"childCollapsed":true,"childExpanded":true,"taskCollapsed":true,"repoCollapsed":true}
+[2026-09-25T19:54:26.879Z] screenshot docs/verification/evidence/ui/center/02-selected-x.png
+[2026-09-25T19:54:29.489Z] PASS selecting a run in another repository switches the review column and the conversation column {"tabsX":["Overseer, Editor Group 1","Review: X edits (1), Editor Group 2","generic: X edits, Editor Group 3"],"tabsY":["Overseer, Editor Group 1","Review: Y live (1), Editor Group 2","generic: Y live, Editor Group 3"],"reviewX":true,"reviewY":true,"convY":true}
+[2026-09-25T19:54:29.571Z] screenshot docs/verification/evidence/ui/center/03-selected-y.png
+[2026-09-25T19:54:29.572Z] PASS live status shown in the agents column "dot status-running"
+[2026-09-25T19:54:30.895Z] PASS keyboard navigation: arrows move between labelled treeitems, Left collapses then goes to the parent, Right expands {"start":{"label":"generic","role":"treeitem","aria":"generic, running","level":"3"},"up":{"label":"Y live","role":"treeitem","aria":"Y live, overseer/y-live, running","level":"2"},"collapsedTask":"false","parent":{"label":"repo-y","role":"treeitem","aria":"repo-y, /private/tmp/ovs-ui-fPaH2k/repo-y, 1 active","level":"1"},"reopened":"true"}
+[2026-09-25T19:54:39.376Z] PASS Overseer view restored after a window reload ["generic"]
+[2026-09-25T19:54:40.888Z] window narrow {"w":1024,"groups":[220,463,283]}
+[2026-09-25T19:54:40.960Z] screenshot docs/verification/evidence/ui/center/04-window-narrow.png
+[2026-09-25T19:54:40.960Z] PASS narrow window: three columns remain usable and the agents column does not overflow {"dims":{"w":1024,"groups":[220,463,283]},"fits":true}
+[2026-09-25T19:54:42.465Z] window wide {"w":1900,"groups":[405,884,553]}
+[2026-09-25T19:54:42.530Z] screenshot docs/verification/evidence/ui/center/05-window-wide.png
+[2026-09-25T19:54:42.530Z] PASS wide window: three columns remain usable and the agents column does not overflow {"dims":{"w":1900,"groups":[405,884,553]},"fits":true}

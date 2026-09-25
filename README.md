@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **41 / 51** · **1** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-08, AC-11, AC-12, AC-13, AC-41, AC-45, AC-47, AC-48, AC-50, AC-51. The biggest gaps are the newer owner requests still in progress
+criteria: **42 / 51** · **1** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-08, AC-11, AC-12, AC-13, AC-41, AC-45, AC-47, AC-50, AC-51. The biggest gaps are the newer owner requests still in progress
 (hunk accept/reject, a structured run conversation view, merge back, simple account governance
 ([side RFC](docs/rfcs/account-governance.md)), a polished theme-compatible UI and a full-page
 Overseer view), live two-account runs (AC-12/13; both ChatGPT accounts are now signed in) and a
@@ -68,7 +68,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-45** Visible background agents — ◐ partial: live Claude run kept running after Cmd+Q; daemon posted the notice through macOS `osascript` (exit 0) naming the agent and the stop command; reopen showed it; Stop Agents and Daemon confirmed, interrupted it and left no daemon, shim or harness process; no notice with nothing running / deferred: a screenshot of the macOS banner itself (screen recording and the notification database are not accessible to the agent) — [evidence](docs/verification/AC-45.md)
 - [x] **AC-46** Simple account governance — [evidence](docs/verification/AC-46.md)
 - [ ] **AC-47** Polished, theme-compatible UI — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-47.md)
-- [ ] **AC-48** Overseer view (command center) — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-48.md)
+- [x] **AC-48** Overseer view (command center) — [evidence](docs/verification/AC-48.md)
 - [x] **AC-49** Restore the open session — [evidence](docs/verification/AC-49.md)
 - [ ] **AC-50** Open a pull request from a run (coming soon) — not started (coming soon; added by the owner on 2026-09-25) — [evidence](docs/verification/AC-50.md)
 - [ ] **AC-51** Worktree file hierarchy — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-51.md)
@@ -174,7 +174,6 @@ the owner action or decision each one needs.
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
 - [ ] [AC-45](docs/verification/AC-45.md) (Visible background agents): Owner action: close VS Code while an agent runs and confirm the "Overseer: N agents still running" banner appears (allow Script Editor notifications if it does not).
 - [ ] [AC-47](docs/verification/AC-47.md) (Polished, theme-compatible UI): Not blocked; not started. Next: a New Task webview with harness/account tiles and a design pass on the run panel and review toolbar, verified in light/dark/high-contrast.
-- [ ] [AC-48](docs/verification/AC-48.md) (Overseer view (command center)): Not blocked; not started. Next: a full-page Overseer view (agents column, review, conversation + event log) independent of the native sidebar and the window's folder, respecting AC-30.
 - [ ] [AC-50](docs/verification/AC-50.md) (Open a pull request from a run (coming soon)): Not blocked; deferred by the owner (coming soon). Next: use VS Code's `github` authentication session to push and create the PR.
 - [ ] [AC-51](docs/verification/AC-51.md) (Worktree file hierarchy): Not blocked; not started. Next: a file tree for the selected run's worktree inside the Overseer view (AC-48).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.

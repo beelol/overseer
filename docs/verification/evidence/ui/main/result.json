@@ -4,7 +4,7 @@
       "name": "profile created from UI",
       "ok": true,
       "detail": {
-        "id": "p-7b1092e33814",
+        "id": "p-477424b58e78",
         "harness": "opencode"
       }
     },
@@ -12,8 +12,8 @@
       "name": "run created in isolated worktree",
       "ok": true,
       "detail": {
-        "run": "r-3acd70b9fc39",
-        "workspace": "/private/tmp/ovs-ui-Le7Jtm/overseer-home/worktrees/repo-d235c651/sequence-8",
+        "run": "r-4644b7cfbec7",
+        "workspace": "/private/tmp/ovs-ui-qQtnKy/overseer-home/worktrees/repo-5d8f1412/sequence-8",
         "branch": "overseer/sequence-8"
       }
     },
@@ -44,7 +44,7 @@
     {
       "name": "output panel streams events",
       "ok": true,
-      "detail": "TURN 1\nYou\nsequence 8\n✎\nedit:\na.txt\n(tool-input)\n⚙\nedit\n{\"filePath\":\"/private/tmp/ovs-ui-Le7Jtm/overseer-home/worktrees/repo-d235c651/sequence-8/a.txt\",\"newString\":\"L20: agent edit 1\",\"oldString\":\"L20: original\"} [completed]\ncompleted\n✎\nedit:\nb.txt\n(tool-input)\n⚙\nedit\n{\"filePath\":\"/private/tmp/ovs-ui-Le7Jtm/overseer-home/worktrees/repo-d235c651/sequence-8/b.txt\",\"newString\":\"L280: agent edit 2\",\"o"
+      "detail": "TURN 1\nYou\nsequence 8\n✎\nedit:\na.txt\n(tool-input)\n⚙\nedit\n{\"filePath\":\"/private/tmp/ovs-ui-qQtnKy/overseer-home/worktrees/repo-5d8f1412/sequence-8/a.txt\",\"newString\":\"L20: agent edit 1\",\"oldString\":\"L20: original\"} [completed]\ncompleted\n✎\nedit:\nb.txt\n(tool-input)\n⚙\nedit\n{\"filePath\":\"/private/tmp/ovs-ui-qQtnKy/overseer-home/worktrees/repo-5d8f1412/sequence-8/b.txt\",\"newString\":\"L280: agent edit 2\",\"o"
     },
     {
       "name": "scroll pauses follow with visible Resume",
@@ -52,7 +52,7 @@
       "detail": {
         "state": "Follow paused by your navigation",
         "resume": true,
-        "top": 340
+        "top": 338
       }
     },
     {
@@ -60,7 +60,7 @@
       "ok": true,
       "detail": {
         "state": "Follow paused by your navigation",
-        "top": 340
+        "top": 338
       }
     },
     {
@@ -82,7 +82,7 @@
     {
       "name": "base icon identifies snapshot and provenance",
       "ok": true,
-      "detail": "Latest run\nBase: 9177fc48729608bffbabb9b9c2a707c84e253a11\nrun-start snapshot s-afd5c96a533e (turn 1 of r-3acd70b9fc39, 1790365594961), captured including dirty and untracked files\nProvenance: recorded\nClick to choose another comparison."
+      "detail": "Latest run\nBase: 32778644fa4b3a0bbb04ce2a4e13c6ada36ac288\nrun-start snapshot s-cb6080033be4 (turn 1 of r-4644b7cfbec7, 1790366169778), captured including dirty and untracked files\nProvenance: recorded\nClick to choose another comparison."
     },
     {
       "name": "follow off preserves position",
@@ -128,12 +128,12 @@
         {
           "n": 1,
           "status": "completed",
-          "snapshot": "s-afd5c96a533e"
+          "snapshot": "s-cb6080033be4"
         },
         {
           "n": 2,
           "status": "interrupted",
-          "snapshot": "s-993bcd410731"
+          "snapshot": "s-8319cbd843b4"
         }
       ]
     },
@@ -150,7 +150,7 @@
         "why": "Native children are controlled through their parent run.",
         "send": true,
         "sendWhy": "Follow-ups go to the top-level run.",
-        "ws": "Workspace: /private/tmp/ovs-ui-Le7Jtm/overseer-home/worktrees/repo-d235c651/delegation (worktree, overseer/delegation) — shared with parent"
+        "ws": "Workspace: /private/tmp/ovs-ui-qQtnKy/overseer-home/worktrees/repo-5d8f1412/delegation (worktree, overseer/delegation) — shared with parent"
       }
     },
     {
@@ -158,12 +158,12 @@
       "ok": true,
       "detail": {
         "sawDisconnect": true,
-        "oldPid": 53778,
-        "newPid": 63379,
+        "oldPid": 12009,
+        "newPid": 22528,
         "tasks": 2
       }
     }
   ],
-  "run": "r-3acd70b9fc39",
-  "workspace": "/private/tmp/ovs-ui-Le7Jtm/overseer-home/worktrees/repo-d235c651/sequence-8"
+  "run": "r-4644b7cfbec7",
+  "workspace": "/private/tmp/ovs-ui-qQtnKy/overseer-home/worktrees/repo-5d8f1412/sequence-8"
 }
