@@ -1,41 +1,110 @@
 # Overseer
 
-A local agent orchestration daemon in Rust, with a VS Code UI for account-based agent
-runs, recursive subagent visibility, and live editable worktree review built on Branch Diff.
+A local agent orchestration daemon in Rust (`overseerd`) with a VS Code extension for
+account-based agent runs, recursive native-child visibility, and live editable worktree
+review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
-**Status: specification drafted; implementation has not started. Verified acceptance
-criteria: 0 / 41.** Design targets macOS and Linux; verification currently targets macOS only, including two
-simultaneous ChatGPT subscription accounts. There is no runnable Overseer build yet.
+**Status: usable macOS milestone — not the complete product.** Verified acceptance
+criteria: **__VERIFIED__ / 41** (see [ledger](docs/verification/README.md)). Unverified:
+__UNVERIFIED__. The biggest gaps are live Claude Code (its login on the test machine is
+expired), two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
+and Linux (no environment). Details and next actions are in [Follow-ups](#follow-ups).
 
-## Project plan
+## What works today (macOS, VS Code 1.139)
+
+- **Daemon** — SQLite state, owner-only Unix socket (versioned JSON-lines protocol), one
+  supervisor process per harness run so work survives VS Code closing and daemon crashes;
+  on restart the daemon reattaches or reports the session as lost, never relaunching work.
+- **Harnesses** — Codex (live-verified with a ChatGPT login), OpenCode (verified through the
+  real OpenCode runtime with a local mock model), any executable (generic), and a Claude Code
+  adapter that is implemented and fixture-tested but not yet live-verified. API keys are
+  never forwarded to harnesses. See the [compatibility matrix](docs/compatibility.md).
+- **Native children** — Codex sub-agents (live), OpenCode children and grandchildren
+  (mock model), Claude Agent/Task nesting (fixtures), shown as a recursive tree with
+  evidence and confidence; missing telemetry is shown as unknown.
+- **Workspaces** — a new worktree per task by default, or the current checkout with its
+  staged/unstaged/untracked/unsaved work recorded and preserved. Single writer per checkout;
+  cleanup reports dirty files and active runs and never removes the current checkout.
+- **Review** — Branch Diff's editable Monaco review opened on the selected run's worktree.
+  Default comparison is **Latest run** (a snapshot taken at the start of every turn,
+  including dirty and untracked files, without touching your index/stash); also since
+  earlier turns, **Since task start**, **Original fork**, and any branch (merge-base or tip).
+  A separate **Workspace Dirty** view always shows staged, unstaged, untracked, conflicted
+  and unsaved work. **Follow** jumps to agent-reported edits across and within files and
+  pauses when you scroll or select a file until you press **Resume**.
+
+## Build and install (macOS)
+
+Requirements: Rust 1.89+ (`cargo`), Node 24, Git, and the VS Code `code` CLI.
+
+```bash
+git clone https://github.com/beelol/overseer.git && cd overseer
+npm ci --prefix extension/branch-diff/tooling/review --ignore-scripts
+npm ci --prefix extension/tooling/vsce --ignore-scripts
+node extension/scripts/package.js
+code --install-extension extension/overseer-0.1.0.vsix
+```
+
+`package.js` builds the review bundle, builds `overseerd` in release mode, copies it into the
+extension as `bin/overseerd-darwin-arm64` (or your platform/arch), and writes the VSIX.
+Reload VS Code; an **Overseer** (eye) icon appears in the activity bar. The extension starts
+the daemon on demand (detached), so agents keep running after you close VS Code.
+
+Run the checks:
+
+```bash
+cargo test
+```
+
+Packaged-UI scenarios (open a real, isolated VS Code window; see [test/ui](test/ui)):
+
+```bash
+node test/ui/scenario-main.js
+```
+
+## Using it
+
+1. **Accounts**: the Accounts view lists *existing login* profiles per harness and any
+   isolated profiles you add (**Add Account Profile…**, then **Sign In…**, which runs the
+   harness's own login in a terminal with that profile's credential home). Overseer never
+   asks for API keys and never logs out an existing login.
+2. **New Task** (+ in the Agents view): pick the repository, harness, account profile,
+   *New worktree* or *Current checkout*, the start ref, an optional model, and the prompt.
+3. The run opens its **Review** (Follow on for runs you launch) and an **output panel** with
+   the event stream, capabilities, **Send follow-up**, **Interrupt**, and permission
+   **Allow/Deny** when a harness asks. Controls a harness cannot support are disabled with
+   the reason.
+4. Click the comparison label (base icon) in the review to switch comparisons; hover it to
+   see the snapshot id or SHAs and their provenance.
+5. Edit in the review's working-tree side and press **Save**, or **Open in Native Diff** for
+   full editor features including undo/redo. Unsaved drafts are labeled and survive reloads
+   and external writes.
+
+## Recovery
+
+- State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run
+  output under `runs/`, worktrees under `worktrees/`, profiles under `profiles/`). Linux
+  uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it.
+- `overseerd ctl state` prints the daemon state; `overseerd ctl daemon.shutdown` stops the
+  daemon (runs continue under their supervisors and are reattached next start).
+- If a supervisor is killed, the run is marked `disconnected`/lost with the reason; nothing
+  is relaunched automatically. Snapshot refs live under `refs/overseer/snapshots/*` in your
+  repository and can be deleted with `git for-each-ref --format='%(refname)' refs/overseer | xargs -n1 git update-ref -d`.
+- Worktrees are only removed by the explicit **Clean Up Worktree…** action (branch kept).
+
+## Follow-ups
+
+Unchecked criteria keep their AC in the [RFC](docs/overseer-rfc.md); this list only tracks
+the owner action or decision each one needs.
+
+__FOLLOWUPS__
+
+## Project documents
 
 - [RFC and authoritative acceptance checklist](docs/overseer-rfc.md)
-- [Verification ledger and evidence requirements](docs/verification/README.md)
+- [Verification ledger and evidence](docs/verification/README.md)
+- [Harness compatibility](docs/compatibility.md)
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 
-The RFC contains confirmed user decisions, explicitly proposed defaults, exact Follow /
-live Review / base-comparison semantics, feasibility gates, and a draft implementation goal.
-Only verified behavior gets checked off; implemented-but-untested and blocked work stays open.
-Update this summary and the ledger together when criteria are verified.
-
-## Delivery order
-
-1. Validate account isolation, native child visibility and reuse choices (AC-01–03).
-2. Build the durable daemon and VS Code controls (AC-04–10).
-3. Integrate accounts/harnesses and recursive visibility (AC-11–20).
-4. Implement safe workspaces and live editable review (AC-21–35).
-5. Verify packaged behavior on macOS and dogfood it (AC-36–40); leave Linux AC-41 unchecked.
-
-Codex and Claude Code must use account login. OpenCode may initially be verified with
-mock responses or a very small local Qwen Coder through Ollama. Paid verification prompts
-must be tiny and use minimal tokens. Two OpenAI accounts exist, but agent login access is
-unproven. Skip Devin if account login is unavailable. Missing native child telemetry stays
-visible and unchecked without making an otherwise usable harness inaccessible.
-
-New agent runs default to changes since that run started; task-start, original fork and
-other-branch comparisons remain selectable. Follow pauses on navigation until resumed.
-
-**Planning only: explicit confirmation is required before implementation or harness tests.**
-The proposed eight-hour future implementation session is separate from runs inside Overseer;
-confirm that interpretation at start. No goal or overnight run is active. Auto routing and a
-terminal UI remain later milestones. No product tests have run or passed yet.
+Design targets macOS and Linux; only macOS is verified. Auto routing, a TUI, VSCodium,
+Windows/Remote SSH and hunk actions are later milestones.

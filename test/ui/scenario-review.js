@@ -98,6 +98,11 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
       while (Date.now() - t0 < limit) { if (await pred()) { result.timings[label] = Date.now() - t0; s.note('timing', { label, ms: result.timings[label] }); return result.timings[label]; } await delay(50); }
       result.timings[label] = null; s.note('timing', { label, ms: null }); return null;
     };
+    await reviewB.eval(`[...document.querySelectorAll('#tree .file')].find(b => b.textContent.includes('a.txt')).id = 'sel-a'`);
+    const selA = await s.webviewPoint(reviewB, '#sel-a');
+    await cdp.click(selA.x, selA.y);
+    await delay(500);
+    const selectedBefore = await reviewB.eval(`document.querySelector('#tree .file.active')?.textContent`);
     const tWrite = await timeUntil('write new file', () => fs.writeFileSync(path.join(wsB, 'x1.txt'), 'new\n'), reviewB, () => listed(reviewB, 'x1.txt'));
     const revBefore = await reviewB.eval(`[...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'b.txt')?.dataset.revision`);
     const tAtomic = await timeUntil('atomic replace', () => { fs.writeFileSync(path.join(wsB, '.b.tmp'), 'atomically replaced\n'); fs.renameSync(path.join(wsB, '.b.tmp'), path.join(wsB, 'b.txt')); }, reviewB,
@@ -109,6 +114,8 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     const tMissed = await timeUntil('missed watcher event (excluded folder)', () => { fs.mkdirSync(path.join(wsB, 'unwatched'), { recursive: true }); fs.writeFileSync(path.join(wsB, 'unwatched/y.txt'), 'y\n'); }, reviewB, () => listed(reviewB, 'unwatched/y.txt'), 12000);
     check('ordinary changes refresh within 2 s', [tWrite, tAtomic, tRename, tDelete, tBranch].every(t => t !== null && t <= 2000) && tStage !== null && tStage <= 2000, result.timings);
     check('missed watcher event reconciled within 5 s', tMissed !== null && tMissed <= 5000, tMissed);
+    const selectedAfter = await reviewB.eval(`document.querySelector('#tree .file.active')?.textContent`);
+    check('navigator selection preserved across live refreshes', selectedBefore && selectedBefore === selectedAfter, { selectedBefore, selectedAfter });
     await s.screenshot('refresh');
 
     // AC-34: unsafe/unsupported files keep truthful states.
@@ -164,6 +171,13 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     const reviewC = await reviewFor(repoA);
     check('current checkout review is the repository itself', true, await reviewC.eval(`document.getElementById('workspace-note').textContent`));
     await reviewC.waitFor(`[...document.querySelectorAll('.diff-file')].some(e => e.querySelector('.file-path')?.textContent === 'a.txt' && e.dataset.loadState === 'rendered')`, 20000);
+    const fbox = await s.webviewPoint(reviewC, '#follow');
+    await cdp.click(fbox.x, fbox.y);
+    await delay(700);
+    const note = await reviewC.eval(`document.getElementById('follow-state').textContent`);
+    check('filesystem-only harness shows the Follow limitation', /Filesystem evidence only/.test(note), note);
+    await cdp.click(fbox.x, fbox.y);
+    await delay(300);
     await editLine(reviewC, 'a.txt', ' SAVED-FROM-REVIEW', '/user.change/');
     const saveC = await s.webviewPoint(reviewC, '#save-target');
     await cdp.click(saveC.x, saveC.y);
@@ -190,11 +204,11 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     await s.screenshot('native-draft');
     // External agent write to the same line while the draft is unsaved.
     const disk = fs.readFileSync(path.join(repoA, 'a.txt'), 'utf8');
-    fs.writeFileSync(path.join(repoA, 'a.txt'), disk.replace(/L20: [^\n]*/, 'L20: AGENT-EXTERNAL-WRITE'));
+    fs.writeFileSync(path.join(repoA, 'a.txt'), disk.replace(/L5: [^\n]*/, 'L5: AGENT-EXTERNAL-WRITE'));
     await delay(2500);
     const draftKept = /NATIVE.DRAFT/.test(await textNow());
     const diskHasAgent = fs.readFileSync(path.join(repoA, 'a.txt'), 'utf8').includes('AGENT-EXTERNAL-WRITE');
-    check('external write does not overwrite the unsaved draft; both versions exist', draftKept && diskHasAgent, { draftKept, diskHasAgent });
+    check('same-line external write does not overwrite the unsaved draft; both versions exist', draftKept && diskHasAgent, { draftKept, diskHasAgent });
     await cdp.evalWorkbench('0');
     const draftListed = await cdp.waitFor(`[...document.querySelectorAll('.monaco-list-row')].some(r => /Unsaved drafts \\(1\\)/.test(r.textContent))`, 8000).catch(() => false);
     check('unsaved draft labeled in Workspace Dirty', draftListed);

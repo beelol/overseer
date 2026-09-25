@@ -85,6 +85,19 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     const resumed = await review.eval(`({ state: document.getElementById('follow-state').textContent, resume: !document.getElementById('resume').hidden })`);
     check('resume restarts follow', !resumed.resume && /Following/.test(resumed.state), resumed);
 
+    // Selecting another file in the navigator also pauses Follow.
+    await review.eval(`[...document.querySelectorAll('#tree .file')].find(b => b.textContent.includes('b.txt')).id = 'nav-b'`);
+    const navB = await s.webviewPoint(review, '#nav-b');
+    await cdp.click(navB.x, navB.y);
+    await delay(500);
+    const pausedBySelect = await review.eval(`({ state: document.getElementById('follow-state').textContent, resume: !document.getElementById('resume').hidden })`);
+    check('selecting another file pauses follow', pausedBySelect.resume && /paused/i.test(pausedBySelect.state), pausedBySelect);
+    const resume2 = await s.webviewPoint(review, '#resume');
+    await cdp.click(resume2.x, resume2.y);
+    await delay(500);
+    const baseTitle = await review.eval(`document.getElementById('base').title`);
+    check('base icon identifies snapshot and provenance', /Latest run/.test(baseTitle) && /Base: [0-9a-f]{40}/.test(baseTitle) && /snapshot s-/.test(baseTitle), baseTitle);
+
     // Follow off preserves position during further edits.
     const box = await s.webviewPoint(review, '#follow');
     await cdp.click(box.x, box.y);
@@ -142,6 +155,30 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     await delay(1000);
     await s.screenshot('interrupted');
     result.run = run.id; result.workspace = ws.path;
+
+    // Native child selected in the tree: controls are disabled with an explanation.
+    const deleg = s.ctl('task.create', { repo, harness: 'opencode', profile_id: profile.id, model: 'mock/mock-coder', prompt: 'please delegate twice', title: 'delegation' });
+    for (let i = 0; i < 40; i++) { if (s.ctl('state').runs.filter(r => r.task_id === deleg.task.id).length >= 3 && s.ctl('state').runs.find(r => r.id === deleg.run.id).status === 'completed') break; await delay(500); }
+    const icon = await cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.activitybar .action-item a, .activitybar .action-label')].find(a => /^Overseer/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const b = a.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000);
+    await cdp.click(icon.x, icon.y);
+    const childRow = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && /grandchild hi/.test(r.textContent)); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2, text: r.textContent }; })()`, 20000, 'grandchild row');
+    check('three-level native tree visible in the UI', /native child/.test(childRow.text), childRow.text);
+    await cdp.click(childRow.x, childRow.y);
+    const childOut = await cdp.webview(`document.getElementById('title')?.textContent.includes('grandchild hi')`, 20000);
+    const ctl = await childOut.eval(`({ interrupt: document.getElementById('interrupt').disabled, why: document.getElementById('interrupt-why').textContent, send: document.getElementById('send').disabled, sendWhy: document.getElementById('send-why').textContent, ws: document.getElementById('ws').textContent })`);
+    check('child controls disabled with explanation', ctl.interrupt && ctl.send && /parent/.test(ctl.why) && /top-level/.test(ctl.sendWhy) && /shared with parent/.test(ctl.ws), ctl);
+    await s.screenshot('native-child-selected');
+
+    // Daemon crash while the UI is open: UI shows disconnected, restarts the daemon and reconnects.
+    const hello = s.ctl('hello');
+    const tasksBefore = s.ctl('state').tasks.map(t => t.id).sort();
+    process.kill(hello.pid, 'SIGKILL');
+    const sawDisconnect = await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /disconnected/.test(e.textContent))`, 5000).catch(() => false);
+    await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \d+ active/.test(e.textContent))`, 20000, 'reconnected');
+    const hello2 = s.ctl('hello');
+    const tasksAfter = s.ctl('state').tasks.map(t => t.id).sort();
+    check('UI survives daemon crash: disconnected state, daemon restarted, same tasks', sawDisconnect && hello2.pid !== hello.pid && JSON.stringify(tasksBefore) === JSON.stringify(tasksAfter), { sawDisconnect, oldPid: hello.pid, newPid: hello2.pid, tasks: tasksAfter.length });
+    await s.screenshot('reconnected');
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message));
     result.error = error.message;

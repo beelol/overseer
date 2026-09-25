@@ -147,7 +147,8 @@ pub fn capabilities(harness: &str) -> Value {
             "approvals": "unsupported in exec transport: sandbox policy decides; requests are never auto-approved by Overseer",
             "file_activity": "supported (file_change items)", "children": "supported (collab_tool_call spawn_agent/wait; child output limited to final message)",
             "usage": "supported (turn.completed usage)", "quota": "unknown (error text classification only)",
-            "account_login": "ChatGPT account via codex login (CODEX_HOME per profile)"
+            "account_login": "ChatGPT account via codex login (CODEX_HOME per profile)",
+            "verification": "live-verified on macOS with one ChatGPT account (codex 0.155); two simultaneous accounts not yet verified"
         }),
         "claude" => json!({
             "transport": "claude -p stream-json (stdin/stdout)",
@@ -156,7 +157,8 @@ pub fn capabilities(harness: &str) -> Value {
             "approvals": "supported (--permission-prompt-tool stdio)", "file_activity": "supported (Write/Edit tool inputs)",
             "children": "supported (Agent/Task tool_use ids, parent_tool_use_id nesting, system task_* events)",
             "usage": "supported (result usage)", "quota": "unknown (error text classification only)",
-            "account_login": "Claude.ai account via claude auth login (CLAUDE_CONFIG_DIR per profile)"
+            "account_login": "Claude.ai account via claude auth login (CLAUDE_CONFIG_DIR per profile)",
+            "verification": "fixture-verified only (synthetic stream-json); live account run not yet verified"
         }),
         "opencode" => json!({
             "transport": "opencode run --format json (one process per turn)",
@@ -164,13 +166,15 @@ pub fn capabilities(harness: &str) -> Value {
             "interrupt": "supported (SIGINT)", "resume": "supported",
             "approvals": "unknown", "file_activity": "supported (edit/write tool parts)",
             "children": "partial (task tool parts expose child session ids when present)", "usage": "supported (step_finish tokens)",
-            "quota": "unknown", "account_login": "opencode auth login (XDG_DATA_HOME per profile); verified here only with a local mock provider"
+            "quota": "unknown", "account_login": "opencode auth login (XDG_DATA_HOME per profile); login itself untested",
+            "verification": "verified with a local mock model provider through the real OpenCode runtime; no account run verified"
         }),
         _ => json!({
             "transport": "generic process (stdin/stdout)", "launch": "supported", "output": "supported (raw lines)",
             "follow_up": "supported (writes a line to stdin)", "interrupt": "supported (SIGINT)", "resume": "unsupported",
             "approvals": "unknown", "file_activity": "unknown (filesystem only)", "children": "unknown", "usage": "unknown", "quota": "unknown",
-            "account_login": "not applicable"
+            "account_login": "not applicable",
+            "verification": "protocol tests with fixture executables"
         }),
     }
 }

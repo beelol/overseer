@@ -327,6 +327,10 @@ fn ac18_fixture_recursive_tree_duplicates_and_delayed_parent() {
         }
     };
     check(&d);
+    let child = d.runs().into_iter().find(|r| r["native_id"] == "toolu_child").unwrap();
+    let err = d.try_call("run.follow_up", json!({"run_id": child["id"], "prompt": "x"})).unwrap_err();
+    assert!(err.contains("top-level run"), "{err}");
+    assert!(d.try_call("run.interrupt", json!({"run_id": child["id"]})).unwrap_err().contains("parent"));
     d.kill9();
     d.spawn();
     check(&d);
@@ -684,4 +688,27 @@ fn ac34_merge_conflicts_do_not_break_snapshots_or_diffs() {
     let head = git(&repo, &["rev-parse", "HEAD"]);
     assert!(diff_paths(&d, &created, &head).contains(&("M".into(), "a.txt".into())));
     assert_eq!(std::fs::read(repo.join(".git/index")).unwrap(), index_before, "real index (with conflict stages) untouched");
+}
+
+#[test]
+fn ac09_follow_up_reaches_only_the_selected_run() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let a = d.generic(&repo, "worktree", "/bin/sh", &["-c", "cat >> input.txt"]);
+    let b = d.generic(&repo, "worktree", "/bin/sh", &["-c", "cat >> input.txt"]);
+    let (ra, rb) = (run_id(&a), run_id(&b));
+    d.wait_status(&ra, |s| s == "running", 10);
+    d.wait_status(&rb, |s| s == "running", 10);
+    d.call("run.follow_up", json!({"run_id": ra, "prompt": "only for A"}));
+    std::thread::sleep(Duration::from_millis(500));
+    assert_eq!(d.call("run.turns", json!({"run_id": ra})).as_array().unwrap().len(), 2);
+    assert_eq!(d.call("run.turns", json!({"run_id": rb})).as_array().unwrap().len(), 1);
+    assert_eq!(std::fs::read_to_string(ws_path(&d, &a).join("input.txt")).unwrap_or_default(), "only for A\n");
+    assert_eq!(std::fs::read_to_string(ws_path(&d, &b).join("input.txt")).unwrap_or_default(), "");
+    d.call("run.interrupt", json!({"run_id": ra}));
+    d.call("run.interrupt", json!({"run_id": rb}));
+    // Children cannot receive follow-ups or interrupts directly.
+    let err = d.try_call("run.follow_up", json!({"run_id": "r-missing", "prompt": "x"})).unwrap_err();
+    assert!(err.contains("unknown run"));
 }

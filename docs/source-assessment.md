@@ -58,3 +58,15 @@ before adoption under AC-03:
 
 A Rust daemon with a small adapter boundary is the proposed architecture, not a promise
 that an existing project's core can be copied into Rust without substantial work.
+
+## Outcome during implementation (2026-09-24)
+
+Branch Diff was adopted as planned: its review stack is vendored under
+`extension/branch-diff/` with its MIT LICENSE, and the modified files carry headers (see
+`extension/NOTICE.md` and [AC-03](verification/AC-03.md)). Verified in the packaged UI:
+external-worktree discovery (via the Git extension's `openRepository`), the staged/unstaged
+cancellation case (Workspace Dirty view plus daemon status), and live refresh within the
+RFC bounds including a deliberately missed watcher event. One upstream behaviour needed a
+change for agent workloads: under continuous writes the comparison restarted on every
+change and never published; it now publishes after one restart and catches up.
+Agetor, Parallel Code, Pane (AGPL) and XCB were inspected at pinned commits and skipped.
