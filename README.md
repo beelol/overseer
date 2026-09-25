@@ -5,13 +5,13 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **44 / 51** · **3** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-08, AC-11, AC-13, AC-41, AC-45, AC-50, AC-51. The biggest gaps are the newer owner requests still in progress
-(hunk accept/reject, a structured run conversation view, merge back, simple account governance
-([side RFC](docs/rfcs/account-governance.md)), a polished theme-compatible UI and a full-page
-Overseer view), live two-account runs (AC-12/13; both ChatGPT accounts are now signed in) and a
-foreign-user socket test (AC-08). Linux (AC-41) is out of scope for now; opening PRs (AC-50) and a
-worktree file tree (AC-51) are future work. Partial criteria list what is proven and what is deferred. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
+criteria: **44 / 51** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-08, AC-11, AC-13, AC-41, AC-45, AC-50, AC-51. The biggest gaps are owner actions, not
+code. Four criteria are partial, each with its proven part and a one-line owner action in
+[Follow-ups](#follow-ups): a real second-macOS-user socket check (AC-08); live Claude sign-in and
+re-sign-in (AC-11); a live sign-in cycle of a disposable account while another works (AC-13); and a
+screenshot of the macOS banner (AC-45). Linux (AC-41) is out of scope for now; opening PRs (AC-50)
+and a worktree file tree (AC-51) are future work. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
 ## Acceptance criteria
 
@@ -28,7 +28,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-05** Independent durable state — [evidence](docs/verification/AC-05.md)
 - [x] **AC-06** Honest process lifecycle — [evidence](docs/verification/AC-06.md)
 - [x] **AC-07** Persistent sessions — [evidence](docs/verification/AC-07.md)
-- [ ] **AC-08** Local access boundary — blocked: rejecting a different local user was never exercised (needs a second macOS account) — [evidence](docs/verification/AC-08.md)
+- [ ] **AC-08** Local access boundary — ◐ partial: owner-only socket (0600) and directory (0700); a connection from a uid other than the owner is refused without a reply, nothing runs, and the daemon logs `rejected connection from uid …` (test-only owner override); untrusted workspaces cannot launch; malformed requests cannot run shell fragments / deferred: a connection attempt from a real second macOS user (needs the owner's password for sudo) — [evidence](docs/verification/AC-08.md)
 - [x] **AC-09** Complete task controls — [evidence](docs/verification/AC-09.md)
 - [x] **AC-10** Event replay and bounded output — [evidence](docs/verification/AC-10.md)
 - [ ] **AC-11** Account profiles — ◐ partial: add/name/select accounts and sign in through each account's own flow in the UI (ChatGPT browser and device code, live for A/B; Claude via the fixture CLI); folders created at creation (0700); a missing login is shown and blocks the account tile; an expired login fails with a classified auth error and "Sign in again" reauthenticates that account, after which the follow-up works; no API keys / deferred: a live sign-in and re-sign-in of a fixed Claude account, and a live re-sign-in of a disposable ChatGPT account (both need the owner's browser login; A and B are never signed out) — [evidence](docs/verification/AC-11.md)
@@ -167,7 +167,7 @@ node test/ui/scenario-main.js
 Unchecked criteria keep their AC in the [RFC](docs/overseer-rfc.md); this list only tracks
 the owner action or decision each one needs.
 
-- [ ] [AC-08](docs/verification/AC-08.md) (Local access boundary): Needs a second local macOS user (owner creates a standard test account). Next: as that user, `nc -U <socket>` / `overseerd ctl hello` with the owner's `OVERSEER_HOME` must fail with a permission error, and a relaxed-permission socket must still be refused by the peer-uid check (log line `rejected connection from uid …`).
+- [ ] [AC-08](docs/verification/AC-08.md) (Local access boundary): Owner action: run `sudo -u nobody "$HOME/.vscode/extensions/beelol.overseer-0.1.0/bin/overseerd-darwin-arm64" ctl hello` (with `OVERSEER_HOME="$HOME/Library/Application Support/Overseer"`) and confirm it fails (permission denied or no reply) and the daemon log shows `rejected connection from uid`.
 - [ ] [AC-11](docs/verification/AC-11.md) (Account profiles): Owner action: in Overseer, Accounts → Add Account → Anthropic → Sign In, then Sign Out and Sign In again on that account (and optionally the same with a throwaway ChatGPT account).
 - [ ] [AC-13](docs/verification/AC-13.md) (Credential isolation on macOS): Owner action: sign a throwaway ChatGPT account (and a Claude account) into a new Overseer account, then Sign Out and Sign In it while ChatGPT B runs a task, and confirm B's identity is unchanged.
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.

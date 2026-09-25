@@ -8,9 +8,9 @@
       "name": "New Task is not offered/enabled in Restricted Mode",
       "ok": true,
       "detail": [
-        "Create New Terminal (With Profile), similar commands",
+        "Overseer: Open Overseer View, similar commands",
+        "Create New Terminal (With Profile)",
         "File: Compare New Untitled Text Files",
-        "File: Open Active Editor in New Empty Workspace",
         "Search Editor: New Search Editor",
         "Terminal: Create New Terminal Starting in a Custom Working Directory"
       ]
@@ -21,9 +21,9 @@
       "detail": {
         "title": " ",
         "rows": [
-          "Create New Terminal (With Profile), similar commands",
+          "Overseer: Open Overseer View, similar commands",
+          "Create New Terminal (With Profile)",
           "File: Compare New Untitled Text Files",
-          "File: Open Active Editor in New Empty Workspace",
           "Search Editor: New Search Editor",
           "Terminal: Create New Terminal Starting in a Custom Working Directory"
         ],
