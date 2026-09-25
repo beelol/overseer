@@ -55,7 +55,14 @@ const rss = pattern => { const out = cp.spawnSync('ps', ['-axo', 'rss=,command='
     while (Date.now() - t0 < (MINUTES * 60 - 60) * 1000) {
       // Navigation: click a file in the navigator and measure until its diff is in view.
       const target = await review.eval(`(() => { document.querySelectorAll('#nav-target').forEach(x => x.removeAttribute('id')); const b = [...document.querySelectorAll('#tree .file')]; const e = b[(${k} * 37) % b.length]; e.id = 'nav-target'; e.scrollIntoView({ block: 'center' }); return e.dataset.id; })()`);
-      const p = await s.webviewPoint(review, '#nav-target');
+      let p = await s.webviewPoint(review, '#nav-target');
+      // The navigator re-renders when new files appear; confirm the element under the pointer.
+      for (let tries = 0; tries < 3; tries++) {
+        const inner = await review.eval(`(() => { const e = document.getElementById('nav-target'); if (!e) return null; const r = e.getBoundingClientRect(); const x = r.left + Math.min(r.width / 2, 40), y = r.top + Math.min(r.height / 2, 12); const hit = document.elementFromPoint(x, y)?.closest('.file'); return { ok: hit === e }; })()`);
+        if (inner && inner.ok) break;
+        await review.eval(`(() => { document.querySelectorAll('#nav-target').forEach(x => x.removeAttribute('id')); const e = [...document.querySelectorAll('#tree .file')].find(b => b.dataset.id === ${JSON.stringify(target)}); if (e) { e.id = 'nav-target'; e.scrollIntoView({ block: 'center' }); } })()`);
+        p = await s.webviewPoint(review, '#nav-target');
+      }
       await review.eval(`window.__navStart = performance.now(); window.__navDone = undefined; (() => { const id = ${JSON.stringify(target)}; const check = () => { const el = document.querySelector('.diff-file[data-id="' + id + '"]'); const d = document.getElementById('diffs'); const r = el && el.getBoundingClientRect(), dr = d.getBoundingClientRect(); if (el && r.top < dr.bottom - 20 && r.bottom > dr.top + 5 && document.querySelector('#tree .file.active')?.dataset.id === id) window.__navDone = { ms: performance.now() - window.__navStart }; else setTimeout(check, 5); }; setTimeout(check, 0); })()`);
       await cdp.click(p.x, p.y);
       const done = await review.waitFor(`window.__navDone`, 5000).catch(() => undefined);
@@ -86,7 +93,7 @@ const rss = pattern => { const out = cp.spawnSync('ps', ['-axo', 'rss=,command='
     // Drain: stop the runs and observe memory settle.
     for (const t of tasks) { try { s.ctl('run.interrupt', { run_id: t.run.id }); } catch {} }
     await delay(20000);
-    const drained = { exthostKB: rss('Code Helper (Plugin)'), daemonKB: rss('overseerd-darwin'), webviewHeapMB: await review.eval(`performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null`) };
+    const drained = { exthostKB: rss('Code Helper (Plugin)'), daemonKB: rss('overseerd-darwin'), rendererKB: rss('Code Helper (Renderer)'), webviewHeapMB: await review.eval(`performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null`) };
     result.drained = drained; result.baseline = baseline;
     const p95 = pct(result.nav, 0.95);
     result.navP95 = p95; result.navP50 = pct(result.nav, 0.5);

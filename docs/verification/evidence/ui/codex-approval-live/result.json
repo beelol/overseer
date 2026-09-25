@@ -10,11 +10,18 @@
       }
     },
     {
-      "name": "Allow runs the command",
-      "ok": false,
+      "name": "Allow click reached the run",
+      "ok": true,
       "detail": {
-        "status": "waiting_for_user",
-        "reason": null
+        "status": "running"
+      }
+    },
+    {
+      "name": "Allow runs the command",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reason": "turn completed; exit 0"
       }
     },
     {
@@ -31,7 +38,7 @@
         "status": "completed",
         "reason": "turn completed; exit 0",
         "output": [
-          "2026-09-25T07:13:00.960958Z ERROR codex_core::tools::router: error=exec_command failed: CreateProcess { message: \"Rejected(\\\"rejected by user\\\")\" }",
+          "2026-09-25T07:14:50.637487Z ERROR codex_core::tools::router: error=exec_command failed: CreateProcess { message: \"Rejected(\\\"rejected by user\\\")\" }",
           "declined"
         ]
       }
@@ -59,11 +66,7 @@
   },
   "usage": [
     {
-      "run": "r-d39279426b92",
-      "status": "waiting_for_user"
-    },
-    {
-      "run": "r-a665451f6582",
+      "run": "r-ccb0f94b35da",
       "status": "completed",
       "usage": {
         "rate_limits": {
@@ -89,7 +92,33 @@
       }
     },
     {
-      "run": "r-a129cbd4c167",
+      "run": "r-947847406452",
+      "status": "completed",
+      "usage": {
+        "rate_limits": {
+          "credits": {
+            "balance": "0",
+            "hasCredits": false,
+            "unlimited": false
+          },
+          "individualLimit": null,
+          "limitId": "codex",
+          "limitName": null,
+          "normalModelSlug": null,
+          "planType": "pro",
+          "primary": {
+            "resetsAt": 1790411599,
+            "usedPercent": 49,
+            "windowDurationMins": 10080
+          },
+          "rateLimitReachedType": null,
+          "secondary": null,
+          "spendControlReached": null
+        }
+      }
+    },
+    {
+      "run": "r-9623edddbc85",
       "status": "interrupted",
       "usage": {
         "rate_limits": {
