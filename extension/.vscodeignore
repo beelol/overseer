@@ -1,0 +1,13 @@
+**/*
+!package.json
+!README.md
+!LICENSE
+!NOTICE.md
+!media/**
+!src/**
+!bin/**
+!branch-diff/LICENSE
+!branch-diff/review/comparison.js
+!branch-diff/review/panel.js
+!branch-diff/review/editing.js
+!branch-diff/dist/**

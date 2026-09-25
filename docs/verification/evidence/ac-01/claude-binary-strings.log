@@ -1,0 +1,32 @@
+# Static string inspection of the installed Claude Code 2.1.246 binary (/Users/bilal/.local/share/claude/versions/2.1.246).
+# No execution of model calls; no secret read. Command: strings -n 8 <binary> | grep ...
+
+## Keychain service-name construction (verbatim minified excerpt)
+function O(){let n=process.env.CLAUDE_SECURESTORAGE_CONFIG_DIR;if(n!==void 0)return(n||y(g(),".claude")).normalize("NFC");return i()}function v(n=""){let e=process.env.CLAUDE_SECURESTORAGE_CONFIG_DIR,t=e!==void 0?!e:!process.env.CLAUDE_CONFIG_DIR,r=e!==void 0?e.normalize("NFC"):i(),s=t?"":`-${m("sha256").update(r).digest("hex").substring(0,8)}`;return`Claude Code${o().OAUTH_FILE_SUFFIX}${n}${s}`}function U(){let n;try{n=process.env.USER||S().username}catch{n="claude-code-user"}if(!C.test(n))return"claude-code-user";return n}class u{cache={data:null,cachedAt:0};generation=0;readInFlight=null;lastReadFailure=null;lastKnown=null;legacyApiKeyPrefetch=null}function l(){return E.of(a().host)}function b(){let n=l();n.cache={data:null,cachedAt:0},n.generation+
+
+## Hidden/undocumented-in-help flags present in binary
+--permission-prompt-tool     occurrences=19
+--sdk-url                    occurrences=27
+--resume-session-at          occurrences=12
+--include-hook-events        occurrences=3
+--forward-subagent-text      occurrences=5
+--replay-user-messages       occurrences=6
+
+## stream-json message type literals seen
+"system"               occurrences=216
+subtype:"init"         occurrences=1
+parent_tool_use_id     occurrences=35
+control_request        occurrences=65
+control_response       occurrences=61
+can_use_tool           occurrences=30
+interrupt              occurrences=388
+task_started           occurrences=15
+task_notification      occurrences=18
+task_progress          occurrences=10
+rate_limit_event       occurrences=11
+SubagentStart          occurrences=20
+SubagentStop           occurrences=35
+
+## keychain probe (metadata only, no secret; acct redacted):
+$ security find-generic-password -s "Claude Code-credentials"   -> item present in login.keychain-db, class genp, acct <redacted>
+$ security find-generic-password -s "Codex Auth"                -> not found

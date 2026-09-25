@@ -1,0 +1,13 @@
+{
+  "name": "branch-diff-local-review-build",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned Monaco and build tools; only reviewed browser bundles are shipped.",
+  "devDependencies": {
+    "monaco-editor": "0.56.0",
+    "esbuild": "0.28.2"
+  },
+  "overrides": {
+    "dompurify": "3.4.14"
+  }
+}

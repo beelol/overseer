@@ -1,0 +1,94 @@
+{
+  "name": "overseer",
+  "displayName": "Overseer",
+  "description": "Launch and supervise account-authenticated agent harnesses, follow their native children, and review/edit their worktrees live (review built on Branch Diff).",
+  "version": "0.1.0",
+  "publisher": "beelol",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/beelol/overseer.git" },
+  "engines": { "vscode": "^1.136.0" },
+  "categories": ["SCM Providers", "Other"],
+  "main": "./src/extension.js",
+  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review"],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Overseer can show existing agent runs in restricted mode, but launching or controlling agents requires a trusted workspace."
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [{ "id": "overseer", "title": "Overseer", "icon": "media/overseer.svg" }]
+    },
+    "views": {
+      "overseer": [
+        { "id": "overseer.agents", "name": "Agents" },
+        { "id": "overseer.dirty", "name": "Workspace Dirty" },
+        { "id": "overseer.accounts", "name": "Accounts" }
+      ]
+    },
+    "viewsWelcome": [
+      { "view": "overseer.agents", "contents": "No agent tasks yet.\n[New Task](command:overseer.newTask)\nOverseer runs agents through a local daemon; closing VS Code does not stop them.", "when": "isWorkspaceTrusted" },
+      { "view": "overseer.agents", "contents": "Launching agents requires a trusted workspace.\n[Manage Workspace Trust](command:workbench.trust.manage)", "when": "!isWorkspaceTrusted" }
+    ],
+    "commands": [
+      { "command": "overseer.newTask", "title": "New Task…", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.refresh", "title": "Refresh", "category": "Overseer", "icon": "$(refresh)" },
+      { "command": "overseer.openReview", "title": "Open Review", "category": "Overseer", "icon": "$(diff-multiple)" },
+      { "command": "overseer.showOutput", "title": "Show Output", "category": "Overseer", "icon": "$(output)" },
+      { "command": "overseer.followUp", "title": "Send Follow-up…", "category": "Overseer", "icon": "$(comment)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.interrupt", "title": "Interrupt", "category": "Overseer", "icon": "$(debug-stop)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.selectComparison", "title": "Select Comparison…", "category": "Overseer", "icon": "$(git-compare)" },
+      { "command": "overseer.cleanupWorkspace", "title": "Clean Up Worktree…", "category": "Overseer", "icon": "$(trash)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.addProfile", "title": "Add Account Profile…", "category": "Overseer", "icon": "$(person-add)" },
+      { "command": "overseer.signIn", "title": "Sign In…", "category": "Overseer", "icon": "$(sign-in)" },
+      { "command": "overseer.signOut", "title": "Sign Out", "category": "Overseer", "icon": "$(sign-out)" },
+      { "command": "overseer.renameProfile", "title": "Rename Profile…", "category": "Overseer", "icon": "$(edit)" },
+      { "command": "overseer.refreshAccounts", "title": "Refresh Account Status", "category": "Overseer", "icon": "$(refresh)" },
+      { "command": "overseer.openDirtyDiff", "title": "Open Diff", "category": "Overseer" },
+      { "command": "overseer.showCapabilities", "title": "Show Harness Capabilities", "category": "Overseer", "icon": "$(info)" },
+      { "command": "overseer.showLog", "title": "Show Daemon Log", "category": "Overseer" },
+      { "command": "overseer.restartDaemonConnection", "title": "Reconnect to Daemon", "category": "Overseer" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "overseer.newTask", "when": "view == overseer.agents", "group": "navigation@1" },
+        { "command": "overseer.refresh", "when": "view == overseer.agents", "group": "navigation@2" },
+        { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "navigation@3" },
+        { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
+        { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
+        { "command": "overseer.selectComparison", "when": "view == overseer.dirty", "group": "navigation@1" }
+      ],
+      "view/item/context": [
+        { "command": "overseer.openReview", "when": "view == overseer.agents && viewItem =~ /run/", "group": "inline@1" },
+        { "command": "overseer.showOutput", "when": "view == overseer.agents && viewItem =~ /run/", "group": "inline@2" },
+        { "command": "overseer.interrupt", "when": "view == overseer.agents && viewItem =~ /run-root-active/", "group": "inline@3" },
+        { "command": "overseer.followUp", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "1_control@1" },
+        { "command": "overseer.selectComparison", "when": "view == overseer.agents && viewItem =~ /run/", "group": "1_control@2" },
+        { "command": "overseer.cleanupWorkspace", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "9_cleanup@1" },
+        { "command": "overseer.signIn", "when": "view == overseer.accounts && viewItem =~ /profile/", "group": "inline@1" },
+        { "command": "overseer.renameProfile", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@1" },
+        { "command": "overseer.signOut", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@2" }
+      ],
+      "commandPalette": [
+        { "command": "overseer.openDirtyDiff", "when": "false" }
+      ]
+    },
+    "configuration": {
+      "title": "Overseer",
+      "properties": {
+        "overseer.daemonPath": { "type": "string", "default": "", "markdownDescription": "Path to the `overseerd` binary. Empty uses the binary bundled with the extension.", "scope": "machine" },
+        "overseer.review.enableEditing": { "type": "boolean", "default": true, "markdownDescription": "Edit working-tree text directly in the review. Undo/redo is available through Open in Native Diff." },
+        "overseer.review.largeDiffThreshold": { "type": "integer", "minimum": 1, "default": 500, "markdownDescription": "Show a Load Diff card when additions + deletions exceed this count." },
+        "overseer.followNewRuns": { "type": "boolean", "default": true, "markdownDescription": "Turn Follow on for runs you launch from this window. Selecting an existing run never turns Follow on." }
+      }
+    }
+  },
+  "scripts": {
+    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/review.js && node --check src/output-panel.js && node --check branch-diff/review/panel.js",
+    "build:review": "node branch-diff/scripts/build-review.js",
+    "package": "node scripts/package.js",
+    "test": "node test/run.js"
+  }
+}

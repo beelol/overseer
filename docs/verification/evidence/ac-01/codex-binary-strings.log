@@ -1,0 +1,27 @@
+# Static string counts in the bundled Codex binary (/Applications/ChatGPT.app/Contents/Resources/codex, codex-cli 0.155.0-alpha.16.4). No execution.
+# Command: strings -n 4 <binary> | grep -cF -- <literal>
+collab_tool_call             1
+thread.started               3
+turn.started                 1
+turn.completed               1
+turn.failed                  1
+item.started                 1
+item.updated                 1
+item.completed               1
+spawn_agent                  38
+send_input                   10
+wait_agent                   20
+close_agent                  11
+resume_agent                 9
+followup_task                17
+list_agents                  10
+interrupt_agent              9
+send_message                 29
+Codex Auth                   1
+cli_auth_credentials_store   21
+
+$ security find-generic-password -s "Codex Auth"  (metadata only, no -w/-g)
+security: SecKeychainSearchCopyNext: The specified item could not be found in the keychain.
+
+$ ls ~/.codex/auth.json
+/Users/bilal/.codex/auth.json
