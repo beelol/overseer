@@ -10,6 +10,13 @@
       }
     },
     {
+      "name": "Allow click reached the run",
+      "ok": true,
+      "detail": {
+        "status": "running"
+      }
+    },
+    {
       "name": "Allow runs the command",
       "ok": true,
       "detail": {
@@ -59,7 +66,7 @@
   },
   "usage": [
     {
-      "run": "r-81cff352b2ab",
+      "run": "r-44cd59e69584",
       "status": "completed",
       "usage": {
         "total": {
@@ -69,7 +76,7 @@
       }
     },
     {
-      "run": "r-e394ddab9293",
+      "run": "r-1f35f7c58ce7",
       "status": "completed",
       "usage": {
         "total": {
@@ -79,7 +86,7 @@
       }
     },
     {
-      "run": "r-a1a27358057e",
+      "run": "r-ff094c9c644b",
       "status": "interrupted"
     }
   ]

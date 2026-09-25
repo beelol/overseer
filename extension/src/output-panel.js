@@ -102,7 +102,8 @@ h1{font-size:1.1em;margin:0 0 4px}
 .ev.kind-status,.ev.kind-turn_started,.ev.kind-turn_done,.ev.kind-session,.ev.kind-reattached{opacity:.7;font-style:italic}
 .ev.kind-child{color:var(--vscode-charts-purple)}
 .ev.kind-retention{color:var(--vscode-editorWarning-foreground)}
-.perm{border:1px solid var(--vscode-editorWarning-foreground);padding:8px;margin:8px 0}
+.perm{border:1px solid var(--vscode-editorWarning-foreground);padding:8px;margin:8px 0;position:sticky;top:0;background:var(--vscode-editor-background);z-index:2}
+.perm-input{max-height:140px;overflow:auto;font-size:.85em}
 footer{position:sticky;bottom:0;background:var(--vscode-editor-background);padding-top:8px}
 textarea{width:100%;box-sizing:border-box;min-height:48px;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,transparent)}
 button{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;padding:4px 10px;margin:4px 4px 0 0;cursor:pointer}
@@ -172,7 +173,8 @@ function setRun(msg){ run = msg.run;
     const pre = document.createElement('pre'); pre.textContent = JSON.stringify(run.attention.input, null, 2).slice(0, 4000);
     const allow = document.createElement('button'); allow.textContent = 'Allow once'; allow.onclick = () => vscode.postMessage({ type: 'permission', request_id: run.attention.request_id, allow: true });
     const deny = document.createElement('button'); deny.className = 'secondary'; deny.textContent = 'Deny'; deny.onclick = () => vscode.postMessage({ type: 'permission', request_id: run.attention.request_id, allow: false });
-    box.append(t, pre, allow, deny); perm.append(box);
+    pre.className = 'perm-input';
+    box.append(t, allow, deny, pre); perm.append(box);
   } }
 window.addEventListener('message', e => { const m = e.data;
   if (m.type === 'run') setRun(m);

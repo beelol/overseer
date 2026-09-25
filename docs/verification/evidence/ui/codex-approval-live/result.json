@@ -1,0 +1,118 @@
+{
+  "checks": [
+    {
+      "name": "codex-app run waits for permission (not auto-approved)",
+      "ok": true,
+      "detail": {
+        "status": "waiting_for_user",
+        "attention": "command: /bin/zsh -lc 'touch approved.txt'",
+        "reason": null
+      }
+    },
+    {
+      "name": "Allow runs the command",
+      "ok": false,
+      "detail": {
+        "status": "waiting_for_user",
+        "reason": null
+      }
+    },
+    {
+      "name": "deny: waiting for permission",
+      "ok": true,
+      "detail": {
+        "status": "waiting_for_user"
+      }
+    },
+    {
+      "name": "Deny: command not run, harness told",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reason": "turn completed; exit 0",
+        "output": [
+          "2026-09-25T07:13:00.960958Z ERROR codex_core::tools::router: error=exec_command failed: CreateProcess { message: \"Rejected(\\\"rejected by user\\\")\" }",
+          "declined"
+        ]
+      }
+    },
+    {
+      "name": "interrupt: waiting for permission",
+      "ok": true,
+      "detail": {
+        "status": "waiting_for_user"
+      }
+    },
+    {
+      "name": "Interrupt while waiting for permission",
+      "ok": true,
+      "detail": {
+        "status": "interrupted",
+        "reason": "interrupted by user (exit code 0)"
+      }
+    }
+  ],
+  "identity": {
+    "plan": "pro",
+    "account": "2e1fa92158bacc71",
+    "version": "codex-cli 0.155.0-alpha.16.4"
+  },
+  "usage": [
+    {
+      "run": "r-d39279426b92",
+      "status": "waiting_for_user"
+    },
+    {
+      "run": "r-a665451f6582",
+      "status": "completed",
+      "usage": {
+        "rate_limits": {
+          "credits": {
+            "balance": "0",
+            "hasCredits": false,
+            "unlimited": false
+          },
+          "individualLimit": null,
+          "limitId": "codex",
+          "limitName": null,
+          "normalModelSlug": null,
+          "planType": "pro",
+          "primary": {
+            "resetsAt": 1790411599,
+            "usedPercent": 49,
+            "windowDurationMins": 10080
+          },
+          "rateLimitReachedType": null,
+          "secondary": null,
+          "spendControlReached": null
+        }
+      }
+    },
+    {
+      "run": "r-a129cbd4c167",
+      "status": "interrupted",
+      "usage": {
+        "rate_limits": {
+          "credits": {
+            "balance": "0",
+            "hasCredits": false,
+            "unlimited": false
+          },
+          "individualLimit": null,
+          "limitId": "codex",
+          "limitName": null,
+          "normalModelSlug": null,
+          "planType": "pro",
+          "primary": {
+            "resetsAt": 1790411599,
+            "usedPercent": 49,
+            "windowDurationMins": 10080
+          },
+          "rateLimitReachedType": null,
+          "secondary": null,
+          "spendControlReached": null
+        }
+      }
+    }
+  ]
+}
