@@ -1,0 +1,43 @@
+{
+  "checks": [
+    {
+      "name": "workspace opened in Restricted Mode",
+      "ok": true
+    },
+    {
+      "name": "New Task is not offered/enabled in Restricted Mode",
+      "ok": true,
+      "detail": [
+        "Create New Terminal (With Profile), similar commands",
+        "File: Compare New Untitled Text Files",
+        "File: Open Active Editor in New Empty Workspace",
+        "Search Editor: New Search Editor",
+        "Terminal: Create New Terminal Starting in a Custom Working Directory"
+      ]
+    },
+    {
+      "name": "no task flow started",
+      "ok": true,
+      "detail": {
+        "title": " ",
+        "rows": [
+          "Create New Terminal (With Profile), similar commands",
+          "File: Compare New Untitled Text Files",
+          "File: Open Active Editor in New Empty Workspace",
+          "Search Editor: New Search Editor",
+          "Terminal: Create New Terminal Starting in a Custom Working Directory"
+        ],
+        "value": ">Overseer: New Task"
+      }
+    },
+    {
+      "name": "view explains that launching requires trust",
+      "ok": true
+    },
+    {
+      "name": "no task or harness launched",
+      "ok": true,
+      "detail": 0
+    }
+  ]
+}

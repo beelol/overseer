@@ -241,7 +241,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             json!({"events": events, "oldest_retained": oldest})
         }
         "comparison.options" => d.comparisons(s(p, "run_id")?, p["branch"].as_str())?,
-        "workspace.diff" => d.workspace_diff(s(p, "workspace_id")?, s(p, "base")?)?,
+        "workspace.diff" => d.workspace_diff_opts(s(p, "workspace_id")?, s(p, "base")?, p["status"].as_bool().unwrap_or(true))?,
         "workspace.status" => {
             let ws = d.workspace(s(p, "workspace_id")?)?;
             json!(crate::git::status(std::path::Path::new(&ws.path))?)

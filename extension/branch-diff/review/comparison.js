@@ -86,12 +86,18 @@ class Comparison {
   }
 
   async compute() {
+    // Overseer: under continuous agent writes the epoch changes faster than a comparison
+    // completes. Restart at most twice, then publish the (briefly stale) result and
+    // immediately schedule a catch-up instead of starving the view. Overseer sessions skip
+    // the Git extension status rescan: entries come from the daemon's own snapshot diff.
+    let restarts = 0;
     while (!this.disposed) {
       const epoch = this.epoch;
+      const current = () => epoch === this.epoch || restarts >= 1;
       let next;
       try {
         this.progress(this.snapshot ? 'Updating comparison…' : 'Finding branch base…');
-        if (this.needsStatus) {
+        if (this.needsStatus && !this.helpers.skipRepoStatus) {
           this.needsStatus = false;
           this.refreshingStatus = true;
           try { await this.repo.status(); } finally { this.refreshingStatus = false; }
@@ -119,18 +125,19 @@ class Comparison {
           if (discovery && old && !this.preview && old.mode === partial.mode && old.context?.mergeBase === context.mergeBase &&
               old.description?.headName === description.headName && old.description?.base === description.base &&
               membership(old.entries) === membership(entries)) return;
-          if (this.disposed || epoch !== this.epoch || inputs !== this.inputs()) return;
+          if (this.disposed || !current() || inputs !== this.inputs()) return;
           this.preview = { ...partial, entries, version: ++this.version };
           this.emitter.fire(this.preview);
         };
-        const entries = await this.entries(context, head, publish, () => epoch === this.epoch);
-        if (this.repo.state.HEAD?.commit !== head || inputs !== this.inputs()) { this.epoch++; continue; }
+        const entries = await this.entries(context, head, publish, current);
+        if ((this.repo.state.HEAD?.commit !== head || inputs !== this.inputs()) && restarts++ < 1) { this.epoch++; continue; }
         next = { context, description: { ...description, mode: this.mode }, entries, inputs,
           warning: this.completenessWarning(), mode: this.mode };
       } catch (error) {
         next = { entries: [], error: error.message || String(error), mode: this.mode };
       }
-      if (epoch !== this.epoch) continue;
+      if (epoch !== this.epoch && restarts++ < 1) continue;
+      const stale = epoch !== this.epoch;
       const fingerprint = digest(JSON.stringify({
         inputs: next.inputs, description: next.description, warning: next.warning, error: next.error, mode: next.mode,
         entries: next.entries.map(e => [e.id, e.revision, e.status, e.unsaved, e.problem]),
@@ -144,6 +151,7 @@ class Comparison {
       }
       this.progress('');
       const published = this.snapshot;
+      if (stale) { clearTimeout(this.timer); this.timer = setTimeout(() => { this.ready().catch(() => {}); }, 150); }
       // Commit subjects are decorative: publish the authoritative membership first.
       if (published.context && !this.baseCache?.description) {
         const cache = this.baseCache;
