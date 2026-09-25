@@ -6,9 +6,9 @@ review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
 criteria: **34 / 41** (see [ledger](docs/verification/README.md)). Unverified:
-AC-11, AC-12, AC-13, AC-14, AC-19, AC-41. The biggest gaps are live Claude Code (its login on the test machine is
+AC-08, AC-11, AC-12, AC-13, AC-14, AC-19, AC-41. The biggest gaps are live Claude Code (its login on the test machine is
 expired), two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
-and Linux (no environment). Details and next actions are in [Follow-ups](#follow-ups).
+a foreign-user socket rejection test (needs a second macOS account), and Linux (no environment). Details and next actions are in [Follow-ups](#follow-ups).
 
 ## What works today (macOS, VS Code 1.139)
 
@@ -40,14 +40,15 @@ and Linux (no environment). Details and next actions are in [Follow-ups](#follow
 Requirements: Rust 1.89+ (`cargo`), Node 24, Git, and the VS Code `code` CLI.
 
 ```bash
-git clone https://github.com/beelol/overseer.git && cd overseer
+git clone https://github.com/beelol/overseer.git && cd overseer   # until PR #1 merges: add --branch claude/overseer-macos-app-2d3d20
 npm ci --prefix extension/branch-diff/tooling/review --ignore-scripts
 npm ci --prefix extension/tooling/vsce --ignore-scripts
 node extension/scripts/package.js
 code --install-extension extension/overseer-0.1.0.vsix
 ```
 
-`package.js` builds the review bundle, builds `overseerd` in release mode, copies it into the
+`package.js` builds the review bundle, builds `overseerd` in release mode
+(`target/release/overseerd`; a few dead-code warnings are expected), copies it into the
 extension as `bin/overseerd-darwin-arm64` (or your platform/arch), and writes the VSIX.
 Reload VS Code; an **Overseer** (eye) icon appears in the activity bar. The extension starts
 the daemon on demand (detached), so agents keep running after you close VS Code.
@@ -87,8 +88,11 @@ node test/ui/scenario-main.js
 - State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run
   output under `runs/`, worktrees under `worktrees/`, profiles under `profiles/`). Linux
   uses `$XDG_DATA_HOME/overseer`. `OVERSEER_HOME` overrides it.
-- `overseerd ctl state` prints the daemon state; `overseerd ctl daemon.shutdown` stops the
-  daemon (runs continue under their supervisors and are reattached next start).
+- The daemon binary is `target/release/overseerd` in a build, or
+  `~/.vscode/extensions/beelol.overseer-0.1.0/bin/overseerd-darwin-arm64` once installed.
+  `overseerd serve` runs it in the foreground without VS Code (the extension normally starts
+  it detached). `overseerd ctl state` prints the daemon state; `overseerd ctl daemon.shutdown`
+  stops the daemon (runs continue under their supervisors and are reattached next start).
 - If a supervisor is killed, the run is marked `disconnected`/lost with the reason; nothing
   is relaunched automatically. Snapshot refs live under `refs/overseer/snapshots/*` in your
   repository and can be deleted with `git for-each-ref --format='%(refname)' refs/overseer | xargs -n1 git update-ref -d`.

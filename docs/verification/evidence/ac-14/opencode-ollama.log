@@ -1,0 +1,31 @@
+# OpenCode 1.15.13 + Ollama 0.34.2 (local models, no account, no paid tokens), overseerd at adb2dc9
+# Profile config: provider ollama via @ai-sdk/openai-compatible, baseURL http://127.0.0.1:11434/v1
+
+## run r-e6a5b123e168 model ollama/qwen2.5-coder:14b status completed - turn completed; exit 0
+4 turn_started exact {"snapshot": "2ad8a5ac91b4907a8ec6108c8085a443403fece3", "turn": {"ended_ms": null, "id": "u-0c9933076271", "n": 1, "prompt": "Use the write tool to create a file named ollama.txt in the current directory containing exac
+5 status exact {"generation": 1, "program": "/Users/bilal/.opencode/bin/opencode", "status": "starting"}
+6 status exact {"status": "running", "why": "harness process started"}
+7 output exact {"role": "stderr", "text": "Performing one time database migration, may take a few minutes..."}
+8 output exact {"role": "stderr", "text": "sqlite-migration:done"}
+9 output exact {"role": "stderr", "text": "Database migration complete."}
+10 session exact {"native_id": "ses_f28713706ffe9spNJu6b33iDqx"}
+11 output exact {"role": "assistant", "text": "{\n  \"name\": \"write\",\n  \"arguments\": {\n    \"content\": \"hello from qwen\",\n    \"filePath\": \"/tmp/ovs-ollama/worktrees/ovs-ollama-repo-0052cd44/ollama-write/ollama.txt\
+12 usage exact {"cost": 0, "reason": "stop", "tokens": {"cache": {"read": 5, "write": 0}, "input": 9584, "output": 67, "reasoning": 0, "total": 9656}}
+13 turn_done exact {"ok": true, "summary": null}
+14 status exact {"reason": "turn completed; exit 0", "status": "completed"}
+
+## run r-7d8a0aef8634 model ollama/qwen3-coder:30b status completed - turn completed; exit 0
+16 turn_started exact {"snapshot": "ebdd9fd0c66e764768b0c5567daecbba84d6967a", "turn": {"ended_ms": null, "id": "u-5b760227361e", "n": 1, "prompt": "Use the write tool to create a file named ollama.txt in the current directory containing exac
+17 status exact {"generation": 1, "program": "/Users/bilal/.opencode/bin/opencode", "status": "starting"}
+18 status exact {"status": "running", "why": "harness process started"}
+19 session exact {"native_id": "ses_f28708d32ffeMFVEmE6OWg1x2T"}
+20 file_activity tool-input {"attribution": "reported by the agent harness", "kind": "write", "paths": ["ollama.txt"]}
+21 tool exact {"id": "call_2oz1fsez", "name": "write", "summary": "{\"content\":\"hello from qwen\",\"filePath\":\"/tmp/ovs-ollama/worktrees/ovs-ollama-repo-0052cd44/ollama-write-qwen3/ollama.txt\"} [completed]"}
+22 usage exact {"cost": 0, "reason": "tool-calls", "tokens": {"cache": {"read": 0, "write": 0}, "input": 10219, "output": 71, "reasoning": 0, "total": 10290}}
+23 output exact {"role": "assistant", "text": "File ollama.txt created successfully with the content \"hello from qwen\"."}
+24 usage exact {"cost": 0, "reason": "stop", "tokens": {"cache": {"read": 10218, "write": 0}, "input": 89, "output": 17, "reasoning": 0, "total": 10324}}
+25 turn_done exact {"ok": true, "summary": null}
+26 status exact {"reason": "turn completed; exit 0", "status": "completed"}
+
+# result file in the qwen3-coder worktree:
+hello from qwen
