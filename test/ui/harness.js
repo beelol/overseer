@@ -120,6 +120,9 @@ class Session {
       await delay(500);
       if (!cp.spawnSync('pgrep', ['-f', this.profile], { encoding: 'utf8' }).stdout.trim()) break;
     }
+    // Orphaned Electron helpers (network/GPU services) can outlive the app; never leave them running.
+    const left = cp.spawnSync('pgrep', ['-f', this.profile], { encoding: 'utf8' }).stdout.trim().split('\n').filter(Boolean);
+    if (left.length) { this.note('killing leftover VS Code helper processes', left.length); for (const pid of left) { try { process.kill(Number(pid), 'SIGKILL'); } catch {} } }
     await delay(500);
   }
 

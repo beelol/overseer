@@ -762,6 +762,25 @@ fn ac14_fixture_claude_background_subagent_keeps_session_open_for_permissions() 
 }
 
 #[test]
+fn ac14_fixture_claude_background_task_finishing_before_the_interim_result_still_keeps_the_session_open() {
+    // Regression for a live Claude run (2026-09-25, AC-43 live scenario): the background agent
+    // finished and was reported before the interim `result`, so no task was "still running";
+    // Claude then continued with another turn whose Write permission failed with "Stream closed".
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("background-early");
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}));
+    let run = run_id(&created);
+    let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
+    assert_eq!(waiting["attention"]["tool"], "Write");
+    d.call("run.permission", json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}));
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    assert!(ws_path(&d, &created).join("bg.txt").exists(), "the continuation turn's Write was allowed and ran");
+    let dones = d.events(&run).into_iter().filter(|e| e["kind"] == "turn_done").count();
+    assert_eq!(dones, 1, "the interim result is not a finished turn");
+}
+
+#[test]
 fn ac19_fixture_codex_app_child_threads_nest_and_do_not_end_the_parent() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
@@ -836,7 +855,11 @@ fn ac45_last_vscode_window_closing_with_active_runs_posts_a_notice_but_a_reload_
     assert!(!log.exists(), "a window reload must not notify");
     // VS Code really closes: exactly one notice naming the running agent and how to stop it.
     drop(w3);
-    std::thread::sleep(Duration::from_millis(1500));
+    for _ in 0..60 {
+        if log.exists() { break; }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    std::thread::sleep(Duration::from_millis(300));
     let text = std::fs::read_to_string(&log).expect("notice sent");
     assert_eq!(text.lines().count(), 1, "{text}");
     assert!(text.starts_with("Overseer: 1 agent still running|generic: /bin/sh -c sleep 30"), "{text}");
@@ -906,4 +929,37 @@ fn ac45_stop_all_interrupts_runs_forces_stragglers_and_exits_the_daemon() {
         let st = d.run(r)["status"].as_str().unwrap().to_string();
         assert!(["interrupted", "failed"].contains(&st.as_str()), "{r} {st}");
     }
+}
+
+// ---------------------------------------------------------------- AC-43 conversation data
+
+#[test]
+fn ac43_fixture_tool_calls_carry_inputs_and_results_for_the_conversation_view() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    // Claude: tool_use input and tool_result output, joined by the tool id; the Agent tool id is the child's native id.
+    let d = claude_daemon("nested");
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "delegate", "title": "nested"}));
+    let root = run_id(&created);
+    assert_eq!(d.wait_done(&root, 15)["status"], "completed");
+    let evs = d.events(&root);
+    let tool = evs.iter().find(|e| e["kind"] == "tool" && e["payload"]["id"] == "toolu_child").expect("Agent tool event");
+    assert_eq!(tool["payload"]["name"], "Agent");
+    let details: Vec<_> = evs.iter().filter(|e| e["kind"] == "tool_result" && e["payload"]["id"] == "toolu_child").collect();
+    assert!(details.iter().any(|e| e["payload"]["input"]["description"] == "child task"), "{details:?}");
+    assert!(details.iter().any(|e| e["payload"]["output"] == "done" && e["payload"]["status"] == "completed"), "{details:?}");
+    let child = d.runs().into_iter().find(|x| x["parent_run_id"] == root.as_str()).unwrap();
+    assert_eq!(child["native_id"], "toolu_child", "the conversation nests the child under the tool with this id");
+    // Codex app-server: the command's input and final status arrive as tool_result.
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js"))]);
+    let created = d.call("task.create", json!({"repo": repo, "harness": "codex-app", "prompt": "touch", "title": "app"}));
+    let run = run_id(&created);
+    let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 20);
+    d.call("run.permission", json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}));
+    d.wait_done(&run, 20);
+    let evs = d.events(&run);
+    let cmd: Vec<_> = evs.iter().filter(|e| e["kind"] == "tool_result" && e["payload"]["id"] == "cmd1").collect();
+    assert!(cmd.iter().any(|e| e["payload"]["input"]["command"] == "touch approved.txt"), "{cmd:?}");
+    assert!(cmd.iter().any(|e| e["payload"]["status"] == "completed"), "{cmd:?}");
+    assert!(evs.iter().any(|e| e["kind"] == "permission_answered"));
 }

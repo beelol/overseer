@@ -48,7 +48,7 @@ echo done`) });
       await delay(1200);
     };
     const reviewFrame = runId => cdp.webview(`document.body.dataset.runId === ${JSON.stringify(runId)} && !!document.getElementById('diffs') && document.querySelectorAll('.diff-file').length > 0`, 30000);
-    const outputFrame = runId => cdp.webview(`document.body.dataset.runId === ${JSON.stringify(runId)} && !!document.getElementById('log') && document.querySelectorAll('.ev').length > 0`, 30000);
+    const outputFrame = runId => cdp.webview(`document.body.dataset.runId === ${JSON.stringify(runId)} && !!document.getElementById('conv') && document.querySelectorAll('#conv .msg').length > 0`, 30000);
 
     await selectRun('R3 removed later');
     await selectRun('R2 other repo');

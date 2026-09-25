@@ -153,6 +153,27 @@ class Review {
     return this.manager.open({ repo, workspaceId: ws.id, runId, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison }, { preserveFocus });
   }
 
+  /** Opens the run's review at the first changed hunk of `rel` (a file edit clicked in the conversation). */
+  async revealEdit(runId, rel) {
+    await this.open(runId);
+    const run = this.model.run(runId);
+    const ws = this.model.workspace(run.workspace_id);
+    const base = (await this.currentComparison(runId).catch(() => undefined))?.base;
+    let line = 1;
+    if (base && rel && !rel.startsWith('/') && !rel.startsWith('..')) {
+      const diff = await new Promise(resolve => execFile('git', ['diff', '-U0', '--no-color', '--no-ext-diff', base, '--', rel], { cwd: ws.path, maxBuffer: 8 * 1024 * 1024 }, (err, out) => resolve(err ? '' : out)));
+      const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/m.exec(diff);
+      if (hunk) line = Math.max(1, Number(hunk[1]) || 1);
+      else if (!diff) {
+        // Untracked files are not in `git diff`; they are new, so the hunk starts at line 1.
+      }
+    }
+    const message = { path: rel, line, attribution: 'opened from the conversation', user: true };
+    // A freshly opened review may not have its file list yet; the webview keeps it pending.
+    this.manager.reveal(runId, message);
+    return message;
+  }
+
   async pickComparison(runId) {
     if (!runId) return;
     const opts = await this.options(runId, this.comparisons.get(runId)?.branch);

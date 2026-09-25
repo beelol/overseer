@@ -7,11 +7,13 @@
 //   ratelimit / quota / auth: emits the corresponding error result formats
 //   prose:       says it delegated but never launches a child
 //   background:  interim result while a background Agent runs, then a Write permission request
+//   background-early: the background Agent finishes before the interim result; Claude then
+//                continues with a new turn that asks for Write permission (live 2.1.x order)
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 if (!process.argv.includes('-p')) { console.log('claude-fixture 0.0.0 (synthetic)'); process.exit(0); }
-const mode = process.env.FIXTURE_MODE || 'nested';
+const mode = process.env.CLAUDE_FIXTURE_MODE || process.env.FIXTURE_MODE || 'nested';
 const sid = 'fixture-session-1';
 const out = o => process.stdout.write(JSON.stringify(o) + '\n');
 const assistant = (content, parent = null) => out({ type: 'assistant', session_id: sid, parent_tool_use_id: parent, message: { role: 'assistant', content } });
@@ -40,12 +42,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     result(false, 'all done');
   } else if (mode === 'permission') {
     const file = path.join(process.cwd(), 'perm.txt');
+    // Like the live CLI: the tool_use is reported first, then the permission request.
+    assistant([{ type: 'tool_use', id: 'toolu_write', name: 'Write', input: { file_path: file, content: 'allowed\n' } }]);
     out({ type: 'control_request', request_id: 'req-1', request: { subtype: 'can_use_tool', tool_name: 'Write', input: { file_path: file, content: 'allowed\n' } } });
     const reply = await next(m => m.type === 'control_response' || (m.type === 'control_request' && m.request?.subtype === 'interrupt'));
     if (reply.type === 'control_request') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
     const decision = reply.response.response;
-    if (decision.behavior === 'allow') { fs.writeFileSync(file, decision.updatedInput.content); assistant([{ type: 'text', text: 'wrote perm.txt' }]); result(false, 'wrote'); }
-    else { assistant([{ type: 'text', text: 'permission denied: ' + decision.message }]); result(false, 'denied'); }
+    if (decision.behavior === 'allow') { fs.writeFileSync(file, decision.updatedInput.content); user([{ type: 'tool_result', tool_use_id: 'toolu_write', content: 'File created successfully at: ' + file }]); assistant([{ type: 'text', text: 'wrote perm.txt' }]); result(false, 'wrote'); }
+    else { user([{ type: 'tool_result', tool_use_id: 'toolu_write', content: 'Permission denied: ' + decision.message, is_error: true }]); assistant([{ type: 'text', text: 'permission denied: ' + decision.message }]); result(false, 'denied'); }
   } else if (mode === 'background') {
     assistant([{ type: 'tool_use', id: 'toolu_bg', name: 'Agent', input: { description: 'background child', prompt: 'hi' } }]);
     out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [{ task_id: 't1', task_type: 'local_agent' }] });
@@ -55,6 +59,25 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     out({ type: 'system', subtype: 'task_notification', session_id: sid, task_id: 't1', tool_use_id: 'toolu_bg', status: 'completed' });
     out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [] });
     const file = path.join(process.cwd(), 'bg.txt');
+    out({ type: 'control_request', request_id: 'req-bg', request: { subtype: 'can_use_tool', tool_name: 'Write', input: { file_path: file, content: 'after background\n' } } });
+    const reply = await next(m => m.type === 'control_response');
+    const decision = reply.response.response;
+    if (decision.behavior === 'allow') fs.writeFileSync(file, decision.updatedInput.content);
+    result(false, 'done');
+  } else if (mode === 'background-early') {
+    assistant([{ type: 'tool_use', id: 'toolu_bg', name: 'Agent', input: { description: 'background child', prompt: 'hi' } }]);
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [{ task_id: 't1', task_type: 'local_agent' }] });
+    out({ type: 'system', subtype: 'task_started', session_id: sid, task_id: 't1', tool_use_id: 'toolu_bg', is_backgrounded: true });
+    user([{ type: 'tool_result', tool_use_id: 'toolu_bg', content: 'Async agent launched successfully.' }]);
+    assistant([{ type: 'text', text: 'hi' }], 'toolu_bg');
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [] });
+    out({ type: 'system', subtype: 'task_notification', session_id: sid, task_id: 't1', tool_use_id: 'toolu_bg', status: 'completed' });
+    assistant([{ type: 'text', text: 'Waiting for it to complete...' }]);
+    result(false, 'Waiting for it to complete...');
+    await sleep(300);
+    out({ type: 'system', subtype: 'init', session_id: sid, model: 'fixture', cwd: process.cwd(), tools: ['Agent', 'Write'] });
+    const file = path.join(process.cwd(), 'bg.txt');
+    assistant([{ type: 'tool_use', id: 'toolu_w', name: 'Write', input: { file_path: file, content: 'after background\n' } }]);
     out({ type: 'control_request', request_id: 'req-bg', request: { subtype: 'can_use_tool', tool_name: 'Write', input: { file_path: file, content: 'after background\n' } } });
     const reply = await next(m => m.type === 'control_response');
     const decision = reply.response.response;

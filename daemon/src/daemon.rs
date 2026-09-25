@@ -837,6 +837,9 @@ impl Daemon {
                 }
                 ev("tool", "harness", "exact", json!({"name": name, "id": id, "summary": summary}), None)?
             }
+            Norm::ToolDetail { id, input, output, status, is_error } => {
+                ev("tool_result", "harness", "exact", json!({"id": id, "input": input, "output": output, "status": status, "is_error": is_error}), None)?
+            }
             Norm::FileChange { paths, kind, confidence } => {
                 let ws = store.workspace(&run.workspace_id)?;
                 let root = ws.map(|w| w.path).unwrap_or_default();
@@ -939,12 +942,27 @@ impl Daemon {
                 ev("error", "harness", "exact", json!({"class": class, "message": message}), None)?
             }
             Norm::BackgroundTasks(n) => state.background = n,
+            Norm::BackgroundLaunched(id) => {
+                state.backgrounded.insert(id);
+            }
+            Norm::BackgroundNotified(id) => {
+                if state.backgrounded.remove(&id) {
+                    state.expected_turns += 1;
+                }
+            }
             Norm::TurnDone { ok, summary } => {
-                if run.harness == "claude" && state.background > 0 {
-                    // Claude reports an interim result while background subagents still run;
-                    // the session must stay open so their permission requests can be answered.
-                    ev("output", "harness", "exact", json!({"role": "system", "text": format!("interim result; {} background task(s) still running: {}", state.background, summary.unwrap_or_default())}), None)?;
-                    return Ok(());
+                if run.harness == "claude" {
+                    state.expected_turns = state.expected_turns.saturating_sub(1);
+                    let interrupted = store.run_process(&run.id)?.map(|(dir, _, _)| Path::new(&dir).join("interrupt.requested").exists()).unwrap_or(false);
+                    if !interrupted && (state.background > 0 || state.expected_turns > 0) {
+                        // Claude reports an interim result while background subagents run, and
+                        // continues with another turn for each finished one (even one that
+                        // finished before this result). The session must stay open so those
+                        // turns' permission requests can be answered.
+                        let why = if state.background > 0 { format!("{} background task(s) still running", state.background) } else { "Claude continues after a background task finished".to_string() };
+                        ev("output", "harness", "exact", json!({"role": "system", "text": format!("interim result; {why}: {}", summary.unwrap_or_default())}), None)?;
+                        return Ok(());
+                    }
                 }
                 state.turn_done = Some(ok);
                 store.finish_open_turns(&run.id, if ok { "completed" } else { "failed" }, now())?;
@@ -1314,11 +1332,15 @@ struct TailState {
     close_stdin: bool,
     sends: Vec<String>,
     background: usize,
+    /// Claude turns still expected from this process: the user's turn plus one continuation per
+    /// reported backgrounded task. The session closes only when all have produced a result.
+    expected_turns: usize,
+    backgrounded: std::collections::HashSet<String>,
 }
 
 impl Default for TailState {
     fn default() -> Self {
-        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new(), background: 0 }
+        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new(), background: 0, expected_turns: 1, backgrounded: Default::default() }
     }
 }
 

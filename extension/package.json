@@ -47,6 +47,7 @@
       { "command": "overseer.renameProfile", "title": "Rename Profile…", "category": "Overseer", "icon": "$(edit)" },
       { "command": "overseer.refreshAccounts", "title": "Refresh Account Status", "category": "Overseer", "icon": "$(refresh)" },
       { "command": "overseer.openDirtyDiff", "title": "Open Diff", "category": "Overseer" },
+      { "command": "overseer.openEdit", "title": "Open Edit in Review", "category": "Overseer" },
       { "command": "overseer.showCapabilities", "title": "Show Harness Capabilities", "category": "Overseer", "icon": "$(info)" },
       { "command": "overseer.stopAll", "title": "Stop Agents and Daemon…", "category": "Overseer", "icon": "$(debug-stop)" },
       { "command": "overseer.startDaemon", "title": "Start Daemon", "category": "Overseer" },
@@ -75,7 +76,8 @@
         { "command": "overseer.signOut", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@2" }
       ],
       "commandPalette": [
-        { "command": "overseer.openDirtyDiff", "when": "false" }
+        { "command": "overseer.openDirtyDiff", "when": "false" },
+        { "command": "overseer.openEdit", "when": "false" }
       ]
     },
     "configuration": {

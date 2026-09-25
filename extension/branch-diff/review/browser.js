@@ -535,11 +535,13 @@ function revealLine(row, line) {
   return true;
 }
 function applyReveal(value) {
-  if (followState !== 'following') return;
+  // Overseer: `user` reveals (a file edit clicked in the conversation) work without Follow and pause it.
+  if (followState !== 'following' && !value.user) return;
   const id = value.id || snapshot?.entries.find(e => e.path === value.path)?.id;
   if (!id || !rows.has(id)) { pendingReveal = value; return; }
   pendingReveal = undefined;
   const row = rows.get(id);
+  if (value.user) { userNavigated('conversation'); jump(id); document.body.dataset.revealed = value.path + ':' + (value.line || ''); if (!revealLine(row, value.line)) row.pendingLine = value.line; return; }
   jump(id);
   followStatus.textContent = 'Following: ' + value.path + (value.line ? ':' + value.line : '') + (value.attribution ? ' (' + value.attribution + ')' : '');
   if (!revealLine(row, value.line)) row.pendingLine = value.line;

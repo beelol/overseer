@@ -173,12 +173,12 @@ class ReviewManager {
     return panel;
   }
 
-  /** Called by the follow controller. */
+  /** Called by the follow controller, or with `user: true` for an edit opened from the conversation. */
   reveal(runId, message) {
     const found = this.panelFor(runId);
     if (!found) return false;
     const entry = found.session.display?.entries.find(e => e.relPath === message.path);
-    found.panel.webview.postMessage({ type: 'reveal', id: entry?.id, path: message.path, line: message.line, attribution: message.attribution });
+    found.panel.webview.postMessage({ type: 'reveal', id: entry?.id, path: message.path, line: message.line, attribution: message.attribution, user: !!message.user });
     return true;
   }
 

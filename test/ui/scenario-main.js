@@ -66,7 +66,7 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     check('follow navigated across files', files.has('a.txt') && files.has('b.txt'), reveals);
     const aLines = reveals.filter(r => r.includes('a.txt:')).map(r => Number(r.match(/:(\d+)/)[1]));
     check('follow revealed distant lines', reveals.length >= 3 && new Set(reveals.map(r => r.match(/:(\d+)/)?.[1])).size >= 3, { aLines });
-    const outText = await output.eval(`document.getElementById('log').innerText`);
+    const outText = await output.eval(`document.getElementById('conv').innerText`);
     check('output panel streams events', /edit/.test(outText) && /a\.txt|b\.txt/.test(outText), outText.slice(0, 400));
 
     // Manual scroll pauses Follow; position is then left alone until Resume.

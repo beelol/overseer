@@ -217,6 +217,11 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.refresh', guard(async () => { await model.refresh(); dirty.refresh(); })),
     vscode.commands.registerCommand('overseer.selectRun', guard(runId => selectRun(runId))),
     vscode.commands.registerCommand('overseer.openReview', guard(arg => review.open(runArg(arg)))),
+    vscode.commands.registerCommand('overseer.openEdit', guard(async (runId, rel) => {
+      const run = model.run(runId) || (await model.refresh(), model.run(runId));
+      if (!run) return;
+      return review.revealEdit(model.rootRun(run).id, rel);
+    })),
     vscode.commands.registerCommand('overseer.showOutput', guard(arg => outputs.show(runArg(arg), { preserveFocus: false }))),
     vscode.commands.registerCommand('overseer.followUp', guard(async arg => {
       requireTrust();
