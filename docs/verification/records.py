@@ -142,12 +142,32 @@ rec(12, "Two simultaneous ChatGPT subscriptions", "verified", commit="1c4c856", 
     live="Live, two paid ChatGPT subscriptions (Team and Plus).",
     limits="Codex exec transport; the same accounts work with codex-app (shared profile folder).")
 
-rec(13, "Credential isolation on macOS", "blocked",
-    steps="Implemented: per-profile `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, `XDG_*` homes (0700), no credential values stored by Overseer (only one-way fingerprints of account ids), system logins never logged out. Protocol test `ac13_isolated_profiles_have_separate_homes_and_no_keys`.",
-    expected="Live A/B logout/login during B's work, restart both, refresh/expiry fault tests, no leakage.",
-    actual="Not run: needs two signed-in dedicated test profiles. Observation relevant to isolation: the shared `~/.codex` login switched accounts underneath during the session (see AC-02), which is exactly why isolated profiles are the default recommendation.",
-    evidence="protocol test; AC-02", live="None.",
-    blocker="Owner-provided dedicated test logins (A and B). Next: A logout/login while B runs a `sleep` turn; restart; compare fingerprints; inspect SQLite/events for token leakage (`grep` for token patterns).")
+rec(13, "Credential isolation on macOS", "partial", commit="1c4c856", date="2026-09-25",
+    harness="LIVE on the owner's daemon: ChatGPT B (Plus) doing real Codex work, ChatGPT A (Team), the desktop-linked login (Pro), and a disposable OpenAI account C. Fixtures: synthetic account CLI for sign-in/out/expiry isolation",
+    proven="while B ran live Codex work, a disposable account C was created, given its own device-code sign-in command, signed out and removed; A, B and the desktop login kept identical identities, including after a daemon restart; B's run and file were unaffected; no token from any Codex credential home appears in Overseer's database, logs or raw outputs; fixture sign-out/sign-in/expiry of one account never changes another",
+    deferred="a live logout/login of a signed-in disposable ChatGPT account during B's work, and the same for a fixed Claude account on the macOS Keychain backend (both need the owner's browser login; A and B are never signed out)",
+    steps="""1. `node docs/verification/evidence/ac-13/run-ac13.js` against the owner's daemon (no other runs active):
+   - Record the identities of A, B and the desktop login; start B on a Codex task (sleep 25, then write b.txt) in a disposable repository.
+   - While it runs: create account C, fetch its sign-in command, sign it out, remove it.
+   - After B finishes: restart the daemon and re-check identities.
+   - Scan every file under the Overseer data directory, except credential homes and worktrees, for the last 40 characters of each real token and for JWT-like strings. Only counts are printed.
+2. `cargo test` — `ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_removal` (fixture sign-in/sign-out/re-sign-in isolation, including the desktop login switching).
+3. `node test/ui/scenario-signin.js` (fixture expiry of one account and re-sign-in from the UI).""",
+    expected="Login, logout, refresh and expiry in profile A do not switch profile B's identity or corrupt its credentials/configuration; no leakage in logs/database; unrelated active logins undisturbed.",
+    actual="""- **Before:** A team `2bb3fae1`, B plus `27e64e3a`, desktop pro `2e1fa921`. All `chatgpt-account`, no API key.
+- **During B's run** (r-53d79f5a9418, running):
+  - C was created with its own `codex` folder (mode 700) and reported not signed in.
+  - C's sign-in command is `codex login --device-auth` with `CODEX_HOME` set to C's own folder.
+  - `profile.logout` on C exited 0. A and B were unchanged mid-run.
+  - Removing C deleted only C's folder; A and B were unchanged.
+- **B finished:** completed (exit 0), and b.txt reads "B still works.".
+- **Daemon restart:** pid 63741 → 21639. A, B and the desktop login had identical identities afterwards, and B's run stayed `completed`.
+- **Leak scan:** 9 token suffixes checked against 99 files (database, WAL, logs, launch files, raw output segments): 0 hits, and no JWT-like content.
+- **Fixtures:** signing one account out, in again, or letting it expire only changes that account. The desktop login switching changes only the linked account.""",
+    evidence="[isolation-live.json](evidence/ac-13/isolation-live.json), [run-ac13.js](evidence/ac-13/run-ac13.js), [accounts scenario](evidence/ui/accounts/), [signin scenario](evidence/ui/signin/)",
+    live="Live for B's concurrent work, the disposable account's lifecycle (no login), the daemon restart and the leak scan. Live sign-in/out of a signed-in disposable account: deferred.",
+    limits="Codex stores credentials in each account's auth.json (file backend). Claude Code on macOS may use the Keychain; its per-account isolation is checked only with fixtures here.",
+    blocker="Owner action: sign a throwaway ChatGPT account (and a Claude account) into a new Overseer account, then Sign Out and Sign In it while ChatGPT B runs a task, and confirm B's identity is unchanged.")
 
 rec(14, "Initial adapters", "verified",
     commit=f"{CODEX_COMMIT} (Codex exec live), 7036cd6 (Codex app-server live), fdf1340 (Claude Code live), b5693b8 (OpenCode)",

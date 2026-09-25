@@ -5,7 +5,7 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **44 / 51** · **2** partial (see [ledger](docs/verification/README.md)). Unverified:
+criteria: **44 / 51** · **3** partial (see [ledger](docs/verification/README.md)). Unverified:
 AC-08, AC-11, AC-13, AC-41, AC-45, AC-50, AC-51. The biggest gaps are the newer owner requests still in progress
 (hunk accept/reject, a structured run conversation view, merge back, simple account governance
 ([side RFC](docs/rfcs/account-governance.md)), a polished theme-compatible UI and a full-page
@@ -33,7 +33,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-10** Event replay and bounded output — [evidence](docs/verification/AC-10.md)
 - [ ] **AC-11** Account profiles — ◐ partial: add/name/select accounts and sign in through each account's own flow in the UI (ChatGPT browser and device code, live for A/B; Claude via the fixture CLI); folders created at creation (0700); a missing login is shown and blocks the account tile; an expired login fails with a classified auth error and "Sign in again" reauthenticates that account, after which the follow-up works; no API keys / deferred: a live sign-in and re-sign-in of a fixed Claude account, and a live re-sign-in of a disposable ChatGPT account (both need the owner's browser login; A and B are never signed out) — [evidence](docs/verification/AC-11.md)
 - [x] **AC-12** Two simultaneous ChatGPT subscriptions — [evidence](docs/verification/AC-12.md)
-- [ ] **AC-13** Credential isolation on macOS — not yet run: isolation check with a disposable extra profile pending — [evidence](docs/verification/AC-13.md)
+- [ ] **AC-13** Credential isolation on macOS — ◐ partial: while B ran live Codex work, a disposable account C was created, given its own device-code sign-in command, signed out and removed; A, B and the desktop login kept identical identities, including after a daemon restart; B's run and file were unaffected; no token from any Codex credential home appears in Overseer's database, logs or raw outputs; fixture sign-out/sign-in/expiry of one account never changes another / deferred: a live logout/login of a signed-in disposable ChatGPT account during B's work, and the same for a fixed Claude account on the macOS Keychain backend (both need the owner's browser login; A and B are never signed out) — [evidence](docs/verification/AC-13.md)
 - [x] **AC-14** Initial adapters — [evidence](docs/verification/AC-14.md)
 - [x] **AC-15** Generic harness fallback — [evidence](docs/verification/AC-15.md)
 - [x] **AC-16** Permissions and limits — [evidence](docs/verification/AC-16.md)
@@ -169,7 +169,7 @@ the owner action or decision each one needs.
 
 - [ ] [AC-08](docs/verification/AC-08.md) (Local access boundary): Needs a second local macOS user (owner creates a standard test account). Next: as that user, `nc -U <socket>` / `overseerd ctl hello` with the owner's `OVERSEER_HOME` must fail with a permission error, and a relaxed-permission socket must still be refused by the peer-uid check (log line `rejected connection from uid …`).
 - [ ] [AC-11](docs/verification/AC-11.md) (Account profiles): Owner action: in Overseer, Accounts → Add Account → Anthropic → Sign In, then Sign Out and Sign In again on that account (and optionally the same with a throwaway ChatGPT account).
-- [ ] [AC-13](docs/verification/AC-13.md) (Credential isolation on macOS): Owner-provided dedicated test logins (A and B). Next: A logout/login while B runs a `sleep` turn; restart; compare fingerprints; inspect SQLite/events for token leakage (`grep` for token patterns).
+- [ ] [AC-13](docs/verification/AC-13.md) (Credential isolation on macOS): Owner action: sign a throwaway ChatGPT account (and a Claude account) into a new Overseer account, then Sign Out and Sign In it while ChatGPT B runs a task, and confirm B's identity is unchanged.
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
 - [ ] [AC-45](docs/verification/AC-45.md) (Visible background agents): Owner action: close VS Code while an agent runs and confirm the "Overseer: N agents still running" banner appears (allow Script Editor notifications if it does not).
 - [ ] [AC-50](docs/verification/AC-50.md) (Open a pull request from a run (coming soon)): Not blocked; deferred by the owner (coming soon). Next: use VS Code's `github` authentication session to push and create the PR.
