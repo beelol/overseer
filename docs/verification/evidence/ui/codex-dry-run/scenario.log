@@ -1,0 +1,26 @@
+[2026-09-25T05:46:16.109Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T05:46:18.745Z] FAIL codex profile signed in with ChatGPT account {"version":"replay-fixture 0.0.0 (not a real harness)","method":"none","plan":"pro","account":"2e1fa92158bacc71","api_key_present":false}
+[2026-09-25T05:46:25.170Z] run {"run":"r-491bade93f33","workspace":"/private/tmp/ovs-ui-Z81bvK/overseer-home/worktrees/overseer-macos-app-2d3d20-fa0437c0/spawn-exactly-one-sub-agent-whose-only-t-4","branch":"overseer/spawn-exactly-one-sub-agent-whose-only-t-4"}
+[2026-09-25T05:46:33.271Z] screenshot docs/verification/evidence/ui/codex-dry-run/01-codex-running.png
+[2026-09-25T05:47:01.951Z] PASS turn 1 completed {"status":"completed","reason":"turn completed; exit 0","native":"01a0d6e3-c796-74a0-ace1-063f6f15c7e5"}
+[2026-09-25T05:47:01.957Z] PASS native Codex child captured [{"id":"r-3a405415f23d","native":"01a0d6e3-e523-7be1-a56d-243f00cb399c","status":"completed","title":"Reply with exactly the word hi (no tools).","source":"codex collab_tool_call spawn_agent item_2"}]
+[2026-09-25T05:47:01.957Z] PASS codex edit landed in the worktree "Hello from an Overseer dogfood run\n"
+[2026-09-25T05:47:01.958Z] PASS follow revealed the agent edit "Following agent edits"
+[2026-09-25T05:47:02.066Z] screenshot docs/verification/evidence/ui/codex-dry-run/02-turn1-review.png
+[2026-09-25T05:47:03.387Z] review edit state {"save":false,"status":"","active":"native-edit-context","lines":["","Hello from an Overseer dogfood run","Reviewed and edited in the Overseer review.",""]}
+[2026-09-25T05:47:03.507Z] screenshot docs/verification/evidence/ui/codex-dry-run/03-review-edit.png
+[2026-09-25T05:47:05.095Z] PASS review edit saved in the worktree "Hello from an Overseer dogfood run\nReviewed and edited in the Overseer review.\n"
+[2026-09-25T05:47:41.582Z] PASS follow-up turn completed {"status":"completed","reason":"turn completed; exit 0"}
+[2026-09-25T05:47:41.814Z] PASS latest-run comparison shows only turn-2 changes {"base":"35972b3b8486817640fd2f5231bdcccf987b46f8","detail":"run-start snapshot s-13d00a6d3d7f (turn 2 of r-491bade93f33, 1790315225426), captured including dirty and untracked files","changes":[{"path":"docs/dogfood/hello.md","status":"M"}]}
+[2026-09-25T05:47:41.946Z] PASS task-start comparison shows the file as added [{"path":"docs/dogfood/hello.md","status":"A"}]
+[2026-09-25T05:47:45.072Z] screenshot docs/verification/evidence/ui/codex-dry-run/04-turn2-review.png
+[2026-09-25T05:47:45.104Z] PASS git diff --check passes on the dogfood worktree "clean"
+[2026-09-25T05:47:50.985Z] screenshot docs/verification/evidence/ui/codex-dry-run/05-turn3-before-close.png
+[2026-09-25T05:47:52.740Z] PASS run still active after VS Code closed {"status":"running"}
+[2026-09-25T05:48:22.932Z] PASS run completed while VS Code was closed {"status":"completed","reason":"turn completed; exit 0"}
+[2026-09-25T05:48:26.843Z] PASS reopened UI shows the run completed from daemon state "codexcompleted · codex (existing login) · gpt-5.6-luna"
+[2026-09-25T05:48:27.241Z] PASS reopened output shows the turn finished while closed "tly the word hi (no tools).— queued\ncodex⚙ collab:wait: \ncodex⚙ collab:wait: \nchild · Reply with exactly the word hi (no tools).— completed\nchild · Reply with exactly the word hi (no tools).hi\ncodex⚙ apply_patch: /private/tmp/ovs-ui-Z81bvK/overseer-home/worktrees/overseer-macos-app-2d3d20-fa0437c0/spawn-exactly-one-sub-agent-whose-only-t-4/hello.txt\ncodex✎ hello.txt (add, reported)\ncodexdone\ncodex∑ usage {\"cache_write_input_tokens\":0,\"cached_input_tokens\":89856,\"input_tokens\":121101,\"output_tokens\":325,\"reasoning_output_tokens\":75}\ncodex■ turn completed\ncodex— completed: turn completed; exit 0"
+[2026-09-25T05:48:27.350Z] screenshot docs/verification/evidence/ui/codex-dry-run/06-reopened.png
+[2026-09-25T05:48:35.221Z] PASS interrupt from UI stops the codex run {"status":"interrupted","reason":"interrupted by user (exit code 130)"}
+[2026-09-25T05:48:36.840Z] screenshot docs/verification/evidence/ui/codex-dry-run/07-interrupted.png
+[2026-09-25T05:48:36.869Z] FAIL source checkout status unchanged by the run {"before":" M daemon/src/adapters.rs\n M daemon/src/daemon.rs\n M test/ui/cdp.js\n M test/ui/harness.js\n?? fixtures/fake-harness/\n?? fixtures/transcripts/\n?? test/ui/scenario-codex-live.js\n","after":" M daemon/src/adapters.rs\n M daemon/src/daemon.rs\n M test/ui/cdp.js\n M test/ui/harness.js\n?? docs/verification/evidence/ui/codex-dry-run/\n?? fixtures/fake-harness/\n?? fixtures/transcripts/\n?? test/ui/scenario-codex-live.js\n"}

@@ -48,6 +48,7 @@ class Session {
     this.profile = path.join(this.root, 'profile');
     this.extensions = path.join(this.root, 'extensions');
     this.evidence = path.join(repoRoot, 'docs/verification/evidence/ui', name);
+    fs.rmSync(this.evidence, { recursive: true, force: true });
     fs.mkdirSync(this.evidence, { recursive: true });
     this.log = [];
     this.shot = 0;
@@ -77,9 +78,10 @@ class Session {
   }
 
   launch(folder, env = {}) {
+    fs.rmSync(path.join(this.profile, 'DevToolsActivePort'), { force: true });
     this.child = cp.spawn(CODE, ['--remote-debugging-port=0', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
       '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust', folder],
-    { env: { ...process.env, OVERSEER_HOME: this.home, ...env }, stdio: 'ignore', detached: false });
+    { env: { ...process.env, OVERSEER_HOME: this.home, ...env }, stdio: ['ignore', fs.openSync(path.join(this.root, 'code-' + Date.now() + '.log'), 'a'), fs.openSync(path.join(this.root, 'code-err-' + Date.now() + '.log'), 'a')], detached: false });
   }
 
   async connect() {
@@ -104,13 +106,20 @@ class Session {
   }
 
   async quit() {
-    try {
-      await this.cdp?.evalWorkbench('0');
-      this.cdp?.close();
-    } catch {}
+    // Close VS Code the way a user does (Cmd+Q); fall back to SIGTERM.
+    try { await this.cdp?.key('q', { meta: true }); } catch {}
+    for (let i = 0; i < 30; i++) {
+      await delay(500);
+      if (!cp.spawnSync('pgrep', ['-f', this.profile], { encoding: 'utf8' }).stdout.trim()) break;
+    }
+    try { this.cdp?.close(); } catch {}
     const pids = cp.spawnSync('pgrep', ['-f', this.profile], { encoding: 'utf8' }).stdout.trim().split('\n').filter(Boolean);
     for (const pid of pids) { try { process.kill(Number(pid), 'SIGTERM'); } catch {} }
-    await delay(1500);
+    for (let i = 0; i < 40; i++) {
+      await delay(500);
+      if (!cp.spawnSync('pgrep', ['-f', this.profile], { encoding: 'utf8' }).stdout.trim()) break;
+    }
+    await delay(500);
   }
 
   stopDaemon() {
