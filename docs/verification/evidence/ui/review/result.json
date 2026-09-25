@@ -3,7 +3,7 @@
     {
       "name": "selecting run A opens A worktree review (outside the open folder)",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-Ojm59g/overseer-home/worktrees/repoA-48c8773f/a-seq"
+      "detail": "/private/tmp/ovs-ui-EPZJr8/overseer-home/worktrees/repoA-2dec0632/a-seq"
     },
     {
       "name": "selecting an existing run does not turn Follow on",
@@ -27,7 +27,7 @@
     {
       "name": "selecting run B shows B worktree",
       "ok": true,
-      "detail": "Worktree: /private/tmp/ovs-ui-Ojm59g/overseer-home/worktrees/repoB-098e1297/b-seq"
+      "detail": "Worktree: /private/tmp/ovs-ui-EPZJr8/overseer-home/worktrees/repoB-bb7055d5/b-seq"
     },
     {
       "name": "agent switch does not inherit Follow",
@@ -50,19 +50,27 @@
       "name": "ordinary changes refresh within 2 s",
       "ok": true,
       "detail": {
-        "write new file": 424,
-        "atomic replace": 529,
-        "staging (dirty view)": 2065,
-        "rename": 388,
-        "delete": 473,
-        "branch change": 502,
-        "missed watcher event (excluded folder)": 1418
+        "write new file": 109,
+        "atomic replace": 365,
+        "staging (dirty view)": 499,
+        "rename": 391,
+        "delete": 419,
+        "branch change": 440,
+        "missed watcher event (excluded folder)": 417
       }
     },
     {
       "name": "missed watcher event reconciled within 5 s",
       "ok": true,
-      "detail": 1418
+      "detail": 417
+    },
+    {
+      "name": "navigator selection preserved across live refreshes",
+      "ok": true,
+      "detail": {
+        "selectedBefore": "a.txtM",
+        "selectedAfter": "a.txtM"
+      }
     },
     {
       "name": "escaping symlink is not editable in the review",
@@ -125,7 +133,12 @@
     {
       "name": "current checkout review is the repository itself",
       "ok": true,
-      "detail": "Current checkout: /private/tmp/ovs-ui-Ojm59g/repoA"
+      "detail": "Current checkout: /private/tmp/ovs-ui-EPZJr8/repoA"
+    },
+    {
+      "name": "filesystem-only harness shows the Follow limitation",
+      "ok": true,
+      "detail": "Filesystem evidence only: this harness does not report its edits, so Follow cannot attribute or jump to them. The file list still refreshes live."
     },
     {
       "name": "current-checkout review edit saved to the checkout path",
@@ -141,7 +154,7 @@
       }
     },
     {
-      "name": "external write does not overwrite the unsaved draft; both versions exist",
+      "name": "same-line external write does not overwrite the unsaved draft; both versions exist",
       "ok": true,
       "detail": {
         "draftKept": true,
@@ -167,12 +180,12 @@
     }
   ],
   "timings": {
-    "write new file": 424,
-    "atomic replace": 529,
-    "staging (dirty view)": 2065,
-    "rename": 388,
-    "delete": 473,
-    "branch change": 502,
-    "missed watcher event (excluded folder)": 1418
+    "write new file": 109,
+    "atomic replace": 365,
+    "staging (dirty view)": 499,
+    "rename": 391,
+    "delete": 419,
+    "branch change": 440,
+    "missed watcher event (excluded folder)": 417
   }
 }

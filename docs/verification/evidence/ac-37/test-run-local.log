@@ -1,0 +1,97 @@
+   Compiling overseerd v0.1.0 (/Users/bilal/projects/overseer/.claude/worktrees/overseer-macos-app-2d3d20/daemon)
+warning: method `workspace_diff` is never used
+    --> daemon/src/daemon.rs:1185:12
+     |
+49   | impl Daemon {
+     | ----------- method in this implementation
+...
+1185 |     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+     |            ^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+warning: method `is_clean` is never used
+   --> daemon/src/git.rs:217:12
+    |
+216 | impl Status {
+    | ----------- method in this implementation
+217 |     pub fn is_clean(&self) -> bool {
+    |            ^^^^^^^^
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:274:8
+    |
+274 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:278:8
+    |
+278 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `is_ancestor` is never used
+   --> daemon/src/git.rs:282:8
+    |
+282 | pub fn is_ancestor(workspace: &Path, a: &str, b: &str) -> bool {
+    |        ^^^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:286:8
+    |
+286 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: method `child_by_native` is never used
+   --> daemon/src/store.rs:313:12
+    |
+121 | impl Store {
+    | ---------- method in this implementation
+...
+313 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+    |            ^^^^^^^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd" test) generated 7 warnings
+warning: `overseerd` (bin "overseerd") generated 7 warnings (7 duplicates)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running unittests src/main.rs (target/debug/deps/overseerd-98039429a10bdbdf)
+
+running 4 tests
+test adapters::tests::classify_errors ... ok
+test adapters::tests::forbidden_keys ... ok
+test adapters::tests::base_env_drops_keys ... ok
+test redact::tests::redacts_common_secrets ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/protocol.rs (target/debug/deps/protocol-7b28e5d031035528)
+
+running 25 tests
+test ac13_isolated_profiles_have_separate_homes_and_no_keys ... ok
+test ac10_redaction_of_secrets_in_output ... ok
+test ac08_socket_is_owner_only_and_requests_are_not_shell ... ok
+test ac06_structured_harness_silence_is_not_completion ... ok
+test ac19_fixture_codex_live_transcript_children ... ok
+test ac18_fixture_recursive_tree_duplicates_and_delayed_parent ... ok
+test ac07_lost_session_is_reported_not_running ... ok
+test ac10_replay_cursor_burst_and_retention ... ok
+test ac20_prose_is_not_a_child_and_unknown_events_are_visible ... ok
+test ac22_current_checkout_preserves_preexisting_work ... ok
+test ac26_unknown_fork_is_reported_unavailable ... ok
+test ac09_follow_up_reaches_only_the_selected_run ... ok
+test ac21_parallel_worktrees_are_independent_and_collisions_are_safe ... ok
+test ac34_merge_conflicts_do_not_break_snapshots_or_diffs ... ok
+test ac28_opposing_layers_remain_inspectable ... ok
+test ac16_fixture_error_classes_stay_distinct ... ok
+test ac27_complete_change_and_dirty_views ... ok
+test ac16_fixture_codex_app_server_approvals_interrupt_and_unsupported_requests ... ok
+test ac23_unrelated_writer_rejected_on_current_checkout ... ok
+test ac16_fixture_permission_allow_deny_and_interrupt_waiting_run ... ok
+test ac26_snapshots_and_selectable_bases ... ok
+test ac05_ac07_state_survives_daemon_crash_and_reattaches ... ok
+test ac06_lifecycle_states_follow_real_signals ... ok
+test ac15_generic_harness_paths_with_spaces_failures_and_unknown_capabilities ... ok
+test ac24_cleanup_reports_and_preserves_until_confirmed ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.35s
+

@@ -70,6 +70,10 @@ function restoreAnchor(value) {
   const row = value && rows.get(value.id);
   if (row) diffs.scrollTop = row.element.offsetTop + value.offset;
 }
+// Overseer: live refreshes re-select the file at the diff anchor. Never scroll the navigator
+// under a user who is pointing at or scrolling it (items would move under the cursor).
+let navigatorTouched = 0;
+function navigatorBusy() { return Date.now() - navigatorTouched < 4000; }
 function select(id) {
   if (!id || selected === id) return;
   selected = id;
@@ -77,7 +81,7 @@ function select(id) {
     const active = button.dataset.id === id;
     button.classList.toggle('active', active);
     button.setAttribute('aria-selected', String(active));
-    if (active) button.scrollIntoView({ block: 'nearest' });
+    if (active && !navigatorBusy()) button.scrollIntoView({ block: 'nearest' });
   }
   persist();
 }
@@ -124,6 +128,7 @@ function renderTree() {
   tree.replaceChildren(fragment); navigator.scrollTop = scrollTop;
 }
 filter.addEventListener('input', () => { renderTree(); persist(); });
+for (const type of ['wheel', 'pointermove', 'pointerdown', 'keydown']) document.getElementById('navigator').addEventListener(type, () => { navigatorTouched = Date.now(); }, { passive: true });
 function fold(row) {
   const closed = closedFiles.has(row.entry.id);
   if (row.element.classList.contains('collapsed') === closed) { if (!closed) ensure(row); return; }

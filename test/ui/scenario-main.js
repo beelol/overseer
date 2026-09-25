@@ -174,7 +174,7 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     const tasksBefore = s.ctl('state').tasks.map(t => t.id).sort();
     process.kill(hello.pid, 'SIGKILL');
     const sawDisconnect = await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /disconnected/.test(e.textContent))`, 5000).catch(() => false);
-    await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \d+ active/.test(e.textContent))`, 20000, 'reconnected');
+    await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer [0-9]+ active/.test(e.textContent))`, 20000, 'reconnected');
     const hello2 = s.ctl('hello');
     const tasksAfter = s.ctl('state').tasks.map(t => t.id).sort();
     check('UI survives daemon crash: disconnected state, daemon restarted, same tasks', sawDisconnect && hello2.pid !== hello.pid && JSON.stringify(tasksBefore) === JSON.stringify(tasksAfter), { sawDisconnect, oldPid: hello.pid, newPid: hello2.pid, tasks: tasksAfter.length });
