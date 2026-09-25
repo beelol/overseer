@@ -30,7 +30,7 @@ An ultra-simple account list:
 | --- | --- |
 | Provider | Who issues the login: `anthropic`, `openai`, `devin`, … |
 | Account | A named provider login owned by Overseer: its own credential folder (0700), identity fingerprint, plan, status. |
-| Harness compatibility | Static map of harness to accepted providers: `claude` → anthropic; `codex`, `codex-app` → openai; `opencode` → anthropic or openai (through OpenCode's provider login) and local providers; `devin` → devin; `generic` → none. |
+| Harness compatibility | Static map of harness to accepted providers: `claude` → anthropic; `codex`, `codex-app` → openai; `opencode` → local providers only for now (owner decision 2026-09-25; OpenCode's own Anthropic/OpenAI login may be added later); `devin` → devin; `generic` → none. |
 | Linked desktop login | An account entry that points at a harness's default folder (e.g. `~/.codex`, `~/.claude`) is labeled **follows <app>**. It is never logged out by Overseer, and the task picker warns that it can change when the app switches accounts. |
 
 One account can serve several harnesses: the daemon derives each harness's credential

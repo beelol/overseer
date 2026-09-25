@@ -321,11 +321,11 @@ rec(43, "Structured run conversation view", "not started",
     evidence="—", live="—",
     blocker="Not blocked; not started. Next: group events by turn in the daemon or panel, render tool calls collapsibly, link file_activity to the review, nest child output, then run the Verify clause.")
 
-rec(44, "Merge back or open a PR", "not started",
+rec(44, "Merge back", "not started",
     expected="See the RFC criterion (added by the owner on 2026-09-25).",
-    actual="Tasks stay on their branch and worktree; the user merges or cherry-picks manually and cleans up with Clean Up Worktree (branch kept). No merge-back or PR action exists yet.",
+    actual="Tasks stay on their branch and worktree; the user merges or cherry-picks manually and cleans up with Clean Up Worktree (branch kept). No merge-back action exists yet.",
     evidence="—", live="—",
-    blocker="Not blocked; not started. Next: add a review toolbar with Merge back (follow-up turn on the same session asking the agent to merge into the target branch in a protected way) and Open PR (push + `gh pr create`), then run the Verify clause.")
+    blocker="Not blocked; not started. Next: add Merge back to the Overseer view: git merge into the target branch in the source checkout (refuse if dirty), hand conflicts to the same session as a follow-up, show the result for review, then run the Verify clause.")
 
 rec(45, "Visible background agents", "not started",
     expected="See the RFC criterion (added by the owner on 2026-09-25).",
@@ -345,17 +345,29 @@ rec(47, "Polished, theme-compatible UI", "not started",
     evidence="—", live="—",
     blocker="Not blocked; not started. Next: a New Task webview with harness/account tiles and a design pass on the run panel and review toolbar, verified in light/dark/high-contrast.")
 
-rec(48, "Command-center layout", "not started",
+rec(48, "Overseer view (command center)", "not started",
     expected="See the RFC criterion (added by the owner on 2026-09-25).",
     actual="The hierarchy is a sidebar tree; review and run panels open as editor tabs in two groups.",
     evidence="—", live="—",
-    blocker="Not blocked; not started. Next: a single command-center panel (hierarchy left, review right) or a pinned layout that restores both, respecting AC-30 navigation rules.")
+    blocker="Not blocked; not started. Next: a full-page Overseer view (agents column, review, conversation + event log) independent of the native sidebar and the window's folder, respecting AC-30.")
 
 rec(49, "Restore the open session", "not started",
     expected="See the RFC criterion (added by the owner on 2026-09-25).",
     actual="The review panel and selected run are restored after a window reload (AC-33 evidence); run panels, comparison mode per run, Follow state and sidebar expansion are not.",
     evidence="—", live="—",
     blocker="Not blocked; not started. Next: webview serializers for run panels, persist per-run comparison/Follow/scroll in workspace state, and restore with explanations for removed worktrees.")
+
+rec(50, "Open a pull request from a run (coming soon)", "not started",
+    expected="See the RFC criterion (added by the owner on 2026-09-25).",
+    actual="Not implemented. Owner opens PRs manually today.",
+    evidence="—", live="—",
+    blocker="Not blocked; deferred by the owner (coming soon). Next: use VS Code's `github` authentication session to push and create the PR.")
+
+rec(51, "Worktree file hierarchy", "not started",
+    expected="See the RFC criterion (added by the owner on 2026-09-25).",
+    actual="Not implemented. Worktrees are only browsable through the review's changed-file list or by opening the folder.",
+    evidence="—", live="—",
+    blocker="Not blocked; not started. Next: a file tree for the selected run's worktree inside the Overseer view (AC-48).")
 
 HEAD = """# AC-{n:02d} — {title}
 Status: {status}
@@ -412,8 +424,10 @@ SHORT_BLOCKERS = {
     47: "not started (added by the owner on 2026-09-25)",
     48: "not started (added by the owner on 2026-09-25)",
     49: "not started (added by the owner on 2026-09-25)",
+    50: "not started (coming soon; added by the owner on 2026-09-25)",
+    51: "not started (added by the owner on 2026-09-25)",
 }
-TOTAL = 49
+TOTAL = 51
 
 EXTRA_FOLLOWUPS = [
     "Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.",
