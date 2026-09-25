@@ -226,6 +226,7 @@ Evidence and blockers live in [the verification ledger](verification/README.md).
 - [ ] **AC-50 — Open a pull request from a run (coming soon).** Beside Merge back, an **Open PR** action pushes the run's branch and creates a pull request with a generated description, using the GitHub sign-in VS Code already has (no personal access tokens pasted into Overseer). Disabled with an explanation when there is no GitHub remote or no VS Code GitHub session. **Verify:** a PR created from a live run against a repository the owner chooses; missing remote and signed-out cases explained; no automatic merge.
 - [ ] **AC-51 — Worktree file hierarchy.** The Overseer view can show the selected run's worktree as a file tree (changed files highlighted, open any file in the editor) without depending on the folder open in the VS Code window. **Verify:** browse and open files in worktrees of two different repositories from one window; changed files marked; large repositories stay responsive.
 - [ ] **AC-52 — Native Overseer notifications (macOS).** The background-agent notification (AC-45) comes from Overseer itself rather than Script Editor: the banner shows Overseer's name and icon, clicking it opens VS Code at the Overseer view, and *System Settings → Notifications* lists **Overseer** with its own switch. A bundled helper app posts the notification; if notifications are denied, Overseer falls back to the current method and records which one it used. Design: [native notifications RFC](rfcs/native-notifications.md). **Verify:** close VS Code with an agent running and see an Overseer-branded banner (owner-observed or screenshot); click it and land in the Overseer view; find Overseer in Notifications settings; deny permission and confirm the fallback banner and the recorded `delivered_via`; **Overseer: Test Notification** posts a sample banner.
+- [ ] **AC-53 — Fixed Claude accounts.** A Claude account added in Overseer (its own `CLAUDE_CONFIG_DIR`, separate from the Claude desktop login) can be signed in, used, signed out and signed in again without affecting the desktop login or runs on it, including on the macOS Keychain credential backend. Moved out of AC-11/AC-13, which keep the ChatGPT paths. **Verify:** with a second Claude account, Add Account → Anthropic → Sign In; run a tiny task with it; Sign Out and Sign In again while a Claude run on the desktop login keeps working; both identities (fingerprints) and their Keychain entries stay separate; no credential in Overseer's database or logs.
 
 ### Deferred platform qualification
 
@@ -242,7 +243,7 @@ The owner authorizes the implementer to record reproducible evidence and mark cr
 verified; a separate review pass can follow. No separate reviewer is required now.
 Claims of complete feedback require known coverage, with gaps explicitly disclosed.
 
-AC-01–03 are research gates. AC-04–40 and AC-42–52 describe the macOS implementation and
+AC-01–03 are research gates. AC-04–40 and AC-42–53 describe the macOS implementation and
 evidence scope; AC-41 retains Linux qualification as deferred and unchecked. A usable macOS milestone may
 be delivered with documented unavailable native telemetry (AC-19) and inaccessible account
 verification left unchecked. Codex/Claude account integration and OpenCode integration remain
@@ -274,6 +275,8 @@ a worktree file tree becomes AC-51. AC-46 keeps OpenCode on local models and moc
 Owner request of 2026-09-25 (fourth): background-agent notifications currently appear as
 Script Editor's (they are posted with `osascript`). AC-52 adds native Overseer notifications
 through a bundled helper app ([RFC](rfcs/native-notifications.md)); it starts unchecked.
+The live Claude sign-in parts of AC-11 and AC-13 move to AC-53 (fixed Claude accounts), which
+waits for a second Claude account; AC-11 and AC-13 keep the ChatGPT paths.
 
 ## Later roadmap (not hidden first-release acceptance criteria)
 

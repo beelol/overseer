@@ -103,7 +103,7 @@ rec(10, "Event replay and bounded output", "verified",
 rec(11, "Account profiles", "partial", commit="1c4c856", date="2026-09-25",
     harness="LIVE: the owner's two ChatGPT accounts signed in through Overseer's per-account login command (A in the browser, B with a device code; 2026-09-25). Fixtures: synthetic account CLI for missing, expired and renewed logins",
     proven="add/name/select accounts and sign in through each account's own flow in the UI (ChatGPT browser and device code, live for A/B; Claude via the fixture CLI); folders created at creation (0700); a missing login is shown and blocks the account tile; an expired login fails with a classified auth error and \"Sign in again\" reauthenticates that account, after which the follow-up works; no API keys",
-    deferred="a live sign-in and re-sign-in of a fixed Claude account, and a live re-sign-in of a disposable ChatGPT account (both need the owner's browser login; A and B are never signed out)",
+    deferred="a live re-sign-in (reauthentication) of a ChatGPT account through the UI (needs the owner's browser login; A and B are never signed out). Fixed Claude accounts moved to AC-53",
     steps="""1. `cargo test` — `ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_removal` (creation-time folders, sign-in/sign-out/re-sign-in isolation).
 2. `node test/ui/scenario-signin.js` (synthetic account CLI):
    - Add and name "Claude work" without signing in; open New Task → Claude Code.
@@ -121,7 +121,7 @@ rec(11, "Account profiles", "partial", commit="1c4c856", date="2026-09-25",
 - **Live:** ChatGPT A (Team, `2bb3fae1`) signed in through the browser flow and ChatGPT B (Plus, `27e64e3a`) through the device-code flow, each into its own profile folder. Both report ChatGPT-account login and no API key. The device-code attempt for one account first failed until the owner enabled device-code sign-in in ChatGPT security settings; the error text is passed through.""",
     evidence="[signin scenario](evidence/ui/signin/) (missing login, expired login with Sign in again, after re-sign-in), [accounts scenario](evidence/ui/accounts/), [live account status](evidence/ac-46/live-accounts.txt)",
     live="Live ChatGPT sign-ins (A browser, B device code). Claude live sign-in and live re-sign-in: deferred.",
-    blocker="Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: Accounts → Add Account → Anthropic → Sign In, then Sign Out and Sign In again on that account.")
+    blocker="Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: sign a throwaway Overseer ChatGPT account in, Sign Out, and Sign In again through the UI (two browser logins). The Claude part is AC-53.")
 
 rec(12, "Two simultaneous ChatGPT subscriptions", "verified", commit="1c4c856", date="2026-09-25",
     harness="LIVE: Codex 0.155 exec, model gpt-5.6-luna, on the owner's daemon with two fixed accounts: ChatGPT A (Team) and ChatGPT B (Plus), each signed in through Overseer into its own profile folder",
@@ -146,7 +146,7 @@ rec(12, "Two simultaneous ChatGPT subscriptions", "verified", commit="1c4c856", 
 rec(13, "Credential isolation on macOS", "partial", commit="1c4c856", date="2026-09-25",
     harness="LIVE on the owner's daemon: ChatGPT B (Plus) doing real Codex work, ChatGPT A (Team), the desktop-linked login (Pro), and a disposable OpenAI account C. Fixtures: synthetic account CLI for sign-in/out/expiry isolation",
     proven="while B ran live Codex work, a disposable account C was created, given its own device-code sign-in command, signed out and removed; A, B and the desktop login kept identical identities, including after a daemon restart; B's run and file were unaffected; no token from any Codex credential home appears in Overseer's database, logs or raw outputs; fixture sign-out/sign-in/expiry of one account never changes another",
-    deferred="a live logout/login of a signed-in disposable ChatGPT account during B's work, and the same for a fixed Claude account on the macOS Keychain backend (both need the owner's browser login; A and B are never signed out)",
+    deferred="a live logout/login of a signed-in disposable ChatGPT account during B's work (needs the owner's browser login; A and B are never signed out). The Claude Keychain case moved to AC-53",
     steps="""1. `node docs/verification/evidence/ac-13/run-ac13.js` against the owner's daemon (no other runs active):
    - Record the identities of A, B and the desktop login; start B on a Codex task (sleep 25, then write b.txt) in a disposable repository.
    - While it runs: create account C, fetch its sign-in command, sign it out, remove it.
@@ -168,7 +168,7 @@ rec(13, "Credential isolation on macOS", "partial", commit="1c4c856", date="2026
     evidence="[isolation-live.json](evidence/ac-13/isolation-live.json), [run-ac13.js](evidence/ac-13/run-ac13.js), [accounts scenario](evidence/ui/accounts/), [signin scenario](evidence/ui/signin/)",
     live="Live for B's concurrent work, the disposable account's lifecycle (no login), the daemon restart and the leak scan. Live sign-in/out of a signed-in disposable account: deferred.",
     limits="Codex stores credentials in each account's auth.json (file backend). Claude Code on macOS may use the Keychain; its per-account isolation is checked only with fixtures here.",
-    blocker="Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: sign a throwaway ChatGPT (and Claude) account into a new Overseer account, then Sign Out and Sign In it while ChatGPT B runs a task, and confirm B's identity is unchanged.")
+    blocker="Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: sign a throwaway Overseer ChatGPT account in, then Sign Out and Sign In it again while ChatGPT B runs a task (two browser logins); Overseer checks that B and A are unchanged.")
 
 rec(14, "Initial adapters", "verified",
     commit=f"{CODEX_COMMIT} (Codex exec live), 7036cd6 (Codex app-server live), fdf1340 (Claude Code live), b5693b8 (OpenCode)",
@@ -545,6 +545,12 @@ rec(52, "Native Overseer notifications (macOS)", "not started",
     evidence="—", live="—",
     blocker="Not blocked; not started. Next: a bundled `Overseer Notifier.app` (Swift, UNUserNotificationCenter, ad-hoc signed) used by overseerd with osascript as the fallback, a `vscode://beelol.overseer/open-center` URI handler, and an Overseer: Test Notification command.")
 
+rec(53, "Fixed Claude accounts", "not started",
+    expected="See the RFC criterion (moved out of AC-11/AC-13 by the owner on 2026-09-25).",
+    actual="Not verified live. The flows exist (Add Account → Anthropic → Sign In runs `claude auth login` with the account's own `CLAUDE_CONFIG_DIR`), and they pass with the synthetic account CLI (AC-11 sign-in, expiry and Sign in again; AC-46 isolation). The owner's only Claude login is the desktop one (`claude (existing login)`, max), which is never signed out.",
+    evidence="[signin scenario](evidence/ui/signin/), [accounts scenario](evidence/ui/accounts/)", live="—",
+    blocker="Needs a second Claude account (the owner has one today). Next: Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.")
+
 HEAD = """# AC-{n:02d} — {title}
 Status: {status}{partial}
 Tested implementation commit: {commit}
@@ -606,8 +612,9 @@ SHORT_BLOCKERS = {
     50: "not started (coming soon; added by the owner on 2026-09-25)",
     51: "not started (added by the owner on 2026-09-25)",
     52: "not started (added by the owner on 2026-09-25; see docs/rfcs/native-notifications.md)",
+    53: "not started (needs a second Claude account)",
 }
-TOTAL = 52
+TOTAL = 53
 
 EXTRA_FOLLOWUPS = [
     "Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.",
