@@ -1,0 +1,130 @@
+{
+  "checks": [
+    {
+      "name": "profile created from UI",
+      "ok": true,
+      "detail": {
+        "id": "p-ad8f3e3c3a9f",
+        "harness": "opencode"
+      }
+    },
+    {
+      "name": "run created in isolated worktree",
+      "ok": true,
+      "detail": {
+        "run": "r-2a9236ca062f",
+        "workspace": "/private/tmp/ovs-ui-Sx64tS/overseer-home/worktrees/repo-14cce889/sequence-8",
+        "branch": "overseer/sequence-8"
+      }
+    },
+    {
+      "name": "follow on for launched run",
+      "ok": true
+    },
+    {
+      "name": "follow navigated across files",
+      "ok": true,
+      "detail": [
+        "Following: b.txt:240 (agent tool input (tool-input))",
+        "Following: a.txt:150 (agent tool input (tool-input))",
+        "Following: b.txt:200 (agent tool input (tool-input))",
+        "Following: a.txt:100 (agent tool input (tool-input))"
+      ]
+    },
+    {
+      "name": "follow revealed distant lines",
+      "ok": true,
+      "detail": {
+        "aLines": [
+          150,
+          100
+        ]
+      }
+    },
+    {
+      "name": "output panel streams events",
+      "ok": true,
+      "detail": "opencodetask created in worktree /private/tmp/ovs-ui-Sx64tS/overseer-home/worktrees/repo-14cce889/sequence-8 (overseer/sequence-8)\nopencode▶ turn 1: sequence 8\nopencode— starting\nopencode— running\nopencodenative session ses_f28f958d5ffeyt3O1ToWHG6Rh6\nopencode✎ a.txt (edit, tool-input)\nopencode⚙ edit: {\"filePath\":\"/private/tmp/ovs-ui-Sx64tS/overseer-home/worktrees/repo-14cce889/sequence-8/a.txt\",\"n"
+    },
+    {
+      "name": "scroll pauses follow with visible Resume",
+      "ok": true,
+      "detail": {
+        "state": "Follow paused by your navigation",
+        "resume": true,
+        "top": 476
+      }
+    },
+    {
+      "name": "paused follow does not move the view",
+      "ok": true,
+      "detail": {
+        "state": "Follow paused by your navigation",
+        "top": 476
+      }
+    },
+    {
+      "name": "resume restarts follow",
+      "ok": true,
+      "detail": {
+        "state": "Following agent edits (agent tool input (tool-input))",
+        "resume": false
+      }
+    },
+    {
+      "name": "follow off preserves position",
+      "ok": true,
+      "detail": {
+        "offTop": 476,
+        "top": 476,
+        "checked": false
+      }
+    },
+    {
+      "name": "run completed",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reason": "turn completed; exit 0"
+      }
+    },
+    {
+      "name": "review edit saved to the selected worktree",
+      "ok": true,
+      "detail": "L20: ageUSER EDIT FROM REVIEW nt edit 1"
+    },
+    {
+      "name": "source checkout untouched",
+      "ok": true,
+      "detail": {
+        "status": "M README.md\nM  c.txt\n?? notes.txt"
+      }
+    },
+    {
+      "name": "interrupt from UI",
+      "ok": true,
+      "detail": {
+        "status": "interrupted",
+        "reason": "interrupted by user (exit signal 2)"
+      }
+    },
+    {
+      "name": "follow-up created a new turn with its own snapshot",
+      "ok": true,
+      "detail": [
+        {
+          "n": 1,
+          "status": "completed",
+          "snapshot": "s-d927914d2055"
+        },
+        {
+          "n": 2,
+          "status": "interrupted",
+          "snapshot": "s-72e2b64d26ba"
+        }
+      ]
+    }
+  ],
+  "run": "r-2a9236ca062f",
+  "workspace": "/private/tmp/ovs-ui-Sx64tS/overseer-home/worktrees/repo-14cce889/sequence-8"
+}

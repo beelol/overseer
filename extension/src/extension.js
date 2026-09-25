@@ -67,8 +67,8 @@ async function activate(context) {
   async function selectRun(runId, { follow } = {}) {
     selectedRun = runId;
     dirty.select(runId);
+    await review.open(runId, { follow });
     await outputs.show(runId);
-    await review.open(runId, { preserveFocus: true, follow });
   }
 
   async function newTask() {

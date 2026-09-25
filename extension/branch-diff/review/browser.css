@@ -71,3 +71,5 @@ label.follow { display: inline-flex; align-items: center; gap: 3px; }
 #follow-state { opacity: .8; font-size: .9em; max-width: 30em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #workspace-note { font-size: .85em; opacity: .75; padding: 2px 8px; }
 .follow-line { background: rgba(255, 200, 0, .25); }
+#toolbar { flex-wrap: wrap; row-gap: 4px; }
+.file-header .file-path { min-width: 5em; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

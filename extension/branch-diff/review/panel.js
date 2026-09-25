@@ -93,7 +93,7 @@ class ReviewManager {
       if (session.display) this.publish(session, session.display);
       return panel;
     }
-    panel = vscode.window.createWebviewPanel('overseer.review', 'Review', { viewColumn: vscode.ViewColumn.Active, preserveFocus }, { retainContextWhenHidden: false });
+    panel = vscode.window.createWebviewPanel('overseer.review', 'Review', { viewColumn: vscode.ViewColumn.One, preserveFocus }, { retainContextWhenHidden: false });
     return this.attach(session, panel);
   }
 

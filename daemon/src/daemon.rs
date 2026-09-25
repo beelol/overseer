@@ -631,7 +631,8 @@ impl Daemon {
         loop {
             let run = self.run(run_id)?;
             if !announced && run.status == "starting" {
-                if let Some((dir, _, _)) = self.store.lock().unwrap().run_process(run_id)? {
+                let process = self.store.lock().unwrap().run_process(run_id)?;
+                if let Some((dir, _, _)) = process {
                     if Path::new(&dir).join("shim.json").exists() {
                         announced = true;
                         self.store.lock().unwrap().update_run_status(run_id, "running", None, None)?;
@@ -640,7 +641,8 @@ impl Daemon {
                     }
                 }
             }
-            let Some((dir, mut seg, mut off)) = self.store.lock().unwrap().run_process(run_id)? else { return Ok(()) };
+            let process = self.store.lock().unwrap().run_process(run_id)?;
+            let Some((dir, mut seg, mut off)) = process else { return Ok(()) };
             let dir = PathBuf::from(dir);
             let path = shim::segment_path(&dir, seg as u64);
             let mut progressed = false;
@@ -664,6 +666,10 @@ impl Daemon {
             if progressed {
                 continue;
             }
+            if run.harness == "opencode" && state.store_polled.elapsed().as_millis() > 1200 {
+                state.store_polled = std::time::Instant::now();
+                self.poll_opencode_store(&run, &mut state)?;
+            }
             if shim::segment_path(&dir, seg as u64 + 1).exists() {
                 seg += 1;
                 off = 0;
@@ -678,6 +684,9 @@ impl Daemon {
                     continue;
                 }
                 let exit: ExitInfo = serde_json::from_slice(&bytes)?;
+                if run.harness == "opencode" {
+                    self.poll_opencode_store(&run, &mut state)?;
+                }
                 self.finalize(&run, &dir, &exit, &state)?;
                 return Ok(());
             }
@@ -749,6 +758,11 @@ impl Daemon {
         }
         for e in emitted {
             let _ = self.events.send(e);
+        }
+        if std::mem::take(&mut state.close_stdin) {
+            if let Ok(sock) = self.control_socket(run) {
+                let _ = shim::control(&sock, &json!({"op": "close_stdin"}));
+            }
         }
         Ok(())
     }
@@ -869,13 +883,57 @@ impl Daemon {
                 ev("turn_done", "harness", "exact", json!({"ok": ok, "summary": summary}), None)?;
                 if run.harness == "claude" {
                     // One turn per process: closing stdin lets the session end cleanly.
-                    if let Ok(sock) = self.control_socket(run) {
-                        let _ = shim::control(&sock, &json!({"op": "close_stdin"}));
-                    }
+                    // Done after the store lock is released (see apply_lines).
+                    state.close_stdin = true;
                 }
             }
             Norm::Ignored => {}
             Norm::Unparsed(text) => ev("raw_unparsed", "harness", "unknown", json!({"text": text, "parser_version": adapters::PARSER_VERSION}), None)?,
+        }
+        Ok(())
+    }
+
+    fn opencode_db(&self, run: &Run) -> Option<PathBuf> {
+        let env = match &run.profile_id {
+            Some(id) => Self::profile_env(&self.profile(id).ok()?),
+            None => BTreeMap::new(),
+        };
+        let data = env.get("XDG_DATA_HOME").map(PathBuf::from).or_else(|| std::env::var_os("XDG_DATA_HOME").map(PathBuf::from)).unwrap_or_else(|| PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".local/share"));
+        Some(data.join("opencode/opencode.db")).filter(|p| p.exists())
+    }
+
+    fn poll_opencode_store(self: &Arc<Self>, run: &Run, state: &mut TailState) -> Result<()> {
+        let Some(root) = self.run(&run.id)?.native_id else { return Ok(()) };
+        let Some(db) = self.opencode_db(run) else { return Ok(()) };
+        let norms = match adapters::opencode_store_children(&db, &root) {
+            Ok(n) => n,
+            Err(_) => return Ok(()), // store busy or schema changed: keep stream-derived children only
+        };
+        let mut fresh = Vec::new();
+        for norm in norms {
+            if let Norm::Child { native_id, status, text, .. } = &norm {
+                let key = format!("{status:?}|{}", text.as_deref().map(|t| fingerprint(t)).unwrap_or_default());
+                if state.store_seen.get(native_id) == Some(&key) {
+                    continue;
+                }
+                state.store_seen.insert(native_id.clone(), key);
+            }
+            fresh.push(norm);
+        }
+        if fresh.is_empty() {
+            return Ok(());
+        }
+        let mut emitted = Vec::new();
+        {
+            let store = self.store.lock().unwrap();
+            let tx = store.conn.unchecked_transaction()?;
+            for norm in fresh {
+                self.apply_norm(&store, run, norm, state, &mut emitted)?;
+            }
+            tx.commit()?;
+        }
+        for e in emitted {
+            let _ = self.events.send(e);
         }
         Ok(())
     }
@@ -941,7 +999,8 @@ impl Daemon {
         let runs = self.store.lock().unwrap().runs()?;
         let mut report = Vec::new();
         for run in runs.iter().filter(|r| r.parent_run_id.is_none() && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {
-            let Some((dir, _, _)) = self.store.lock().unwrap().run_process(&run.id)? else {
+            let process = self.store.lock().unwrap().run_process(&run.id)?;
+            let Some((dir, _, _)) = process else {
                 if ACTIVE.contains(&run.status.as_str()) {
                     self.mark_ended(run, "failed", "daemon stopped before the run was launched")?;
                     report.push(json!({"run": run.id, "result": "never launched"}));
@@ -1100,7 +1159,8 @@ impl Daemon {
     }
 
     pub fn raw_output(&self, run_id: &str, max_bytes: usize) -> Result<Value> {
-        let Some((dir, _, _)) = self.store.lock().unwrap().run_process(run_id)? else { return Ok(json!({"lines": [], "truncated": false})) };
+        let process = self.store.lock().unwrap().run_process(run_id)?;
+        let Some((dir, _, _)) = process else { return Ok(json!({"lines": [], "truncated": false})) };
         let dir = PathBuf::from(dir);
         let mut segments: Vec<u64> = (0..10_000).filter(|n| shim::segment_path(&dir, *n).exists()).collect();
         let dropped = segments.first().copied().unwrap_or(0) > 0;
@@ -1129,12 +1189,20 @@ impl Daemon {
     }
 }
 
-#[derive(Default)]
 struct TailState {
     session: Option<String>,
     turn_done: Option<bool>,
     last_error: Option<(String, String)>,
     since_prune: usize,
+    store_polled: std::time::Instant,
+    store_seen: std::collections::HashMap<String, String>,
+    close_stdin: bool,
+}
+
+impl Default for TailState {
+    fn default() -> Self {
+        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false }
+    }
 }
 
 /// Find a descendant of `root` with the given native id (breadth-first, cycle-safe).
@@ -1173,7 +1241,8 @@ fn redact_value(v: Value) -> Value {
         Value::Array(a) => Value::Array(a.into_iter().map(redact_value).collect()),
         Value::Object(o) => Value::Object(o.into_iter().map(|(k, v)| {
             let lower = k.to_ascii_lowercase();
-            if lower.contains("token") || lower.contains("secret") || lower.contains("password") || lower == "api_key" || lower == "authorization" {
+            let secret = ["token", "access_token", "refresh_token", "id_token", "oauth_token", "api_key", "apikey", "authorization", "password", "secret", "client_secret", "cookie"];
+            if secret.contains(&lower.as_str()) {
                 (k, Value::String("[redacted]".into()))
             } else {
                 (k, redact_value(v))
