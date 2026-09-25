@@ -65,9 +65,26 @@ async fn connection(daemon: Arc<Daemon>, stream: UnixStream) -> Result<()> {
     });
     let mut reader = BufReader::new(read);
     let mut buf = Vec::new();
+    let mut ui = false;
+    let result = connection_loop(&daemon, &mut reader, &mut buf, &tx, &mut ui).await;
+    if ui {
+        daemon.ui_disconnected();
+    }
+    drop(tx);
+    let _ = writer.await;
+    result
+}
+
+async fn connection_loop(
+    daemon: &Arc<Daemon>,
+    reader: &mut BufReader<tokio::net::unix::OwnedReadHalf>,
+    buf: &mut Vec<u8>,
+    tx: &mpsc::Sender<Value>,
+    ui: &mut bool,
+) -> Result<()> {
     loop {
         buf.clear();
-        let n = (&mut reader).take(MAX_REQUEST_BYTES + 1).read_until(b'\n', &mut buf).await?;
+        let n = (&mut *reader).take(MAX_REQUEST_BYTES + 1).read_until(b'\n', buf).await?;
         if n == 0 {
             break;
         }
@@ -75,7 +92,7 @@ async fn connection(daemon: Arc<Daemon>, stream: UnixStream) -> Result<()> {
             let _ = tx.send(json!({"id": null, "error": {"code": "request_too_large", "message": "request exceeds 1 MiB"}})).await;
             break;
         }
-        let msg: Value = match serde_json::from_slice(&buf) {
+        let msg: Value = match serde_json::from_slice(buf) {
             Ok(v) => v,
             Err(e) => {
                 let _ = tx.send(json!({"id": null, "error": {"code": "parse_error", "message": e.to_string()}})).await;
@@ -96,10 +113,15 @@ async fn connection(daemon: Arc<Daemon>, stream: UnixStream) -> Result<()> {
             subscribe(daemon.clone(), id, params, tx.clone());
             continue;
         }
+        if method == "hello" && params["client"] == "vscode" && !*ui {
+            // A VS Code window: counted so closing the last one can surface background agents.
+            *ui = true;
+            daemon.ui_connected();
+        }
         let daemon = daemon.clone();
         let tx = tx.clone();
         tokio::spawn(async move {
-            let shutdown = method == "daemon.shutdown";
+            let shutdown = method == "daemon.shutdown" || method == "daemon.stop_all";
             let result = {
                 let daemon = daemon.clone();
                 let method = method.clone();
@@ -118,8 +140,6 @@ async fn connection(daemon: Arc<Daemon>, stream: UnixStream) -> Result<()> {
             }
         });
     }
-    drop(tx);
-    let _ = writer.await;
     Ok(())
 }
 
@@ -249,6 +269,20 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "workspace.cleanup_plan" => d.cleanup_plan(s(p, "workspace_id")?)?,
         "workspace.cleanup" => d.cleanup(s(p, "workspace_id")?, p["discard_dirty"].as_bool().unwrap_or(false))?,
         "daemon.shutdown" => json!({"ok": true}),
+        "daemon.stop_all" => d.stop_all()?,
+        "daemon.background_notice" => json!({"notice": d.background_notice()?}),
+        "daemon.last_notice" => {
+            use rusqlite::OptionalExtension;
+            let store = d.store.lock().unwrap();
+            let notice = store
+                .conn
+                .query_row("SELECT seq, ts, payload FROM events WHERE kind='background_notice' ORDER BY seq DESC LIMIT 1", [], |r| {
+                    Ok(json!({"seq": r.get::<_, i64>(0)?, "ts": r.get::<_, i64>(1)?, "payload": serde_json::from_str::<Value>(&r.get::<_, String>(2)?).unwrap_or(Value::Null)}))
+                })
+                .optional()?;
+            json!({"notice": notice})
+        }
+        "daemon.clients" => json!({"vscode": d.ui_clients.load(std::sync::atomic::Ordering::SeqCst)}),
         other => return Err(anyhow!("unknown method {other}")),
     })
 }

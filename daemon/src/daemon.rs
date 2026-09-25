@@ -32,6 +32,11 @@ pub struct Daemon {
     tails: Mutex<HashSet<String>>,
     exe: PathBuf,
     pub started_ms: i64,
+    /// Connected VS Code windows (connections that said hello as `client: "vscode"`).
+    pub ui_clients: std::sync::atomic::AtomicUsize,
+    /// Bumped on every UI connect/disconnect so a pending background notice can tell a reload
+    /// (reconnect within the grace period) from VS Code really closing.
+    pub ui_epoch: std::sync::atomic::AtomicU64,
 }
 
 fn pid_alive(pid: u32) -> bool {
@@ -54,7 +59,8 @@ impl Daemon {
         let store = Store::open(&paths::db_path())?;
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), exe, started_ms: now() });
+        let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), exe, started_ms: now(),
+            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0) });
         daemon.ensure_system_profiles()?;
         Ok(daemon)
     }
@@ -530,7 +536,7 @@ impl Daemon {
         Ok(())
     }
 
-    fn control_socket(&self, run: &Run) -> Result<PathBuf> {
+    pub(crate) fn control_socket(&self, run: &Run) -> Result<PathBuf> {
         let (dir, _, _) = self.store.lock().unwrap().run_process(&run.id)?.ok_or_else(|| anyhow!("run has no process"))?;
         let launch: LaunchFile = serde_json::from_slice(&std::fs::read(Path::new(&dir).join("launch.json"))?)?;
         Ok(PathBuf::from(launch.control_socket))

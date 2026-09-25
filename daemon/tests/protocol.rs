@@ -785,3 +785,125 @@ fn ac19_fixture_codex_app_child_threads_nest_and_do_not_end_the_parent() {
     let launch = std::fs::read_to_string(d.home.path().join("runs").join(&root).join("p1/launch.json")).unwrap();
     assert!(launch.contains("agents.max_depth=2"), "extra args passed to the harness");
 }
+
+// ---------------------------------------------------------------- AC-45 visible background agents
+
+/// A persistent connection that identifies itself as a VS Code window.
+fn vscode_window(d: &Daemon) -> std::os::unix::net::UnixStream {
+    use std::io::{BufRead, BufReader, Write};
+    let mut conn = std::os::unix::net::UnixStream::connect(d.socket()).unwrap();
+    conn.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+    conn.write_all(format!("{}\n", json!({"id": 1, "method": "hello", "params": {"client": "vscode"}})).as_bytes()).unwrap();
+    let mut line = String::new();
+    BufReader::new(conn.try_clone().unwrap()).read_line(&mut line).unwrap();
+    assert!(line.contains("\"protocol\""), "{line}");
+    conn
+}
+
+fn notifier(dir: &Path) -> (String, std::path::PathBuf) {
+    let log = dir.join("notices.log");
+    let script = dir.join("notify.sh");
+    std::fs::write(&script, format!("#!/bin/sh\nprintf '%s|%s\\n' \"$1\" \"$2\" >> '{}'\n", log.display())).unwrap();
+    std::process::Command::new("chmod").arg("+x").arg(&script).status().unwrap();
+    (script.display().to_string(), log)
+}
+
+fn notices(d: &Daemon) -> Vec<serde_json::Value> {
+    d.call("events.list", json!({"after": 0, "limit": 5000}))["events"].as_array().unwrap().iter().filter(|e| e["kind"] == "background_notice").cloned().collect()
+}
+
+#[test]
+fn ac45_last_vscode_window_closing_with_active_runs_posts_a_notice_but_a_reload_does_not() {
+    let t = tmp();
+    let (cmd, log) = notifier(t.path());
+    let d = Daemon::start(&[("OVERSEER_BACKGROUND_NOTICE_MS", "600"), ("OVERSEER_NOTIFY_COMMAND", &cmd)]);
+    let repo = repo(&t.path().join("r"));
+    let created = sh(&d, &repo, "worktree", "sleep 30");
+    let run = run_id(&created);
+    d.wait_status(&run, |s| s == "running", 20);
+    let w1 = vscode_window(&d);
+    let w2 = vscode_window(&d);
+    assert_eq!(d.call("daemon.clients", json!({}))["vscode"], 2);
+    // One of two windows closes: not the last, no notice.
+    drop(w1);
+    std::thread::sleep(Duration::from_millis(1200));
+    assert!(!log.exists(), "closing one of two windows must not notify");
+    // Reload: the last window disconnects and reconnects within the grace period.
+    drop(w2);
+    std::thread::sleep(Duration::from_millis(150));
+    let w3 = vscode_window(&d);
+    std::thread::sleep(Duration::from_millis(1200));
+    assert!(!log.exists(), "a window reload must not notify");
+    // VS Code really closes: exactly one notice naming the running agent and how to stop it.
+    drop(w3);
+    std::thread::sleep(Duration::from_millis(1500));
+    let text = std::fs::read_to_string(&log).expect("notice sent");
+    assert_eq!(text.lines().count(), 1, "{text}");
+    assert!(text.starts_with("Overseer: 1 agent still running|generic: /bin/sh -c sleep 30"), "{text}");
+    assert!(text.contains("Stop Agents and Daemon"), "{text}");
+    let n = notices(&d);
+    assert_eq!(n.len(), 1);
+    assert_eq!(n[0]["payload"]["runs"][0]["id"], run.as_str());
+    // The agent keeps running (unchanged behavior).
+    assert_eq!(d.run(&run)["status"], "running");
+    d.call("run.interrupt", json!({"run_id": run}));
+    d.wait_done(&run, 20);
+}
+
+#[test]
+fn ac45_no_notice_when_nothing_is_running() {
+    let t = tmp();
+    let (cmd, log) = notifier(t.path());
+    let d = Daemon::start(&[("OVERSEER_BACKGROUND_NOTICE_MS", "300"), ("OVERSEER_NOTIFY_COMMAND", &cmd)]);
+    let repo = repo(&t.path().join("r"));
+    let done = run_id(&sh(&d, &repo, "worktree", "echo finished"));
+    d.wait_done(&done, 20);
+    drop(vscode_window(&d));
+    std::thread::sleep(Duration::from_millis(1200));
+    assert!(!log.exists(), "no notice when nothing is running");
+    assert!(notices(&d).is_empty());
+    assert!(std::fs::read_to_string(d.home.path().join("overseerd.log")).unwrap_or_default().contains("no active agents, no notice"));
+}
+
+#[test]
+fn ac45_stop_all_interrupts_runs_forces_stragglers_and_exits_the_daemon() {
+    use std::io::{BufRead, BufReader, Write};
+    let t = tmp();
+    let mut d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("r"));
+    let polite = run_id(&sh(&d, &repo, "worktree", "sleep 60"));
+    // Ignores SIGINT, so interrupt alone cannot stop it.
+    let stubborn = run_id(&sh(&d, &repo, "worktree", "trap '' INT; while true; do sleep 1; done"));
+    for r in [&polite, &stubborn] {
+        d.wait_status(r, |s| s == "running", 20);
+    }
+    let pids: Vec<i64> = [&polite, &stubborn].iter().flat_map(|r| { let (s, _) = launch_info(&d, r); vec![s["shim_pid"].as_i64().unwrap(), s["child_pid"].as_i64().unwrap()] }).collect();
+    // Another window is subscribed; it must learn that the stop was deliberate (so it does not respawn).
+    let mut sub = std::os::unix::net::UnixStream::connect(d.socket()).unwrap();
+    sub.set_read_timeout(Some(Duration::from_secs(30))).unwrap();
+    sub.write_all(format!("{}\n", json!({"id": 1, "method": "events.subscribe", "params": {"after": 0}})).as_bytes()).unwrap();
+    let reader = std::thread::spawn(move || {
+        let mut seen = Vec::new();
+        for line in BufReader::new(sub).lines().map_while(Result::ok) {
+            if line.contains("daemon_stopping") { seen.push(line); break; }
+        }
+        seen
+    });
+    let result = d.call("daemon.stop_all", json!({}));
+    assert_eq!(result["stopped"].as_array().unwrap().len(), 2, "{result}");
+    assert!(result["forced"].as_array().unwrap().iter().any(|x| x == stubborn.as_str()), "{result}");
+    assert!(result["remaining"].as_array().unwrap().is_empty(), "{result}");
+    let exited = (0..50).any(|_| { std::thread::sleep(Duration::from_millis(100)); d.child.as_mut().unwrap().try_wait().unwrap().is_some() });
+    assert!(exited, "daemon exits after stop_all");
+    for pid in pids {
+        assert!(!pid_alive(pid), "process {pid} still alive");
+    }
+    assert_eq!(reader.join().unwrap().len(), 1, "subscribers get daemon_stopping");
+    // Restarting finds both runs stopped, not reattached.
+    d.child = None;
+    d.spawn();
+    for r in [&polite, &stubborn] {
+        let st = d.run(r)["status"].as_str().unwrap().to_string();
+        assert!(["interrupted", "failed"].contains(&st.as_str()), "{r} {st}");
+    }
+}

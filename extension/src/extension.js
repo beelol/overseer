@@ -41,14 +41,16 @@ async function activate(context) {
     const runs = model.state.runs || [];
     const active = runs.filter(r => ACTIVE.has(r.status)).length;
     const waiting = runs.filter(r => r.status === 'waiting_for_user').length;
-    status.text = client.connected ? `$(pulse) Overseer ${active} active${waiting ? `, ${waiting} waiting` : ''}` : '$(debug-disconnect) Overseer disconnected';
-    status.tooltip = client.connected ? 'overseerd is running; agents continue when VS Code closes.' : 'Reconnecting to overseerd…';
+    status.text = client.connected ? `$(pulse) Overseer ${active} active${waiting ? `, ${waiting} waiting` : ''}` : client.stopped ? '$(circle-slash) Overseer stopped' : '$(debug-disconnect) Overseer disconnected';
+    status.tooltip = client.connected ? 'overseerd is running; agents continue when VS Code closes. Use "Overseer: Stop Agents and Daemon" to stop everything.' : client.stopped ? 'Agents and daemon were stopped. Click to start the daemon again.' : 'Reconnecting to overseerd…';
+    status.command = client.stopped && !client.connected ? 'overseer.startDaemon' : 'overseer.refresh';
     status.show();
     vscode.commands.executeCommand('setContext', 'overseer.connected', client.connected);
   };
   model.onDidChange(updateStatus);
   client.on('connected', () => { model.refresh(); updateStatus(); });
   client.on('disconnected', () => { model.error = 'daemon connection lost; reconnecting'; model.emitter.fire(); updateStatus(); });
+  client.on('stopped', () => { model.error = 'agents and daemon stopped (Overseer: Start Daemon to restart)'; model.emitter.fire(); updateStatus(); });
   client.on('event', event => {
     model.scheduleRefresh();
     if (selectedRun && ['file_activity', 'status', 'turn_done', 'workspace_removed'].includes(event.kind)) setTimeout(() => dirty.refresh(), 300);
@@ -171,6 +173,37 @@ async function activate(context) {
     context.subscriptions.push(done);
   }
 
+  /** Interrupts every active agent and stops the daemon, after confirmation. Nothing respawns it. */
+  async function stopAll() {
+    await model.refresh();
+    const active = (model.state.runs || []).filter(r => !r.parent_run_id && ACTIVE.has(r.status));
+    const detail = active.length
+      ? `These agents will be interrupted:\n${active.map(r => `• ${r.harness}: ${r.title} (${r.status.replace(/_/g, ' ')})`).join('\n')}\n\nWorktrees and history are kept. Other VS Code windows will not restart the daemon.`
+      : 'No agents are running. The daemon stops; worktrees and history are kept.';
+    const ok = await vscode.window.showWarningMessage(active.length ? `Stop ${active.length} running agent${active.length === 1 ? '' : 's'} and the Overseer daemon?` : 'Stop the Overseer daemon?', { modal: true, detail }, 'Stop Agents and Daemon');
+    if (ok !== 'Stop Agents and Daemon') return;
+    client.stopped = true;
+    let result;
+    try { result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Stopping Overseer agents…' }, () => client.request('daemon.stop_all')); }
+    catch (error) { client.stopped = false; throw error; }
+    say('stop_all: ' + JSON.stringify(result));
+    const left = result.remaining?.length ? ` ${result.remaining.length} could not be stopped; check Activity Monitor.` : '';
+    vscode.window.showInformationMessage(`Overseer stopped ${result.stopped.length} agent${result.stopped.length === 1 ? '' : 's'} and its daemon.${left}`);
+  }
+
+  /** On reopening VS Code: say which agents kept running while it was closed (once per notice). */
+  async function announceBackgroundAgents() {
+    const { notice } = await client.request('daemon.last_notice');
+    const seen = context.globalState.get('overseer.noticeSeen', 0);
+    if (!notice || notice.seq <= seen) return;
+    await context.globalState.update('overseer.noticeSeen', notice.seq);
+    const active = (model.state.runs || []).filter(r => !r.parent_run_id && ACTIVE.has(r.status));
+    const names = (notice.payload?.runs || []).map(r => `${r.harness}: ${r.title}`).join('; ');
+    const choice = await vscode.window.showInformationMessage(`Overseer agents kept running while VS Code was closed: ${names}. ${active.length} still active.`, 'Show Agents', ...(active.length ? ['Stop Agents and Daemon'] : []));
+    if (choice === 'Show Agents') await vscode.commands.executeCommand('overseer.agents.focus');
+    else if (choice) await stopAll();
+  }
+
   async function refreshAccounts() {
     await model.refresh();
     await Promise.all(model.state.profiles.map(async p => {
@@ -243,6 +276,8 @@ async function activate(context) {
         '\n\n## Not integrated\n\n- **Gemini CLI**: not installed on this machine; no adapter yet.\n- **Devin**: skipped — no account-login CLI path without API keys/personal access tokens was available.\n' });
       await vscode.window.showTextDocument(doc, { preview: true });
     })),
+    vscode.commands.registerCommand('overseer.stopAll', guard(stopAll)),
+    vscode.commands.registerCommand('overseer.startDaemon', guard(async () => { client.disposed = false; await client.start(); await model.refresh(); updateStatus(); })),
     vscode.commands.registerCommand('overseer.showLog', () => log.show()),
     vscode.commands.registerCommand('overseer.restartDaemonConnection', guard(async () => { client.dispose(); client.disposed = false; await client.start(); })),
     vscode.workspace.onDidGrantWorkspaceTrust(() => model.emitter.fire()),
@@ -253,6 +288,7 @@ async function activate(context) {
     await client.start();
     await model.refresh();
     refreshAccounts().catch(() => {});
+    announceBackgroundAgents().catch(error => say('background notice check: ' + error.message));
     const remembered = context.workspaceState.get('overseer.selectedRun');
     if (remembered && model.run(remembered)) {
       selectedRun = remembered; dirty.select(remembered);

@@ -1,4 +1,5 @@
 mod adapters;
+mod background;
 mod daemon;
 mod git;
 mod paths;

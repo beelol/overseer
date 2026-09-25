@@ -48,6 +48,8 @@
       { "command": "overseer.refreshAccounts", "title": "Refresh Account Status", "category": "Overseer", "icon": "$(refresh)" },
       { "command": "overseer.openDirtyDiff", "title": "Open Diff", "category": "Overseer" },
       { "command": "overseer.showCapabilities", "title": "Show Harness Capabilities", "category": "Overseer", "icon": "$(info)" },
+      { "command": "overseer.stopAll", "title": "Stop Agents and Daemon…", "category": "Overseer", "icon": "$(debug-stop)" },
+      { "command": "overseer.startDaemon", "title": "Start Daemon", "category": "Overseer" },
       { "command": "overseer.showLog", "title": "Show Daemon Log", "category": "Overseer" },
       { "command": "overseer.restartDaemonConnection", "title": "Reconnect to Daemon", "category": "Overseer" }
     ],
@@ -56,6 +58,7 @@
         { "command": "overseer.newTask", "when": "view == overseer.agents", "group": "navigation@1" },
         { "command": "overseer.refresh", "when": "view == overseer.agents", "group": "navigation@2" },
         { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "navigation@3" },
+        { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
         { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
         { "command": "overseer.selectComparison", "when": "view == overseer.dirty", "group": "navigation@1" }
