@@ -5,7 +5,7 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **36 / 51** (see [ledger](docs/verification/README.md)). Unverified:
+criteria: **36 / 51** · **0** partial (see [ledger](docs/verification/README.md)). Unverified:
 AC-08, AC-11, AC-12, AC-13, AC-41, AC-42, AC-43, AC-44, AC-45, AC-46, AC-47, AC-48, AC-49, AC-50, AC-51. The biggest gaps are two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
 a foreign-user socket rejection test (needs a second macOS account), and Linux (no environment).
 AC-42–51 are newer owner requests, not started yet: hunk accept/reject, a structured run

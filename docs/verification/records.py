@@ -370,9 +370,9 @@ rec(51, "Worktree file hierarchy", "not started",
     blocker="Not blocked; not started. Next: a file tree for the selected run's worktree inside the Overseer view (AC-48).")
 
 HEAD = """# AC-{n:02d} — {title}
-Status: {status}
+Status: {status}{partial}
 Tested implementation commit: {commit}
-Verification date and verifier: 2026-09-24/25, implementing agent (Claude Code), overnight session
+Verification date and verifier: {date}, implementing agent (Claude Code)
 OS / architecture / VS Code / harness versions: {env}; {harn}
 Harness, provider and redacted account identities (if applicable): {harness}
 Prerequisites and fixture: {fixture}
@@ -399,7 +399,10 @@ def main():
         status = r["status"]
         if status == "__PERF__":
             status = "verified" if perf_text.startswith("PASS") else "blocked"
-        text = HEAD.format(n=n, title=r["title"], status=status, commit=r.get("commit", COMMIT), env=ENV, harn=HARN,
+        partial = ""
+        if status.startswith("partial"):
+            partial = f"\nPartial evidence — proven: {r.get('proven', '—')}\nPartial evidence — deferred: {r.get('deferred', '—')}"
+        text = HEAD.format(n=n, title=r["title"], status=status, partial=partial, date=r.get("date", "2026-09-24/25"), commit=r.get("commit", COMMIT), env=ENV, harn=HARN,
                            harness=r.get("harness", "not applicable (fixture harnesses; no accounts)"),
                            fixture=r.get("fixture", "Real Git repositories created per test under /tmp; isolated OVERSEER_HOME; isolated VS Code profile for UI scenarios"),
                            steps=r.get("steps", "—"), expected=r["expected"], actual=r["actual"].replace("__PERFRESULT__", perf_text),
@@ -457,6 +460,12 @@ def sync(out):
         f = out / f"AC-{n:02d}.md"
         statuses[n] = status_of(f) if f.exists() else "not started"
     verified = [n for n, st in statuses.items() if st.startswith("verified")]
+    partials = [n for n, st in statuses.items() if st.startswith("partial")]
+
+    def partial_line(n, key):
+        f = out / f"AC-{n:02d}.md"
+        prefix = f"Partial evidence — {key}:"
+        return next((l[len(prefix):].strip() for l in f.read_text().splitlines() if l.startswith(prefix)), "—") if f.exists() else "—"
     for n in range(1, TOTAL + 1):
         box = "[x]" if n in verified else "[ ]"
         text = re.sub(r"- \[[ x]\] \*\*AC-%02d " % n, f"- {box} **AC-{n:02d} ", text)
@@ -466,6 +475,7 @@ def sync(out):
         rows.append(f"| AC-{n:02d} | {titles.get(f'{n:02d}', '')} | {statuses[n]} | [AC-{n:02d}.md](AC-{n:02d}.md) |")
     unverified = [n for n in range(1, TOTAL + 1) if n not in verified]
     audit = [f"- Verified: {len(verified)} / {TOTAL} ({', '.join(f'AC-{n:02d}' for n in verified)}).",
+             f"- Partial (box unchecked): {len(partials)} ({', '.join(f'AC-{n:02d}' for n in partials) or 'none'}).",
              f"- Not verified: {', '.join(f'AC-{n:02d}' for n in unverified)} — each record states the exact blocker and next action.",
              "- Every verified record was re-read against its evidence folder/test before checking; anything that relied only on fixtures where the criterion demands live evidence stays unchecked."]
     items = []
@@ -474,6 +484,8 @@ def sync(out):
         link = f"[evidence](docs/verification/AC-{n:02d}.md)"
         if n in verified:
             items.append(f"- [x] **AC-{n:02d}** {title} — {link}")
+        elif n in partials:
+            items.append(f"- [ ] **AC-{n:02d}** {title} — ◐ partial: {partial_line(n, 'proven')} / deferred: {partial_line(n, 'deferred')} — {link}")
         else:
             items.append(f"- [ ] **AC-{n:02d}** {title} — {SHORT_BLOCKERS.get(n, statuses[n])} — {link}")
     rows = ["See the [acceptance criteria list in the README](../../README.md#acceptance-criteria) for every criterion's checkbox, status and evidence link."]
@@ -494,14 +506,14 @@ def sync(out):
     readme = root / "README.md"
     rt = readme.read_text()
     rt = re.sub(r"(<!-- ac-list:start -->\n)(.*?)(<!-- ac-list:end -->)", lambda m: m.group(1) + "\n".join(items) + "\n" + m.group(3), rt, flags=re.S)
-    rt = re.sub(r"Verified acceptance\ncriteria: \*\*[^*]+\*\*", f"Verified acceptance\ncriteria: **{len(verified)} / {TOTAL}**", rt)
+    rt = re.sub(r"Verified acceptance\ncriteria: \*\*[^*]+\*\*( · \*\*\d+\*\* partial)?", f"Verified acceptance\ncriteria: **{len(verified)} / {TOTAL}** · **{len(partials)}** partial", rt)
     rt = rt.replace("__VERIFIED__ / 41", f"{len(verified)} / {TOTAL}")
     rt = rt.replace("__UNVERIFIED__", ", ".join(f"AC-{n:02d}" for n in unverified))
     rt = re.sub(r"(Unverified:\n)AC-[0-9, AC-]+(\. The biggest gaps)", lambda m: m.group(1) + ", ".join(f"AC-{n:02d}" for n in unverified) + m.group(2), rt)
     rt = re.sub(r"(## Follow-ups\n\n.*?\n\n)(.*?)(\n\n## Project documents)", lambda m: m.group(1) + "\n".join(follow) + m.group(3), rt, flags=re.S)
     rt = rt.replace("__FOLLOWUPS__", "\n".join(follow))
     readme.write_text(rt)
-    print("verified:", len(verified), "unverified:", unverified)
+    print("verified:", len(verified), "partial:", partials, "unverified:", unverified)
 
 if __name__ == "__main__":
     main()
