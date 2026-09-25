@@ -1,0 +1,29 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "mock": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Mock (deterministic fixture)",
+      "options": {
+        "baseURL": "http://127.0.0.1:47811/v1"
+      },
+      "models": {
+        "mock-coder": {
+          "name": "Mock Coder",
+          "tool_call": true
+        }
+      }
+    }
+  },
+  "model": "mock/mock-coder",
+  "small_model": "mock/mock-coder",
+  "autoupdate": false,
+  "share": "disabled",
+  "agent": {
+    "general": {
+      "permission": {
+        "task": "allow"
+      }
+    }
+  }
+}

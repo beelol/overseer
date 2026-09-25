@@ -137,6 +137,9 @@ function text(ev){ const p = ev.payload || {};
     case 'retention': return '… older history truncated by retention bound ' + JSON.stringify(p);
     case 'raw_unparsed': return '? unparsed (' + p.parser_version + '): ' + p.text;
     case 'session': return 'native session ' + p.native_id;
+    case 'task_created': return 'task created in ' + (p.workspace ? p.workspace.kind + ' ' + p.workspace.path : '?') + (p.workspace && p.workspace.branch ? ' (' + p.workspace.branch + ')' : '');
+    case 'interrupt_requested': return '⏹ interrupt requested';
+    case 'reattached': return '↺ daemon restarted and reattached to this run';
     default: return ev.kind + ' ' + JSON.stringify(p);
   } }
 function add(ev, label){ if (seen.has(ev.seq)) return; seen.add(ev.seq);

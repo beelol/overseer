@@ -183,6 +183,9 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             args.extend(["--json".into(), "--skip-git-repo-check".into()]);
             if req.resume_session.is_none() {
                 args.extend(["-s".into(), "workspace-write".into(), "-C".into(), req.cwd.display().to_string()]);
+            } else {
+                // `exec resume` has no -s/-C; keep the same sandbox (cwd comes from the supervisor).
+                args.extend(["-c".into(), "sandbox_mode=\"workspace-write\"".into()]);
             }
             if let Some(m) = model {
                 args.extend(["-m".into(), m.into()]);
@@ -545,6 +548,51 @@ pub fn parse_opencode(v: &Value) -> Vec<Norm> {
         _ => out.push(Norm::Unparsed(truncate(&v.to_string(), 4000))),
     }
     out
+}
+
+/// OpenCode's `run --format json` stream only covers the root session. Descendant
+/// sessions (children and grandchildren) are read from OpenCode's own session store,
+/// read-only: `session.parent_id` gives the tree and the parent's `task` tool part gives
+/// status. Returns child upserts ordered parents-first.
+pub fn opencode_store_children(db: &Path, root_session: &str) -> Result<Vec<Norm>> {
+    use rusqlite::{Connection, OpenFlags};
+    let conn = Connection::open_with_flags(db, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX)?;
+    conn.busy_timeout(std::time::Duration::from_millis(500))?;
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE tree(id, parent_id, title, depth) AS (
+           SELECT id, parent_id, title, 1 FROM session WHERE parent_id = ?1
+           UNION ALL SELECT s.id, s.parent_id, s.title, t.depth + 1 FROM session s JOIN tree t ON s.parent_id = t.id WHERE t.depth < 16)
+         SELECT tree.id, tree.parent_id, tree.title,
+           (SELECT json_extract(p.data, '$.state.status') FROM part p WHERE p.session_id = tree.parent_id
+              AND json_extract(p.data, '$.tool') = 'task' AND json_extract(p.data, '$.state.metadata.sessionId') = tree.id
+              ORDER BY p.time_updated DESC LIMIT 1),
+           (SELECT json_extract(p.data, '$.text') FROM part p WHERE p.session_id = tree.id AND json_extract(p.data, '$.type') = 'text'
+              ORDER BY p.time_updated DESC LIMIT 1)
+         FROM tree ORDER BY tree.depth, tree.id",
+    )?;
+    let rows = stmt.query_map([root_session], |r| {
+        Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?, r.get::<_, String>(2)?, r.get::<_, Option<String>>(3)?, r.get::<_, Option<String>>(4)?))
+    })?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (id, parent, title, status, text) = row?;
+        let status = match status.as_deref() {
+            Some("completed") => "completed",
+            Some("error") => "failed",
+            Some("running") | Some("pending") => "running",
+            _ => "running",
+        };
+        out.push(Norm::Child {
+            native_id: id.clone(),
+            parent_native: parent.filter(|p| p != root_session),
+            title: Some(title),
+            status: Some(status.into()),
+            text: text.map(|t| truncate(&t, 8192)),
+            only_if_known: false,
+            evidence: format!("opencode session store: session {id} parent_id link"),
+        });
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
