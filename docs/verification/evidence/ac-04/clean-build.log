@@ -1,0 +1,40 @@
++(eval):3> date
+Fri Sep 25 00:48:09 PDT 2026
++(eval):3> sw_vers
++(eval):3> tr '\n' ' '
+ProductName:		macOS ProductVersion:		26.6.2 BuildVersion:		25G83 +(eval):3> echo
+
++(eval):3> git clone -q --branch claude/overseer-macos-app-2d3d20 https://github.com/beelol/overseer.git /tmp/ovs-clean-33866
++(eval):3> cd /tmp/ovs-clean-33866
++(eval):3> git log --oneline -1
+1c2b670 evidence: final UI regression and load runs at b5693b8
++(eval):3> npm ci --prefix extension/branch-diff/tooling/review --ignore-scripts
++(eval):3> tail -1
+found 0 vulnerabilities
++(eval):3> npm ci --prefix extension/tooling/vsce --ignore-scripts
++(eval):3> tail -1
+found 0 vulnerabilities
++(eval):3> node extension/scripts/package.js
++(eval):3> tail -3
+
+ DONE  Packaged: /private/tmp/ovs-clean-33866/extension/overseer-0.1.0.vsix (107 files, 3.5 MB)
+/private/tmp/ovs-clean-33866/extension/overseer-0.1.0.vsix
++(eval):3> ls -la extension/overseer-0.1.0.vsix target/release/overseerd
+-rw-r--r--@ 1 bilal  wheel  3667734 Sep 25 00:48 extension/overseer-0.1.0.vsix
+-rwxr-xr-x@ 1 bilal  wheel  5814320 Sep 25 00:48 target/release/overseerd
++(eval):3> H=+(eval):3> mktemp -d /tmp/ovs-smoke.XXXX
++(eval):3> H=/tmp/ovs-smoke.UoOc 
++(eval):3> OVERSEER_HOME=/tmp/ovs-smoke.UoOc target/release/overseerd serve
++(eval):3> sleep 1
++(eval):3> OVERSEER_HOME=/tmp/ovs-smoke.UoOc target/release/overseerd ctl hello
+{"id":1,"result":{"data_dir":"/tmp/ovs-smoke.UoOc","pid":36489,"protocol":1,"socket":"/tmp/ovs-smoke.UoOc/run/overseerd.sock","version":"0.1.0"}}
++(eval):3> OVERSEER_HOME=/tmp/ovs-smoke.UoOc target/release/overseerd ctl harness.list
++(eval):3> head -c 400
+{"id":1,"result":[{"capabilities":{"account_login":"ChatGPT account via codex login (CODEX_HOME per profile)","approvals":"unsupported in exec transport (sandbox policy decides); use the codex-app transport for approvals","children":"supported (collab_tool_call spawn_agent/wait; child output limited to final message)","file_activity":"supported (file_change items)","follow_up":"supported (codex ex+(eval):3> echo
+
++(eval):3> OVERSEER_HOME=/tmp/ovs-smoke.UoOc target/release/overseerd ctl daemon.shutdown
+{"id":1,"result":{"ok":true}}
++(eval):3> cat /tmp/ovs-smoke.UoOc/overseerd.log
+1790322513973 [36489] overseerd 0.1.0 starting, data dir /tmp/ovs-smoke.UoOc
+1790322513973 [36489] reconcile: []
+1790322513973 [36489] listening on /tmp/ovs-smoke.UoOc/run/overseerd.sock

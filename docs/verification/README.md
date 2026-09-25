@@ -10,7 +10,49 @@ Only `verified` gets `[x]` in the RFC.
 
 ## Status by criterion
 
-__TABLE__
+| AC | Criterion | Status | Record |
+| --- | --- | --- | --- |
+| AC-01 | Harness capability survey | verified (research criterion; live probes appended below) | [AC-01.md](AC-01.md) |
+| AC-02 | Account and child feasibility spikes | verified (research criterion with investigated blockers) | [AC-02.md](AC-02.md) |
+| AC-03 | Reuse decision | verified | [AC-03.md](AC-03.md) |
+| AC-04 | Installable macOS foundation with portable design | verified | [AC-04.md](AC-04.md) |
+| AC-05 | Independent durable state | verified | [AC-05.md](AC-05.md) |
+| AC-06 | Honest process lifecycle | verified | [AC-06.md](AC-06.md) |
+| AC-07 | Persistent sessions | verified | [AC-07.md](AC-07.md) |
+| AC-08 | Local access boundary | blocked | [AC-08.md](AC-08.md) |
+| AC-09 | Complete task controls | verified | [AC-09.md](AC-09.md) |
+| AC-10 | Event replay and bounded output | verified | [AC-10.md](AC-10.md) |
+| AC-11 | Account profiles | blocked | [AC-11.md](AC-11.md) |
+| AC-12 | Two simultaneous ChatGPT subscriptions | blocked | [AC-12.md](AC-12.md) |
+| AC-13 | Credential isolation on macOS | blocked | [AC-13.md](AC-13.md) |
+| AC-14 | Initial adapters | blocked | [AC-14.md](AC-14.md) |
+| AC-15 | Generic harness fallback | verified | [AC-15.md](AC-15.md) |
+| AC-16 | Permissions and limits | verified | [AC-16.md](AC-16.md) |
+| AC-17 | Compatibility truthfulness | verified | [AC-17.md](AC-17.md) |
+| AC-18 | Recursive run tree | verified | [AC-18.md](AC-18.md) |
+| AC-19 | Actual native children | blocked | [AC-19.md](AC-19.md) |
+| AC-20 | Evidence-backed inference | verified | [AC-20.md](AC-20.md) |
+| AC-21 | Worktrees by default | verified | [AC-21.md](AC-21.md) |
+| AC-22 | Current dirty checkout | verified | [AC-22.md](AC-22.md) |
+| AC-23 | Shared workspace ownership | verified | [AC-23.md](AC-23.md) |
+| AC-24 | Safe workspace retention | verified | [AC-24.md](AC-24.md) |
+| AC-25 | Correct repository selection | verified | [AC-25.md](AC-25.md) |
+| AC-26 | Run snapshots and selectable bases | verified | [AC-26.md](AC-26.md) |
+| AC-27 | Complete change and dirty views | verified | [AC-27.md](AC-27.md) |
+| AC-28 | No cancellation blind spot | verified | [AC-28.md](AC-28.md) |
+| AC-29 | Follow across and within files | verified | [AC-29.md](AC-29.md) |
+| AC-30 | Navigation ownership | verified | [AC-30.md](AC-30.md) |
+| AC-31 | Live Review refresh | verified | [AC-31.md](AC-31.md) |
+| AC-32 | Edit selected workspace | verified | [AC-32.md](AC-32.md) |
+| AC-33 | Preserve conflicting drafts | verified | [AC-33.md](AC-33.md) |
+| AC-34 | Safe file boundaries | verified | [AC-34.md](AC-34.md) |
+| AC-35 | Responsive review | verified | [AC-35.md](AC-35.md) |
+| AC-36 | Packaged macOS UI | verified | [AC-36.md](AC-36.md) |
+| AC-37 | Automated regression coverage | verified | [AC-37.md](AC-37.md) |
+| AC-38 | Reproducible acceptance ledger | verified | [AC-38.md](AC-38.md) |
+| AC-39 | Minimal dogfood flow | verified | [AC-39.md](AC-39.md) |
+| AC-40 | Repository handoff | verified | [AC-40.md](AC-40.md) |
+| AC-41 | Linux verification (deferred by owner) | blocked | [AC-41.md](AC-41.md) |
 
 ## Evidence layout
 
@@ -26,6 +68,8 @@ __TABLE__
     files, current-checkout editing, native undo/redo, drafts across reload.
   - `codex-approval-live` — **live** Codex app-server transport: Allow, Deny and Interrupt
     on real permission requests (3 tiny turns).
+  - `codex-follow-live` — **live** Codex app-server turn alternating edits across files at
+    distant lines: Follow, pause during live edits, Resume.
   - `trust` — Restricted Mode blocks launching.
   - `perf` — 10,000 files, four active runs, 10 minutes.
 - `fixtures/transcripts/` — recorded live transcripts (paths redacted) and mock-provider runs.
@@ -67,4 +111,6 @@ criteria on regressions. Keep README's verified count synchronized in the same u
 
 ## Audit notes (handoff)
 
-__AUDIT__
+- Verified: 34 / 41 (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-09, AC-10, AC-15, AC-16, AC-17, AC-18, AC-20, AC-21, AC-22, AC-23, AC-24, AC-25, AC-26, AC-27, AC-28, AC-29, AC-30, AC-31, AC-32, AC-33, AC-34, AC-35, AC-36, AC-37, AC-38, AC-39, AC-40).
+- Not verified: AC-08, AC-11, AC-12, AC-13, AC-14, AC-19, AC-41 — each record states the exact blocker and next action.
+- Every verified record was re-read against its evidence folder/test before checking; anything that relied only on fixtures where the criterion demands live evidence stays unchecked.
