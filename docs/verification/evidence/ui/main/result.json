@@ -4,7 +4,7 @@
       "name": "profile created from UI",
       "ok": true,
       "detail": {
-        "id": "p-ad8f3e3c3a9f",
+        "id": "p-43207e97cebc",
         "harness": "opencode"
       }
     },
@@ -12,8 +12,8 @@
       "name": "run created in isolated worktree",
       "ok": true,
       "detail": {
-        "run": "r-2a9236ca062f",
-        "workspace": "/private/tmp/ovs-ui-Sx64tS/overseer-home/worktrees/repo-14cce889/sequence-8",
+        "run": "r-28c16f55642e",
+        "workspace": "/private/tmp/ovs-ui-WnLlfM/overseer-home/worktrees/repo-c57a3d19/sequence-8",
         "branch": "overseer/sequence-8"
       }
     },
@@ -25,10 +25,10 @@
       "name": "follow navigated across files",
       "ok": true,
       "detail": [
+        "Following: b.txt:280 (agent tool input (tool-input))",
+        "Following: a.txt:60 (agent tool input (tool-input))",
         "Following: b.txt:240 (agent tool input (tool-input))",
-        "Following: a.txt:150 (agent tool input (tool-input))",
-        "Following: b.txt:200 (agent tool input (tool-input))",
-        "Following: a.txt:100 (agent tool input (tool-input))"
+        "Following: a.txt:150 (agent tool input (tool-input))"
       ]
     },
     {
@@ -36,15 +36,15 @@
       "ok": true,
       "detail": {
         "aLines": [
-          150,
-          100
+          60,
+          150
         ]
       }
     },
     {
       "name": "output panel streams events",
       "ok": true,
-      "detail": "opencodetask created in worktree /private/tmp/ovs-ui-Sx64tS/overseer-home/worktrees/repo-14cce889/sequence-8 (overseer/sequence-8)\nopencode▶ turn 1: sequence 8\nopencode— starting\nopencode— running\nopencodenative session ses_f28f958d5ffeyt3O1ToWHG6Rh6\nopencode✎ a.txt (edit, tool-input)\nopencode⚙ edit: {\"filePath\":\"/private/tmp/ovs-ui-Sx64tS/overseer-home/worktrees/repo-14cce889/sequence-8/a.txt\",\"n"
+      "detail": "opencodetask created in worktree /private/tmp/ovs-ui-WnLlfM/overseer-home/worktrees/repo-c57a3d19/sequence-8 (overseer/sequence-8)\nopencode▶ turn 1: sequence 8\nopencode— starting\nopencode— running\nopencodenative session ses_f288fd638ffeiXXU8tekwEe0td\nopencode✎ a.txt (edit, tool-input)\nopencode⚙ edit: {\"filePath\":\"/private/tmp/ovs-ui-WnLlfM/overseer-home/worktrees/repo-c57a3d19/sequence-8/a.txt\",\"n"
     },
     {
       "name": "scroll pauses follow with visible Resume",
@@ -52,7 +52,7 @@
       "detail": {
         "state": "Follow paused by your navigation",
         "resume": true,
-        "top": 476
+        "top": 155
       }
     },
     {
@@ -60,7 +60,7 @@
       "ok": true,
       "detail": {
         "state": "Follow paused by your navigation",
-        "top": 476
+        "top": 155
       }
     },
     {
@@ -72,11 +72,24 @@
       }
     },
     {
+      "name": "selecting another file pauses follow",
+      "ok": true,
+      "detail": {
+        "state": "Follow paused by your navigation",
+        "resume": true
+      }
+    },
+    {
+      "name": "base icon identifies snapshot and provenance",
+      "ok": true,
+      "detail": "Latest run\nBase: 48e3fdbfa766d93a9a287b441974a6ab8a2356ba\nrun-start snapshot s-06c9268e170f (turn 1 of r-28c16f55642e, 1790320846526), captured including dirty and untracked files\nProvenance: recorded\nClick to choose another comparison."
+    },
+    {
       "name": "follow off preserves position",
       "ok": true,
       "detail": {
-        "offTop": 476,
-        "top": 476,
+        "offTop": 659,
+        "top": 659,
         "checked": false
       }
     },
@@ -115,16 +128,42 @@
         {
           "n": 1,
           "status": "completed",
-          "snapshot": "s-d927914d2055"
+          "snapshot": "s-06c9268e170f"
         },
         {
           "n": 2,
           "status": "interrupted",
-          "snapshot": "s-72e2b64d26ba"
+          "snapshot": "s-0641b7f01c70"
         }
       ]
+    },
+    {
+      "name": "three-level native tree visible in the UI",
+      "ok": true,
+      "detail": "grandchild hi (@general subagent)completed · native child"
+    },
+    {
+      "name": "child controls disabled with explanation",
+      "ok": true,
+      "detail": {
+        "interrupt": true,
+        "why": "Native children are controlled through their parent run.",
+        "send": true,
+        "sendWhy": "Follow-ups go to the top-level run.",
+        "ws": "Workspace: /private/tmp/ovs-ui-WnLlfM/overseer-home/worktrees/repo-c57a3d19/delegation (worktree, overseer/delegation) — shared with parent"
+      }
+    },
+    {
+      "name": "UI survives daemon crash: disconnected state, daemon restarted, same tasks",
+      "ok": true,
+      "detail": {
+        "sawDisconnect": true,
+        "oldPid": 47539,
+        "newPid": 60448,
+        "tasks": 2
+      }
     }
   ],
-  "run": "r-2a9236ca062f",
-  "workspace": "/private/tmp/ovs-ui-Sx64tS/overseer-home/worktrees/repo-14cce889/sequence-8"
+  "run": "r-28c16f55642e",
+  "workspace": "/private/tmp/ovs-ui-WnLlfM/overseer-home/worktrees/repo-c57a3d19/sequence-8"
 }

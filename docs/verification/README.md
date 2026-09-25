@@ -24,6 +24,8 @@ __TABLE__
     Overseer repo, native sub-agent, review edit, follow-up, VS Code closure, interrupt.
   - `review` — two repos, agent switching, attribution, refresh timings, unsafe/unsupported
     files, current-checkout editing, native undo/redo, drafts across reload.
+  - `codex-approval-live` — **live** Codex app-server transport: Allow, Deny and Interrupt
+    on real permission requests (3 tiny turns).
   - `trust` — Restricted Mode blocks launching.
   - `perf` — 10,000 files, four active runs, 10 minutes.
 - `fixtures/transcripts/` — recorded live transcripts (paths redacted) and mock-provider runs.

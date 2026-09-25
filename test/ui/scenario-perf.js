@@ -56,7 +56,10 @@ const rss = pattern => { const out = cp.spawnSync('ps', ['-axo', 'rss=,command='
       // Navigation: click a file in the navigator and measure until its diff is in view.
       const target = await review.eval(`(() => { document.querySelectorAll('#nav-target').forEach(x => x.removeAttribute('id')); const b = [...document.querySelectorAll('#tree .file')]; const e = b[(${k} * 37) % b.length]; e.id = 'nav-target'; e.scrollIntoView({ block: 'center' }); return e.dataset.id; })()`);
       let p = await s.webviewPoint(review, '#nav-target');
-      // The navigator re-renders when new files appear; confirm the element under the pointer.
+      // Like a user: move the pointer over the navigator first, then confirm the element under it.
+      await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y }, cdp.workbench);
+      await delay(80);
+      p = await s.webviewPoint(review, '#nav-target');
       for (let tries = 0; tries < 3; tries++) {
         const inner = await review.eval(`(() => { const e = document.getElementById('nav-target'); if (!e) return null; const r = e.getBoundingClientRect(); const x = r.left + Math.min(r.width / 2, 40), y = r.top + Math.min(r.height / 2, 12); const hit = document.elementFromPoint(x, y)?.closest('.file'); return { ok: hit === e }; })()`);
         if (inner && inner.ok) break;

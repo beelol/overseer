@@ -261,7 +261,7 @@ rec(36, "Packaged macOS UI", "verified",
     evidence="`evidence/ui/*/install.log`, screenshots, result.json", live="Codex live + mock.")
 
 rec(37, "Automated regression coverage", "verified",
-    steps="`cargo test` (unit: adapters/redaction; protocol: 24 named `acNN_*` tests with real Git fixtures and fixture harnesses) and packaged-UI scenarios `test/ui/scenario-{main,review,trust,perf}.js` (fixture/mock, no paid tokens) plus `scenario-codex-live.js` (live, run deliberately; `DRY_RUN=1` replays a recorded transcript). Mocks and fixtures are labelled in test names/headers and do not satisfy live-only criteria.",
+    steps="`cargo test` (unit: adapters/redaction; protocol: 24 named `acNN_*` tests with real Git fixtures and fixture harnesses) and packaged-UI scenarios `test/ui/scenario-{main,review,trust,perf}.js` (fixture/mock, no paid tokens) plus `scenario-codex-live.js` and `scenario-codex-approval.js` (live, run deliberately; `DRY_RUN=1` uses a recorded transcript / synthetic app-server). Protocol tests pin every fixture harness path so they can never reach a real, paid harness. Mocks and fixtures are labelled in test names/headers and do not satisfy live-only criteria.",
     expected="Passing clean-checkout macOS checks with named tests mapped to ACs.",
     actual="See [evidence/ac-37/test-run.log](evidence/ac-37/test-run.log) (clean clone) and scenario results.",
     evidence="`evidence/ac-37/test-run.log`, `evidence/ac-04/clean-build.log`, UI results", live="Fixtures/mocks; live Codex scenario separate.",
