@@ -1,0 +1,21 @@
+[2026-09-25T20:08:34.995Z] PASS UI sources use theme tokens only (no hard-coded colors) {"files":11,"hits":[]}
+[2026-09-25T20:08:35.563Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T20:08:46.397Z] screenshot docs/verification/evidence/ui/theme/01-new-task-keyboard.png
+[2026-09-25T20:08:47.189Z] PASS keyboard-only task creation (tiles by arrow keys, Tab between groups, Enter to start) {"trail":[{"id":"","role":"radio","label":"theme-demo, /private/tmp/ovs-ui-L6HQGL/theme-demo, on main, open folder","group":"repos"},{"id":"","role":"radio","label":"Codex, ready, account-fixture 0.0.0 (synthetic), native children, follow-ups, interrupt","group":"harnesses"},{"id":"","role":"radio","label":"Generic program, ready, installed, follow-ups, interrupt, filesystem-only edits","group":"harnesses"},{"id":"program","role":null,"label":""},{"id":"args","role":null,"label":""},{"id":"","role":"radio","label":"New worktree, recommended, Isolated branch and worktree; your checkout is not touched.","group":"modes"},{"id":"start","role":null,"label":"Start task"}],"run":"r-57fb3e8f966c"}
+[2026-09-25T20:08:51.514Z] screenshot docs/verification/evidence/ui/theme/02-new-task-dark-modern.png
+[2026-09-25T20:08:54.074Z] screenshot docs/verification/evidence/ui/theme/03-views-dark-modern.png
+[2026-09-25T20:08:56.116Z] screenshot docs/verification/evidence/ui/theme/04-conversation-dark-modern.png
+[2026-09-25T20:08:56.124Z] PASS delayed parent (grandchild reported first) ends up nested inside its child in the conversation {"grandInsideChild":true,"childUnderAgent":true}
+[2026-09-25T20:08:56.124Z] PASS Default Dark Modern: views render with the theme and every control has an accessible name {"bodyClass":"vscode-dark","audits":{"form":{"checked":19,"bad":[]},"center":{"checked":10,"bad":[]},"conversation":{"checked":8,"bad":[]},"review":{"checked":15,"bad":[]}}}
+[2026-09-25T20:08:59.655Z] screenshot docs/verification/evidence/ui/theme/05-new-task-light-modern.png
+[2026-09-25T20:09:02.228Z] screenshot docs/verification/evidence/ui/theme/06-views-light-modern.png
+[2026-09-25T20:09:04.282Z] screenshot docs/verification/evidence/ui/theme/07-conversation-light-modern.png
+[2026-09-25T20:09:04.282Z] PASS Default Light Modern: views render with the theme and every control has an accessible name {"bodyClass":"vscode-light","audits":{"form":{"checked":19,"bad":[]},"center":{"checked":10,"bad":[]},"conversation":{"checked":8,"bad":[]},"review":{"checked":15,"bad":[]}}}
+[2026-09-25T20:09:07.818Z] screenshot docs/verification/evidence/ui/theme/08-new-task-high-contrast.png
+[2026-09-25T20:09:10.394Z] screenshot docs/verification/evidence/ui/theme/09-views-high-contrast.png
+[2026-09-25T20:09:12.447Z] screenshot docs/verification/evidence/ui/theme/10-conversation-high-contrast.png
+[2026-09-25T20:09:12.448Z] PASS Default High Contrast: views render with the theme and every control has an accessible name {"bodyClass":"vscode-high-contrast","audits":{"form":{"checked":19,"bad":[]},"center":{"checked":10,"bad":[]},"conversation":{"checked":8,"bad":[]},"review":{"checked":15,"bad":[]}}}
+[2026-09-25T20:09:15.989Z] screenshot docs/verification/evidence/ui/theme/11-new-task-high-contrast-light.png
+[2026-09-25T20:09:18.557Z] screenshot docs/verification/evidence/ui/theme/12-views-high-contrast-light.png
+[2026-09-25T20:09:20.593Z] screenshot docs/verification/evidence/ui/theme/13-conversation-high-contrast-light.png
+[2026-09-25T20:09:20.593Z] PASS Default High Contrast Light: views render with the theme and every control has an accessible name {"bodyClass":"vscode-high-contrast-light vscode-high-contrast","audits":{"form":{"checked":19,"bad":[]},"center":{"checked":10,"bad":[]},"conversation":{"checked":8,"bad":[]},"review":{"checked":15,"bad":[]}}}
