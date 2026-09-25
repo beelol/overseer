@@ -401,7 +401,7 @@ impl Daemon {
         };
         self.store.lock().unwrap().insert_run(&run)?;
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(&run.id))?;
-        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request")});
+        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "extra_args": p["extra_args"].clone()});
         {
             let store = self.store.lock().unwrap();
             store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![run.id, generic.to_string()])?;
@@ -459,6 +459,7 @@ impl Daemon {
         };
         let generic_meta = launch_meta.get("generic").cloned().unwrap_or(launch_meta.clone());
         let args: Option<Vec<String>> = generic_meta["args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
+        let extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
         let resume = if follow_up { run.native_id.clone() } else { None };
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
@@ -473,6 +474,7 @@ impl Daemon {
                 resume_session: resume.as_deref(),
                 program_override: generic_meta["program"].as_str(),
                 args_override: args.as_deref(),
+                extra_args: &extra_args,
             },
         )?;
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(run_id))?;
@@ -749,10 +751,20 @@ impl Daemon {
         {
             let store = self.store.lock().unwrap();
             let tx = store.conn.unchecked_transaction()?;
+            let root_native = if run.harness == "codex-app" { store.run(&run.id)?.and_then(|r| r.native_id) } else { None };
             for rec in lines {
                 let stream = rec["s"].as_str().unwrap_or("o");
                 let data = rec["d"].as_str().unwrap_or_default();
-                for norm in adapters::parse(&run.harness, stream, data) {
+                let mut norms = adapters::parse(&run.harness, stream, data);
+                if run.harness == "codex-app" && stream == "o" {
+                    let thread = serde_json::from_str::<Value>(data).ok().and_then(|v| v["params"]["threadId"].as_str().map(str::to_string));
+                    if let (Some(t), Some(root)) = (thread, &root_native) {
+                        if &t != root {
+                            norms = adapters::scope_codex_app_child(&t, norms);
+                        }
+                    }
+                }
+                for norm in norms {
                     self.apply_norm(&store, run, norm, state, &mut emitted)?;
                 }
             }

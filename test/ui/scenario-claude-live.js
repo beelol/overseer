@@ -20,12 +20,27 @@ const PROMPT = "Use the Agent tool to launch one general-purpose subagent with t
   const waitFor = async (id, pred, secs = 240) => { for (let i = 0; i < secs * 2; i++) { const r = runState(id); if (pred(r)) return r; await delay(500); } return runState(id); };
   const allowPending = async (panel, label) => {
     await panel.waitFor(`!!document.querySelector('.perm button')`, 60000);
-    await panel.eval(`(() => { const b = [...document.querySelectorAll('.perm button')].find(b => /Allow/.test(b.textContent)); b.id = 'allow-btn'; b.scrollIntoView({ block: 'center' }); })()`);
     const tool = await panel.eval(`document.querySelector('.perm div').textContent`);
     await s.screenshot('permission-' + label);
-    const p = await s.webviewPoint(panel, '#allow-btn');
-    await s.cdp.click(p.x, p.y);
-    return tool;
+    // The card re-renders on every run update; tag and locate the button until it holds still.
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try {
+        await panel.eval(`(() => { const b = [...document.querySelectorAll('.perm button')].find(b => /Allow/.test(b.textContent)); b.id = 'allow-btn'; b.scrollIntoView({ block: 'center' }); })()`);
+        const p = await s.webviewPoint(panel, '#allow-btn');
+        await s.cdp.click(p.x, p.y);
+        return tool;
+      } catch { await delay(300); }
+    }
+    throw new Error('could not click Allow');
+  };
+  const sendFollowUp = async (panel, text) => {
+    await panel.waitFor(`!document.getElementById('send').disabled`, 60000);
+    const pr = await s.webviewPoint(panel, '#prompt');
+    await s.cdp.click(pr.x, pr.y);
+    await s.cdp.type(text);
+    await delay(300);
+    const sd = await s.webviewPoint(panel, '#send');
+    await s.cdp.click(sd.x, sd.y);
   };
   try {
     const repo = makeRepo(path.join(s.root, 'claude-demo'), { dirty: false });
@@ -66,11 +81,7 @@ const PROMPT = "Use the Agent tool to launch one general-purpose subagent with t
     check('allowed Write landed in the worktree', fs.existsSync(hello) && /Hello from Claude via Overseer/.test(fs.readFileSync(hello, 'utf8')), fs.existsSync(hello) && fs.readFileSync(hello, 'utf8'));
     await s.screenshot('turn1-done');
     // Follow-up turn 2.
-    const prompt = await s.webviewPoint(output, '#prompt');
-    await cdp.click(prompt.x, prompt.y);
-    await cdp.type('Use the Edit tool to append one final line to hello.md: Edited by a follow-up turn. Change nothing else, then reply exactly: done');
-    const send = await s.webviewPoint(output, '#send');
-    await cdp.click(send.x, send.y);
+    await sendFollowUp(output, 'Use the Edit tool to append one final line to hello.md: Edited by a follow-up turn. Change nothing else, then reply exactly: done');
     const w2 = await waitFor(root.id, r => s.ctl('run.turns', { run_id: root.id }).length >= 2 && (r.status === 'waiting_for_user' || !['queued', 'starting', 'running'].includes(r.status)));
     if (w2.status === 'waiting_for_user') await allowPending(output, 'edit');
     const done2 = await waitFor(root.id, r => !['queued', 'starting', 'running', 'waiting_for_user'].includes(r.status) && s.ctl('run.turns', { run_id: root.id }).length >= 2);
@@ -80,14 +91,12 @@ const PROMPT = "Use the Agent tool to launch one general-purpose subagent with t
     check('latest-run comparison shows only turn-2 changes', diff.changes.length === 1 && diff.changes[0].path === 'hello.md' && diff.changes[0].status === 'M', diff.changes);
     // Turn 3: interrupt a running command.
     result.turn3Seq = Math.max(...s.ctl('events.list', { run_id: root.id, limit: 5000 }).events.map(e => e.seq));
-    await cdp.click(prompt.x, prompt.y);
-    await cdp.type('Use the Bash tool to run exactly: sleep 60. Then reply exactly: done');
-    await cdp.click(send.x, send.y);
+    await sendFollowUp(output, 'Use the Bash tool to run exactly this command in the foreground: for i in 1 2 3 4 5 6 7 8 9 10 11 12; do echo tick $i; sleep 5; done. Then reply exactly: done');
     // Wait until the sleep is actually running (answer a permission request if Claude asks).
     for (let i = 0; i < 240; i++) {
       const r = runState(root.id);
       if (r.status === 'waiting_for_user') { await allowPending(output, 'bash'); continue; }
-      const bash = s.ctl('events.list', { run_id: root.id, limit: 5000 }).events.some(e => e.kind === 'tool' && e.payload.name === 'Bash' && /sleep 60/.test(e.payload.summary) && e.seq > (result.turn3Seq || 0));
+      const bash = s.ctl('events.list', { run_id: root.id, limit: 5000 }).events.some(e => e.kind === 'tool' && e.payload.name === 'Bash' && /tick/.test(e.payload.summary) && e.seq > (result.turn3Seq || 0));
       if (bash && r.status === 'running') break;
       await delay(500);
     }

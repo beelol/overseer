@@ -760,3 +760,28 @@ fn ac14_fixture_claude_background_subagent_keeps_session_open_for_permissions() 
     assert_eq!(kids.len(), 1);
     assert_eq!(kids[0]["status"], "completed");
 }
+
+#[test]
+fn ac19_fixture_codex_app_child_threads_nest_and_do_not_end_the_parent() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "tree")]);
+    let created = d.call("task.create", json!({"repo": repo, "harness": "codex-app", "prompt": "tree", "title": "tree", "approval_policy": "untrusted", "extra_args": ["-c", "agents.max_depth=2"]}));
+    let root = run_id(&created);
+    // The child's turn/completed must not end the root turn: the root still reaches its approval.
+    let waiting = d.wait_status(&root, |s| s == "waiting_for_user", 15);
+    d.call("run.permission", json!({"run_id": root, "request_id": waiting["attention"]["request_id"], "allow": true}));
+    assert_eq!(d.wait_done(&root, 15)["status"], "completed");
+    let runs = d.runs();
+    let child = runs.iter().find(|x| x["native_id"] == "thr-child").expect("child");
+    let grand = runs.iter().find(|x| x["native_id"] == "thr-grand").expect("grandchild");
+    assert_eq!(child["parent_run_id"], root.as_str());
+    assert_eq!(grand["parent_run_id"], child["id"]);
+    assert_eq!(child["status"], "completed");
+    let child_out: Vec<_> = d.events(child["id"].as_str().unwrap()).into_iter().filter(|e| e["kind"] == "output").map(|e| e["payload"]["text"].as_str().unwrap_or_default().to_string()).collect();
+    assert!(child_out.contains(&"child output".to_string()), "{child_out:?}");
+    let root_out: Vec<_> = d.events(&root).into_iter().filter(|e| e["kind"] == "output").map(|e| e["payload"]["text"].as_str().unwrap_or_default().to_string()).collect();
+    assert!(!root_out.contains(&"child output".to_string()), "child text not attributed to the root");
+    let launch = std::fs::read_to_string(d.home.path().join("runs").join(&root).join("p1/launch.json")).unwrap();
+    assert!(launch.contains("agents.max_depth=2"), "extra args passed to the harness");
+}

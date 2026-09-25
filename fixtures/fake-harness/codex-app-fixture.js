@@ -22,6 +22,14 @@ rl.on('line', line => {
     turn = 'turn-' + Date.now();
     out({ id: m.id, result: { turn: { id: turn, status: 'inProgress' } } });
     out({ method: 'turn/started', params: { threadId: thread, turn: { id: turn } } });
+    if (process.env.FIXTURE_MODE === 'tree') {
+      // A child thread spawned by the root, which spawns a grandchild; child-thread items and
+      // its own turn/completed carry the child's threadId.
+      out({ method: 'item/completed', params: { threadId: thread, turnId: turn, item: { type: 'collabAgentToolCall', id: 'c1', tool: 'spawnAgent', status: 'completed', senderThreadId: thread, receiverThreadIds: ['thr-child'], prompt: 'child task', agentsStates: { 'thr-child': { status: 'running' } } } } });
+      out({ method: 'item/completed', params: { threadId: 'thr-child', turnId: 't-child', item: { type: 'agentMessage', id: 'cm', text: 'child output' } } });
+      out({ method: 'item/completed', params: { threadId: 'thr-child', turnId: 't-child', item: { type: 'collabAgentToolCall', id: 'c2', tool: 'spawnAgent', status: 'completed', senderThreadId: 'thr-child', receiverThreadIds: ['thr-grand'], prompt: 'grandchild task', agentsStates: { 'thr-grand': { status: 'completed', message: 'hi' } } } } });
+      out({ method: 'turn/completed', params: { threadId: 'thr-child', turn: { id: 't-child', status: 'completed', error: null } } });
+    }
     out({ id: 'srv-1', method: 'currentTime/read', params: {} });
     out({ method: 'item/started', params: { threadId: thread, turnId: turn, item: { type: 'commandExecution', id: 'cmd1', command: 'touch approved.txt', status: 'inProgress', exitCode: null } } });
     out({ id: approvalId, method: 'item/commandExecution/requestApproval', params: { kind: 'command', threadId: thread, turnId: turn, itemId: 'cmd1', command: 'touch approved.txt', cwd: process.cwd(), reason: 'needs write' } });

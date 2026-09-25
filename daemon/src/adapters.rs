@@ -45,6 +45,8 @@ pub struct LaunchReq<'a> {
     pub resume_session: Option<&'a str>,
     pub program_override: Option<&'a str>,
     pub args_override: Option<&'a [String]>,
+    /// Extra harness arguments chosen for the task (e.g. `-c agents.max_depth=2`).
+    pub extra_args: &'a [String],
 }
 
 pub struct Launch {
@@ -213,7 +215,13 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
         env.insert(k.clone(), v.clone());
     }
     let model = req.model.filter(|m| !m.is_empty());
-    let (args, initial_stdin, close_stdin) = match harness {
+    for a in req.extra_args {
+        let lower = a.to_ascii_lowercase();
+        if lower.contains("api-key") || lower.contains("api_key") || lower.contains("access-token") {
+            bail!("extra harness argument {a} is not allowed (no API keys or tokens)");
+        }
+    }
+    let (mut args, initial_stdin, close_stdin) = match harness {
         "codex" => {
             let mut args = vec!["exec".to_string()];
             if let Some(session) = req.resume_session {
@@ -271,6 +279,12 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
         }
         other => bail!("unknown harness {other}"),
     };
+    if !req.extra_args.is_empty() && harness != "generic" {
+        // Options go before the positional prompt separator where one exists.
+        let at = args.iter().position(|a| a == "--").unwrap_or(args.len());
+        let extra: Vec<String> = req.extra_args.to_vec();
+        args.splice(at..at, extra);
+    }
     Ok(Launch { program: program_str, args, env, initial_stdin, close_stdin })
 }
 
@@ -527,6 +541,24 @@ pub fn parse_codex_app(v: &Value) -> Vec<Norm> {
         }
         _ => vec![Norm::Ignored],
     }
+}
+
+/// Re-scope app-server norms that belong to a child thread (`params.threadId` differs from
+/// the root thread): their text/tools become that child's output, their turn completion
+/// becomes the child's status, and their spawns nest under the child.
+pub fn scope_codex_app_child(thread: &str, norms: Vec<Norm>) -> Vec<Norm> {
+    let evidence = format!("codex app-server notification for child thread {thread}");
+    norms
+        .into_iter()
+        .map(|n| match n {
+            Norm::Text { role, text } => Norm::Child { native_id: thread.into(), parent_native: None, title: None, status: None, text: Some(if role == "assistant" { text } else { format!("[{role}] {text}") }), only_if_known: true, evidence: evidence.clone() },
+            Norm::Tool { name, summary, .. } => Norm::Child { native_id: thread.into(), parent_native: None, title: None, status: None, text: Some(format!("[tool {name}] {summary}")), only_if_known: true, evidence: evidence.clone() },
+            Norm::TurnDone { ok, .. } => Norm::Child { native_id: thread.into(), parent_native: None, title: None, status: Some(if ok { "completed" } else { "failed" }.into()), text: None, only_if_known: true, evidence: evidence.clone() },
+            Norm::Child { native_id, parent_native: None, title, status, text, only_if_known, evidence } => Norm::Child { native_id, parent_native: Some(thread.into()), title, status, text, only_if_known, evidence },
+            Norm::TurnId(_) | Norm::Running | Norm::Session(_) | Norm::Usage(_) => Norm::Ignored,
+            other => other,
+        })
+        .collect()
 }
 
 pub fn parse_claude(v: &Value) -> Vec<Norm> {

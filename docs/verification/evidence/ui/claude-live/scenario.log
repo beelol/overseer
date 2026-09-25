@@ -1,16 +1,16 @@
-[2026-09-25T15:31:56.258Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-25T15:31:59.184Z] PASS Claude profile signed in with a claude.ai account {"version":"2.1.246 (Claude Code)","plan":"max","id":"e303c70977c6348f"}
-[2026-09-25T15:32:07.946Z] run {"run":"r-0a4247dad0b4","workspace":"/Users/bilal/Library/Application Support/Overseer/worktrees/claude-demo-389ec9fe/use-the-agent-tool-to-launch-one-general","branch":"overseer/use-the-agent-tool-to-launch-one-general"}
-[2026-09-25T15:32:33.361Z] FAIL turn 1 reaches a permission request (not auto-approved) {"status":"completed","attention":null,"reason":"turn completed; exit 0"}
-[2026-09-25T15:32:33.371Z] PASS turn 1 completed {"status":"completed","reason":"turn completed; exit 0","native":"18d1c936-80b3-4abc-9aa1-60ce1ff40cb5"}
-[2026-09-25T15:32:33.376Z] PASS native Claude child captured [{"id":"r-0a4247dad0b4","parent":null,"native":"18d1c936-80b3-4abc-9aa1-60ce1ff40cb5","status":"completed","title":"Use the Agent tool to launch one general-purpose subagent wi","confidence":null},{"id":"r-6007fb90d2e1","parent":"r-0a4247dad0b4","native":"toolu_01P7VyK2nfZ8H1BhZbiNzMCm","status":"completed","title":"Launch nested subagent","confidence":"exact (structured harness event)"},{"id":"r-5b5ffe3f205c","parent":"r-6007fb90d2e1","native":"toolu_01FBdX2fBQAiiBjM3gBmb3zA","status":"completed","title":"Reply with hi","confidence":"exact (structured harness event)"}]
-[2026-09-25T15:32:33.376Z] PASS native Claude grandchild captured [{"title":"Reply with hi","status":"completed"}]
-[2026-09-25T15:32:33.376Z] FAIL allowed Write landed in the worktree false
-[2026-09-25T15:32:33.521Z] screenshot docs/verification/evidence/ui/claude-live/01-turn1-done.png
-[2026-09-25T15:32:42.159Z] screenshot docs/verification/evidence/ui/claude-live/02-permission-edit.png
-[2026-09-25T15:32:47.332Z] PASS follow-up turn completed {"status":"completed","reason":"turn completed; exit 0"}
-[2026-09-25T15:32:47.579Z] FAIL latest-run comparison shows only turn-2 changes [{"path":"hello.md","status":"A"}]
-[2026-09-25T15:35:15.630Z] ERROR Error: Timed out in webview waiting for !document.getElementById('interrupt').disabled (last: false)
-    at Frame.waitFor (/Users/bilal/projects/overseer/.claude/worktrees/overseer-macos-app-2d3d20/test/ui/cdp.js:199:11)
-    at async /Users/bilal/projects/overseer/.claude/worktrees/overseer-macos-app-2d3d20/test/ui/scenario-claude-live.js:88:5
-[2026-09-25T15:35:15.786Z] screenshot docs/verification/evidence/ui/claude-live/03-error.png
+[2026-09-25T15:43:14.338Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T15:43:17.275Z] PASS Claude profile signed in with a claude.ai account {"version":"2.1.246 (Claude Code)","plan":"max","id":"e303c70977c6348f"}
+[2026-09-25T15:43:26.027Z] run {"run":"r-5f284a2c23f5","workspace":"/Users/bilal/Library/Application Support/Overseer/worktrees/claude-demo-d1297561/use-the-agent-tool-to-launch-one-general","branch":"overseer/use-the-agent-tool-to-launch-one-general"}
+[2026-09-25T15:43:37.217Z] PASS turn 1 reaches a permission request (not auto-approved) {"status":"waiting_for_user","attention":"Write","reason":null}
+[2026-09-25T15:43:37.521Z] screenshot docs/verification/evidence/ui/claude-live/01-permission-write.png
+[2026-09-25T15:43:40.167Z] PASS turn 1 completed {"status":"completed","reason":"turn completed; exit 0","native":"979c7ba2-9f90-448d-aaca-b277286d359e"}
+[2026-09-25T15:43:40.171Z] PASS native Claude child captured [{"id":"r-5f284a2c23f5","parent":null,"native":"979c7ba2-9f90-448d-aaca-b277286d359e","status":"completed","title":"Use the Agent tool to launch one general-purpose subagent wi","confidence":null},{"id":"r-767f51a2a346","parent":"r-5f284a2c23f5","native":"toolu_017uhc9bkDB9MUjtCgFYzXm1","status":"completed","title":"Test nested agent call","confidence":"exact (structured harness event)"},{"id":"r-1ee6a38fb26f","parent":"r-767f51a2a346","native":"toolu_01HjFv81VipBqJ6fDWv6q4HJ","status":"completed","title":"Simple task to reply with hi","confidence":"exact (structured harness event)"}]
+[2026-09-25T15:43:40.171Z] PASS native Claude grandchild captured [{"title":"Simple task to reply with hi","status":"completed"}]
+[2026-09-25T15:43:40.171Z] PASS allowed Write landed in the worktree "Hello from Claude via Overseer\n"
+[2026-09-25T15:43:40.245Z] screenshot docs/verification/evidence/ui/claude-live/02-turn1-done.png
+[2026-09-25T15:43:47.568Z] screenshot docs/verification/evidence/ui/claude-live/03-permission-edit.png
+[2026-09-25T15:43:49.185Z] PASS follow-up turn completed {"status":"completed","reason":"turn completed; exit 0"}
+[2026-09-25T15:43:49.463Z] PASS latest-run comparison shows only turn-2 changes [{"path":"hello.md","status":"M"}]
+[2026-09-25T15:43:53.203Z] screenshot docs/verification/evidence/ui/claude-live/04-permission-bash.png
+[2026-09-25T15:43:57.918Z] PASS interrupt from UI stops the Claude run {"status":"interrupted","reason":"interrupted by user (exit code 1)"}
+[2026-09-25T15:43:59.490Z] screenshot docs/verification/evidence/ui/claude-live/05-interrupted.png
