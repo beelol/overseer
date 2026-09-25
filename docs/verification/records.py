@@ -321,6 +321,42 @@ rec(43, "Structured run conversation view", "not started",
     evidence="—", live="—",
     blocker="Not blocked; not started. Next: group events by turn in the daemon or panel, render tool calls collapsibly, link file_activity to the review, nest child output, then run the Verify clause.")
 
+rec(44, "Merge back or open a PR", "not started",
+    expected="See the RFC criterion (added by the owner on 2026-09-25).",
+    actual="Tasks stay on their branch and worktree; the user merges or cherry-picks manually and cleans up with Clean Up Worktree (branch kept). No merge-back or PR action exists yet.",
+    evidence="—", live="—",
+    blocker="Not blocked; not started. Next: add a review toolbar with Merge back (follow-up turn on the same session asking the agent to merge into the target branch in a protected way) and Open PR (push + `gh pr create`), then run the Verify clause.")
+
+rec(45, "Visible background agents", "not started",
+    expected="See the RFC criterion (added by the owner on 2026-09-25).",
+    actual="Agents and the daemon keep running after VS Code closes (AC-07), silently; stopping requires `overseerd ctl daemon.shutdown`.",
+    evidence="—", live="—",
+    blocker="Not blocked; not started. Next: the daemon tracks connected UI clients and sends an OS notification (macOS `osascript`, Linux `notify-send`) when the last one disconnects with active runs; add a Stop agents and daemon command.")
+
+rec(46, "Simple account governance", "not started",
+    expected="See the RFC criterion (added by the owner on 2026-09-25).",
+    actual="Per-harness profiles exist (isolated folders or the desktop's existing login); there is no provider-level account model yet.",
+    evidence="—", live="—",
+    blocker="Not blocked; not started. Next: implement the model in docs/rfcs/account-governance.md (accounts per provider, harness compatibility map, migration of profiles), then run its acceptance list.")
+
+rec(47, "Polished, theme-compatible UI", "not started",
+    expected="See the RFC criterion (added by the owner on 2026-09-25).",
+    actual="Task creation uses stock quick picks; panels use theme variables but are plain.",
+    evidence="—", live="—",
+    blocker="Not blocked; not started. Next: a New Task webview with harness/account tiles and a design pass on the run panel and review toolbar, verified in light/dark/high-contrast.")
+
+rec(48, "Command-center layout", "not started",
+    expected="See the RFC criterion (added by the owner on 2026-09-25).",
+    actual="The hierarchy is a sidebar tree; review and run panels open as editor tabs in two groups.",
+    evidence="—", live="—",
+    blocker="Not blocked; not started. Next: a single command-center panel (hierarchy left, review right) or a pinned layout that restores both, respecting AC-30 navigation rules.")
+
+rec(49, "Restore the open session", "not started",
+    expected="See the RFC criterion (added by the owner on 2026-09-25).",
+    actual="The review panel and selected run are restored after a window reload (AC-33 evidence); run panels, comparison mode per run, Follow state and sidebar expansion are not.",
+    evidence="—", live="—",
+    blocker="Not blocked; not started. Next: webview serializers for run panels, persist per-run comparison/Follow/scroll in workspace state, and restore with explanations for removed worktrees.")
+
 HEAD = """# AC-{n:02d} — {title}
 Status: {status}
 Tested implementation commit: {commit}
@@ -370,8 +406,14 @@ SHORT_BLOCKERS = {
     41: "deferred: no Linux environment",
     42: "not started (added by the owner on 2026-09-25)",
     43: "not started (added by the owner on 2026-09-25)",
+    44: "not started (added by the owner on 2026-09-25)",
+    45: "not started (added by the owner on 2026-09-25)",
+    46: "not started (added by the owner on 2026-09-25; see docs/rfcs/account-governance.md)",
+    47: "not started (added by the owner on 2026-09-25)",
+    48: "not started (added by the owner on 2026-09-25)",
+    49: "not started (added by the owner on 2026-09-25)",
 }
-TOTAL = 43
+TOTAL = 49
 
 EXTRA_FOLLOWUPS = [
     "Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.",

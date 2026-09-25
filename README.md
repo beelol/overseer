@@ -5,11 +5,13 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **36 / 43** (see [ledger](docs/verification/README.md)). Unverified:
-AC-08, AC-11, AC-12, AC-13, AC-41, AC-42, AC-43. The biggest gaps are two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
+criteria: **36 / 49** (see [ledger](docs/verification/README.md)). Unverified:
+AC-08, AC-11, AC-12, AC-13, AC-41, AC-42, AC-43, AC-44, AC-45, AC-46, AC-47, AC-48, AC-49. The biggest gaps are two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
 a foreign-user socket rejection test (needs a second macOS account), and Linux (no environment).
-AC-42 (hunk accept/reject) and AC-43 (structured run conversation view) were added afterwards
-and are not started. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
+AC-42–49 are newer owner requests, not started yet: hunk accept/reject, a structured run
+conversation view, merge back or open a PR, visible background agents, simple account
+governance ([side RFC](docs/rfcs/account-governance.md)), a polished theme-compatible UI, a
+command-center layout, and restoring the open session. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
 ## Acceptance criteria
 
@@ -62,6 +64,12 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-41** Linux verification (deferred by owner) — deferred: no Linux environment — [evidence](docs/verification/AC-41.md)
 - [ ] **AC-42** Hunk accept and reject — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-42.md)
 - [ ] **AC-43** Structured run conversation view — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-43.md)
+- [ ] **AC-44** Merge back or open a PR — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-44.md)
+- [ ] **AC-45** Visible background agents — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-45.md)
+- [ ] **AC-46** Simple account governance — not started (added by the owner on 2026-09-25; see docs/rfcs/account-governance.md) — [evidence](docs/verification/AC-46.md)
+- [ ] **AC-47** Polished, theme-compatible UI — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-47.md)
+- [ ] **AC-48** Command-center layout — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-48.md)
+- [ ] **AC-49** Restore the open session — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-49.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -164,6 +172,12 @@ the owner action or decision each one needs.
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
 - [ ] [AC-42](docs/verification/AC-42.md) (Hunk accept and reject): Not blocked; not started. Next: add per-hunk actions to the vendored review (reject = write the base hunk through a VS Code edit, accept = reviewed marker keyed by hunk content), then run the Verify clause.
 - [ ] [AC-43](docs/verification/AC-43.md) (Structured run conversation view): Not blocked; not started. Next: group events by turn in the daemon or panel, render tool calls collapsibly, link file_activity to the review, nest child output, then run the Verify clause.
+- [ ] [AC-44](docs/verification/AC-44.md) (Merge back or open a PR): Not blocked; not started. Next: add a review toolbar with Merge back (follow-up turn on the same session asking the agent to merge into the target branch in a protected way) and Open PR (push + `gh pr create`), then run the Verify clause.
+- [ ] [AC-45](docs/verification/AC-45.md) (Visible background agents): Not blocked; not started. Next: the daemon tracks connected UI clients and sends an OS notification (macOS `osascript`, Linux `notify-send`) when the last one disconnects with active runs; add a Stop agents and daemon command.
+- [ ] [AC-46](docs/verification/AC-46.md) (Simple account governance): Not blocked; not started. Next: implement the model in docs/rfcs/account-governance.md (accounts per provider, harness compatibility map, migration of profiles), then run its acceptance list.
+- [ ] [AC-47](docs/verification/AC-47.md) (Polished, theme-compatible UI): Not blocked; not started. Next: a New Task webview with harness/account tiles and a design pass on the run panel and review toolbar, verified in light/dark/high-contrast.
+- [ ] [AC-48](docs/verification/AC-48.md) (Command-center layout): Not blocked; not started. Next: a single command-center panel (hierarchy left, review right) or a pinned layout that restores both, respecting AC-30 navigation rules.
+- [ ] [AC-49](docs/verification/AC-49.md) (Restore the open session): Not blocked; not started. Next: webview serializers for run panels, persist per-run comparison/Follow/scroll in workspace state, and restore with explanations for removed worktrees.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
@@ -174,6 +188,7 @@ the owner action or decision each one needs.
 - [RFC and authoritative acceptance checklist](docs/overseer-rfc.md)
 - [Verification ledger and evidence](docs/verification/README.md)
 - [Harness compatibility](docs/compatibility.md)
+- [Side RFC: simple account governance](docs/rfcs/account-governance.md)
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 
 Design targets macOS and Linux; only macOS is verified. Auto routing, a TUI, VSCodium,
