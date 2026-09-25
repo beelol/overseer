@@ -742,3 +742,21 @@ fn ac16_fixture_codex_app_server_approvals_interrupt_and_unsupported_requests() 
         assert_eq!(done["native_id"], "thr-fixture-1");
     }
 }
+
+#[test]
+fn ac14_fixture_claude_background_subagent_keeps_session_open_for_permissions() {
+    // Regression for a live Claude 2.1.246 run: an interim `result` arrives while a background
+    // subagent runs; closing stdin then made later permission requests fail ("Stream closed").
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("background");
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}));
+    let run = run_id(&created);
+    let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
+    d.call("run.permission", json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}));
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    assert!(ws_path(&d, &created).join("bg.txt").exists());
+    let kids: Vec<_> = d.runs().into_iter().filter(|x| x["parent_run_id"] == run.as_str()).collect();
+    assert_eq!(kids.len(), 1);
+    assert_eq!(kids[0]["status"], "completed");
+}

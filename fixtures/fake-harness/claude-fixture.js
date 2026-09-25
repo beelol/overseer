@@ -6,6 +6,7 @@
 //   permission:  asks can_use_tool for Write, waits for allow/deny, writes the file if allowed
 //   ratelimit / quota / auth: emits the corresponding error result formats
 //   prose:       says it delegated but never launches a child
+//   background:  interim result while a background Agent runs, then a Write permission request
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
@@ -45,6 +46,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     const decision = reply.response.response;
     if (decision.behavior === 'allow') { fs.writeFileSync(file, decision.updatedInput.content); assistant([{ type: 'text', text: 'wrote perm.txt' }]); result(false, 'wrote'); }
     else { assistant([{ type: 'text', text: 'permission denied: ' + decision.message }]); result(false, 'denied'); }
+  } else if (mode === 'background') {
+    assistant([{ type: 'tool_use', id: 'toolu_bg', name: 'Agent', input: { description: 'background child', prompt: 'hi' } }]);
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [{ task_id: 't1', task_type: 'local_agent' }] });
+    out({ type: 'system', subtype: 'task_started', session_id: sid, task_id: 't1', tool_use_id: 'toolu_bg', is_backgrounded: true });
+    result(false, 'launched in the background; waiting');
+    await sleep(500);
+    out({ type: 'system', subtype: 'task_notification', session_id: sid, task_id: 't1', tool_use_id: 'toolu_bg', status: 'completed' });
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [] });
+    const file = path.join(process.cwd(), 'bg.txt');
+    out({ type: 'control_request', request_id: 'req-bg', request: { subtype: 'can_use_tool', tool_name: 'Write', input: { file_path: file, content: 'after background\n' } } });
+    const reply = await next(m => m.type === 'control_response');
+    const decision = reply.response.response;
+    if (decision.behavior === 'allow') fs.writeFileSync(file, decision.updatedInput.content);
+    result(false, 'done');
   } else if (mode === 'ratelimit') {
     out({ type: 'assistant', session_id: sid, error: 'rate_limit', message: { role: 'assistant', content: [{ type: 'text', text: 'API Error: Request rejected (429) · rate limited' }] } });
     result(true, 'API Error: Request rejected (429) · rate limited');

@@ -29,6 +29,8 @@ pub enum Norm {
     Send(String),
     /// The harness reported its current turn id (needed to interrupt that turn).
     TurnId(String),
+    /// Number of background tasks the harness reports as still running (Claude Code).
+    BackgroundTasks(usize),
     /// Line was recognized structurally but carries no user-visible content.
     Ignored,
     /// Line not understood by this parser version; retained as raw output.
@@ -533,6 +535,7 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
     match ty {
         "system" => match v["subtype"].as_str() {
             Some("init") => vec![Norm::Session(s(&v["session_id"])), Norm::Running, Norm::Text { role: "system".into(), text: format!("session started (model {})", s(&v["model"])) }],
+            Some("background_tasks_changed") => vec![Norm::BackgroundTasks(v["tasks"].as_array().map(|a| a.len()).unwrap_or(0))],
             Some(sub) if sub.starts_with("task_") && v["tool_use_id"].is_string() => {
                 let status = match v["status"].as_str() {
                     Some("completed") => Some("completed".to_string()),
@@ -610,6 +613,10 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
             let mut out = vec![Norm::Usage(json!({"usage": v["usage"], "total_cost_usd": v["total_cost_usd"], "num_turns": v["num_turns"]}))];
             if is_error {
                 out.push(Norm::Error { class: classify_error(&result).into(), message: truncate(&result, 2000) });
+            }
+            if let Some(denials) = v["permission_denials"].as_array().filter(|d| !d.is_empty()) {
+                let tools: Vec<String> = denials.iter().map(|d| s(&d["tool_name"])).collect();
+                out.push(Norm::Error { class: "permission_denied".into(), message: format!("{} tool request(s) were denied during this turn: {}", denials.len(), tools.join(", ")) });
             }
             out.push(Norm::TurnDone { ok: !is_error, summary: Some(truncate(&result, 300)) });
             out

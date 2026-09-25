@@ -920,7 +920,14 @@ impl Daemon {
                 state.last_error = Some((class.clone(), message.clone()));
                 ev("error", "harness", "exact", json!({"class": class, "message": message}), None)?
             }
+            Norm::BackgroundTasks(n) => state.background = n,
             Norm::TurnDone { ok, summary } => {
+                if run.harness == "claude" && state.background > 0 {
+                    // Claude reports an interim result while background subagents still run;
+                    // the session must stay open so their permission requests can be answered.
+                    ev("output", "harness", "exact", json!({"role": "system", "text": format!("interim result; {} background task(s) still running: {}", state.background, summary.unwrap_or_default())}), None)?;
+                    return Ok(());
+                }
                 state.turn_done = Some(ok);
                 store.finish_open_turns(&run.id, if ok { "completed" } else { "failed" }, now())?;
                 ev("turn_done", "harness", "exact", json!({"ok": ok, "summary": summary}), None)?;
@@ -1288,11 +1295,12 @@ struct TailState {
     store_seen: std::collections::HashMap<String, String>,
     close_stdin: bool,
     sends: Vec<String>,
+    background: usize,
 }
 
 impl Default for TailState {
     fn default() -> Self {
-        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new() }
+        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new(), background: 0 }
     }
 }
 
