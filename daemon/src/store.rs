@@ -165,6 +165,10 @@ impl Store {
             CREATE INDEX IF NOT EXISTS events_run ON events(run_id, seq);
             "#,
         )?;
+        let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;
+        if !has_pending {
+            self.conn.execute_batch("ALTER TABLE runs ADD COLUMN pending_parent_native TEXT;")?;
+        }
         self.conn.execute("INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', ?1)", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
     }
