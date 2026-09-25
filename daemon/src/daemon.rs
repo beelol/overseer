@@ -824,9 +824,12 @@ impl Daemon {
                     Some(c) => c,
                     None if only_if_known => return Ok(()),
                     None => {
-                        let parent_id = match &parent_native {
-                            Some(p) => find_in_tree(store, &run.id, p)?.map(|r| r.id).unwrap_or_else(|| run.id.clone()),
-                            None => run.id.clone(),
+                        let (parent_id, pending) = match &parent_native {
+                            Some(p) => match find_in_tree(store, &run.id, p)? {
+                                Some(r) => (r.id, None),
+                                None => (run.id.clone(), Some(p.clone())),
+                            },
+                            None => (run.id.clone(), None),
                         };
                         let child = Run {
                             id: format!("r-{}", short_id()),
@@ -844,13 +847,35 @@ impl Daemon {
                             ended_ms: None,
                             title: title.clone().unwrap_or_else(|| "native child".into()),
                             relation_source: Some(evidence.clone()),
-                            relation_confidence: Some("exact (structured harness event)".into()),
+                            relation_confidence: Some(match &pending {
+                                Some(p) => format!("inferred: reported parent {p} not seen yet; attached to the root run provisionally"),
+                                None => "exact (structured harness event)".into(),
+                            }),
                             capabilities: json!({"control": "through parent harness only", "workspace": "shared with parent"}),
                             process_generation: 0,
                             attention: None,
                         };
                         store.insert_run(&child)?;
-                        ev("child", "harness", "exact", json!({"child": child, "evidence": evidence, "workspace": "shared with parent"}), None)?;
+                        ev("child", "harness", if pending.is_some() { "inferred" } else { "exact" }, json!({"child": child, "evidence": evidence, "workspace": "shared with parent"}), None)?;
+                        if let Some(p) = &pending {
+                            store.conn.execute("UPDATE runs SET pending_parent_native=?2 WHERE id=?1", rusqlite::params![child.id, p])?;
+                        }
+                        // A delayed parent: adopt earlier-seen children that named this run as parent.
+                        let orphans: Vec<String> = {
+                            let mut stmt = store.conn.prepare("SELECT id FROM runs WHERE task_id=?1 AND pending_parent_native=?2")?;
+                            let rows = stmt.query_map(rusqlite::params![run.task_id, native_id], |r| r.get::<_, String>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
+                            rows
+                        };
+                        for orphan in orphans {
+                            if is_ancestor_run(store, &orphan, &child.id)? {
+                                continue; // never create a cycle
+                            }
+                            store.conn.execute(
+                                "UPDATE runs SET parent_run_id=?2, pending_parent_native=NULL, relation_confidence='exact (structured harness event; parent reported later)' WHERE id=?1",
+                                rusqlite::params![orphan, child.id],
+                            )?;
+                            ev("child_reparented", "harness", "exact", json!({"child_run_id": orphan, "parent_run_id": child.id}), Some(&orphan))?;
+                        }
                         child
                     }
                 };
@@ -1203,6 +1228,22 @@ impl Default for TailState {
     fn default() -> Self {
         Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false }
     }
+}
+
+/// Is `candidate` an ancestor of (or equal to) `run`?
+fn is_ancestor_run(store: &Store, candidate: &str, run: &str) -> Result<bool> {
+    let mut current = Some(run.to_string());
+    let mut seen = HashSet::new();
+    while let Some(id) = current {
+        if id == candidate {
+            return Ok(true);
+        }
+        if !seen.insert(id.clone()) {
+            return Ok(true); // existing cycle: refuse
+        }
+        current = store.run(&id)?.and_then(|r| r.parent_run_id);
+    }
+    Ok(false)
 }
 
 /// Find a descendant of `root` with the given native id (breadth-first, cycle-safe).
