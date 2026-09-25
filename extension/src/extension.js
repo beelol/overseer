@@ -173,6 +173,56 @@ async function activate(context) {
     context.subscriptions.push(done);
   }
 
+  /**
+   * Merge back (never automatic): prepare in the worktree (commit its work, merge the target into
+   * the run's branch; conflicts go to the same session), show what will land for review, then
+   * merge into the target branch in the source checkout only after confirmation.
+   */
+  async function mergeBack(arg) {
+    requireTrust();
+    const picked = model.run(runArg(arg));
+    if (!picked) return;
+    const run = model.rootRun(picked);
+    const wsId = run.workspace_id;
+    let plan = await client.request('workspace.merge_plan', { workspace_id: wsId });
+    if (!plan.ok) { vscode.window.showWarningMessage(`Merge back is unavailable: ${plan.reason}`); return; }
+    if (plan.state === 'idle') {
+      const detail = [`${plan.branch} → ${plan.target} in ${plan.repo}`,
+        plan.worktree_uncommitted.length ? `1. Commit ${plan.worktree_uncommitted.length} uncommitted worktree file(s) to ${plan.branch}.` : '1. The worktree has no uncommitted changes.',
+        `2. Merge ${plan.target} into ${plan.branch} inside the worktree. Conflicts go back to ${run.harness} in the same session.`,
+        `3. You review exactly what will land, then confirm. Nothing reaches ${plan.target} before that.`,
+        ...plan.blockers.map(b => '⚠ ' + b)].join('\n');
+      const go = await vscode.window.showInformationMessage(`Merge back ${plan.branch} into ${plan.target}?`, { modal: true, detail }, 'Prepare Merge Back');
+      if (go !== 'Prepare Merge Back') return;
+      const prep = await client.request('workspace.merge_prepare', { workspace_id: wsId, handoff: true });
+      await model.refresh();
+      if (prep.state === 'conflicts') {
+        const how = prep.handoff?.sent ? `Sent to ${run.harness} as a follow-up in the same session. Run Merge Back again when it finishes.` : `Resolve them in the worktree (${prep.handoff?.why || 'no follow-up possible'}), then run Merge Back again.`;
+        vscode.window.showWarningMessage(`Merge back: conflicts in ${prep.files.join(', ')}. ${how}`);
+        await outputs.show(run.id, { preserveFocus: false });
+        return;
+      }
+      plan = await client.request('workspace.merge_plan', { workspace_id: wsId });
+    }
+    if (plan.state === 'resolving' || plan.state === 'resolved') {
+      const res = await client.request('workspace.merge_resolved', { workspace_id: wsId });
+      if (res.state !== 'ready') { vscode.window.showWarningMessage(`Merge back: conflict markers remain in ${res.remaining.join(', ')}. Resolve them (or ask the agent again), then run Merge Back again.`); return; }
+      plan = await client.request('workspace.merge_plan', { workspace_id: wsId });
+    }
+    // Show the result for review: exactly what lands on the target (merge-base comparison).
+    const opts = await client.request('comparison.options', { run_id: run.id, branch: plan.target });
+    const landing = opts.options.find(o => o.mode === 'branch_merge_base' && o.branch === plan.target && o.available);
+    if (landing) { review.setComparison(run.id, landing); await review.open(run.id); }
+    const files = landing ? (await client.request('workspace.diff', { workspace_id: wsId, base: landing.base, status: false })).changes : [];
+    if (plan.blockers.length) { vscode.window.showWarningMessage(`Merge back is ready but blocked: ${plan.blockers.join(' ')}`); return; }
+    const detail = `The review now shows exactly what lands on ${plan.target} (merge-base comparison), ${files.length} file(s):\n${files.slice(0, 20).map(f => `${f.status} ${f.path}`).join('\n')}${files.length > 20 ? '\n…' : ''}\n\nThe worktree and ${plan.branch} are kept.`;
+    const ok = await vscode.window.showWarningMessage(`Merge ${plan.branch} into ${plan.target} in ${path.basename(plan.repo)}?`, { modal: true, detail }, 'Complete Merge Back');
+    if (ok !== 'Complete Merge Back') return;
+    const done = await client.request('workspace.merge_complete', { workspace_id: wsId });
+    await model.refresh();
+    vscode.window.showInformationMessage(`Merged ${done.branch} into ${done.target} (${String(done.commit).slice(0, 10)}). The worktree and branch are kept; clean them up when you no longer need them.`);
+  }
+
   /** Interrupts every active agent and stops the daemon, after confirmation. Nothing respawns it. */
   async function stopAll() {
     await model.refresh();
@@ -282,6 +332,7 @@ async function activate(context) {
       await vscode.window.showTextDocument(doc, { preview: true });
     })),
     vscode.commands.registerCommand('overseer.stopAll', guard(stopAll)),
+    vscode.commands.registerCommand('overseer.mergeBack', guard(mergeBack)),
     vscode.commands.registerCommand('overseer.startDaemon', guard(async () => { client.disposed = false; await client.start(); await model.refresh(); updateStatus(); })),
     vscode.commands.registerCommand('overseer.showLog', () => log.show()),
     vscode.commands.registerCommand('overseer.restartDaemonConnection', guard(async () => { client.dispose(); client.disposed = false; await client.start(); })),

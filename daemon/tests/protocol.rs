@@ -963,3 +963,115 @@ fn ac43_fixture_tool_calls_carry_inputs_and_results_for_the_conversation_view() 
     assert!(cmd.iter().any(|e| e["payload"]["status"] == "completed"), "{cmd:?}");
     assert!(evs.iter().any(|e| e["kind"] == "permission_answered"));
 }
+
+// ---------------------------------------------------------------- AC-44 merge back
+
+fn ws_id(created: &serde_json::Value) -> String {
+    created["workspace"]["id"].as_str().unwrap().to_string()
+}
+
+#[test]
+fn ac44_clean_merge_back_commits_the_worktree_and_merges_only_on_request() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &repo, "worktree", "printf 'a\\nagent line\\n' > a.txt; printf 'new\\n' > new.txt");
+    let run = run_id(&created);
+    d.wait_done(&run, 20);
+    let main_before = git(&repo, &["rev-parse", "main"]);
+    std::thread::sleep(Duration::from_millis(300));
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "never merges automatically");
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(plan["ok"], true, "{plan}");
+    assert_eq!(plan["state"], "idle");
+    assert_eq!(plan["target"], "main");
+    assert_eq!(plan["worktree_uncommitted"].as_array().unwrap().len(), 2, "{plan}");
+    let prep = d.call("workspace.merge_prepare", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(prep["state"], "ready", "{prep}");
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "prepare never touches the target");
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(plan["can_complete"], true, "{plan}");
+    let done = d.call("workspace.merge_complete", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(done["merged"], true);
+    assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "a\nagent line\n");
+    assert!(repo.join("new.txt").exists());
+    assert_eq!(git(&repo, &["status", "--porcelain"]), "");
+    assert!(git(&repo, &["log", "-1", "--format=%s"]).contains("Overseer merge back"));
+    assert!(d.events(&run).iter().any(|e| e["kind"] == "merge_back" && e["payload"]["state"] == "merged"));
+    // Afterwards there is nothing left to merge.
+    let again = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(again["ok"], false);
+    assert!(again["reason"].as_str().unwrap().contains("Nothing to merge"), "{again}");
+}
+
+#[test]
+fn ac44_conflicts_are_resolved_in_the_worktree_before_the_target_changes() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &repo, "worktree", "printf 'agent version\\n' > a.txt");
+    d.wait_done(&run_id(&created), 20);
+    // The target moved on meanwhile, touching the same line.
+    std::fs::write(repo.join("a.txt"), "main version\n").unwrap();
+    git(&repo, &["commit", "-qam", "main edit"]);
+    let main_before = git(&repo, &["rev-parse", "main"]);
+    let id = ws_id(&created);
+    let prep = d.call("workspace.merge_prepare", json!({"workspace_id": id, "handoff": true}));
+    assert_eq!(prep["state"], "conflicts", "{prep}");
+    assert_eq!(prep["files"], json!(["a.txt"]));
+    assert_eq!(prep["handoff"]["sent"], false, "generic runs cannot take follow-ups: {prep}");
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before);
+    assert_eq!(d.call("workspace.merge_plan", json!({"workspace_id": id}))["state"], "resolving");
+    // Still conflicted: refuses to finish.
+    let still = d.call("workspace.merge_resolved", json!({"workspace_id": id}));
+    assert_eq!(still["state"], "resolving");
+    assert!(d.try_call("workspace.merge_complete", json!({"workspace_id": id})).is_err());
+    // The agent (here: the test) resolves the file; Overseer stages it and finishes the worktree merge.
+    let ws = ws_path(&d, &created);
+    std::fs::write(ws.join("a.txt"), "main version\nagent version\n").unwrap();
+    assert_eq!(d.call("workspace.merge_resolved", json!({"workspace_id": id}))["state"], "ready");
+    let done = d.call("workspace.merge_complete", json!({"workspace_id": id}));
+    assert_eq!(done["merged"], true);
+    assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "main version\nagent version\n");
+    assert_eq!(git(&repo, &["status", "--porcelain"]), "");
+}
+
+#[test]
+fn ac44_refuses_dirty_target_active_runs_and_current_checkout_tasks() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &repo, "worktree", "printf 'agent\\n' > b.txt");
+    d.wait_done(&run_id(&created), 20);
+    let id = ws_id(&created);
+    // Dirty target checkout: refused, explained, untouched.
+    std::fs::write(repo.join("a.txt"), "user's unsaved work\n").unwrap();
+    std::fs::write(repo.join("scratch.txt"), "untracked\n").unwrap();
+    let before = fingerprint(&repo);
+    assert_eq!(d.call("workspace.merge_prepare", json!({"workspace_id": id}))["state"], "ready");
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": id}));
+    assert_eq!(plan["can_complete"], false);
+    assert!(plan["blockers"][0].as_str().unwrap().contains("uncommitted changes (a.txt)"), "{plan}");
+    let err = d.try_call("workspace.merge_complete", json!({"workspace_id": id})).unwrap_err();
+    assert!(err.contains("never disturbs"), "{err}");
+    assert_eq!(fingerprint(&repo), before, "dirty target left untouched");
+    // Target checkout on another branch: refused with an explanation.
+    git(&repo, &["checkout", "-q", "--", "a.txt"]);
+    git(&repo, &["switch", "-q", "-c", "elsewhere"]);
+    let err = d.try_call("workspace.merge_complete", json!({"workspace_id": id})).unwrap_err();
+    assert!(err.contains("switch it to main"), "{err}");
+    git(&repo, &["switch", "-q", "main"]);
+    // Active run: refused.
+    let busy = sh(&d, &repo, "worktree", "sleep 30");
+    d.wait_status(&run_id(&busy), |s| s == "running", 20);
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&busy)}));
+    assert_eq!(plan["ok"], false);
+    assert!(plan["reason"].as_str().unwrap().contains("still running"), "{plan}");
+    d.call("run.interrupt", json!({"run_id": run_id(&busy)}));
+    // Current-checkout task: nothing to merge back.
+    let cur = sh(&d, &repo, "current", "true");
+    d.wait_done(&run_id(&cur), 20);
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&cur)}));
+    assert_eq!(plan["ok"], false);
+    assert!(plan["reason"].as_str().unwrap().contains("current checkout"), "{plan}");
+}

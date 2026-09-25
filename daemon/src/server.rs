@@ -268,6 +268,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "workspace.cleanup_plan" => d.cleanup_plan(s(p, "workspace_id")?)?,
         "workspace.cleanup" => d.cleanup(s(p, "workspace_id")?, p["discard_dirty"].as_bool().unwrap_or(false))?,
+        "workspace.merge_plan" => d.merge_plan(s(p, "workspace_id")?)?,
+        "workspace.merge_prepare" => d.merge_prepare(s(p, "workspace_id")?, p["handoff"].as_bool().unwrap_or(false))?,
+        "workspace.merge_resolved" => d.merge_resolved(s(p, "workspace_id")?)?,
+        "workspace.merge_complete" => d.merge_complete(s(p, "workspace_id")?)?,
+        "workspace.merge_abort" => d.merge_abort(s(p, "workspace_id")?)?,
         "daemon.shutdown" => json!({"ok": true}),
         "daemon.stop_all" => d.stop_all()?,
         "daemon.background_notice" => json!({"notice": d.background_notice()?}),
