@@ -4,6 +4,8 @@
 //   codex:  --version | login [--device-auth] | login status | logout      (CODEX_HOME/auth.json)
 //   claude: --version | auth login | auth status | auth logout            (CLAUDE_CONFIG_DIR/.fixture-login.json)
 // `login` signs in as the account named in $FIXTURE_LOGIN_ACCOUNT_FILE ("name:plan").
+//   claude -p (stream-json): one turn that fails with authentication_failed unless signed in,
+//           so expired/missing logins and re-sign-in can be exercised end to end.
 // Default homes: $OVERSEER_TEST_SYSTEM_HOME or $HOME. Tokens are fake unsigned JWTs.
 const fs = require('fs');
 const path = require('path');
@@ -12,6 +14,26 @@ if (args[0] === '--version') { console.log('account-fixture 0.0.0 (synthetic)');
 const base = process.env.OVERSEER_TEST_SYSTEM_HOME || process.env.HOME;
 const next = () => { const [name, plan] = fs.readFileSync(process.env.FIXTURE_LOGIN_ACCOUNT_FILE, 'utf8').trim().split(':'); return { name, plan: plan || 'plus' }; };
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
+if (args.includes('-p')) {
+  const dir = process.env.CLAUDE_CONFIG_DIR || path.join(base, '.claude');
+  const out = o => process.stdout.write(JSON.stringify(o) + '\n');
+  const sid = 'account-fixture-session';
+  require('readline').createInterface({ input: process.stdin }).once('line', () => {
+    out({ type: 'system', subtype: 'init', session_id: sid, model: 'fixture', cwd: process.cwd(), tools: [] });
+    const file = path.join(dir, '.fixture-login.json');
+    if (!fs.existsSync(file)) {
+      const msg = 'Failed to authenticate: OAuth session expired and could not be refreshed';
+      out({ type: 'assistant', session_id: sid, error: 'authentication_failed', message: { role: 'assistant', content: [{ type: 'text', text: msg }] } });
+      out({ type: 'result', subtype: 'error_during_execution', is_error: true, result: msg, session_id: sid, usage: {} });
+    } else {
+      const who = JSON.parse(fs.readFileSync(file, 'utf8')).email;
+      out({ type: 'assistant', session_id: sid, parent_tool_use_id: null, message: { role: 'assistant', content: [{ type: 'text', text: `hello from ${who}` }] } });
+      out({ type: 'result', subtype: 'success', is_error: false, result: 'ok', session_id: sid, usage: { input_tokens: 1, output_tokens: 1 } });
+    }
+    setTimeout(() => process.exit(0), 100);
+  });
+  return;
+}
 if (args[0] === 'auth') {
   const dir = process.env.CLAUDE_CONFIG_DIR || path.join(base, '.claude');
   const file = path.join(dir, '.fixture-login.json');

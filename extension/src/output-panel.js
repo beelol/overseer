@@ -100,7 +100,7 @@ class OutputPanels {
 
   async receive(runId, message) {
     if (!message || typeof message !== 'object') return;
-    if (!vscode.workspace.isTrusted && ['followUp', 'interrupt', 'permission', 'mergeBack'].includes(message.type)) throw new Error('Controlling agents requires a trusted workspace.');
+    if (!vscode.workspace.isTrusted && ['followUp', 'interrupt', 'permission', 'mergeBack', 'signIn'].includes(message.type)) throw new Error('Controlling agents requires a trusted workspace.');
     if (message.type === 'followUp') {
       const text = String(message.text || '').trim();
       if (!text) return;
@@ -114,6 +114,11 @@ class OutputPanels {
     } else if (message.type === 'raw') {
       const raw = await this.client.request('run.raw_output', { run_id: runId, max_bytes: 512 * 1024 });
       this.panels.get(runId)?.panel.webview.postMessage({ type: 'raw', raw });
+    } else if (message.type === 'signIn') {
+      const run = this.model.rootRun(this.model.run(runId) || {}) || this.model.run(runId);
+      const profile = run?.profile_id && this.model.profile(run.profile_id);
+      if (!profile) throw new Error('This run has no account to sign in.');
+      await vscode.commands.executeCommand('overseer.signIn', { profile });
     } else if (message.type === 'mergeBack') {
       await vscode.commands.executeCommand('overseer.mergeBack', runId);
     } else if (message.type === 'openReview') {

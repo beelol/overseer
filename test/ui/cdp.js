@@ -127,9 +127,17 @@ class Cdp {
 
   /** Runs a command through the real command palette. */
   async command(title) {
-    await this.focusWorkbench();
-    await this.key('p', { meta: true, shift: true });
-    await this.waitFor('!!document.querySelector(".quick-input-widget:not([style*=\\"display: none\\"]) input")', 5000, 'command palette');
+    for (let attempt = 0; ; attempt++) {
+      await this.focusWorkbench();
+      await this.key('p', { meta: true, shift: true });
+      try { await this.waitFor('!!document.querySelector(".quick-input-widget:not([style*=\\"display: none\\"]) input")', 5000, 'command palette'); break; }
+      catch (error) {
+        if (attempt >= 1) throw error;
+        // Keyboard focus can stay inside a webview's own frame; click a neutral workbench spot.
+        const p = await this.evalWorkbench(`(() => { const b = document.querySelector('.part.statusbar').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+        await this.click(p.x, p.y); await delay(300);
+      }
+    }
     await this.type(title);
     await delay(400);
     await this.key('Enter');

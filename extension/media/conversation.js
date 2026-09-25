@@ -213,6 +213,13 @@
         case 'error': {
           const e = el('div', 'error-block'); e.setAttribute('role', 'alert');
           e.append(el('strong', null, `✖ ${p.class || 'error'}`), el('div', 'text', p.message || ''));
+          if (p.class === 'auth') {
+            // Expired or missing login: reauthenticate this run's account through its own flow.
+            const b = el('button', 'secondary sign-in-again', 'Sign in again');
+            b.setAttribute('aria-label', 'Sign in again with this run\'s account');
+            b.addEventListener('click', () => this.opts.post({ type: 'signIn' }));
+            e.append(b);
+          }
           this.container(ev).append(e);
           break;
         }
