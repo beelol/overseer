@@ -73,3 +73,16 @@ label.follow { display: inline-flex; align-items: center; gap: 3px; }
 .follow-line { background: rgba(255, 200, 0, .25); }
 #toolbar { flex-wrap: wrap; row-gap: 4px; }
 .file-header .file-path { min-width: 5em; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Overseer hunk actions */
+.hunk-actions { position: absolute; right: 14px; z-index: 5; display: flex; gap: 2px; align-items: center; padding: 0 2px; border-radius: 6px; height: 18px;
+  background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border, var(--vscode-contrastBorder, transparent)); box-shadow: 0 1px 4px var(--vscode-widget-shadow, transparent); font-size: 12px; }
+.hunk-actions button { font: inherit; line-height: 14px; min-width: 20px; padding: 0 4px; border-radius: 4px; border: 1px solid transparent; cursor: pointer;
+  background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+.hunk-actions button:hover:not(:disabled) { background: var(--vscode-button-secondaryHoverBackground); }
+.hunk-actions button:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
+.hunk-actions button:disabled { opacity: .5; cursor: default; }
+.hunk-actions .hunk-accept { color: var(--vscode-testing-iconPassed, var(--vscode-button-secondaryForeground)); }
+.hunk-actions.reviewed { opacity: .85; }
+.hunk-badge { color: var(--vscode-testing-iconPassed, var(--vscode-charts-green)); font-weight: 600; padding: 0 2px; }
+.hunk-reviewed-line { opacity: .55; }

@@ -69,7 +69,7 @@ class ReviewManager {
   overseerInfo(session) {
     const o = session.overseer || {};
     return { runId: o.runId, runTitle: o.runTitle, harness: o.harness, workspacePath: session.repo.rootUri.fsPath, workspaceKind: o.workspaceKind,
-      comparison: o.comparison, follow: this.host.followState(o.runId), followNote: this.host.followNote(o.runId) };
+      comparison: o.comparison, follow: this.host.followState(o.runId), followNote: this.host.followNote(o.runId), reviewed: this.host.reviewedKeys(o.runId) };
   }
 
   message(session, snapshot) {
@@ -120,6 +120,11 @@ class ReviewManager {
           if (message.type === 'pickComparison') { await this.host.pickComparison(session.overseer?.runId); return; }
           if (message.type === 'follow') { this.host.setFollow(session.overseer?.runId, message.enabled ? 'following' : 'off'); this.postOverseer(session); return; }
           if (message.type === 'followPause') { this.host.pauseFollow(session.overseer?.runId, String(message.reason || 'navigation')); this.postOverseer(session); return; }
+          if (message.type === 'hunkReview') {
+            await this.host.reviewHunk(session, message);
+            send({ type: 'hunkReviewed', key: message.key, reviewed: !!message.reviewed });
+            return;
+          }
           if (message.type === 'followResume') { this.host.setFollow(session.overseer?.runId, 'following'); this.postOverseer(session); return; }
           if (!['body', 'open', 'openFile'].includes(message.type) || typeof message.id !== 'string' || !Number.isSafeInteger(message.version)) return;
           if (message.type === 'open' || message.type === 'openFile') {

@@ -45,6 +45,8 @@ class Review {
       pauseFollow: (runId, reason) => this.pauseFollow(runId, reason),
       followReady: runId => { const last = this.lastReveal.get(runId); if (last && this.follow.get(runId) === 'following') this.manager.reveal(runId, last); },
       restore: state => this.restore(state),
+      reviewedKeys: runId => Object.keys(this.reviewed()[runId] || {}),
+      reviewHunk: (session, message) => this.reviewHunk(session, message),
     });
     context.subscriptions.push(this.manager,
       vscode.window.registerWebviewPanelSerializer('overseer.review', this.manager),
@@ -105,6 +107,41 @@ class Review {
       if (!repo || repo.rootUri.fsPath !== real) throw new Error(`Could not open the Git repository at ${workspacePath}.`);
     }
     return repo;
+  }
+
+  // ------------------------------------------------------------ reviewed hunks (AC-42)
+
+  reviewed() { return this.context.workspaceState.get('overseer.reviewedHunks', {}); }
+
+  /**
+   * Accept = mark a hunk reviewed (no Git staging). Keys hash the hunk's base and working text,
+   * so a hunk that changes again is simply no longer reviewed. The hunk is re-checked against
+   * the current text first: if the agent changed it meanwhile, that is a conflict.
+   */
+  async reviewHunk(session, msg) {
+    const runId = session.overseer?.runId;
+    if (!runId || !/^[a-f0-9]{16}$/.test(String(msg.key)) || typeof msg.path !== 'string') throw new Error('Invalid hunk.');
+    const all = this.reviewed();
+    const run = { ...(all[runId] || {}) };
+    if (!msg.reviewed) { delete run[msg.key]; }
+    else {
+      const uri = vscode.Uri.joinPath(session.repo.rootUri, ...msg.path.split('/'));
+      if (path.relative(session.repo.rootUri.fsPath, uri.fsPath).startsWith('..')) throw new Error('File is outside this review.');
+      const open = vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
+      // A clean document may lag an agent's write by a moment; disk is the truth unless it has unsaved edits.
+      const text = open?.isDirty ? open.getText() : await fs.readFile(uri.fsPath, 'utf8').catch(() => '');
+      const lines = text.split(/\r?\n/);
+      const modified = Array.isArray(msg.modified) ? msg.modified : [];
+      const start = Number(msg.modifiedStart) || 0, end = Number(msg.modifiedEnd) || 0;
+      const same = end ? lines.slice(start - 1, end).join('\n') === modified.join('\n') : (start === 0 || lines[start - 1] === msg.anchor);
+      if (!same) throw new Error(`Not marked reviewed: ${msg.path} changed while you were accepting this hunk (conflict). Review the current content.`);
+      run[msg.key] = { path: msg.path, at: Date.now() };
+    }
+    const next = { ...all, [runId]: run };
+    // Bound the stored state: the newest 2,000 hunks per run and 200 runs.
+    for (const id of Object.keys(next)) { const entries = Object.entries(next[id]).sort((a, b) => b[1].at - a[1].at).slice(0, 2000); next[id] = Object.fromEntries(entries); }
+    const runs = Object.keys(next).slice(-200);
+    await this.context.workspaceState.update('overseer.reviewedHunks', Object.fromEntries(runs.map(id => [id, next[id]])));
   }
 
   persistFollow() {
