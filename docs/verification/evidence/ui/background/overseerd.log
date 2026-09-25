@@ -1,0 +1,4 @@
+1790361166659 [13630] background notice (osascript (ok)): Overseer: 1 agent still running — claude: tick loop. They keep running with VS Code closed. Reopen VS Code to watch them, or run “Overseer: Stop Agents and Daemon”.
+1790361176069 [13630] stop_all: {"forced":[],"interrupted":["r-f3db6b5dcf85"],"remaining":[],"stopped":["r-f3db6b5dcf85"]}
+1790361176171 [13630] shutdown requested
+1790361186239 [15556] last VS Code window closed; no active agents, no notice

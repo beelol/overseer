@@ -5,13 +5,13 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **37 / 51** · **0** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-08, AC-11, AC-12, AC-13, AC-41, AC-42, AC-43, AC-44, AC-45, AC-46, AC-47, AC-48, AC-50, AC-51. The biggest gaps are two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
-a foreign-user socket rejection test (needs a second macOS account), and Linux (no environment).
-AC-42–51 are newer owner requests, not started yet: hunk accept/reject, a structured run
-conversation view, merge back, visible background agents, simple account governance
-([side RFC](docs/rfcs/account-governance.md)), a polished theme-compatible UI, a full-page
-Overseer view, restoring the open session, opening PRs (coming soon) and a worktree file tree. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
+criteria: **37 / 51** · **1** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-08, AC-11, AC-12, AC-13, AC-41, AC-42, AC-43, AC-44, AC-45, AC-46, AC-47, AC-48, AC-50, AC-51. The biggest gaps are the newer owner requests still in progress
+(hunk accept/reject, a structured run conversation view, merge back, simple account governance
+([side RFC](docs/rfcs/account-governance.md)), a polished theme-compatible UI and a full-page
+Overseer view), live two-account runs (AC-12/13; both ChatGPT accounts are now signed in) and a
+foreign-user socket test (AC-08). Linux (AC-41) is out of scope for now; opening PRs (AC-50) and a
+worktree file tree (AC-51) are future work. Partial criteria list what is proven and what is deferred. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
 ## Acceptance criteria
 
@@ -65,7 +65,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-42** Hunk accept and reject — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-42.md)
 - [ ] **AC-43** Structured run conversation view — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-43.md)
 - [ ] **AC-44** Merge back — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-44.md)
-- [ ] **AC-45** Visible background agents — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-45.md)
+- [ ] **AC-45** Visible background agents — ◐ partial: live Claude run kept running after Cmd+Q; daemon posted the notice through macOS `osascript` (exit 0) naming the agent and the stop command; reopen showed it; Stop Agents and Daemon confirmed, interrupted it and left no daemon, shim or harness process; no notice with nothing running / deferred: a screenshot of the macOS banner itself (screen recording and the notification database are not accessible to the agent) — [evidence](docs/verification/AC-45.md)
 - [ ] **AC-46** Simple account governance — not started (added by the owner on 2026-09-25; see docs/rfcs/account-governance.md) — [evidence](docs/verification/AC-46.md)
 - [ ] **AC-47** Polished, theme-compatible UI — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-47.md)
 - [ ] **AC-48** Overseer view (command center) — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-48.md)
@@ -175,7 +175,7 @@ the owner action or decision each one needs.
 - [ ] [AC-42](docs/verification/AC-42.md) (Hunk accept and reject): Not blocked; not started. Next: add per-hunk actions to the vendored review (reject = write the base hunk through a VS Code edit, accept = reviewed marker keyed by hunk content), then run the Verify clause.
 - [ ] [AC-43](docs/verification/AC-43.md) (Structured run conversation view): Not blocked; not started. Next: group events by turn in the daemon or panel, render tool calls collapsibly, link file_activity to the review, nest child output, then run the Verify clause.
 - [ ] [AC-44](docs/verification/AC-44.md) (Merge back): Not blocked; not started. Next: add Merge back to the Overseer view: git merge into the target branch in the source checkout (refuse if dirty), hand conflicts to the same session as a follow-up, show the result for review, then run the Verify clause.
-- [ ] [AC-45](docs/verification/AC-45.md) (Visible background agents): Not blocked; not started. Next: the daemon tracks connected UI clients and sends an OS notification (macOS `osascript`, Linux `notify-send`) when the last one disconnects with active runs; add a Stop agents and daemon command.
+- [ ] [AC-45](docs/verification/AC-45.md) (Visible background agents): Owner action: close VS Code while an agent runs and confirm the "Overseer: N agents still running" banner appears (allow Script Editor notifications if it does not).
 - [ ] [AC-46](docs/verification/AC-46.md) (Simple account governance): Not blocked; not started. Next: implement the model in docs/rfcs/account-governance.md (accounts per provider, harness compatibility map, migration of profiles), then run its acceptance list.
 - [ ] [AC-47](docs/verification/AC-47.md) (Polished, theme-compatible UI): Not blocked; not started. Next: a New Task webview with harness/account tiles and a design pass on the run panel and review toolbar, verified in light/dark/high-contrast.
 - [ ] [AC-48](docs/verification/AC-48.md) (Overseer view (command center)): Not blocked; not started. Next: a full-page Overseer view (agents column, review, conversation + event log) independent of the native sidebar and the window's folder, respecting AC-30.
