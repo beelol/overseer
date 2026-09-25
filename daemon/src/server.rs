@@ -268,6 +268,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "workspace.cleanup_plan" => d.cleanup_plan(s(p, "workspace_id")?)?,
         "workspace.cleanup" => d.cleanup(s(p, "workspace_id")?, p["discard_dirty"].as_bool().unwrap_or(false))?,
+        "account.list" => d.account_list()?,
+        "account.create" => d.account_create(s(p, "provider")?, s(p, "name")?)?,
+        "account.remove" => d.account_remove(s(p, "id")?)?,
         "workspace.merge_plan" => d.merge_plan(s(p, "workspace_id")?)?,
         "workspace.merge_prepare" => d.merge_prepare(s(p, "workspace_id")?, p["handoff"].as_bool().unwrap_or(false))?,
         "workspace.merge_resolved" => d.merge_resolved(s(p, "workspace_id")?)?,

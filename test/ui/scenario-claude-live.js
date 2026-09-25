@@ -54,7 +54,7 @@ const PROMPT = "Use the Agent tool to launch one general-purpose subagent with t
     await cdp.command('Overseer: New Task');
     await cdp.pick('New task: repository');
     await cdp.pick('New task: harness', 'claude');
-    await cdp.pick('New task: account profile', 'claude (existing login)');
+    await cdp.pick('New task: account for', 'claude (existing login)');
     await cdp.pick('New task: workspace');
     await cdp.pick('Start the worktree from');
     await cdp.input('Model (optional)', MODEL);

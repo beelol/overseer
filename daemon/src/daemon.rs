@@ -104,6 +104,8 @@ impl Daemon {
         let home = paths::profiles_dir().join(&id);
         paths::ensure_private_dir(&home)?;
         let profile = Profile { id, name: name.into(), harness: harness.into(), home: Some(home.display().to_string()), is_system: false, created_ms: now() };
+        // Create the harness credential folder now (0700), so a sign-in never starts without it.
+        let _ = Self::profile_env(&profile);
         self.store.lock().unwrap().insert_profile(&profile)?;
         self.emit(None, None, "profile", "daemon", "exact", json!({"profile": profile}))?;
         Ok(profile)
@@ -111,6 +113,16 @@ impl Daemon {
 
     pub fn profile_env(profile: &Profile) -> BTreeMap<String, String> {
         let mut env = BTreeMap::new();
+        if profile.is_system {
+            // Test-only: point the desktop-linked logins at a fixture home instead of ~/.codex, ~/.claude.
+            if let Some(sys) = std::env::var_os("OVERSEER_TEST_SYSTEM_HOME").map(std::path::PathBuf::from) {
+                match profile.harness.as_str() {
+                    "codex" => { env.insert("CODEX_HOME".into(), sys.join(".codex").display().to_string()); }
+                    "claude" => { env.insert("CLAUDE_CONFIG_DIR".into(), sys.join(".claude").display().to_string()); }
+                    _ => {}
+                }
+            }
+        }
         if let Some(home) = &profile.home {
             let home = Path::new(home);
             match profile.harness.as_str() {

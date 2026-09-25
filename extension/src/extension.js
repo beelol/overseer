@@ -107,11 +107,12 @@ async function activate(context) {
       if (argText === undefined) return;
       args = JSON.parse(argText);
     } else {
-      const family = harness === 'codex-app' ? 'codex' : harness;
-      const profiles = model.state.profiles.filter(p => p.harness === family);
-      const statuses = await Promise.all(profiles.map(p => client.request('profile.status', { id: p.id }).catch(() => undefined)));
-      statuses.forEach((s, i) => s && model.profileStatus.set(profiles[i].id, s));
-      const pPick = await vscode.window.showQuickPick(profiles.map((p, i) => ({ label: p.name, description: statuses[i]?.logged_in ? 'signed in' : 'not signed in', detail: statuses[i]?.detail, p, ok: statuses[i]?.logged_in })), { title: 'New task: account profile (account login only; no API keys)' });
+      // Only accounts whose provider this harness accepts (docs/rfcs/account-governance.md).
+      await refreshAccounts();
+      const compatible = (model.accounts || []).filter(a => (a.harnesses || []).includes(harness));
+      const statuses = compatible.map(a => model.profileStatus.get(a.id));
+      const pPick = await vscode.window.showQuickPick(compatible.map((a, i) => ({ label: a.name, description: `${statuses[i]?.logged_in ? 'signed in' : 'not signed in'}${statuses[i]?.identity?.plan ? ' · ' + statuses[i].identity.plan : ''} · ${a.kind === 'follows-app' ? 'follows the desktop app (can change)' : 'fixed account'}`, detail: statuses[i]?.detail, p: model.profile(a.id) || { id: a.id, name: a.name }, ok: statuses[i]?.logged_in })),
+        { title: `New task: account for ${harness} (only compatible accounts; account login only, no API keys)` });
       if (!pPick) return;
       if (!pPick.ok) {
         const choice = await vscode.window.showWarningMessage(`${pPick.p.name} is not signed in.`, 'Sign In', 'Launch anyway');
@@ -162,7 +163,17 @@ async function activate(context) {
 
   async function signIn(profileId) {
     requireTrust();
-    const cmd = await client.request('profile.login_command', { id: profileId });
+    const profile = model.profile(profileId);
+    let device = false;
+    if (profile?.harness === 'codex') {
+      const how = await vscode.window.showQuickPick([
+        { label: '$(globe) Sign in with ChatGPT in the browser', detail: 'Opens the ChatGPT sign-in page on this Mac.', device: false },
+        { label: '$(device-mobile) Sign in with a device code', detail: 'Shows a code to enter on another browser or device (needs device-code sign-in enabled in ChatGPT security settings).', device: true },
+      ], { title: `Sign in ${profile.name}` });
+      if (!how) return;
+      device = how.device;
+    }
+    const cmd = await client.request('profile.login_command', { id: profileId, device });
     const terminal = vscode.window.createTerminal({ name: `Sign in: ${cmd.profile.name}`, shellPath: cmd.program, shellArgs: cmd.args, env: cmd.env });
     terminal.show();
     const done = vscode.window.onDidCloseTerminal(async t => {
@@ -256,6 +267,7 @@ async function activate(context) {
 
   async function refreshAccounts() {
     await model.refresh();
+    try { const list = await client.request('account.list'); model.accounts = list.accounts; model.providers = list.providers; } catch (e) { say('account.list: ' + e.message); }
     await Promise.all(model.state.profiles.map(async p => {
       try { model.profileStatus.set(p.id, await client.request('profile.status', { id: p.id })); } catch (e) { say(e.message); }
     }));
@@ -297,20 +309,34 @@ async function activate(context) {
       await client.request('workspace.cleanup', { workspace_id: run.workspace_id, discard_dirty: files.length > 0 });
       await model.refresh();
     })),
-    vscode.commands.registerCommand('overseer.addProfile', guard(async () => {
-      const harness = await vscode.window.showQuickPick(['codex', 'claude', 'opencode'], { title: 'Harness for the new account profile' });
-      if (!harness) return;
-      const name = await vscode.window.showInputBox({ title: 'Profile name', prompt: 'For example: ChatGPT (work)', validateInput: v => v.trim() ? undefined : 'Required' });
+    vscode.commands.registerCommand('overseer.addProfile', guard(async arg => {
+      await refreshAccounts();
+      let provider = arg?.provider;
+      if (!provider) {
+        const pick = await vscode.window.showQuickPick((model.providers || []).map(p => ({ label: p.label, description: p.available ? (p.harnesses || []).join(', ') : 'unavailable', detail: p.available ? `Sign-in: ${p.sign_in}` : p.why, p })), { title: 'Add account: provider (account login only; no API keys)' });
+        if (!pick) return;
+        provider = pick.p;
+      }
+      if (!provider.available || provider.id === 'devin') { vscode.window.showInformationMessage(`${provider.label} is not available: ${provider.why || 'no account login'}`); return; }
+      const name = await vscode.window.showInputBox({ title: `Name for the ${provider.label} account`, prompt: 'For example: ChatGPT (work)', validateInput: v => v.trim() ? undefined : 'Required' });
       if (!name) return;
-      const profile = await client.request('profile.create', { name, harness });
-      await model.refresh();
-      const choice = await vscode.window.showInformationMessage(`Created ${profile.name}. Sign in now?`, 'Sign In');
-      if (choice) await signIn(profile.id);
+      const created = await client.request('account.create', { provider: provider.id, name });
+      await refreshAccounts();
+      if (provider.id === 'local') { vscode.window.showInformationMessage(`Created ${name}. OpenCode uses local providers; configure them in its folder: ${created.account.home}`); return; }
+      const choice = await vscode.window.showInformationMessage(`Created ${created.account.name}. Sign in now?`, 'Sign In');
+      if (choice) await signIn(created.account.id);
+    })),
+    vscode.commands.registerCommand('overseer.removeAccount', guard(async arg => {
+      const p = arg?.profile; if (!p) return;
+      const ok = await vscode.window.showWarningMessage(`Remove the account ${p.name}?`, { modal: true, detail: 'Its own credential folder is deleted. Runs keep their history. No other account, and no desktop-app login, is affected.' }, 'Remove Account');
+      if (ok !== 'Remove Account') return;
+      await client.request('account.remove', { id: p.id });
+      await refreshAccounts();
     })),
     vscode.commands.registerCommand('overseer.signIn', guard(async arg => signIn(arg?.profile?.id || (await vscode.window.showQuickPick(model.state.profiles.map(p => ({ label: p.name, id: p.id }))))?.id))),
     vscode.commands.registerCommand('overseer.signOut', guard(async arg => {
       const p = arg?.profile; if (!p) return;
-      const ok = await vscode.window.showWarningMessage(`Sign out ${p.name}? Only this isolated profile is affected.`, { modal: true }, 'Sign Out');
+      const ok = await vscode.window.showWarningMessage(`Sign out ${p.name}? Only this account is affected.`, { modal: true }, 'Sign Out');
       if (!ok) return;
       await client.request('profile.logout', { id: p.id });
       await refreshAccounts();

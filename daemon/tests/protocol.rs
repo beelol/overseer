@@ -1075,3 +1075,97 @@ fn ac44_refuses_dirty_target_active_runs_and_current_checkout_tasks() {
     assert_eq!(plan["ok"], false);
     assert!(plan["reason"].as_str().unwrap().contains("current checkout"), "{plan}");
 }
+
+// ---------------------------------------------------------------- AC-46 / AC-11 accounts (fixture CLI)
+
+struct AccountLab { d: Daemon, _t: tempfile::TempDir, sys: std::path::PathBuf, next: std::path::PathBuf }
+
+fn account_lab() -> AccountLab {
+    let t = tmp();
+    let sys = t.path().join("desktop-home");
+    std::fs::create_dir_all(&sys).unwrap();
+    let next = t.path().join("next-login");
+    let cli = fixture("fake-harness/account-cli.js");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &cli), ("OVERSEER_CLAUDE_PATH", &cli), ("OVERSEER_TEST_SYSTEM_HOME", sys.to_str().unwrap()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_LOGIN_ACCOUNT_FILE,OVERSEER_TEST_SYSTEM_HOME"), ("FIXTURE_LOGIN_ACCOUNT_FILE", next.to_str().unwrap())]);
+    AccountLab { d, _t: t, sys, next }
+}
+
+impl AccountLab {
+    /// Runs the account's own sign-in command the way the UI's terminal does, as `who`.
+    fn sign_in(&self, id: &str, who: &str) {
+        std::fs::write(&self.next, who).unwrap();
+        let cmd = self.d.call("profile.login_command", json!({"id": id}));
+        let mut c = std::process::Command::new(cmd["program"].as_str().unwrap());
+        c.args(cmd["args"].as_array().unwrap().iter().map(|a| a.as_str().unwrap())).env("FIXTURE_LOGIN_ACCOUNT_FILE", &self.next);
+        for (k, v) in cmd["env"].as_object().unwrap() { c.env(k, v.as_str().unwrap()); }
+        assert!(c.status().unwrap().success());
+    }
+    fn fp(&self, id: &str) -> (bool, String, String) {
+        let st = self.d.call("profile.status", json!({"id": id}));
+        let idn = &st["identity"];
+        let fp = idn["account_fingerprint"].as_str().or(idn["fingerprint"].as_str()).unwrap_or("").to_string();
+        (st["logged_in"] == true, fp, idn["plan"].as_str().unwrap_or("").to_string())
+    }
+}
+
+#[test]
+fn ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_removal() {
+    let lab = account_lab();
+    let d = &lab.d;
+    let list = d.call("account.list", json!({}));
+    let providers: Vec<_> = list["providers"].as_array().unwrap().iter().map(|p| (p["id"].as_str().unwrap().to_string(), p["available"] == true)).collect();
+    assert_eq!(providers.iter().map(|p| p.0.as_str()).collect::<Vec<_>>(), ["openai", "anthropic", "local", "devin"]);
+    assert!(!providers[3].1, "Devin has no account login");
+    assert!(d.try_call("account.create", json!({"provider": "devin", "name": "x"})).is_err());
+    let sys_codex = list["accounts"].as_array().unwrap().iter().find(|a| a["id"] == "system-codex").unwrap().clone();
+    assert_eq!(sys_codex["kind"], "follows-app");
+    assert_eq!(sys_codex["harnesses"], json!(["codex", "codex-app"]));
+    // Add one fixed account per available provider; their folders exist immediately (AC-11).
+    let work = d.call("account.create", json!({"provider": "openai", "name": "Work ChatGPT"}))["account"].clone();
+    let claude = d.call("account.create", json!({"provider": "anthropic", "name": "Claude fixed"}))["account"].clone();
+    let (work_id, claude_id) = (work["id"].as_str().unwrap().to_string(), claude["id"].as_str().unwrap().to_string());
+    use std::os::unix::fs::PermissionsExt;
+    for (acct, sub) in [(&work, "codex"), (&claude, "claude")] {
+        let dir = std::path::Path::new(acct["home"].as_str().unwrap()).join(sub);
+        assert!(dir.is_dir(), "{} created at creation time", dir.display());
+        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+    }
+    assert_eq!(lab.fp(&work_id).0, false, "missing login reported");
+    lab.sign_in(&work_id, "work:team");
+    lab.sign_in(&claude_id, "claudia:max");
+    lab.sign_in("system-codex", "desk1:pro"); // the desktop app's own login
+    let (w_ok, w_fp, w_plan) = lab.fp(&work_id);
+    let (c_ok, c_fp, c_plan) = lab.fp(&claude_id);
+    let (_, d1, _) = lab.fp("system-codex");
+    assert!(w_ok && c_ok && w_plan == "team" && c_plan == "max" && !w_fp.is_empty() && !c_fp.is_empty());
+    assert_ne!(w_fp, d1);
+    // The desktop app switches accounts: the linked account follows, the fixed one does not.
+    lab.sign_in("system-codex", "desk2:plus");
+    let (_, d2, _) = lab.fp("system-codex");
+    assert_ne!(d1, d2, "desktop-linked account follows the app");
+    assert_eq!(lab.fp(&work_id).1, w_fp, "fixed account unchanged by the desktop switch");
+    // Re-sign-in affects only that account.
+    d.call("profile.logout", json!({"id": work_id}));
+    assert_eq!(lab.fp(&work_id).0, false);
+    assert_eq!(lab.fp(&claude_id), (true, c_fp.clone(), c_plan.clone()));
+    assert_eq!(lab.fp("system-codex").1, d2);
+    lab.sign_in(&work_id, "work2:plus");
+    let (_, w2, _) = lab.fp(&work_id);
+    assert_ne!(w2, w_fp);
+    assert_eq!(lab.fp("system-codex").1, d2);
+    // Removal affects only that account; desktop logins cannot be removed or signed out.
+    let claude_home = std::path::PathBuf::from(claude["home"].as_str().unwrap());
+    d.call("account.remove", json!({"id": claude_id}));
+    assert!(!claude_home.exists());
+    assert_eq!(lab.fp(&work_id).1, w2);
+    assert_eq!(lab.fp("system-codex").1, d2);
+    assert!(lab.sys.join(".codex/auth.json").exists());
+    assert!(d.try_call("account.remove", json!({"id": "system-codex"})).unwrap_err().contains("never removes"));
+    assert!(d.try_call("profile.logout", json!({"id": "system-codex"})).is_err());
+    let ids: Vec<String> = d.call("account.list", json!({}))["accounts"].as_array().unwrap().iter().map(|a| a["id"].as_str().unwrap().to_string()).collect();
+    assert!(!ids.contains(&claude_id) && ids.contains(&work_id));
+    // Credentials never enter the database or events.
+    let db = std::fs::read(d.home.path().join("overseer.sqlite")).unwrap();
+    assert!(!String::from_utf8_lossy(&db).contains("\"access_token\""));
+}

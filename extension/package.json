@@ -41,10 +41,11 @@
       { "command": "overseer.interrupt", "title": "Interrupt", "category": "Overseer", "icon": "$(debug-stop)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.selectComparison", "title": "Select Comparison…", "category": "Overseer", "icon": "$(git-compare)" },
       { "command": "overseer.cleanupWorkspace", "title": "Clean Up Worktree…", "category": "Overseer", "icon": "$(trash)", "enablement": "isWorkspaceTrusted" },
-      { "command": "overseer.addProfile", "title": "Add Account Profile…", "category": "Overseer", "icon": "$(person-add)" },
+      { "command": "overseer.addProfile", "title": "Add Account…", "category": "Overseer", "icon": "$(person-add)" },
+      { "command": "overseer.removeAccount", "title": "Remove Account…", "category": "Overseer", "icon": "$(trash)" },
       { "command": "overseer.signIn", "title": "Sign In…", "category": "Overseer", "icon": "$(sign-in)" },
       { "command": "overseer.signOut", "title": "Sign Out", "category": "Overseer", "icon": "$(sign-out)" },
-      { "command": "overseer.renameProfile", "title": "Rename Profile…", "category": "Overseer", "icon": "$(edit)" },
+      { "command": "overseer.renameProfile", "title": "Rename Account…", "category": "Overseer", "icon": "$(edit)" },
       { "command": "overseer.refreshAccounts", "title": "Refresh Account Status", "category": "Overseer", "icon": "$(refresh)" },
       { "command": "overseer.openDirtyDiff", "title": "Open Diff", "category": "Overseer" },
       { "command": "overseer.openEdit", "title": "Open Edit in Review", "category": "Overseer" },
@@ -76,7 +77,9 @@
         { "command": "overseer.cleanupWorkspace", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "9_cleanup@1" },
         { "command": "overseer.signIn", "when": "view == overseer.accounts && viewItem =~ /profile/", "group": "inline@1" },
         { "command": "overseer.renameProfile", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@1" },
-        { "command": "overseer.signOut", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@2" }
+        { "command": "overseer.signOut", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@2" },
+        { "command": "overseer.removeAccount", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "9_remove@1" },
+        { "command": "overseer.addProfile", "when": "view == overseer.accounts && viewItem == provider", "group": "inline@1" }
       ],
       "commandPalette": [
         { "command": "overseer.openDirtyDiff", "when": "false" },

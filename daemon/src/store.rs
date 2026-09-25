@@ -455,6 +455,11 @@ impl Store {
         Ok(self.profiles()?.into_iter().find(|p| p.id == id))
     }
 
+    pub fn delete_profile(&self, id: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM profiles WHERE id=?1 AND is_system=0", params![id])?;
+        Ok(())
+    }
+
     pub fn rename_profile(&self, id: &str, name: &str) -> Result<()> {
         self.conn.execute("UPDATE profiles SET name=?2 WHERE id=?1", params![id, name])?;
         Ok(())

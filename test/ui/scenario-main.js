@@ -21,9 +21,9 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     await s.screenshot('activated');
 
     // Account profile for OpenCode through the UI; its config points at the local mock.
-    await cdp.command('Overseer: Add Account Profile');
-    await cdp.pick('Harness for the new account profile', 'opencode');
-    await cdp.input('Profile name', 'OpenCode mock');
+    await cdp.command('Overseer: Add Account');
+    await cdp.pick('Add account: provider', 'OpenCode');
+    await cdp.input('Name for the', 'OpenCode mock');
     await delay(800);
     await cdp.key('Escape');
     const profile = s.ctl('profile.list').find(p => p.name === 'OpenCode mock');
@@ -35,7 +35,7 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     await cdp.command('Overseer: New Task');
     await cdp.pick('New task: repository');
     await cdp.pick('New task: harness', 'opencode');
-    await cdp.pick('New task: account profile', 'OpenCode mock');
+    await cdp.pick('New task: account for', 'OpenCode mock');
     // Not signed in (the mock needs no credentials): choose "Launch anyway" in the notification.
     await cdp.waitFor(`[...document.querySelectorAll('.notification-toast .monaco-button')].some(b => b.textContent.includes('Launch anyway'))`, 10000, 'launch anyway button');
     const btn = await cdp.evalWorkbench(`(() => { const b = [...document.querySelectorAll('.notification-toast .monaco-button')].find(b => b.textContent.includes('Launch anyway')); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);

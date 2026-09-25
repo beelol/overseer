@@ -1,3 +1,4 @@
+mod accounts;
 mod adapters;
 mod background;
 mod daemon;
