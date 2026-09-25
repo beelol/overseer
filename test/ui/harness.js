@@ -80,7 +80,7 @@ class Session {
   launch(folder, env = {}) {
     fs.rmSync(path.join(this.profile, 'DevToolsActivePort'), { force: true });
     this.child = cp.spawn(CODE, ['--remote-debugging-port=0', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
-      '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust', folder],
+      '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', ...(env.OVERSEER_TEST_TRUST ? [] : ['--disable-workspace-trust']), folder],
     { env: { ...process.env, OVERSEER_HOME: this.home, ...env }, stdio: ['ignore', fs.openSync(path.join(this.root, 'code-' + Date.now() + '.log'), 'a'), fs.openSync(path.join(this.root, 'code-err-' + Date.now() + '.log'), 'a')], detached: false });
   }
 

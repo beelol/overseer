@@ -52,6 +52,7 @@ class Review {
   helpers(holder) {
     const self = this;
     return {
+      skipRepoStatus: true,
       async comparisonKey(repo, target) {
         return JSON.stringify([target, repo.state.HEAD?.commit, holder.session?.overseer?.workspaceId]);
       },
@@ -63,7 +64,7 @@ class Review {
       },
       async getChangeEntries(git, repo, mode, base) {
         const workspaceId = holder.session?.overseer?.workspaceId;
-        const diff = await self.client.request('workspace.diff', { workspace_id: workspaceId, base });
+        const diff = await self.client.request('workspace.diff', { workspace_id: workspaceId, base, status: false });
         const root = repo.rootUri;
         return diff.changes.map(change => {
           const uri = vscode.Uri.joinPath(root, ...change.path.split('/'));

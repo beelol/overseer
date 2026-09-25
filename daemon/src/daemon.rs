@@ -1122,6 +1122,10 @@ impl Daemon {
     }
 
     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {
+        self.workspace_diff_opts(workspace_id, base, true)
+    }
+
+    pub fn workspace_diff_opts(&self, workspace_id: &str, base: &str, with_status: bool) -> Result<Value> {
         let ws = self.workspace(workspace_id)?;
         let path = Path::new(&ws.path);
         if git::rev_parse(path, base).is_none() {
@@ -1129,7 +1133,7 @@ impl Daemon {
         }
         let trees = git::capture_trees(path, &paths::data_dir().join("tmp"))?;
         let changes = git::diff_trees(path, base, &trees.worktree_tree)?;
-        let status = git::status(path)?;
+        let status = if with_status { serde_json::to_value(git::status(path)?)? } else { Value::Null };
         Ok(json!({"workspace_id": ws.id, "root": ws.path, "base": base, "current_tree": trees.worktree_tree, "index_tree": trees.index_tree, "head": trees.head, "changes": changes, "status": status}))
     }
 
