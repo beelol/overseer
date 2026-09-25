@@ -358,11 +358,22 @@ rec(43, "Structured run conversation view", "verified", commit="80112ee", date="
     live="Live for Codex exec, Codex app-server and Claude Code. OpenCode shares the renderer (tool inputs/results from its tool parts), exercised by the fixture scenarios' generic and mock runs.",
     limits="Child tool calls inside a child are shown as text lines (harnesses report them without separate ids). Codex exec has no interactive permissions (sandbox policy), so its conversation has none.")
 
-rec(44, "Merge back", "not started",
-    expected="See the RFC criterion (added by the owner on 2026-09-25).",
-    actual="Tasks stay on their branch and worktree; the user merges or cherry-picks manually and cleans up with Clean Up Worktree (branch kept). No merge-back action exists yet.",
-    evidence="—", live="—",
-    blocker="Not blocked; not started. Next: add Merge back to the Overseer view: git merge into the target branch in the source checkout (refuse if dirty), hand conflicts to the same session as a follow-up, show the result for review, then run the Verify clause.")
+rec(44, "Merge back", "verified", commit="75c7375", date="2026-09-25",
+    harness="LIVE: Codex exec (`codex (existing login)`, gpt-5.6-luna) for the clean and conflicting merges, including the conflict follow-up; generic runs for the dirty-target and active cases",
+    steps="""1. `cargo test` — `ac44_clean_merge_back_commits_the_worktree_and_merges_only_on_request`, `ac44_conflicts_are_resolved_in_the_worktree_before_the_target_changes`, `ac44_refuses_dirty_target_active_runs_and_current_checkout_tasks`.
+2. `node test/ui/scenario-merge.js` (LIVE, disposable repository, packaged UI, custom dialogs): two Codex runs (append to b.txt; change a.txt L5), then main commits a different L5. **Merge back…** from each run panel: Prepare → review → Complete. A generic run with a dirty README in the source checkout. A running generic run.""",
+    expected="Never automatic; clean merge back; conflicts handed to the same harness/account/session and reviewed before completing; dirty target refused and untouched; disabled with an explanation while active or when unmergeable.",
+    actual="""- **No automatic merge:** main was unchanged after both live runs finished.
+- **Clean merge back:** the dialog explained the three steps: commit 1 uncommitted worktree file, merge main into `overseer/merge-clean` in the worktree, then review. The review switched to "Merge-base with main" for the run's worktree. The confirmation listed exactly what lands. Confirming produced the merge commit "Merge overseer/merge-clean into main (Overseer merge back)" with b.txt's new line, and the checkout stayed clean.
+- **Conflicting merge back:**
+  - main had moved L5 to "from main", so `merge_prepare` stopped with a conflict in a.txt inside the worktree.
+  - "Sent to codex as a follow-up in the same session": the same run got turn 2 (Codex resumed its native thread) and resolved the file. main did not move meanwhile.
+  - The second **Merge back…** staged the resolution, completed the worktree merge, and showed "1 file(s): M a.txt" for review. Confirming merged it into main with no conflict markers (L5 is "from agent").
+- **Dirty target:** preparing only touched the worktree. Completing was refused: "The source checkout … has uncommitted changes (README.md). Overseer never disturbs them; commit or stash them first." The checkout's status, HEAD, index and README were byte-identical. Protocol tests also refuse a target checkout on another branch ("switch it to main") and current-checkout tasks ("no separate branch to merge back"), and treat an already-merged branch as "Nothing to merge".
+- **Active run:** the button was disabled with "Wait for the run to finish or interrupt it before merging back."; the daemon refuses too ("The run is still running …").""",
+    evidence="[merge scenario](evidence/ui/merge/) (dialog screenshots for prepare/complete, merged states, busy button; result.json); `cargo test` ac44_* tests",
+    live="Live Codex for both merges and the conflict resolution; the refusal cases use generic runs (harness-independent daemon logic).",
+    limits="The final merge uses the user's Git identity from the repository's config. Opening a PR instead is AC-50 (coming soon). Generic runs cannot take the conflict follow-up, so the user resolves those files and runs Merge back again.")
 
 rec(45, "Visible background agents", "partial", commit="1e2f24e", date="2026-09-25",
     harness="Claude Code 2.1.x with the owner's existing claude.ai login (`system-claude`), model haiku, one tiny turn",
