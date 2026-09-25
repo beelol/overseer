@@ -663,3 +663,25 @@ fn ac13_isolated_profiles_have_separate_homes_and_no_keys() {
     use std::os::unix::fs::PermissionsExt;
     assert_eq!(std::fs::metadata(a["home"].as_str().unwrap()).unwrap().permissions().mode() & 0o777, 0o700);
 }
+
+#[test]
+fn ac34_merge_conflicts_do_not_break_snapshots_or_diffs() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    git(&repo, &["switch", "-q", "-c", "other"]);
+    std::fs::write(repo.join("a.txt"), "theirs\n").unwrap();
+    git(&repo, &["commit", "-q", "-am", "theirs"]);
+    git(&repo, &["switch", "-q", "main"]);
+    std::fs::write(repo.join("a.txt"), "ours\n").unwrap();
+    git(&repo, &["commit", "-q", "-am", "ours"]);
+    let _ = std::process::Command::new("git").current_dir(&repo).args(["merge", "other"]).output();
+    let index_before = std::fs::read(repo.join(".git/index")).unwrap();
+    let d = Daemon::start(&[]);
+    let created = d.generic(&repo, "current", "/usr/bin/true", &[]);
+    assert_eq!(d.wait_done(&run_id(&created), 10)["status"], "completed", "snapshot succeeded during a conflict");
+    let st = d.call("workspace.status", json!({"workspace_id": created["workspace"]["id"]}));
+    assert_eq!(st["conflicted"][0], "a.txt");
+    let head = git(&repo, &["rev-parse", "HEAD"]);
+    assert!(diff_paths(&d, &created, &head).contains(&("M".into(), "a.txt".into())));
+    assert_eq!(std::fs::read(repo.join(".git/index")).unwrap(), index_before, "real index (with conflict stages) untouched");
+}

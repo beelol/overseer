@@ -53,7 +53,7 @@ async function activate(context) {
       vscode.window.showWarningMessage(`An agent is waiting for permission to use ${event.payload.tool}.`, 'Show').then(choice => { if (choice) outputs.show(event.run_id, { preserveFocus: false }); });
     }
   });
-  const dirtyTimer = setInterval(() => { if (dirtyView.visible && selectedRun) dirty.refresh(); }, 2500);
+  const dirtyTimer = setInterval(() => { if (dirtyView.visible && selectedRun) dirty.refresh(); }, 1000);
   context.subscriptions.push({ dispose: () => clearInterval(dirtyTimer) });
 
   const requireTrust = () => {
@@ -66,6 +66,7 @@ async function activate(context) {
 
   async function selectRun(runId, { follow } = {}) {
     selectedRun = runId;
+    context.workspaceState.update('overseer.selectedRun', runId);
     dirty.select(runId);
     await review.open(runId, { follow });
     await outputs.show(runId);
@@ -238,6 +239,8 @@ async function activate(context) {
     await client.start();
     await model.refresh();
     refreshAccounts().catch(() => {});
+    const remembered = context.workspaceState.get('overseer.selectedRun');
+    if (remembered && model.run(remembered)) { selectedRun = remembered; dirty.select(remembered); }
   } catch (error) {
     say('daemon start failed: ' + error.message);
     vscode.window.showErrorMessage(`Overseer could not start its daemon: ${error.message}`);

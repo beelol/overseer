@@ -173,6 +173,8 @@ class Review {
   }
 
   async restore(state) {
+    // Serializers run during activation, possibly before the daemon connection is up.
+    await this.client.waitConnected(20000);
     await this.model.refresh();
     const repoPath = vscode.Uri.parse(state.repository).fsPath;
     const runs = this.model.state.runs.filter(r => !r.parent_run_id && this.model.workspace(r.workspace_id)?.path === repoPath);

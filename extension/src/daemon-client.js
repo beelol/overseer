@@ -104,6 +104,15 @@ class DaemonClient extends EventEmitter {
     }
   }
 
+  waitConnected(timeout = 15000) {
+    if (this.connected) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { this.off('connected', done); reject(new Error('Timed out connecting to overseerd.')); }, timeout);
+      const done = () => { clearTimeout(timer); resolve(); };
+      this.once('connected', done);
+    });
+  }
+
   request(method, params = {}) {
     if (!this.socket) return Promise.reject(new Error('Not connected to overseerd.'));
     const id = this.nextId++;

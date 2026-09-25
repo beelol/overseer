@@ -142,6 +142,15 @@ pub fn capture_trees(workspace: &Path, tmp_dir: &Path) -> Result<SnapshotTrees> 
     let tmp_str = tmp.to_str().ok_or_else(|| anyhow!("non-UTF-8 temp path"))?.to_string();
     let result = (|| {
         let env = [("GIT_INDEX_FILE", tmp_str.as_str())];
+        // Unmerged (conflicted) entries cannot be written as a tree. Resolve them to their
+        // working-tree content inside the private index only; the real index keeps its stages.
+        let unmerged = String::from_utf8_lossy(&git_env(workspace, &["diff", "--name-only", "--diff-filter=U", "-z"], &env)?).to_string();
+        let unmerged: Vec<&str> = unmerged.split('\0').filter(|p| !p.is_empty()).collect();
+        if !unmerged.is_empty() {
+            let mut args = vec!["add", "-A", "--"];
+            args.extend(unmerged.iter().copied());
+            git_env(workspace, &args, &env)?;
+        }
         let index_tree = String::from_utf8_lossy(&git_env(workspace, &["write-tree"], &env)?).trim().to_string();
         git_env(workspace, &["add", "-A", "--", "."], &env)?;
         let worktree_tree = String::from_utf8_lossy(&git_env(workspace, &["write-tree"], &env)?).trim().to_string();
