@@ -177,7 +177,7 @@ class Review {
     return opts.options.find(o => o.default) || opts.options[0];
   }
 
-  async open(runId, { preserveFocus = false, follow } = {}) {
+  async open(runId, { preserveFocus = false, follow, viewColumn } = {}) {
     const run = this.model.run(runId);
     if (!run) throw new Error('Unknown run.');
     const ws = this.model.workspace(run.workspace_id);
@@ -187,7 +187,7 @@ class Review {
     const comparison = await this.currentComparison(runId);
     if (follow !== undefined) { this.follow.set(runId, follow ? 'following' : 'off'); this.persistFollow(); }
     if (String(run.capabilities?.file_activity || '').startsWith('unknown')) this.followNotes.set(runId, 'Filesystem evidence only: this harness does not report its edits, so Follow cannot attribute or jump to them. The file list still refreshes live.');
-    return this.manager.open({ repo, workspaceId: ws.id, runId, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison }, { preserveFocus });
+    return this.manager.open({ repo, workspaceId: ws.id, runId, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison }, { preserveFocus, viewColumn: viewColumn || this.reviewColumn?.() });
   }
 
   /** Opens the run's review at the first changed hunk of `rel` (a file edit clicked in the conversation). */

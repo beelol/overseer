@@ -42,10 +42,11 @@ class OutputPanels {
       children: this.model.descendants(runId).map(c => ({ id: c.id, title: c.title, status: c.status, parent: c.parent_run_id, evidence: c.relation_source })) });
   }
 
-  async show(runId, { preserveFocus = true } = {}) {
+  async show(runId, { preserveFocus = true, viewColumn } = {}) {
+    const column = viewColumn || this.column?.();
     const entry = this.panels.get(runId);
-    if (entry) { entry.panel.reveal(undefined, preserveFocus); return; }
-    const panel = vscode.window.createWebviewPanel('overseer.output', 'Overseer run', { viewColumn: vscode.ViewColumn.Beside, preserveFocus }, { enableScripts: true, retainContextWhenHidden: true });
+    if (entry) { entry.panel.reveal(column, preserveFocus); return; }
+    const panel = vscode.window.createWebviewPanel('overseer.output', 'Overseer run', { viewColumn: column || vscode.ViewColumn.Beside, preserveFocus }, { enableScripts: true, retainContextWhenHidden: true });
     await this.attach(runId, panel);
   }
 

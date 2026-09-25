@@ -2,7 +2,8 @@
 // (https://github.com/beelol/branch-diff @ fbc6eb807fd41d8fd1a004977e1aa637a4f7c900, MIT).
 // Changes: sessions are opened for an Overseer-selected worktree and comparison base
 // (not the active editor's repository), the toolbar shows the comparison/base icon,
-// and a Follow checkbox with pause/resume is wired to the host FollowController.
+// and a Follow checkbox with pause/resume is wired to the host FollowController; panels can
+// open in a given editor column (the Overseer view's review column).
 const vscode = require('vscode');
 const { randomBytes } = require('crypto');
 const { Comparison, contains } = require('./comparison');
@@ -84,16 +85,16 @@ class ReviewManager {
     this.panels.get(session)?.webview.postMessage({ type: 'overseer', overseer: this.overseerInfo(session) });
   }
 
-  async open(target, { reveal = true, preserveFocus = false } = {}) {
+  async open(target, { reveal = true, preserveFocus = false, viewColumn } = {}) {
     const session = this.sessionFor(target);
     let panel = this.panels.get(session);
     if (panel) {
-      if (reveal) panel.reveal(undefined, preserveFocus);
+      if (reveal) panel.reveal(viewColumn, preserveFocus);
       this.postOverseer(session);
       if (session.display) this.publish(session, session.display);
       return panel;
     }
-    panel = vscode.window.createWebviewPanel('overseer.review', 'Review', { viewColumn: vscode.ViewColumn.One, preserveFocus }, { retainContextWhenHidden: false });
+    panel = vscode.window.createWebviewPanel('overseer.review', 'Review', { viewColumn: viewColumn || vscode.ViewColumn.One, preserveFocus }, { retainContextWhenHidden: false });
     return this.attach(session, panel);
   }
 

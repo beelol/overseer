@@ -9,7 +9,7 @@
   "engines": { "vscode": "^1.136.0" },
   "categories": ["SCM Providers", "Other"],
   "main": "./src/extension.js",
-  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review", "onWebviewPanel:overseer.output"],
+  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review", "onWebviewPanel:overseer.output", "onWebviewPanel:overseer.center"],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
@@ -33,6 +33,7 @@
       { "view": "overseer.agents", "contents": "Launching agents requires a trusted workspace.\n[Manage Workspace Trust](command:workbench.trust.manage)", "when": "!isWorkspaceTrusted" }
     ],
     "commands": [
+      { "command": "overseer.openCenter", "title": "Open Overseer View", "category": "Overseer", "icon": "$(layout)" },
       { "command": "overseer.newTask", "title": "New Task…", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.refresh", "title": "Refresh", "category": "Overseer", "icon": "$(refresh)" },
       { "command": "overseer.openReview", "title": "Open Review", "category": "Overseer", "icon": "$(diff-multiple)" },
@@ -59,6 +60,7 @@
     "menus": {
       "view/title": [
         { "command": "overseer.newTask", "when": "view == overseer.agents", "group": "navigation@1" },
+        { "command": "overseer.openCenter", "when": "view == overseer.agents", "group": "navigation@0" },
         { "command": "overseer.refresh", "when": "view == overseer.agents", "group": "navigation@2" },
         { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "navigation@3" },
         { "command": "overseer.mergeBack", "title": "Merge Back…", "category": "Overseer", "icon": "$(git-merge)", "enablement": "isWorkspaceTrusted" },

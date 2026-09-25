@@ -1,0 +1,35 @@
+/* Overseer view — agents column. VS Code theme tokens only (light, dark, high contrast). */
+body { margin: 0; padding: 0 8px 12px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); background: var(--vscode-sideBar-background, var(--vscode-editor-background)); }
+.bar { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 6px; padding: 8px 2px; background: inherit; border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, var(--vscode-panel-border, transparent)); }
+.bar h1 { margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--vscode-sideBarTitle-foreground, var(--vscode-foreground)); }
+.spacer { flex: 1; }
+button { font: inherit; border: 1px solid var(--vscode-button-border, transparent); border-radius: 6px; padding: 3px 10px; cursor: pointer; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+button.primary:hover { background: var(--vscode-button-hoverBackground); }
+button.icon { padding: 3px 7px; min-width: 26px; }
+button:focus-visible, .row:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+#tree { margin-top: 6px; }
+.row { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 1px 6px 1px calc(6px + var(--level) * 14px); border-radius: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.row:hover { background: var(--vscode-list-hoverBackground); }
+.row[aria-selected="true"] { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+.row[aria-selected="true"] .desc { color: inherit; opacity: .85; }
+.twisty { width: 12px; flex: none; color: var(--vscode-descriptionForeground); text-align: center; }
+.label { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+.row.repo .label { font-weight: 700; }
+.row.task .label { font-weight: 600; }
+.desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--vscode-descriptionForeground); font-size: .92em; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--vscode-descriptionForeground); }
+.dot.none { background: transparent; }
+.dot.status-running, .dot.status-starting, .dot.status-queued { background: var(--vscode-charts-blue); animation: pulse 1.6s ease-in-out infinite; }
+.dot.status-waiting_for_user { background: var(--vscode-charts-orange); }
+.dot.status-completed { background: var(--vscode-testing-iconPassed, var(--vscode-charts-green)); }
+.dot.status-failed, .dot.status-disconnected { background: var(--vscode-errorForeground); }
+.dot.status-interrupted { background: var(--vscode-editorWarning-foreground); }
+.dot.status-unknown { background: var(--vscode-charts-purple); }
+@media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } }
+@keyframes pulse { 50% { opacity: .35; } }
+.badge { flex: none; font-size: 10.5px; padding: 0 7px; border-radius: 9px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+.badge.attention { background: var(--vscode-statusBarItem-warningBackground, var(--vscode-charts-orange)); color: var(--vscode-statusBarItem-warningForeground, var(--vscode-editor-background)); }
+.empty { color: var(--vscode-descriptionForeground); padding: 12px 6px; line-height: 1.5; }
+body.vscode-high-contrast .row[aria-selected="true"], body.vscode-high-contrast-light .row[aria-selected="true"] { outline: 1px solid var(--vscode-contrastActiveBorder); }

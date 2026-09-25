@@ -7,6 +7,7 @@ const { DaemonClient, resolveBinary } = require('./daemon-client');
 const { Model, AgentsProvider, DirtyProvider, AccountsProvider, ACTIVE } = require('./views');
 const { OutputPanels } = require('./output-panel');
 const { Review } = require('./review');
+const { CommandCenter, COLUMNS } = require('./command-center');
 
 let client;
 
@@ -29,6 +30,12 @@ async function activate(context) {
   const accountsView = vscode.window.createTreeView('overseer.accounts', { treeDataProvider: accounts });
   const outputs = new OutputPanels(context, client, model);
   const review = new Review(context, client, model, say);
+  let selectedRun;
+  // With the Overseer view open, reviews go to its review column and run panels to its conversation column.
+  const center = new CommandCenter(context, model, { select: runId => selectRun(runId, { preserveFocus: true }), selected: () => selectedRun });
+  review.reviewColumn = () => center.active ? COLUMNS.review : undefined;
+  outputs.column = () => center.active ? COLUMNS.conversation : undefined;
+  context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.output', outputs),
     agentsView.onDidExpandElement(e => agents.setCollapsed(e.element, false)),
     agentsView.onDidCollapseElement(e => agents.setCollapsed(e.element, true)));
@@ -36,7 +43,6 @@ async function activate(context) {
   status.command = 'overseer.refresh';
   context.subscriptions.push(agentsView, dirtyView, accountsView, status, { dispose: () => client.dispose() });
 
-  let selectedRun;
   const updateStatus = () => {
     const runs = model.state.runs || [];
     const active = runs.filter(r => ACTIVE.has(r.status)).length;
@@ -69,11 +75,13 @@ async function activate(context) {
   };
   const runArg = arg => (typeof arg === 'string' ? arg : arg?.run?.id) || selectedRun;
 
-  async function selectRun(runId, { follow } = {}) {
+  async function selectRun(runId, { follow, preserveFocus = false } = {}) {
     selectedRun = runId;
+    center.selected(runId);
     context.workspaceState.update('overseer.selectedRun', runId);
     dirty.select(runId);
-    await review.open(runId, { follow });
+    // From the Overseer view, keep keyboard focus in the agents column.
+    await review.open(runId, { follow, preserveFocus });
     await outputs.show(runId);
   }
 
@@ -358,6 +366,7 @@ async function activate(context) {
       await vscode.window.showTextDocument(doc, { preview: true });
     })),
     vscode.commands.registerCommand('overseer.stopAll', guard(stopAll)),
+    vscode.commands.registerCommand('overseer.openCenter', guard(async () => { await model.refresh(); await center.open(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); })),
     vscode.commands.registerCommand('overseer.mergeBack', guard(mergeBack)),
     vscode.commands.registerCommand('overseer.startDaemon', guard(async () => { client.disposed = false; await client.start(); await model.refresh(); updateStatus(); })),
     vscode.commands.registerCommand('overseer.showLog', () => log.show()),
@@ -383,7 +392,7 @@ async function activate(context) {
     say('daemon start failed: ' + error.message);
     vscode.window.showErrorMessage(`Overseer could not start its daemon: ${error.message}`);
   }
-  return { client, model, review, outputs, selectRun, dirty, agents, agentsView, selectedRun: () => selectedRun }; // exported for UI tests
+  return { client, model, review, outputs, selectRun, dirty, agents, agentsView, center, selectedRun: () => selectedRun }; // exported for UI tests
 }
 
 function deactivate() { client?.dispose(); }
