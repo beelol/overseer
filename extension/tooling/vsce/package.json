@@ -1,0 +1,9 @@
+{
+  "name": "branch-diff-local-build",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Locked packaging tools; excluded from the extension VSIX.",
+  "devDependencies": {
+    "@vscode/vsce": "3.9.2"
+  }
+}

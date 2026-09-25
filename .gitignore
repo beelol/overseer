@@ -1,0 +1,8 @@
+/target
+node_modules/
+extension/dist/
+*.vsix
+.DS_Store
+extension/branch-diff/dist/
+extension/bin/
+extension/tooling/vsce/node_modules/

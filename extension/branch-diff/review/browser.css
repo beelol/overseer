@@ -1,0 +1,73 @@
+:root { --nav-width: 260px; }
+* { box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; padding: 0; margin: 0; }
+body { color: var(--vscode-foreground); background: var(--vscode-editor-background); font: var(--vscode-font-size) var(--vscode-font-family); display: flex; flex-direction: column; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button, select { border: 1px solid var(--vscode-widget-border, transparent); background: var(--vscode-button-secondaryBackground); border-radius: 3px; padding: 4px 7px; }
+button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+button:focus-visible, a:focus-visible, summary:focus-visible, #resize:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+#toolbar { display: flex; align-items: center; gap: 14px; padding: 10px 12px; min-height: 46px; border-bottom: 1px solid var(--vscode-panel-border); }
+#comparison { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#total { color: var(--vscode-descriptionForeground); white-space: nowrap; }
+#toolbar label { white-space: nowrap; }
+.spacer { flex: 1; }
+#notice { padding: 9px 12px; background: var(--vscode-inputValidation-warningBackground); border-bottom: 1px solid var(--vscode-inputValidation-warningBorder); }
+#notice[hidden] { display: none; }
+#review { display: grid; grid-template-columns: var(--nav-width) 5px minmax(0, 1fr); flex: 1; min-height: 0; }
+#navigator { overflow: auto; background: var(--vscode-sideBar-background, var(--vscode-editor-background)); padding: 10px 6px; }
+#filter { width: calc(100% - 8px); margin: 0 4px 10px; padding: 6px; background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 3px; color: var(--vscode-input-foreground); }
+#filter:focus { outline: 1px solid var(--vscode-focusBorder); }
+#resize { cursor: col-resize; border-right: 1px solid var(--vscode-panel-border); touch-action: none; }
+#resize:hover, #resize:focus { background: var(--vscode-focusBorder); }
+.folder { padding-left: 10px; }
+.folder summary { cursor: pointer; padding: 5px 3px; white-space: nowrap; }
+.folder-children { border-left: 1px solid var(--vscode-tree-indentGuidesStroke); padding-left: 4px; }
+.file { display: flex; align-items: center; gap: 8px; text-align: left; width: 100%; border: 0; border-radius: 2px; padding: 5px 7px; background: transparent; }
+.file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file:hover { background: var(--vscode-list-hoverBackground); }
+.file.active { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+.status { font-size: 11px; font-weight: 600; }
+.status-A, .status-U, .additions { color: var(--vscode-gitDecoration-addedResourceForeground, #73c991); }
+.status-D, .deletions { color: var(--vscode-gitDecoration-deletedResourceForeground, #f48771); }
+.status-M { color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d); }
+.status-R { color: var(--vscode-gitDecoration-renamedResourceForeground, #73c991); }
+#diffs { position: relative; overflow: auto; min-width: 0; scroll-behavior: auto; overflow-anchor: none; padding-bottom: 30px; }
+.diff-file { border-bottom: 1px solid var(--vscode-panel-border); }
+.file-header { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 7px 10px; background: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background)); border-bottom: 1px solid var(--vscode-panel-border); }
+.file-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--vscode-editor-font-family); color: var(--vscode-textLink-foreground); text-decoration: none; }
+.file-path[href]:hover, .file-path[href]:focus-visible { color: var(--vscode-textLink-activeForeground); text-decoration: underline; }
+.file-path[aria-disabled="true"] { color: inherit; cursor: default; }
+.fold { border: 0; background: transparent; width: 22px; padding: 0; }
+.unsaved { color: var(--vscode-descriptionForeground); font-size: 11px; }
+.stats { display: flex; gap: 8px; font-size: 11px; white-space: nowrap; }
+.open-native { font-size: 11px; white-space: nowrap; }
+.diff-body { overflow: hidden; min-width: 0; }
+.collapsed .diff-body { display: none; }
+.file-problem, .empty { padding: 20px; color: var(--vscode-descriptionForeground); }
+@media (max-width: 850px) { #toolbar { gap: 7px; } #toolbar label { font-size: 0; } #toolbar select { font-size: 12px; } .open-native { max-width: 95px; overflow: hidden; text-overflow: ellipsis; } }
+
+.nav-collapsed #review { grid-template-columns: minmax(0, 1fr); }
+.nav-collapsed #navigator, .nav-collapsed #resize { display: none; }
+
+.loading { display: flex; align-items: center; gap: 9px; padding: 24px; color: var(--vscode-descriptionForeground); }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--vscode-progressBar-background, currentColor); border-right-color: transparent; border-radius: 50%; animation: spin 900ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+.file-loading { font-size: 11px; color: var(--vscode-descriptionForeground); white-space: nowrap; }
+.large-diff { padding: 15px 22px; color: var(--vscode-descriptionForeground); }
+.large-diff p { margin-top: 0; }
+
+#loading-stage { color: var(--vscode-descriptionForeground); font-size: 11px; white-space: nowrap; }
+
+.edit-recovery { padding: 6px 12px; border-bottom: 1px solid var(--vscode-panel-border); }
+.edit-recovery[hidden] { display: none; }
+.edit-status { color: var(--vscode-descriptionForeground); white-space: nowrap; }
+.save-file:disabled { opacity: .5; cursor: default; }
+
+/* Overseer additions */
+button.base { display: inline-flex; align-items: center; gap: 4px; }
+label.follow { display: inline-flex; align-items: center; gap: 3px; }
+#follow-state { opacity: .8; font-size: .9em; max-width: 30em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#workspace-note { font-size: .85em; opacity: .75; padding: 2px 8px; }
+.follow-line { background: rgba(255, 200, 0, .25); }

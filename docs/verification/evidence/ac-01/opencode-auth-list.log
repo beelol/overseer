@@ -1,0 +1,28 @@
+$ ~/.opencode/bin/opencode auth list   # XDG_* unset
+
+┌  Credentials ~/.local/share/opencode/auth.json
+│
+└  0 credentials
+
+exit=0
+
+$ ls -la ~/.local/share/opencode (names/modes only)
+total 84128
+drwxr-xr-x .
+drwxr-xr-x ..
+drwxr-xr-x log
+-rw-r--r--@ opencode.db
+-rw-r--r--@ opencode.db-shm
+-rw-r--r--@ opencode.db-wal
+drwxr-xr-x repos
+drwxr-xr-x snapshot
+drwxr-xr-x storage
+drwxr-xr-x tool-output
+$ ls ~/.config/opencode
+.
+..
+.gitignore
+node_modules
+opencode.json
+package-lock.json
+package.json

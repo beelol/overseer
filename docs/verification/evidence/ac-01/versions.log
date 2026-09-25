@@ -1,0 +1,28 @@
+$ uname -a
+Darwin 25.6.0 arm64
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83
+
+$ which -a codex claude opencode gemini devin ollama
+/Users/bilal/Library/pnpm/codex
+/Users/bilal/.local/bin/claude
+/Users/bilal/.opencode/bin/opencode
+/usr/local/bin/ollama
+/usr/local/bin/ollama
+
+$ /Applications/ChatGPT.app/Contents/Resources/codex --version
+codex-cli 0.155.0-alpha.16.4
+$ ~/Library/pnpm/codex --version
+0.1.2505172129
+$ ~/.local/bin/claude --version
+2.1.246 (Claude Code)
+$ ls -l ~/.local/bin/claude
+lrwxr-xr-x  1 bilal  staff  49 Aug 25 16:37 /Users/bilal/.local/bin/claude -> /Users/bilal/.local/share/claude/versions/2.1.246
+$ ~/.opencode/bin/opencode --version
+1.15.13
+$ ollama --version
+ollama version is 0.34.2
+$ node --version; npm --version
+v24.20.0
+11.19.0

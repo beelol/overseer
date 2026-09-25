@@ -1,0 +1,7 @@
+$ ~/.local/bin/claude auth status --json   # CLAUDE_CONFIG_DIR unset; identity fields redacted
+{ "loggedIn": false, "authMethod": "none", "apiProvider": "firstParty", "analyticsDisabled": false }
+exit=1
+
+# NOTE: a "Claude Code-credentials" keychain item exists (see claude-binary-strings.log), yet the CLI in the
+# agent shell reports loggedIn:false. Cause not determined (possibly keychain access being denied to the agent
+# process / non-interactive keychain ACL). Not investigated further to avoid touching credentials; re-check in AC-02.

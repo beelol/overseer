@@ -1,0 +1,24 @@
+$ which gemini
+gemini not found
+
+$ npm view @google/gemini-cli version dist-tags --json   # registry metadata only; package NOT downloaded or installed
+{
+  "version": "0.61.0",
+  "dist-tags": {
+    "false": "0.42.0-nightly.20260512.g11a9edc80",
+    "preview": "0.62.0-preview.0",
+    "latest": "0.61.0",
+    "staging-tmp": "0.62.0-nightly.20260925.gbedef96ef",
+    "nightly": "0.62.0-nightly.20260925.gbedef96ef"
+  }
+}
+
+$ ls ~/.gemini  (names only)
+GEMINI.md
+antigravity
+antigravity-browser-profile
+
+# npx @google/gemini-cli --version was NOT run: it would download and execute the package; not authorized in this survey.
+
+$ which devin
+devin not found

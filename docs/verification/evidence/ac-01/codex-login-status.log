@@ -1,0 +1,11 @@
+$ /Applications/ChatGPT.app/Contents/Resources/codex login status   # CODEX_HOME unset (=> ~/.codex)
+Not logged in
+exit=1
+
+# Context (no credential content read):
+$ ls -l ~/.codex/auth.json        -> -rw------- 4162 bytes, mtime 2026-09-24 21:46 (file present)
+$ security find-generic-password -s "Codex Auth"   -> not found (no keyring entry for this CODEX_HOME)
+# ~/.codex/config.toml has no cli_auth_credentials_store key (default applies).
+# Discrepancy: auth.json exists yet `codex login status` reports "Not logged in" (exit 1). The file may hold
+# ChatGPT-desktop-managed auth that this CLI path does not treat as a login, or the entry may be stale/other-mode.
+# Not diagnosed here (would require reading the credential file). Re-check in AC-02.
