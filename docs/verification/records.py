@@ -440,7 +440,7 @@ rec(45, "Visible background agents", "verified", commit="1e2f24e", date="2026-09
     evidence="[banner confirmation](evidence/ac-45/banner-confirmed.txt), [fire-banner.js](evidence/ac-45/fire-banner.js), [background scenario](evidence/ui/background/) (scenario.log, result.json, screenshots: running before close, reopened, confirm stop, stopped; `overseerd.log` excerpt); `cargo test` ac45_* tests",
     live="Live Claude Code run (tiny Haiku turn); real macOS `osascript` notifier. Protocol tests use fixture runs and a fixture notifier.",
     limits="`osascript` notifications appear under Script Editor; if its notifications are turned off in System Settings, macOS drops the banner silently (the reopen message still appears).",
-    blocker="not blocked"Overseer: N agents still running\" banner appears (allow Script Editor notifications if it does not).")
+    blocker="not blocked")
 
 rec(46, "Simple account governance", "verified", commit="5dce9f5", date="2026-09-25",
     harness="Synthetic account CLI (`fixtures/fake-harness/account-cli.js`) standing in for `codex`/`claude` login commands, plus a read-only check of the owner's real accounts on the updated daemon",

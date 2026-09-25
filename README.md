@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **45 / 51** · **3** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-11, AC-13, AC-41, AC-45, AC-50, AC-51. The biggest gaps are owner actions, not
+criteria: **46 / 51** · **2** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-11, AC-13, AC-41, AC-50, AC-51. The biggest gaps are owner actions, not
 code. Two criteria are partial, each with its proven part and the remaining step in
 [Follow-ups](#follow-ups): live Claude sign-in and re-sign-in (AC-11) and a live sign-in cycle of a
 disposable account while another works (AC-13), both skipped by the owner for now. Linux (AC-41) is out of scope for now; opening PRs (AC-50)
@@ -64,7 +64,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-42** Hunk accept and reject — [evidence](docs/verification/AC-42.md)
 - [x] **AC-43** Structured run conversation view — [evidence](docs/verification/AC-43.md)
 - [x] **AC-44** Merge back — [evidence](docs/verification/AC-44.md)
-- [ ] **AC-45** Visible background agents — ◐ partial: live Claude run kept running after Cmd+Q; daemon posted the notice through macOS `osascript` (exit 0) naming the agent and the stop command; reopen showed it; Stop Agents and Daemon confirmed, interrupted it and left no daemon, shim or harness process; no notice with nothing running / deferred: a screenshot of the macOS banner itself (screen recording and the notification database are not accessible to the agent) — [evidence](docs/verification/AC-45.md)
+- [x] **AC-45** Visible background agents — [evidence](docs/verification/AC-45.md)
 - [x] **AC-46** Simple account governance — [evidence](docs/verification/AC-46.md)
 - [x] **AC-47** Polished, theme-compatible UI — [evidence](docs/verification/AC-47.md)
 - [x] **AC-48** Overseer view (command center) — [evidence](docs/verification/AC-48.md)
@@ -196,7 +196,6 @@ the owner action or decision each one needs.
 - [ ] [AC-11](docs/verification/AC-11.md) (Account profiles): Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: Accounts → Add Account → Anthropic → Sign In, then Sign Out and Sign In again on that account.
 - [ ] [AC-13](docs/verification/AC-13.md) (Credential isolation on macOS): Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: sign a throwaway ChatGPT (and Claude) account into a new Overseer account, then Sign Out and Sign In it while ChatGPT B runs a task, and confirm B's identity is unchanged.
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
-- [ ] [AC-45](docs/verification/AC-45.md) (Visible background agents): Owner action: close VS Code while an agent runs and confirm the "Overseer: N agents still running" banner appears (allow Script Editor notifications if it does not).
 - [ ] [AC-50](docs/verification/AC-50.md) (Open a pull request from a run (coming soon)): Not blocked; deferred by the owner (coming soon). Next: use VS Code's `github` authentication session to push and create the PR.
 - [ ] [AC-51](docs/verification/AC-51.md) (Worktree file hierarchy): Not blocked; not started. Next: a file tree for the selected run's worktree inside the Overseer view (AC-48).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
