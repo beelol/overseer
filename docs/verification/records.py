@@ -351,11 +351,25 @@ rec(48, "Overseer view (command center)", "not started",
     evidence="—", live="—",
     blocker="Not blocked; not started. Next: a full-page Overseer view (agents column, review, conversation + event log) independent of the native sidebar and the window's folder, respecting AC-30.")
 
-rec(49, "Restore the open session", "not started",
-    expected="See the RFC criterion (added by the owner on 2026-09-25).",
-    actual="The review panel and selected run are restored after a window reload (AC-33 evidence); run panels, comparison mode per run, Follow state and sidebar expansion are not.",
-    evidence="—", live="—",
-    blocker="Not blocked; not started. Next: webview serializers for run panels, persist per-run comparison/Follow/scroll in workspace state, and restore with explanations for removed worktrees.")
+rec(49, "Restore the open session", "verified", commit="8103a2e", date="2026-09-25",
+    steps="""1. `node extension/scripts/package.js` then `node test/ui/scenario-restore.js` (isolated VS Code profile, VSIX installed with the `code` CLI, CDP; generic-harness runs, no paid tokens).
+2. Three runs: R1 (repoA worktree, long review), R3 (repoA worktree), R2 (repoB worktree, still running; repoB is never opened in the window). Select each in the Agents view so its review and run panel open.
+3. On R1: choose **Since task start** from the review's comparison button, turn Follow on, scroll the review to 1200 px, scroll the run panel to 400 px and type an unsent follow-up; collapse task R2 in the Agents view.
+4. `Developer: Reload Window`; check tabs, Agents view, R1 review (comparison, scroll, Follow), R1 run panel (scroll, draft), R2 review, R2 still running.
+5. Remove R3's worktree (`workspace.cleanup`), quit VS Code with Cmd+Q and relaunch it with the same profile; repeat the checks and open R3's review tab.
+6. Repeated 4 consecutive times (all passed) after fixing a race in the review's scroll restore; `scenario-review.js` and `scenario-main.js` rerun and pass.""",
+    expected="After reload and restart the same runs, panels, comparison modes, Follow state (never auto-resumed), file and scroll positions and sidebar expansion return; a removed worktree is explained.",
+    actual="""- Review and run panels for all three runs reopen after reload and after restart (webview serializers for `overseer.review` and `overseer.output`; the review now records its run id instead of guessing the newest run in that folder).
+- R1's review returns with **Since task start** (per-run comparison persisted in workspace state) and scrollTop 1200 → 1200. The saved anchor is re-applied as diffs render and relayout until the user interacts, because rows start as short placeholders and a later snapshot can release rendered rows.
+- Follow returns checked but **paused** with "Follow was on before VS Code reloaded. It stays paused until you resume it." — never auto-resumed.
+- R1's run panel returns at scrollY 400 with the unsent follow-up draft intact.
+- The Agents view keeps R1 selected and task R2 collapsed (expansion persisted per workspace).
+- R2's review (repository not open in the window) returns, and R2 keeps running throughout.
+- R3's review tab, after its worktree was removed, shows "Review unavailable — The worktree for "R3 removed later" (<path>) was removed on <date>. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."
+- Harness fix found on the way: Cmd+Q and the command palette were sent while focus was inside a webview, so VS Code was SIGTERM'd; `Cdp.focusWorkbench` now runs first.""",
+    evidence="[restore scenario](evidence/ui/restore/) (scenario.log, result.json, screenshots before reload, after reload, after restart, removed worktree explained); `cargo test` green",
+    live="Fixture runs (generic harness). Restoring is harness-independent: it uses the daemon's run/workspace records and VS Code webview state.",
+    limits="Native file editors are restored by VS Code itself. Run panels show the unavailable page if the daemon is unreachable for 20 s at startup (reopen from the Agents view).")
 
 rec(50, "Open a pull request from a run (coming soon)", "not started",
     expected="See the RFC criterion (added by the owner on 2026-09-25).",
@@ -416,8 +430,8 @@ def main():
 SHORT_BLOCKERS = {
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     11: "blocked: sign-in and reauthentication flows need the owner's logins",
-    12: "blocked: the second ChatGPT account is not signed in to an Overseer profile",
-    13: "blocked: needs two dedicated, signed-in test profiles",
+    12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
+    13: "not yet run: isolation check with a disposable extra profile pending",
     41: "deferred: no Linux environment",
     42: "not started (added by the owner on 2026-09-25)",
     43: "not started (added by the owner on 2026-09-25)",

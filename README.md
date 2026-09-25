@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **36 / 51** · **0** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-08, AC-11, AC-12, AC-13, AC-41, AC-42, AC-43, AC-44, AC-45, AC-46, AC-47, AC-48, AC-49, AC-50, AC-51. The biggest gaps are two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
+criteria: **37 / 51** · **0** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-08, AC-11, AC-12, AC-13, AC-41, AC-42, AC-43, AC-44, AC-45, AC-46, AC-47, AC-48, AC-50, AC-51. The biggest gaps are two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
 a foreign-user socket rejection test (needs a second macOS account), and Linux (no environment).
 AC-42–51 are newer owner requests, not started yet: hunk accept/reject, a structured run
 conversation view, merge back, visible background agents, simple account governance
@@ -32,8 +32,8 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-09** Complete task controls — [evidence](docs/verification/AC-09.md)
 - [x] **AC-10** Event replay and bounded output — [evidence](docs/verification/AC-10.md)
 - [ ] **AC-11** Account profiles — blocked: sign-in and reauthentication flows need the owner's logins — [evidence](docs/verification/AC-11.md)
-- [ ] **AC-12** Two simultaneous ChatGPT subscriptions — blocked: the second ChatGPT account is not signed in to an Overseer profile — [evidence](docs/verification/AC-12.md)
-- [ ] **AC-13** Credential isolation on macOS — blocked: needs two dedicated, signed-in test profiles — [evidence](docs/verification/AC-13.md)
+- [ ] **AC-12** Two simultaneous ChatGPT subscriptions — not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending — [evidence](docs/verification/AC-12.md)
+- [ ] **AC-13** Credential isolation on macOS — not yet run: isolation check with a disposable extra profile pending — [evidence](docs/verification/AC-13.md)
 - [x] **AC-14** Initial adapters — [evidence](docs/verification/AC-14.md)
 - [x] **AC-15** Generic harness fallback — [evidence](docs/verification/AC-15.md)
 - [x] **AC-16** Permissions and limits — [evidence](docs/verification/AC-16.md)
@@ -69,7 +69,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-46** Simple account governance — not started (added by the owner on 2026-09-25; see docs/rfcs/account-governance.md) — [evidence](docs/verification/AC-46.md)
 - [ ] **AC-47** Polished, theme-compatible UI — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-47.md)
 - [ ] **AC-48** Overseer view (command center) — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-48.md)
-- [ ] **AC-49** Restore the open session — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-49.md)
+- [x] **AC-49** Restore the open session — [evidence](docs/verification/AC-49.md)
 - [ ] **AC-50** Open a pull request from a run (coming soon) — not started (coming soon; added by the owner on 2026-09-25) — [evidence](docs/verification/AC-50.md)
 - [ ] **AC-51** Worktree file hierarchy — not started (added by the owner on 2026-09-25) — [evidence](docs/verification/AC-51.md)
 <!-- ac-list:end -->
@@ -179,7 +179,6 @@ the owner action or decision each one needs.
 - [ ] [AC-46](docs/verification/AC-46.md) (Simple account governance): Not blocked; not started. Next: implement the model in docs/rfcs/account-governance.md (accounts per provider, harness compatibility map, migration of profiles), then run its acceptance list.
 - [ ] [AC-47](docs/verification/AC-47.md) (Polished, theme-compatible UI): Not blocked; not started. Next: a New Task webview with harness/account tiles and a design pass on the run panel and review toolbar, verified in light/dark/high-contrast.
 - [ ] [AC-48](docs/verification/AC-48.md) (Overseer view (command center)): Not blocked; not started. Next: a full-page Overseer view (agents column, review, conversation + event log) independent of the native sidebar and the window's folder, respecting AC-30.
-- [ ] [AC-49](docs/verification/AC-49.md) (Restore the open session): Not blocked; not started. Next: webview serializers for run panels, persist per-run comparison/Follow/scroll in workspace state, and restore with explanations for removed worktrees.
 - [ ] [AC-50](docs/verification/AC-50.md) (Open a pull request from a run (coming soon)): Not blocked; deferred by the owner (coming soon). Next: use VS Code's `github` authentication session to push and create the PR.
 - [ ] [AC-51](docs/verification/AC-51.md) (Worktree file hierarchy): Not blocked; not started. Next: a file tree for the selected run's worktree inside the Overseer view (AC-48).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.

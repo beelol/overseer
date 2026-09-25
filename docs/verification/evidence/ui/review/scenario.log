@@ -1,53 +1,53 @@
-[2026-09-25T07:45:54.710Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-25T07:45:58.487Z] workspaces {"wsA":"/private/tmp/ovs-ui-Bu4QPi/overseer-home/worktrees/repoA-703c0071/a-seq","wsB":"/private/tmp/ovs-ui-Bu4QPi/overseer-home/worktrees/repoB-7ecdca4d/b-seq"}
-[2026-09-25T07:46:00.188Z] PASS selecting run A opens A worktree review (outside the open folder) "/private/tmp/ovs-ui-Bu4QPi/overseer-home/worktrees/repoA-703c0071/a-seq"
-[2026-09-25T07:46:00.188Z] PASS selecting an existing run does not turn Follow on
-[2026-09-25T07:46:06.341Z] PASS follow ignores unattributed user file ["Following agent edits","Following agent edits (agent tool input (tool-input))","Following: a.txt:60 (agent tool input (tool-input))","Following agent edits (agent tool input (tool-input))"]
-[2026-09-25T07:46:06.343Z] PASS user file still listed in the live review "user-note.txt listed"
-[2026-09-25T07:46:06.493Z] screenshot docs/verification/evidence/ui/review/01-run-a-following.png
-[2026-09-25T07:46:08.107Z] PASS selecting run B shows B worktree "Worktree: /private/tmp/ovs-ui-Bu4QPi/overseer-home/worktrees/repoB-7ecdca4d/b-seq"
-[2026-09-25T07:46:08.107Z] PASS agent switch does not inherit Follow
-[2026-09-25T07:46:13.112Z] PASS switched-to review does not jump during live edits {"topB1":0,"topB2":0}
-[2026-09-25T07:46:13.234Z] screenshot docs/verification/evidence/ui/review/02-run-b-selected.png
-[2026-09-25T07:46:23.905Z] edit diagnostics {"active":"native-edit-context","save":false,"status":"","notice":"","typed":true}
-[2026-09-25T07:46:24.021Z] screenshot docs/verification/evidence/ui/review/03-edit-atxt.png
-[2026-09-25T07:46:25.618Z] PASS review edit wrote only B worktree "A unchanged, source repoB unchanged"
-[2026-09-25T07:46:26.588Z] timing {"label":"write new file","ms":366}
-[2026-09-25T07:46:27.064Z] timing {"label":"atomic replace","ms":475}
-[2026-09-25T07:46:28.130Z] timing {"label":"staging (dirty view)","ms":1066}
-[2026-09-25T07:46:28.522Z] timing {"label":"rename","ms":392}
-[2026-09-25T07:46:28.995Z] timing {"label":"delete","ms":473}
-[2026-09-25T07:46:29.444Z] timing {"label":"branch change","ms":449}
-[2026-09-25T07:46:31.283Z] timing {"label":"missed watcher event (excluded folder)","ms":1839}
-[2026-09-25T07:46:31.283Z] PASS ordinary changes refresh within 2 s {"write new file":366,"atomic replace":475,"staging (dirty view)":1066,"rename":392,"delete":473,"branch change":449,"missed watcher event (excluded folder)":1839}
-[2026-09-25T07:46:31.283Z] PASS missed watcher event reconciled within 5 s 1839
-[2026-09-25T07:46:31.284Z] PASS navigator selection preserved across live refreshes {"selectedBefore":"a.txtM","selectedAfter":"a.txtM"}
-[2026-09-25T07:46:31.434Z] screenshot docs/verification/evidence/ui/review/04-refresh.png
-[2026-09-25T07:46:36.357Z] file states {"esc":{"load":"rendered","problem":"","card":"","save":true,"readOnly":false},"latin":{"load":"unsupported","problem":"The encoded data was not valid for encoding utf-8","card":"","save":true,"readOnly":false},"big":{"load":"unsupported","problem":"File exceeds the 2 MiB preview limit. Open in Native Diff to inspect it.","card":"","save":true,"readOnly":false}}
-[2026-09-25T07:46:36.357Z] PASS escaping symlink is not editable in the review {"load":"rendered","problem":"","card":"","save":true,"readOnly":false}
-[2026-09-25T07:46:36.357Z] PASS invalid UTF-8 shows a truthful problem {"load":"unsupported","problem":"The encoded data was not valid for encoding utf-8","card":"","save":true,"readOnly":false}
-[2026-09-25T07:46:36.357Z] PASS oversized file shows the preview limit {"load":"unsupported","problem":"File exceeds the 2 MiB preview limit. Open in Native Diff to inspect it.","card":"","save":true,"readOnly":false}
-[2026-09-25T07:46:37.417Z] PASS symlink escaping the workspace cannot be edited in the review {"typed":false,"save":true}
-[2026-09-25T07:46:37.417Z] PASS symlink target outside workspace untouched
-[2026-09-25T07:46:37.558Z] merge "Auto-merging conflict.txt\nCONFLICT (content): Merge conflict in conflict.txt\nAutomatic merge failed; fix conflicts and then commit the result."
-[2026-09-25T07:46:38.168Z] PASS merge conflict shown as Conflicted and listed in the review {"conflictShown":true,"conflictListed":true}
-[2026-09-25T07:46:38.283Z] screenshot docs/verification/evidence/ui/review/05-conflict.png
-[2026-09-25T07:46:40.046Z] edit diagnostics {"active":"native-edit-context","save":false,"status":"","notice":"","typed":true}
-[2026-09-25T07:46:40.168Z] screenshot docs/verification/evidence/ui/review/06-edit-atxt.png
-[2026-09-25T07:46:44.188Z] PASS draft survives a rename during edit (kept as a dirty buffer) "Review: A seq (3), Editor Group 1 | Review: B seq (11), Editor Group 1 | a.txt, Editor Group 1 | opencode: A seq, Editor Group 2 | opencode: B seq, Editor Group 2"
-[2026-09-25T07:46:44.314Z] screenshot docs/verification/evidence/ui/review/07-rename-during-edit.png
-[2026-09-25T07:46:44.413Z] screenshot docs/verification/evidence/ui/review/08-unsupported-files.png
-[2026-09-25T07:46:46.917Z] PASS current checkout review is the repository itself "Current checkout: /private/tmp/ovs-ui-Bu4QPi/repoA"
-[2026-09-25T07:46:47.712Z] PASS filesystem-only harness shows the Follow limitation "Filesystem evidence only: this harness does not report its edits, so Follow cannot attribute or jump to them. The file list still refreshes live."
-[2026-09-25T07:46:49.661Z] edit diagnostics {"active":"native-edit-context","save":false,"status":"","notice":"","typed":true}
-[2026-09-25T07:46:49.791Z] screenshot docs/verification/evidence/ui/review/09-edit-atxt.png
-[2026-09-25T07:46:51.395Z] PASS current-checkout review edit saved to the checkout path
-[2026-09-25T07:46:53.634Z] PASS native editor undo/redo on the selected file {"typed":true,"undone":true,"redone":true}
-[2026-09-25T07:46:53.749Z] screenshot docs/verification/evidence/ui/review/10-native-draft.png
-[2026-09-25T07:46:56.254Z] PASS same-line external write does not overwrite the unsaved draft; both versions exist {"draftKept":true,"diskHasAgent":true}
-[2026-09-25T07:46:56.255Z] PASS unsaved draft labeled in Workspace Dirty
-[2026-09-25T07:47:04.753Z] PASS pending draft recovered after reload
-[2026-09-25T07:47:04.843Z] screenshot docs/verification/evidence/ui/review/11-after-reload.png
-[2026-09-25T07:47:05.311Z] PASS review restored after reload "tab restored"
-[2026-09-25T07:47:05.311Z] PASS selected run and Workspace Dirty restored after reload
-[2026-09-25T07:47:05.414Z] screenshot docs/verification/evidence/ui/review/12-review-after-reload.png
+[2026-09-25T18:24:27.707Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T18:24:31.747Z] workspaces {"wsA":"/private/tmp/ovs-ui-el841O/overseer-home/worktrees/repoA-8ff36f01/a-seq","wsB":"/private/tmp/ovs-ui-el841O/overseer-home/worktrees/repoB-1e77880a/b-seq"}
+[2026-09-25T18:24:33.456Z] PASS selecting run A opens A worktree review (outside the open folder) "/private/tmp/ovs-ui-el841O/overseer-home/worktrees/repoA-8ff36f01/a-seq"
+[2026-09-25T18:24:33.457Z] PASS selecting an existing run does not turn Follow on
+[2026-09-25T18:24:39.608Z] PASS follow ignores unattributed user file ["Following agent edits","Following agent edits (agent tool input (tool-input))","Following: a.txt:60 (agent tool input (tool-input))","Following agent edits (agent tool input (tool-input))"]
+[2026-09-25T18:24:39.609Z] PASS user file still listed in the live review "user-note.txt listed"
+[2026-09-25T18:24:39.687Z] screenshot docs/verification/evidence/ui/review/01-run-a-following.png
+[2026-09-25T18:24:41.290Z] PASS selecting run B shows B worktree "Worktree: /private/tmp/ovs-ui-el841O/overseer-home/worktrees/repoB-1e77880a/b-seq"
+[2026-09-25T18:24:41.291Z] PASS agent switch does not inherit Follow
+[2026-09-25T18:24:46.293Z] PASS switched-to review does not jump during live edits {"topB1":0,"topB2":0}
+[2026-09-25T18:24:46.367Z] screenshot docs/verification/evidence/ui/review/02-run-b-selected.png
+[2026-09-25T18:24:57.000Z] edit diagnostics {"active":"native-edit-context","save":false,"status":"","notice":"","typed":true}
+[2026-09-25T18:24:57.071Z] screenshot docs/verification/evidence/ui/review/03-edit-atxt.png
+[2026-09-25T18:24:58.661Z] PASS review edit wrote only B worktree "A unchanged, source repoB unchanged"
+[2026-09-25T18:24:59.674Z] timing {"label":"write new file","ms":413}
+[2026-09-25T18:25:00.197Z] timing {"label":"atomic replace","ms":523}
+[2026-09-25T18:25:00.321Z] timing {"label":"staging (dirty view)","ms":124}
+[2026-09-25T18:25:00.789Z] timing {"label":"rename","ms":468}
+[2026-09-25T18:25:01.408Z] timing {"label":"delete","ms":619}
+[2026-09-25T18:25:01.903Z] timing {"label":"branch change","ms":495}
+[2026-09-25T18:25:04.541Z] timing {"label":"missed watcher event (excluded folder)","ms":2638}
+[2026-09-25T18:25:04.541Z] PASS ordinary changes refresh within 2 s {"write new file":413,"atomic replace":523,"staging (dirty view)":124,"rename":468,"delete":619,"branch change":495,"missed watcher event (excluded folder)":2638}
+[2026-09-25T18:25:04.541Z] PASS missed watcher event reconciled within 5 s 2638
+[2026-09-25T18:25:04.542Z] PASS navigator selection preserved across live refreshes {"selectedBefore":"a.txtM","selectedAfter":"a.txtM"}
+[2026-09-25T18:25:04.619Z] screenshot docs/verification/evidence/ui/review/04-refresh.png
+[2026-09-25T18:25:09.534Z] file states {"esc":{"load":"rendered","problem":"","card":"","save":true,"readOnly":false},"latin":{"load":"unsupported","problem":"The encoded data was not valid for encoding utf-8","card":"","save":true,"readOnly":false},"big":{"load":"unsupported","problem":"File exceeds the 2 MiB preview limit. Open in Native Diff to inspect it.","card":"","save":true,"readOnly":false}}
+[2026-09-25T18:25:09.534Z] PASS escaping symlink is not editable in the review {"load":"rendered","problem":"","card":"","save":true,"readOnly":false}
+[2026-09-25T18:25:09.534Z] PASS invalid UTF-8 shows a truthful problem {"load":"unsupported","problem":"The encoded data was not valid for encoding utf-8","card":"","save":true,"readOnly":false}
+[2026-09-25T18:25:09.534Z] PASS oversized file shows the preview limit {"load":"unsupported","problem":"File exceeds the 2 MiB preview limit. Open in Native Diff to inspect it.","card":"","save":true,"readOnly":false}
+[2026-09-25T18:25:10.580Z] PASS symlink escaping the workspace cannot be edited in the review {"typed":false,"save":true}
+[2026-09-25T18:25:10.580Z] PASS symlink target outside workspace untouched
+[2026-09-25T18:25:10.720Z] merge "Auto-merging conflict.txt\nCONFLICT (content): Merge conflict in conflict.txt\nAutomatic merge failed; fix conflicts and then commit the result."
+[2026-09-25T18:25:11.327Z] PASS merge conflict shown as Conflicted and listed in the review {"conflictShown":true,"conflictListed":true}
+[2026-09-25T18:25:11.399Z] screenshot docs/verification/evidence/ui/review/05-conflict.png
+[2026-09-25T18:25:13.345Z] edit diagnostics {"active":"native-edit-context","save":false,"status":"","notice":"","typed":true}
+[2026-09-25T18:25:13.400Z] screenshot docs/verification/evidence/ui/review/06-edit-atxt.png
+[2026-09-25T18:25:17.449Z] PASS draft survives a rename during edit (kept as a dirty buffer) "Review: A seq (3), Editor Group 1 | Review: B seq (11), Editor Group 1 | a.txt, Editor Group 1 | opencode: A seq, Editor Group 2 | opencode: B seq, Editor Group 2"
+[2026-09-25T18:25:17.507Z] screenshot docs/verification/evidence/ui/review/07-rename-during-edit.png
+[2026-09-25T18:25:17.582Z] screenshot docs/verification/evidence/ui/review/08-unsupported-files.png
+[2026-09-25T18:25:20.236Z] PASS current checkout review is the repository itself "Current checkout: /private/tmp/ovs-ui-el841O/repoA"
+[2026-09-25T18:25:21.027Z] PASS filesystem-only harness shows the Follow limitation "Filesystem evidence only: this harness does not report its edits, so Follow cannot attribute or jump to them. The file list still refreshes live."
+[2026-09-25T18:25:22.954Z] edit diagnostics {"active":"native-edit-context","save":false,"status":"","notice":"","typed":true}
+[2026-09-25T18:25:23.023Z] screenshot docs/verification/evidence/ui/review/09-edit-atxt.png
+[2026-09-25T18:25:24.611Z] PASS current-checkout review edit saved to the checkout path
+[2026-09-25T18:25:26.847Z] PASS native editor undo/redo on the selected file {"typed":true,"undone":true,"redone":true}
+[2026-09-25T18:25:26.903Z] screenshot docs/verification/evidence/ui/review/10-native-draft.png
+[2026-09-25T18:25:29.406Z] PASS same-line external write does not overwrite the unsaved draft; both versions exist {"draftKept":true,"diskHasAgent":true}
+[2026-09-25T18:25:29.407Z] PASS unsaved draft labeled in Workspace Dirty
+[2026-09-25T18:25:37.884Z] PASS pending draft recovered after reload
+[2026-09-25T18:25:37.921Z] screenshot docs/verification/evidence/ui/review/11-after-reload.png
+[2026-09-25T18:25:38.631Z] PASS review restored after reload "tab restored"
+[2026-09-25T18:25:38.631Z] PASS selected run and Workspace Dirty restored after reload
+[2026-09-25T18:25:38.707Z] screenshot docs/verification/evidence/ui/review/12-review-after-reload.png
