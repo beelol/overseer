@@ -5,7 +5,7 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **43 / 51** · **1** partial (see [ledger](docs/verification/README.md)). Unverified:
+criteria: **43 / 51** · **2** partial (see [ledger](docs/verification/README.md)). Unverified:
 AC-08, AC-11, AC-12, AC-13, AC-41, AC-45, AC-50, AC-51. The biggest gaps are the newer owner requests still in progress
 (hunk accept/reject, a structured run conversation view, merge back, simple account governance
 ([side RFC](docs/rfcs/account-governance.md)), a polished theme-compatible UI and a full-page
@@ -31,7 +31,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-08** Local access boundary — blocked: rejecting a different local user was never exercised (needs a second macOS account) — [evidence](docs/verification/AC-08.md)
 - [x] **AC-09** Complete task controls — [evidence](docs/verification/AC-09.md)
 - [x] **AC-10** Event replay and bounded output — [evidence](docs/verification/AC-10.md)
-- [ ] **AC-11** Account profiles — blocked: sign-in and reauthentication flows need the owner's logins — [evidence](docs/verification/AC-11.md)
+- [ ] **AC-11** Account profiles — ◐ partial: add/name/select accounts and sign in through each account's own flow in the UI (ChatGPT browser and device code, live for A/B; Claude via the fixture CLI); folders created at creation (0700); a missing login is shown and blocks the account tile; an expired login fails with a classified auth error and "Sign in again" reauthenticates that account, after which the follow-up works; no API keys / deferred: a live sign-in and re-sign-in of a fixed Claude account, and a live re-sign-in of a disposable ChatGPT account (both need the owner's browser login; A and B are never signed out) — [evidence](docs/verification/AC-11.md)
 - [ ] **AC-12** Two simultaneous ChatGPT subscriptions — not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending — [evidence](docs/verification/AC-12.md)
 - [ ] **AC-13** Credential isolation on macOS — not yet run: isolation check with a disposable extra profile pending — [evidence](docs/verification/AC-13.md)
 - [x] **AC-14** Initial adapters — [evidence](docs/verification/AC-14.md)
@@ -168,7 +168,7 @@ Unchecked criteria keep their AC in the [RFC](docs/overseer-rfc.md); this list o
 the owner action or decision each one needs.
 
 - [ ] [AC-08](docs/verification/AC-08.md) (Local access boundary): Needs a second local macOS user (owner creates a standard test account). Next: as that user, `nc -U <socket>` / `overseerd ctl hello` with the owner's `OVERSEER_HOME` must fail with a permission error, and a relaxed-permission socket must still be refused by the peer-uid check (log line `rejected connection from uid …`).
-- [ ] [AC-11](docs/verification/AC-11.md) (Account profiles): Owner must perform the sign-in flows (Codex profile A/B, Claude). Next: run Accounts → Add Account Profile → Sign In for each, then record status/identity fingerprints and a reauthentication after `Sign Out`.
+- [ ] [AC-11](docs/verification/AC-11.md) (Account profiles): Owner action: in Overseer, Accounts → Add Account → Anthropic → Sign In, then Sign Out and Sign In again on that account (and optionally the same with a throwaway ChatGPT account).
 - [ ] [AC-12](docs/verification/AC-12.md) (Two simultaneous ChatGPT subscriptions): Owner signs in two isolated Codex profiles in Overseer (Accounts → Add Account Profile → Sign In, one per OpenAI account). Next: launch two tiny tasks concurrently and record `profile.status` identity fingerprints, overlapping run timestamps and both edits.
 - [ ] [AC-13](docs/verification/AC-13.md) (Credential isolation on macOS): Owner-provided dedicated test logins (A and B). Next: A logout/login while B runs a `sleep` turn; restart; compare fingerprints; inspect SQLite/events for token leakage (`grep` for token patterns).
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.

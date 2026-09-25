@@ -99,12 +99,28 @@ rec(10, "Event replay and bounded output", "verified",
     expected="Cursor-based replay without duplicates or gaps; bounded, redacted, inspectable output with explicit truncation markers.",
     actual="All pass.", evidence="protocol tests; load scenario retention samples (AC-35)", live="Fixtures.")
 
-rec(11, "Account profiles", "blocked",
-    steps="Accounts view: Add Account Profile (codex/claude/opencode), rename, Sign In (runs the harness's own login in a terminal with the profile's credential home), Sign Out (isolated profiles only), status refresh; New Task picks a profile and warns when it is not signed in. Protocol test `ac13_isolated_profiles_have_separate_homes_and_no_keys`. Packaged UI: profile created and selected in [main](evidence/ui/main/).",
-    expected="Login and reauthentication through the UI for each supported account path, including a missing/expired login.",
-    actual="Add/name/select work in the packaged UI; the expired Claude login is shown as *not signed in* and launching surfaces the `auth` error class. **Not verified:** completing a sign-in or reauthentication — that requires the owner's browser/device login.",
-    evidence="`evidence/ui/main/` (profile created), protocol test", live="None for login.",
-    blocker="Owner must perform the sign-in flows (Codex profile A/B, Claude). Next: run Accounts → Add Account Profile → Sign In for each, then record status/identity fingerprints and a reauthentication after `Sign Out`.")
+rec(11, "Account profiles", "partial", commit="1c4c856", date="2026-09-25",
+    harness="LIVE: the owner's two ChatGPT accounts signed in through Overseer's per-account login command (A in the browser, B with a device code; 2026-09-25). Fixtures: synthetic account CLI for missing, expired and renewed logins",
+    proven="add/name/select accounts and sign in through each account's own flow in the UI (ChatGPT browser and device code, live for A/B; Claude via the fixture CLI); folders created at creation (0700); a missing login is shown and blocks the account tile; an expired login fails with a classified auth error and \"Sign in again\" reauthenticates that account, after which the follow-up works; no API keys",
+    deferred="a live sign-in and re-sign-in of a fixed Claude account, and a live re-sign-in of a disposable ChatGPT account (both need the owner's browser login; A and B are never signed out)",
+    steps="""1. `cargo test` — `ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_removal` (creation-time folders, sign-in/sign-out/re-sign-in isolation).
+2. `node test/ui/scenario-signin.js` (synthetic account CLI):
+   - Add and name "Claude work" without signing in; open New Task → Claude Code.
+   - Sign in from the palette; run a task.
+   - Delete the credential (expired login); send a follow-up.
+   - Click **Sign in again** in the conversation; send another follow-up.
+3. `node test/ui/scenario-accounts.js`: provider picker, device-code/browser choice, sign out and sign in again.
+4. Live: `profile.status` for ChatGPT A and B on the owner's daemon ([live-accounts.txt](evidence/ac-46/live-accounts.txt)).""",
+    expected="Login and reauthentication through the UI for each claimed supported account path, including a missing/expired login; no API keys.",
+    actual="""- **Missing login:** "Claude work" shows "not signed in". Its New Task tile is disabled with "Sign in first (Accounts → Sign In). Account login only; no API keys."
+- **Sign in:** **Overseer: Sign In** → Claude work ran the account's own login in a terminal; the account shows "signed in · max · f03ab3f8" and a task ran with it.
+- **Expired login:** the next turn failed with `[auth]: Failed to authenticate: OAuth session expired and could not be refreshed`. The conversation shows the auth error with a **Sign in again** button.
+- **Reauthentication:** clicking **Sign in again** ran that account's login again ("signed in · max · 55f70cc2"); the follow-up completed ("hello from claudia-again…").
+- **ChatGPT:** Sign In offers "in the browser" and "with a device code" (`codex login --device-auth`).
+- **Live:** ChatGPT A (Team, `2bb3fae1`) signed in through the browser flow and ChatGPT B (Plus, `27e64e3a`) through the device-code flow, each into its own profile folder. Both report ChatGPT-account login and no API key. The device-code attempt for one account first failed until the owner enabled device-code sign-in in ChatGPT security settings; the error text is passed through.""",
+    evidence="[signin scenario](evidence/ui/signin/) (missing login, expired login with Sign in again, after re-sign-in), [accounts scenario](evidence/ui/accounts/), [live account status](evidence/ac-46/live-accounts.txt)",
+    live="Live ChatGPT sign-ins (A browser, B device code). Claude live sign-in and live re-sign-in: deferred.",
+    blocker="Owner action: in Overseer, Accounts → Add Account → Anthropic → Sign In, then Sign Out and Sign In again on that account (and optionally the same with a throwaway ChatGPT account).")
 
 rec(12, "Two simultaneous ChatGPT subscriptions", "blocked",
     expected="Two distinct paid ChatGPT profiles run Codex tasks concurrently in separate worktrees with overlapping timestamps and distinct identities.",
