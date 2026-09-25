@@ -5,9 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **34 / 43** (see [ledger](docs/verification/README.md)). Unverified:
-AC-08, AC-11, AC-12, AC-13, AC-14, AC-19, AC-41, AC-42, AC-43. The biggest gaps are live Claude Code (its login on the test machine is
-expired), two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
+criteria: **36 / 43** (see [ledger](docs/verification/README.md)). Unverified:
+AC-08, AC-11, AC-12, AC-13, AC-41, AC-42, AC-43. The biggest gaps are two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
 a foreign-user socket rejection test (needs a second macOS account), and Linux (no environment).
 AC-42 (hunk accept/reject) and AC-43 (structured run conversation view) were added afterwards
 and are not started. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -33,12 +32,12 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-11** Account profiles — blocked: sign-in and reauthentication flows need the owner's logins — [evidence](docs/verification/AC-11.md)
 - [ ] **AC-12** Two simultaneous ChatGPT subscriptions — blocked: the second ChatGPT account is not signed in to an Overseer profile — [evidence](docs/verification/AC-12.md)
 - [ ] **AC-13** Credential isolation on macOS — blocked: needs two dedicated, signed-in test profiles — [evidence](docs/verification/AC-13.md)
-- [ ] **AC-14** Initial adapters — blocked: Claude Code's login is expired on this Mac (Codex and OpenCode parts pass) — [evidence](docs/verification/AC-14.md)
+- [x] **AC-14** Initial adapters — [evidence](docs/verification/AC-14.md)
 - [x] **AC-15** Generic harness fallback — [evidence](docs/verification/AC-15.md)
 - [x] **AC-16** Permissions and limits — [evidence](docs/verification/AC-16.md)
 - [x] **AC-17** Compatibility truthfulness — [evidence](docs/verification/AC-17.md)
 - [x] **AC-18** Recursive run tree — [evidence](docs/verification/AC-18.md)
-- [ ] **AC-19** Actual native children — blocked: Claude Code's login is expired (Codex and OpenCode children captured) — [evidence](docs/verification/AC-19.md)
+- [x] **AC-19** Actual native children — [evidence](docs/verification/AC-19.md)
 - [x] **AC-20** Evidence-backed inference — [evidence](docs/verification/AC-20.md)
 - [x] **AC-21** Worktrees by default — [evidence](docs/verification/AC-21.md)
 - [x] **AC-22** Current dirty checkout — [evidence](docs/verification/AC-22.md)
@@ -71,14 +70,14 @@ and Verify clauses. Both lists are generated from the records by
   supervisor process per harness run so work survives VS Code closing and daemon crashes;
   on restart the daemon reattaches or reports the session as lost, never relaunching work.
 - **Harnesses** — Codex via `exec` and via the app-server transport (`codex-app`, with
-  permission requests you Allow/Deny in the run panel), both live-verified with a ChatGPT
-  login; OpenCode (verified through the
-  real OpenCode runtime with a local mock model), any executable (generic), and a Claude Code
-  adapter that is implemented and fixture-tested but not yet live-verified. API keys are
-  never forwarded to harnesses. See the [compatibility matrix](docs/compatibility.md).
-- **Native children** — Codex sub-agents (live), OpenCode children and grandchildren
-  (mock model), Claude Agent/Task nesting (fixtures), shown as a recursive tree with
-  evidence and confidence; missing telemetry is shown as unknown.
+  permission requests you Allow/Deny in the run panel) on a ChatGPT login; Claude Code on a
+  claude.ai login (permission requests, nested subagents, follow-ups, interrupt); OpenCode
+  through its real runtime (verified with a mock provider and local Ollama models); and any
+  executable (generic). All live-verified on macOS except OpenCode account login. API keys
+  are never forwarded to harnesses. See the [compatibility matrix](docs/compatibility.md).
+- **Native children** — live child and grandchild capture for Claude Code, Codex
+  (`codex-app` with `-c agents.max_depth=2`; default depth 1) and OpenCode, shown as a
+  recursive tree with evidence and confidence; missing telemetry is shown as unknown.
 - **Workspaces** — a new worktree per task by default, or the current checkout with its
   staged/unstaged/untracked/unsaved work recorded and preserved. Single writer per checkout;
   cleanup reports dirty files and active runs and never removes the current checkout.
@@ -162,14 +161,11 @@ the owner action or decision each one needs.
 - [ ] [AC-11](docs/verification/AC-11.md) (Account profiles): Owner must perform the sign-in flows (Codex profile A/B, Claude). Next: run Accounts → Add Account Profile → Sign In for each, then record status/identity fingerprints and a reauthentication after `Sign Out`.
 - [ ] [AC-12](docs/verification/AC-12.md) (Two simultaneous ChatGPT subscriptions): Owner signs in two isolated Codex profiles in Overseer (Accounts → Add Account Profile → Sign In, one per OpenAI account). Next: launch two tiny tasks concurrently and record `profile.status` identity fingerprints, overlapping run timestamps and both edits.
 - [ ] [AC-13](docs/verification/AC-13.md) (Credential isolation on macOS): Owner-provided dedicated test logins (A and B). Next: A logout/login while B runs a `sleep` turn; restart; compare fingerprints; inspect SQLite/events for token leakage (`grep` for token patterns).
-- [ ] [AC-14](docs/verification/AC-14.md) (Initial adapters): Claude Code login (owner). Next: after `claude auth login`, run a tiny stream-json task through Overseer: edit, follow-up, interrupt.
-- [ ] [AC-19](docs/verification/AC-19.md) (Actual native children): Claude login (owner); Codex grandchild needs a prompt that makes the child delegate (small extra paid run) and possibly the app-server transport's `subAgentActivity`. Next: after Claude login, run a Task-delegation prompt with a nested Agent.
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
 - [ ] [AC-42](docs/verification/AC-42.md) (Hunk accept and reject): Not blocked; not started. Next: add per-hunk actions to the vendored review (reject = write the base hunk through a VS Code edit, accept = reviewed marker keyed by hunk content), then run the Verify clause.
 - [ ] [AC-43](docs/verification/AC-43.md) (Structured run conversation view): Not blocked; not started. Next: group events by turn in the daemon or panel, render tool calls collapsibly, link file_activity to the review, nest child output, then run the Verify clause.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
-- [ ] Map the Codex app-server `subAgentActivity` / child-thread notifications so Codex grandchildren and child output stream live (would strengthen [AC-19](docs/verification/AC-19.md)); approvals already use the app-server transport.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
 - [ ] VS Code on this machine trusts `/` in its workspace-trust list, so folders never open in Restricted Mode; the trust test uses an empty window ([AC-08](docs/verification/AC-08.md)). Owner environment note.
 

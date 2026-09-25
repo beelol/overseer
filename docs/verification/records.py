@@ -119,14 +119,16 @@ rec(13, "Credential isolation on macOS", "blocked",
     evidence="protocol test; AC-02", live="None.",
     blocker="Owner-provided dedicated test logins (A and B). Next: A logout/login while B runs a `sleep` turn; restart; compare fingerprints; inspect SQLite/events for token leakage (`grep` for token patterns).")
 
-rec(14, "Initial adapters", "blocked",
-    commit=f"{CODEX_COMMIT} (Codex live), final commit (OpenCode mock, Claude fixtures)",
-    harness="Codex: owner's ChatGPT login (live). OpenCode 1.15.13 with the deterministic mock provider (mock model responses; no OpenCode account). Claude Code 2.1.246: synthetic fixtures only.",
-    steps="Codex: [codex-live](evidence/ui/codex-live/) (edit, follow-up, interrupt, streaming, capabilities). OpenCode: [main](evidence/ui/main/) (8-edit run, follow-up, interrupt through the real `opencode run --format json` adapter) and protocol/store tests. Claude: protocol fixture tests `ac16_*`, `ac18_*`, `ac20_*`.",
-    expected="Codex and Claude Code live account-authenticated edit/follow-up/interrupt; OpenCode integrated (mock/local allowed).",
-    actual="Codex ✅ live (`exec` and the app-server transport). OpenCode ✅ with the mock model (edit/follow-up/interrupt through the UI) and additionally with real local models via Ollama: `qwen3-coder:30b` wrote the requested file through the adapter with reported file activity, while `qwen2.5-coder:14b` printed its tool call as plain text and edited nothing (a model/tool-calling limitation, recorded as such). No OpenCode account authentication is claimed. Claude Code ❌ live not possible: OAuth session expired on this machine.",
-    evidence="see above; [evidence/ac-14/opencode-ollama.log](evidence/ac-14/opencode-ollama.log)", live="Codex live; OpenCode mock + local Ollama models; Claude fixture.",
-    blocker="Claude Code login (owner). Next: after `claude auth login`, run a tiny stream-json task through Overseer: edit, follow-up, interrupt.")
+rec(14, "Initial adapters", "verified",
+    commit=f"{CODEX_COMMIT} (Codex exec live), 7036cd6 (Codex app-server live), fdf1340 (Claude Code live), b5693b8 (OpenCode)",
+    harness="Codex 0.155 on the owner's ChatGPT login (plan pro); Claude Code 2.1.246 on the owner's claude.ai login (plan max, signed in on 2026-09-25), model haiku; OpenCode 1.15.13 with the deterministic mock provider and with local Ollama models (no OpenCode account)",
+    steps="""1. **Codex** (live): [codex-live](evidence/ui/codex-live/) — edit, follow-up (resume), interrupt, streaming, capabilities; [codex-approval-live](evidence/ui/codex-approval-live/) — the app-server transport with approvals.
+2. **Claude Code** (live): [claude-live](evidence/ui/claude-live/) (`SHARED_DAEMON=1 node test/ui/scenario-claude-live.js`) — New Task from the command palette; the Write permission request is answered with Allow in the run panel and `hello.md` lands in the worktree; nested Agent child + grandchild; follow-up (`--resume`) edits the file after a second Allow with its own latest-run baseline; a running Bash loop is interrupted from the UI (`interrupted by user`).
+3. **OpenCode**: [main](evidence/ui/main/) through the real `opencode run --format json` adapter with the mock model (edit/follow-up/interrupt), plus real local models via Ollama ([log](evidence/ac-14/opencode-ollama.log)): `qwen3-coder:30b` wrote the requested file; `qwen2.5-coder:14b` printed its tool call as text (model limitation).
+4. A live Claude run exposed an adapter bug, fixed before the passing run: Claude emits an interim `result` while a background subagent runs, and closing stdin then denied later tool permissions ("Stream closed"). Regression test `ac14_fixture_claude_background_subagent_keeps_session_open_for_permissions`.""",
+    expected="Tiny live account-authenticated edit/follow-up/interrupt probes for Codex and Claude Code; OpenCode integrated through its real adapter with honest mock/local coverage; exact versions recorded.",
+    actual="All pass. No OpenCode account authentication is claimed.",
+    evidence="`evidence/ui/codex-live/`, `evidence/ui/codex-approval-live/`, `evidence/ui/claude-live/`, `evidence/ui/main/`, `evidence/ac-14/opencode-ollama.log`", live="Codex live; Claude Code live; OpenCode mock + local models.")
 
 rec(15, "Generic harness fallback", "verified",
     steps=f"{T}: `ac15_generic_harness_paths_with_spaces_failures_and_unknown_capabilities` (script at `my tools/fake agent.sh`, args `two words`/`x y z`, stdin prompt, exit 7 → failed, missing binary → failed 'could not start', trap/interrupt → interrupted, capabilities children/usage/quota/approvals = unknown). UI: generic runs show 'Native children: unknown' and the Follow limitation note ([review](evidence/ui/review/)).",
@@ -158,13 +160,16 @@ rec(18, "Recursive run tree", "verified",
     actual="All pass. Tree items show status, harness, account, workspace and relationship evidence/confidence.",
     evidence="protocol tests; `evidence/ui/main/`", live="Fixtures + OpenCode mock runtime.")
 
-rec(19, "Actual native children", "blocked",
-    harness="Codex live (owner's ChatGPT login); OpenCode real runtime with mock model; Claude blocked",
-    steps="Codex: live `spawn_agent` child in the CLI probe and in [codex-live](evidence/ui/codex-live/) (turn 1) attached to the correct parent with status/final message. OpenCode: child and grandchild via task tool + session store ([main](evidence/ui/main/), store test). Claude: fixtures only.",
-    expected="Live delegation for Codex, Claude Code and OpenCode, plus a native grandchild where supported.",
-    actual="Codex depth-1 live ✅ (grandchild not observed; Codex exec does not stream child-of-child events). OpenCode ✅ children and grandchildren, but with mock model responses. Claude ❌ (login expired).",
-    evidence="see AC-02", live="Codex live; OpenCode mock.",
-    blocker="Claude login (owner); Codex grandchild needs a prompt that makes the child delegate (small extra paid run) and possibly the app-server transport's `subAgentActivity`. Next: after Claude login, run a Task-delegation prompt with a nested Agent.")
+rec(19, "Actual native children", "verified",
+    commit="fdf1340 (Claude), e055167 (Codex app-server grandchild, OpenCode live delegation)",
+    harness="Codex 0.155 (owner's ChatGPT login); Claude Code 2.1.246 (owner's claude.ai login, haiku); OpenCode 1.15.13 with a real local model (Ollama qwen3-coder:30b)",
+    steps="""1. **Claude Code**: [claude-live](evidence/ui/claude-live/) — the prompt asks for an Agent subagent that itself launches an Agent; Overseer shows root → child → grandchild with exact provenance (Agent `tool_use` ids, `parent_tool_use_id` nesting, `system/task_*`), each child's output and completed status, all sharing the parent's workspace.
+2. **Codex**: the exec transport captured a live depth-1 child ([codex-live](evidence/ui/codex-live/)). With the app-server transport and `extra_args: ["-c", "agents.max_depth=2"]`, a live run produced root → child → grandchild; each child thread's items and completion are attributed to that child ([log](evidence/ac-19/live-r-84d950aec2f6.log)). Default Codex depth is 1 (the first probe without the setting produced no grandchild).
+3. **OpenCode**: a live run with a real local model (not the mock) delegated twice; the child and grandchild sessions were attached from OpenCode's session store ([log](evidence/ac-19/live-r-9db11694a476.log)); requires `agent.general.permission.task=allow` for a subagent to delegate further.
+4. Fixture/regression coverage: `ac18_*`, `ac19_fixture_codex_live_transcript_children`, `ac19_fixture_codex_app_child_threads_nest_and_do_not_end_the_parent`.""",
+    expected="Live delegation sessions for Codex, Claude Code and OpenCode attached to the correct parent with output/status, plus a native grandchild where supported; unsupported depth documented.",
+    actual="All pass. Depth limits: Codex default 1 (2 with `agents.max_depth=2`); Claude Code nests (depth 2 observed); OpenCode subagents need the `task` permission to delegate.",
+    evidence="`evidence/ui/claude-live/`, `evidence/ac-19/*.log`, `evidence/ui/codex-live/`", live="Live for all three harnesses (OpenCode with a local model).")
 
 rec(20, "Evidence-backed inference", "verified",
     steps=f"{T}: `ac20_prose_is_not_a_child_and_unknown_events_are_visible` (text claiming delegation creates no child; unknown Codex event type retained as `raw_unparsed` with `parser_version`, confidence `unknown`), `ac06_structured_harness_silence_is_not_completion` (incomplete telemetry → run and child `unknown`, not completed), `ac18_*` (unknown parent → provisional attachment labelled `inferred: reported parent … not seen yet`, then exact once the parent appears).",
@@ -362,8 +367,6 @@ SHORT_BLOCKERS = {
     11: "blocked: sign-in and reauthentication flows need the owner's logins",
     12: "blocked: the second ChatGPT account is not signed in to an Overseer profile",
     13: "blocked: needs two dedicated, signed-in test profiles",
-    14: "blocked: Claude Code's login is expired on this Mac (Codex and OpenCode parts pass)",
-    19: "blocked: Claude Code's login is expired (Codex and OpenCode children captured)",
     41: "deferred: no Linux environment",
     42: "not started (added by the owner on 2026-09-25)",
     43: "not started (added by the owner on 2026-09-25)",
@@ -373,7 +376,6 @@ TOTAL = 43
 EXTRA_FOLLOWUPS = [
     "Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.",
     "Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.",
-    "Map the Codex app-server `subAgentActivity` / child-thread notifications so Codex grandchildren and child output stream live (would strengthen [AC-19](docs/verification/AC-19.md)); approvals already use the app-server transport.",
     "Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.",
     "VS Code on this machine trusts `/` in its workspace-trust list, so folders never open in Restricted Mode; the trust test uses an empty window ([AC-08](docs/verification/AC-08.md)). Owner environment note.",
 ]

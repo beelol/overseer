@@ -180,7 +180,7 @@ pub fn capabilities(harness: &str) -> Value {
             "children": "supported (Agent/Task tool_use ids, parent_tool_use_id nesting, system task_* events)",
             "usage": "supported (result usage)", "quota": "unknown (error text classification only)",
             "account_login": "Claude.ai account via claude auth login (CLAUDE_CONFIG_DIR per profile)",
-            "verification": "fixture-verified only (synthetic stream-json); live account run not yet verified"
+            "verification": "live-verified on macOS with a claude.ai account (Claude Code 2.1.246): edit, permissions, nested subagents, follow-up, interrupt"
         }),
         "opencode" => json!({
             "transport": "opencode run --format json (one process per turn)",
@@ -189,7 +189,7 @@ pub fn capabilities(harness: &str) -> Value {
             "approvals": "unknown", "file_activity": "supported (edit/write tool parts)",
             "children": "partial (task tool parts expose child session ids when present)", "usage": "supported (step_finish tokens)",
             "quota": "unknown", "account_login": "opencode auth login (XDG_DATA_HOME per profile); login itself untested",
-            "verification": "verified with a local mock model provider through the real OpenCode runtime; no account run verified"
+            "verification": "verified through the real OpenCode runtime with a mock provider and with local Ollama models; no account login verified"
         }),
         _ => json!({
             "transport": "generic process (stdin/stdout)", "launch": "supported", "output": "supported (raw lines)",
