@@ -1,0 +1,26 @@
+[2026-09-25T05:48:48.979Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T05:48:51.659Z] PASS codex profile signed in with ChatGPT account {"version":"codex-cli 0.155.0-alpha.16.4","method":"chatgpt-account","plan":"pro","account":"2e1fa92158bacc71","api_key_present":false}
+[2026-09-25T05:48:58.030Z] run {"run":"r-76bd333053f0","workspace":"/private/tmp/ovs-ui-OjV5zc/overseer-home/worktrees/overseer-macos-app-2d3d20-fa0437c0/spawn-exactly-one-sub-agent-whose-only-t-5","branch":"overseer/spawn-exactly-one-sub-agent-whose-only-t-5"}
+[2026-09-25T05:49:06.113Z] screenshot docs/verification/evidence/ui/codex-live/01-codex-running.png
+[2026-09-25T05:49:30.260Z] PASS turn 1 completed {"status":"completed","reason":"turn completed; exit 0","native":"01a0d71c-177f-7db1-bcd2-3678cac07859"}
+[2026-09-25T05:49:30.264Z] PASS native Codex child captured [{"id":"r-ee0f0bf4efbc","native":"01a0d71c-381c-7a33-b35c-04f5bf87f844","status":"completed","title":"Reply with exactly the word hi and do nothing else.","source":"codex collab_tool_call spawn_agent item_1"}]
+[2026-09-25T05:49:30.265Z] PASS codex edit landed in the worktree "Hello from an Overseer dogfood run.\n"
+[2026-09-25T05:49:30.265Z] PASS follow revealed the agent edit "Following agent edits (agent-reported edit)"
+[2026-09-25T05:49:30.375Z] screenshot docs/verification/evidence/ui/codex-live/02-turn1-review.png
+[2026-09-25T05:49:31.690Z] review edit state {"save":false,"status":"","active":"native-edit-context","lines":["","Hello from an Overseer dogfood run.","Reviewed and edited in the Overseer review.",""]}
+[2026-09-25T05:49:31.804Z] screenshot docs/verification/evidence/ui/codex-live/03-review-edit.png
+[2026-09-25T05:49:33.394Z] PASS review edit saved in the worktree "Hello from an Overseer dogfood run.\nReviewed and edited in the Overseer review.\n"
+[2026-09-25T05:49:44.232Z] PASS follow-up turn completed {"status":"completed","reason":"turn completed; exit 0"}
+[2026-09-25T05:49:44.488Z] PASS latest-run comparison shows only turn-2 changes {"base":"7856e780f2254d17a48b66e7bfb9d19e5054a25b","detail":"run-start snapshot s-8da192f6f22a (turn 2 of r-76bd333053f0, 1790315373742), captured including dirty and untracked files","changes":[{"path":"docs/dogfood/hello.md","status":"M"}]}
+[2026-09-25T05:49:44.618Z] PASS task-start comparison shows the file as added [{"path":"docs/dogfood/hello.md","status":"A"}]
+[2026-09-25T05:49:47.741Z] screenshot docs/verification/evidence/ui/codex-live/04-turn2-review.png
+[2026-09-25T05:49:47.779Z] PASS git diff --check passes on the dogfood worktree "clean"
+[2026-09-25T05:49:53.664Z] screenshot docs/verification/evidence/ui/codex-live/05-turn3-before-close.png
+[2026-09-25T05:49:55.447Z] PASS run still active after VS Code closed {"status":"running"}
+[2026-09-25T05:50:21.111Z] PASS run completed while VS Code was closed {"status":"completed","reason":"turn completed; exit 0"}
+[2026-09-25T05:50:25.004Z] PASS reopened UI shows the run completed from daemon state "codexcompleted · codex (existing login) · gpt-5.6-luna"
+[2026-09-25T05:50:25.404Z] PASS reopened output shows the turn finished while closed "_input_tokens\":226816,\"input_tokens\":265762,\"output_tokens\":1070,\"reasoning_output_tokens\":185}\ncodex■ turn completed\ncodex— completed: turn completed; exit 0\ncodex▶ turn 3: Run the shell command `sleep 25` and then reply with exactly: done\ncodex— starting\ncodex— running\ncodex⚙ shell: /bin/zsh -lc 'sleep 25' [in_progress]\ncodex⚙ shell: /bin/zsh -lc 'sleep 25' [completed, exit 0]\ncodexdone\ncodex∑ usage {\"cache_write_input_tokens\":0,\"cached_input_tokens\":281600,\"input_tokens\":322550,\"output_tokens\":1182,\"reasoning_output_tokens\":196}\ncodex■ turn completed\ncodex— completed: turn completed; exit 0"
+[2026-09-25T05:50:25.506Z] screenshot docs/verification/evidence/ui/codex-live/06-reopened.png
+[2026-09-25T05:50:34.895Z] PASS interrupt from UI stops the codex run {"status":"interrupted","reason":"interrupted by user (exit code 1)"}
+[2026-09-25T05:50:36.516Z] screenshot docs/verification/evidence/ui/codex-live/07-interrupted.png
+[2026-09-25T05:50:36.545Z] PASS source checkout status unchanged by the run {"before":"","after":""}
