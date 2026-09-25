@@ -34,10 +34,14 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
     }
     crate::log(&format!("listening on {}", path.display()));
     let uid = unsafe { libc::getuid() };
+    // Test-only: pretend the owner is another uid. It can only reject more peers (a peer must
+    // still be this process's own uid), so it lets a test observe a "foreign" connection being
+    // refused without a second macOS account; it can never admit a different user.
+    let expected = std::env::var("OVERSEER_TEST_EXPECT_UID").ok().and_then(|v| v.parse::<u32>().ok());
     loop {
         let (stream, _) = listener.accept().await?;
         let peer = crate::shim::peer_uid_fd(stream.as_raw_fd());
-        if peer != Some(uid) {
+        if peer != Some(uid) || expected.is_some_and(|e| peer != Some(e)) {
             crate::log(&format!("rejected connection from uid {peer:?}"));
             drop(stream);
             continue;

@@ -1169,3 +1169,37 @@ fn ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_
     let db = std::fs::read(d.home.path().join("overseer.sqlite")).unwrap();
     assert!(!String::from_utf8_lossy(&db).contains("\"access_token\""));
 }
+
+// ---------------------------------------------------------------- AC-08 foreign peers
+
+#[test]
+fn ac08_connections_from_a_foreign_uid_are_rejected_and_logged() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::fs::PermissionsExt;
+    // Test-only override: the daemon treats uid 4242424 as its owner, so this test process
+    // (the real owner) is a foreign peer. The override can only reject more, never admit more.
+    let home = tempfile::Builder::new().prefix("ovs-t").tempdir_in("/tmp").unwrap();
+    let mut child = std::process::Command::new(BIN).arg("serve").env("OVERSEER_HOME", home.path()).env("OVERSEER_TEST_EXPECT_UID", "4242424")
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().unwrap();
+    let sock = std::path::PathBuf::from(String::from_utf8(std::process::Command::new(BIN).arg("socket-path").env("OVERSEER_HOME", home.path()).output().unwrap().stdout).unwrap().trim());
+    for _ in 0..100 { if sock.exists() { break; } std::thread::sleep(Duration::from_millis(50)); }
+    assert_eq!(std::fs::metadata(&sock).unwrap().permissions().mode() & 0o777, 0o600, "socket is owner-only");
+    assert_eq!(std::fs::metadata(sock.parent().unwrap()).unwrap().permissions().mode() & 0o777, 0o700, "socket directory is owner-only");
+    let mut conn = std::os::unix::net::UnixStream::connect(&sock).unwrap();
+    conn.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let _ = conn.write_all(format!("{}\n", json!({"id": 1, "method": "task.create", "params": {"repo": "/tmp", "harness": "generic", "program": "/usr/bin/touch", "args": ["/tmp/ovs-ac08-should-not-exist"]}})).as_bytes());
+    let mut line = String::new();
+    let n = BufReader::new(conn).read_line(&mut line).unwrap_or(0);
+    assert_eq!(n, 0, "no reply to a foreign peer: {line}");
+    assert!(!std::path::Path::new("/tmp/ovs-ac08-should-not-exist").exists(), "nothing executed");
+    let uid = unsafe { libc_getuid() };
+    let log = std::fs::read_to_string(home.path().join("overseerd.log")).unwrap_or_default();
+    assert!(log.contains(&format!("rejected connection from uid Some({uid})")), "{log}");
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+extern "C" {
+    #[link_name = "getuid"]
+    fn libc_getuid() -> u32;
+}
