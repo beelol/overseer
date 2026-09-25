@@ -9,7 +9,7 @@
   "engines": { "vscode": "^1.136.0" },
   "categories": ["SCM Providers", "Other"],
   "main": "./src/extension.js",
-  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review"],
+  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review", "onWebviewPanel:overseer.output"],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",

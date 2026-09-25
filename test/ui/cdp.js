@@ -120,8 +120,14 @@ class Cdp {
     throw new Error(`Timed out waiting for ${label} (last: ${JSON.stringify(last)})`);
   }
 
+  /** Moves keyboard focus out of a webview so workbench shortcuts reach VS Code. */
+  async focusWorkbench() {
+    await this.evalWorkbench(`(() => { const a = document.activeElement; if (a && a.tagName === 'IFRAME') a.blur(); return true; })()`).catch(() => {});
+  }
+
   /** Runs a command through the real command palette. */
   async command(title) {
+    await this.focusWorkbench();
     await this.key('p', { meta: true, shift: true });
     await this.waitFor('!!document.querySelector(".quick-input-widget:not([style*=\\"display: none\\"]) input")', 5000, 'command palette');
     await this.type(title);

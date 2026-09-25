@@ -43,14 +43,35 @@ class Model {
 }
 
 class AgentsProvider {
-  constructor(model) {
-    this.model = model;
+  constructor(model, memento) {
+    this.model = model; this.memento = memento;
+    // Expansion is remembered per workspace (item ids are stable), so reloads keep the tree shape.
+    this.collapsed = new Set(memento?.get('overseer.collapsed', []) || []);
     this.emitter = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.emitter.event;
     model.onDidChange(() => this.emitter.fire());
   }
   getTreeItem(node) { return node.item; }
   getParent(node) { return node.parent; }
+  setCollapsed(node, collapsed) {
+    const id = node?.item?.id; if (!id) return;
+    if (collapsed) this.collapsed.add(id); else this.collapsed.delete(id);
+    this.memento?.update('overseer.collapsed', [...this.collapsed].slice(-500));
+  }
+  expansion(id, expandable = true) {
+    if (!expandable) return vscode.TreeItemCollapsibleState.None;
+    return this.collapsed.has(id) ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.Expanded;
+  }
+  /** The tree node for a run, with its parents, for TreeView.reveal. */
+  nodeFor(runId) {
+    const chain = [];
+    for (let r = this.model.run(runId), seen = new Set(); r && !seen.has(r.id); r = r.parent_run_id && this.model.run(r.parent_run_id)) { seen.add(r.id); chain.unshift(r); }
+    const task = chain.length && this.model.task(chain[0].task_id);
+    if (!task) return undefined;
+    let node = this.taskNode(task);
+    for (const run of chain) node = this.runNode(run, node);
+    return node;
+  }
   getChildren(node) {
     const m = this.model;
     if (!node) {
@@ -72,7 +93,7 @@ class AgentsProvider {
   }
   taskNode(task) {
     const ws = this.model.workspace(task.workspace_id);
-    const item = new vscode.TreeItem(task.title, vscode.TreeItemCollapsibleState.Expanded);
+    const item = new vscode.TreeItem(task.title, this.expansion('task:' + task.id));
     item.id = 'task:' + task.id;
     item.iconPath = new vscode.ThemeIcon(ws?.kind === 'current' ? 'repo' : 'git-branch');
     item.description = ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}${ws.removed_ms ? ' · removed' : ''}` : '';
@@ -86,7 +107,7 @@ class AgentsProvider {
     const caps = run.capabilities || {};
     const expandable = kids || (!run.parent_run_id && typeof caps.children === 'string' && !caps.children.startsWith('supported'));
     const label = run.parent_run_id ? run.title : `${run.harness}`;
-    const item = new vscode.TreeItem(label, expandable ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None);
+    const item = new vscode.TreeItem(label, this.expansion('run:' + run.id, !!expandable));
     item.id = 'run:' + run.id;
     item.iconPath = statusIcon(run.status);
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;

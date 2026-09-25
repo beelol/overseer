@@ -41,17 +41,21 @@ class OutputPanels {
   }
 
   async show(runId, { preserveFocus = true } = {}) {
-    let entry = this.panels.get(runId);
+    const entry = this.panels.get(runId);
     if (entry) { entry.panel.reveal(undefined, preserveFocus); return; }
     const panel = vscode.window.createWebviewPanel('overseer.output', 'Overseer run', { viewColumn: vscode.ViewColumn.Beside, preserveFocus }, { enableScripts: true, retainContextWhenHidden: true });
-    entry = { panel, runIds: new Set([runId]) };
+    await this.attach(runId, panel);
+  }
+
+  async attach(runId, panel) {
+    const entry = { panel, runIds: new Set([runId]) };
     this.panels.set(runId, entry);
-    panel.onDidDispose(() => this.panels.delete(runId));
+    panel.onDidDispose(() => { if (this.panels.get(runId) === entry) this.panels.delete(runId); });
     panel.webview.onDidReceiveMessage(message => this.receive(runId, message).catch(error => {
       panel.webview.postMessage({ type: 'notice', message: error.message });
     }));
     const nonce = randomBytes(18).toString('base64');
-    panel.webview.html = html(nonce, panel.webview.cspSource);
+    panel.webview.html = html(nonce, panel.webview.cspSource, runId);
     for (const d of this.model.descendants(runId)) entry.runIds.add(d.id);
     this.pushRun(runId, entry);
     // History: each run's retained events, merged by the global sequence.
@@ -59,6 +63,25 @@ class OutputPanels {
     const events = lists.flatMap(l => l.events).sort((a, b) => a.seq - b.seq);
     const truncated = lists.some(l => l.oldest_retained && events.length && l.events.some(e => e.kind === 'retention'));
     panel.webview.postMessage({ type: 'history', events: events.map(e => ({ event: e, label: this.label(e.run_id) })), truncated });
+  }
+
+  /** Restores run panels after a window reload or VS Code restart (webview state holds the run id). */
+  async deserializeWebviewPanel(panel, state) {
+    const runId = state && typeof state.runId === 'string' ? state.runId : undefined;
+    try {
+      await this.client.waitConnected(20000);
+      await this.model.refresh();
+    } catch { /* explained below */ }
+    const run = runId && this.model.run(runId);
+    if (!run || this.panels.has(runId)) {
+      if (run) { panel.dispose(); return; }
+      panel.webview.options = { enableScripts: false };
+      panel.title = 'Overseer run (unavailable)';
+      panel.webview.html = `<!doctype html><html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';"></head><body style="font-family:var(--vscode-font-family);color:var(--vscode-foreground);padding:16px"><h2 style="font-size:1.1em">Run unavailable</h2><p>${this.client.connected ? 'This run is no longer in Overseer\'s records.' : 'Overseer\'s daemon is not reachable yet. Reopen the run from the Overseer view once it reconnects.'}</p></body></html>`;
+      return;
+    }
+    panel.webview.options = { enableScripts: true };
+    await this.attach(runId, panel);
   }
 
   async receive(runId, message) {
@@ -83,7 +106,7 @@ class OutputPanels {
   }
 }
 
-function html(nonce, csp) {
+function html(nonce, csp, runId) {
   return `<!doctype html><html><head><meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${csp} 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
@@ -111,7 +134,7 @@ button:disabled{opacity:.5;cursor:default}
 button.secondary{background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground)}
 .why{font-size:.85em;opacity:.8}
 pre.raw{max-height:300px;overflow:auto;font-size:.85em}
-</style></head><body>
+</style></head><body data-run-id="${runId.replace(/[^A-Za-z0-9_-]/g, '')}">
 <header><h1 id="title">Run</h1><div class="meta"><span class="status" id="status"></span> <span id="meta"></span></div>
 <div class="meta" id="ws"></div><div class="meta" id="children"></div>
 <details class="caps"><summary>Capabilities (as reported by this adapter)</summary><div id="caps"></div></details>
@@ -120,8 +143,15 @@ pre.raw{max-height:300px;overflow:auto;font-size:.85em}
 <footer><textarea id="prompt" placeholder="Follow-up message to this run only"></textarea><button id="send">Send follow-up</button><span class="why" id="send-why"></span></footer>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
-const log = document.getElementById('log'); let run; let seen = new Set(); let stick = true;
-window.addEventListener('scroll', () => { stick = (window.innerHeight + window.scrollY) >= document.body.scrollHeight - 40; });
+// Webview state (run id, scroll position, unsent follow-up draft) survives reloads and restarts.
+const saved = vscode.getState() || {};
+const same = saved.runId === document.body.dataset.runId;
+const log = document.getElementById('log'); let run; let seen = new Set(); let stick = same && saved.stick === false ? false : true; let restored = false;
+const persist = () => vscode.setState({ runId: document.body.dataset.runId, scrollY: window.scrollY, stick, draft: document.getElementById('prompt').value });
+if (same && saved.draft) document.getElementById('prompt').value = saved.draft;
+persist();
+window.addEventListener('scroll', () => { if (!restored) return; stick = (window.innerHeight + window.scrollY) >= document.body.scrollHeight - 40; persist(); });
+document.getElementById('prompt').addEventListener('input', persist);
 function text(ev){ const p = ev.payload || {};
   switch(ev.kind){
     case 'output': return (p.role && p.role!=='assistant' ? '['+p.role+'] ' : '') + (p.text||'');
@@ -178,11 +208,12 @@ function setRun(msg){ run = msg.run;
   } }
 window.addEventListener('message', e => { const m = e.data;
   if (m.type === 'run') setRun(m);
-  else if (m.type === 'history') { for (const x of m.events) add(x.event, x.label); }
+  else if (m.type === 'history') { for (const x of m.events) add(x.event, x.label);
+    if (!restored) { restored = true; if (!stick && same) window.scrollTo(0, saved.scrollY || 0); else window.scrollTo(0, document.body.scrollHeight); persist(); } }
   else if (m.type === 'event') add(m.event, m.label);
   else if (m.type === 'notice') document.getElementById('notice').textContent = m.message;
   else if (m.type === 'raw') { const r = document.getElementById('rawout'); r.hidden = false; r.textContent = (m.raw.truncated ? '[' + m.raw.note + ']\\n' : '') + m.raw.lines.map(l => '[' + l.s + '] ' + l.d).join('\\n'); } });
-document.getElementById('send').onclick = () => { const t = document.getElementById('prompt'); if (!t.value.trim()) return; vscode.postMessage({ type: 'followUp', text: t.value }); t.value = ''; };
+document.getElementById('send').onclick = () => { const t = document.getElementById('prompt'); if (!t.value.trim()) return; vscode.postMessage({ type: 'followUp', text: t.value }); t.value = ''; persist(); };
 document.getElementById('interrupt').onclick = () => vscode.postMessage({ type: 'interrupt' });
 document.getElementById('raw').onclick = () => vscode.postMessage({ type: 'raw' });
 document.getElementById('review').onclick = () => vscode.postMessage({ type: 'openReview' });

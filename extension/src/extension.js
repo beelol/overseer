@@ -21,7 +21,7 @@ async function activate(context) {
   const binary = resolveBinary(context, vscode.workspace.getConfiguration('overseer').get('daemonPath'));
   client = new DaemonClient(binary, say);
   const model = new Model(client);
-  const agents = new AgentsProvider(model);
+  const agents = new AgentsProvider(model, context.workspaceState);
   const dirty = new DirtyProvider(model, client);
   const accounts = new AccountsProvider(model);
   const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true });
@@ -29,6 +29,9 @@ async function activate(context) {
   const accountsView = vscode.window.createTreeView('overseer.accounts', { treeDataProvider: accounts });
   const outputs = new OutputPanels(context, client, model);
   const review = new Review(context, client, model, say);
+  context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.output', outputs),
+    agentsView.onDidExpandElement(e => agents.setCollapsed(e.element, false)),
+    agentsView.onDidCollapseElement(e => agents.setCollapsed(e.element, true)));
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
   status.command = 'overseer.refresh';
   context.subscriptions.push(agentsView, dirtyView, accountsView, status, { dispose: () => client.dispose() });
@@ -251,12 +254,18 @@ async function activate(context) {
     await model.refresh();
     refreshAccounts().catch(() => {});
     const remembered = context.workspaceState.get('overseer.selectedRun');
-    if (remembered && model.run(remembered)) { selectedRun = remembered; dirty.select(remembered); }
+    if (remembered && model.run(remembered)) {
+      selectedRun = remembered; dirty.select(remembered);
+      // Show the remembered run as selected in the Agents view without stealing focus.
+      const reveal = () => { const node = agents.nodeFor(remembered); if (node) agentsView.reveal(node, { select: true, focus: false, expand: false }).then(undefined, () => {}); };
+      if (agentsView.visible) reveal();
+      else { const once = agentsView.onDidChangeVisibility(e => { if (e.visible) { once.dispose(); setTimeout(reveal, 200); } }); context.subscriptions.push(once); }
+    }
   } catch (error) {
     say('daemon start failed: ' + error.message);
     vscode.window.showErrorMessage(`Overseer could not start its daemon: ${error.message}`);
   }
-  return { client, model, review, outputs, selectRun, dirty }; // exported for UI tests
+  return { client, model, review, outputs, selectRun, dirty, agents, agentsView, selectedRun: () => selectedRun }; // exported for UI tests
 }
 
 function deactivate() { client?.dispose(); }

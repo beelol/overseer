@@ -107,13 +107,14 @@ class Session {
 
   async quit() {
     // Close VS Code the way a user does (Cmd+Q); fall back to SIGTERM.
-    try { await this.cdp?.key('q', { meta: true }); } catch {}
+    try { await this.cdp?.focusWorkbench(); await this.cdp?.key('q', { meta: true }); } catch {}
     for (let i = 0; i < 30; i++) {
       await delay(500);
       if (!cp.spawnSync('pgrep', ['-f', this.profile], { encoding: 'utf8' }).stdout.trim()) break;
     }
     try { this.cdp?.close(); } catch {}
     const pids = cp.spawnSync('pgrep', ['-f', this.profile], { encoding: 'utf8' }).stdout.trim().split('\n').filter(Boolean);
+    if (pids.length) this.note('VS Code did not quit on Cmd+Q; sending SIGTERM', pids.length);
     for (const pid of pids) { try { process.kill(Number(pid), 'SIGTERM'); } catch {} }
     for (let i = 0; i < 40; i++) {
       await delay(500);

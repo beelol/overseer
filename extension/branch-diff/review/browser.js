@@ -1,12 +1,13 @@
 // Modified for Overseer from Branch Diff (Local) review/browser.js (MIT): adds the
-// comparison/base control, Follow (off/following/paused) and agent-edit reveal.
+// comparison/base control, Follow (off/following/paused), agent-edit reveal, and restores
+// the saved scroll anchor once the rows above it have rendered (after reload/restart).
 import './browser.css';
 import { StatisticsWorker } from './statistics-client';
 import { EditingClient, replaceText } from './editing-client';
 
 const vscode = acquireVsCodeApi();
 const saved = vscode.getState() || {};
-const identity = { repository: document.body.dataset.repository, mode: document.body.dataset.mode, target: document.body.dataset.target };
+const identity = { repository: document.body.dataset.repository, mode: document.body.dataset.mode, target: document.body.dataset.target, runId: document.body.dataset.runId };
 // Save repository identity even if the first comparison has not finished yet.
 vscode.setState({ ...saved, ...identity });
 const diffs = document.getElementById('diffs');
@@ -45,9 +46,11 @@ toggleNavigator.addEventListener('click', () => { collapseNavigator(!document.bo
 function persist() {
   clearTimeout(persistTimer);
   if (!snapshot) return;
+  // Overseer: a hidden or zero-height view clamps scrollTop to 0; keep the last real position.
+  if (document.visibilityState === 'hidden' || !diffs.clientHeight) return;
   pendingState = { ...identity, layout: layout.value, closedFiles: [...closedFiles], closedFolders: [...closedFolders],
     navWidth, navCollapsed: document.body.classList.contains('nav-collapsed'), filter: filter.value,
-    selected, scrollTop: diffs.scrollTop, anchor: anchor(), hierarchy };
+    selected, scrollTop: diffs.scrollTop, anchor: restoreGoal ? { id: restoreGoal.id, offset: restoreGoal.offset } : anchor(), hierarchy };
   persistTimer = setTimeout(flushState, 100);
 }
 function flushState() {
@@ -66,6 +69,21 @@ function anchor() {
   const row = element && rows.get(element.dataset.id);
   return row && { id: row.entry.id, offset: diffs.scrollTop - row.element.offsetTop };
 }
+// Overseer: rows start as short placeholders after a reload and later snapshots can release
+// rendered rows, so the saved anchor is re-applied as diffs render and relayout until the user
+// interacts with the review (or jumps/follows). Until then it is also the position we save.
+let restoreGoal = saved.runId === identity.runId && saved.anchor && typeof saved.anchor.id === 'string' ? { id: saved.anchor.id, offset: Number(saved.anchor.offset) || 0 } : undefined;
+document.body.dataset.restore = restoreGoal ? 'pending' : 'none';
+function pursueRestore() {
+  if (!restoreGoal) return;
+  const row = rows.get(restoreGoal.id);
+  if (!row) return;
+  const want = row.element.offsetTop + restoreGoal.offset;
+  if (diffs.scrollTop !== want) diffs.scrollTop = want;
+  if (Math.abs(diffs.scrollTop - want) < 2 && !snapshot?.cached && row.element.dataset.loadState === 'rendered') document.body.dataset.restore = 'reached';
+}
+function stopRestore(reason) { if (restoreGoal) { restoreGoal = undefined; document.body.dataset.restore = 'cancelled:' + reason; } }
+for (const type of ['wheel', 'touchstart', 'keydown', 'pointerdown']) document.addEventListener(type, () => stopRestore(type), { passive: true, capture: true });
 function restoreAnchor(value) {
   const row = value && rows.get(value.id);
   if (row) diffs.scrollTop = row.element.offsetTop + value.offset;
@@ -91,6 +109,7 @@ function trackScroll() {
 }
 diffs.addEventListener('scroll', trackScroll, { passive: true });
 function jump(id) {
+  stopRestore('jump');
   const row = rows.get(id); if (!row) { pendingJump = id; return; }
   clicked = id; closedFiles.delete(id); row.nearby = true; fold(row); ensure(row);
   diffs.scrollTop = row.element.offsetTop;
@@ -272,6 +291,7 @@ function showCard(row, body, stats) {
   showCounts(row, stats); loading(row, false); restoreAnchor(position); trackScroll();
 }
 function updateViewport() {
+  pursueRestore();
   const top = diffs.scrollTop - 750, bottom = diffs.scrollTop + diffs.clientHeight + 750;
   for (const row of rows.values()) {
     const start = row.element.offsetTop;
@@ -305,6 +325,7 @@ function resize(row) {
   if (Math.abs(parseFloat(row.host.style.height) - height) > 1) { row.host.style.height = height + 'px'; trackScroll(); }
   row.editor.layout({ width: row.host.clientWidth, height });
   restoreAnchor(savedAnchor);
+  pursueRestore();
 }
 function showProblem(row, revision, problem) {
   if (editing.held(row)) return;
@@ -412,7 +433,7 @@ async function reconcile() {
       }
       const oldStructure = snapshot?.entries.map(e => [e.id, e.path, e.status, e.unsaved]);
       snapshot = next;
-      Object.assign(identity, { repository: next.repository, mode: next.mode, target: next.target });
+      Object.assign(identity, { repository: next.repository, mode: next.mode, target: next.target, runId: next.overseer?.runId || identity.runId });
       updateSettings(next.settings);
       message(next.error || next.warning);
       const description = next.description;
@@ -456,8 +477,8 @@ async function reconcile() {
       }
       if (!next.entries.length) diffs.append(node('p', 'empty', next.error ? 'Comparison unavailable: ' + next.error : next.checking ? 'Checking files…' : 'No changes for this comparison. Pre-existing dirty work stays listed in the Workspace Dirty view.'));
       if (restoring) {
-        diffs.scrollTop = saved.scrollTop || 0; restoreAnchor(saved.anchor); restoring = false;
-      } else restoreAnchor(previousAnchor);
+        diffs.scrollTop = saved.scrollTop || 0; restoreAnchor(saved.anchor); pursueRestore(); restoring = false;
+      } else { restoreAnchor(previousAnchor); pursueRestore(); }
       if (pendingJump && rows.has(pendingJump)) { const id = pendingJump; pendingJump = undefined; jump(id); }
       if (pendingReveal) applyReveal(pendingReveal);
       document.body.dataset.version = next.version;
@@ -488,7 +509,7 @@ function applyOverseer(o) {
   followState = o.follow || 'off';
   followBox.checked = followState !== 'off';
   resumeButton.hidden = followState !== 'paused';
-  followStatus.textContent = followState === 'paused' ? 'Follow paused by your navigation' : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
+  followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
 }
 function userNavigated(reason) {
   if (followState !== 'following') return;

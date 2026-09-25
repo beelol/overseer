@@ -23,9 +23,14 @@ function gitShow(root, spec) {
 class Review {
   constructor(context, client, model, log) {
     this.context = context; this.client = client; this.model = model; this.log = log;
-    this.comparisons = new Map(); // runId -> selected comparison option
+    // Comparison choice and Follow survive reloads and restarts (workspace state). Follow is
+    // never auto-resumed: a run that was being followed comes back paused.
+    this.comparisons = new Map(Object.entries(context.workspaceState.get('overseer.comparisons', {}))); // runId -> { mode, branch }
     this.follow = new Map(); // runId -> 'off' | 'following' | 'paused'
     this.followNotes = new Map();
+    for (const [runId, state] of Object.entries(context.workspaceState.get('overseer.follow', {}))) {
+      if (state === 'following' || state === 'paused') { this.follow.set(runId, 'paused'); this.followNotes.set(runId, 'Follow was on before VS Code reloaded. It stays paused until you resume it.'); }
+    }
     this.observed = new Map(); // abs path -> last observed text (bounded)
     this.userSaves = new Map(); // abs path -> ms of last user save
     this.lastReveal = new Map(); // runId -> last reveal message
@@ -102,6 +107,25 @@ class Review {
     return repo;
   }
 
+  persistFollow() {
+    const saved = {};
+    for (const [runId, state] of this.follow) if (state !== 'off') saved[runId] = state;
+    this.context.workspaceState.update('overseer.follow', saved);
+  }
+
+  setComparison(runId, option) {
+    this.comparisons.set(runId, { mode: option.mode, branch: option.branch });
+    this.context.workspaceState.update('overseer.comparisons', Object.fromEntries([...this.comparisons].slice(-200)));
+  }
+
+  /** Why a run's review cannot open, or undefined when its workspace is usable. */
+  unavailable(run, ws) {
+    if (!ws) return `The workspace for "${run.title}" no longer exists in Overseer's records.`;
+    if (!ws.removed_ms) return undefined;
+    return `The worktree for "${run.title}" (${ws.path}) was removed on ${new Date(ws.removed_ms).toLocaleString()}.` +
+      (ws.branch ? ` Its branch ${ws.branch} was kept, so the commits are still in the repository.` : '') + ' The run panel still has its history.';
+  }
+
   async options(runId, branch) {
     return this.client.request('comparison.options', { run_id: runId, branch });
   }
@@ -120,10 +144,11 @@ class Review {
     const run = this.model.run(runId);
     if (!run) throw new Error('Unknown run.');
     const ws = this.model.workspace(run.workspace_id);
-    if (!ws || ws.removed_ms) throw new Error('This run\'s workspace was removed.');
+    const why = this.unavailable(run, ws);
+    if (why) throw new Error(why);
     const repo = await this.repoFor(ws.path);
     const comparison = await this.currentComparison(runId);
-    if (follow !== undefined) this.follow.set(runId, follow ? 'following' : 'off');
+    if (follow !== undefined) { this.follow.set(runId, follow ? 'following' : 'off'); this.persistFollow(); }
     if (String(run.capabilities?.file_activity || '').startsWith('unknown')) this.followNotes.set(runId, 'Filesystem evidence only: this harness does not report its edits, so Follow cannot attribute or jump to them. The file list still refreshes live.');
     return this.manager.open({ repo, workspaceId: ws.id, runId, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison }, { preserveFocus });
   }
@@ -146,7 +171,7 @@ class Review {
     }
     if (!option) return;
     if (!option.available) { vscode.window.showWarningMessage(`${option.label} is unavailable: ${option.detail}`); return; }
-    this.comparisons.set(runId, option);
+    this.setComparison(runId, option);
     await this.open(runId);
   }
 
@@ -177,11 +202,16 @@ class Review {
     // Serializers run during activation, possibly before the daemon connection is up.
     await this.client.waitConnected(20000);
     await this.model.refresh();
-    const repoPath = vscode.Uri.parse(state.repository).fsPath;
-    const runs = this.model.state.runs.filter(r => !r.parent_run_id && this.model.workspace(r.workspace_id)?.path === repoPath);
-    const run = runs.sort((a, b) => b.created_ms - a.created_ms)[0];
+    let run = state.runId && this.model.run(state.runId);
+    if (!run && !state.runId) {
+      // Reviews saved before run ids were recorded: the newest top-level run in that worktree.
+      const repoPath = vscode.Uri.parse(state.repository).fsPath;
+      run = this.model.state.runs.filter(r => !r.parent_run_id && this.model.workspace(r.workspace_id)?.path === repoPath).sort((a, b) => b.created_ms - a.created_ms)[0];
+    }
     if (!run) return undefined;
     const ws = this.model.workspace(run.workspace_id);
+    const why = this.unavailable(run, ws);
+    if (why) throw Object.assign(new Error(why), { runTitle: run.title });
     return { repo: await this.repoFor(ws.path), workspaceId: ws.id, runId: run.id, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison: await this.currentComparison(run.id) };
   }
 
@@ -190,6 +220,8 @@ class Review {
   setFollow(runId, state) {
     if (!runId) return;
     this.follow.set(runId, state);
+    this.persistFollow();
+    if (/paused/.test(this.followNotes.get(runId) || '')) this.followNotes.delete(runId);
     if (state === 'following') {
       const last = this.lastReveal.get(runId);
       if (last) this.manager.reveal(runId, last);
@@ -197,7 +229,7 @@ class Review {
   }
 
   pauseFollow(runId, reason) {
-    if (runId && this.follow.get(runId) === 'following') { this.follow.set(runId, 'paused'); this.log(`follow paused for ${runId}: ${reason}`); }
+    if (runId && this.follow.get(runId) === 'following') { this.follow.set(runId, 'paused'); this.persistFollow(); this.log(`follow paused for ${runId}: ${reason}`); }
   }
 
   async readText(abs) {
