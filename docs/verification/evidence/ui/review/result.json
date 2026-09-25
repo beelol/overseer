@@ -3,7 +3,7 @@
     {
       "name": "selecting run A opens A worktree review (outside the open folder)",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-EPZJr8/overseer-home/worktrees/repoA-2dec0632/a-seq"
+      "detail": "/private/tmp/ovs-ui-Bu4QPi/overseer-home/worktrees/repoA-703c0071/a-seq"
     },
     {
       "name": "selecting an existing run does not turn Follow on",
@@ -27,7 +27,7 @@
     {
       "name": "selecting run B shows B worktree",
       "ok": true,
-      "detail": "Worktree: /private/tmp/ovs-ui-EPZJr8/overseer-home/worktrees/repoB-bb7055d5/b-seq"
+      "detail": "Worktree: /private/tmp/ovs-ui-Bu4QPi/overseer-home/worktrees/repoB-7ecdca4d/b-seq"
     },
     {
       "name": "agent switch does not inherit Follow",
@@ -50,19 +50,19 @@
       "name": "ordinary changes refresh within 2 s",
       "ok": true,
       "detail": {
-        "write new file": 109,
-        "atomic replace": 365,
-        "staging (dirty view)": 499,
-        "rename": 391,
-        "delete": 419,
-        "branch change": 440,
-        "missed watcher event (excluded folder)": 417
+        "write new file": 366,
+        "atomic replace": 475,
+        "staging (dirty view)": 1066,
+        "rename": 392,
+        "delete": 473,
+        "branch change": 449,
+        "missed watcher event (excluded folder)": 1839
       }
     },
     {
       "name": "missed watcher event reconciled within 5 s",
       "ok": true,
-      "detail": 417
+      "detail": 1839
     },
     {
       "name": "navigator selection preserved across live refreshes",
@@ -133,7 +133,7 @@
     {
       "name": "current checkout review is the repository itself",
       "ok": true,
-      "detail": "Current checkout: /private/tmp/ovs-ui-EPZJr8/repoA"
+      "detail": "Current checkout: /private/tmp/ovs-ui-Bu4QPi/repoA"
     },
     {
       "name": "filesystem-only harness shows the Follow limitation",
@@ -180,12 +180,12 @@
     }
   ],
   "timings": {
-    "write new file": 109,
-    "atomic replace": 365,
-    "staging (dirty view)": 499,
-    "rename": 391,
-    "delete": 419,
-    "branch change": 440,
-    "missed watcher event (excluded folder)": 417
+    "write new file": 366,
+    "atomic replace": 475,
+    "staging (dirty view)": 1066,
+    "rename": 392,
+    "delete": 473,
+    "branch change": 449,
+    "missed watcher event (excluded folder)": 1839
   }
 }
