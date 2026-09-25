@@ -3,7 +3,7 @@
     {
       "name": "selecting run A opens A worktree review (outside the open folder)",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-el841O/overseer-home/worktrees/repoA-8ff36f01/a-seq"
+      "detail": "/private/tmp/ovs-ui-CNjO5l/overseer-home/worktrees/repoA-96c95dd9/a-seq"
     },
     {
       "name": "selecting an existing run does not turn Follow on",
@@ -15,8 +15,7 @@
       "detail": [
         "Following agent edits",
         "Following agent edits (agent tool input (tool-input))",
-        "Following: a.txt:60 (agent tool input (tool-input))",
-        "Following agent edits (agent tool input (tool-input))"
+        "Following: a.txt:60 (agent tool input (tool-input))"
       ]
     },
     {
@@ -27,7 +26,7 @@
     {
       "name": "selecting run B shows B worktree",
       "ok": true,
-      "detail": "Worktree: /private/tmp/ovs-ui-el841O/overseer-home/worktrees/repoB-1e77880a/b-seq"
+      "detail": "Worktree: /private/tmp/ovs-ui-CNjO5l/overseer-home/worktrees/repoB-68355d3e/b-seq"
     },
     {
       "name": "agent switch does not inherit Follow",
@@ -50,19 +49,19 @@
       "name": "ordinary changes refresh within 2 s",
       "ok": true,
       "detail": {
-        "write new file": 413,
-        "atomic replace": 523,
-        "staging (dirty view)": 124,
-        "rename": 468,
-        "delete": 619,
-        "branch change": 495,
-        "missed watcher event (excluded folder)": 2638
+        "write new file": 309,
+        "atomic replace": 467,
+        "staging (dirty view)": 227,
+        "rename": 389,
+        "delete": 418,
+        "branch change": 447,
+        "missed watcher event (excluded folder)": 473
       }
     },
     {
       "name": "missed watcher event reconciled within 5 s",
       "ok": true,
-      "detail": 2638
+      "detail": 473
     },
     {
       "name": "navigator selection preserved across live refreshes",
@@ -133,7 +132,7 @@
     {
       "name": "current checkout review is the repository itself",
       "ok": true,
-      "detail": "Current checkout: /private/tmp/ovs-ui-el841O/repoA"
+      "detail": "Current checkout: /private/tmp/ovs-ui-CNjO5l/repoA"
     },
     {
       "name": "filesystem-only harness shows the Follow limitation",
@@ -180,12 +179,12 @@
     }
   ],
   "timings": {
-    "write new file": 413,
-    "atomic replace": 523,
-    "staging (dirty view)": 124,
-    "rename": 468,
-    "delete": 619,
-    "branch change": 495,
-    "missed watcher event (excluded folder)": 2638
+    "write new file": 309,
+    "atomic replace": 467,
+    "staging (dirty view)": 227,
+    "rename": 389,
+    "delete": 418,
+    "branch change": 447,
+    "missed watcher event (excluded folder)": 473
   }
 }

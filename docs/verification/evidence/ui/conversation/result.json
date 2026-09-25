@@ -1,0 +1,119 @@
+{
+  "checks": [
+    {
+      "name": "conversation shows the turn with its prompt",
+      "ok": true,
+      "detail": {
+        "turns": 1,
+        "prompt": "spawn a child, then touch approved.txt",
+        "spawn": true,
+        "child": "child task",
+        "childText": "child output",
+        "grand": "grandchild task"
+      }
+    },
+    {
+      "name": "native child nested under the spawning tool call, grandchild under the child, with their own output",
+      "ok": true,
+      "detail": {
+        "turns": 1,
+        "prompt": "spawn a child, then touch approved.txt",
+        "spawn": true,
+        "child": "child task",
+        "childText": "child output",
+        "grand": "grandchild task"
+      }
+    },
+    {
+      "name": "permission request inline in the conversation with Allow/Deny",
+      "ok": true,
+      "detail": {
+        "head": "⚠ Waiting for your permission: command: touch approved.txt",
+        "buttons": [
+          "Allow once",
+          "Deny"
+        ]
+      }
+    },
+    {
+      "name": "decision recorded inline, turn completed with usage, file edit listed",
+      "ok": true,
+      "detail": {
+        "decision": [
+          "✔ Allowed: command: touch approved.txt"
+        ],
+        "done": "■ Turn completed",
+        "usage": "∑ 1 in · 1 out",
+        "edits": [
+          "approved.txt"
+        ]
+      }
+    },
+    {
+      "name": "tool call expands to its input and status, and collapses again",
+      "ok": true,
+      "detail": {
+        "open": {
+          "open": true,
+          "input": "{\n  \"command\": \"touch approved.txt\",\n  \"cwd\": null\n}",
+          "status": "completed"
+        },
+        "closed": true
+      }
+    },
+    {
+      "name": "clicking a file edit opens that hunk in the run's worktree review",
+      "ok": true,
+      "detail": "/private/tmp/ovs-ui-L2fBE8/overseer-home/worktrees/conv-demo-65f9fe3b/app-tree"
+    },
+    {
+      "name": "Claude Write tool call shown before its permission request",
+      "ok": true,
+      "detail": {
+        "summary": "{\"content\":\"allowed\\n\",\"file_path\":\"/private/tmp/ovs-ui-L2fBE8/overseer-home/worktrees/conv-demo-65f9fe3b/claude-write/perm.txt\"}"
+      }
+    },
+    {
+      "name": "Claude tool call shows input and result",
+      "ok": true,
+      "detail": {
+        "pres": [
+          "{\n  \"content\": \"allowed\\n\",\n  \"file_path\": \"/private/tmp/ovs-ui-L2fBE8/overseer-home/worktrees/conv-demo-65f9fe3b/claude-write/perm.txt\"\n}",
+          "File created successfully at: /private/tmp/ovs-ui-L2fBE8/overseer-home/worktrees/conv-demo-65f9fe3b/claude-write/perm.txt"
+        ],
+        "status": "completed"
+      }
+    },
+    {
+      "name": "Claude file edit opens the Claude worktree review (not the codex-app one)",
+      "ok": true,
+      "detail": "/private/tmp/ovs-ui-L2fBE8/overseer-home/worktrees/conv-demo-65f9fe3b/claude-write"
+    },
+    {
+      "name": "Event log tab lists the raw events; conversation returns",
+      "ok": true,
+      "detail": 18
+    },
+    {
+      "name": "history at the retention bound renders within 1.5 s with truncation visible",
+      "ok": true,
+      "detail": {
+        "last": "burst line 5999",
+        "ms": 57,
+        "events": 5002,
+        "banner": "Older history was truncated by the retention bound. The raw output keeps the full stream.",
+        "msgs": 5000
+      }
+    },
+    {
+      "name": "live burst keeps the panel responsive (event-loop lag p95 under 250 ms, the AC-35 bound) and shows the newest output",
+      "ok": true,
+      "detail": {
+        "n": 96,
+        "p95": 2,
+        "max": 113,
+        "msgs": 5064
+      }
+    }
+  ]
+}

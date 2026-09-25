@@ -315,11 +315,26 @@ rec(42, "Hunk accept and reject", "not started",
     evidence="—", live="—",
     blocker="Not blocked; not started. Next: add per-hunk actions to the vendored review (reject = write the base hunk through a VS Code edit, accept = reviewed marker keyed by hunk content), then run the Verify clause.")
 
-rec(43, "Structured run conversation view", "not started",
-    expected="See the RFC criterion (added by the owner on 2026-09-25).",
-    actual="Not implemented yet. The run panel is a flat, ordered event log with an optional raw-output view.",
-    evidence="—", live="—",
-    blocker="Not blocked; not started. Next: group events by turn in the daemon or panel, render tool calls collapsibly, link file_activity to the review, nest child output, then run the Verify clause.")
+rec(43, "Structured run conversation view", "verified", commit="80112ee", date="2026-09-25",
+    harness="LIVE: Codex exec and Codex app-server (`codex (existing login)`, model gpt-5.6-luna), Claude Code (`claude (existing login)`, haiku); one tiny prompt each. Fixtures: codex-app and Claude fixtures, generic bursts",
+    steps="""1. `cargo test` — `ac43_fixture_tool_calls_carry_inputs_and_results_for_the_conversation_view` (tool input/result events for Claude and app-server), `ac14_fixture_claude_background_task_finishing_before_the_interim_result_still_keeps_the_session_open` (regression found by the live run).
+2. `node test/ui/scenario-conversation.js` (fixtures, packaged UI): codex-app run with child and grandchild threads, command approval and file change; Claude run with a Write permission; a 6,000-line generic run (retention bound 5,000) and a live 6,000-line burst.
+3. `node test/ui/scenario-conversation-live.js` (LIVE): for Codex exec, Codex app-server (approval policy `untrusted`) and Claude Code, a prompt that spawns one sub-agent replying "hi" and then creates a file; permission requests answered with the conversation's inline **Allow once**; expand/collapse the first tool call; click the file edit.
+4. Reran `scenario-main.js`, `scenario-review.js`, `scenario-trust.js` and `scenario-restore.js` (all pass).""",
+    expected="Conversation with turns, collapsible tool calls with inputs/results, file edits opening the hunk in the right worktree review, inline permissions with decisions, children nested under the spawning tool call with their own output, highlighted errors, per-turn usage; raw event log and raw output still available; responsive at the retention bound with truncation visible.",
+    actual="""- **Live Codex exec:** tools `shell`, `collab:spawn_agent`, `collab:wait`, `apply_patch`; the sub-agent "Reply with exactly: hi." is nested under `collab:spawn_agent` with its reply "hi."; usage "195,934 in · 968 out"; clicking `hello.txt` opened the Codex worktree review at that file.
+- **Live Codex app-server:** three approvals answered inline (two of the sub-agent's `sed` reads, then the file change), each recorded as "✔ Allowed: …"; the child is nested under `collab:spawn_agent` with its reply "hi"; usage shows tokens plus "rate limits reported"; `app.txt` opened in the app-server worktree review.
+- **Live Claude Code:** `Agent` then `Write`; the subagent is nested under `Agent` with its reply "hi"; the Write permission was answered inline ("✔ Allowed: Write"); usage "28 in · 431 out · $0.0446"; `hello.md` opened in the Claude worktree review.
+- **Fixtures:** child and grandchild nesting with their own output; tool calls expand to input and result and collapse again; the codex-app edit and the Claude edit each open their own worktree's review (checked by path) at line 1; the Event log tab lists the raw events.
+- **Bounds:** 5,002 retained events render in 55 ms with "Older history was truncated by the retention bound" visible and the newest line shown. During a live 6,000-event burst, webview event-loop lag was p95 2 ms, max 90 ms (AC-35 bound 250 ms).
+- **Bugs found and fixed on the way:**
+  - History requested the oldest 5,000 events, so at the bound it dropped the newest ones and the truncation marker; it is now paged.
+  - Live events were posted one per message with a forced scroll each (a 2.8 s stall); they are now batched with one scroll per frame.
+  - Claude 2.1.x continues with another turn after a backgrounded task finishes, even when it finished before the interim `result`. Overseer had closed stdin, so the Write permission failed with "Stream closed". The session now stays open until every expected turn has a result.
+  - Subagent replies arrive only in `task_notification.summary`; they are now recorded as the child's output.""",
+    evidence="[fixture scenario](evidence/ui/conversation/) (screenshots: pending approval, tool expanded, edit opened in review, event-log tab, burst), [live scenario](evidence/ui/conversation-live/) (result.json with each run's conversation summary; screenshots of each conversation, permission and edit-in-review)",
+    live="Live for Codex exec, Codex app-server and Claude Code. OpenCode shares the renderer (tool inputs/results from its tool parts), exercised by the fixture scenarios' generic and mock runs.",
+    limits="Child tool calls inside a child are shown as text lines (harnesses report them without separate ids). Codex exec has no interactive permissions (sandbox policy), so its conversation has none.")
 
 rec(44, "Merge back", "not started",
     expected="See the RFC criterion (added by the owner on 2026-09-25).",

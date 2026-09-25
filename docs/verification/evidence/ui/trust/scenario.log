@@ -1,9 +1,9 @@
-[2026-09-25T07:19:57.206Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-25T07:20:02.397Z] screenshot docs/verification/evidence/ui/trust/01-trust-editor.png
-[2026-09-25T07:20:02.466Z] PASS workspace opened in Restricted Mode
-[2026-09-25T07:20:04.001Z] screenshot docs/verification/evidence/ui/trust/02-palette.png
-[2026-09-25T07:20:04.002Z] PASS New Task is not offered/enabled in Restricted Mode ["Create New Terminal (With Profile), similar commands","File: Compare New Untitled Text Files","File: Open Active Editor in New Empty Workspace","Search Editor: New Search Editor","Terminal: Create New Terminal Starting in a Custom Working Directory"]
-[2026-09-25T07:20:04.068Z] PASS no task flow started {"title":" ","rows":["Create New Terminal (With Profile), similar commands","File: Compare New Untitled Text Files","File: Open Active Editor in New Empty Workspace","Search Editor: New Search Editor","Terminal: Create New Terminal Starting in a Custom Working Directory"],"value":">Overseer: New Task"}
-[2026-09-25T07:20:05.691Z] PASS view explains that launching requires trust
-[2026-09-25T07:20:05.698Z] PASS no task or harness launched 0
-[2026-09-25T07:20:05.771Z] screenshot docs/verification/evidence/ui/trust/03-restricted.png
+[2026-09-25T19:05:25.069Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T19:05:30.329Z] screenshot docs/verification/evidence/ui/trust/01-trust-editor.png
+[2026-09-25T19:05:30.399Z] PASS workspace opened in Restricted Mode
+[2026-09-25T19:05:31.902Z] screenshot docs/verification/evidence/ui/trust/02-palette.png
+[2026-09-25T19:05:31.903Z] PASS New Task is not offered/enabled in Restricted Mode ["Create New Terminal (With Profile), similar commands","File: Compare New Untitled Text Files","File: Open Active Editor in New Empty Workspace","Search Editor: New Search Editor","Terminal: Create New Terminal Starting in a Custom Working Directory"]
+[2026-09-25T19:05:31.971Z] PASS no task flow started {"title":" ","rows":["Create New Terminal (With Profile), similar commands","File: Compare New Untitled Text Files","File: Open Active Editor in New Empty Workspace","Search Editor: New Search Editor","Terminal: Create New Terminal Starting in a Custom Working Directory"],"value":">Overseer: New Task"}
+[2026-09-25T19:05:33.595Z] PASS view explains that launching requires trust
+[2026-09-25T19:05:33.604Z] PASS no task or harness launched 0
+[2026-09-25T19:05:33.663Z] screenshot docs/verification/evidence/ui/trust/03-restricted.png
