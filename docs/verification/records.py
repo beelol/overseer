@@ -124,8 +124,8 @@ rec(14, "Initial adapters", "blocked",
     harness="Codex: owner's ChatGPT login (live). OpenCode 1.15.13 with the deterministic mock provider (mock model responses; no OpenCode account). Claude Code 2.1.246: synthetic fixtures only.",
     steps="Codex: [codex-live](evidence/ui/codex-live/) (edit, follow-up, interrupt, streaming, capabilities). OpenCode: [main](evidence/ui/main/) (8-edit run, follow-up, interrupt through the real `opencode run --format json` adapter) and protocol/store tests. Claude: protocol fixture tests `ac16_*`, `ac18_*`, `ac20_*`.",
     expected="Codex and Claude Code live account-authenticated edit/follow-up/interrupt; OpenCode integrated (mock/local allowed).",
-    actual="Codex ✅ live. OpenCode ✅ with mock model (labelled; no account authentication claimed). Claude Code ❌ live not possible: OAuth session expired on this machine.",
-    evidence="see above", live="Codex live; OpenCode mock; Claude fixture.",
+    actual="Codex ✅ live (`exec` and the app-server transport). OpenCode ✅ with the mock model (edit/follow-up/interrupt through the UI) and additionally with real local models via Ollama: `qwen3-coder:30b` wrote the requested file through the adapter with reported file activity, while `qwen2.5-coder:14b` printed its tool call as plain text and edited nothing (a model/tool-calling limitation, recorded as such). No OpenCode account authentication is claimed. Claude Code ❌ live not possible: OAuth session expired on this machine.",
+    evidence="see above; [evidence/ac-14/opencode-ollama.log](evidence/ac-14/opencode-ollama.log)", live="Codex live; OpenCode mock + local Ollama models; Claude fixture.",
     blocker="Claude Code login (owner). Next: after `claude auth login`, run a tiny stream-json task through Overseer: edit, follow-up, interrupt.")
 
 rec(15, "Generic harness fallback", "verified",
@@ -291,9 +291,14 @@ rec(39, "Minimal dogfood flow", "verified",
     actual="Pass. Native delegation observed (Codex `spawn_agent`).", evidence="`evidence/ui/codex-live/`, `dogfood-hello.md`; branch on GitHub", live="Live Codex.")
 
 rec(40, "Repository handoff", "verified",
-    steps="README states progress and links the RFC/ledger/compatibility; install/accounts/capabilities/recovery/blockers documented; branch pushed to `beelol/overseer` and read back; a fresh-reader agent followed README setup in a new clone (see [evidence/ac-40/fresh-reader.md](evidence/ac-40/fresh-reader.md)). Secret scan of the tree before push.",
-    expected="Accurate README; docs; GitHub readback; fresh reader succeeds; no credentials.",
-    actual="See evidence file.", evidence="`evidence/ac-40/`", live="n/a")
+    commit="adb2dc9 (fresh-reader clone); README fixes from that review in the following docs commit",
+    steps="""1. README states progress (verified count, unverified list), links the RFC/ledger/compatibility matrix, and documents build/install, accounts, capabilities (matrix), recovery and known blockers (Follow-ups).
+2. The branch was pushed to `beelol/overseer` and PR #1 opened; the fresh reader cloned it from GitHub (remote readback).
+3. An independent agent with no prior context followed only the README in a new clone ([evidence/ac-40/fresh-reader.md](evidence/ac-40/fresh-reader.md)): both `npm ci`, `node extension/scripts/package.js`, VSIX install into an isolated VS Code profile (`beelol.overseer@0.1.0` listed), `cargo test` (29 passed), daemon `serve`/`ctl hello`/`ctl state`/`ctl daemon.shutdown` — all passed. Its four documentation findings (stale unverified list, binary location, `overseerd serve`, branch to clone) were fixed in the README.
+4. `git grep` secret scan before pushing: only synthetic test strings matched; evidence identifies accounts only by one-way fingerprints.""",
+    expected="Accurate README linked to the checklist; install/accounts/capabilities/recovery/blockers documented; implementation and evidence on GitHub without credentials; remote readback and a fresh reader succeed.",
+    actual="Pass (verdict: a fresh reader could build, install and run from the README).",
+    evidence="`evidence/ac-40/fresh-reader.md`; https://github.com/beelol/overseer/pull/1", live="n/a")
 
 rec(41, "Linux verification (deferred by owner)", "blocked",
     expected="Linux build/install/regressions/account isolation/UI flow.", actual="Not attempted: no Linux environment (owner decision).",
@@ -397,6 +402,7 @@ def sync(out):
     rt = re.sub(r"Verified acceptance\ncriteria: \*\*[^*]+\*\*", f"Verified acceptance\ncriteria: **{len(verified)} / 41**", rt)
     rt = rt.replace("__VERIFIED__ / 41", f"{len(verified)} / 41")
     rt = rt.replace("__UNVERIFIED__", ", ".join(f"AC-{n:02d}" for n in unverified))
+    rt = re.sub(r"(Unverified:\n)AC-[0-9, AC-]+(\. The biggest gaps)", lambda m: m.group(1) + ", ".join(f"AC-{n:02d}" for n in unverified) + m.group(2), rt)
     rt = re.sub(r"(## Follow-ups\n\n.*?\n\n)(.*?)(\n\n## Project documents)", lambda m: m.group(1) + "\n".join(follow) + m.group(3), rt, flags=re.S)
     rt = rt.replace("__FOLLOWUPS__", "\n".join(follow))
     readme.write_text(rt)
