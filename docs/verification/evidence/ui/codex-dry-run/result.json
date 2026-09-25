@@ -1,0 +1,179 @@
+{
+  "checks": [
+    {
+      "name": "codex profile signed in with ChatGPT account",
+      "ok": false,
+      "detail": {
+        "version": "replay-fixture 0.0.0 (not a real harness)",
+        "method": "none",
+        "plan": "pro",
+        "account": "2e1fa92158bacc71",
+        "api_key_present": false
+      }
+    },
+    {
+      "name": "turn 1 completed",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reason": "turn completed; exit 0",
+        "native": "01a0d6e3-c796-74a0-ace1-063f6f15c7e5"
+      }
+    },
+    {
+      "name": "native Codex child captured",
+      "ok": true,
+      "detail": [
+        {
+          "id": "r-3a405415f23d",
+          "native": "01a0d6e3-e523-7be1-a56d-243f00cb399c",
+          "status": "completed",
+          "title": "Reply with exactly the word hi (no tools).",
+          "source": "codex collab_tool_call spawn_agent item_2"
+        }
+      ]
+    },
+    {
+      "name": "codex edit landed in the worktree",
+      "ok": true,
+      "detail": "Hello from an Overseer dogfood run\n"
+    },
+    {
+      "name": "follow revealed the agent edit",
+      "ok": true,
+      "detail": "Following agent edits"
+    },
+    {
+      "name": "review edit saved in the worktree",
+      "ok": true,
+      "detail": "Hello from an Overseer dogfood run\nReviewed and edited in the Overseer review.\n"
+    },
+    {
+      "name": "follow-up turn completed",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reason": "turn completed; exit 0"
+      }
+    },
+    {
+      "name": "latest-run comparison shows only turn-2 changes",
+      "ok": true,
+      "detail": {
+        "base": "35972b3b8486817640fd2f5231bdcccf987b46f8",
+        "detail": "run-start snapshot s-13d00a6d3d7f (turn 2 of r-491bade93f33, 1790315225426), captured including dirty and untracked files",
+        "changes": [
+          {
+            "path": "docs/dogfood/hello.md",
+            "status": "M"
+          }
+        ]
+      }
+    },
+    {
+      "name": "task-start comparison shows the file as added",
+      "ok": true,
+      "detail": [
+        {
+          "path": "docs/dogfood/hello.md",
+          "status": "A"
+        }
+      ]
+    },
+    {
+      "name": "git diff --check passes on the dogfood worktree",
+      "ok": true,
+      "detail": "clean"
+    },
+    {
+      "name": "run still active after VS Code closed",
+      "ok": true,
+      "detail": {
+        "status": "running"
+      }
+    },
+    {
+      "name": "run completed while VS Code was closed",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reason": "turn completed; exit 0"
+      }
+    },
+    {
+      "name": "reopened UI shows the run completed from daemon state",
+      "ok": true,
+      "detail": "codexcompleted · codex (existing login) · gpt-5.6-luna"
+    },
+    {
+      "name": "reopened output shows the turn finished while closed",
+      "ok": true,
+      "detail": "tly the word hi (no tools).— queued\ncodex⚙ collab:wait: \ncodex⚙ collab:wait: \nchild · Reply with exactly the word hi (no tools).— completed\nchild · Reply with exactly the word hi (no tools).hi\ncodex⚙ apply_patch: /private/tmp/ovs-ui-Z81bvK/overseer-home/worktrees/overseer-macos-app-2d3d20-fa0437c0/spawn-exactly-one-sub-agent-whose-only-t-4/hello.txt\ncodex✎ hello.txt (add, reported)\ncodexdone\ncodex∑ usage {\"cache_write_input_tokens\":0,\"cached_input_tokens\":89856,\"input_tokens\":121101,\"output_tokens\":325,\"reasoning_output_tokens\":75}\ncodex■ turn completed\ncodex— completed: turn completed; exit 0"
+    },
+    {
+      "name": "interrupt from UI stops the codex run",
+      "ok": true,
+      "detail": {
+        "status": "interrupted",
+        "reason": "interrupted by user (exit code 130)"
+      }
+    },
+    {
+      "name": "source checkout status unchanged by the run",
+      "ok": false,
+      "detail": {
+        "before": " M daemon/src/adapters.rs\n M daemon/src/daemon.rs\n M test/ui/cdp.js\n M test/ui/harness.js\n?? fixtures/fake-harness/\n?? fixtures/transcripts/\n?? test/ui/scenario-codex-live.js\n",
+        "after": " M daemon/src/adapters.rs\n M daemon/src/daemon.rs\n M test/ui/cdp.js\n M test/ui/harness.js\n?? docs/verification/evidence/ui/codex-dry-run/\n?? fixtures/fake-harness/\n?? fixtures/transcripts/\n?? test/ui/scenario-codex-live.js\n"
+      }
+    }
+  ],
+  "model": "gpt-5.6-luna",
+  "turns": [
+    {
+      "n": 1,
+      "status": "completed",
+      "snapshot": "s-8b4f2eec171b"
+    },
+    {
+      "n": 2,
+      "status": "completed",
+      "snapshot": "s-13d00a6d3d7f"
+    },
+    {
+      "n": 3,
+      "status": "completed",
+      "snapshot": "s-bdf6dead32ad"
+    },
+    {
+      "n": 4,
+      "status": "failed",
+      "snapshot": "s-de98a684c26c"
+    }
+  ],
+  "usage": [
+    {
+      "cache_write_input_tokens": 0,
+      "cached_input_tokens": 89856,
+      "input_tokens": 121101,
+      "output_tokens": 325,
+      "reasoning_output_tokens": 75
+    },
+    {
+      "cache_write_input_tokens": 0,
+      "cached_input_tokens": 89856,
+      "input_tokens": 121101,
+      "output_tokens": 325,
+      "reasoning_output_tokens": 75
+    },
+    {
+      "cache_write_input_tokens": 0,
+      "cached_input_tokens": 89856,
+      "input_tokens": 121101,
+      "output_tokens": 325,
+      "reasoning_output_tokens": 75
+    }
+  ],
+  "run": "r-491bade93f33",
+  "workspace": "/private/tmp/ovs-ui-Z81bvK/overseer-home/worktrees/overseer-macos-app-2d3d20-fa0437c0/spawn-exactly-one-sub-agent-whose-only-t-4",
+  "branch": "overseer/spawn-exactly-one-sub-agent-whose-only-t-4"
+}

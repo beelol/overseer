@@ -33,9 +33,18 @@ class Cdp {
   static async connect(profileDir) {
     const file = path.join(profileDir, 'DevToolsActivePort');
     for (let i = 0; i < 120 && !fs.existsSync(file); i++) await delay(250);
-    const lines = fs.readFileSync(file, 'utf8').trim().split('\n');
-    const socket = new WebSocket('ws://127.0.0.1:' + lines[0] + lines[1]);
-    await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', reject, { once: true }); });
+    let socket;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const lines = fs.readFileSync(file, 'utf8').trim().split('\n');
+        socket = new WebSocket('ws://127.0.0.1:' + lines[0] + lines[1]);
+        await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', () => reject(new Error('CDP socket error')), { once: true }); });
+        break;
+      } catch (error) {
+        if (attempt > 40) throw error;
+        await delay(500);
+      }
+    }
     const cdp = new Cdp(socket);
     await cdp.attachWorkbench();
     return cdp;
@@ -75,7 +84,7 @@ class Cdp {
 
   async key(key, { meta = false, shift = false, ctrl = false, alt = false } = {}) {
     const modifiers = (alt ? 1 : 0) | (ctrl ? 2 : 0) | (meta ? 4 : 0) | (shift ? 8 : 0);
-    const codes = { Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], Tab: [9, 'Tab'], ArrowDown: [40, 'ArrowDown'], ArrowUp: [38, 'ArrowUp'], Backspace: [8, 'Backspace'], PageDown: [34, 'PageDown'] };
+    const codes = { Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], Tab: [9, 'Tab'], ArrowDown: [40, 'ArrowDown'], ArrowUp: [38, 'ArrowUp'], Backspace: [8, 'Backspace'], PageDown: [34, 'PageDown'], End: [35, 'End'], Home: [36, 'Home'] };
     const [keyCode, code, text] = codes[key] || [key.toUpperCase().charCodeAt(0), 'Key' + key.toUpperCase()];
     const base = { modifiers, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode, key: codes[key] ? key : (shift ? key.toUpperCase() : key), code };
     await this.call('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...base }, this.workbench);

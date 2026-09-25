@@ -1266,7 +1266,7 @@ fn strip_ansi(s: &str) -> String {
 fn run_with_env(program: &Path, args: &[&str], env: &BTreeMap<String, String>) -> Result<(i32, String)> {
     let mut base = adapters::base_env(&program.display().to_string());
     base.extend(env.clone());
-    let out = std::process::Command::new(program).args(args).env_clear().envs(&base).stdin(std::process::Stdio::null()).output()?;
+    let out = std::process::Command::new(program).args(args).current_dir(adapters::neutral_dir()).env_clear().envs(&base).stdin(std::process::Stdio::null()).output()?;
     let mut text = String::from_utf8_lossy(&out.stdout).to_string();
     text.push_str(&String::from_utf8_lossy(&out.stderr));
     Ok((out.status.code().unwrap_or(-1), text))

@@ -63,6 +63,14 @@ pub fn base_env(program: &str) -> BTreeMap<String, String> {
             env.insert(key.to_string(), v);
         }
     }
+    // Explicit passthrough for fixture harness configuration (never API keys).
+    if let Ok(names) = std::env::var("OVERSEER_HARNESS_ENV_PASSTHROUGH") {
+        for key in names.split(',').map(str::trim).filter(|k| !k.is_empty() && !forbidden_env(k)) {
+            if let Ok(v) = std::env::var(key) {
+                env.insert(key.to_string(), v);
+            }
+        }
+    }
     let home = env.get("HOME").cloned().unwrap_or_default();
     let mut path: Vec<String> = Vec::new();
     if let Some(dir) = Path::new(program).parent().filter(|p| !p.as_os_str().is_empty()) {
@@ -117,8 +125,15 @@ pub fn resolve_program(harness: &str) -> Option<PathBuf> {
     }
 }
 
+/// Probes (versions, login status) never run inside a user's repository.
+pub fn neutral_dir() -> PathBuf {
+    let dir = crate::paths::data_dir().join("tmp");
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}
+
 pub fn version_of(program: &Path) -> Option<String> {
-    let out = std::process::Command::new(program).arg("--version").env_clear().envs(base_env(&program.display().to_string())).output().ok()?;
+    let out = std::process::Command::new(program).arg("--version").current_dir(neutral_dir()).env_clear().envs(base_env(&program.display().to_string())).stdin(std::process::Stdio::null()).output().ok()?;
     let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
     if text.is_empty() { None } else { Some(text.lines().next().unwrap_or_default().to_string()) }
 }
