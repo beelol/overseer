@@ -6,7 +6,7 @@
 // the Overseer view. Everything is built with textContent (never innerHTML) for safety.
 (function () {
   const SPAWN_TOOLS = /^(Agent|Task|task|collab:spawn_agent)$/;
-  const QUIET = new Set(['session', 'task_created', 'reattached', 'child_reparented', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping']);
+  const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping']);
 
   function el(tag, cls, text) {
     const e = document.createElement(tag);
@@ -135,7 +135,8 @@
       if (id) {
         for (const [runId, block] of this.children) {
           const info = this.childInfo.get(runId) || {};
-          if (!block.nested && (info.native_id === id || String(info.evidence || '').includes(id))) { kids.append(block.el); block.nested = id; }
+          const sameParent = !info.parent || info.parent === card.run || (card.run === this.rootId && info.parent === this.rootId);
+          if (!block.nested && sameParent && (info.native_id === id || String(info.evidence || '').split(' inside ')[0].split(/[\s()]+/).includes(id))) { kids.append(block.el); block.nested = id; }
         }
       }
       return card;
@@ -227,6 +228,16 @@
         case 'child': {
           const c = p.child || {};
           this.childBlock(c.id, { id: c.id, title: c.title, status: c.status, native_id: c.native_id, parent: c.parent_run_id, evidence: p.evidence || c.relation_source, confidence: c.relation_confidence });
+          break;
+        }
+        case 'child_reparented': {
+          // A delayed parent was reported later: move the child's block under its real parent.
+          const block = this.children.get(p.child_run_id);
+          if (!block) break;
+          const info = this.childInfo.get(p.child_run_id) || {};
+          info.parent = p.parent_run_id; this.childInfo.set(p.child_run_id, info);
+          const parent = p.parent_run_id === this.rootId ? null : this.childBlock(p.parent_run_id);
+          if (parent && !parent.el.contains(block.el) && !block.el.contains(parent.el)) { parent.body.append(block.el); block.nested = 'reparented'; }
           break;
         }
         case 'turn_done': {

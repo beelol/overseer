@@ -22,7 +22,7 @@ const PROMPT = 'Edit files one at a time, one patch per step, in exactly this or
     s.launch(repo);
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer [0-9]+ active/.test(e.textContent))`, 60000, 'status bar');
-    await cdp.command('Overseer: New Task');
+    await cdp.command('Overseer: Start Task with Quick Picks');
     await cdp.pick('New task: repository');
     await cdp.pick('New task: harness', 'codex-app');
     await cdp.pick('New task: account for', 'codex (existing login)');

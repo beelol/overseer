@@ -35,6 +35,7 @@
     "commands": [
       { "command": "overseer.openCenter", "title": "Open Overseer View", "category": "Overseer", "icon": "$(layout)" },
       { "command": "overseer.newTask", "title": "New Task…", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.newTaskQuick", "title": "Start Task with Quick Picks…", "category": "Overseer", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.refresh", "title": "Refresh", "category": "Overseer", "icon": "$(refresh)" },
       { "command": "overseer.openReview", "title": "Open Review", "category": "Overseer", "icon": "$(diff-multiple)" },
       { "command": "overseer.showOutput", "title": "Show Output", "category": "Overseer", "icon": "$(output)" },

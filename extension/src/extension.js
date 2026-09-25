@@ -8,6 +8,7 @@ const { Model, AgentsProvider, DirtyProvider, AccountsProvider, ACTIVE } = requi
 const { OutputPanels } = require('./output-panel');
 const { Review } = require('./review');
 const { CommandCenter, COLUMNS } = require('./command-center');
+const { NewTaskPanel } = require('./new-task');
 
 let client;
 
@@ -36,6 +37,7 @@ async function activate(context) {
   review.reviewColumn = () => center.active ? COLUMNS.review : undefined;
   outputs.column = () => center.active ? COLUMNS.conversation : undefined;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
+  const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), refreshAccounts: () => refreshAccounts(), column: () => center.active ? COLUMNS.review : undefined });
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.output', outputs),
     agentsView.onDidExpandElement(e => agents.setCollapsed(e.element, false)),
     agentsView.onDidCollapseElement(e => agents.setCollapsed(e.element, true)));
@@ -283,7 +285,8 @@ async function activate(context) {
   }
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('overseer.newTask', guard(newTask)),
+    vscode.commands.registerCommand('overseer.newTask', guard(async () => { requireTrust(); await model.refresh(); await newTaskPanel.open(); })),
+    vscode.commands.registerCommand('overseer.newTaskQuick', guard(newTask)),
     vscode.commands.registerCommand('overseer.refresh', guard(async () => { await model.refresh(); dirty.refresh(); })),
     vscode.commands.registerCommand('overseer.selectRun', guard(runId => selectRun(runId))),
     vscode.commands.registerCommand('overseer.openReview', guard(arg => review.open(runArg(arg)))),

@@ -51,7 +51,7 @@ const PROMPT = "Use the Agent tool to launch one general-purpose subagent with t
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer [0-9]+ active/.test(e.textContent))`, 60000, 'status bar');
     const status = s.ctl('profile.status', { id: 'system-claude' });
     check('Claude profile signed in with a claude.ai account', status.logged_in && status.method === 'claude.ai', { version: status.version, plan: status.identity && status.identity.plan, id: status.identity && status.identity.fingerprint });
-    await cdp.command('Overseer: New Task');
+    await cdp.command('Overseer: Start Task with Quick Picks');
     await cdp.pick('New task: repository');
     await cdp.pick('New task: harness', 'claude');
     await cdp.pick('New task: account for', 'claude (existing login)');

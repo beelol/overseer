@@ -32,7 +32,7 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     fs.writeFileSync(path.join(profile.home, 'config/opencode/opencode.json'), openCodeConfig(await mock.port()));
 
     // New task through the command palette and quick picks.
-    await cdp.command('Overseer: New Task');
+    await cdp.command('Overseer: Start Task with Quick Picks');
     await cdp.pick('New task: repository');
     await cdp.pick('New task: harness', 'opencode');
     await cdp.pick('New task: account for', 'OpenCode mock');

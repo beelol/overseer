@@ -138,7 +138,7 @@ h1{font-size:1.1em;margin:0 0 4px}
 .caps{font-size:.85em;opacity:.85;margin-top:4px}
 .caps summary{cursor:pointer}
 .tabs{display:flex;gap:4px;margin-top:6px}
-.tabs button[aria-selected="true"]{background:var(--vscode-button-background);color:var(--vscode-button-foreground)}
+.tabs button[aria-selected="true"]{background:var(--vscode-button-background);color:var(--vscode-button-foreground);outline:1px solid var(--vscode-contrastActiveBorder,transparent);outline-offset:1px;font-weight:600}
 #log{margin-top:8px}
 .ev{padding:3px 0;border-bottom:1px solid var(--vscode-panel-border);white-space:pre-wrap;word-break:break-word}
 .ev .who{opacity:.7;font-size:.85em;margin-right:6px}
@@ -151,7 +151,9 @@ h1{font-size:1.1em;margin:0 0 4px}
 .perm-input{max-height:140px;overflow:auto;font-size:.85em}
 footer{position:sticky;bottom:0;background:var(--vscode-editor-background);padding-top:8px}
 textarea{width:100%;box-sizing:border-box;min-height:48px;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,transparent);border-radius:4px;font-family:inherit}
-button{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:4px;padding:4px 10px;margin:4px 4px 0 0;cursor:pointer}
+button{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:1px solid var(--vscode-button-border,var(--vscode-contrastBorder,transparent));border-radius:4px;padding:4px 10px;margin:4px 4px 0 0;cursor:pointer}
+button:hover:not(:disabled){background:var(--vscode-button-hoverBackground)}
+button.secondary:hover:not(:disabled){background:var(--vscode-button-secondaryHoverBackground)}
 button:disabled{opacity:.5;cursor:default}
 button.secondary{background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground)}
 button:focus-visible{outline:1px solid var(--vscode-focusBorder);outline-offset:1px}

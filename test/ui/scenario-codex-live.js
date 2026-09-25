@@ -43,7 +43,7 @@ async function sendFollowUp(s, output, text) {
     const status = s.ctl('profile.status', { id: 'system-codex' });
     check('codex profile signed in with ChatGPT account', status.logged_in && status.method === 'chatgpt-account', { version: status.version, method: status.method, plan: status.identity?.plan, account: status.identity?.account_fingerprint, api_key_present: status.identity?.has_api_key });
 
-    await cdp.command('Overseer: New Task');
+    await cdp.command('Overseer: Start Task with Quick Picks');
     await cdp.pick('New task: repository');
     await cdp.pick('New task: harness', 'codex');
     await cdp.pick('New task: account for', 'codex (existing login)');
