@@ -54,15 +54,19 @@ const rss = pattern => { const out = cp.spawnSync('ps', ['-axo', 'rss=,command='
     let k = 0;
     while (Date.now() - t0 < (MINUTES * 60 - 60) * 1000) {
       // Navigation: click a file in the navigator and measure until its diff is in view.
-      const target = await review.eval(`(() => { const b = [...document.querySelectorAll('#tree .file')]; const e = b[(${k} * 37) % b.length]; e.id = 'nav-target'; e.scrollIntoView({ block: 'center' }); return e.dataset.id; })()`);
+      const target = await review.eval(`(() => { document.querySelectorAll('#nav-target').forEach(x => x.removeAttribute('id')); const b = [...document.querySelectorAll('#tree .file')]; const e = b[(${k} * 37) % b.length]; e.id = 'nav-target'; e.scrollIntoView({ block: 'center' }); return e.dataset.id; })()`);
       const p = await s.webviewPoint(review, '#nav-target');
-      await review.eval(`window.__navStart = performance.now(); window.__navDone = undefined; (() => { const id = ${JSON.stringify(target)}; const check = () => { const el = document.querySelector('.diff-file[data-id="' + id + '"]'); const d = document.getElementById('diffs'); const r = el && el.getBoundingClientRect(), dr = d.getBoundingClientRect(); if (el && r.top < dr.bottom - 20 && r.bottom > dr.top + 5 && document.querySelector('#tree .file.active')?.dataset.id === id) window.__navDone = performance.now() - window.__navStart; else setTimeout(check, 5); }; setTimeout(check, 0); })()`);
+      await review.eval(`window.__navStart = performance.now(); window.__navDone = undefined; (() => { const id = ${JSON.stringify(target)}; const check = () => { const el = document.querySelector('.diff-file[data-id="' + id + '"]'); const d = document.getElementById('diffs'); const r = el && el.getBoundingClientRect(), dr = d.getBoundingClientRect(); if (el && r.top < dr.bottom - 20 && r.bottom > dr.top + 5 && document.querySelector('#tree .file.active')?.dataset.id === id) window.__navDone = { ms: performance.now() - window.__navStart }; else setTimeout(check, 5); }; setTimeout(check, 0); })()`);
       await cdp.click(p.x, p.y);
-      const nav = await review.waitFor(`window.__navDone`, 5000).catch(() => 5000);
-      result.nav.push(nav);
+      const done = await review.waitFor(`window.__navDone`, 5000).catch(() => undefined);
+      let nav = done ? done.ms : 5000;
+      if (!done && !(await review.eval(`document.querySelector('#tree .file.active')?.dataset.id === ${JSON.stringify(target)}`))) { result.misclicks = (result.misclicks || 0) + 1; nav = null; }
+      if (nav !== null) result.nav.push(nav);
+      if (nav >= 5000 && result.nav.filter(x => x >= 5000).length <= 3) s.note('nav timeout diagnostics', await review.eval(`(() => { const id = ${JSON.stringify(target)}; const el = document.querySelector('.diff-file[data-id="' + id + '"]'); const d = document.getElementById('diffs'); return { found: !!el, active: document.querySelector('#tree .file.active')?.dataset.id === id, activeText: document.querySelector('#tree .file.active')?.textContent, top: el && el.getBoundingClientRect().top, dtop: d.getBoundingClientRect().top, dbottom: d.getBoundingClientRect().bottom, point: ${JSON.stringify(p)} }; })()`));
       // Refresh latency for an ordinary file write in the reviewed worktree.
       if (k % 5 === 0) {
-        const name = `probe-${k}.txt`;
+        const name = `zz-probes/probe-${k}.txt`;
+        fs.mkdirSync(path.join(ws, 'zz-probes'), { recursive: true });
         const w0 = Date.now();
         fs.writeFileSync(path.join(ws, name), 'probe\n');
         const ok = await review.waitFor(`[...document.querySelectorAll('.diff-file .file-path')].some(e => e.textContent === ${JSON.stringify(name)})`, 8000).then(() => true, () => false);
@@ -88,7 +92,8 @@ const rss = pattern => { const out = cp.spawnSync('ps', ['-axo', 'rss=,command='
     result.navP95 = p95; result.navP50 = pct(result.nav, 0.5);
     const refreshes = result.refresh.filter(x => x !== null);
     result.refreshP95 = pct(refreshes, 0.95);
-    check('navigation p95 under 250 ms', p95 < 250, { p95, p50: result.navP50, n: result.nav.length });
+    check('navigation p95 under 250 ms', p95 < 250, { p95, p50: result.navP50, n: result.nav.length, misclicks: result.misclicks || 0 });
+    check('misclicks are rare (probe validity)', (result.misclicks || 0) <= Math.max(2, result.nav.length * 0.05), result.misclicks || 0);
     check('ordinary file refresh within 2 s under load', result.refresh.every(x => x !== null && x <= 2000), { p95: result.refreshP95, max: Math.max(...refreshes), missed: result.refresh.filter(x => x === null).length });
     const retained = result.samples.map(x => x.retainedEventsRun1);
     check('daemon retention bounds per-run events', Math.max(...retained) <= 5000 + 50, { max: Math.max(...retained) });

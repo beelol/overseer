@@ -1,0 +1,38 @@
+# Harness compatibility (macOS, this build)
+
+What Overseer supports per harness, account path, version and capability — and how each
+claim was established. "Live" means a real harness process with a real account; "mock"
+means the real harness process driven by Overseer's deterministic mock model provider;
+"fixture" means a recorded or synthetic transcript replayed through the adapter. Unknown is
+never shown as zero or as supported. The same capability strings are shown in the UI
+(**Overseer: Show Harness Capabilities** and each run's *Capabilities* section).
+
+Verified on macOS 26.6.2 (arm64), VS Code 1.139.0. Evidence index: [verification ledger](verification/README.md).
+
+| Harness (version) | Account path | Launch / output | Follow-up / resume | Interrupt | Permission requests | File activity | Native children | Usage / quota | Evidence level |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Codex** 0.155.0-alpha.16.4 (ChatGPT.app bundle; stale PATH `codex` 0.1.x ignored) | ChatGPT login via `codex login` per profile (`CODEX_HOME`); existing `~/.codex` login usable as "codex (existing login)" | ✅ `exec --json` | ✅ `exec resume <thread>` | ✅ SIGINT | ⚠️ none in exec transport (sandbox policy; never auto-approved by Overseer). App-server approvals not integrated | ✅ `file_change` items | ✅ depth 1 observed live (`collab_tool_call spawn_agent/wait`); child output limited to final message; deeper levels not observed | usage ✅ (`turn.completed`); quota unknown (error text only) | **Live** single account ([codex-live](verification/evidence/ui/codex-live/)). Two simultaneous accounts **not verified** (AC-12). |
+| **Claude Code** 2.1.246 | claude.ai login via `claude auth login` per profile (`CLAUDE_CONFIG_DIR`) | ⚠️ implemented (`-p` stream-json) | ⚠️ implemented (`--resume`) | ⚠️ implemented (control_request interrupt → SIGINT) | ⚠️ implemented (`--permission-prompt-tool stdio`, Allow/Deny in UI) | ⚠️ implemented (Write/Edit inputs) | ⚠️ implemented (Agent/Task ids, `parent_tool_use_id` nesting, delayed-parent adoption) | ⚠️ implemented | **Fixture only** (synthetic stream-json). Live run blocked: the machine's Claude Code OAuth session is expired (`authentication_failed`); owner re-login required (AC-14, AC-16, AC-19). |
+| **OpenCode** 1.15.13 | provider login via `opencode auth login` per profile (`XDG_DATA_HOME`) — **not tested**; verified with a local mock provider configured in the profile | ✅ `run --format json` | ✅ `--session <id>` | ✅ SIGINT | unknown (`run` auto-rejects asks unless configured) | ✅ edit/write tool parts | ✅ children and grandchildren (task tool `metadata.sessionId` + session store `parent_id`) | usage ✅ (step_finish tokens); quota unknown | **Mock** model through the real OpenCode runtime ([main](verification/evidence/ui/main/), protocol tests). No account authentication claimed. |
+| **Generic executable** | none | ✅ argv (no shell), cwd = workspace, sanitized env | ✅ line to stdin | ✅ SIGINT | unknown | unknown — review refreshes from the filesystem; Follow shows a limitation note | unknown (shown as "Native children: unknown") | unknown | Protocol tests (AC-15). |
+| **Gemini CLI** | Google sign-in (doc-only) | ❌ no adapter | — | — | — | — | subagents cannot nest (doc-only) | — | Not installed; documentation survey only (AC-01). Use the generic harness meanwhile. |
+| **Devin** | `devin auth login` is Enterprise-only (doc-only) | ❌ skipped | — | — | — | — | — | — | Skipped per owner decision: no account-login path without API keys / personal access tokens (AC-01, AC-17). |
+
+## Environment and account rules enforced by the daemon
+
+- Harness processes get an allow-listed environment (HOME, USER, PATH, locale, TMPDIR, XDG
+  dirs). `*_API_KEY`, `ANTHROPIC_*`, `OPENAI_*`, `CLAUDE_CODE_OAUTH_TOKEN` and `*_ACCESS_TOKEN`
+  are never forwarded and a profile cannot set them (`daemon/src/adapters.rs`, tests
+  `base_env_drops_keys`, `forbidden_keys`).
+- Profile status reports API-key logins as *not signed in* for Overseer's purposes.
+- Overseer never logs out the existing (system) login; isolated profiles live under
+  `~/Library/Application Support/Overseer/profiles/<id>` (0700).
+- Observed on this machine: the shared `~/.codex/auth.json` (also used by the ChatGPT
+  desktop app) switched between two different ChatGPT accounts during the session. Use
+  isolated profiles when the account must not change underneath a run.
+
+## Platform
+
+Designed for macOS and Linux (platform paths in `daemon/src/paths.rs`, peer credentials
+via `getpeereid`/`SO_PEERCRED` in `daemon/src/shim.rs`); only macOS is verified. Linux is
+AC-41 and unverified.

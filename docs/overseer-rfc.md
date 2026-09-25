@@ -1,6 +1,6 @@
 # Overseer RFC and acceptance criteria
 
-Status: planning only. Owner decisions incorporated; implementation requires explicit start confirmation.
+Status: implementation in progress — usable macOS milestone with documented gaps (see the [ledger](verification/README.md)). The owner authorized the overnight implementation session on 2026-09-24 via the session goal; the eight hours applied to the implementing agent's session, not to runs inside Overseer.
 Reconstructed on 2026-09-24 from the owner's supplied conversation. The earlier agent's
 actual RFC was unavailable: both the local directory and GitHub repository were empty.
 This document replaces the missing draft; it does not claim to reproduce its 28 criteria.
@@ -140,7 +140,7 @@ by copying HOME: test each harness's credential-store and refresh behavior.
 
 ## Acceptance criteria
 
-Only the checkboxes below are authoritative. All are currently unchecked.
+Only the checkboxes below are authoritative. A box is checked only when its evidence record is `verified`.
 Each **Verify** clause is required evidence, not a suggestion. Fixture tests complement
 real integration tests; they cannot substitute for subscription, native-child, or UI tests.
 The owner explicitly permits mock/local-model verification for OpenCode AC-14 only;
@@ -256,10 +256,11 @@ its own bounded acceptance criteria. Do not silently expand an overnight run to 
 
 ### Start gate and execution authority
 
-**We are still planning. Obtain explicit confirmation before starting implementation, an
-unattended goal, harness launches, login changes, model downloads or live verification.**
-Document editing and publication to the confirmed project repository are authorized now.
-No implementation goal or scheduled run has been activated.
+**Start confirmation recorded (2026-09-24):** the owner started the overnight implementation
+goal, authorizing implementation, dependency installation, tiny live harness runs on existing
+subscriptions, local commits, pushes and PRs to `beelol/overseer` (no purchases, no automatic
+merge, no login changes on the owner's behalf). The eight hours were the implementing
+agent's session budget. No recurring automation was created.
 
 For the later implementation session, the owner accepted the proposed limits: eight hours,
 project dependency installation, existing subscriptions, local commits, branches/PRs allowed,

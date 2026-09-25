@@ -1,0 +1,100 @@
+{
+  "checks": [
+    {
+      "name": "review lists the 100 changed files of the selected run (10k tracked)",
+      "ok": true,
+      "detail": 100
+    },
+    {
+      "name": "navigation p95 under 250 ms",
+      "ok": false,
+      "detail": {
+        "p95": 5000,
+        "p50": 17.700000047683716,
+        "n": 23
+      }
+    },
+    {
+      "name": "ordinary file refresh within 2 s under load",
+      "ok": true,
+      "detail": {
+        "p95": 821,
+        "max": 821,
+        "missed": 0
+      }
+    },
+    {
+      "name": "daemon retention bounds per-run events",
+      "ok": true,
+      "detail": {
+        "max": 200
+      }
+    },
+    {
+      "name": "extension host memory stabilizes (<25% growth late vs early)",
+      "ok": false,
+      "detail": {
+        "early": [],
+        "late": [
+          171152
+        ],
+        "growth": "NaN%"
+      }
+    }
+  ],
+  "samples": [
+    {
+      "t": 32,
+      "exthostKB": 171152,
+      "daemonKB": 92144,
+      "rendererKB": 1276176,
+      "webviewHeapMB": 43,
+      "retainedEventsRun1": 200
+    }
+  ],
+  "nav": [
+    5000,
+    5000,
+    14.899999976158142,
+    16.5,
+    19.80000001192093,
+    17.599999964237213,
+    27.80000001192093,
+    19.100000023841858,
+    17.700000047683716,
+    21.200000047683716,
+    15.599999964237213,
+    12.600000023841858,
+    16.69999998807907,
+    16.80000001192093,
+    5000,
+    5000,
+    18.5,
+    14.400000035762787,
+    16,
+    14.199999988079071,
+    18.30000001192093,
+    18.69999998807907,
+    14.099999964237213
+  ],
+  "refresh": [
+    812,
+    412,
+    821,
+    204,
+    614
+  ],
+  "minutes": 2,
+  "drained": {
+    "exthostKB": 180432,
+    "daemonKB": 81584,
+    "webviewHeapMB": 31
+  },
+  "baseline": {
+    "exthost": 157792,
+    "daemon": 91776
+  },
+  "navP95": 5000,
+  "navP50": 17.700000047683716,
+  "refreshP95": 821
+}

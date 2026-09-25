@@ -1,0 +1,14 @@
+[2026-09-25T06:48:31.553Z] fixture {"tracked":10000}
+[2026-09-25T06:48:31.999Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-25T06:48:52.055Z] processes ["264432 /Applications/Visual Studio Code.app/Contents/MacOS/Code --remote-debugging-port=0 --disable-renderer-backgrounding --disable-backgro","96448 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=gpu-process --user-data-dir","53792 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type=","606880 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app/Contents/MacOS/Code Helper (Renderer) --type=rend","179008 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type","92208 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type=","175520 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin) --type=utility "]
+[2026-09-25T06:49:28.083Z] PASS review lists the 100 changed files of the selected run (10k tracked) 100
+[2026-09-25T06:49:28.203Z] screenshot docs/verification/evidence/ui/perf/01-load-review.png
+[2026-09-25T06:49:33.443Z] nav timeout diagnostics {"found":true,"active":true,"activeText":"file0.txtM","top":93,"dtop":93,"dbottom":798,"point":{"x":414,"y":248}}
+[2026-09-25T06:49:40.917Z] nav timeout diagnostics {"found":true,"active":false,"activeText":"file0.txtM","top":9216,"dtop":93,"dbottom":798,"point":{"x":414,"y":510}}
+[2026-09-25T06:49:59.974Z] sample {"t":32,"exthostKB":171152,"daemonKB":92144,"rendererKB":1276176,"webviewHeapMB":43,"retainedEventsRun1":200}
+[2026-09-25T06:50:08.250Z] nav timeout diagnostics {"found":true,"active":false,"activeText":"file1.txtM","top":-12419,"dtop":93,"dbottom":798,"point":{"x":414,"y":398}}
+[2026-09-25T06:50:28.559Z] screenshot docs/verification/evidence/ui/perf/02-load-end.png
+[2026-09-25T06:50:48.658Z] FAIL navigation p95 under 250 ms {"p95":5000,"p50":17.700000047683716,"n":23}
+[2026-09-25T06:50:48.658Z] PASS ordinary file refresh within 2 s under load {"p95":821,"max":821,"missed":0}
+[2026-09-25T06:50:48.658Z] PASS daemon retention bounds per-run events {"max":200}
+[2026-09-25T06:50:48.658Z] FAIL extension host memory stabilizes (<25% growth late vs early) {"early":[],"late":[171152],"growth":"NaN%"}
