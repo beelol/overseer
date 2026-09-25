@@ -10,7 +10,7 @@ AC-11, AC-13, AC-41, AC-50, AC-51, AC-52, AC-53. The biggest gaps are owner acti
 code. Two criteria are partial, each with its proven part and the remaining step in
 [Follow-ups](#follow-ups): a live ChatGPT re-sign-in (AC-11) and a live sign-in cycle of a
 disposable ChatGPT account while another works (AC-13), both skipped by the owner for now.
-Fixed Claude accounts (AC-53) wait for a second Claude account. Linux (AC-41) is out of scope for now; opening PRs (AC-50),
+Fixed Claude accounts (AC-53, [design](docs/rfcs/claude-credentials.md)) wait for a second Claude account. Linux (AC-41) is out of scope for now; opening PRs (AC-50),
 a worktree file tree (AC-51) and native Overseer-branded notifications (AC-52,
 [design](docs/rfcs/native-notifications.md)) are future work. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
@@ -203,7 +203,7 @@ the owner action or decision each one needs.
 - [ ] [AC-50](docs/verification/AC-50.md) (Open a pull request from a run (coming soon)): Not blocked; deferred by the owner (coming soon). Next: use VS Code's `github` authentication session to push and create the PR.
 - [ ] [AC-51](docs/verification/AC-51.md) (Worktree file hierarchy): Not blocked; not started. Next: a file tree for the selected run's worktree inside the Overseer view (AC-48).
 - [ ] [AC-52](docs/verification/AC-52.md) (Native Overseer notifications (macOS)): Not blocked; not started. Next: a bundled `Overseer Notifier.app` (Swift, UNUserNotificationCenter, ad-hoc signed) used by overseerd with osascript as the fallback, a `vscode://beelol.overseer/open-center` URI handler, and an Overseer: Test Notification command.
-- [ ] [AC-53](docs/verification/AC-53.md) (Fixed Claude accounts): Needs a second Claude account (the owner has one today). Next: Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.
+- [ ] [AC-53](docs/verification/AC-53.md) (Fixed Claude accounts): Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
@@ -216,6 +216,7 @@ the owner action or decision each one needs.
 - [Harness compatibility](docs/compatibility.md)
 - [Side RFC: simple account governance](docs/rfcs/account-governance.md)
 - [Side RFC: native Overseer notifications on macOS](docs/rfcs/native-notifications.md)
+- [Side RFC: Overseer-managed Claude credentials](docs/rfcs/claude-credentials.md)
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 
 Design targets macOS and Linux; only macOS is verified. Auto routing, a TUI, VSCodium,
