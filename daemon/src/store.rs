@@ -171,6 +171,13 @@ impl Store {
             let page_size: i64 = learning_conn.pragma_query_value(None, "page_size", |row| row.get(0))?;
             let max_pages = (128 * 1024 * 1024 / page_size).max(1);
             learning_conn.pragma_update(None, "max_page_count", max_pages)?;
+            // SQLite cannot lower this limit beneath an existing file's page count.
+            // Treat an oversized file as unavailable instead of silently bypassing the cap.
+            let applied_max_pages: i64 = learning_conn.pragma_query_value(
+                None, "max_page_count", |row| row.get(0))?;
+            if applied_max_pages > max_pages {
+                return Err(anyhow!("Auto learning database exceeds its page cap"));
+            }
             Ok(learning_conn)
         })();
         let (learning_conn, learning_persistent) = match learning {
@@ -1284,6 +1291,32 @@ mod schema_migration_tests {
     use super::*;
 
     #[test]
+    fn oversized_existing_learning_database_pauses_learning_without_stopping_execution() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        drop(Store::open(&path).unwrap());
+        let learning_path = dir.path().join("state.sqlite.learning");
+        let learning = Connection::open(&learning_path).unwrap();
+        learning.execute_batch("CREATE TABLE oversized_payload(value BLOB)").unwrap();
+        learning.execute(
+            "INSERT INTO oversized_payload(value) VALUES(zeroblob(?1))",
+            params![129 * 1024 * 1024],
+        ).unwrap();
+        let page_size: i64 = learning.pragma_query_value(None, "page_size", |row| row.get(0)).unwrap();
+        let page_count: i64 = learning.pragma_query_value(None, "page_count", |row| row.get(0)).unwrap();
+        assert!(page_size * page_count > 128 * 1024 * 1024);
+        drop(learning);
+
+        let store = Store::open(&path).unwrap();
+        assert!(!store.learning_persistent, "an oversized file must not silently bypass the cap");
+        assert!(store.auto_learning_is_paused().unwrap());
+        store.conn.execute("INSERT INTO meta(key,value) VALUES('execution-after-oversize','ok')", []).unwrap();
+        assert_eq!(store.conn.query_row(
+            "SELECT value FROM meta WHERE key='execution-after-oversize'", [], |row| row.get::<_, String>(0)
+        ).unwrap(), "ok");
+    }
+
+    #[test]
     fn failed_account_cleanup_hides_learning_and_reports_pause_until_recovery() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("state.sqlite");
@@ -1385,6 +1418,46 @@ mod schema_migration_tests {
         let reopened = Store::open(&path).unwrap();
         assert!(reopened.auto_measurements(10).unwrap().is_empty());
         assert!(reopened.auto_daily_aggregates(10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn interrupted_learning_migration_retries_without_doubling_aggregates() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let store = Store::open(&path).unwrap();
+        store.conn.execute_batch("DELETE FROM meta WHERE key='auto_learning_split_migrated';
+            INSERT INTO auto_measurements(event_seq,observed_ms,task_id,run_id,harness,profile_id,model,effort,input_tokens)
+              VALUES(7,1000,'t','r','codex','p','model','',42);
+            INSERT INTO auto_daily_aggregates VALUES(0,'codex','p','model','',1000,1,1,42,1,1,0,0,0,0,0,0);
+            CREATE TRIGGER stop_learning_marker BEFORE INSERT ON meta
+              WHEN NEW.key='auto_learning_split_migrated'
+              BEGIN SELECT RAISE(FAIL,'injected migration marker failure'); END;").unwrap();
+        drop(store);
+
+        let interrupted = Store::open(&path).unwrap();
+        assert!(interrupted.auto_learning_is_paused().unwrap());
+        assert_eq!(interrupted.conn.query_row("SELECT COUNT(*) FROM auto_measurements", [],
+            |row| row.get::<_, i64>(0)).unwrap(), 1,
+            "legacy rows cannot be deleted before the durable marker commits");
+        drop(interrupted);
+        let learning = Connection::open(dir.path().join("state.sqlite.learning")).unwrap();
+        assert_eq!(learning.query_row("SELECT COUNT(*) FROM auto_measurements", [],
+            |row| row.get::<_, i64>(0)).unwrap(), 1,
+            "the learning copy commits before the main marker");
+        drop(learning);
+
+        let main = Connection::open(&path).unwrap();
+        main.execute_batch("DROP TRIGGER stop_learning_marker").unwrap();
+        drop(main);
+        for _ in 0..2 {
+            let recovered = Store::open(&path).unwrap();
+            assert!(!recovered.auto_learning_is_paused().unwrap());
+            assert_eq!(recovered.auto_measurements(10).unwrap().len(), 1);
+            assert_eq!(recovered.auto_daily_aggregates(10).unwrap()[0].samples, 1,
+                "retry must not double an already copied aggregate");
+            assert_eq!(recovered.conn.query_row("SELECT COUNT(*) FROM auto_measurements", [],
+                |row| row.get::<_, i64>(0)).unwrap(), 0);
+        }
     }
 
     #[test]

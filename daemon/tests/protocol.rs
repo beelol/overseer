@@ -2193,8 +2193,25 @@ fn auto_opencode_silent_503_budget_stops_while_daemon_is_down_without_duplicate(
         rejected["execution_budget_ms"] = invalid;
         assert!(d.try_call("auto.dispatch", rejected).is_err());
     }
-    let first = d.call("auto.dispatch", request("local-503-first"));
-    assert_eq!(first["state"], "dispatched", "{first}");
+    // A cold installed CLI can time out during metadata discovery in the
+    // serial suite. That must pause without a child; a fresh unit may retry.
+    let mut first = None;
+    let mut first_unit = String::new();
+    for attempt in 0..3 {
+        let unit = format!("local-503-first-{attempt}");
+        let result = d.call("auto.dispatch", request(&unit));
+        if result["state"] == "dispatched" {
+            first = Some(result);
+            first_unit = unit;
+            break;
+        }
+        assert_eq!(result["state"], "paused", "{result}");
+        assert!(result["discovery_failures"].as_array().is_some_and(|failures|
+            failures.iter().any(|failure| failure["reason"] == "metadata_or_auth_unavailable")),
+            "only transient metadata discovery may be retried: {result}");
+        assert_eq!(d.runs().len(), 1, "metadata timeout cannot launch a child");
+    }
+    let first = first.expect("installed OpenCode metadata did not recover in three bounded attempts");
     assert!(first["decision"]["selected"].as_str().unwrap().contains("local_a"));
     let first_id = run_id(&first);
     let request_deadline = std::time::Instant::now() + Duration::from_secs(8);
@@ -2225,10 +2242,10 @@ fn auto_opencode_silent_503_budget_stops_while_daemon_is_down_without_duplicate(
     assert_eq!(d.events(&first_id).iter().filter(|event|
         event["kind"] == "auto_execution_budget_exhausted").count(), 1,
         "reattachment should publish one budget outcome");
-    let replay = d.call("auto.dispatch", request("local-503-first"));
+    let replay = d.call("auto.dispatch", request(&first_unit));
     assert_eq!(replay["state"], "paused", "{replay}");
     assert_eq!(replay["run"]["id"], first_id);
-    let mut changed = request("local-503-first");
+    let mut changed = request(&first_unit);
     changed["execution_budget_ms"] = json!(6000);
     assert!(d.try_call("auto.dispatch", changed).is_err(),
         "replay must not change the persisted execution deadline");

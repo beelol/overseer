@@ -353,8 +353,19 @@ mod tests {
             std::fs::create_dir(&path).unwrap();
             env.insert(key.into(), path.display().to_string());
         }
-        let catalog = crate::auto_collect::opencode_local_catalog(&program, &env, &project,
-            Duration::from_secs(8), 1000).unwrap();
+        // The installed CLI can miss an eight-second cold-start deadline under
+        // full-suite load. Only that bounded timeout is retried; other errors
+        // still fail immediately so parser or auth regressions remain visible.
+        let mut catalog = None;
+        for _ in 0..3 {
+            match crate::auto_collect::opencode_local_catalog(&program, &env, &project,
+                Duration::from_secs(8), 1000) {
+                Ok(found) => { catalog = Some(found); break; }
+                Err(error) if error.to_string().contains("metadata read timed out") => continue,
+                Err(error) => panic!("OpenCode metadata discovery failed: {error}"),
+            }
+        }
+        let catalog = catalog.expect("installed OpenCode metadata never became available");
         assert_eq!(catalog.models.iter().map(|m| m.model.as_str()).collect::<Vec<_>>(),
             ["local_a/fixture-a", "local_b/fixture-b"]);
     }
