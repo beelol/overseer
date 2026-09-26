@@ -10,6 +10,8 @@ const { Review } = require('./review');
 const { CommandCenter, COLUMNS } = require('./command-center');
 const { NewTaskPanel } = require('./new-task');
 const { PullRequests } = require('./pull-request');
+const { TaskLauncher } = require('./task-launcher');
+const { Dashboard } = require('./dashboard-mode');
 
 let client;
 
@@ -26,20 +28,51 @@ async function activate(context) {
   const model = new Model(client);
   const agents = new AgentsProvider(model, context.workspaceState);
   const dirty = new DirtyProvider(model, client);
-  const accounts = new AccountsProvider(model);
+  const accounts = new AccountsProvider(model, context.extensionUri);
   const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true });
   const dirtyView = vscode.window.createTreeView('overseer.dirty', { treeDataProvider: dirty });
   const accountsView = vscode.window.createTreeView('overseer.accounts', { treeDataProvider: accounts });
   const outputs = new OutputPanels(context, client, model);
   const review = new Review(context, client, model, say);
   let selectedRun;
-  // With the Overseer view open, reviews go to its review column and run panels to its conversation column.
-  const center = new CommandCenter(context, model, { select: runId => selectRun(runId, { preserveFocus: true }), selected: () => selectedRun, client });
+  const launcher = new TaskLauncher(context, client, model, () => refreshAccounts());
+  // Needs you (AC-61): waiting for a decision, failed, or finished with changes not yet reviewed.
+  const reviewed = new Map(Object.entries(context.workspaceState.get('overseer.reviewed', {})));
+  const markReviewed = runId => { if (!runId) return; reviewed.set(runId, Date.now()); context.workspaceState.update('overseer.reviewed', Object.fromEntries([...reviewed].slice(-800))); };
+  const changedRuns = new Map(); // run id -> changed files (finished runs)
+  const checkChanged = async run => {
+    if (!run || changedRuns.has(run.id) || run.parent_run_id) return;
+    changedRuns.set(run.id, 0);
+    try { const c = await client.request('workspace.changes', { workspace_id: run.workspace_id }); changedRuns.set(run.id, c.files || 0); if (c.files) model.emitter.fire(); } catch { /* removed worktree */ }
+  };
+  const archivedTasks = () => (model.state.tasks || []).filter(t => t.archived_ms).map(t => t.id);
+  function attention() {
+    const archived = new Set(archivedTasks());
+    const out = [];
+    for (const r of (model.state.runs || []).filter(r => !r.parent_run_id)) {
+      if (archived.has(r.task_id)) continue;
+      const seen = reviewed.get(r.id) || 0;
+      if (r.status === 'waiting_for_user') out.push({ run_id: r.id, rank: 0, label: r.attention?.kind === 'permission' ? 'Approve' : 'Reply', detail: r.attention?.kind === 'permission' ? `Wants to use ${r.attention.tool}` : 'Waiting for your reply' });
+      else if (['failed', 'disconnected'].includes(r.status) && seen < (r.ended_ms || r.created_ms)) out.push({ run_id: r.id, rank: 1, label: 'Failed', detail: r.exit_reason || 'The agent failed' });
+      else if (r.status === 'completed' && seen < (r.ended_ms || r.created_ms) && Date.now() - (r.ended_ms || r.created_ms) < 7 * 86400000) {
+        if (!changedRuns.has(r.id)) checkChanged(r);
+        const n = changedRuns.get(r.id);
+        if (n) out.push({ run_id: r.id, rank: 2, label: 'Review', detail: `${n} file${n === 1 ? '' : 's'} changed` });
+      }
+    }
+    return out.sort((a, b) => a.rank - b.rank);
+  }
+  const pinned = () => context.workspaceState.get('overseer.pinned', []).filter(id => model.run(id));
+  const setPinned = (runId, on) => context.workspaceState.update('overseer.pinned', [...new Set([...pinned().filter(id => id !== runId), ...(on ? [runId] : [])])]);
+  const search = async q => { try { return (await client.request('search', { query: q, limit: 200 })).task_ids || []; } catch { return []; } };
+  // With the dashboard open, the chat stays inside it and reviews go to the column on its right.
+  const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, { preserveFocus: true, ...opts }), selected: () => selectedRun, client, model, launcher, attention, pinned, setPinned, archived: archivedTasks, search });
   review.reviewColumn = () => center.active ? COLUMNS.review : undefined;
   outputs.column = () => center.active ? COLUMNS.conversation : undefined;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
+  const dashboard = new Dashboard(context, center, say);
   const pullRequests = new PullRequests(client, model, say);
-  const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), refreshAccounts: () => refreshAccounts(), column: () => center.active ? COLUMNS.review : undefined });
+  const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => center.active ? COLUMNS.review : undefined });
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.output', outputs),
     agentsView.onDidExpandElement(e => agents.setCollapsed(e.element, false)),
     agentsView.onDidCollapseElement(e => agents.setCollapsed(e.element, true)));
@@ -50,10 +83,10 @@ async function activate(context) {
   const updateStatus = () => {
     const runs = model.state.runs || [];
     const active = runs.filter(r => ACTIVE.has(r.status)).length;
-    const waiting = runs.filter(r => r.status === 'waiting_for_user').length;
-    status.text = client.connected ? `$(pulse) Overseer ${active} active${waiting ? `, ${waiting} waiting` : ''}` : client.stopped ? '$(circle-slash) Overseer stopped' : '$(debug-disconnect) Overseer disconnected';
-    status.tooltip = client.connected ? 'overseerd is running; agents continue when VS Code closes. Use "Overseer: Stop Agents and Daemon" to stop everything.' : client.stopped ? 'Agents and daemon were stopped. Click to start the daemon again.' : 'Reconnecting to overseerd…';
-    status.command = client.stopped && !client.connected ? 'overseer.startDaemon' : 'overseer.refresh';
+    const needs = client.connected ? attention().length : 0;
+    status.text = client.connected ? `$(eye) Overseer ${active} active${needs ? `  $(bell-dot) ${needs}` : ''}` : client.stopped ? '$(circle-slash) Overseer stopped' : '$(debug-disconnect) Overseer disconnected';
+    status.tooltip = client.connected ? `${active} agent${active === 1 ? '' : 's'} running${needs ? ` · ${needs} need${needs === 1 ? 's' : ''} you` : ''}\nAgents keep running when VS Code closes.\nClick to open the dashboard.` : client.stopped ? 'Agents and daemon were stopped. Click to start the daemon again.' : 'Reconnecting to overseerd…';
+    status.command = client.stopped && !client.connected ? 'overseer.startDaemon' : 'overseer.openCenter';
     status.show();
     vscode.commands.executeCommand('setContext', 'overseer.connected', client.connected);
   };
@@ -65,7 +98,8 @@ async function activate(context) {
     model.scheduleRefresh();
     if (selectedRun && ['file_activity', 'status', 'turn_done', 'workspace_removed'].includes(event.kind)) setTimeout(() => dirty.refresh(), 300);
     if (event.kind === 'permission') {
-      vscode.window.showWarningMessage(`An agent is waiting for permission to use ${event.payload.tool}.`, 'Show').then(choice => { if (choice) outputs.show(event.run_id, { preserveFocus: false }); });
+      if (center.panel?.visible) return; // the dashboard's Needs you shows it
+      vscode.window.showWarningMessage(`An agent is waiting for permission to use ${event.payload.tool}.`, 'Show').then(choice => { if (!choice) return; if (center.active) { center.open(); selectRun(model.rootRun(model.run(event.run_id) || {})?.id || event.run_id); } else outputs.show(event.run_id, { preserveFocus: false }); });
     }
   });
   const dirtyTimer = setInterval(() => { if (dirtyView.visible && selectedRun) dirty.refresh(); }, 1000);
@@ -81,12 +115,16 @@ async function activate(context) {
 
   async function selectRun(runId, { follow, preserveFocus = false } = {}) {
     selectedRun = runId;
+    const picked = model.run(runId);
+    // Opening a failed or finished run counts as seeing it (it leaves Needs you).
+    if (picked && !ACTIVE.has(picked.status)) markReviewed(model.rootRun(picked)?.id || runId);
     center.selected(runId);
     context.workspaceState.update('overseer.selectedRun', runId);
     dirty.select(runId);
     // From the Overseer view, keep keyboard focus in the agents column.
     await review.open(runId, { follow, preserveFocus });
-    await outputs.show(runId);
+    if (!center.active) await outputs.show(runId);
+    model.emitter.fire();
   }
 
   async function newTask() {
@@ -277,6 +315,16 @@ async function activate(context) {
     else if (choice) await stopAll();
   }
 
+  /** Allow or deny the pending permission of the selected agent, or of the first agent waiting. */
+  async function answerPermission(allow) {
+    requireTrust();
+    const waiting = (model.state.runs || []).filter(r => r.attention?.kind === 'permission');
+    const run = waiting.find(r => r.id === selectedRun || model.rootRun(r)?.id === selectedRun) || waiting[0];
+    if (!run) { vscode.window.setStatusBarMessage('$(check) No permission request is waiting', 2500); return; }
+    await client.request('run.permission', { run_id: run.id, request_id: String(run.attention.request_id), allow });
+    model.scheduleRefresh();
+  }
+
   async function refreshAccounts() {
     await model.refresh();
     try { const list = await client.request('account.list'); model.accounts = list.accounts; model.providers = list.providers; } catch (e) { say('account.list: ' + e.message); }
@@ -381,6 +429,30 @@ async function activate(context) {
     // Notification clicks open vscode://beelol.overseer/open-center (AC-52).
     vscode.window.registerUriHandler({ handleUri: uri => { if (uri.path === '/open-center') vscode.commands.executeCommand('overseer.openCenter'); } }),
     vscode.commands.registerCommand('overseer.openCenter', guard(async () => { await model.refresh(); await center.open(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); })),
+    vscode.commands.registerCommand('overseer.openDashboard', guard(async () => { await model.refresh(); await dashboard.enter(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); })),
+    vscode.commands.registerCommand('overseer.exitDashboard', guard(() => dashboard.exit())),
+    vscode.commands.registerCommand('overseer.toggleDashboard', guard(async () => { if (dashboard.inDashboard) await dashboard.exit(); else { await model.refresh(); await dashboard.enter(); } })),
+    vscode.commands.registerCommand('overseer.openDashboardWindow', guard(() => dashboard.openWindow())),
+    vscode.commands.registerCommand('overseer.newAgent', guard(async () => { requireTrust(); await center.open({ layout: !center.active }); center.setMode('composer'); })),
+    vscode.commands.registerCommand('overseer.toggleGrid', guard(async () => { await center.open({ layout: !center.active }); center.setMode(center.mode === 'grid' ? 'chat' : 'grid'); })),
+    vscode.commands.registerCommand('overseer.switchAgent', guard(async () => {
+      await model.refresh();
+      const roots = (model.state.runs || []).filter(r => !r.parent_run_id).sort((a, b) => (ACTIVE.has(b.status) - ACTIVE.has(a.status)) || b.created_ms - a.created_ms);
+      const pick = await vscode.window.showQuickPick(roots.map(r => { const t = model.task(r.task_id); const p = r.profile_id && model.profile(r.profile_id);
+        return { label: `$(${{ waiting_for_user: 'bell-dot', running: 'sync', starting: 'sync', queued: 'clock', completed: 'check', failed: 'error', interrupted: 'circle-slash' }[r.status] || 'circle'}) ${t?.title || r.title}`,
+          description: [path.basename(t?.repo_root || ''), p?.name].filter(Boolean).join(' · '), detail: undefined, run: r }; }), { title: 'Switch to agent', matchOnDescription: true, placeHolder: 'Search agents' });
+      if (pick) { await center.open({ layout: !center.active }); await selectRun(pick.run.id); center.focus('chat'); }
+    })),
+    vscode.commands.registerCommand('overseer.nextNeedsYou', guard(async () => {
+      const list = attention();
+      if (!list.length) { vscode.window.setStatusBarMessage('$(check) Nothing needs you', 2500); return; }
+      const i = list.findIndex(a => a.run_id === selectedRun);
+      const next = list[(i + 1) % list.length];
+      await center.open({ layout: !center.active }); await selectRun(next.run_id); center.focus('chat');
+    })),
+    vscode.commands.registerCommand('overseer.allowPermission', guard(async () => answerPermission(true))),
+    vscode.commands.registerCommand('overseer.denyPermission', guard(async () => answerPermission(false))),
+    vscode.commands.registerCommand('overseer.stopSelected', guard(async () => { requireTrust(); const r = selectedRun && model.run(selectedRun); if (r && ACTIVE.has(r.status)) await client.request('run.interrupt', { run_id: model.rootRun(r).id }); })),
     vscode.commands.registerCommand('overseer.mergeBack', guard(mergeBack)),
     vscode.commands.registerCommand('overseer.openPullRequest', guard(arg => pullRequests.open(runArg(arg)))),
     vscode.commands.registerCommand('overseer.startDaemon', guard(async () => { client.disposed = false; await client.start(); await model.refresh(); updateStatus(); })),
@@ -395,6 +467,7 @@ async function activate(context) {
     await model.refresh();
     refreshAccounts().catch(() => {});
     announceBackgroundAgents().catch(error => say('background notice check: ' + error.message));
+    dashboard.startup().catch(error => say('dashboard startup: ' + error.message));
     const remembered = context.workspaceState.get('overseer.selectedRun');
     if (remembered && model.run(remembered)) {
       selectedRun = remembered; dirty.select(remembered);
@@ -407,7 +480,7 @@ async function activate(context) {
     say('daemon start failed: ' + error.message);
     vscode.window.showErrorMessage(`Overseer could not start its daemon: ${error.message}`);
   }
-  return { client, model, review, outputs, selectRun, dirty, agents, agentsView, center, selectedRun: () => selectedRun }; // exported for UI tests
+  return { client, model, review, outputs, selectRun, dirty, agents, agentsView, center, dashboard, attention, selectedRun: () => selectedRun }; // exported for UI tests
 }
 
 function deactivate() { client?.dispose(); }

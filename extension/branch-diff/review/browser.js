@@ -165,12 +165,12 @@ function fold(row) {
 function makeRow(entry) {
   const element = node('article', 'diff-file'); element.dataset.id = entry.id;
   const header = node('header', 'file-header'); header.tabIndex = -1;
-  const toggle = node('button', 'fold', '▾'); toggle.setAttribute('aria-label', 'Collapse or expand ' + entry.path); toggle.setAttribute('aria-expanded', 'true');
+  const toggle = node('button', 'fold', '▾'); toggle.setAttribute('aria-label', 'Collapse or expand ' + entry.path); toggle.title = 'Collapse or expand'; toggle.setAttribute('aria-expanded', 'true');
   const title = node('a', 'file-path', entry.path); title.setAttribute('role', 'link');
   const status = node('span', 'status'); const unsaved = node('span', 'unsaved');
   const stats = node('span', 'stats', '…');
-  const open = node('button', 'open-native', 'Open in Native Diff');
-  const save = node('button', 'save-file', 'Save'); save.disabled = true;
+  const open = node('button', 'open-native', '↗'); open.title = 'Open in native diff (undo, redo, Git gutters)'; open.setAttribute('aria-label', 'Open ' + entry.path + ' in native diff');
+  const save = node('button', 'save-file', 'Save'); save.disabled = true; save.title = 'Save this file (Cmd+S)';
   const editStatus = node('span', 'edit-status'); editStatus.setAttribute('role', 'status');
   const host = node('div', 'diff-body'); host.style.height = '220px';
   header.append(toggle, status, title, unsaved, editStatus, stats, save, open); element.append(header, host);
@@ -519,7 +519,8 @@ async function reconcile() {
       const description = next.description;
       if (!next.overseer) document.getElementById('comparison').textContent = description ? `${description.headName || 'HEAD'} → ${description.base}` : 'Branch Diff';
       if (!next.overseer) document.getElementById('comparison').title = description ? `Merge-base ${description.mergeBase} → ${next.mode === 'workingTree' ? 'working tree + unsaved edits' : description.headSha}` : '';
-      total.textContent = `${next.entries.length} ${next.checking ? 'files found' : 'changed ' + (next.entries.length === 1 ? 'file' : 'files')}`;
+      total.textContent = `${next.entries.length} ${next.entries.length === 1 ? 'file' : 'files'}${next.checking ? '…' : ''}`;
+      total.title = next.checking ? 'Still looking for changed files' : 'Changed files in this comparison';
       total.dataset.count = next.entries.length;
       document.body.dataset.checking = String(!!next.checking);
       document.body.dataset.cached = String(!!next.cached);
@@ -589,9 +590,20 @@ function applyOverseer(o) {
   const c = o.comparison || {};
   label.textContent = c.label || 'Comparison';
   document.getElementById('base').title = [c.label, c.base ? 'Base: ' + c.base : 'Base unavailable', c.detail, c.provenance ? 'Provenance: ' + c.provenance : ''].filter(Boolean).join('\n') + '\nClick to choose another comparison.';
-  document.getElementById('comparison').textContent = (o.runTitle || 'Run') + (o.harness ? ' · ' + o.harness : '');
-  document.getElementById('comparison').title = o.workspacePath || '';
-  document.getElementById('workspace-note').textContent = (o.workspaceKind === 'current' ? 'Current checkout: ' : 'Worktree: ') + (o.workspacePath || '');
+  document.getElementById('comparison').textContent = o.runTitle || 'Run';
+  document.getElementById('comparison').title = [o.runTitle, o.harness, o.workspacePath].filter(Boolean).join('\n');
+  // The full path is in the tooltip and data-workspace; the note shows ~/…/last/two.
+  const note = document.getElementById('workspace-note');
+  const home = document.body.dataset.home || '';
+  let short = o.workspacePath || '';
+  if (home && short.startsWith(home + '/')) short = '~' + short.slice(home.length);
+  const parts = short.split('/').filter(Boolean);
+  if (parts.length > 3) short = (short.startsWith('~') ? '~/…/' : '…/') + parts.slice(-2).join('/');
+  // Kept for assistive tech and tests; the visible header stays short (the path is in tooltips).
+  note.textContent = o.workspacePath || '';
+  note.hidden = true;
+  document.getElementById('base').title += `\n${o.workspaceKind === 'current' ? 'Checkout' : 'Worktree'}: ${short}`;
+  document.body.dataset.workspace = o.workspacePath || '';
   followState = o.follow || 'off';
   followBox.checked = followState !== 'off';
   resumeButton.hidden = followState !== 'paused';

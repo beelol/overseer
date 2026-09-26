@@ -1,65 +1,127 @@
-// Overseer view (command center, AC-48): a full-page layout that does not depend on the native
-// sidebar or on the folder open in this window. Column 1: the agents column (every repository
-// the daemon knows). Column 2: the selected run's live editable review. Column 3: that run's
-// conversation with its event log. Below the agents: the selected run's worktree files (AC-51).
+// Overseer dashboard (AC-48, AC-54..AC-63): one webview with the agents rail, the selected agent's
+// chat (or the new-agent composer, or the agent grid) and the files panel; the selected run's live
+// review opens in the editor column to its right. Not tied to the folder open in the window.
 // Restored after reloads by a webview serializer.
 const vscode = require('vscode');
-const { randomBytes } = require('crypto');
+const { RunFeed, runMessage } = require('./run-feed');
+const { handleRunMessage, changesFetcher } = require('./run-actions');
+const { page, localRoots } = require('./webview-html');
+const { ACTIVE } = require('./views');
 
-const COLUMNS = { agents: vscode.ViewColumn.One, review: vscode.ViewColumn.Two, conversation: vscode.ViewColumn.Three };
+const COLUMNS = { agents: vscode.ViewColumn.One, review: vscode.ViewColumn.Two, conversation: vscode.ViewColumn.Two };
 
 class CommandCenter {
   constructor(context, model, handlers) {
-    this.context = context; this.model = model; this.handlers = handlers;
+    this.context = context; this.model = model; this.handlers = handlers; this.client = handlers.client;
+    this.changes = changesFetcher(this.client);
+    this.mode = 'chat';
     model.onDidChange(() => this.push());
+    this.client.on('event', event => {
+      if (!this.panel) return;
+      if (['file_activity', 'turn_done', 'status'].includes(event.kind) && this.chatRun && this.chatFeed?.roots.get(this.chatRun)?.has(event.run_id)) this.pushChanges();
+    });
   }
 
   get active() { return !!this.panel; }
 
-  async open({ layout = true } = {}) {
-    if (this.panel) { this.panel.reveal(COLUMNS.agents); return this.panel; }
+  async open({ layout = true, reveal = true } = {}) {
+    if (this.panel) { if (reveal) this.panel.reveal(COLUMNS.agents); return this.panel; }
     if (layout) await this.layout();
-    const panel = vscode.window.createWebviewPanel('overseer.center', 'Overseer', { viewColumn: COLUMNS.agents, preserveFocus: false }, { enableScripts: true, retainContextWhenHidden: true });
+    const panel = vscode.window.createWebviewPanel('overseer.center', 'Overseer', { viewColumn: COLUMNS.agents, preserveFocus: false }, { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: localRoots(this.context.extensionUri) });
     this.attach(panel);
     return panel;
   }
 
-  /** Three columns: agents (narrow), review (wide), conversation. */
+  /** Two columns: the dashboard (wide) and the review. */
   async layout() {
-    await vscode.commands.executeCommand('vscode.setEditorLayout', { orientation: 0, groups: [{ size: 0.22 }, { size: 0.48 }, { size: 0.30 }] });
+    await vscode.commands.executeCommand('vscode.setEditorLayout', { orientation: 0, groups: [{ size: 0.62 }, { size: 0.38 }] });
   }
 
   attach(panel) {
     this.panel = panel;
-    const media = vscode.Uri.joinPath(this.context.extensionUri, 'media');
-    panel.webview.options = { enableScripts: true, localResourceRoots: [media] };
+    panel.webview.options = { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri) };
     panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer.svg');
-    const nonce = randomBytes(18).toString('base64');
-    const asset = name => panel.webview.asWebviewUri(vscode.Uri.joinPath(media, name));
-    panel.webview.html = `<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${panel.webview.cspSource}; script-src 'nonce-${nonce}';">
-<link rel="stylesheet" href="${asset('center.css')}"><title>Overseer</title></head>
-<body><header class="bar"><h1>Agents</h1><span class="spacer"></span>
-<button id="new-task" class="primary" title="Start a new agent task in any repository">New Task</button>
-<button id="collapse" class="icon" title="Collapse all tasks" aria-label="Collapse all tasks">⊟</button>
-<button id="refresh" class="icon" title="Refresh" aria-label="Refresh">↻</button></header>
-<div id="tree" role="tree" aria-label="Agents in all repositories"></div>
-<p id="empty" class="empty" hidden>No agent tasks yet. Start one with New Task; it can target any repository, not only the folder open in this window.</p>
-<section id="files-section" aria-labelledby="files-h"><header class="bar sub"><h1 id="files-h">Files</h1><span id="files-for" class="desc"></span><span class="spacer"></span>
-<button id="files-refresh" class="icon" title="Refresh files" aria-label="Refresh files">↻</button></header>
-<p id="files-note" class="note" role="status">Select a run to browse its worktree.</p><div id="files" role="tree" aria-label="Worktree files"></div></section>
-<script nonce="${nonce}" src="${asset('center.js')}"></script><script nonce="${nonce}" src="${asset('files.js')}"></script></body></html>`;
-    panel.onDidDispose(() => { if (this.panel === panel) this.panel = undefined; });
-    panel.webview.onDidReceiveMessage(message => this.receive(message).catch(error => vscode.window.showErrorMessage(`Overseer: ${error.message}`)));
+    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css'], js: ['composer.js', 'grid.js', 'dashboard.js', 'files.js'] });
+    const post = m => panel.webview.postMessage(m);
+    this.chatFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'chat' }));
+    this.gridFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'grid' }));
+    panel.onDidDispose(() => {
+      this.chatFeed.dispose(); this.gridFeed.dispose();
+      if (this.panel === panel) { this.panel = undefined; this.chatRun = undefined; }
+      vscode.commands.executeCommand('setContext', 'overseer.dashboardOpen', false);
+    });
+    panel.onDidChangeViewState(e => vscode.commands.executeCommand('setContext', 'overseer.dashboardFocus', e.webviewPanel.active));
+    vscode.commands.executeCommand('setContext', 'overseer.dashboardOpen', true);
+    panel.webview.onDidReceiveMessage(message => this.receive(message).catch(error => {
+      if (message?.type === 'start') post({ type: 'notice', scope: 'composer', message: error.message });
+      else post({ type: 'notice', message: error.message });
+    }));
   }
 
-  async receive(message) {
-    if (message?.type === 'ready') await this.push();
-    else if (message?.type === 'select' && typeof message.runId === 'string') await this.handlers.select(message.runId);
-    else if (message?.type === 'newTask') await vscode.commands.executeCommand('overseer.newTask');
-    else if (message?.type === 'refresh') await this.model.refresh();
-    else if (message?.type === 'tree') await this.tree(String(message.runId || ''), String(message.dir || ''));
-    else if (message?.type === 'openFile') await this.openFile(String(message.runId || ''), String(message.path || ''));
+  async receive(m) {
+    if (!m || typeof m !== 'object') return;
+    const post = x => this.panel?.webview.postMessage(x);
+    switch (m.type) {
+      case 'ready': await this.push(); return;
+      case 'select': if (typeof m.runId === 'string') { await this.showChat(m.runId); if (!m.restore) await this.handlers.select(m.runId); } return;
+      case 'mode': this.mode = m.mode; if (m.mode !== 'chat') { /* keep the chat feed; it is cheap */ } return;
+      case 'focusComposer': post({ type: 'mode', mode: 'composer' }); return;
+      case 'gridSubscribe': {
+        const ids = (m.runIds || []).filter(id => this.model.run(id));
+        // Metadata first: the tile needs its root run id before history arrives.
+        for (const id of ids) { const msg = runMessage(this.model, id); if (msg) post({ type: 'run', channel: 'grid', ...msg }); }
+        await this.gridFeed.set(ids, { limit: 400 });
+        return;
+      }
+      case 'tree': return this.tree(String(m.runId || ''), String(m.dir || ''));
+      case 'openFile': return this.openFile(String(m.runId || ''), String(m.path || ''));
+      case 'composerData': post({ type: 'composerData', data: await this.handlers.launcher.data() }); return;
+      case 'composerDefaults': await this.handlers.launcher.saveDefaults(m.defaults || {}); return;
+      case 'composerBrowse': { const repo = await this.handlers.launcher.browse(); if (repo) post({ type: 'notice', scope: 'composer', kind: 'repo', repo }); return; }
+      case 'composerBranches': post({ type: 'notice', scope: 'composer', kind: 'branches', branches: await this.handlers.launcher.branches(m.repo) }); return;
+      case 'composerModel': {
+        const model = await vscode.window.showInputBox({ title: 'Model', prompt: 'Any model name this harness accepts. Leave empty for the default.', value: m.current || '' });
+        if (model !== undefined) post({ type: 'notice', scope: 'composer', kind: 'model', model: model.trim() });
+        return;
+      }
+      case 'start': {
+        const runId = await this.handlers.launcher.start(m.form || {});
+        if (!runId) { post({ type: 'notice', scope: 'composer', message: 'Not started.' }); return; }
+        post({ type: 'notice', scope: 'composer', kind: 'started', runId });
+        await this.showChat(runId);
+        await this.handlers.select(runId, { follow: vscode.workspace.getConfiguration('overseer').get('followNewRuns', true), fromDashboard: true });
+        return;
+      }
+      case 'pin': await this.handlers.setPinned(m.runId, !!m.on); await this.push(); return;
+      case 'search': post({ type: 'searchHits', q: m.q, taskIds: await this.handlers.search(String(m.q || '')) }); return;
+      case 'command': await vscode.commands.executeCommand(String(m.command), ...(m.args !== undefined ? [m.args] : [])); return;
+      case 'openExternal': { const url = String(m.url || ''); if (/^https?:\/\//i.test(url)) await vscode.env.openExternal(vscode.Uri.parse(url)); return; }
+      case 'exitDashboard': await vscode.commands.executeCommand('overseer.exitDashboard'); return;
+      case 'dashboardWindow': await vscode.commands.executeCommand('overseer.openDashboardWindow'); return;
+      case 'cleanupArchived': await vscode.commands.executeCommand('overseer.cleanupArchived'); return;
+      default: {
+        const runId = typeof m.runId === 'string' ? m.runId : this.chatRun;
+        if (!runId) return;
+        await handleRunMessage(this.handlers, runId, m, x => post(x));
+      }
+    }
+  }
+
+  /** Shows a run's chat in the dashboard: its metadata, history and live events. */
+  async showChat(runId) {
+    if (!this.panel || !this.model.run(runId)) return;
+    this.chatRun = runId;
+    const msg = runMessage(this.model, runId);
+    this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg });
+    await this.chatFeed.set([runId]);
+    this.pushChanges(true);
+  }
+
+  async pushChanges(force) {
+    const run = this.chatRun && this.model.run(this.chatRun);
+    if (!run || run.parent_run_id) return;
+    const changes = await this.changes(run.workspace_id, { force });
+    if (changes) this.panel?.webview.postMessage({ type: 'changes', runId: run.id, changes });
   }
 
   /** One directory of the selected run's worktree (AC-51). */
@@ -67,7 +129,7 @@ class CommandCenter {
     const run = this.model.run(runId);
     try {
       if (!run) throw new Error('Unknown run.');
-      const data = await this.handlers.client.request('workspace.tree', { workspace_id: run.workspace_id, dir });
+      const data = await this.client.request('workspace.tree', { workspace_id: run.workspace_id, dir });
       this.panel?.webview.postMessage({ type: 'treeData', runId, dir, data });
     } catch (error) {
       this.panel?.webview.postMessage({ type: 'treeError', runId, dir, message: `Files unavailable: ${error.message}` });
@@ -88,14 +150,20 @@ class CommandCenter {
   async push() {
     if (!this.panel) return;
     const { tasks, runs, workspaces, profiles } = this.model.state;
-    await this.panel.webview.postMessage({ type: 'state', state: { tasks, runs, workspaces, profiles }, selected: this.handlers.selected() });
+    const state = { tasks, runs, workspaces, profiles, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), pinned: this.handlers.pinned(),
+      gridMax: Math.max(1, Math.min(9, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
+    await this.panel.webview.postMessage({ type: 'state', state, selected: this.handlers.selected() });
+    if (this.chatRun) { const msg = runMessage(this.model, this.chatRun); if (msg) { this.chatFeed.refreshDescendants(); this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg }); } }
+    for (const id of this.gridFeed?.roots.keys() || []) { const msg = runMessage(this.model, id); if (msg) this.panel.webview.postMessage({ type: 'run', channel: 'grid', ...msg }); }
   }
 
   selected(runId) { this.panel?.webview.postMessage({ type: 'selected', runId }); }
+  setMode(mode) { this.panel?.webview.postMessage({ type: 'mode', mode }); }
+  focus(target) { this.panel?.webview.postMessage({ type: 'focus', target }); }
 
   async deserializeWebviewPanel(panel) {
     this.attach(panel);
   }
 }
 
-module.exports = { CommandCenter, COLUMNS };
+module.exports = { CommandCenter, COLUMNS, ACTIVE };

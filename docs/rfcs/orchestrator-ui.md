@@ -41,6 +41,32 @@ Study these and record what Overseer adopts from each, never their assets:
 | Codex app, Claude Code desktop, Conductor | Multi-agent lists, status at a glance, how runs are started |
 | Apple HIG, GitHub Primer | Accessibility, contrast, focus states |
 
+## What Overseer adopts (research, 2026-09-26)
+
+These rules come from studying the products above: official docs, design posts and changelogs,
+plus a few third-party measurements marked "approx.". The notes and sources are in
+[docs/design/references.md](../design/references.md). Ideas only; no assets were taken.
+
+1. **Chat column:** about 720 px (≈70 characters), centered, 24 px gutters (16 px when narrow). Sources: ChatGPT (40–48 rem), Claude.ai.
+2. **Messages:** the user's in a right-aligned raised bubble (max 80% wide, 12 px radius, 10×14 px padding); the agent's as plain full-width text with no bubble and no avatar column, line height 1.6. Sources: Claude.ai, ChatGPT.
+3. **Rhythm:** 24 px between turns, 8 px between blocks within a turn. Copy and other message actions fade in on hover (150 ms).
+4. **Tool calls:** one muted row (icon + verb + target + result: `+12 −3`, `✓`, `exit 1`). Consecutive calls fold into "Ran 6 tools", collapsed by default. Sources: Zed, Warp, Claude Code desktop.
+5. **Code blocks:** 13 px monospace, 8 px radius, a quiet header with the language; long blocks collapse. Copy appears on hover. Source: Zed.
+6. **Composer:** a rounded card (12 px radius) with a hairline border and no shadow. Chips inside it for agent, account and model. Enter sends, Shift+Enter adds a new line, Stop replaces Send while running. Sources: Claude.ai, Zed, Claude Code desktop.
+7. **Changes bar:** a quiet bar above the composer ("2 files +12 −1") that opens the review. Sources: Zed, Claude Code desktop.
+8. **Agent rows:** one line, 28–32 px high: status icon, title, then muted meta on the right (provider logo, relative time). Sources: Raycast, Zed, Codex app.
+9. **Status:** running = accent with gentle motion; waiting for you = amber; done = green check; failed = red. Rows that need the user sort first and are never dimmed. Sources: Codex app, Linear.
+10. **Grouping:** runs grouped under a quiet repository header; finished runs archive out of sight. Source: Zed.
+11. **Actions:** one primary action; the rest in a `…` / ⌘K menu with shortcuts shown. Sources: Raycast, Linear.
+12. **Grid:** one tile per agent: status stripe, last lines of output, one-line reply. Sources: Cursor Agent Tabs, Zed parallel agents.
+13. **Color:** Overseer Dark and Light are generated from three inputs (graphite base, purple accent, contrast) into a stepped scale. Steps 1–3 are backgrounds, 4–6 borders, 9–10 text. Sources: Linear (LCH), Vercel Geist (10-step scale).
+14. **Radii:** 6 px for controls and rows, 12 px for cards, menus and the composer, full pills for chips. Borders are hairlines; shadows only on floating layers. Sources: Geist, Claude.
+15. **Type:** 12/13/14/16/20 px, weights 400/500/600, one monospace size. Hierarchy comes from weight and color, not size jumps. Sources: Geist, Linear.
+16. **Spacing:** a 4 px grid; 16–24 px section padding. A surface change replaces a separator line. Sources: Geist, Linear.
+17. **Empty states:** icon + one line + one action ("Start an agent"). Source: Raycast.
+18. **Motion:** 120–200 ms ease-out; no spinners on content. Source: Geist.
+19. **Avoid:** colored icon backgrounds and decorative badges (Linear); repeating a fact in several places (Raycast); dimming rows that need the user (Codex app); code dumps that push prose apart (Zed).
+
 ## Layout
 
 The Overseer dashboard (AC-57) has three columns and one alternative mode.

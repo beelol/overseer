@@ -47,7 +47,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, #resize:focus-visi
 .diff-body { overflow: hidden; min-width: 0; }
 .collapsed .diff-body { display: none; }
 .file-problem, .empty { padding: 20px; color: var(--vscode-descriptionForeground); }
-@media (max-width: 850px) { #toolbar { gap: 7px; } #toolbar label { font-size: 0; } #toolbar select { font-size: 12px; } .open-native { max-width: 95px; overflow: hidden; text-overflow: ellipsis; } }
+@media (max-width: 850px) { #toolbar { gap: 7px; } #toolbar label:not(.follow) { font-size: 0; } #toolbar select { font-size: 12px; } .open-native { max-width: 95px; overflow: hidden; text-overflow: ellipsis; } }
 
 .nav-collapsed #review { grid-template-columns: minmax(0, 1fr); }
 .nav-collapsed #navigator, .nav-collapsed #resize { display: none; }
@@ -88,3 +88,7 @@ label.follow { display: inline-flex; align-items: center; gap: 3px; }
 .hunk-actions.reviewed { opacity: .85; }
 .hunk-badge { color: var(--vscode-testing-iconPassed, var(--vscode-charts-green)); font-weight: 600; padding: 0 2px; }
 .hunk-reviewed-line { opacity: .55; }
+
+/* Overseer: quieter file headers (AC-54) — Save appears only when there is something to save. */
+.save-file:disabled { display: none; }
+button.open-native { min-width: 26px; }

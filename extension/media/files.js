@@ -12,6 +12,7 @@
   const expanded = new Map(Object.entries(saved.expanded || {}).map(([k, v]) => [k, new Set(v)])); // runId -> Set(dir)
   const cache = new Map(); // dir -> listing, for the current run
   let focusPath, lastLoad = 0;
+  const ui = window.OverseerUI;
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   const STATUS = { A: 'added', M: 'modified', D: 'deleted', R: 'renamed', T: 'type changed', U: 'conflicted' };
   const persist = () => vscode.setState({ ...(vscode.getState() || {}), files: { expanded: Object.fromEntries([...expanded].map(([k, v]) => [k, [...v]])) } });
@@ -25,10 +26,10 @@
     runId = id; cache.clear(); focusPath = undefined; document.body.dataset.filesReady = '';
     const run = runs.find(r => r.id === id);
     const ws = run && workspaces.find(w => w.id === run.workspace_id);
-    title.textContent = run ? `${run.title}${ws ? ' · ' + (ws.kind === 'current' ? 'current checkout' : ws.branch || '') : ''}` : '';
-    title.title = ws?.path || '';
+    title.textContent = ws ? (ws.kind === 'current' ? 'Current checkout' : ui.basename(ws.branch || ws.path)) : '';
+    title.title = ws ? `${ws.branch || ''}\n${ws.path}` : '';
     box.setAttribute('aria-label', `Files in the worktree of ${run?.title || 'the selected run'}`);
-    box.replaceChildren(); note.textContent = 'Loading files…';
+    box.replaceChildren(); note.textContent = 'Loading…';
     reload();
   }
   function onState(state, selected) {
@@ -44,14 +45,14 @@
     const frag = document.createDocumentFragment();
     const walk = (dir, level) => {
       const listing = cache.get(dir);
-      if (!listing) { if (dir) { const r = el('div', 'row muted', 'Loading…'); r.style.setProperty('--level', level - 1); frag.append(r); } return; }
+      if (!listing) { if (dir) { const r = el('div', 'row muted', '…'); r.style.setProperty('--level', level - 1); frag.append(r); } return; }
       for (const e of listing.entries) {
         const row = el('div', 'row file' + (e.deleted ? ' deleted' : '') + (e.status ? ' changed' : ''));
         row.setAttribute('role', 'treeitem'); row.setAttribute('aria-level', String(level)); row.tabIndex = -1;
         row.dataset.path = e.path; row.dataset.level = level; row.style.setProperty('--level', level - 1);
         if (e.dir) { row.dataset.dir = '1'; row.setAttribute('aria-expanded', String(open().has(e.path))); }
-        const twisty = el('span', 'twisty', e.dir ? (open().has(e.path) ? '▾' : '▸') : ''); twisty.setAttribute('aria-hidden', 'true');
-        const icon = el('span', 'ficon', e.dir ? '▣' : '▤'); icon.setAttribute('aria-hidden', 'true');
+        const twisty = el('span', 'twisty'); if (e.dir) twisty.append(ui.icon(open().has(e.path) ? 'chevron-down' : 'chevron-right', 'xs')); twisty.setAttribute('aria-hidden', 'true');
+        const icon = el('span', 'ficon'); icon.append(ui.icon(e.dir ? (open().has(e.path) ? 'folder-opened' : 'folder') : 'file', 'sm')); icon.setAttribute('aria-hidden', 'true');
         const name = el('span', 'label', e.name);
         row.append(twisty, icon, name);
         if (e.status) row.append(el('span', 'fstatus st-' + e.status, e.status));
@@ -61,13 +62,14 @@
         frag.append(row); rows.push(row);
         if (e.dir && open().has(e.path)) walk(e.path, level + 1);
       }
-      if (listing.truncated) { const r = el('div', 'row muted', `… ${listing.total - listing.entries.filter(x => !x.deleted).length} more entries not shown`); r.style.setProperty('--level', level - 1); frag.append(r); }
+      if (listing.truncated) { const r = el('div', 'row muted', `+${listing.total - listing.entries.filter(x => !x.deleted).length} more`); r.title = `${listing.total - listing.entries.filter(x => !x.deleted).length} more entries not shown`; r.style.setProperty('--level', level - 1); frag.append(r); }
     };
     walk('', 1);
     const hadFocus = box.contains(document.activeElement);
     box.replaceChildren(frag);
     const root = cache.get('');
-    note.textContent = !root ? 'Loading files…' : root.changed_total ? `${root.changed_total} changed since the task started` : 'No changes since the task started';
+    note.textContent = !root ? 'Loading…' : root.changed_total ? `${root.changed_total} changed` : 'No changes';
+    note.title = 'Since the task started';
     const f = rows.find(r => r.dataset.path === focusPath) || rows[0];
     if (f) { f.tabIndex = 0; if (hadFocus) f.focus({ preventScroll: true }); }
     document.body.dataset.filesReady = root ? '1' : '';

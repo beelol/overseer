@@ -184,26 +184,36 @@ class DirtyProvider {
   }
 }
 
+const LOGO = { openai: 'openai', anthropic: 'claude', local: 'opencode', devin: undefined };
+const SHORT = { openai: 'ChatGPT', anthropic: 'Claude', local: 'OpenCode' };
+
 class AccountsProvider {
-  constructor(model) {
-    this.model = model;
+  constructor(model, extensionUri) {
+    this.model = model; this.extensionUri = extensionUri;
     this.emitter = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.emitter.event;
     model.onDidChange(() => this.emitter.fire());
   }
   getTreeItem(node) { return node.item; }
+  /** Provider logo (AC-65) for native views; codicon fallback. */
+  logo(provider, fallback) {
+    const name = LOGO[provider];
+    if (!name || !this.extensionUri) return new vscode.ThemeIcon(fallback);
+    return { light: vscode.Uri.joinPath(this.extensionUri, 'media', 'logos', `${name}-light.svg`), dark: vscode.Uri.joinPath(this.extensionUri, 'media', 'logos', `${name}-dark.svg`) };
+  }
   /** Accounts grouped by provider (docs/rfcs/account-governance.md). */
   getChildren(node) {
     const accounts = this.model.accounts || this.model.state.profiles.map(p => ({ id: p.id, name: p.name, provider: { codex: 'openai', claude: 'anthropic', opencode: 'local' }[p.harness], kind: p.is_system ? 'follows-app' : 'fixed', harnesses: [p.harness] }));
     const providers = this.model.providers || [{ id: 'openai', label: 'OpenAI / ChatGPT', available: true }, { id: 'anthropic', label: 'Anthropic / Claude', available: true }, { id: 'local', label: 'OpenCode (local models)', available: true }];
     if (!node) {
-      return providers.map(pr => {
+      // Providers without an account login (Devin) are listed in Add Account, not here.
+      return providers.filter(pr => pr.available).map(pr => {
         const mine = accounts.filter(a => a.provider === pr.id);
-        const item = new vscode.TreeItem(pr.label, mine.length ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None);
+        const item = new vscode.TreeItem(SHORT[pr.id] || pr.label, mine.length ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None);
         item.id = 'provider:' + pr.id;
-        item.iconPath = new vscode.ThemeIcon(pr.id === 'openai' ? 'hubot' : pr.id === 'anthropic' ? 'sparkle' : pr.id === 'local' ? 'server' : 'circle-slash');
-        item.description = pr.available ? (pr.harnesses?.length ? pr.harnesses.join(', ') : '') : `unavailable: ${pr.why}`;
-        item.tooltip = pr.available ? `Sign-in: ${pr.sign_in || 'provider flow'}. Account login only; no API keys.` : pr.why;
+        item.iconPath = pr.available ? this.logo(pr.id, 'account') : new vscode.ThemeIcon('circle-slash');
+        item.description = pr.available ? '' : 'unavailable';
+        item.tooltip = pr.available ? `${pr.label}\nSign-in: ${pr.sign_in || 'provider flow'}. Account login only; no API keys.` : pr.why;
         item.contextValue = pr.available && pr.id !== 'local' ? 'provider' : 'provider-unavailable';
         return { item, provider: pr };
       });
@@ -217,11 +227,12 @@ class AccountsProvider {
       let detail = 'status not checked';
       if (st) {
         if (!st.installed) detail = 'harness not installed';
-        else if (st.logged_in) detail = `signed in${st.identity?.plan ? ` · ${st.identity.plan}` : ''}${st.identity?.account_fingerprint ? ` · ${st.identity.account_fingerprint.slice(0, 8)}` : st.identity?.fingerprint ? ` · ${st.identity.fingerprint.slice(0, 8)}` : ''}`;
-        else detail = 'not signed in';
+        else if (st.logged_in) detail = [st.identity?.plan, (st.identity?.account_fingerprint || st.identity?.fingerprint || '').slice(0, 8)].filter(Boolean).join(' · ') || 'signed in';
+        else detail = 'signed out';
       }
-      item.description = `${detail}${a.kind === 'follows-app' ? ' · follows app' : ''}`;
-      item.iconPath = new vscode.ThemeIcon(st?.logged_in ? (a.kind === 'follows-app' ? 'link' : 'account') : 'circle-slash', st?.logged_in ? new vscode.ThemeColor('charts.green') : undefined);
+      item.description = `${detail}${a.kind === 'follows-app' ? ' · desktop' : ''}`;
+      item.iconPath = st?.logged_in ? this.logo(a.provider, 'account') : new vscode.ThemeIcon('circle-slash');
+      item.accessibilityInformation = { label: `${a.name}, ${st?.logged_in ? 'signed in' : 'not signed in'}${detail && st?.logged_in ? ', ' + detail : ''}${a.kind === 'follows-app' ? ', follows the desktop app' : ''}` };
       item.tooltip = new vscode.MarkdownString(`**${a.name}** — ${node.provider.label}\n\n${a.kind === 'follows-app' ? `Follows ${a.follows}. It changes when that app switches accounts; Overseer never signs it out.` : `Fixed account with its own credential folder: \`${p.home || ''}\`. The desktop app switching accounts does not change it.`}\n\nUsable by: ${(a.harnesses || []).join(', ')}${a.last_used_ms ? `\n\nLast used ${new Date(a.last_used_ms).toLocaleString()}` : ''}${st ? '\n\n```\n' + (st.detail || '') + '\n```' : ''}`);
       // The sign-in state picks the menu: Sign In for a signed-out account, Sign Out only for a signed-in one.
       item.contextValue = `${a.kind === 'follows-app' ? 'profile-system' : 'profile-isolated'}-${st?.logged_in ? 'signedin' : 'signedout'}`;

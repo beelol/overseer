@@ -13,6 +13,39 @@ use std::path::{Component, Path};
 pub const MAX_ENTRIES: usize = 5000;
 
 impl Daemon {
+    /// Changes since the task started, with line counts, for the chat's changes bar (AC-55).
+    pub fn workspace_changes(&self, workspace_id: &str) -> Result<Value> {
+        let ws = self.workspace(workspace_id)?;
+        if ws.removed_ms.is_some() || !Path::new(&ws.path).exists() {
+            return Ok(json!({"files": 0, "added": 0, "removed": 0, "names": []}));
+        }
+        let root = Path::new(&ws.path);
+        let base = {
+            let store = self.store.lock().unwrap();
+            let task = store.tasks()?.into_iter().find(|t| t.workspace_id == ws.id);
+            task.and_then(|t| t.start_snapshot).and_then(|id| store.snapshot(&id).ok().flatten()).map(|s| s.commit_sha)
+        }
+        .or_else(|| git::head(root));
+        let Some(base) = base else { return Ok(json!({"files": 0, "added": 0, "removed": 0, "names": []})) };
+        let trees = git::capture_trees(root, &crate::paths::data_dir().join("tmp"))?;
+        let numstat = git::git(root, &["diff", "--numstat", "--no-renames", &base, &trees.worktree_tree])?;
+        let (mut files, mut added, mut removed, mut names) = (0u64, 0u64, 0u64, Vec::new());
+        for line in numstat.lines() {
+            let mut parts = line.splitn(3, '\t');
+            let (a, r, path) = (parts.next().unwrap_or("0"), parts.next().unwrap_or("0"), parts.next().unwrap_or(""));
+            if path.is_empty() {
+                continue;
+            }
+            files += 1;
+            added += a.parse::<u64>().unwrap_or(0);
+            removed += r.parse::<u64>().unwrap_or(0);
+            if names.len() < 20 {
+                names.push(path.to_string());
+            }
+        }
+        Ok(json!({"files": files, "added": added, "removed": removed, "names": names, "base": base}))
+    }
+
     pub fn workspace_tree(&self, workspace_id: &str, dir: &str) -> Result<Value> {
         let ws = self.workspace(workspace_id)?;
         if ws.removed_ms.is_some() {

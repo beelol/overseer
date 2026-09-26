@@ -13,16 +13,12 @@ let failures = 0;
 const parse = (label, code) => { try { new Function(code); console.log('ok  ', label); } catch (e) { failures++; console.log('FAIL', label, '-', e.message); } };
 
 for (const f of fs.readdirSync(path.join(ext, 'media')).filter(f => f.endsWith('.js'))) parse(`media/${f}`, fs.readFileSync(path.join(ext, 'media', f), 'utf8'));
-// Inline scripts in generated HTML.
-const withHtml = file => {
-  const src = fs.readFileSync(path.join(ext, file), 'utf8') + '\nmodule.exports.__html = html;';
-  const m = { exports: {} };
-  new Function('require', 'module', 'exports', '__dirname', src)(r => Module._load(r.startsWith('.') ? path.join(ext, path.dirname(file), r) : r, module), m, m.exports, path.join(ext, path.dirname(file)));
-  return m.exports.__html;
-};
-const outputHtml = withHtml('src/output-panel.js')('nonce', 'csp', 'r-test', { js: 'x.js', css: 'x.css' });
-const inline = [...outputHtml.matchAll(/<script nonce="nonce">([\s\S]*?)<\/script>/g)].map(m => m[1]);
-if (!inline.length) { failures++; console.log('FAIL', 'src/output-panel.js: no inline script found'); }
-inline.forEach((code, i) => parse(`src/output-panel.js inline script ${i + 1}`, code));
+// Inline scripts in the generated page shell (src/webview-html.js) used by every Overseer webview.
+stubs.vscode.Uri.joinPath = (...parts) => ({ parts });
+const { page } = require(path.join(ext, 'src/webview-html.js'));
+const html = page({ cspSource: 'csp', asWebviewUri: u => ({ toString: () => 'x.js' }) }, {}, { title: 'Test', chat: true, js: ['dashboard.js'], body: '<main></main>' });
+const inline = [...html.matchAll(/<script nonce="[^"]+">([\s\S]*?)<\/script>/g)].map(m => m[1]);
+if (!inline.length) { failures++; console.log('FAIL', 'src/webview-html.js: no inline script found'); }
+inline.forEach((code, i) => parse(`src/webview-html.js inline script ${i + 1}`, code));
 console.log(failures ? `${failures} webview script(s) do not parse` : 'all webview scripts parse');
 process.exit(failures ? 1 : 0);
