@@ -479,3 +479,248 @@ fn interrupted_integration_rejects_unexpected_workspace_edits() {
         .unwrap();
     assert_eq!(count, 0);
 }
+
+#[test]
+fn individually_accepted_patches_cannot_complete_after_combined_check_fails() {
+    let t = tmp();
+    let verifier = t.path().join("verify-combination.py");
+    std::fs::write(&verifier, "#!/usr/bin/env python3\nfrom pathlib import Path\na = Path('a.txt').read_text().strip()\nb = Path('b.txt').read_text().strip()\nraise SystemExit(1 if a == 'first' and b == 'second' else 0)\n").unwrap();
+    std::fs::set_permissions(&verifier, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let d = Daemon::start(&[("OVERSEER_SWARM_VERIFIER_PATH", verifier.to_str().unwrap())]);
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    let make_patch = |name: &str, content: &str, original: &str| {
+        std::fs::write(checkout.join(name), content).unwrap();
+        assert!(
+            std::process::Command::new(&verifier)
+                .current_dir(&checkout)
+                .status()
+                .unwrap()
+                .success(),
+            "individual module check failed for {name}"
+        );
+        let patch = format!("{}\n", git(&checkout, &["diff", "--", name]));
+        std::fs::write(checkout.join(name), original).unwrap();
+        patch
+    };
+    let first_patch = make_patch("a.txt", "first\n", "a\n");
+    let second_patch = make_patch("b.txt", "second\n", "b\n");
+    let source_before = fingerprint(&checkout);
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Combined verification fixture",
+        "objective":"Change two modules", "allowed_targets":["system-codex"]}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,"jobs":[
+            {"id":"one","title":"Module one","acceptance":"patch","deps":[]},
+            {"id":"two","title":"Module two","acceptance":"patch","deps":[]}
+        ]}),
+    );
+    accepted_patch(&d, run, "one", "patch-one", &first_patch);
+    accepted_patch(&d, run, "two", "patch-two", &second_patch);
+    let integrate = |job: &str, artifact: &str| {
+        json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":job,"artifact_id":artifact,"repo":checkout,
+        "base_revision":base})
+    };
+    let first = d.call("swarm.integrate", integrate("one", "patch-one"));
+    let before = d.call(
+        "swarm.verify",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "request_id":"check-first-commit"}),
+    );
+    assert_eq!(before["status"], "passed", "{before}");
+    assert_eq!(before["commit"], first["commit"]);
+    let second = d.call("swarm.integrate", integrate("two", "patch-two"));
+    let after = d.call(
+        "swarm.verify",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "request_id":"check-second-commit"}),
+    );
+    assert_eq!(after["status"], "failed", "{after}");
+    assert_eq!(after["commit"], second["commit"]);
+    for message in ["result-one", "result-two"] {
+        d.call(
+            "swarm.ack",
+            json!({"run_id":run,"message_id":message,
+            "recipient":"director","generation":1,"revision":1,"phase":"applied"}),
+        );
+    }
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite"))
+        .unwrap()
+        .execute("UPDATE swarm_runs SET status='running' WHERE id=?1", [run])
+        .unwrap();
+    let error = d
+        .try_call(
+            "swarm.complete",
+            json!({"run_id":run,"generation":1,
+            "revision":1,"request_id":"complete-combined", "summary":"Both modules updated",
+            "verification":"Combined check", "checks":[
+                {"job_id":"one","outcome":"passed","evidence":["patch-one"]},
+                {"job_id":"two","outcome":"passed","evidence":["patch-two"]}
+            ]}),
+        )
+        .unwrap_err();
+    assert!(error.contains("combined verification"), "{error}");
+    assert_eq!(fingerprint(&checkout), source_before);
+    assert_eq!(d.call("swarm.get", json!({"id":run}))["status"], "running");
+}
+
+#[test]
+fn completion_requires_a_current_passed_combined_check() {
+    let t = tmp();
+    let verifier = t.path().join("verify-module.py");
+    let script = "#!/usr/bin/env python3\nfrom pathlib import Path\nraise SystemExit(0 if Path('a.txt').read_text() == 'changed\\n' else 1)\n";
+    std::fs::write(&verifier, script).unwrap();
+    std::fs::set_permissions(&verifier, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let d = Daemon::start(&[("OVERSEER_SWARM_VERIFIER_PATH", verifier.to_str().unwrap())]);
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Passing combined check",
+        "objective":"Change a.txt", "allowed_targets":["system-codex"]}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    d.call(
+        "swarm.integrate",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"writer-patch","repo":checkout,
+        "base_revision":base}),
+    );
+    d.call(
+        "swarm.ack",
+        json!({"run_id":run,"message_id":"result-writer",
+        "recipient":"director","generation":1,"revision":1,"phase":"applied"}),
+    );
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite"))
+        .unwrap()
+        .execute("UPDATE swarm_runs SET status='running' WHERE id=?1", [run])
+        .unwrap();
+    let completion = json!({"run_id":run,"generation":1,"revision":1,
+    "request_id":"finish-verified-patch","summary":"Patch verified",
+    "verification":"Combined a.txt check passed","checks":[
+        {"job_id":"writer","outcome":"passed","evidence":["writer-patch"]}
+    ]});
+    assert!(d
+        .try_call("swarm.complete", completion.clone())
+        .unwrap_err()
+        .contains("combined verification"));
+    let request = json!({"run_id":run,"generation":1,"revision":1,
+        "request_id":"check-current-commit"});
+    let result = d.call("swarm.verify", request.clone());
+    assert_eq!(result["status"], "passed", "{result}");
+    assert_eq!(d.call("swarm.verify", request)["duplicate"], true);
+    std::fs::write(&verifier, format!("{script}# changed verifier\n")).unwrap();
+    assert!(d
+        .try_call("swarm.complete", completion.clone())
+        .unwrap_err()
+        .contains("combined verification"));
+    std::fs::write(&verifier, script).unwrap();
+    assert_eq!(d.call("swarm.complete", completion)["status"], "completed");
+}
+
+#[test]
+fn stop_remains_responsive_while_combined_checker_is_running() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::time::{Duration, Instant};
+
+    let t = tmp();
+    let verifier = t.path().join("slow-check.py");
+    std::fs::write(
+        &verifier,
+        "#!/usr/bin/env python3\nimport time\ntime.sleep(2)\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&verifier, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let d = Daemon::start(&[("OVERSEER_SWARM_VERIFIER_PATH", verifier.to_str().unwrap())]);
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Responsive verification",
+        "objective":"Check a.txt", "allowed_targets":["system-codex"]}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    d.call(
+        "swarm.integrate",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"writer-patch","repo":checkout,
+        "base_revision":base}),
+    );
+    let socket = d.socket();
+    let run_owned = run.to_string();
+    let checker = std::thread::spawn(move || {
+        let mut conn = UnixStream::connect(socket).unwrap();
+        conn.set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        writeln!(
+            conn,
+            "{}",
+            json!({"id":1,"method":"swarm.verify","params":{
+            "run_id":run_owned,"generation":1,"revision":1,"request_id":"slow-check"}})
+        )
+        .unwrap();
+        let mut line = String::new();
+        BufReader::new(conn).read_line(&mut line).unwrap();
+        serde_json::from_str::<serde_json::Value>(&line).unwrap()
+    });
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        let started: i64 = db
+            .query_row(
+                "SELECT COUNT(*) FROM swarm_verifications WHERE run_id=?1 AND status='running'",
+                [run],
+                |r| r.get(0),
+            )
+            .unwrap();
+        if started == 1 {
+            break;
+        }
+        assert!(Instant::now() < deadline, "verifier did not start");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let overlapping = d
+        .try_call(
+            "swarm.verify",
+            json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"overlapping-check"}),
+        )
+        .unwrap_err();
+    assert!(overlapping.contains("already running"), "{overlapping}");
+    let begin = Instant::now();
+    let stopped = d.call(
+        "swarm.stop",
+        json!({"run_id":run,"generation":1,"revision":1}),
+    );
+    assert!(
+        begin.elapsed() < Duration::from_secs(2),
+        "Stop waited for checker"
+    );
+    assert_eq!(stopped["status"], "stopping");
+    let result = checker.join().unwrap();
+    assert_eq!(result["result"]["status"], "interrupted", "{result}");
+}

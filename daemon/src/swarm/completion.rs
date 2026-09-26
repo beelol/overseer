@@ -216,6 +216,13 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
             }
         }
     }
+    let integrated_patches: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM swarm_integrated_artifacts WHERE run_id=?1",
+        [run], |r| r.get(0),
+    )?;
+    if integrated_patches > 0 && !super::verification::completion_passed(&tx, run, revision)? {
+        bail!("combined verification has not passed for the current integration commit");
+    }
     let now = crate::daemon::now();
     tx.execute(
         "INSERT INTO swarm_completions(run_id,request_sha256,generation,revision,summary,verification,checks,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",

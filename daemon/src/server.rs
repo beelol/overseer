@@ -321,6 +321,20 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             crate::swarm::integrate(&mut d.store.lock().unwrap(), p)?
         }
+        "swarm.verify" => {
+            fixture_only()?;
+            let prepared = {
+                let mut store = d.store.lock().unwrap();
+                crate::swarm::prepare_verification(&mut store, p)?
+            };
+            match prepared {
+                crate::swarm::PreparedVerification::Existing(result) => result,
+                crate::swarm::PreparedVerification::Ready(plan) => {
+                    let outcome = crate::swarm::run_verification(&plan);
+                    crate::swarm::record_verification(&mut d.store.lock().unwrap(), &plan, outcome)?
+                }
+            }
+        }
         "swarm.decide" => {
             fixture_only()?;
             crate::swarm::decide(&mut d.store.lock().unwrap(), p)?

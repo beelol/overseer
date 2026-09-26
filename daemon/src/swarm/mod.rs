@@ -11,6 +11,7 @@ mod director;
 mod dispatch;
 mod effects;
 mod integration;
+mod verification;
 mod plan;
 mod policy;
 mod revision;
@@ -34,6 +35,8 @@ pub use dispatch::next as dispatch_next;
 pub use dispatch::recover_pending as recover_pending_dispatches;
 pub use effects::{begin as begin_effect, reconcile as reconcile_effect};
 pub use integration::integrate;
+pub use verification::{prepare as prepare_verification, run as run_verification,
+    record as record_verification, PreparedVerification};
 pub use policy::preview;
 pub use settings::set_policy;
 pub use revision::revise;
