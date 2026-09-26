@@ -58,6 +58,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
                         crate::log(&format!("swarm job deadline interrupt {worker} failed: {error}"));
                     }
                 }
+                crate::swarm::retry_revoked_interrupts(&daemon)?;
                 crate::swarm::reconcile_terminal_workers(&daemon)?;
                 crate::swarm::sample_due_workers(&daemon, crate::daemon::now())?;
                 Ok::<(), anyhow::Error>(())

@@ -230,6 +230,7 @@ fn revoked_artifact_stops_dependent_delivery_and_worker_but_not_unrelated_work()
         "title":"Dependent worker"}));
     assert_eq!(launched["status"], "launched");
     let worker = launched["overseer_run_id"].as_str().unwrap();
+    d.wait_status(worker, |status| status == "running", 10);
     let revoked = d.call("swarm.context.revoke", json!({"run_id":id,
         "generation":1,"revision":1,"artifact_id":"contract-evidence",
         "target_id":"account-a"}));
@@ -257,4 +258,65 @@ fn revoked_artifact_stops_dependent_delivery_and_worker_but_not_unrelated_work()
         "required_capabilities":["code"],"estimate_milli":{"points":100},
         "purpose":"worker"}))["reason"], "artifact_permission_revoked");
     assert_eq!(admit(&d, id, "unrelated", "account-a")["status"], "admitted");
+}
+
+#[test]
+fn revoked_artifact_interrupt_retries_after_daemon_crash() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("revocation-crash-source"));
+    let run = d.call("swarm.create", json!({"category":"Revocation crash",
+        "objective":"Inspect backend","allowed_targets":["account-a"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"source","title":"Contract","acceptance":"evidence","deps":[]},
+        {"id":"child","title":"Check dependent","acceptance":"evidence","deps":["source"]},
+        {"id":"sibling","title":"Independent work","acceptance":"evidence","deps":[]}
+    ]}));
+    let source = d.call("swarm.attempt.register", json!({"run_id":id,"job_id":"source",
+        "generation":1,"revision":1}));
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"source",
+        "attempt_id":source["id"],"token":source["token"],
+        "artifact_id":"contract","source_revision":1,"kind":"contract",
+        "content":"checked contract"}));
+    d.call("swarm.report", json!({"run_id":id,"job_id":"source",
+        "attempt_id":source["id"],"token":source["token"],
+        "message_id":"source-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["contract"]}}));
+    d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"source","decision":"accept","evidence":["contract"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"source","attempt_id":source["id"]}));
+    commit_beneficial_batch(&d,id,&["child".into(),"sibling".into()]);
+    let child = admit(&d,id,"child","account-a");
+    let launched = d.call("swarm.worker.launch", json!({"run_id":id,
+        "job_id":"child","attempt_id":child["attempt_id"],
+        "token":child["token"],"repo":checkout,
+        "program":"/bin/sleep","args":["30"],"prompt":"Check contract",
+        "title":"Revoked worker"}));
+    let worker = launched["overseer_run_id"].as_str().unwrap();
+    d.wait_status(worker, |status| status == "running", 10);
+    let sibling = admit(&d,id,"sibling","account-a");
+    let sibling_launch = d.call("swarm.worker.launch", json!({"run_id":id,
+        "job_id":"sibling","attempt_id":sibling["attempt_id"],
+        "token":sibling["token"],"repo":repo(&temp.path().join("revocation-sibling")),
+        "program":"/bin/sleep","args":["30"],"prompt":"Independent work",
+        "title":"Unrelated worker"}));
+    let sibling_worker = sibling_launch["overseer_run_id"].as_str().unwrap();
+    d.wait_status(sibling_worker, |status| status == "running", 10);
+    let revoked = d.call("swarm.context.revoke", json!({"run_id":id,
+        "generation":1,"revision":1,"artifact_id":"contract",
+        "target_id":"account-a","fault_persist_only":true}));
+    assert_eq!(revoked["status"], "revoked");
+    assert!(revoked["interrupt_requested"].as_array().unwrap().is_empty());
+    assert_eq!(d.run(worker)["status"], "running");
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.wait_done(worker,10)["status"], "interrupted");
+    assert_eq!(d.run(sibling_worker)["status"], "running");
+    assert!(d.try_call("swarm.context.get", json!({"run_id":id,"job_id":"child",
+        "attempt_id":child["attempt_id"],"token":child["token"],
+        "artifact_id":"contract"})).is_err());
+    d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
+    assert_eq!(d.wait_done(sibling_worker,10)["status"], "interrupted");
 }

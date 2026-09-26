@@ -150,6 +150,11 @@ pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let mut interrupt_requested = Vec::new();
     let mut unconfirmed = Vec::new();
     for worker in workers {
+        // Fixture-only fault seam: emulate a crash after the durable revocation commit.
+        if p["fault_persist_only"] == true {
+            unconfirmed.push(worker);
+            continue;
+        }
         if d.interrupt(&worker).is_ok() {
             interrupt_requested.push(worker);
         } else {
@@ -159,6 +164,38 @@ pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     Ok(json!({"status":"revoked","artifact_id":artifact,"target_id":target,
         "duplicate":duplicate,"affected_jobs":affected_jobs,
         "interrupt_requested":interrupt_requested,"unconfirmed":unconfirmed}))
+}
+
+/// Retry the external interrupt after a committed artifact revocation. A daemon crash may
+/// happen after the transaction but before the first signal; active linked workers remain
+/// discoverable from durable destination, dependency and launch records.
+pub fn retry_revoked_interrupts(d: &Arc<Daemon>) -> Result<usize> {
+    let workers = {
+        let store = d.store.lock().unwrap();
+        let mut stmt = store.conn.prepare(
+            "SELECT DISTINCT l.overseer_run_id FROM swarm_worker_launches l
+             JOIN swarm_attempts t ON t.id=l.attempt_id AND t.status='registered'
+             JOIN swarm_admissions s ON s.attempt_id=t.id AND s.run_id=t.run_id
+             JOIN swarm_jobs j ON j.run_id=t.run_id AND j.id=t.job_id
+             JOIN runs r ON r.id=l.overseer_run_id
+               AND r.status IN ('queued','starting','running','waiting_for_user')
+             WHERE EXISTS (
+               SELECT 1 FROM swarm_artifact_revocations v
+               JOIN swarm_artifacts a ON a.run_id=v.run_id AND a.id=v.artifact_id
+               JOIN json_each(j.deps) dep ON dep.value=a.job_id
+               WHERE v.run_id=t.run_id AND v.target_id=s.target_id)
+             ORDER BY l.overseer_run_id",
+        )?;
+        let rows = stmt.query_map([], |r| r.get::<_,String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
+    };
+    for worker in &workers {
+        if let Err(error) = d.interrupt(worker) {
+            crate::log(&format!("swarm revoked artifact interrupt {worker} failed: {error}"));
+        }
+    }
+    Ok(workers.len())
 }
 
 fn inline_limit(p: &Value) -> Result<usize> {

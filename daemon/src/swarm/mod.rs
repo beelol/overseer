@@ -27,7 +27,7 @@ pub use completion::complete;
 pub use coverage::report as coverage_report;
 pub use control::{expire_due, expire_jobs_due, off, pause, resume};
 pub use context::{artifact_chunk, director_summary, worker_brief};
-pub use context::{grant_artifact, revoke_artifact};
+pub use context::{grant_artifact, retry_revoked_interrupts, revoke_artifact};
 pub use director::{claim_batch, complete_batch, recover};
 pub use dispatch::next as dispatch_next;
 pub use dispatch::recover_pending as recover_pending_dispatches;
