@@ -466,6 +466,28 @@ mod tests {
     }
 
     #[test]
+    fn eligibility_reasons_do_not_depend_on_harness_identity() {
+        let work = unit(CapabilityTier::General, &["browser"]);
+        for harness in ["codex", "claude", "opencode", "synthetic-future-harness"] {
+            let mut candidate = route("candidate", harness, "pool-a",
+                CapabilityTier::General, "medium", &[]);
+            let missing_tool = select(&work, &[candidate.clone()]);
+            assert_eq!(missing_tool.selected, None, "{harness}");
+            assert_eq!(missing_tool.exclusions[0].reason, "missing_tool", "{harness}");
+
+            candidate.tools.insert("browser".into());
+            candidate.quota = Allowance::Exhausted;
+            let exhausted = select(&work, &[candidate.clone()]);
+            assert_eq!(exhausted.exclusions[0].reason, "quota_exhausted", "{harness}");
+
+            candidate.quota = Allowance::Unknown;
+            candidate.health = Health::Healthy;
+            assert_eq!(select(&work, &[candidate]).selected.as_deref(), Some("candidate"),
+                "unknown allowance stays a disclosed cold-start candidate for {harness}");
+        }
+    }
+
+    #[test]
     fn hard_pin_and_missing_tools_override_harness_preference() {
         let preferred = route(
             "preferred",
