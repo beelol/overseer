@@ -149,6 +149,17 @@ pub(crate) struct SwarmWorkerIdentity {
     pub revision: i64,
 }
 
+pub(crate) struct SwarmDirectorIdentity {
+    pub run_id: String,
+    pub generation: i64,
+    pub token: String,
+}
+
+enum SwarmLaunchIdentity<'a> {
+    Worker(&'a SwarmWorkerIdentity),
+    Director(&'a SwarmDirectorIdentity),
+}
+
 impl Daemon {
     fn reserve_agent_slot(&self) -> Result<AgentSlotReservation<'_>> {
         let mut pending = self.pending_agent_slots.lock().unwrap();
@@ -404,10 +415,14 @@ impl Daemon {
     }
 
     pub(crate) fn create_task_for_swarm(self: &Arc<Self>, p: &Value, identity: &SwarmWorkerIdentity) -> Result<Value> {
-        self.create_task_internal(p, Some(identity))
+        self.create_task_internal(p, Some(SwarmLaunchIdentity::Worker(identity)))
     }
 
-    fn create_task_internal(self: &Arc<Self>, p: &Value, swarm_identity: Option<&SwarmWorkerIdentity>) -> Result<Value> {
+    pub(crate) fn create_task_for_swarm_director(self: &Arc<Self>, p: &Value, identity: &SwarmDirectorIdentity) -> Result<Value> {
+        self.create_task_internal(p, Some(SwarmLaunchIdentity::Director(identity)))
+    }
+
+    fn create_task_internal(self: &Arc<Self>, p: &Value, swarm_identity: Option<SwarmLaunchIdentity<'_>>) -> Result<Value> {
         let repo_in = p["repo"].as_str().ok_or_else(|| anyhow!("repo is required"))?;
         let harness = p["harness"].as_str().unwrap_or("codex");
         if !["codex", "codex-app", "claude", "opencode", "generic"].contains(&harness) {
@@ -417,7 +432,7 @@ impl Daemon {
         if prompt.is_empty() && harness != "generic" {
             bail!("prompt is required");
         }
-        let mut slot = if swarm_identity.is_none() {
+        let mut slot = if !matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_))) {
             Some(self.reserve_agent_slot()?)
         } else {
             None
@@ -546,7 +561,7 @@ impl Daemon {
                 reservation.insert_task_and_run(&task, &run)?;
             } else {
                 self.store.lock().unwrap().insert_task_and_run(
-                    &task, &run, swarm_identity.map(|identity| identity.attempt_id.as_str())
+                    &task, &run, match swarm_identity.as_ref() { Some(SwarmLaunchIdentity::Worker(identity)) => Some(identity.attempt_id.as_str()), _ => None }
                 )?;
             }
         }
@@ -557,7 +572,7 @@ impl Daemon {
             store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![run.id, generic.to_string()])?;
         }
         self.emit(Some(&task.id), Some(&run.id), "task_created", "daemon", "exact", json!({"task": task, "workspace": ws, "run": run}))?;
-        let started = self.start_turn_internal(&run.id, &prompt, false, &opts, swarm_identity);
+        let started = self.start_turn_internal(&run.id, &prompt, false, &opts, swarm_identity.as_ref());
         if let Err(e) = started {
             let current = self.run(&run.id)?;
             // If no supervisor was recorded, a rejected initial turn must not
@@ -582,15 +597,21 @@ impl Daemon {
         self.start_turn_internal(run_id, prompt, follow_up, opts, None)
     }
 
-    fn start_turn_internal(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts, swarm_identity: Option<&SwarmWorkerIdentity>) -> Result<Turn> {
+    fn start_turn_internal(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts, swarm_identity: Option<&SwarmLaunchIdentity<'_>>) -> Result<Turn> {
         let mut run = self.run(run_id)?;
         if run.parent_run_id.is_some() {
             bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
         }
-        if swarm_identity.is_none() && self.store.lock().unwrap().conn.prepare(
-            "SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1 LIMIT 1"
-        )?.exists([run_id])? {
-            bail!("Swarm worker runs cannot receive ordinary follow-ups; continue through the Swarm director");
+        if swarm_identity.is_none() {
+            let store = self.store.lock().unwrap();
+            if store.conn.prepare("SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1")?
+                .exists([run_id])? {
+                bail!("Swarm worker runs cannot receive ordinary follow-ups; continue through the Swarm director");
+            }
+            if store.conn.prepare("SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1")?
+                .exists([run_id])? {
+                bail!("Swarm director runs cannot receive ordinary follow-ups; continue through Swarm coordination");
+            }
         }
         let ws = self.workspace(&run.workspace_id)?;
         if ws.removed_ms.is_some() {
@@ -688,18 +709,28 @@ impl Daemon {
         )?;
         if let Some(identity) = swarm_identity {
             if run.harness != "generic" || std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() != Ok("1") {
-                bail!("scripted Swarm worker identity requires fixture-only generic harness");
+                bail!("scripted Swarm identity requires fixture-only generic harness");
             }
-            for (key, value) in [
-                ("OVERSEER_SWARM_RUN_ID", identity.run_id.clone()),
-                ("OVERSEER_SWARM_JOB_ID", identity.job_id.clone()),
-                ("OVERSEER_SWARM_ATTEMPT_ID", identity.attempt_id.clone()),
-                ("OVERSEER_SWARM_TOKEN", identity.token.clone()),
-                ("OVERSEER_SWARM_REVISION", identity.revision.to_string()),
+            let mut private_env = vec![
                 ("OVERSEER_HOME", paths::data_dir().display().to_string()),
                 ("OVERSEER_SOCKET", paths::socket_path().display().to_string()),
                 ("OVERSEER_BIN", self.exe.display().to_string()),
-            ] {
+            ];
+            match identity {
+                SwarmLaunchIdentity::Worker(identity) => private_env.extend([
+                    ("OVERSEER_SWARM_RUN_ID", identity.run_id.clone()),
+                    ("OVERSEER_SWARM_JOB_ID", identity.job_id.clone()),
+                    ("OVERSEER_SWARM_ATTEMPT_ID", identity.attempt_id.clone()),
+                    ("OVERSEER_SWARM_TOKEN", identity.token.clone()),
+                    ("OVERSEER_SWARM_REVISION", identity.revision.to_string()),
+                ]),
+                SwarmLaunchIdentity::Director(identity) => private_env.extend([
+                    ("OVERSEER_SWARM_RUN_ID", identity.run_id.clone()),
+                    ("OVERSEER_SWARM_GENERATION", identity.generation.to_string()),
+                    ("OVERSEER_SWARM_DIRECTOR_TOKEN", identity.token.clone()),
+                ]),
+            }
+            for (key, value) in private_env {
                 launch.env.insert(key.to_string(), value);
             }
         }

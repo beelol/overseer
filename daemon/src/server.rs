@@ -297,6 +297,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             json!({"stalled":crate::swarm::expire_director_owners(&mut d.store.lock().unwrap())?})
         }
+        "swarm.director.launch" => {
+            fixture_only()?;
+            crate::swarm::launch_director(d,p)?
+        }
         "swarm.get" => crate::swarm::get(&d.store.lock().unwrap(), s(p, "id")?)?,
         "swarm.plan" => {
             fixture_only()?;

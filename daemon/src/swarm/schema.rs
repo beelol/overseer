@@ -251,7 +251,8 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           status TEXT NOT NULL CHECK(status IN ('active','released')),
           created_ms INTEGER NOT NULL,
           renewed_ms INTEGER NOT NULL,
-          lease_expires_ms INTEGER NOT NULL
+          lease_expires_ms INTEGER NOT NULL,
+          overseer_run_id TEXT REFERENCES runs(id)
         );
         CREATE UNIQUE INDEX IF NOT EXISTS swarm_one_director_turn
           ON swarm_director_turns(run_id) WHERE status='active';
@@ -376,6 +377,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     if !has_stop_reason {
         conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN stop_reason TEXT;")?;
     }
+    let has_director_process = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_director_owners') WHERE name='overseer_run_id'")?
+        .exists([])?;
+    if !has_director_process {
+        conn.execute_batch("ALTER TABLE swarm_director_owners ADD COLUMN overseer_run_id TEXT REFERENCES runs(id);")?;
+    }
     let has_source_change_permission = conn
         .prepare(
             "SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='source_change_permission'",
@@ -488,6 +495,22 @@ pub fn migrate(conn: &Connection) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_director_owner_keeps_its_reservation_when_process_link_is_added() {
+        let conn=Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE swarm_director_owners(
+            run_id TEXT PRIMARY KEY,generation INTEGER NOT NULL,token_sha256 TEXT NOT NULL,
+            status TEXT NOT NULL,created_ms INTEGER NOT NULL,renewed_ms INTEGER NOT NULL,
+            lease_expires_ms INTEGER NOT NULL);
+            INSERT INTO swarm_director_owners VALUES('old-run',1,'digest','active',1,2,30000);").unwrap();
+        migrate(&conn).unwrap();
+        let owner: (i64,String,Option<String>)=conn.query_row(
+            "SELECT generation,status,overseer_run_id FROM swarm_director_owners WHERE run_id='old-run'",
+            [],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+        assert_eq!(owner,(1,"active".into(),None));
+        migrate(&conn).unwrap();
+    }
 
     #[test]
     fn old_swarm_runs_do_not_inherit_source_change_permission() {

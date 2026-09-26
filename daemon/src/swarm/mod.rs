@@ -45,6 +45,7 @@ pub use settings::set_policy;
 pub use revision::revise;
 pub use runtime::{interrupt_workers, launch_worker, liveness, reconcile_terminal_workers,
     reconcile_worker, retry_stopping_interrupts, sample_due_workers, sample_liveness};
+pub use runtime::launch_director;
 pub use runtime::interrupt_workers_with_fault;
 pub use scheduler::next as schedule_next;
 

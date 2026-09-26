@@ -2,7 +2,7 @@
 //! daemon-owned target and each live adapter proves directive/descendant control.
 
 use super::{broker, get, required};
-use crate::daemon::{Daemon, SwarmWorkerIdentity};
+use crate::daemon::{Daemon, SwarmDirectorIdentity, SwarmWorkerIdentity};
 use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
@@ -15,6 +15,41 @@ const UNKNOWN_AFTER_MS: i64 = 60_000;
 const SAMPLE_INTERVAL_MS: i64 = 15_000;
 const SUSPECT_RETRY_MS: i64 = 1_000;
 const STOP_RETRY_MS: i64 = 5_000;
+
+/// Bind the owner before starting a supervised scripted process. The returned
+/// result contains only the linked process ID; the credential stays in the
+/// private 0600 launch file and process environment.
+pub fn launch_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
+    let _serial = d.swarm_launch_lock.lock().unwrap();
+    let run = required(p,"run_id")?;
+    let generation = p["generation"].as_i64().ok_or_else(|| anyhow!("missing generation"))?;
+    let repo = required(p,"repo")?;
+    let program = required(p,"program")?;
+    let prompt = required(p,"prompt")?;
+    let title = required(p,"title")?;
+    let args = p["args"].as_array().ok_or_else(|| anyhow!("args must be an array"))?;
+    if program.is_empty() || !program.starts_with('/') || program.len()>1024
+        || prompt.is_empty() || prompt.len()>8000 || title.is_empty() || title.len()>200
+        || args.len()>32 || args.iter().any(|v| v.as_str().is_none_or(|s| s.len()>4096)) {
+        bail!("invalid scripted director launch");
+    }
+    crate::git::toplevel(std::path::Path::new(repo))?;
+    let owner = super::owner::begin(&mut d.store.lock().unwrap(),
+        &json!({"run_id":run,"generation":generation}))?;
+    let token = owner["owner_token"].as_str().unwrap();
+    let task = d.create_task_for_swarm_director(&json!({
+        "repo":repo,"harness":"generic","workspace_mode":"worktree",
+        "program":program,"args":args,"prompt":prompt,"title":title,
+    }), &SwarmDirectorIdentity { run_id:run.to_string(),generation,token:token.to_string() })?;
+    let process = task["run"]["id"].as_str()
+        .ok_or_else(|| anyhow!("director run was not recorded"))?;
+    super::owner::link_process(&mut d.store.lock().unwrap(),run,generation,token,process)?;
+    if !task["launch_error"].is_null() {
+        return Ok(json!({"status":"launch_failed","overseer_run_id":process,
+            "error":task["launch_error"]}));
+    }
+    Ok(json!({"status":"launched","overseer_run_id":process}))
+}
 
 fn sample_interval(state: &str) -> i64 {
     if state == "suspect" { SUSPECT_RETRY_MS } else { SAMPLE_INTERVAL_MS }
