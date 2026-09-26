@@ -1252,6 +1252,7 @@ impl Daemon {
 
     fn apply_lines(self: &Arc<Self>, run: &Run, lines: &[Value], seg: i64, off: i64, state: &mut TailState) -> Result<()> {
         let mut emitted = Vec::new();
+        let mut pending_learning = Vec::new();
         {
             let store = self.store.lock().unwrap();
             let tx = store.conn.unchecked_transaction()?;
@@ -1269,7 +1270,7 @@ impl Daemon {
                     }
                 }
                 for norm in norms {
-                    self.apply_norm(&store, run, norm, state, &mut emitted)?;
+                    self.apply_norm(&store, run, norm, state, &mut emitted, &mut pending_learning)?;
                 }
             }
             store.set_run_cursor(&run.id, seg, off)?;
@@ -1281,6 +1282,10 @@ impl Daemon {
                 }
             }
             tx.commit()?;
+            for (event_seq, measurement) in pending_learning {
+                let recorded = store.insert_auto_measurement(event_seq, &measurement);
+                self.learning_paused.store(recorded.is_err(), std::sync::atomic::Ordering::Relaxed);
+            }
         }
         for e in emitted {
             let _ = self.events.send(e);
@@ -1301,7 +1306,8 @@ impl Daemon {
         Ok(())
     }
 
-    fn apply_norm(&self, store: &Store, run: &Run, norm: Norm, state: &mut TailState, out: &mut Vec<Event>) -> Result<()> {
+    fn apply_norm(&self, store: &Store, run: &Run, norm: Norm, state: &mut TailState,
+        out: &mut Vec<Event>, pending_learning: &mut Vec<(i64, crate::auto_telemetry::Measurement)>) -> Result<()> {
         let task = Some(run.task_id.as_str());
         let rid = Some(run.id.as_str());
         let mut ev = |kind: &str, source: &str, conf: &str, payload: Value, run_override: Option<&str>| -> Result<()> {
@@ -1443,9 +1449,9 @@ impl Daemon {
                     event.ts, &run.task_id, &run.id, &run.harness,
                     run.profile_id.as_deref(), run.model.as_deref(), run.effort.as_deref(), &event.payload,
                 ) {
-                    // Learning is best effort. The durable execution event remains authoritative.
-                    let recorded = store.insert_auto_measurement(event.seq, &measurement);
-                    self.learning_paused.store(recorded.is_err(), std::sync::atomic::Ordering::Relaxed);
+                    // Only publish learning after the execution transaction
+                    // commits; a rolled-back event must never leave a sample.
+                    pending_learning.push((event.seq, measurement));
                 }
                 out.push(event);
             }
@@ -1684,13 +1690,18 @@ impl Daemon {
             return Ok(());
         }
         let mut emitted = Vec::new();
+        let mut pending_learning = Vec::new();
         {
             let store = self.store.lock().unwrap();
             let tx = store.conn.unchecked_transaction()?;
             for norm in fresh {
-                self.apply_norm(&store, run, norm, state, &mut emitted)?;
+                self.apply_norm(&store, run, norm, state, &mut emitted, &mut pending_learning)?;
             }
             tx.commit()?;
+            for (event_seq, measurement) in pending_learning {
+                let recorded = store.insert_auto_measurement(event_seq, &measurement);
+                self.learning_paused.store(recorded.is_err(), std::sync::atomic::Ordering::Relaxed);
+            }
         }
         for e in emitted {
             let _ = self.events.send(e);

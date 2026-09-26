@@ -915,8 +915,8 @@ impl Store {
         if !crate::auto_telemetry::valid_for_store(m) {
             return Err(anyhow!("invalid Auto measurement"));
         }
-        // The daemon already batches normalized events in an outer transaction.
-        // A savepoint keeps detail and aggregate writes atomic in either context.
+        // Keep detail and aggregate writes atomic on the learning connection.
+        // Callers may invoke this after the execution event has committed.
         self.conn.execute_batch("SAVEPOINT auto_measurement_write")?;
         let result = (|| -> Result<usize> {
         let inserted = self.conn.execute(
