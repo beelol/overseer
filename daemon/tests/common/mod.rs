@@ -37,7 +37,24 @@ impl Daemon {
     }
 
     pub fn spawn(&mut self) {
+        #[cfg(target_os = "macos")]
+        let deny_egress = self.env.iter().any(|(key, value)|
+            key == "OVERSEER_TEST_DENY_EGRESS" && value == "1");
+        #[cfg(target_os = "macos")]
+        let mut cmd = if deny_egress {
+            let mut sandbox = Command::new("/usr/bin/sandbox-exec");
+            sandbox.args(["-p", "(version 1) (allow default) (deny network-outbound)", BIN]);
+            sandbox
+        } else { Command::new(BIN) };
+        #[cfg(not(target_os = "macos"))]
         let mut cmd = Command::new(BIN);
+        #[cfg(target_os = "macos")]
+        if deny_egress {
+            cmd.env_clear();
+            for key in ["HOME", "PATH", "TMPDIR", "USER", "LOGNAME", "SHELL", "LANG"] {
+                if let Some(value) = std::env::var_os(key) { cmd.env(key, value); }
+            }
+        }
         cmd.arg("serve").env("OVERSEER_HOME", self.home.path()).stdout(Stdio::null()).stderr(Stdio::null());
         for (k, v) in &self.env {
             cmd.env(k, v);

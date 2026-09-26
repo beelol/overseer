@@ -1444,6 +1444,72 @@ fn auto_usage_is_local_bounded_and_clear_does_not_erase_run_history() {
     assert!(d.events(&run).iter().any(|e| e["kind"] == "usage"));
 }
 
+#[cfg(target_os = "macos")]
+#[test]
+fn auto_local_usage_records_and_aggregates_with_egress_denied() {
+    let profile = "(version 1) (allow default) (deny network-outbound)";
+    let denied = std::process::Command::new("/usr/bin/sandbox-exec")
+        .args(["-p", profile, "python3", "-c",
+            "import socket; s=socket.socket(); print(s.connect_ex(('127.0.0.1', 9)))"])
+        .output().unwrap();
+    assert!(denied.status.success(), "sandbox preflight failed: {}",
+        String::from_utf8_lossy(&denied.stderr));
+    assert_eq!(String::from_utf8_lossy(&denied.stdout).trim(), "1",
+        "the sandbox must reject outbound connections before this test can prove anything");
+
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let replay = r.path().join("local-usage.jsonl");
+    std::fs::write(&replay, concat!(
+        "{\"type\":\"thread.started\",\"thread_id\":\"egress-denied-thread\"}\n",
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":21,\"output_tokens\":3}}\n"
+    )).unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"),
+        ("REPLAY_FILE", replay.to_str().unwrap()), ("REPLAY_DELAY_MS", "1000"),
+        ("OVERSEER_TEST_DENY_EGRESS", "1")]);
+    let pid = d.child.as_ref().unwrap().id().to_string();
+    let inspected = std::process::Command::new("/bin/ps")
+        .args(["-o", "pid=,comm=", "-p", &pid]).output().unwrap();
+    assert!(inspected.status.success(), "daemon process disappeared");
+    assert!(!String::from_utf8_lossy(&inspected.stdout).trim().is_empty());
+    let sockets = std::process::Command::new("/usr/sbin/lsof")
+        .args(["-nP", "-a", "-p", &pid, "-i"]).output().unwrap();
+    assert!(sockets.stdout.is_empty(), "unexpected daemon Internet socket: {}",
+        String::from_utf8_lossy(&sockets.stdout));
+
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex",
+        "model":"gpt-6-sol","effort":"medium","prompt":"record local usage"}));
+    let run = run_id(&created);
+    d.wait_status(&run, |status| status == "running", 10);
+    let (shim, _) = launch_info(&d, &run);
+    let harness_pid = shim["child_pid"].as_i64().unwrap().to_string();
+    let harness_process = std::process::Command::new("/bin/ps")
+        .args(["-o", "pid=,comm=", "-p", &harness_pid]).output().unwrap();
+    assert!(harness_process.status.success(), "harness process disappeared before inspection");
+    for inspected_pid in [&pid, &harness_pid] {
+        let live_sockets = std::process::Command::new("/usr/sbin/lsof")
+            .args(["-nP", "-a", "-p", inspected_pid, "-i"]).output().unwrap();
+        assert!(live_sockets.stdout.is_empty(), "unexpected Internet socket during task: {}",
+            String::from_utf8_lossy(&live_sockets.stdout));
+    }
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let usage = d.call("auto.usage.list", json!({"limit":10}));
+    let summary = d.call("auto.usage.summary", json!({"limit":10}));
+    assert_eq!(usage["measurements"][0]["input_tokens"], 21, "{usage}");
+    assert_eq!(usage["measurements"][0]["output_tokens"], 3, "{usage}");
+    assert_eq!(summary["aggregates"][0]["samples"], 1, "{summary}");
+    assert_eq!(summary["aggregates"][0]["input_tokens"], 21, "{summary}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let details: i64 = db.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get(0)).unwrap();
+    let aggregates: i64 = db.query_row("SELECT COUNT(*) FROM auto_daily_aggregates", [], |row| row.get(0)).unwrap();
+    assert_eq!((details, aggregates), (1, 1), "usage must remain in the local execution database");
+    let sockets_after = std::process::Command::new("/usr/sbin/lsof")
+        .args(["-nP", "-a", "-p", &pid, "-i"]).output().unwrap();
+    assert!(sockets_after.stdout.is_empty(), "unexpected daemon Internet socket after measurement");
+}
+
 #[test]
 fn auto_telemetry_failure_pauses_learning_without_restarting_or_replaying_work() {
     let r = tmp();
