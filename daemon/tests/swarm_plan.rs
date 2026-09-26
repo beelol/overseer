@@ -11,6 +11,28 @@ fn run_with_job(d: &Daemon, category: &str, job: &str) -> String {
 }
 
 #[test]
+fn stop_does_not_retry_a_rejected_worker_when_it_exits() {
+    let d = Daemon::start(&[]);
+    let run = run_with_job(&d,"Stop rejected worker","inspect");
+    let attempt = d.call("swarm.attempt.register",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"inspect"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"inspect",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "artifact_id":"evidence","source_revision":1,"kind":"finding","content":"local evidence"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"inspect",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "message_id":"result","type":"result","revision":1,
+        "payload":{"artifact_ids":["evidence"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"inspect","decision":"reject","evidence":["evidence"]}));
+    d.call("swarm.stop",json!({"run_id":run,"generation":1,"revision":1}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"job_id":"inspect",
+        "attempt_id":attempt["id"],"generation":1,"revision":1}));
+    let job=&d.call("swarm.jobs",json!({"id":run}))["jobs"][0];
+    assert_eq!(job["status"],"cancelled");
+}
+
+#[test]
 fn shared_reads_and_exclusive_claims_span_categories() {
     let d = Daemon::start(&[]);
     let backend = run_with_job(&d, "Backend", "routes");

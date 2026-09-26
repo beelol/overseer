@@ -117,3 +117,71 @@ pub fn interrupt_workers(d: &Arc<Daemon>, run: &str) -> Result<Value> {
     }
     Ok(json!({"interrupt_requested":requested,"unconfirmed":unconfirmed}))
 }
+
+/// Copy a supervised worker's terminal state into the durable director inbox.
+/// A process exit is only lifecycle evidence; the director still has to assess
+/// a separate result/artifact before the job can be accepted.
+pub fn reconcile_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
+    let run = required(p, "run_id")?;
+    let job = required(p, "job_id")?;
+    let attempt = required(p, "attempt_id")?;
+    let generation = p["generation"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing generation"))?;
+    let revision = p["revision"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing revision"))?;
+    let mut store = d.store.lock().unwrap();
+    let current = get(&store, run)?;
+    if current["generation"] != generation || current["revision"] != revision {
+        bail!("stale director generation or plan revision");
+    }
+    let linked: Option<(String, Option<String>, Option<i64>, i64)> = store
+        .conn
+        .query_row(
+            "SELECT l.overseer_run_id,r.status,r.ended_ms,a.revision
+         FROM swarm_worker_launches l
+         JOIN swarm_attempts a ON a.id=l.attempt_id AND a.run_id=l.run_id AND a.job_id=l.job_id
+         LEFT JOIN runs r ON r.id=l.overseer_run_id
+         WHERE l.run_id=?1 AND l.job_id=?2 AND l.attempt_id=?3 AND l.overseer_run_id IS NOT NULL",
+            params![run, job, attempt],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .optional()?;
+    let Some((overseer_run_id, worker_status, ended, attempt_revision)) = linked else {
+        return Ok(json!({"status":"unlinked"}));
+    };
+    let Some(worker_status) = worker_status else {
+        bail!("linked worker run is missing");
+    };
+    if crate::daemon::ACTIVE.contains(&worker_status.as_str()) || ended.is_none() {
+        return Ok(json!({"status":"active","overseer_run_id":overseer_run_id}));
+    }
+    let message_id = format!("terminal-{attempt}");
+    let payload = json!({"overseer_run_id":overseer_run_id,"run_status":worker_status});
+    let previous: Option<String> = store
+        .conn
+        .query_row(
+            "SELECT payload FROM swarm_messages WHERE run_id=?1 AND message_id=?2",
+            params![run, message_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if let Some(old) = &previous {
+        if serde_json::from_str::<Value>(old)? != payload {
+            bail!("terminal event replay changed payload");
+        }
+    } else {
+        let now = crate::daemon::now();
+        store.conn.execute(
+            "INSERT INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+             VALUES(?1,?2,?3,?4,'runtime','director','terminal',?5,?6,'queued',?7,?7)",
+            params![run,message_id,job,attempt,attempt_revision,payload.to_string(),now],
+        )?;
+    }
+    super::artifacts::confirm_exit(&mut store, p)?;
+    Ok(
+        json!({"status":"terminal","overseer_run_id":overseer_run_id,
+        "worker_status":worker_status,"duplicate":previous.is_some()}),
+    )
+}

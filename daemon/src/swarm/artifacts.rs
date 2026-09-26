@@ -294,6 +294,12 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
     )?;
     if job_status == "accepted" {
         release_and_unlock(&tx, run, job, now)?;
+    } else if current["status"] == "stopping" {
+        tx.execute(
+            "UPDATE swarm_jobs SET status='cancelled',updated_ms=?3 WHERE run_id=?1 AND id=?2",
+            params![run, job, now],
+        )?;
+        tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
     } else if job_status == "rejected" {
         let next = if count < 2 { "ready" } else { "failed" };
         tx.execute(

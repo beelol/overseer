@@ -41,7 +41,15 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
             interval.tick().await;
             let daemon = deadline_daemon.clone();
             match tokio::task::spawn_blocking(move || {
-                crate::swarm::expire_due(&mut daemon.store.lock().unwrap(), crate::daemon::now())
+                let _serial = daemon.swarm_launch_lock.lock().unwrap();
+                let expired = crate::swarm::expire_due(
+                    &mut daemon.store.lock().unwrap(),
+                    crate::daemon::now(),
+                )?;
+                for run in expired {
+                    crate::swarm::interrupt_workers(&daemon, &run)?;
+                }
+                Ok::<(), anyhow::Error>(())
             })
             .await
             {
@@ -255,6 +263,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             crate::swarm::ack(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.stop" => {
+            let _serial = d.swarm_launch_lock.lock().unwrap();
             let mut stopped = crate::swarm::stop(&mut d.store.lock().unwrap(), p)?;
             stopped["workers"] = crate::swarm::interrupt_workers(d, s(p,"run_id")?)?;
             stopped
@@ -288,6 +297,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.worker.launch" => {
             fixture_only()?;
             crate::swarm::launch_worker(d, p)?
+        }
+        "swarm.worker.reconcile" => {
+            fixture_only()?;
+            crate::swarm::reconcile_worker(d, p)?
         }
         "swarm.director.claim_batch" => {
             fixture_only()?;
