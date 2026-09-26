@@ -95,6 +95,7 @@ fn validate_envelope(p: &Value) -> Result<(&str, &str, i64, String)> {
         "claim",
         "submit",
         "redirect",
+        "advisory",
         "checkpoint",
         "stop",
         "retract",
@@ -235,7 +236,7 @@ pub fn direct(store: &mut Store, p: &Value) -> Result<Value> {
     if current["status"] == "stopping" && p["type"] != "stop" && p["type"] != "checkpoint" {
         bail!("swarm run is stopping");
     }
-    if !["redirect", "checkpoint", "stop", "retract"].contains(&required(p, "type")?) {
+    if !["redirect", "advisory", "checkpoint", "stop", "retract"].contains(&required(p, "type")?) {
         bail!("director cannot send this message type");
     }
     let exists: bool = store

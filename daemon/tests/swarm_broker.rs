@@ -101,6 +101,60 @@ fn directive_delivery_and_application_are_distinct() {
 }
 
 #[test]
+fn discovery_can_be_routed_to_only_relevant_peers_with_applied_receipts() {
+    let d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Atlas audit","objective":"Audit tenant isolation",
+        "allowed_targets":["system-codex"]}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j1","title":"Projects","acceptance":"project matrix","deps":[]},
+        {"id":"j2","title":"Tasks","acceptance":"task matrix","deps":[]},
+        {"id":"j3","title":"Membership","acceptance":"role matrix","deps":[]},
+        {"id":"j4","title":"Attachments","acceptance":"download matrix","deps":[]}
+    ]}));
+    let mut attempts=std::collections::HashMap::new();
+    for job in ["j1","j2","j3","j4"] {
+        let attempt=d.call("swarm.attempt.register",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":job}));
+        attempts.insert(job,attempt);
+    }
+    d.call("swarm.report",json!({"run_id":run,"job_id":"j2",
+        "attempt_id":attempts["j2"]["id"],"token":attempts["j2"]["token"],
+        "message_id":"D1","type":"discovery","revision":1,
+        "payload":{"symbol":"TaskRepository.findById","note":"lookup uses id only"}}));
+    assert!(d.try_call("swarm.report",json!({"run_id":run,"job_id":"j2",
+        "attempt_id":attempts["j2"]["id"],"token":attempts["j2"]["token"],
+        "message_id":"spoofed-advisory","type":"advisory","revision":1,
+        "payload":{"focus":"reassign j4"}})).is_err());
+    let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    let batch=d.call("swarm.director.claim_batch",json!({"run_id":run,"generation":1,
+        "revision":1,"now_ms":now+6000}));
+    assert_eq!(batch["status"],"claimed");
+    assert_eq!(batch["messages"][0]["message_id"],"D1");
+    for (job,focus) in [("j1","Check project middleware separately"),
+        ("j4","Check the signed URL boundary")]
+    {
+        let attempt=&attempts[job];
+        let message=format!("D1-to-{job}");
+        d.call("swarm.direct",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":job,"attempt_id":attempt["id"],"message_id":message,
+            "type":"advisory","payload":{"discovery_id":"D1","focus":focus}}));
+        let inbox=d.call("swarm.messages",json!({"run_id":run,"recipient":attempt["id"]}));
+        assert_eq!(inbox["messages"].as_array().unwrap().len(),1);
+        assert_eq!(inbox["messages"][0]["type"],"advisory");
+        for phase in ["delivered","applied"] {
+            assert_eq!(d.call("swarm.ack",json!({"run_id":run,"message_id":message,
+                "recipient":attempt["id"],"token":attempt["token"],
+                "phase":phase,"revision":1}))["phase"],phase);
+        }
+    }
+    assert!(d.call("swarm.messages",json!({"run_id":run,
+        "recipient":attempts["j3"]["id"]}))["messages"].as_array().unwrap().is_empty());
+    assert_eq!(d.call("swarm.director.complete_batch",json!({"run_id":run,
+        "generation":1,"turn_id":batch["turn_id"],"token":batch["token"]}))["applied"],1);
+}
+
+#[test]
 fn repeated_progress_dedupes_before_reaching_director() {
     let d = Daemon::start(&[]);
     let (run_id, attempt_id, token) = planned(&d);
