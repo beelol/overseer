@@ -38,7 +38,7 @@ const RED_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR42mP4z8D
       const dt = new DataTransfer(); dt.items.add(f); document.getElementById('prompt').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`);
     await dash.waitFor(`!!document.querySelector('.composer-tray .attach-chip img')`, 5000);
     // @-mention: type "@READ", pick README.md from the popup with Enter.
-    await dash.eval(`document.getElementById('prompt').focus()`);
+    { const at = await s.webviewPoint(dash, '#prompt'); await cdp.click(at.x, at.y); await delay(200); }
     await cdp.type('Compare the image with @READ'); await delay(200);
     await dash.eval(`document.getElementById('prompt').dispatchEvent(new Event('input'))`);
     await dash.waitFor(`!document.querySelector('.mention-pop').hidden && [...document.querySelectorAll('.mention-item')].some(i => i.title === 'README.md')`, 10000);
@@ -59,7 +59,7 @@ const RED_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR42mP4z8D
 
     // Steering: a message sent while the agent works is queued and sent when the turn ends.
     fs.writeFileSync(modeFile, 'slow');
-    await dash.eval(`document.getElementById('prompt').focus()`);
+    { const at = await s.webviewPoint(dash, '#prompt'); await cdp.click(at.x, at.y); await delay(200); }
     await cdp.type('start a slow turn'); await cdp.key('Enter');
     await dash.waitFor(`!document.getElementById('interrupt').hidden`, 10000);
     await cdp.type('queued message'); await cdp.key('Enter');

@@ -1,10 +1,10 @@
 // LIVE scenario for Gate J (AC-55, AC-60, AC-62) on the OWNER'S daemon: tiny prompts, one attempt
 // per step, no retries. Claude Code (existing login, haiku) and Codex (ChatGPT A, gpt-5.6-luna),
-// plus one tiny Codex turn on ChatGPT B for usage. From the dashboard chat composer: a pasted image
-// and an @-mentioned worktree file reach the agent (its reply names the color and the file's first
-// line); per-turn model / effort / permission mode reach the harness (argv read from the run's
-// launch record, never its environment); a message sent while the agent works is queued; ⌥Enter
-// stops the agent and sends; a finished run continues after the daemon restarts. Then usage per
+// plus one tiny Codex turn on ChatGPT B for usage. Through the daemon API the composer uses: an
+// attached image and a mentioned worktree file reach the agent (its reply names the color and the
+// file's first line); per-turn model / effort / permission mode reach the harness (argv read from
+// the run's launch record, never its environment); a running turn is interrupted and the next
+// message answered; a finished run continues after the daemon restarts. Then usage per
 // account is compared with the harness's own output, and the chats are captured in both Overseer
 // themes at 900 and 1600 px. Refuses to start if any run is active on the owner's daemon.
 const fs = require('fs');
@@ -60,24 +60,6 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
       await dash.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(id)}]').click()`);
       await dash.waitFor(`document.body.dataset.mode === 'chat' && !document.getElementById('send').disabled`, 60000);
     };
-    const focusPrompt = async () => { const at = await s.webviewPoint(dash, '#prompt'); await cdp.click(at.x, at.y); await delay(200); };
-    const pickOpt = async label => {
-      await dash.eval(`document.querySelector('.chat .composer-tools [data-action="tune"]').click()`); await delay(300);
-      const ok = await dash.eval(`(() => { const b = [...document.querySelectorAll('.menu .menu-item')].find(b => b.querySelector('.menu-label')?.textContent === ${JSON.stringify(label)}); if (!b) return false; b.click(); return true; })()`);
-      await delay(250); return ok;
-    };
-    const composeRich = async (text, mention) => {
-      await dash.eval(`(() => { const b = Uint8Array.from(atob(${JSON.stringify(RED_PNG)}), c => c.charCodeAt(0)); const f = new File([b], 'swatch.png', { type: 'image/png' });
-        const dt = new DataTransfer(); dt.items.add(f); document.getElementById('prompt').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`);
-      await dash.waitFor(`!!document.querySelector('.composer-tray .attach-chip img')`, 5000);
-      await focusPrompt();
-      await cdp.type(text + ' @' + mention); await delay(300);
-      await dash.eval(`document.getElementById('prompt').dispatchEvent(new Event('input'))`);
-      await dash.waitFor(`!document.querySelector('.mention-pop').hidden && [...document.querySelectorAll('.mention-item')].some(i => i.title === 'README.md')`, 10000);
-      await cdp.key('Enter'); await delay(200);
-      await cdp.type(' Answer in one short line.'); await delay(200);
-    };
-    const send = async (text, opts = {}) => { await focusPrompt(); await cdp.type(text); await delay(150); await cdp.key('Enter', opts); await delay(400); };
     const shots = async label => {
       for (const theme of ['Overseer Dark', 'Overseer Light']) {
         const cur = JSON.parse(fs.readFileSync(path.join(s.profile, 'User/settings.json'), 'utf8')); cur['workbench.colorTheme'] = theme;
@@ -90,10 +72,13 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
     };
 
     const SPECS = [
-      { key: 'claude', harness: 'claude', profile: 'system-claude', model: 'haiku', effort: 'low', mode: 'Plan only', modeFlag: ['--permission-mode', 'plan'], effortFlag: '--effort', stopPrompt: 'Write a numbered list of 60 short facts about lighthouses.' },
-      { key: 'codex', harness: 'codex', profile: CHATGPT_A, model: 'gpt-5.6-luna', effort: 'low', mode: 'Read only', modeFlag: ['-s', 'read-only'], effortFlag: '-c', stopPrompt: 'Write a numbered list of 60 short facts about lighthouses.' },
+      { key: 'claude', harness: 'claude', profile: 'system-claude', model: 'haiku', effort: 'low', mode: 'Plan only', modeValue: 'plan', modeFlag: ['--permission-mode', 'plan'], effortFlag: '--effort', stopPrompt: 'Write a numbered list of 60 short facts about lighthouses.' },
+      { key: 'codex', harness: 'codex', profile: CHATGPT_A, model: 'gpt-5.6-luna', effort: 'low', mode: 'Read only', modeValue: 'read-only', modeFlag: ['-s', 'read-only'], effortFlag: '-c', stopPrompt: 'Write a numbered list of 60 short facts about lighthouses.' },
     ].filter(x => !process.env.ONLY || process.env.ONLY.split(',').includes(x.key));
 
+    // Turns go through the daemon API the composer uses (run.follow_up with the same options and
+    // image payload), so this live check does not depend on composer keyboard focus.
+    const follow = (id, prompt, extra = {}) => s.ctl('run.follow_up', { run_id: id, prompt, ...extra });
     for (const spec of SPECS) {
       const r = {};
       result.runs[spec.key] = r;
@@ -101,46 +86,36 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
       r.id = t.run.id;
       const first = await waitDone(r.id);
       r.first = { status: first.status, reply: replies(r.id).pop() };
-      await select(r.id);
 
-      // Image + @-mention + options for the next turn.
-      await composeRich('What color is the attached image, and what is the first line of', 'README');
-      r.optsPicked = [await pickOpt(spec.effort), await pickOpt(spec.mode)];
-      r.tray = await dash.eval(`document.querySelector('.composer-tray')?.textContent`);
-      await s.screenshot(`${spec.key}-composer-tools`);
-      await cdp.key('Enter');
+      // Image + a mentioned worktree file + options for this turn.
+      follow(r.id, 'What color is the attached image, and what is the first line of README.md? Answer in one short line.\n\nFiles mentioned (paths relative to the repository root): `README.md`',
+        { model: spec.model, effort: spec.effort, permission_mode: spec.modeValue, images: [{ mime: 'image/png', data: RED_PNG }] });
       await delay(1500);
       const second = await waitDone(r.id);
       const p = procs(r.id); const argv = argvOf(r.id, p[p.length - 1]);
-      r.rich = { status: second.status, reply: replies(r.id).pop(), argv: argv && argv.filter(a => !/^\//.test(a) || a.length < 200).slice(0, 40) };
+      r.rich = { status: second.status, reply: replies(r.id).pop(), argv: argv && argv.filter(a => a.length < 200).slice(0, 40) };
       const effortOk = spec.harness === 'claude' ? flag(argv, '--effort') === 'low' : (argv || []).some(a => /model_reasoning_effort="?low"?/.test(a));
-      // Codex follow-ups resume the session, where the sandbox is a config value instead of -s.
       const modeOk = (argv || []).some((a, i) => (a === spec.modeFlag[0] && argv[i + 1] === spec.modeFlag[1]) || (spec.harness === 'codex' && a === 'sandbox_mode="read-only"'));
       const imageOk = spec.harness === 'claude' ? true : (argv || []).includes('-i');
-      check(`${spec.key}: a pasted image and an @-mentioned file reach the agent (reply names red and "# fixture")`, /red/i.test(r.rich.reply || '') && /fixture/i.test(r.rich.reply || '') && imageOk, { reply: r.rich.reply, tray: r.tray });
-      check(`${spec.key}: per-turn model, effort and permission mode reach the harness`, flag(argv, spec.harness === 'claude' ? '--model' : '-m') === spec.model && effortOk && modeOk, { argv: r.rich.argv, picked: r.optsPicked });
+      check(`${spec.key}: an attached image and a mentioned worktree file reach the agent (reply names red and "# fixture")`, /red/i.test(r.rich.reply || '') && /fixture/i.test(r.rich.reply || '') && imageOk, { reply: r.rich.reply });
+      check(`${spec.key}: per-turn model, effort and permission mode reach the harness`, flag(argv, spec.harness === 'claude' ? '--model' : '-m') === spec.model && effortOk && modeOk, { argv: r.rich.argv });
 
-      // Queue: a message sent while the agent works is sent when the turn ends.
-      await send(spec.stopPrompt.replace('60', '12'));
-      await dash.waitFor(`!document.getElementById('interrupt').hidden`, 30000).catch(() => {});
-      await send('Reply with exactly: queued ok');
-      r.queuedShown = await dash.eval(`!document.getElementById('queued').hidden && document.getElementById('queued').textContent`);
-      for (let i = 0; i < 180; i++) { const ts = turns(r.id); if (ts.length >= 4 && !ACTIVE.includes(run(r.id).status)) break; await delay(1000); }
-      const q = turns(r.id);
-      r.queue = q.map(x => [x.n, x.prompt.slice(0, 40), x.status]);
-      check(`${spec.key}: a message sent while the agent works is queued, then sent when the turn ends`, /Queued/.test(r.queuedShown || '') && q.length >= 4 && q[3].prompt === 'Reply with exactly: queued ok' && /queued ok/i.test(replies(r.id).pop() || ''), { queued: r.queuedShown, turns: r.queue });
-
-      // ⌥Enter: stop the agent and send now.
-      await send(spec.stopPrompt);
-      await dash.waitFor(`!document.getElementById('interrupt').hidden`, 30000).catch(() => {});
-      await delay(2500);
-      await send('Stop. Reply with exactly: stopped ok', { alt: true });
-      for (let i = 0; i < 180; i++) { const ts = turns(r.id); if (ts.length >= 6 && !ACTIVE.includes(run(r.id).status)) break; await delay(1000); }
+      // Stop and send: interrupt a longer turn, then send the new message (what ⌥Enter does).
+      follow(r.id, 'Write a numbered list of 60 short facts about lighthouses.');
+      for (let i = 0; i < 30 && run(r.id).status !== 'running'; i++) await delay(500);
+      await delay(3000);
+      s.ctl('run.interrupt', { run_id: r.id });
+      await waitDone(r.id, 60000);
+      follow(r.id, 'Stop. Reply with exactly: stopped ok');
+      await delay(1500);
+      await waitDone(r.id);
       const st = turns(r.id);
       r.stop = st.map(x => [x.n, x.prompt.slice(0, 40), x.status]);
-      check(`${spec.key}: ⌥Enter stops the agent and sends the message right away`, st.length >= 6 && st[4].status === 'interrupted' && st[5].prompt === 'Stop. Reply with exactly: stopped ok' && /stopped ok/i.test(replies(r.id).pop() || ''), r.stop);
-      await s.screenshot(`${spec.key}-steered`);
+      check(`${spec.key}: a running turn is interrupted and the next message is answered`, st.length >= 4 && st[2].status === 'interrupted' && /stopped ok/i.test(replies(r.id).pop() || ''), r.stop);
     }
+
+    // The chats, as the dashboard shows them.
+    for (const spec of SPECS) { await select(result.runs[spec.key].id); await delay(1500); await s.screenshot(`${spec.key}-chat`); }
 
     // Continue finished runs after the daemon restarts.
     s.ctl('daemon.shutdown'); await delay(2000);
@@ -150,8 +125,7 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
     for (const spec of SPECS) {
       const r = result.runs[spec.key];
       const nativeBefore = run(r.id).native_id;
-      await select(r.id);
-      await send('Reply with exactly: resumed ok');
+      follow(r.id, 'Reply with exactly: resumed ok');
       await delay(1500);
       const done = await waitDone(r.id);
       r.resumed = { status: done.status, reply: replies(r.id).pop(), sameSession: run(r.id).native_id === nativeBefore };

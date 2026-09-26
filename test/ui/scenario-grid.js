@@ -90,6 +90,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await s.screenshot('grid-4-dark');
 
     // Keyboard: arrows move between tiles; Enter opens the agent's chat.
+    // Put keyboard focus inside the webview (the search field), then on the first tile.
+    { const at = await s.webviewPoint(dash, '.rail-search input, input[type="search"], #search'); await cdp.click(at.x, at.y); await delay(200); }
     await dash.eval(`document.querySelector('.grid .tile').focus()`);
     const first = await dash.eval(`document.activeElement.dataset.run`);
     await cdp.key('ArrowRight'); await delay(200);

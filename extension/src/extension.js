@@ -105,8 +105,10 @@ async function activate(context) {
   const accountsSoon = () => { clearTimeout(accountsTimer); accountsTimer = setTimeout(() => refreshAccounts().catch(() => {}), 400); };
   let accountsSeen = Date.now();
   context.subscriptions.push(vscode.window.onDidChangeWindowState(w => { if (w.focused && Date.now() - accountsSeen > 30000) { accountsSeen = Date.now(); accountsSoon(); } }));
+  // Output and tool events do not change the daemon's state summary; streaming skips the refresh.
+  const STREAM_ONLY = new Set(['output', 'tool', 'tool_result']);
   client.on('event', event => {
-    model.scheduleRefresh();
+    if (!STREAM_ONLY.has(event.kind)) model.scheduleRefresh();
     if (event.kind === 'profile') accountsSoon();
     if (selectedRun && ['file_activity', 'status', 'turn_done', 'workspace_removed'].includes(event.kind)) setTimeout(() => dirty.refresh(), 300);
     if (event.kind === 'permission') {
