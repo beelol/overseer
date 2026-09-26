@@ -391,9 +391,10 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-2.md"
       ],
-      "blocker": "Evidence is required for a review decision; contradictory evidence handling and bounded reproduction remain unimplemented."
+      "blocker": "Evidence is required for a review decision and a typed confirmed-defect result requires a reproduction artifact; contradictory evidence handling, independent reproduction and live director review remain unimplemented."
     },
     "SWARM-48": {
       "status": "partial",
@@ -464,9 +465,13 @@
       "blocker": "Acceptance and fixture final completion revalidate stored evidence provenance and integrity, including tampering after review. Live filesystem provenance and permission-scoped replacement retrieval remain unimplemented."
     },
     "SWARM-55": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "The broker stores result payloads but no typed coverage classification or negative/environment-failure/defect report is implemented."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_broker.rs",
+        "daemon/src/swarm/coverage.rs",
+        "docs/verification/swarm/SWARM-55.md"
+      ],
+      "blocker": "Fixture result messages retain distinct negative, environment-failure and defect states; environment failures cannot be passed or hidden by later same-attempt messages, and defect acceptance requires reproduction artifact evidence. Versioned S1/S2 backend replays, independent reproduction, a complete coverage matrix and live director/harness paths remain unverified."
     },
     "SWARM-56": {
       "status": "partial",
