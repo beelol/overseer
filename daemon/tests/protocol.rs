@@ -2894,6 +2894,98 @@ fn auto_managed_child_reattaches_after_daemon_restart_without_relaunch() {
 }
 
 #[test]
+fn auto_running_child_survives_lost_dispatch_response_and_two_client_reconnect() {
+    use std::io::Write;
+    use std::os::unix::net::UnixStream;
+    use std::time::Instant;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("post-spawn-trace.txt");
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "6000"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"auto-post-spawn-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"prompt":"browser check"});
+    let mut lost_client = UnixStream::connect(d.socket()).unwrap();
+    lost_client.write_all(format!("{}\n", json!({"id":1,"method":"auto.dispatch",
+        "params":request})).as_bytes()).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let child = loop {
+        let runs = d.runs();
+        if let Some(run) = runs.iter().find(|run| run["parent_run_id"] == parent) {
+            let child = run["id"].as_str().unwrap().to_string();
+            if d.events(&child).iter().any(|event| event["kind"] == "turn_started") { break child; }
+        }
+        assert!(Instant::now() < deadline, "Auto child never reached the post-spawn crash window");
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    d.wait_status(&child, |status| status == "running", 10);
+    d.kill9();
+    drop(lost_client);
+    d.spawn();
+    let first = d.call("auto.dispatch", request.clone());
+    let second = d.call("auto.dispatch", request);
+    for replay in [&first, &second] {
+        assert_eq!(replay["run"]["id"], child);
+        assert_eq!(replay["replayed"], true);
+    }
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert_eq!(d.run(&child)["process_generation"], 1);
+    assert_eq!(d.runs().len(), 2);
+    assert_eq!(d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count(), 1);
+    assert_eq!(d.events(&parent).into_iter().filter(|event|
+        event["kind"] == "managed_child_result_available").count(), 1);
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 1,
+        "lost dispatch response must not start a second model turn");
+}
+
+#[test]
+fn auto_replay_does_not_claim_a_committed_but_unstarted_child_was_dispatched() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("unstarted-child-trace.txt");
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER reject_child_created_notice BEFORE INSERT ON events
+        WHEN NEW.kind='managed_child_created'
+        BEGIN SELECT RAISE(FAIL, 'injected child notice failure'); END;").unwrap();
+    let request = json!({"work_unit_id":"unstarted-auto-child-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"prompt":"bounded child task"});
+    let first = d.call("auto.dispatch", request.clone());
+    assert_eq!(first["state"], "paused", "{first}");
+    let children = d.runs().into_iter().filter(|run| run["parent_run_id"] == parent)
+        .collect::<Vec<_>>();
+    assert_eq!(children.len(), 1, "child identity was committed before the notice failed");
+    let child = children[0]["id"].as_str().unwrap().to_string();
+    assert_eq!(children[0]["status"], "queued");
+    assert_eq!(children[0]["process_generation"], 0);
+    let before_restart = d.call("auto.dispatch", request.clone());
+    assert_eq!(before_restart["state"], "paused",
+        "unstarted child cannot be reported as dispatched: {before_restart}");
+    assert_eq!(before_restart["pause_reason"], "launch_effects_uncertain");
+    assert_eq!(before_restart["run"]["id"], child);
+    d.kill9();
+    db.execute_batch("DROP TRIGGER reject_child_created_notice;").unwrap();
+    d.spawn();
+    let replay = d.call("auto.dispatch", request);
+    assert_eq!(replay["state"], "paused", "unstarted child cannot be reported as dispatched: {replay}");
+    assert_eq!(replay["pause_reason"], "launch_effects_uncertain");
+    assert_eq!(replay["run"]["id"], child);
+    assert_eq!(d.runs().len(), 2);
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 0,
+        "replay must not start an unstarted child automatically");
+}
+
+#[test]
 fn auto_managed_result_notice_failure_rolls_back_settlement_and_recovers_once() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

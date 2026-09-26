@@ -141,8 +141,10 @@ rl.on('line', line => {
           item: { type: 'agentMessage', id: 'message-1', text } } });
         out({ method: 'turn/completed', params: { threadId: thread, turn: { id: turn, status: 'completed', error: null } } });
       };
-      if (process.env.FIXTURE_MODE === 'managed-delay' && (prompt === 'browser check' || prompt === 'hold parent')) {
-        pendingTurnTimer = setTimeout(finish, 6000);
+      const turnDelay = Number(process.env.FIXTURE_TURN_DELAY_MS ??
+        (process.env.FIXTURE_MODE === 'managed-delay' ? 6000 : 0));
+      if (turnDelay > 0 && turnDelay <= 10000 && (prompt === 'browser check' || prompt === 'hold parent')) {
+        pendingTurnTimer = setTimeout(finish, turnDelay);
       } else finish();
       return;
     }

@@ -744,13 +744,29 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 }
                 let route_id = format!("{}/{}/{}", child.profile_id.as_deref().unwrap_or("unknown"),
                     child.model.as_deref().unwrap_or("unknown"), child.effort.as_deref().unwrap_or("unknown"));
-                let replay_state = if !ACTIVE.contains(&child.status.as_str())
-                    && child.status != "completed" { "paused" } else { "dispatched" };
+                // The child row is committed before the launch notice and
+                // supervisor are started. A queued row alone is not proof that
+                // any harness process exists, including after a lost response.
+                if child.process_generation == 0 && auto_launch_active(work_unit_id) {
+                    return Ok(auto_pending_response(work_unit_id, &route_id, true));
+                }
+                let unstarted = child.process_generation == 0
+                    && (ACTIVE.contains(&child.status.as_str())
+                        || child.exit_reason.as_deref() == Some("daemon stopped before the run was launched"));
+                let replay_state = if (!ACTIVE.contains(&child.status.as_str())
+                    && child.status != "completed") || unstarted {
+                    "paused"
+                } else { "dispatched" };
                 let mut replay = json!({"state":replay_state,"work_unit_id":work_unit_id,"run":child,
                     "workspace":d.workspace(&child.workspace_id)?,"replayed":true,
                     "decision":{"work_unit_id":work_unit_id,"selected":route_id,"exclusions":[],"reason":"replayed_existing_work_unit"}});
                 if replay_state == "paused" {
-                    replay["actions"] = json!(["refresh", "choose_manual_route"]);
+                    if unstarted {
+                        replay["pause_reason"] = json!("launch_effects_uncertain");
+                        replay["actions"] = json!(["inspect_launch", "choose_manual_route"]);
+                    } else {
+                        replay["actions"] = json!(["refresh", "choose_manual_route"]);
+                    }
                 }
                 replay
             } else if let Some((intent_parent, intent_hash, route_id, _, phase)) = saved_intent {
