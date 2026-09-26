@@ -2444,6 +2444,88 @@ fn auto_four_slow_profile_collectors_finish_within_the_decision_deadline() {
 }
 
 #[test]
+fn auto_hundred_local_routes_with_stalled_account_read_pause_before_deadline_and_keep_ui_responsive() {
+    use std::collections::BTreeSet;
+    use std::time::Instant;
+    let Some(program) = std::env::var_os("PATH").and_then(|path| std::env::split_paths(&path)
+        .map(|dir| dir.join("opencode")).find(|candidate| candidate.is_file())) else { return };
+    struct MockServer(std::process::Child);
+    impl Drop for MockServer {
+        fn drop(&mut self) { let _ = self.0.kill(); let _ = self.0.wait(); }
+    }
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let port_file = r.path().join("mock-port");
+    let mock_log = r.path().join("mock-log.jsonl");
+    let _mock = MockServer(std::process::Command::new("node")
+        .arg(fixture("mock-openai/server.js"))
+        .env("MOCK_PORT_FILE", &port_file).env("MOCK_LOG", &mock_log)
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+        .spawn().unwrap());
+    let ready_deadline = Instant::now() + Duration::from_secs(5);
+    while !port_file.exists() {
+        assert!(Instant::now() < ready_deadline, "local mock provider did not start");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let endpoint = format!("http://127.0.0.1:{}/v1", std::fs::read_to_string(&port_file).unwrap());
+    let providers = (0..100).map(|n| (format!("local_{n:03}"), json!({
+        "npm":"@ai-sdk/openai-compatible","options":{"baseURL":endpoint},
+        "models":{"gpt-oss-120b":{"name":format!("Local {n}"),"tool_call":true,"reasoning":true}}
+    }))).collect::<serde_json::Map<String, serde_json::Value>>();
+    std::fs::write(repo.join("opencode.json"), json!({
+        "$schema":"https://opencode.ai/config.json","provider":providers,
+        "model":"local_000/gpt-oss-120b","small_model":"local_000/gpt-oss-120b",
+        "autoupdate":false,"share":"disabled"
+    }).to_string()).unwrap();
+    git(&repo, &["add", "opencode.json"]);
+    git(&repo, &["commit", "-q", "-m", "hundred local routes"]);
+    let trace = r.path().join("stalled-account-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_OPENCODE_PATH", program.to_str().unwrap()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_MODEL_DELAY_MS,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_MODEL_DELAY_MS", "12000"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let local = d.call("profile.create", json!({"name":"Hundred local routes","harness":"opencode"}));
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"hundred-local-routes-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":["browser/navigate"],
+        "sandbox":"read_only","allowed_profiles":[local["id"],"system-codex"],
+        "prompt":"bounded browser audit"});
+    let start = Instant::now();
+    let outcome = std::thread::scope(|scope| {
+        let pending = scope.spawn(|| d.call("auto.dispatch", request));
+        let probe_deadline = Instant::now() + Duration::from_secs(3);
+        while !std::fs::read_to_string(&trace).unwrap_or_default().contains("model_read") {
+            assert!(Instant::now() < probe_deadline, "stalled account collector did not begin");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let ui_start = Instant::now();
+        assert!(d.call("hello", json!({}))["protocol"].is_number());
+        assert!(ui_start.elapsed() < Duration::from_secs(2),
+            "another UI client waited behind the stalled hundred-route decision");
+        pending.join().unwrap()
+    });
+    assert_eq!(outcome["state"], "paused", "{outcome}");
+    assert!(start.elapsed() <= Duration::from_secs(11),
+        "hundred-route decision exceeded the 10+1 second tolerance");
+    let decision = d.events(&parent).into_iter().find(|event| event["kind"] == "auto_decision").unwrap();
+    assert!(decision["payload"]["discovery_failures"].as_array().unwrap().iter()
+        .any(|failure| failure["profile_id"] == "system-codex"
+            && failure["reason"] == "metadata_or_auth_unavailable"),
+        "the stalled account read must be excluded before the decision: {decision}");
+    let routes = decision["payload"]["selection_input"]["routes"].as_array().unwrap();
+    assert_eq!(routes.len(), 100, "all bounded local candidates reached the selector");
+    let pools = routes.iter().map(|route| route["pool_id"].as_str().unwrap()).collect::<BTreeSet<_>>();
+    assert_eq!(pools.len(), 1, "one endpoint must retain one shared pool identity");
+    assert_eq!(d.runs().len(), 1, "metadata reads and ineligible routes must not start a child");
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("model_read").count(), 1);
+    assert!(!std::fs::read_to_string(&mock_log).unwrap_or_default().contains("/v1/chat/completions"),
+        "catalog discovery must not send a paid or mock model request");
+}
+
+#[test]
 fn auto_claude_api_key_auth_is_excluded_without_a_child() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
