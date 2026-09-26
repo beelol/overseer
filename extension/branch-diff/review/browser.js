@@ -411,6 +411,13 @@ function renderHunks(row) {
   for (const h of row.hunks || []) editor.removeOverlayWidget(h.widget);
   row.hunks = [];
   const changes = row.editor.getLineChanges() || [];
+  // Overseer (AC-76): a thin strip above each hunk holds its actions, so they never cover code.
+  const tops = [];
+  editor.changeViewZones(zones => {
+    for (const id of row.hunkZones || []) zones.removeZone(id);
+    row.hunkZones = changes.map((change, index) => zones.addZone({ afterLineNumber: change.modifiedEndLineNumber ? change.modifiedStartLineNumber - 1 : change.modifiedStartLineNumber,
+      heightInPx: 22, domNode: node('div', 'hunk-strip'), onDomNodeTop: top => { tops[index] = top; const h = row.hunks?.[index]; if (h) { h.zoneTop = top; h.dom.style.top = top + 'px'; } } }));
+  });
   const reviewedRanges = [];
   const canEdit = editing.enabled(row);
   changes.forEach((change, index) => {
@@ -420,13 +427,14 @@ function renderHunks(row) {
     dom.dataset.key = key; dom.dataset.hunk = String(index + 1);
     const where = change.modifiedEndLineNumber ? `lines ${change.modifiedStartLineNumber}–${change.modifiedEndLineNumber}` : `deletion after line ${change.modifiedStartLineNumber}`;
     dom.setAttribute('role', 'group'); dom.setAttribute('aria-label', `Hunk ${index + 1} of ${row.entry.path}, ${where}`);
-    if (reviewed) { const badge = node('span', 'hunk-badge', '✓'); badge.title = 'Reviewed'; dom.append(badge); }
-    const accept = node('button', 'hunk-accept', reviewed ? '○' : '✓');
+    const glyph = name => { const g = node('span', 'codicon codicon-' + name); g.setAttribute('aria-hidden', 'true'); return g; };
+    if (reviewed) { const badge = node('span', 'hunk-badge'); badge.append(glyph('pass-filled')); badge.title = 'Reviewed'; dom.append(badge); }
+    const accept = node('button', 'hunk-accept'); accept.append(glyph(reviewed ? 'close' : 'check'));
     accept.title = reviewed ? 'Unmark: this hunk is reviewed; mark it not reviewed' : 'Accept: keep this change and mark the hunk reviewed (no Git staging)';
     accept.setAttribute('aria-label', reviewed ? `Unmark reviewed hunk ${index + 1}` : `Accept hunk ${index + 1}`);
     accept.addEventListener('click', () => vscode.postMessage({ type: 'hunkReview', reviewed: !reviewed, key, path: row.entry.path, version: snapshot?.version,
       modifiedStart: change.modifiedStartLineNumber, modifiedEnd: change.modifiedEndLineNumber, modified: mod, anchor: row.modified.getLineContent(Math.max(1, Math.min(change.modifiedStartLineNumber || 1, row.modified.getLineCount()))) }));
-    const reject = node('button', 'hunk-reject', '↶');
+    const reject = node('button', 'hunk-reject'); reject.append(glyph('discard'));
     reject.disabled = !canEdit;
     reject.title = canEdit ? 'Reject: restore this hunk to the comparison base (undo with Cmd+Z in the native editor)' : 'Reject is unavailable: this file cannot be edited in the review (see Open in Native Diff)';
     reject.setAttribute('aria-label', `Reject hunk ${index + 1}`);
@@ -434,7 +442,7 @@ function renderHunks(row) {
     dom.append(accept, reject);
     const widget = { getId: () => `overseer.hunk.${row.entry.id}.${index}`, getDomNode: () => dom, getPosition: () => null };
     editor.addOverlayWidget(widget);
-    row.hunks.push({ widget, dom, change, key });
+    row.hunks.push({ widget, dom, change, key, zoneTop: tops[index] });
     if (reviewed && change.modifiedEndLineNumber) reviewedRanges.push({ range: { startLineNumber: change.modifiedStartLineNumber, startColumn: 1, endLineNumber: change.modifiedEndLineNumber, endColumn: 1 }, options: { isWholeLine: true, className: 'hunk-reviewed-line' } });
   });
   if (!row.hunkDecorations) row.hunkDecorations = editor.createDecorationsCollection();
@@ -447,6 +455,7 @@ function placeHunks(row) {
   const editor = row.editor?.getModifiedEditor();
   if (!editor) return;
   for (const h of row.hunks || []) {
+    if (h.zoneTop !== undefined) { h.dom.style.top = h.zoneTop + 'px'; continue; }
     const line = Math.max(1, Math.min(row.modified.getLineCount(), h.change.modifiedEndLineNumber ? h.change.modifiedStartLineNumber : h.change.modifiedStartLineNumber + 1));
     h.dom.style.top = Math.max(0, editor.getTopForLineNumber(line) - editor.getScrollTop()) + 'px';
   }

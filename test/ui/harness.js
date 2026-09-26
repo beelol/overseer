@@ -150,6 +150,14 @@ class Session {
     await delay(800);
   }
 
+  /** Selects an agent by clicking its row in the side bar's agents list (Gate K). */
+  async selectAgent(title, { settle = 1500 } = {}) {
+    await this.openOverseerView();
+    const pt = await this.cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(title)}).pop(); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2 }; })()`, 30000, 'agent ' + title);
+    await this.cdp.click(pt.x, pt.y);
+    await delay(settle);
+  }
+
   /** Absolute page coordinates of an element inside a webview frame. */
   async webviewPoint(frame, selector) {
     const inner = await frame.eval(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 40), y: r.top + Math.min(r.height / 2, 12), w: innerWidth, h: innerHeight }; })()`);

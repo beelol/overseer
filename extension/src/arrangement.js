@@ -64,8 +64,19 @@ class Arrangement {
     await this.review.open(runId, { viewColumn: vscode.ViewColumn.One, preserveFocus: true, follow });
     await this.center.open({ column: vscode.ViewColumn.Two, preserveFocus: true });
     await this.keepChat();
+    await this.fitChat();
     this.current = 'split';
     this.persist();
+  }
+
+  /** The chat keeps at least 360 px beside the review (AC-77): widen its column on small windows. */
+  async fitChat() {
+    const size = await this.center.measure?.();
+    if (!size || !size.w || size.w >= 360) return;
+    const editorWidth = size.w / SPLIT.groups[1].size;
+    const share = Math.min(0.5, 372 / editorWidth);
+    if (share <= SPLIT.groups[1].size) return;
+    await vscode.commands.executeCommand('vscode.setEditorLayout', { orientation: 0, groups: [{ size: 1 - share }, { size: share }] });
   }
 
   /** A moved editor becomes a preview tab, which the next opened file would replace; keep the chat. */

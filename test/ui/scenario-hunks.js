@@ -37,12 +37,7 @@ echo done`;
     const indexBefore = git(W, 'diff', '--cached');
 
     await s.openOverseerView();
-    const selectRun = async title => {
-      const pt = await cdp.waitFor(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-        const i = rows.findIndex(r => r.textContent.includes(${JSON.stringify(title)})); const r = rows[i + 1]; if (!r || !/generic|codex/.test(r.textContent)) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 20000, 'run row ' + title);
-      await cdp.click(pt.x, pt.y);
-      await delay(1500);
-    };
+    const selectRun = title => s.selectAgent(title);
     const reviewOf = ws => cdp.webview(`document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(ws)}) && !!document.querySelector('.hunk-actions')`, 30000);
     const fileState = (frame, file) => frame.eval(`(() => { const e = [...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === ${JSON.stringify(file)}); return e ? { hunks: Number(e.dataset.hunks || 0), reviewed: Number(e.dataset.reviewed || 0), load: e.dataset.loadState } : null; })()`);
     const waitFile = (frame, file, pred, ms = 15000) => frame.waitFor(`(() => { const e = [...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === ${JSON.stringify(file)}); if (!e) return ${pred.includes('missing') ? 'true' : 'false'}; const hunks = Number(e.dataset.hunks || 0), reviewed = Number(e.dataset.reviewed || 0); return e.dataset.loadState === 'rendered' && (${pred}); })()`, ms);

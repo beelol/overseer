@@ -1,0 +1,14 @@
+[2026-09-26T19:58:22.214Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T19:58:34.606Z] screenshot docs/verification/evidence/ui/review-width/01-review-dark-900.png
+[2026-09-26T19:58:36.926Z] screenshot docs/verification/evidence/ui/review-width/02-review-dark-1280.png
+[2026-09-26T19:58:39.224Z] screenshot docs/verification/evidence/ui/review-width/03-review-dark-1600.png
+[2026-09-26T19:58:43.330Z] screenshot docs/verification/evidence/ui/review-width/04-review-light-900.png
+[2026-09-26T19:58:45.621Z] screenshot docs/verification/evidence/ui/review-width/05-review-light-1280.png
+[2026-09-26T19:58:47.909Z] screenshot docs/verification/evidence/ui/review-width/06-review-light-1600.png
+[2026-09-26T19:58:47.911Z] audits [{"theme":"Overseer Dark","window":900,"review":322,"toolbar":{"ok":true,"height":47},"overlaps":0,"overflow":false,"hunks":4},{"theme":"Overseer Dark","window":1280,"review":608,"toolbar":{"ok":true,"height":47},"overlaps":0,"overflow":false,"hunks":4},{"theme":"Overseer Dark","window":1600,"review":820,"toolbar":{"ok":true,"height":47},"overlaps":0,"overflow":false,"hunks":4},{"theme":"Overseer Light","window":900,"review":322,"toolbar":{"ok":true,"height":47},"overlaps":0,"overflow":false,"hunks":4},{"theme":"Overseer Light","window":1280,"review":608,"toolbar":{"ok":true,"height":47},"overlaps":0,"overflow":false,"hunks":4},{"theme":"Overseer Light","window":1600,"review":820,"toolbar":{"ok":true,"height":47},"overlaps":0,"overflow":false,"hunks":4}]
+[2026-09-26T19:58:47.911Z] PASS the review header stays on one line at 900, 1280 and 1600 px in both themes [["Overseer Dark",900,{"ok":true,"height":47}],["Overseer Dark",1280,{"ok":true,"height":47}],["Overseer Dark",1600,{"ok":true,"height":47}],["Overseer Light",900,{"ok":true,"height":47}],["Overseer Light",1280,{"ok":true,"height":47}],["Overseer Light",1600,{"ok":true,"height":47}]]
+[2026-09-26T19:58:47.911Z] PASS each file header stays on one line [[900,[]],[1280,[]],[1600,[]],[900,[]],[1280,[]],[1600,[]]]
+[2026-09-26T19:58:47.911Z] PASS no hunk Accept/Revert control covers code [["Overseer Dark",900,4,[]],["Overseer Dark",1280,4,[]],["Overseer Dark",1600,4,[]],["Overseer Light",900,4,[]],["Overseer Light",1280,4,[]],["Overseer Light",1600,4,[]]]
+[2026-09-26T19:58:47.911Z] PASS nothing in the review overflows sideways [[900,false],[1280,false],[1600,false],[900,false],[1280,false],[1600,false]]
+[2026-09-26T19:58:47.911Z] PASS file rows carry codicons []
+[2026-09-26T19:58:47.911Z] PASS a very large diff starts collapsed with its line count ["800 changed lines. Load this diff to review it.Load Diff"]

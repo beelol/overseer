@@ -1,0 +1,372 @@
+{
+  "checks": [
+    {
+      "name": "the review header stays on one line at 900, 1280 and 1600 px in both themes",
+      "ok": true,
+      "detail": [
+        [
+          "Overseer Dark",
+          900,
+          {
+            "ok": true,
+            "height": 47
+          }
+        ],
+        [
+          "Overseer Dark",
+          1280,
+          {
+            "ok": true,
+            "height": 47
+          }
+        ],
+        [
+          "Overseer Dark",
+          1600,
+          {
+            "ok": true,
+            "height": 47
+          }
+        ],
+        [
+          "Overseer Light",
+          900,
+          {
+            "ok": true,
+            "height": 47
+          }
+        ],
+        [
+          "Overseer Light",
+          1280,
+          {
+            "ok": true,
+            "height": 47
+          }
+        ],
+        [
+          "Overseer Light",
+          1600,
+          {
+            "ok": true,
+            "height": 47
+          }
+        ]
+      ]
+    },
+    {
+      "name": "each file header stays on one line",
+      "ok": true,
+      "detail": [
+        [
+          900,
+          []
+        ],
+        [
+          1280,
+          []
+        ],
+        [
+          1600,
+          []
+        ],
+        [
+          900,
+          []
+        ],
+        [
+          1280,
+          []
+        ],
+        [
+          1600,
+          []
+        ]
+      ]
+    },
+    {
+      "name": "no hunk Accept/Revert control covers code",
+      "ok": true,
+      "detail": [
+        [
+          "Overseer Dark",
+          900,
+          4,
+          []
+        ],
+        [
+          "Overseer Dark",
+          1280,
+          4,
+          []
+        ],
+        [
+          "Overseer Dark",
+          1600,
+          4,
+          []
+        ],
+        [
+          "Overseer Light",
+          900,
+          4,
+          []
+        ],
+        [
+          "Overseer Light",
+          1280,
+          4,
+          []
+        ],
+        [
+          "Overseer Light",
+          1600,
+          4,
+          []
+        ]
+      ]
+    },
+    {
+      "name": "nothing in the review overflows sideways",
+      "ok": true,
+      "detail": [
+        [
+          900,
+          false
+        ],
+        [
+          1280,
+          false
+        ],
+        [
+          1600,
+          false
+        ],
+        [
+          900,
+          false
+        ],
+        [
+          1280,
+          false
+        ],
+        [
+          1600,
+          false
+        ]
+      ]
+    },
+    {
+      "name": "file rows carry codicons",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "a very large diff starts collapsed with its line count",
+      "ok": true,
+      "detail": [
+        "800 changed lines. Load this diff to review it.Load Diff"
+      ]
+    }
+  ],
+  "audits": [
+    {
+      "theme": "Overseer Dark",
+      "window": 900,
+      "width": 322,
+      "toolbar": {
+        "ok": true,
+        "height": 47
+      },
+      "headers": [
+        {
+          "file": "a.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "b.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "big.txt",
+          "ok": true,
+          "height": 42
+        }
+      ],
+      "overlaps": [],
+      "overflow": false,
+      "rowsWithoutIcon": [],
+      "card": [
+        "800 changed lines. Load this diff to review it.Load Diff"
+      ],
+      "hunks": 4
+    },
+    {
+      "theme": "Overseer Dark",
+      "window": 1280,
+      "width": 608,
+      "toolbar": {
+        "ok": true,
+        "height": 47
+      },
+      "headers": [
+        {
+          "file": "a.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "b.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "big.txt",
+          "ok": true,
+          "height": 42
+        }
+      ],
+      "overlaps": [],
+      "overflow": false,
+      "rowsWithoutIcon": [],
+      "card": [
+        "800 changed lines. Load this diff to review it.Load Diff"
+      ],
+      "hunks": 4
+    },
+    {
+      "theme": "Overseer Dark",
+      "window": 1600,
+      "width": 820,
+      "toolbar": {
+        "ok": true,
+        "height": 47
+      },
+      "headers": [
+        {
+          "file": "a.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "b.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "big.txt",
+          "ok": true,
+          "height": 42
+        }
+      ],
+      "overlaps": [],
+      "overflow": false,
+      "rowsWithoutIcon": [],
+      "card": [
+        "800 changed lines. Load this diff to review it.Load Diff"
+      ],
+      "hunks": 4
+    },
+    {
+      "theme": "Overseer Light",
+      "window": 900,
+      "width": 322,
+      "toolbar": {
+        "ok": true,
+        "height": 47
+      },
+      "headers": [
+        {
+          "file": "a.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "b.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "big.txt",
+          "ok": true,
+          "height": 42
+        }
+      ],
+      "overlaps": [],
+      "overflow": false,
+      "rowsWithoutIcon": [],
+      "card": [
+        "800 changed lines. Load this diff to review it.Load Diff"
+      ],
+      "hunks": 4
+    },
+    {
+      "theme": "Overseer Light",
+      "window": 1280,
+      "width": 608,
+      "toolbar": {
+        "ok": true,
+        "height": 47
+      },
+      "headers": [
+        {
+          "file": "a.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "b.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "big.txt",
+          "ok": true,
+          "height": 42
+        }
+      ],
+      "overlaps": [],
+      "overflow": false,
+      "rowsWithoutIcon": [],
+      "card": [
+        "800 changed lines. Load this diff to review it.Load Diff"
+      ],
+      "hunks": 4
+    },
+    {
+      "theme": "Overseer Light",
+      "window": 1600,
+      "width": 820,
+      "toolbar": {
+        "ok": true,
+        "height": 47
+      },
+      "headers": [
+        {
+          "file": "a.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "b.txt",
+          "ok": true,
+          "height": 42
+        },
+        {
+          "file": "big.txt",
+          "ok": true,
+          "height": 42
+        }
+      ],
+      "overlaps": [],
+      "overflow": false,
+      "rowsWithoutIcon": [],
+      "card": [
+        "800 changed lines. Load this diff to review it.Load Diff"
+      ],
+      "hunks": 4
+    }
+  ]
+}

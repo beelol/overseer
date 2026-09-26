@@ -85,7 +85,15 @@ button.icon:hover { background: var(--vscode-toolbar-hoverBackground, var(--vsco
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 #workspace-note { font-size: .85em; opacity: .75; padding: 2px 8px; }
 .follow-line { background: var(--vscode-editor-rangeHighlightBackground); }
-#toolbar { flex-wrap: wrap; row-gap: 4px; }
+/* Overseer (AC-76): the header stays on one line; the title shortens first. */
+#toolbar { flex-wrap: nowrap; gap: 8px; }
+#toolbar > * { flex: none; }
+#toolbar #comparison { flex: 0 1 auto; min-width: 3em; }
+#toolbar .spacer { flex: 1 1 0; min-width: 0; }
+/* Narrow reviews (beside the chat on a small window): icons first, words go to tooltips. */
+@media (max-width: 700px) { #base-label, #total { display: none; } #scope { max-width: 7.5em; } }
+@media (max-width: 520px) { #layout, #comparison { display: none; } }
+@media (max-width: 760px) { #review { grid-template-columns: min(var(--nav-width), 32%) 5px minmax(0, 1fr); } }
 .file-header .file-path { min-width: 5em; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Overseer hunk actions */
@@ -110,3 +118,8 @@ button.open-native { min-width: 26px; }
 .file .codicon { font-size: 14px; opacity: .75; flex: none; }
 .file .marker { font-size: 8px; opacity: .9; }
 .file.conflicted .codicon-warning { color: var(--vscode-editorWarning-foreground); opacity: 1; }
+
+.hunk-strip { background: transparent; }
+.file-header { flex-wrap: nowrap; }
+.file-header > * { flex: none; }
+.file-header .file-path { flex: 0 1 auto; }
