@@ -59,12 +59,13 @@
     "SWARM-07": {
       "status": "partial",
       "evidence": [
+        "docs/verification/swarm/SWARM-07.md",
         "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-7.md",
         "docs/verification/swarm/SWARM-08.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "A persisted app-level max now gates ordinary starts and Swarm admission, with pending manual starts reserved before workspace setup; native children inherit the parent's slot. Fixture tests cover stopped-director slot release and lower-maximum drain. Separate reviewer execution, max=1 serial director work, and live director activation remain unverified."
+      "blocker": "The app setting is now the sole total-agent ceiling; fixture tests cover pending manual reservations, native-child exclusion, stopped-director release, lower-maximum drain and old saved-policy compatibility. Separate reviewer execution, max=1 serial director work and real director activation remain unverified; benefit planning still overstates capacity before admission."
     },
     "SWARM-08": {
       "status": "partial",

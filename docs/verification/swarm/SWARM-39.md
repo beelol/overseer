@@ -11,3 +11,5 @@ Actual: precedence and frozen settings were already tested. The new test initial
 Evidence: `daemon/tests/swarm_settings.rs`, `daemon/tests/swarm_policy.rs`, `daemon/tests/swarm_admission.rs`, `docs/verification/swarm/milestone-16.md`.
 
 Remaining: no normal S0 start UI or live director/worker launch, one-time account selection, immediate permission revocation or full scheduler integration exists. This remains a fixture-only policy result.
+
+Follow-up at `5b39f0f`: the 9-agent default is now the persisted application `agents.max_active` setting. The duplicate per-Swarm `max_executing` option was removed from policy defaults, preview and admission; new writes reject it. An older saved application policy with that key still loads, ignores the obsolete ceiling, and retains `max_workers` and approved targets. The full offline suite passed 198 tests with 11 ignored. S0 normal launch and the remaining items above are still unverified.
