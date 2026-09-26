@@ -277,7 +277,7 @@
         "docs/verification/swarm/milestone-7.md",
         "docs/verification/swarm/SWARM-29.md"
       ],
-      "blocker": "A deterministic 100-job fixture admits 32 attempts at a time and accepts all 100 exactly once with intact synthetic evidence; a separate fixture runs 32 supervised local processes alongside a scripted active director turn, and quota headroom reduces effective concurrency with a reason. A working model director, executed checks and combined 100-job supervised/provider path remain unverified."
+      "blocker": "A deterministic 100-job fixture admits 32 attempts at a time and accepts all 100 exactly once with intact synthetic evidence; a 130-job fixture now bounds the ready window to 100 and refills its durable backlog. A separate fixture runs 32 supervised local processes alongside a scripted active director turn, and quota headroom reduces effective concurrency with a reason. A working model director, executed checks and combined 100-job supervised/provider path remain unverified."
     },
     "SWARM-30": {
       "status": "partial",
@@ -362,9 +362,10 @@
         "docs/verification/swarm/milestone-6.md",
         "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-16.md",
+        "daemon/tests/swarm_state.rs",
         "docs/verification/swarm/SWARM-39.md"
       ],
-      "blocker": "Built-in defaults, saved precedence, approved-target inheritance, immutable run snapshots and percentage override arithmetic pass; actual S0 launch, one-time selection UI, immediate revocation and full scheduler enforcement remain unimplemented."
+      "blocker": "Built-in defaults, saved precedence, approved-target inheritance, immutable run snapshots, percentage override arithmetic and the 100-job ready-window default pass in fixtures; actual S0 launch, one-time selection UI, immediate revocation and full scheduler enforcement remain unimplemented."
     },
     "SWARM-40": {
       "status": "partial",
