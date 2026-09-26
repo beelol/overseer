@@ -1,0 +1,120 @@
+{
+  "checks": [
+    {
+      "name": "starting layout: side bar and panel open, two editor groups",
+      "ok": true,
+      "detail": {
+        "sidebar": true,
+        "sidebarTitle": "Explorer",
+        "panel": true,
+        "auxiliary": false,
+        "groups": 2,
+        "sizes": [
+          {
+            "w": 421,
+            "h": 468
+          },
+          {
+            "w": 421,
+            "h": 468
+          }
+        ]
+      }
+    },
+    {
+      "name": "dashboard mode hides the panel and secondary side bar and keeps the side bar on the Overseer agents list (Gate K, AC-79); it works in a window without a folder",
+      "ok": true,
+      "detail": {
+        "during": {
+          "sidebar": true,
+          "sidebarTitle": "Overseer",
+          "panel": false,
+          "auxiliary": false,
+          "groups": 1,
+          "sizes": [
+            {
+              "w": 842,
+              "h": 731
+            }
+          ]
+        },
+        "agents": [
+          "Dashboard demo",
+          "Dashboard demo",
+          "codex (existing login)",
+          "claude (existing login)",
+          "opencode (existing login)"
+        ]
+      }
+    },
+    {
+      "name": "the dashboard survives a window reload (still in dashboard mode)",
+      "ok": true,
+      "detail": {
+        "sidebar": true,
+        "sidebarTitle": "Overseer",
+        "panel": false,
+        "auxiliary": false,
+        "groups": 1,
+        "sizes": [
+          {
+            "w": 842,
+            "h": 731
+          }
+        ]
+      }
+    },
+    {
+      "name": "Exit Dashboard restores the previous layout (side bar, panel, secondary side bar and editor groups)",
+      "ok": true,
+      "detail": {
+        "before": {
+          "sidebar": true,
+          "sidebarTitle": "Explorer",
+          "panel": true,
+          "auxiliary": false,
+          "groups": 2,
+          "sizes": [
+            {
+              "w": 421,
+              "h": 468
+            },
+            {
+              "w": 421,
+              "h": 468
+            }
+          ]
+        },
+        "after": {
+          "sidebar": true,
+          "sidebarTitle": "Explorer",
+          "panel": true,
+          "auxiliary": false,
+          "groups": 2,
+          "sizes": [
+            {
+              "w": 421,
+              "h": 469
+            },
+            {
+              "w": 421,
+              "h": 469
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "no setting changed (user settings identical apart from VS Code's own migration)",
+      "ok": true,
+      "detail": {
+        "before": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\"}",
+        "after": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\"}"
+      }
+    },
+    {
+      "name": "with overseer.dashboard.openOnStartup the dashboard opens when VS Code starts",
+      "ok": true
+    }
+  ]
+}

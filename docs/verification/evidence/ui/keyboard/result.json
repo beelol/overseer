@@ -1,0 +1,93 @@
+{
+  "checks": [
+    {
+      "name": "Needs you gathers permission requests, the failure and the finished run with changes, counted on the view and in the status bar",
+      "ok": true,
+      "detail": {
+        "list": [
+          {
+            "title": "Write file A",
+            "why": "Approve"
+          },
+          {
+            "title": "Write file B",
+            "why": "Approve"
+          },
+          {
+            "title": "Broken build",
+            "why": "Failed"
+          },
+          {
+            "title": "Small edit",
+            "why": "Review"
+          }
+        ],
+        "badge": "4",
+        "status": "eye  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."
+      }
+    },
+    {
+      "name": "⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request",
+      "ok": true,
+      "detail": {
+        "first": "r-20f3ceba2981",
+        "second": "r-204653c438ae",
+        "firstDone": "completed",
+        "secondDone": "completed",
+        "denied": true
+      }
+    },
+    {
+      "name": "⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each",
+      "ok": true,
+      "detail": {
+        "visited": [
+          "r-eccda3e28762",
+          "r-20f3ceba2981",
+          "r-2e11bd52ec2d"
+        ],
+        "left": []
+      }
+    },
+    {
+      "name": "⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent",
+      "ok": true,
+      "detail": {
+        "switched": "r-e141115ebe16",
+        "stopped": "interrupted"
+      }
+    },
+    {
+      "name": "⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent",
+      "ok": true,
+      "detail": {
+        "created": "r-aa237e3d3003",
+        "nowSelected": "r-aa237e3d3003"
+      }
+    },
+    {
+      "name": "Enter in the chat composer sends a follow-up",
+      "ok": true,
+      "detail": {
+        "turns": 2
+      }
+    },
+    {
+      "name": "the shortcuts also work from the side bar (⌥⌘A opens the agent switcher, ⌥⌘N the composer)",
+      "ok": true,
+      "detail": {
+        "inList": true,
+        "switcher": true,
+        "composer": true
+      }
+    },
+    {
+      "name": "every control in the dashboard has a screen-reader label",
+      "ok": true,
+      "detail": {
+        "checked": 36,
+        "bad": []
+      }
+    }
+  ]
+}

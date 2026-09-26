@@ -3,6 +3,7 @@ mod adapters;
 mod background;
 mod daemon;
 mod files;
+mod usage;
 mod git;
 mod merge;
 mod paths;

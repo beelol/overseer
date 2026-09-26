@@ -7,9 +7,9 @@
         "Review: R3 removed later (1), Editor Group 1",
         "Review: R2 other repo (1), Editor Group 1",
         "Review: R1 long review (2), Editor Group 1",
-        "generic: R3 removed later, Editor Group 2",
-        "generic: R2 other repo, Editor Group 2",
-        "generic: R1 long review, Editor Group 2"
+        "R3 removed later, Editor Group 2",
+        "R2 other repo, Editor Group 2",
+        "R1 long review, Editor Group 2"
       ]
     },
     {
@@ -79,9 +79,9 @@
       "name": "after-reload: run panel scroll position and unsent draft restored",
       "ok": true,
       "detail": {
-        "before": 414,
+        "before": 400,
         "after": {
-          "y": 414,
+          "y": 400,
           "draft": "unsent follow-up draft"
         }
       }
@@ -89,7 +89,7 @@
     {
       "name": "after-reload: review for a run in another repository (not open in the window) restored",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoB-8e99c157/r2-other-repo"
+      "detail": "/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoB-039fe8ac/r2-other-repo"
     },
     {
       "name": "after-reload: active run kept running",
@@ -99,7 +99,7 @@
     {
       "name": "R3 worktree removed before restart",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoA-839c23f3/r3-removed-later"
+      "detail": "/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoA-fd0fc365/r3-removed-later"
     },
     {
       "name": "after-restart: review and run panels reopened",
@@ -108,9 +108,9 @@
         "Review: R3 removed later (1), Editor Group 1",
         "Review: R2 other repo (1), Editor Group 1",
         "Review: R1 long review (2), Editor Group 1",
-        "generic: R3 removed later, Editor Group 2",
-        "generic: R2 other repo, Editor Group 2",
-        "generic: R1 long review, Editor Group 2"
+        "R3 removed later, Editor Group 2",
+        "R2 other repo, Editor Group 2",
+        "R1 long review, Editor Group 2"
       ]
     },
     {
@@ -180,9 +180,9 @@
       "name": "after-restart: run panel scroll position and unsent draft restored",
       "ok": true,
       "detail": {
-        "before": 414,
+        "before": 400,
         "after": {
-          "y": 414,
+          "y": 400,
           "draft": "unsent follow-up draft"
         }
       }
@@ -190,7 +190,7 @@
     {
       "name": "after-restart: review for a run in another repository (not open in the window) restored",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoB-8e99c157/r2-other-repo"
+      "detail": "/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoB-039fe8ac/r2-other-repo"
     },
     {
       "name": "after-restart: active run kept running",
@@ -202,7 +202,7 @@
       "ok": true,
       "detail": {
         "tab": "Review: R3 removed later (1), Editor Group 1",
-        "text": "The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoA-839c23f3/r3-removed-later) was removed on 9/25/2026, 6:17:26 PM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."
+        "text": "The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoA-fd0fc365/r3-removed-later) was removed on 9/26/2026, 3:02:38 AM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."
       }
     }
   ]

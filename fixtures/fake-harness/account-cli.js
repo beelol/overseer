@@ -6,6 +6,8 @@
 // `login` signs in as the account named in $FIXTURE_LOGIN_ACCOUNT_FILE ("name:plan").
 //   claude -p (stream-json): one turn that fails with authentication_failed unless signed in,
 //           so expired/missing logins and re-sign-in can be exercised end to end.
+//   codex exec [resume <id>] --json ... -- <prompt>: one synthetic turn (fails unless signed in);
+//           also writes a session log with rate limits ($FIXTURE_CODEX_USED percent of 5 hours).
 // Default homes: $OVERSEER_TEST_SYSTEM_HOME or $HOME. Tokens are fake unsigned JWTs.
 const fs = require('fs');
 const path = require('path');
@@ -49,6 +51,25 @@ if (args[0] === 'auth') {
 }
 const dir = process.env.CODEX_HOME || path.join(base, '.codex');
 const auth = path.join(dir, 'auth.json');
+if (args[0] === 'exec') {
+  const out = o => process.stdout.write(JSON.stringify(o) + '\n');
+  const resume = args[1] === 'resume' ? args[2] : undefined;
+  const thread = resume || 'fixture-thread-' + process.pid;
+  const prompt = args[args.indexOf('--') + 1] || '';
+  out({ type: 'thread.started', thread_id: thread });
+  out({ type: 'turn.started' });
+  if (!fs.existsSync(auth)) { out({ type: 'error', message: 'unexpected status 401 Unauthorized: token expired' }); out({ type: 'turn.failed', error: { message: 'unexpected status 401 Unauthorized' } }); process.exit(1); }
+  const used = Number(process.env.FIXTURE_CODEX_USED || 20);
+  const day = path.join(dir, 'sessions', '2026', '09', '26'); fs.mkdirSync(day, { recursive: true });
+  const reset = Math.floor(Date.now() / 1000) + 3600;
+  fs.appendFileSync(path.join(day, `rollout-fixture-${thread}.jsonl`), JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', rate_limits: { primary: { used_percent: used, window_minutes: 300, resets_at: reset }, secondary: { used_percent: 40, window_minutes: 10080, resets_at: reset + 86400 * 3 }, plan_type: 'plus' } } }) + '\n');
+  setTimeout(() => {
+    out({ type: 'item.completed', item: { id: 'item_0', type: 'agent_message', text: `codex fixture reply to: ${prompt.split('\n')[0]}` } });
+    out({ type: 'turn.completed', usage: { input_tokens: 12, cached_input_tokens: 0, output_tokens: 5 } });
+    process.exit(0);
+  }, Number(process.env.FIXTURE_CODEX_DELAY_MS || 200));
+  return;
+}
 if (args[0] === 'login' && args[1] === 'status') {
   if (fs.existsSync(auth)) { console.log('Logged in using ChatGPT'); process.exit(0); }
   console.log('Not logged in'); process.exit(1);

@@ -139,9 +139,15 @@ function renderTree() {
     }
     for (const entry of dir.files) {
       const button = node('button', 'file' + (entry.id === selected ? ' active' : ''));
-      button.dataset.id = entry.id; button.title = entry.path + (entry.unsaved ? ' (unsaved)' : '');
+      button.dataset.id = entry.id; button.title = entry.path + (entry.unsaved ? ' (unsaved)' : '') + (entry.conflicted ? ' (conflicted)' : '') + (entry.readOnly ? ' (staged: read-only)' : '');
       button.setAttribute('role', 'treeitem'); button.setAttribute('aria-selected', String(entry.id === selected));
-      button.append(node('span', 'file-name', entry.path.split('/').pop()), node('span', 'status status-' + entry.status, entry.status + (entry.unsaved ? ' •' : '')));
+      button.setAttribute('aria-label', [entry.path, entry.status, entry.unsaved && 'unsaved', entry.conflicted && 'conflicted'].filter(Boolean).join(', '));
+      // Codicon per file, plus markers: conflicted (warning) and unsaved (filled dot).
+      const icon = node('span', 'codicon codicon-' + (entry.conflicted ? 'warning' : 'file')); icon.setAttribute('aria-hidden', 'true');
+      button.append(icon, node('span', 'file-name', entry.path.split('/').pop()));
+      if (entry.unsaved) { const m = node('span', 'marker codicon codicon-circle-filled'); m.title = 'Unsaved edits'; m.setAttribute('aria-hidden', 'true'); button.append(m); }
+      button.append(node('span', 'status status-' + entry.status, entry.status));
+      if (entry.conflicted) button.classList.add('conflicted');
       button.addEventListener('click', () => jump(entry.id)); parent.append(button);
     }
   };
@@ -158,19 +164,19 @@ function fold(row) {
   const position = row.element.classList.contains('collapsed') !== closed ? anchor() : undefined;
   if (position?.id === row.entry.id && closed) position.offset = 0;
   row.element.classList.toggle('collapsed', closed);
-  row.toggle.textContent = closed ? '▸' : '▾'; row.toggle.setAttribute('aria-expanded', String(!closed));
+  row.toggle.setAttribute('aria-expanded', String(!closed));
   if (closed) release(row); else ensure(row);
   restoreAnchor(position);
 }
 function makeRow(entry) {
   const element = node('article', 'diff-file'); element.dataset.id = entry.id;
   const header = node('header', 'file-header'); header.tabIndex = -1;
-  const toggle = node('button', 'fold', '▾'); toggle.setAttribute('aria-label', 'Collapse or expand ' + entry.path); toggle.setAttribute('aria-expanded', 'true');
+  const toggle = node('button', 'fold'); toggle.setAttribute('aria-label', 'Collapse or expand ' + entry.path); toggle.title = 'Collapse or expand'; toggle.setAttribute('aria-expanded', 'true');
   const title = node('a', 'file-path', entry.path); title.setAttribute('role', 'link');
   const status = node('span', 'status'); const unsaved = node('span', 'unsaved');
   const stats = node('span', 'stats', '…');
-  const open = node('button', 'open-native', 'Open in Native Diff');
-  const save = node('button', 'save-file', 'Save'); save.disabled = true;
+  const open = node('button', 'open-native', '↗'); open.title = 'Open in native diff (undo, redo, Git gutters)'; open.setAttribute('aria-label', 'Open ' + entry.path + ' in native diff');
+  const save = node('button', 'save-file', 'Save'); save.disabled = true; save.title = 'Save this file (Cmd+S)';
   const editStatus = node('span', 'edit-status'); editStatus.setAttribute('role', 'status');
   const host = node('div', 'diff-body'); host.style.height = '220px';
   header.append(toggle, status, title, unsaved, editStatus, stats, save, open); element.append(header, host);
@@ -405,6 +411,13 @@ function renderHunks(row) {
   for (const h of row.hunks || []) editor.removeOverlayWidget(h.widget);
   row.hunks = [];
   const changes = row.editor.getLineChanges() || [];
+  // Overseer (AC-76): a thin strip above each hunk holds its actions, so they never cover code.
+  const tops = [];
+  editor.changeViewZones(zones => {
+    for (const id of row.hunkZones || []) zones.removeZone(id);
+    row.hunkZones = changes.map((change, index) => zones.addZone({ afterLineNumber: change.modifiedEndLineNumber ? change.modifiedStartLineNumber - 1 : change.modifiedStartLineNumber,
+      heightInPx: 22, domNode: node('div', 'hunk-strip'), onDomNodeTop: top => { tops[index] = top; const h = row.hunks?.[index]; if (h) { h.zoneTop = top; h.dom.style.top = top + 'px'; } } }));
+  });
   const reviewedRanges = [];
   const canEdit = editing.enabled(row);
   changes.forEach((change, index) => {
@@ -414,13 +427,14 @@ function renderHunks(row) {
     dom.dataset.key = key; dom.dataset.hunk = String(index + 1);
     const where = change.modifiedEndLineNumber ? `lines ${change.modifiedStartLineNumber}–${change.modifiedEndLineNumber}` : `deletion after line ${change.modifiedStartLineNumber}`;
     dom.setAttribute('role', 'group'); dom.setAttribute('aria-label', `Hunk ${index + 1} of ${row.entry.path}, ${where}`);
-    if (reviewed) { const badge = node('span', 'hunk-badge', '✓'); badge.title = 'Reviewed'; dom.append(badge); }
-    const accept = node('button', 'hunk-accept', reviewed ? '○' : '✓');
+    const glyph = name => { const g = node('span', 'codicon codicon-' + name); g.setAttribute('aria-hidden', 'true'); return g; };
+    if (reviewed) { const badge = node('span', 'hunk-badge'); badge.append(glyph('pass-filled')); badge.title = 'Reviewed'; dom.append(badge); }
+    const accept = node('button', 'hunk-accept'); accept.append(glyph(reviewed ? 'close' : 'check'));
     accept.title = reviewed ? 'Unmark: this hunk is reviewed; mark it not reviewed' : 'Accept: keep this change and mark the hunk reviewed (no Git staging)';
     accept.setAttribute('aria-label', reviewed ? `Unmark reviewed hunk ${index + 1}` : `Accept hunk ${index + 1}`);
     accept.addEventListener('click', () => vscode.postMessage({ type: 'hunkReview', reviewed: !reviewed, key, path: row.entry.path, version: snapshot?.version,
       modifiedStart: change.modifiedStartLineNumber, modifiedEnd: change.modifiedEndLineNumber, modified: mod, anchor: row.modified.getLineContent(Math.max(1, Math.min(change.modifiedStartLineNumber || 1, row.modified.getLineCount()))) }));
-    const reject = node('button', 'hunk-reject', '↶');
+    const reject = node('button', 'hunk-reject'); reject.append(glyph('discard'));
     reject.disabled = !canEdit;
     reject.title = canEdit ? 'Reject: restore this hunk to the comparison base (undo with Cmd+Z in the native editor)' : 'Reject is unavailable: this file cannot be edited in the review (see Open in Native Diff)';
     reject.setAttribute('aria-label', `Reject hunk ${index + 1}`);
@@ -428,7 +442,7 @@ function renderHunks(row) {
     dom.append(accept, reject);
     const widget = { getId: () => `overseer.hunk.${row.entry.id}.${index}`, getDomNode: () => dom, getPosition: () => null };
     editor.addOverlayWidget(widget);
-    row.hunks.push({ widget, dom, change, key });
+    row.hunks.push({ widget, dom, change, key, zoneTop: tops[index] });
     if (reviewed && change.modifiedEndLineNumber) reviewedRanges.push({ range: { startLineNumber: change.modifiedStartLineNumber, startColumn: 1, endLineNumber: change.modifiedEndLineNumber, endColumn: 1 }, options: { isWholeLine: true, className: 'hunk-reviewed-line' } });
   });
   if (!row.hunkDecorations) row.hunkDecorations = editor.createDecorationsCollection();
@@ -441,6 +455,7 @@ function placeHunks(row) {
   const editor = row.editor?.getModifiedEditor();
   if (!editor) return;
   for (const h of row.hunks || []) {
+    if (h.zoneTop !== undefined) { h.dom.style.top = h.zoneTop + 'px'; continue; }
     const line = Math.max(1, Math.min(row.modified.getLineCount(), h.change.modifiedEndLineNumber ? h.change.modifiedStartLineNumber : h.change.modifiedStartLineNumber + 1));
     h.dom.style.top = Math.max(0, editor.getTopForLineNumber(line) - editor.getScrollTop()) + 'px';
   }
@@ -511,7 +526,7 @@ async function reconcile() {
         manual.clear(); queued.clear();
         for (const row of rows.values()) { release(row); row.renderedRevision = undefined; row.classification = undefined; }
       }
-      const oldStructure = snapshot?.entries.map(e => [e.id, e.path, e.status, e.unsaved]);
+      const oldStructure = snapshot?.entries.map(e => [e.id, e.path, e.status, e.unsaved, e.conflicted]);
       snapshot = next;
       Object.assign(identity, { repository: next.repository, mode: next.mode, target: next.target, runId: next.overseer?.runId || identity.runId });
       updateSettings(next.settings);
@@ -519,7 +534,8 @@ async function reconcile() {
       const description = next.description;
       if (!next.overseer) document.getElementById('comparison').textContent = description ? `${description.headName || 'HEAD'} → ${description.base}` : 'Branch Diff';
       if (!next.overseer) document.getElementById('comparison').title = description ? `Merge-base ${description.mergeBase} → ${next.mode === 'workingTree' ? 'working tree + unsaved edits' : description.headSha}` : '';
-      total.textContent = `${next.entries.length} ${next.checking ? 'files found' : 'changed ' + (next.entries.length === 1 ? 'file' : 'files')}`;
+      total.textContent = `${next.entries.length} ${next.entries.length === 1 ? 'file' : 'files'}${next.checking ? '…' : ''}`;
+      total.title = next.checking ? 'Still looking for changed files' : 'Changed files in this comparison';
       total.dataset.count = next.entries.length;
       document.body.dataset.checking = String(!!next.checking);
       document.body.dataset.cached = String(!!next.cached);
@@ -528,7 +544,7 @@ async function reconcile() {
       for (const [id, row] of rows) if (!ids.has(id)) { release(row); row.element.remove(); rows.delete(id); }
       diffs.querySelector('.empty')?.remove();
       // Metadata-only validation updates reuse the existing navigator DOM.
-      if (JSON.stringify(oldStructure) !== JSON.stringify(next.entries.map(e => [e.id, e.path, e.status, e.unsaved]))) renderTree();
+      if (JSON.stringify(oldStructure) !== JSON.stringify(next.entries.map(e => [e.id, e.path, e.status, e.unsaved, e.conflicted]))) renderTree();
       let previous = null, batchStart = performance.now();
       for (let index = 0; index < next.entries.length; index++) {
         const entry = next.entries[index];
@@ -573,10 +589,19 @@ async function reconcile() {
 }
 
 // ---- Overseer: comparison label, Follow state and reveal of agent edits.
-const followBox = document.getElementById('follow');
-const resumeButton = document.getElementById('resume');
+// One icon (AC-74): following, paused by your navigation (click resumes), or manual.
+const followButton = document.getElementById('follow');
 const followStatus = document.getElementById('follow-state');
-let followState = 'off', pendingReveal;
+let followState = 'off', followNote = '', pendingReveal;
+function renderFollow() {
+  const on = followState === 'following', paused = followState === 'paused';
+  followButton.setAttribute('aria-pressed', String(on));
+  followButton.dataset.state = followState;
+  const name = on ? 'Following the agent' : paused ? 'Resume Follow' : 'Follow the agent';
+  followButton.setAttribute('aria-label', name);
+  followButton.title = on ? `Following the agent's edits${followNote ? ' — ' + followNote : ''}\nClick to stay where you are` : paused ? 'Follow paused by your navigation\nClick to resume' : "Manual: your file and scroll stay put\nClick to follow the agent's edits";
+  followButton.firstElementChild.className = 'codicon codicon-' + (on ? 'eye' : paused ? 'debug-pause' : 'eye-closed');
+}
 function applyOverseer(o) {
   if (!o) return;
   if (Array.isArray(o.reviewed)) {
@@ -589,22 +614,39 @@ function applyOverseer(o) {
   const c = o.comparison || {};
   label.textContent = c.label || 'Comparison';
   document.getElementById('base').title = [c.label, c.base ? 'Base: ' + c.base : 'Base unavailable', c.detail, c.provenance ? 'Provenance: ' + c.provenance : ''].filter(Boolean).join('\n') + '\nClick to choose another comparison.';
-  document.getElementById('comparison').textContent = (o.runTitle || 'Run') + (o.harness ? ' · ' + o.harness : '');
-  document.getElementById('comparison').title = o.workspacePath || '';
-  document.getElementById('workspace-note').textContent = (o.workspaceKind === 'current' ? 'Current checkout: ' : 'Worktree: ') + (o.workspacePath || '');
+  document.getElementById('comparison').textContent = o.runTitle || 'Run';
+  const scope = document.getElementById('scope');
+  if (scope && o.scope && scope.value !== o.scope) scope.value = o.scope;
+  document.body.dataset.scope = o.scope || 'all';
+  document.getElementById('comparison').title = [o.runTitle, o.harness, o.workspacePath].filter(Boolean).join('\n');
+  // The full path is in the tooltip and data-workspace; the note shows ~/…/last/two.
+  const note = document.getElementById('workspace-note');
+  const home = document.body.dataset.home || '';
+  let short = o.workspacePath || '';
+  if (home && short.startsWith(home + '/')) short = '~' + short.slice(home.length);
+  const parts = short.split('/').filter(Boolean);
+  if (parts.length > 3) short = (short.startsWith('~') ? '~/…/' : '…/') + parts.slice(-2).join('/');
+  // Kept for assistive tech and tests; the visible header stays short (the path is in tooltips).
+  note.textContent = o.workspacePath || '';
+  note.hidden = true;
+  document.getElementById('base').title += `\n${o.workspaceKind === 'current' ? 'Checkout' : 'Worktree'}: ${short}`;
+  document.body.dataset.workspace = o.workspacePath || '';
   followState = o.follow || 'off';
-  followBox.checked = followState !== 'off';
-  resumeButton.hidden = followState !== 'paused';
+  followNote = o.followNote || '';
   followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
+  renderFollow();
 }
 function userNavigated(reason) {
   if (followState !== 'following') return;
-  followState = 'paused'; resumeButton.hidden = false; followStatus.textContent = 'Follow paused by your navigation';
+  followState = 'paused'; followStatus.textContent = 'Follow paused by your navigation'; renderFollow();
   vscode.postMessage({ type: 'followPause', reason });
 }
-followBox.addEventListener('change', () => vscode.postMessage({ type: 'follow', enabled: followBox.checked }));
-resumeButton.addEventListener('click', () => vscode.postMessage({ type: 'followResume' }));
+followButton.addEventListener('click', () => {
+  if (followState === 'paused') vscode.postMessage({ type: 'followResume' });
+  else vscode.postMessage({ type: 'follow', enabled: followState !== 'following' });
+});
 document.getElementById('base').addEventListener('click', () => vscode.postMessage({ type: 'pickComparison' }));
+document.getElementById('scope').addEventListener('change', event => vscode.postMessage({ type: 'scope', scope: event.target.value }));
 diffs.addEventListener('wheel', () => userNavigated('scroll'), { passive: true });
 diffs.addEventListener('touchstart', () => userNavigated('scroll'), { passive: true });
 diffs.addEventListener('mousedown', event => { if (!event.target.closest('button')) userNavigated('pointer'); });
@@ -630,6 +672,7 @@ function applyReveal(value) {
   if (value.user) { userNavigated('conversation'); jump(id); document.body.dataset.revealed = value.path + ':' + (value.line || ''); if (!revealLine(row, value.line)) row.pendingLine = value.line; return; }
   jump(id);
   followStatus.textContent = 'Following: ' + value.path + (value.line ? ':' + value.line : '') + (value.attribution ? ' (' + value.attribution + ')' : '');
+  followNote = followStatus.textContent; renderFollow();
   if (!revealLine(row, value.line)) row.pendingLine = value.line;
 }
 window.addEventListener('message', event => {

@@ -50,7 +50,9 @@ export class EditingClient {
     const enabled = this.enabled(row);
     if (row.editor && row.editable !== enabled) { row.editor.updateOptions({ readOnly: !enabled, domReadOnly: !enabled, originalEditable: false }); row.editable = enabled; }
     row.save.disabled = !this.enabled(row) || !!row.edit?.saving;
-    row.save.hidden = this.api.snapshot()?.mode !== 'workingTree';
+    // Overseer: read-only sides (a staged file's index) hide Save instead of showing it disabled.
+    row.save.hidden = this.api.snapshot()?.mode !== 'workingTree' || (!!row.body && !row.body.editable);
+    row.element.dataset.editable = String(enabled);
     row.editStatus.textContent = row.edit?.failed ? 'Draft needs attention' : row.edit?.saveError ? 'Save failed' : row.edit?.saving ? 'Saving…' : this.pending(row) ? 'Syncing…' : '';
     row.editStatus.title = row.edit?.failed || row.edit?.saveError || '';
     row.element.dataset.editState = row.edit?.failed ? 'conflict' : this.pending(row) ? 'pending' : 'ready';

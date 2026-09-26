@@ -1,0 +1,110 @@
+/* Overseer base styles shared by every webview: typography, controls, chips, menus, rows and
+   status icons. Uses tokens.css only (theme variables), so light, dark and high contrast work. */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: var(--ov-font); font-size: var(--ov-font-md); line-height: var(--ov-line-tight); color: var(--ov-text); background: var(--ov-bg); -webkit-font-smoothing: antialiased; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.muted { color: var(--ov-muted); }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.spacer { flex: 1; }
+.codicon { font-size: 16px; line-height: 1; }
+.codicon.sm { font-size: 14px; }
+.codicon.xs { font-size: 12px; }
+.logo { flex: none; display: block; }
+
+/* Focus: one visible ring, inside the control so it never gets clipped. */
+:focus { outline: none; }
+:focus-visible { outline: 1px solid var(--ov-focus); outline-offset: -1px; }
+
+/* Buttons: primary (accent), quiet (secondary) and icon-only. */
+button { font: inherit; color: inherit; cursor: pointer; border: 1px solid transparent; background: none; }
+button:disabled { opacity: .45; cursor: default; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--ov-space-2); height: 28px; padding: 0 var(--ov-space-3); border-radius: var(--ov-radius-control);
+  background: var(--ov-raised-2); color: var(--ov-text); border-color: var(--ov-hc-border); font-weight: var(--ov-weight-medium); white-space: nowrap; transition: background var(--ov-motion-fast) var(--ov-ease); }
+.btn:hover:not(:disabled) { background: var(--ov-hover); }
+.btn.primary { background: var(--ov-accent-bg); color: var(--ov-accent-fg); }
+.btn.primary:hover:not(:disabled) { background: var(--ov-accent-bg-hover); }
+.btn.ghost { background: transparent; color: var(--ov-muted); }
+.btn.ghost:hover:not(:disabled) { color: var(--ov-text); background: var(--ov-hover); }
+.btn.sm { height: 24px; padding: 0 var(--ov-space-2); font-size: var(--ov-font-sm); }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: none; border-radius: var(--ov-radius-control); color: var(--ov-muted);
+  transition: background var(--ov-motion-fast) var(--ov-ease), color var(--ov-motion-fast) var(--ov-ease); }
+.icon-btn:hover:not(:disabled) { background: var(--ov-hover); color: var(--ov-text); }
+.icon-btn[aria-pressed="true"] { color: var(--ov-accent); background: var(--ov-accent-soft); }
+.icon-btn.sm { width: 24px; height: 24px; }
+.icon-btn.primary { background: var(--ov-accent-bg); color: var(--ov-accent-fg); border-radius: var(--ov-radius-pill); }
+.icon-btn.primary:hover:not(:disabled) { background: var(--ov-accent-bg-hover); color: var(--ov-accent-fg); }
+.link { background: none; border: none; padding: 0; color: var(--ov-link); text-decoration: none; cursor: pointer; }
+.link:hover { text-decoration: underline; }
+
+/* Chips: compact, pill-shaped choices and facts. */
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; max-width: 100%; padding: 0 10px; border-radius: var(--ov-radius-pill); border: 1px solid var(--ov-border);
+  background: var(--ov-raised); color: var(--ov-text); font-size: var(--ov-font-sm); white-space: nowrap; }
+button.chip:hover:not(:disabled) { border-color: var(--ov-border-strong); background: var(--ov-hover); }
+.chip .codicon { font-size: 14px; color: var(--ov-muted); }
+.chip .chip-label { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.chip.quiet { background: transparent; border-color: transparent; color: var(--ov-muted); padding: 0 6px; }
+.chip.warn { border-color: var(--ov-waiting); }
+.chip.danger { border-color: var(--ov-failed); color: var(--ov-failed); }
+
+/* Floating menu (… and ⌘K style), rendered by menu.js. */
+.menu { position: fixed; z-index: 50; min-width: 200px; max-width: 320px; max-height: 70vh; overflow: auto; padding: 4px; border-radius: var(--ov-radius-card); border: 1px solid var(--ov-border);
+  background: var(--ov-raised); box-shadow: 0 8px 24px var(--ov-shadow); animation: menu-in var(--ov-motion-fast) var(--ov-ease); }
+@keyframes menu-in { from { opacity: 0; transform: translateY(-2px); } }
+.menu-item { display: flex; align-items: center; gap: var(--ov-space-2); width: 100%; height: 30px; padding: 0 10px; border-radius: var(--ov-radius-control); text-align: left; color: var(--ov-text); white-space: nowrap; }
+.menu-item:hover, .menu-item:focus-visible { background: var(--ov-selected); outline: none; }
+.menu-item .codicon, .menu-item .logo { color: var(--ov-muted); flex: none; }
+.menu-item .menu-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.menu-item .menu-hint { color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.menu-item[aria-checked="true"] .menu-check { color: var(--ov-accent); }
+.menu-item.danger { color: var(--ov-failed); }
+.menu-sep { height: 1px; margin: 4px 6px; background: var(--ov-border); }
+.menu-head { padding: 6px 10px 4px; font-size: var(--ov-font-xs); color: var(--ov-muted); }
+
+/* Status: one icon per state; running pulses gently, waiting is amber, done green, failed red. */
+.status { flex: none; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; }
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ov-running); box-shadow: 0 0 0 0 var(--ov-running); animation: pulse 1.8s var(--ov-ease) infinite; }
+.status.st-queued .dot, .status.st-starting .dot { animation-duration: 1s; opacity: .8; }
+.status.st-waiting_for_user { color: var(--ov-waiting); }
+.status.st-completed { color: var(--ov-done); }
+.status.st-failed, .status.st-disconnected { color: var(--ov-failed); }
+.status.st-interrupted, .status.st-unknown { color: var(--ov-muted); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--ov-running); } 70% { box-shadow: 0 0 0 5px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .status .dot, .menu, .fade-in { animation: none !important; } }
+
+/* Rows (agents, files, accounts): one line, icon left, title, quiet meta right. */
+.row { display: flex; align-items: center; gap: var(--ov-space-2); min-height: 30px; padding: 0 var(--ov-space-2); border-radius: var(--ov-radius-control); cursor: pointer; color: var(--ov-text); }
+.row:hover { background: var(--ov-hover); }
+.row[aria-selected="true"] { background: var(--ov-selected); }
+.row .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .meta { flex: none; display: inline-flex; align-items: center; gap: 6px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.twisty { width: 16px; flex: none; color: var(--ov-muted); display: inline-flex; justify-content: center; }
+.badge { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 6px; border-radius: var(--ov-radius-pill);
+  background: var(--ov-accent-soft); color: var(--ov-text); font-size: var(--ov-font-xs); font-weight: var(--ov-weight-medium); }
+.badge.attention { background: var(--ov-waiting); color: var(--ov-bg); }
+
+/* Inputs */
+input, textarea, select { font: inherit; color: var(--ov-input-fg); background: var(--ov-input-bg); border: 1px solid var(--ov-border); border-radius: var(--ov-radius-control); }
+input::placeholder, textarea::placeholder { color: var(--ov-muted); }
+input:focus-visible, textarea:focus-visible, select:focus-visible { border-color: var(--ov-focus); outline: none; }
+.search { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 var(--ov-space-2); border-radius: var(--ov-radius-control); background: var(--ov-input-bg); border: 1px solid var(--ov-border); color: var(--ov-muted); }
+.search:focus-within { border-color: var(--ov-focus); }
+.search input { flex: 1; min-width: 0; border: none; background: transparent; padding: 0; height: 26px; outline: none; }
+
+/* Empty states: icon, one line, one action. */
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ov-space-3); padding: var(--ov-space-10) var(--ov-space-6); color: var(--ov-muted); text-align: center; }
+.empty-state .codicon { font-size: 28px; color: var(--ov-icon); opacity: .8; }
+
+/* Scrollbars follow the theme. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--vscode-scrollbarSlider-hoverBackground); background-clip: padding-box; border: 2px solid transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* High contrast: outlines instead of fills. */
+body.vscode-high-contrast .row[aria-selected="true"], body.vscode-high-contrast-light .row[aria-selected="true"],
+body.vscode-high-contrast .menu-item:hover, body.vscode-high-contrast-light .menu-item:hover { outline: 1px solid var(--ov-hc-active); outline-offset: -1px; }
+body.vscode-high-contrast .chip, body.vscode-high-contrast-light .chip, body.vscode-high-contrast .btn, body.vscode-high-contrast-light .btn { border-color: var(--ov-hc-border); }
+.fade-in { animation: fade-in var(--ov-motion-base) var(--ov-ease); }
+@keyframes fade-in { from { opacity: 0; } }

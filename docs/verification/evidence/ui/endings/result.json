@@ -1,0 +1,52 @@
+{
+  "checks": [
+    {
+      "name": "a stopped Claude turn reads \"Stopped\": no empty error card, no \"Failed\", one ending line",
+      "ok": true,
+      "detail": {
+        "status": "interrupted",
+        "errors": [],
+        "foot": [
+          "Stopped"
+        ],
+        "statusLines": [],
+        "unparsed": 0
+      }
+    },
+    {
+      "name": "a stopped Codex turn reads \"Stopped\" (no \"Failed\", no error card)",
+      "ok": true,
+      "detail": {
+        "status": "interrupted",
+        "errors": [],
+        "foot": [
+          "Stopped"
+        ],
+        "statusLines": [],
+        "unparsed": 0
+      }
+    },
+    {
+      "name": "a line the parser does not understand stays out of the chat and is in the event log",
+      "ok": true,
+      "detail": {
+        "raw": "Warning: telemetry flush skipped (fixture)",
+        "inChat": 0
+      }
+    },
+    {
+      "name": "a failed turn shows its reason once",
+      "ok": true,
+      "detail": {
+        "times": 1,
+        "foot": [
+          "Failed"
+        ],
+        "errors": [
+          "Error\nMigration failed: relation users_v2 does not exist"
+        ],
+        "statusLines": []
+      }
+    }
+  ]
+}

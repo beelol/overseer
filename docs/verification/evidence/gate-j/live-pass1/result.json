@@ -1,0 +1,397 @@
+{
+  "checks": [
+    {
+      "name": "claude: an attached image and a mentioned worktree file reach the agent (reply names red and \"# fixture\")",
+      "ok": false,
+      "detail": {
+        "reply": "No image was actually attached, so I can't identify a color; README.md's first line is \"# fixture\"."
+      }
+    },
+    {
+      "name": "claude: per-turn model, effort and permission mode reach the harness",
+      "ok": true,
+      "detail": {
+        "argv": [
+          "-p",
+          "--output-format",
+          "stream-json",
+          "--input-format",
+          "stream-json",
+          "--verbose",
+          "--permission-prompt-tool",
+          "stdio",
+          "--model",
+          "haiku",
+          "--resume",
+          "39f85a26-4972-42cb-b20d-9ca4ed3bcfff",
+          "--effort",
+          "low",
+          "--permission-mode",
+          "plan"
+        ]
+      }
+    },
+    {
+      "name": "claude: a running turn is interrupted and the next message is answered",
+      "ok": false,
+      "detail": [
+        [
+          1,
+          "Reply with exactly: ready",
+          "completed"
+        ],
+        [
+          2,
+          "What color is the attached image, and wh",
+          "completed"
+        ],
+        [
+          3,
+          "Write a numbered list of 60 short facts ",
+          "failed"
+        ],
+        [
+          4,
+          "Stop. Reply with exactly: stopped ok",
+          "completed"
+        ]
+      ]
+    },
+    {
+      "name": "codex: an attached image and a mentioned worktree file reach the agent (reply names red and \"# fixture\")",
+      "ok": false,
+      "detail": {
+        "reply": "Image color unavailable (corrupted attachment); README.md: `# fixture`"
+      }
+    },
+    {
+      "name": "codex: per-turn model, effort and permission mode reach the harness",
+      "ok": true,
+      "detail": {
+        "argv": [
+          "exec",
+          "resume",
+          "01a0dd35-3825-78c2-859e-5f49fa15d1cc",
+          "--json",
+          "--skip-git-repo-check",
+          "-c",
+          "sandbox_mode=\"read-only\"",
+          "-m",
+          "gpt-5.6-luna",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-i",
+          "/Users/bilal/Library/Application Support/Overseer/runs/r-53dfbdb541be/attachments/340d6db12996fa0c9ca0abcfa1da95685dfba1660bd4de083c90476cc730d40f.png",
+          "--",
+          "What color is the attached image, and what is the first line of README.md? Answer in one short line.\n\nFiles mentioned (paths relative to the repository root): `README.md`"
+        ]
+      }
+    },
+    {
+      "name": "codex: a running turn is interrupted and the next message is answered",
+      "ok": true,
+      "detail": [
+        [
+          1,
+          "Reply with exactly: ready",
+          "completed"
+        ],
+        [
+          2,
+          "What color is the attached image, and wh",
+          "completed"
+        ],
+        [
+          3,
+          "Write a numbered list of 60 short facts ",
+          "interrupted"
+        ],
+        [
+          4,
+          "Stop. Reply with exactly: stopped ok",
+          "completed"
+        ]
+      ]
+    },
+    {
+      "name": "claude: a finished run continues its session after the daemon restarts",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reply": "resumed ok",
+        "sameSession": true
+      }
+    },
+    {
+      "name": "codex: a finished run continues its session after the daemon restarts",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reply": "resumed ok",
+        "sameSession": true
+      }
+    },
+    {
+      "name": "Claude usage matches its own rate_limit_event (or says not reported)",
+      "ok": false,
+      "detail": {
+        "usage": {
+          "limited": false,
+          "observed_ms": 1790417713104,
+          "reported": true,
+          "source": "Claude rate_limit_event",
+          "status": "allowed",
+          "windows": [
+            {
+              "label": "5 hours",
+              "resets_at_ms": 1790429400000,
+              "used": 0.16
+            },
+            {
+              "label": "week",
+              "resets_at_ms": 1790568000000,
+              "used": 0.48
+            }
+          ]
+        },
+        "raw": null
+      }
+    },
+    {
+      "name": "Codex ChatGPT A usage comes from its session log (or says not reported)",
+      "ok": true,
+      "detail": {
+        "limited": false,
+        "observed_ms": 1790417716676,
+        "plan": "team",
+        "reported": true,
+        "source": "Codex session log",
+        "windows": [
+          {
+            "label": "5 hours",
+            "resets_at_ms": 1790435651000,
+            "used": 0
+          },
+          {
+            "label": "week",
+            "resets_at_ms": 1791022451000,
+            "used": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "Codex ChatGPT B usage comes from its session log (or says not reported)",
+      "ok": true,
+      "detail": {
+        "limited": false,
+        "observed_ms": 1790417721446,
+        "plan": "plus",
+        "reported": true,
+        "source": "Codex session log",
+        "windows": [
+          {
+            "label": "5 hours",
+            "resets_at_ms": 1790418636000,
+            "used": 0
+          },
+          {
+            "label": "week",
+            "resets_at_ms": 1790911242000,
+            "used": 0.16
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenCode says not reported",
+      "ok": true,
+      "detail": {
+        "reported": false
+      }
+    }
+  ],
+  "runs": {
+    "claude": {
+      "id": "r-78cf9579377e",
+      "first": {
+        "status": "completed",
+        "reply": "ready"
+      },
+      "rich": {
+        "status": "completed",
+        "reply": "No image was actually attached, so I can't identify a color; README.md's first line is \"# fixture\".",
+        "argv": [
+          "-p",
+          "--output-format",
+          "stream-json",
+          "--input-format",
+          "stream-json",
+          "--verbose",
+          "--permission-prompt-tool",
+          "stdio",
+          "--model",
+          "haiku",
+          "--resume",
+          "39f85a26-4972-42cb-b20d-9ca4ed3bcfff",
+          "--effort",
+          "low",
+          "--permission-mode",
+          "plan"
+        ]
+      },
+      "stop": [
+        [
+          1,
+          "Reply with exactly: ready",
+          "completed"
+        ],
+        [
+          2,
+          "What color is the attached image, and wh",
+          "completed"
+        ],
+        [
+          3,
+          "Write a numbered list of 60 short facts ",
+          "failed"
+        ],
+        [
+          4,
+          "Stop. Reply with exactly: stopped ok",
+          "completed"
+        ]
+      ],
+      "resumed": {
+        "status": "completed",
+        "reply": "resumed ok",
+        "sameSession": true
+      }
+    },
+    "codex": {
+      "id": "r-53dfbdb541be",
+      "first": {
+        "status": "completed",
+        "reply": "ready"
+      },
+      "rich": {
+        "status": "completed",
+        "reply": "Image color unavailable (corrupted attachment); README.md: `# fixture`",
+        "argv": [
+          "exec",
+          "resume",
+          "01a0dd35-3825-78c2-859e-5f49fa15d1cc",
+          "--json",
+          "--skip-git-repo-check",
+          "-c",
+          "sandbox_mode=\"read-only\"",
+          "-m",
+          "gpt-5.6-luna",
+          "-c",
+          "model_reasoning_effort=\"low\"",
+          "-i",
+          "/Users/bilal/Library/Application Support/Overseer/runs/r-53dfbdb541be/attachments/340d6db12996fa0c9ca0abcfa1da95685dfba1660bd4de083c90476cc730d40f.png",
+          "--",
+          "What color is the attached image, and what is the first line of README.md? Answer in one short line.\n\nFiles mentioned (paths relative to the repository root): `README.md`"
+        ]
+      },
+      "stop": [
+        [
+          1,
+          "Reply with exactly: ready",
+          "completed"
+        ],
+        [
+          2,
+          "What color is the attached image, and wh",
+          "completed"
+        ],
+        [
+          3,
+          "Write a numbered list of 60 short facts ",
+          "interrupted"
+        ],
+        [
+          4,
+          "Stop. Reply with exactly: stopped ok",
+          "completed"
+        ]
+      ],
+      "resumed": {
+        "status": "completed",
+        "reply": "resumed ok",
+        "sameSession": true
+      }
+    },
+    "chatgptB": {
+      "id": "r-e8c6c867ff3e",
+      "status": "completed"
+    }
+  },
+  "usage": {
+    "system-claude": {
+      "limited": false,
+      "observed_ms": 1790417713104,
+      "reported": true,
+      "source": "Claude rate_limit_event",
+      "status": "allowed",
+      "windows": [
+        {
+          "label": "5 hours",
+          "resets_at_ms": 1790429400000,
+          "used": 0.16
+        },
+        {
+          "label": "week",
+          "resets_at_ms": 1790568000000,
+          "used": 0.48
+        }
+      ]
+    },
+    "p-f262c1bc4958": {
+      "limited": false,
+      "observed_ms": 1790417716676,
+      "plan": "team",
+      "reported": true,
+      "source": "Codex session log",
+      "windows": [
+        {
+          "label": "5 hours",
+          "resets_at_ms": 1790435651000,
+          "used": 0
+        },
+        {
+          "label": "week",
+          "resets_at_ms": 1791022451000,
+          "used": 0
+        }
+      ]
+    },
+    "p-52fb6421edd2": {
+      "limited": false,
+      "observed_ms": 1790417721446,
+      "plan": "plus",
+      "reported": true,
+      "source": "Codex session log",
+      "windows": [
+        {
+          "label": "5 hours",
+          "resets_at_ms": 1790418636000,
+          "used": 0
+        },
+        {
+          "label": "week",
+          "resets_at_ms": 1790911242000,
+          "used": 0.16
+        }
+      ]
+    },
+    "system-opencode": {
+      "reported": false
+    }
+  },
+  "raw": {
+    "claude": null,
+    "codex": null
+  }
+}

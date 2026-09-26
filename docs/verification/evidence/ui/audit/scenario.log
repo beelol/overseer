@@ -1,0 +1,105 @@
+[2026-09-26T10:15:41.906Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T10:15:48.089Z] runs {"showcase":{"id":"r-48e4e7b35405","status":"completed"},"permission":{"id":"r-24c66938ece1","status":"waiting_for_user"},"nested":{"id":"r-46338878ca5b","status":"completed"},"watch":{"id":"r-f6d23a0ae23d","status":"running"},"failed":{"id":"r-5172a1b04b91","status":"failed"}}
+[2026-09-26T10:15:55.775Z] screenshot docs/verification/evidence/ui/audit/01-dashboard-overseer-dark-1280.png
+[2026-09-26T10:15:55.777Z] view dashboard Overseer Dark@1280: 1360 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:15:55.778Z] view agents Overseer Dark@1280: 238 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:15:55.779Z] view chat Overseer Dark@1280: 1063 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:15:55.779Z] view files Overseer Dark@1280: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:15:55.781Z] view review Overseer Dark@1280: 175 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:15:57.349Z] screenshot docs/verification/evidence/ui/audit/02-dashboard-overseer-dark-900.png
+[2026-09-26T10:15:57.351Z] view dashboard Overseer Dark@900: 1360 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:15:57.352Z] view agents Overseer Dark@900: 238 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:15:57.353Z] view chat Overseer Dark@900: 1063 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:15:57.354Z] view files Overseer Dark@900: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:15:57.355Z] view review Overseer Dark@900: 175 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:00.989Z] screenshot docs/verification/evidence/ui/audit/03-dashboard-overseer-light-1280.png
+[2026-09-26T10:16:00.991Z] view dashboard Overseer Light@1280: 1360 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:00.992Z] view agents Overseer Light@1280: 238 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:00.992Z] view chat Overseer Light@1280: 1063 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:00.993Z] view files Overseer Light@1280: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:00.994Z] view review Overseer Light@1280: 175 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:02.561Z] screenshot docs/verification/evidence/ui/audit/04-dashboard-overseer-light-900.png
+[2026-09-26T10:16:02.562Z] view dashboard Overseer Light@900: 1360 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:02.563Z] view agents Overseer Light@900: 238 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:02.563Z] view chat Overseer Light@900: 1063 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:02.564Z] view files Overseer Light@900: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:02.565Z] view review Overseer Light@900: 175 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:06.160Z] screenshot docs/verification/evidence/ui/audit/05-dashboard-default-dark-modern-1280.png
+[2026-09-26T10:16:06.161Z] view dashboard Default Dark Modern@1280: 1360 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:06.162Z] view agents Default Dark Modern@1280: 238 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:06.163Z] view chat Default Dark Modern@1280: 1063 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:06.164Z] view files Default Dark Modern@1280: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:06.165Z] view review Default Dark Modern@1280: 175 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:07.737Z] screenshot docs/verification/evidence/ui/audit/06-dashboard-default-dark-modern-900.png
+[2026-09-26T10:16:07.738Z] view dashboard Default Dark Modern@900: 1360 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:07.739Z] view agents Default Dark Modern@900: 238 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:07.739Z] view chat Default Dark Modern@900: 1063 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:07.740Z] view files Default Dark Modern@900: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:07.741Z] view review Default Dark Modern@900: 175 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:11.342Z] screenshot docs/verification/evidence/ui/audit/07-grid-overseer-dark-1280.png
+[2026-09-26T10:16:11.344Z] view grid Overseer Dark@1280: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:12.911Z] screenshot docs/verification/evidence/ui/audit/08-grid-overseer-dark-900.png
+[2026-09-26T10:16:12.912Z] view grid Overseer Dark@900: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:16.538Z] screenshot docs/verification/evidence/ui/audit/09-grid-overseer-light-1280.png
+[2026-09-26T10:16:16.539Z] view grid Overseer Light@1280: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:18.127Z] screenshot docs/verification/evidence/ui/audit/10-grid-overseer-light-900.png
+[2026-09-26T10:16:18.128Z] view grid Overseer Light@900: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:21.740Z] screenshot docs/verification/evidence/ui/audit/11-grid-default-dark-modern-1280.png
+[2026-09-26T10:16:21.742Z] view grid Default Dark Modern@1280: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:23.332Z] screenshot docs/verification/evidence/ui/audit/12-grid-default-dark-modern-900.png
+[2026-09-26T10:16:23.333Z] view grid Default Dark Modern@900: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:27.730Z] screenshot docs/verification/evidence/ui/audit/13-new-agent-overseer-dark-1280.png
+[2026-09-26T10:16:27.731Z] view new-agent Overseer Dark@1280: 133 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:29.301Z] screenshot docs/verification/evidence/ui/audit/14-new-agent-overseer-dark-900.png
+[2026-09-26T10:16:29.302Z] view new-agent Overseer Dark@900: 133 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:32.908Z] screenshot docs/verification/evidence/ui/audit/15-new-agent-overseer-light-1280.png
+[2026-09-26T10:16:32.909Z] view new-agent Overseer Light@1280: 133 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:34.493Z] screenshot docs/verification/evidence/ui/audit/16-new-agent-overseer-light-900.png
+[2026-09-26T10:16:34.494Z] view new-agent Overseer Light@900: 133 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:38.079Z] screenshot docs/verification/evidence/ui/audit/17-new-agent-default-dark-modern-1280.png
+[2026-09-26T10:16:38.080Z] view new-agent Default Dark Modern@1280: 133 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:39.664Z] screenshot docs/verification/evidence/ui/audit/18-new-agent-default-dark-modern-900.png
+[2026-09-26T10:16:39.665Z] view new-agent Default Dark Modern@900: 133 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:47.669Z] screenshot docs/verification/evidence/ui/audit/19-accounts-overseer-dark-1280.png
+[2026-09-26T10:16:47.671Z] view accounts Overseer Dark@1280: 189 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:49.280Z] screenshot docs/verification/evidence/ui/audit/20-accounts-overseer-dark-900.png
+[2026-09-26T10:16:49.281Z] view accounts Overseer Dark@900: 189 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:52.888Z] screenshot docs/verification/evidence/ui/audit/21-accounts-overseer-light-1280.png
+[2026-09-26T10:16:52.889Z] view accounts Overseer Light@1280: 189 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:54.476Z] screenshot docs/verification/evidence/ui/audit/22-accounts-overseer-light-900.png
+[2026-09-26T10:16:54.477Z] view accounts Overseer Light@900: 189 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:58.086Z] screenshot docs/verification/evidence/ui/audit/23-accounts-default-dark-modern-1280.png
+[2026-09-26T10:16:58.087Z] view accounts Default Dark Modern@1280: 189 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:59.685Z] screenshot docs/verification/evidence/ui/audit/24-accounts-default-dark-modern-900.png
+[2026-09-26T10:16:59.686Z] view accounts Default Dark Modern@900: 189 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T10:16:59.712Z] summary {"dashboard":{"chars":1360,"longRuns":[],"overflow":0,"unnamed":[]},"agents":{"chars":238,"longRuns":[],"overflow":0,"unnamed":[]},"chat":{"chars":1063,"longRuns":[],"overflow":0,"unnamed":[]},"files":{"chars":59,"longRuns":[],"overflow":0,"unnamed":[]},"review":{"chars":175,"longRuns":[],"overflow":0,"unnamed":[]},"grid":{"chars":993,"longRuns":[],"overflow":0,"unnamed":[]},"new-agent":{"chars":133,"longRuns":[],"overflow":0,"unnamed":[]},"accounts":{"chars":189,"longRuns":[],"overflow":0,"unnamed":[]}}
+[2026-09-26T10:16:59.712Z] PASS dashboard: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-26T10:16:59.712Z] PASS dashboard: no unbroken text run over 80 characters outside code []
+[2026-09-26T10:16:59.712Z] PASS dashboard: every icon-only control has a name and a tooltip []
+[2026-09-26T10:16:59.712Z] PASS agents: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-26T10:16:59.712Z] PASS agents: no unbroken text run over 80 characters outside code []
+[2026-09-26T10:16:59.712Z] PASS agents: every icon-only control has a name and a tooltip []
+[2026-09-26T10:16:59.712Z] PASS agents: at least 40% less visible text than today's UI (531 → 238) {"before":531,"after":238,"reduction":"55%"}
+[2026-09-26T10:16:59.712Z] PASS chat: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-26T10:16:59.712Z] PASS chat: no unbroken text run over 80 characters outside code []
+[2026-09-26T10:16:59.712Z] PASS chat: every icon-only control has a name and a tooltip []
+[2026-09-26T10:16:59.712Z] PASS chat: at least 40% less visible text than today's UI (2795 → 1063) {"before":2795,"after":1063,"reduction":"62%"}
+[2026-09-26T10:16:59.712Z] PASS files: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-26T10:16:59.712Z] PASS files: no unbroken text run over 80 characters outside code []
+[2026-09-26T10:16:59.712Z] PASS files: every icon-only control has a name and a tooltip []
+[2026-09-26T10:16:59.712Z] PASS files: at least 40% less visible text than today's UI (127 → 59) {"before":127,"after":59,"reduction":"54%"}
+[2026-09-26T10:16:59.712Z] PASS review: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-26T10:16:59.712Z] PASS review: no unbroken text run over 80 characters outside code []
+[2026-09-26T10:16:59.712Z] PASS review: every icon-only control has a name and a tooltip []
+[2026-09-26T10:16:59.712Z] PASS review: at least 40% less visible text than today's UI (350 → 175) {"before":350,"after":175,"reduction":"50%"}
+[2026-09-26T10:16:59.712Z] PASS grid: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-26T10:16:59.712Z] PASS grid: no unbroken text run over 80 characters outside code []
+[2026-09-26T10:16:59.712Z] PASS grid: every icon-only control has a name and a tooltip []
+[2026-09-26T10:16:59.712Z] PASS new-agent: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-26T10:16:59.712Z] PASS new-agent: no unbroken text run over 80 characters outside code []
+[2026-09-26T10:16:59.712Z] PASS new-agent: every icon-only control has a name and a tooltip []
+[2026-09-26T10:16:59.712Z] PASS new-agent: at least 40% less visible text than today's UI (1037 → 133) {"before":1037,"after":133,"reduction":"87%"}
+[2026-09-26T10:16:59.712Z] PASS accounts: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-26T10:16:59.712Z] PASS accounts: no unbroken text run over 80 characters outside code []
+[2026-09-26T10:16:59.712Z] PASS accounts: every icon-only control has a name and a tooltip []
+[2026-09-26T10:16:59.712Z] PASS accounts: at least 40% less visible text than today's UI (381 → 189) {"before":381,"after":189,"reduction":"50%"}
