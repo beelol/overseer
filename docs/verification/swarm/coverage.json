@@ -180,7 +180,7 @@
         "docs/verification/swarm/SWARM-22.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "A linked scripted worker survives daemon restart and launch replay returns one run with its attempt reserved; exact spawn-record crash windows, result receipt replay, VS Code restart and live harness recovery remain unverified."
+      "blocker": "A linked scripted worker survives daemon restart, launch replay returns one run, and terminal reconciliation emits one neutral director event; exact spawn-record crash windows, result receipt replay, VS Code restart and live harness recovery remain unverified."
     },
     "SWARM-23": {
       "status": "unverified",
@@ -245,7 +245,7 @@
         "docs/verification/swarm/SWARM-31.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "A scripted local launch remains separate from completion, replays to one run and requires terminal process state; native async receipts, silent/stale output, late append, descendants and usage reconciliation remain unverified."
+      "blocker": "A scripted local launch remains separate from completion, replays to one run, and emits a once-only terminal event without accepting the job; native async receipts, silent/stale output, late append, descendants and usage reconciliation remain unverified."
     },
     "SWARM-32": {
       "status": "partial",
@@ -493,9 +493,10 @@
         "daemon/tests/swarm_director.rs",
         "docs/verification/swarm/milestone-5.md",
         "docs/verification/swarm/SWARM-61.md",
-        "daemon/tests/swarm_runtime.rs"
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_plan.rs"
       ],
-      "blocker": "Pending local launch replay is rejected after Stop and a linked scripted worker is interrupted; permission revocation, result/acceptance races, native descendants and unreachable-process retry remain unverified."
+      "blocker": "Pending local launch replay is rejected after Stop, a linked scripted worker is interrupted, and rejected/superseded work does not requeue after cancellation; permission revocation, result/acceptance races, native descendants and unreachable-process retry remain unverified."
     },
     "SWARM-62": {
       "status": "partial",
@@ -503,9 +504,10 @@
         "daemon/tests/swarm_control.rs",
         "docs/verification/swarm/milestone-8.md",
         "docs/verification/swarm/milestone-10.md",
-        "docs/verification/swarm/SWARM-62.md"
+        "docs/verification/swarm/SWARM-62.md",
+        "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "A daemon timer checks deadlines without admission requests, records a deadline reason, cancels queued work and requests active stops; live checkpoint/interrupt, confirmed exit and explicit extension remain unimplemented."
+      "blocker": "A daemon timer checks deadlines without admission requests, records a deadline reason, cancels queued work and interrupts a linked scripted worker; live checkpoint/interrupt, visible unconfirmed exit and explicit extension remain unverified."
     },
     "SWARM-63": {
       "status": "unverified",
