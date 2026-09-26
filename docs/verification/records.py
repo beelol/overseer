@@ -588,7 +588,9 @@ rec(52, "Native Overseer notifications (macOS)", "partial", commit="fb1de73", da
     limits="Ad-hoc signed, not notarized: from a downloaded VSIX Gatekeeper may warn once; Developer ID signing belongs with release packaging. VS Code asks once before Overseer handles its vscode:// link.",
     blocker="Owner action: reload VS Code with the new VSIX, run Overseer: Test Notification, allow Overseer when macOS asks, and confirm the banner shows Overseer (name and icon), that Overseer appears in System Settings → Notifications, and that clicking a banner opens the Overseer view.")
 
-rec(53, "Fixed Claude accounts", "not started",
+rec(53, "Fixed Claude accounts", "partial", date="2026-09-25",
+    proven="the design for keeping each Claude account's credentials separate is written (docs/rfcs/claude-credentials.md: check per-folder Keychain entries first, otherwise Overseer-managed credentials); the account flows it builds on (Add Account → Anthropic → Sign In with its own CLAUDE_CONFIG_DIR, sign-out, expiry and Sign in again) pass with the synthetic account CLI",
+    deferred="a live test with a second Claude account (the owner asked not to test Claude yet, and has one Claude account)",
     expected="See the RFC criterion and the [Claude credentials RFC](../rfcs/claude-credentials.md) (moved out of AC-11/AC-13 by the owner on 2026-09-25).",
     actual="Not verified live. The flows exist (Add Account → Anthropic → Sign In runs `claude auth login` with the account's own `CLAUDE_CONFIG_DIR`), and they pass with the synthetic account CLI (AC-11 sign-in, expiry and Sign in again; AC-46 isolation). The owner's only Claude login is the desktop one (`claude (existing login)`, max), which is never signed out.",
     evidence="[signin scenario](evidence/ui/signin/), [accounts scenario](evidence/ui/accounts/)", live="—",

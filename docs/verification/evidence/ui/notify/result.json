@@ -24,7 +24,7 @@
       "name": "with notifications denied it falls back, delivers anyway and tells the user how to fix it",
       "ok": true,
       "detail": {
-        "deniedToast": "Sent a test notification, but not as Overseer: overseer-notifier (denied); fell back to /private/tmp/ovs-ui-Sy59r5/fallback.sh (ok). Allow Overseer in System Settings → Notifications to get Overseer-branded banners."
+        "deniedToast": "Sent a test notification, but not as Overseer: overseer-notifier (denied); fell back to /private/tmp/ovs-ui-Ds242V/fallback.sh (ok). Allow Overseer in System Settings → Notifications to get Overseer-branded banners."
       }
     },
     {

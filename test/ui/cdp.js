@@ -58,6 +58,9 @@ class Cdp {
         const { sessionId } = await this.call('Target.attachToTarget', { targetId: page.targetId, flatten: true });
         this.workbench = sessionId;
         await this.call('Runtime.enable', {}, sessionId);
+        // Behave as focused even when the test window is not the frontmost app (CDP input does not
+        // activate the window; without this, focus() in webviews is dropped immediately).
+        await this.call('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId).catch(() => {});
         await this.call('Page.enable', {}, sessionId);
         for (let i = 0; i < 80; i++) {
           if (await this.evalWorkbench('!!document.querySelector(".monaco-workbench .part.activitybar")').catch(() => false)) return;
@@ -181,6 +184,7 @@ class Cdp {
         try {
           const { sessionId } = await this.call('Target.attachToTarget', { targetId: target.targetId, flatten: true });
           await this.call('Runtime.enable', {}, sessionId); attached.add(target.targetId);
+          await this.call('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId).catch(() => {});
         } catch {}
       }
       for (const context of [...this.contexts.values()].reverse()) {

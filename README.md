@@ -5,14 +5,14 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **47 / 53** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
+criteria: **47 / 53** · **5** partial (see [ledger](docs/verification/README.md)). Unverified:
 AC-11, AC-13, AC-41, AC-50, AC-52, AC-53. The biggest gaps are owner actions, not
-code. Two criteria are partial, each with its proven part and the remaining step in
+code. Five criteria are partial, each with its proven part and the owner's step in
 [Follow-ups](#follow-ups): a live ChatGPT re-sign-in (AC-11) and a live sign-in cycle of a
-disposable ChatGPT account while another works (AC-13), both skipped by the owner for now.
-Fixed Claude accounts (AC-53, [design](docs/rfcs/claude-credentials.md)) wait for a second Claude account. Linux (AC-41) is out of scope for now; opening PRs (AC-50),
-a worktree file tree (AC-51) and native Overseer-branded notifications (AC-52,
-[design](docs/rfcs/native-notifications.md)) are future work. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
+disposable ChatGPT account while another works (AC-13); one live pull request (AC-50); a look at
+the Overseer-branded notification (AC-52); and fixed Claude accounts (AC-53,
+[design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account. Linux (AC-41)
+is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
 ## Acceptance criteria
 
@@ -74,7 +74,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-50** Open a pull request from a run — ◐ partial: Open PR (run panel and Agents menu) explains a missing remote, a non-GitHub remote, an active run and a current-checkout task; signed out of GitHub in VS Code it explains and offers VS Code's own GitHub sign-in (no personal access token); signed in (mock GitHub API) it commits the worktree, pushes the branch with an in-memory header, creates the PR with a generated description, reuses an existing PR, records the URL, never merges, and stores no token / deferred: one live pull request on a repository the owner chooses, with the owner approving VS Code's GitHub sign-in — [evidence](docs/verification/AC-50.md)
 - [x] **AC-51** Worktree file hierarchy — [evidence](docs/verification/AC-51.md)
 - [ ] **AC-52** Native Overseer notifications (macOS) — ◐ partial: the bundled Overseer Notifier.app ships in the installed VSIX (signed, com.beelol.overseer.notifier, named Overseer, universal, transparent icon) and runs; the daemon posts through it (found next to its binary) with the Overseer-view link and falls back to osascript when it is denied, unanswered or missing, recording which path in delivered_via; Test Notification reports both; the link opens the Overseer view / deferred: the owner sees the real Overseer-branded banner, allows it once, finds Overseer in System Settings → Notifications, and clicks a banner into the Overseer view — [evidence](docs/verification/AC-52.md)
-- [ ] **AC-53** Fixed Claude accounts — not started (needs a second Claude account) — [evidence](docs/verification/AC-53.md)
+- [ ] **AC-53** Fixed Claude accounts — ◐ partial: the design for keeping each Claude account's credentials separate is written (docs/rfcs/claude-credentials.md: check per-folder Keychain entries first, otherwise Overseer-managed credentials); the account flows it builds on (Add Account → Anthropic → Sign In with its own CLAUDE_CONFIG_DIR, sign-out, expiry and Sign in again) pass with the synthetic account CLI / deferred: a live test with a second Claude account (the owner asked not to test Claude yet, and has one Claude account) — [evidence](docs/verification/AC-53.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -109,12 +109,13 @@ and Verify clauses. Both lists are generated from the records by
   requests, native children nested under the tool call that spawned them, errors (with
   **Sign in again** for expired logins) and per-turn usage; the raw event log is one tab away.
 - **Overseer view** — **Open Overseer View** lays out an agents column (every repository,
-  not just the open folder) beside the selected run's review and conversation; it works with
-  the native sidebar closed.
+  not just the open folder) and the selected run's worktree files beside its review and
+  conversation; it works with the native sidebar closed.
 - **Merge back** — never automatic: Overseer commits the worktree, merges the target into
   the run's branch in the worktree (conflicts go back to the same agent session), shows you
   exactly what lands, and merges into the target only after you confirm; a dirty target
-  checkout is refused and left untouched.
+  checkout is refused and left untouched. **Open PR…** instead pushes the branch and opens a
+  GitHub pull request with the GitHub account VS Code is signed in to (no tokens to paste).
 - **Accounts** — accounts by provider (OpenAI/ChatGPT, Anthropic/Claude, OpenCode local);
   desktop-app logins are labeled as following the app; New Task offers only compatible
   accounts. Account login only, never API keys.
@@ -175,7 +176,8 @@ node test/ui/scenario-main.js
 4. In the review, click the comparison label (base icon) to switch comparisons; use each
    hunk's **✓ Accept** / **↶ Reject**, or edit the working-tree side and **Save**. **Open in
    Native Diff** gives full editor features including undo/redo.
-5. **Merge back…** when a run is done: prepare, review exactly what lands, confirm.
+5. **Merge back…** when a run is done: prepare, review exactly what lands, confirm. Or
+   **Open PR…** to push the branch and open a GitHub pull request instead.
 6. Agents keep running when VS Code closes (you get a notification). **Stop Agents and
    Daemon** (Agents view menu) stops them all after confirmation.
 
