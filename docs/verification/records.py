@@ -527,14 +527,20 @@ rec(49, "Restore the open session", "verified", commit="8103a2e", date="2026-09-
     live="Fixture runs (generic harness). Restoring is harness-independent: it uses the daemon's run/workspace records and VS Code webview state.",
     limits="Native file editors are restored by VS Code itself. Run panels show the unavailable page if the daemon is unreachable for 20 s at startup (reopen from the Agents view).")
 
-rec(50, "Open a pull request from a run", "partial", commit="b82deac", date="2026-09-25",
-    proven="Open PR (run panel and Agents menu) explains a missing remote, a non-GitHub remote, an active run and a current-checkout task; signed out of GitHub in VS Code it explains and offers VS Code's own GitHub sign-in (no personal access token); signed in (mock GitHub API) it commits the worktree, pushes the branch with an in-memory header, creates the PR with a generated description, reuses an existing PR, records the URL, never merges, and stores no token",
-    deferred="one live pull request on a repository the owner chooses, with the owner approving VS Code's GitHub sign-in",
+rec(50, "Open a pull request from a run", "verified", commit="0cdd312", date="2026-09-25 (owner-confirmed live on the owner's Mac)",
+    harness="codex (ChatGPT A, `p-f262c1bc4958`, gpt-5.6-luna) for the live run; the owner's VS Code GitHub sign-in (account `beelol`) for the push and the pull request",
     steps="""1. `cargo test` — `ac50_pr_plan_explains_refusals_and_prepares_a_github_branch_without_merging` (refusals, owner/repo parsing through an `insteadOf` stand-in, commit without merging, `pull_request` event, bad URLs refused) and the `pr::tests` unit test (github.com remote parsing: https, ssh, scp-like; others rejected).
 2. `node test/ui/scenario-pr.js` (packaged UI; `fixtures/mock-github/server.js` as the API; a local bare repository stands in for `https://github.com/test-owner/pr-demo.git` via `url.<bare>.insteadOf`). A generic run edits a.txt and adds NOTES.md. Then **Open PR…** four times: with no remote; with a GitLab remote; with the GitHub remote while the API is real GitHub and VS Code has no GitHub session; and after pointing `overseer.github.apiUrl` at the mock (test token honored only for a loopback API). Finally open it again.
-3. `node test/unit/webview-scripts.js`; reran `scenario-main.js`.""",
+3. `node test/unit/webview-scripts.js`; reran `scenario-main.js`.
+4. Live with the owner ([session](evidence/ac-50/session.md)): the owner asked for a new repository, so the agent created the private `beelol/overseer-pr-sandbox` and cloned it fresh under /tmp. One tiny Codex run added `OVERSEER.md`. The owner pressed **Open PR…** in their own VS Code, approved VS Code's GitHub sign-in and confirmed. The agent checked GitHub with read-only `gh`.""",
     expected="A PR created from a live run against a repository the owner chooses; missing remote and signed-out cases explained; no automatic merge.",
-    actual="""- **No remote:** "Open PR is unavailable: The repository … has no Git remote. Add a GitHub remote (git remote add origin https://github.com/OWNER/REPO.git) …".
+    actual="""- **Live, owner's Mac (2026-09-25):**
+  - **Bugs found:** the plan targeted `origin/master` in a fresh clone (fixed in 4fa7166, with a regression test). With no run selected, Open PR did nothing (it now asks which run). With VS Code's Do Not Disturb on (as on the owner's Mac), every answer was an invisible toast: the sign-in prompt, the refusals and the result. They are dialogs now (0cdd312), and the scenario runs with Do Not Disturb on.
+  - Then the owner pressed Open PR… on the run and approved VS Code's GitHub sign-in. The extension log showed "no GitHub session with repo access" first, then the PR URL. Owner: "worked! amazing".
+  - [beelol/overseer-pr-sandbox#1](https://github.com/beelol/overseer-pr-sandbox/pull/1): open, not merged; head `overseer/add-overseer-pr-check-note` = the worktree HEAD; base `master` (unchanged); title "Add Overseer PR check note". It has one file (`OVERSEER.md`) and the generated description (run, task, commits, files, "never merges automatically").
+  - The run recorded a `pull_request` event. Token-like strings in Overseer's database, the daemon log and the extension log: 0. `extraheader` in git config: 0.
+- **Scenario (mock API):** the messages are now dialogs; the texts below are from the toast version and read the same.
+- **No remote:** "Open PR is unavailable: The repository … has no Git remote. Add a GitHub remote (git remote add origin https://github.com/OWNER/REPO.git) …".
 - **Non-GitHub remote:** "The remote origin (https://gitlab.example.invalid/…) is not on GitHub; Open PR only supports github.com remotes."
 - **Signed out:** "Open PR uses the GitHub sign-in VS Code already has, and VS Code is not signed in to GitHub. No personal access token is needed." with **Sign in to GitHub**. Nothing was pushed or sent.
 - **Signed in (mock API):** the confirmation read "test-owner/pr-demo: overseer/pr-demo-change → main / Commits 2 uncommitted worktree file(s) … first / Pushes … Nothing is merged." Confirming did the following:
@@ -545,10 +551,10 @@ rec(50, "Open a pull request from a run", "partial", commit="b82deac", date="202
 - **Opened again:** the existing PR #42 was found (422 "already exists" → looked up) instead of failing.
 - **No merge, no stored token:** main never moved; the token is absent from Overseer's database, the daemon log, the mock's log, the worktree's git files and the repository's git config.
 - **Found on the way:** a quote in the new button's tooltip broke the run panel's whole inline script, which rendered as an empty "Run". `test/unit/webview-scripts.js` now parses every shipped webview script, including generated inline ones.""",
-    evidence="[pr scenario](evidence/ui/pr/) (signed-out message, confirmation, PR opened; result.json); `cargo test` ac50 and pr::tests",
-    live="Mock GitHub API and a local stand-in remote; the live PR is the owner's step.",
+    evidence="[owner session](evidence/ac-50/session.md), [GitHub checks](evidence/ac-50/github-checks.txt); [pr scenario](evidence/ui/pr/) (signed-out message, confirmation, PR opened; result.json); `cargo test` ac50 and pr::tests",
+    live="Live: a real pull request on github.com from a live Codex run, with the owner's VS Code GitHub sign-in (no token pasted anywhere). Refusal cases and the reuse of an existing PR are covered with the mock API and a local stand-in remote.",
     limits="github.com remotes only (GitHub Enterprise via the `overseer.github.apiUrl` setting is untested). The first push of a branch that needs extra GitHub permissions (for example a fork) reports GitHub's refusal instead of guessing.",
-    blocker="Owner action: choose a GitHub repository you can push to, run a tiny task on a clone of it, press Open PR…, and approve VS Code's GitHub sign-in when asked; confirm the pull request appears on GitHub and nothing was merged.")
+    blocker="not blocked")
 
 rec(51, "Worktree file hierarchy", "verified", commit="0496e0b", date="2026-09-25",
     steps="""1. `cargo test` — `ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside` (directories first, `.git` hidden, A/M/D marks and per-folder counts against the task-start snapshot, `..`/absolute/`.git` paths refused, a 6,000-entry folder listed in under 2 s and capped at 5,000 with `truncated`).
@@ -658,7 +664,6 @@ SHORT_BLOCKERS = {
     47: "not started (added by the owner on 2026-09-25)",
     48: "not started (added by the owner on 2026-09-25)",
     49: "not started (added by the owner on 2026-09-25)",
-    50: "not started (coming soon; added by the owner on 2026-09-25)",
     51: "not started (added by the owner on 2026-09-25)",
     53: "not started (needs a second Claude account)",
 }

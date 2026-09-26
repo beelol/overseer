@@ -17,3 +17,25 @@ and reads GitHub with `gh` (read-only).
    fix with `origin/main`, passes after); full `cargo test` green. Rebuilt the VSIX, installed it, and restarted
    the owner's daemon with no runs active. The plan now reads
    `beelol/overseer-pr-sandbox: overseer/add-overseer-pr-check-note → master`, uncommitted `OVERSEER.md`.
+4. Asked the owner to open the run and press **Open PR…**. Owner (quote): "Don't see where the "Add overseer" PR check node
+   is, but pressing "Open PR" is not working." The extension log had no Open PR entry and no error.
+   - **Bug:** from the Command Palette with no run selected, Open PR returned silently. It now offers a quick pick of
+     worktree runs (2c2c7cf). The run sits under the repository row `ovs-ac50` in the Overseer view.
+5. Owner (quote): "I press it. It clicks, but there's no feedback on anything. It should open it. Also, the open PR
+   button should run that same command if it doesn't already" (it already does: the run panel's button runs
+   `overseer.openPullRequest` for its run).
+   - **Cause:** the owner's VS Code has **Do Not Disturb** on (`notifications.doNotDisturbMode = true`), which hides
+     warning and info toasts — the "not signed in to GitHub" prompt, the "unavailable" reasons and the final
+     "Pull request #N is open". **Fix** (0cdd312): Open PR answers with dialogs and logs each step; the UI scenario
+     now runs with Do Not Disturb on (8/8 PASS). VSIX reinstalled with no runs active.
+6. Owner reloaded and pressed Open PR… again. Extension log:
+   `open PR for r-b3a97720b863: beelol/overseer-pr-sandbox overseer/add-overseer-pr-check-note → master`,
+   `open PR: VS Code has no GitHub session with repo access` (so the sign-in dialog appeared and the owner approved
+   VS Code's GitHub sign-in), then `pull request https://github.com/beelol/overseer-pr-sandbox/pull/1`.
+   Owner (quote): "worked! amazing".
+7. Agent checks (read-only `gh`, see `github-checks.txt`): PR #1 is OPEN, not merged, not draft; head
+   `overseer/add-overseer-pr-check-note` = the worktree HEAD `45f52dd`; base `master`; title "Add Overseer PR check
+   note"; author `beelol`; one file `OVERSEER.md` (+1); generated description (run, task, commits, files, "never merges
+   automatically"). `master` is still `78db700 Initial commit`. The daemon recorded a `pull_request` event (URL and
+   number only). Token-like strings (`gh?_…`, `x-access-token:`, `AUTHORIZATION: basic`) in Overseer's database, the
+   daemon log and the extension log: 0, 0, 0; `extraheader` in the worktree's and the clone's git config: 0, 0.
