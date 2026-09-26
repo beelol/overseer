@@ -550,11 +550,26 @@ rec(51, "Worktree file hierarchy", "verified", commit="0496e0b", date="2026-09-2
     live="Fixture runs; the tree reads the worktree and the daemon's task-start snapshot, independent of the harness.",
     limits="Folders list at most 5,000 entries (the rest are counted). Deleted files cannot be opened (they are listed for context; the review shows their change).")
 
-rec(52, "Native Overseer notifications (macOS)", "not started",
-    expected="See the RFC criterion and the [native notifications RFC](../rfcs/native-notifications.md) (added by the owner on 2026-09-25).",
-    actual="Not implemented. Background-agent notifications (AC-45, verified) are posted with `osascript`, so macOS shows them as Script Editor's: its icon, clicking opens Script Editor, and the switch is under Script Editor in Notifications settings.",
-    evidence="—", live="—",
-    blocker="Not blocked; not started. Next: a bundled `Overseer Notifier.app` (Swift, UNUserNotificationCenter, ad-hoc signed) used by overseerd with osascript as the fallback, a `vscode://beelol.overseer/open-center` URI handler, and an Overseer: Test Notification command.")
+rec(52, "Native Overseer notifications (macOS)", "partial", commit="fb1de73", date="2026-09-25",
+    proven="the bundled Overseer Notifier.app ships in the installed VSIX (signed, com.beelol.overseer.notifier, named Overseer, universal, transparent icon) and runs; the daemon posts through it (found next to its binary) with the Overseer-view link and falls back to osascript when it is denied, unanswered or missing, recording which path in delivered_via; Test Notification reports both; the link opens the Overseer view",
+    deferred="the owner sees the real Overseer-branded banner, allows it once, finds Overseer in System Settings → Notifications, and clicks a banner into the Overseer view",
+    steps="""1. `node extension/scripts/package.js` builds `bin/Overseer Notifier.app` (`extension/notifier/build.js`: swiftc arm64 + x86_64 → lipo, Info.plist, AppKit-rendered transparent icon → .icns, `codesign -s -`).
+2. `cargo test` — `ac52_notifications_use_the_overseer_helper_and_fall_back_when_denied_or_missing`, `ac52_background_notice_is_delivered_by_the_helper`, `ac52_the_daemon_finds_the_notifier_app_next_to_its_own_binary` (fake helpers; no banners).
+3. `node test/ui/scenario-notify.js`:
+   - Inspect the helper inside the installed VSIX: codesign, bundle id, name, archs, icon, `--status`.
+   - Run **Overseer: Test Notification** with a fake helper that allows, then one that denies.
+   - Open `vscode://beelol.overseer/open-center` twice with **Developer: Open URL**.""",
+    expected="Overseer-branded banner (name, icon) when the last window closes with agents running; a click opens VS Code at the Overseer view; Overseer listed in Notifications settings; osascript fallback when denied, recorded in delivered_via; Test Notification posts a sample.",
+    actual="""- **Installed helper:** the helper inside the installed extension passes `codesign --verify --deep`. It has bundle id `com.beelol.overseer.notifier`, name "Overseer", archs `x86_64 arm64`, and `AppIcon.icns` (transparent corners, checked). `notifier --status` answers `notDetermined` without prompting.
+- **Allowed:** Test Notification reported "Sent a test notification from Overseer". The helper got `--title "Overseer notifications are on" --body … --open vscode://beelol.overseer/open-center`, and the fallback was not used.
+- **Denied:** "Sent a test notification, but not as Overseer: overseer-notifier (denied); fell back to …/fallback.sh (ok). Allow Overseer in System Settings → Notifications…". Protocol tests also cover "permission not answered yet" (the helper gives up after 20 s instead of blocking) and "not installed".
+- **Background notice:** it goes through the helper (`delivered_via: overseer-notifier (ok)`, title "Overseer: 1 agent still running"). The daemon finds `Overseer Notifier.app` next to its own binary, which is the installed layout.
+- **Click link:** `vscode://beelol.overseer/open-center` opens the Overseer view. VS Code asks once ("Allow 'Overseer' extension to open this URI?", with "Do not ask me again"), and later links open it without asking.
+- **Not yet observed:** the real banner's look, the first-time permission prompt, and the System Settings entry (owner step).""",
+    evidence="[notify scenario](evidence/ui/notify/) (toasts, VS Code's URI prompt, Overseer view opened; result.json); `cargo test` ac52_* tests",
+    live="The helper is built and inspected for real; deliveries in tests use fake helpers so no banner or permission prompt appears during automation.",
+    limits="Ad-hoc signed, not notarized: from a downloaded VSIX Gatekeeper may warn once; Developer ID signing belongs with release packaging. VS Code asks once before Overseer handles its vscode:// link.",
+    blocker="Owner action: reload VS Code with the new VSIX, run Overseer: Test Notification, allow Overseer when macOS asks, and confirm the banner shows Overseer (name and icon), that Overseer appears in System Settings → Notifications, and that clicking a banner opens the Overseer view.")
 
 rec(53, "Fixed Claude accounts", "not started",
     expected="See the RFC criterion and the [Claude credentials RFC](../rfcs/claude-credentials.md) (moved out of AC-11/AC-13 by the owner on 2026-09-25).",

@@ -1,0 +1,44 @@
+{
+  "checks": [
+    {
+      "name": "the installed extension ships a signed Overseer Notifier.app (bundle id, name, universal, icon) that runs",
+      "ok": true,
+      "detail": {
+        "verify": 0,
+        "id": "com.beelol.overseer.notifier",
+        "name": "Overseer",
+        "archs": "x86_64 arm64",
+        "status": "notDetermined",
+        "statusExit": 0
+      }
+    },
+    {
+      "name": "Test Notification is delivered by the Overseer helper with the Overseer-view link",
+      "ok": true,
+      "detail": {
+        "okToast": "Sent a test notification from Overseer. If no banner appeared, allow Overseer in System Settings → Notifications.",
+        "args": "--title\nOverseer notifications are on\n--body\nThis is how Overseer tells you agents are still running after VS Code closes.\n--open\nvscode://beelol.overseer/open-center\n"
+      }
+    },
+    {
+      "name": "with notifications denied it falls back, delivers anyway and tells the user how to fix it",
+      "ok": true,
+      "detail": {
+        "deniedToast": "Sent a test notification, but not as Overseer: overseer-notifier (denied); fell back to /private/tmp/ovs-ui-Sy59r5/fallback.sh (ok). Allow Overseer in System Settings → Notifications to get Overseer-branded banners."
+      }
+    },
+    {
+      "name": "the notification link opens the Overseer view (after VS Code's one-time \"Allow … to open this URI?\")",
+      "ok": true,
+      "detail": "Cancel\nOpen\nAllow 'Overseer' extension to open this URI?\nvscode://beelol.overseer/open-center\nDo not ask me again for this extension"
+    },
+    {
+      "name": "later links open the Overseer view without asking again",
+      "ok": true,
+      "detail": {
+        "again": true,
+        "asked": false
+      }
+    }
+  ]
+}
