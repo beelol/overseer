@@ -320,7 +320,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.artifact.put" => crate::swarm::put(&mut d.store.lock().unwrap(), p)?,
         "swarm.integrate" => {
             fixture_only()?;
-            crate::swarm::integrate(&mut d.store.lock().unwrap(), p)?
+            let _serial = d.swarm_integration_lock.lock().unwrap();
+            let mut store = crate::store::Store::connect_existing(&paths::db_path())?;
+            crate::swarm::integrate(&mut store, p)?
         }
         "swarm.verify" => {
             fixture_only()?;

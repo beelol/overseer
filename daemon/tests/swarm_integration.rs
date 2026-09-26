@@ -141,6 +141,62 @@ fn accepted_patch_integrates_in_isolated_workspace_without_touching_checkout() {
 }
 
 #[test]
+fn stop_remains_responsive_during_slow_integration_and_cannot_ack_its_patch() {
+    use std::time::{Duration, Instant};
+
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("slow-integration"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call("swarm.create", json!({"category":"Stop during integration",
+        "objective":"Change a.txt","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}));
+    accepted_patch(&d, &run, "writer", "slow-patch", &patch);
+    let request = json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"slow-patch","repo":checkout,
+        "base_revision":base,"fixture_delay_before_commit_ms":2000});
+    let integration = std::thread::scope(|scope| {
+        let worker = scope.spawn(|| d.try_call("swarm.integrate", request));
+        let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let started: i64 = db.query_row(
+                "SELECT COUNT(*) FROM swarm_integration_intents WHERE run_id=?1",
+                [&run], |row| row.get(0)).unwrap();
+            if started == 1 { break; }
+            assert!(Instant::now() < deadline, "integration did not reach intent");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let begin = Instant::now();
+        let stopped = d.call("swarm.stop",json!({"run_id":run,"generation":1,"revision":1}));
+        assert!(begin.elapsed() < Duration::from_secs(1), "Stop waited for Git integration");
+        assert!(["stopping","stopped"].contains(&stopped["status"].as_str().unwrap()));
+        worker.join().unwrap()
+    });
+    let error = integration.unwrap_err();
+    assert!(error.contains("run cannot integrate"), "{error}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let committed: i64 = db.query_row(
+        "SELECT COUNT(*) FROM swarm_integrated_artifacts WHERE run_id=?1",
+        [&run], |row| row.get(0)).unwrap();
+    assert_eq!(committed, 0);
+    let workspace: String = db.query_row(
+        "SELECT workspace_path FROM swarm_integrations WHERE run_id=?1",
+        [&run], |row| row.get(0)).unwrap();
+    assert_eq!(git(std::path::Path::new(&workspace), &["rev-parse", "HEAD"]), base);
+    let pending: i64 = db.query_row(
+        "SELECT COUNT(*) FROM swarm_integration_intents WHERE run_id=?1",
+        [&run], |row| row.get(0)).unwrap();
+    assert_eq!(pending, 1, "a stopped integration retains its recovery intent");
+}
+
+#[test]
 fn source_commit_change_blocks_stale_patch_integration() {
     let d = Daemon::start(&[]);
     let t = tmp();

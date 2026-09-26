@@ -132,6 +132,15 @@ impl Store {
         Ok(store)
     }
 
+    /// An additional daemon-owned connection for operations that run slow external
+    /// tools between short SQLite writes. The database was migrated at startup.
+    pub fn connect_existing(path: &Path) -> Result<Self> {
+        let conn = Connection::open(path)?;
+        conn.pragma_update(None, "foreign_keys", "ON")?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
+        Ok(Self { conn })
+    }
+
     fn migrate(&self) -> Result<()> {
         self.conn.execute_batch(
             r#"

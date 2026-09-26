@@ -66,6 +66,7 @@ pub struct Daemon {
     pub events: broadcast::Sender<Event>,
     tails: Mutex<HashSet<String>>,
     pub(crate) swarm_launch_lock: Mutex<()>,
+    pub(crate) swarm_integration_lock: Mutex<()>,
     exe: PathBuf,
     pub started_ms: i64,
     /// Connected VS Code windows (connections that said hello as `client: "vscode"`).
@@ -109,7 +110,7 @@ impl Daemon {
         let store = Store::open(&paths::db_path())?;
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), exe, started_ms: now(),
+        let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), exe, started_ms: now(),
             ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)) });
         daemon.ensure_system_profiles()?;
         Ok(daemon)

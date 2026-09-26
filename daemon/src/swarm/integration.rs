@@ -78,9 +78,19 @@ fn acknowledge(
     artifact: &str,
     prior: &str,
     commit: &str,
+    generation: i64,
+    revision: i64,
 ) -> Result<()> {
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
+    let current: (i64, i64, String) = tx.query_row(
+        "SELECT generation,revision,status FROM swarm_runs WHERE id=?1",
+        [run], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )?;
+    if current.0 != generation || current.1 != revision
+        || !["planning", "running"].contains(&current.2.as_str()) {
+        bail!("run cannot integrate after its control state changed");
+    }
     let changed = tx.execute(
         "UPDATE swarm_integrations SET current_commit=?2,updated_ms=?3 WHERE run_id=?1 AND current_commit=?4",
         params![run,commit,now,prior],
@@ -99,6 +109,18 @@ fn acknowledge(
     )?;
     super::artifacts::release_and_unlock(&tx, run, job, now)?;
     tx.commit().map_err(Into::into)
+}
+
+fn ensure_current(store: &Store, run: &str, generation: i64, revision: i64) -> Result<()> {
+    let current: (i64, i64, String) = store.conn.query_row(
+        "SELECT generation,revision,status FROM swarm_runs WHERE id=?1",
+        [run], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )?;
+    if current.0 != generation || current.1 != revision
+        || !["planning", "running"].contains(&current.2.as_str()) {
+        bail!("run cannot integrate after its control state changed");
+    }
+    Ok(())
 }
 
 pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
@@ -282,7 +304,7 @@ pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
             {
                 bail!("integration workspace requires reconciliation");
             }
-            acknowledge(store, run, job, artifact, &prior_commit, &actual_head)?;
+            acknowledge(store, run, job, artifact, &prior_commit, &actual_head, generation, revision)?;
             return Ok(
                 json!({"status":"integrated","duplicate":false,"recovered":true,
                 "commit":actual_head,"workspace_path":workspace,"branch":branch}),
@@ -326,6 +348,12 @@ pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
     if p["fixture_fault"] == "after_apply" {
         bail!("fixture interruption after patch apply");
     }
+    if let Some(delay) = p.get("fixture_delay_before_commit_ms") {
+        let millis = delay.as_u64().ok_or_else(|| anyhow!("invalid fixture integration delay"))?;
+        if millis > 5000 { bail!("fixture integration delay exceeds limit"); }
+        std::thread::sleep(std::time::Duration::from_millis(millis));
+    }
+    ensure_current(store, run, generation, revision)?;
     ensure_no_active_commit_hooks(&root)?;
     git::git_env(&workspace, &["commit", "-m", &message], &IDENTITY)?;
     let commit = git::head(&workspace).ok_or_else(|| anyhow!("integration commit missing"))?;
@@ -339,7 +367,7 @@ pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
     if p["fixture_fault"] == "after_commit" {
         bail!("fixture interruption after Git commit");
     }
-    acknowledge(store, run, job, artifact, &prior_commit, &commit)?;
+    acknowledge(store, run, job, artifact, &prior_commit, &commit, generation, revision)?;
     Ok(
         json!({"status":"integrated","duplicate":false,"commit":commit,
         "workspace_path":workspace,"branch":branch}),
