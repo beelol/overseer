@@ -1784,7 +1784,8 @@ fn auto_selected_opencode_child_uses_guarded_alternate_local_endpoint() {
         "title":"unreachable local child","auto_selected":true,
         "requirements_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "auto_local_endpoint":"http://127.0.0.1:1/v1"}));
-    assert!(refused.unwrap_err().contains("unavailable before child creation"));
+    let refused = refused.unwrap_err();
+    assert!(refused.contains("unavailable before child creation"), "{refused}");
     let auth_file = Path::new(profile["home"].as_str().unwrap()).join("data/opencode/auth.json");
     std::fs::create_dir_all(auth_file.parent().unwrap()).unwrap();
     std::fs::write(&auth_file, "secret-auth-sentinel").unwrap();
@@ -1887,7 +1888,7 @@ fn auto_dispatch_selects_reachable_local_opencode_provider_after_another_fails()
 }
 
 #[test]
-fn auto_opencode_silent_503_interrupt_replays_as_paused_without_duplicate() {
+fn auto_opencode_silent_503_budget_survives_restart_and_pauses_without_duplicate() {
     let Some(program) = std::env::var_os("PATH").and_then(|path| std::env::split_paths(&path)
         .map(|dir| dir.join("opencode")).find(|candidate| candidate.is_file())) else { return };
     struct MockServer(std::process::Child);
@@ -1926,7 +1927,7 @@ fn auto_opencode_silent_503_interrupt_replays_as_paused_without_duplicate() {
         "autoupdate":false,"share":"disabled"}).to_string()).unwrap();
     git(&repo, &["add", "opencode.json"]);
     git(&repo, &["commit", "-q", "-m", "two reachable local routes"]);
-    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
         ("OVERSEER_OPENCODE_PATH", program.to_str().unwrap()),
         ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
         ("FIXTURE_MODE", "managed-models")]);
@@ -1937,7 +1938,13 @@ fn auto_opencode_silent_503_interrupt_replays_as_paused_without_duplicate() {
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
     let request = |unit: &str| json!({"work_unit_id":unit,"parent_run_id":parent,
         "min_tier":"general","required_tools":[],"sandbox":"read_only",
-        "allowed_profiles":[profile["id"]],"prompt":"reply hello","title":"local check"});
+        "allowed_profiles":[profile["id"]],"prompt":"reply hello","title":"local check",
+        "execution_budget_ms":5000});
+    for invalid in [json!(0), json!("5000"), json!(1_800_001)] {
+        let mut rejected = request("local-503-invalid-budget");
+        rejected["execution_budget_ms"] = invalid;
+        assert!(d.try_call("auto.dispatch", rejected).is_err());
+    }
     let first = d.call("auto.dispatch", request("local-503-first"));
     assert_eq!(first["state"], "dispatched", "{first}");
     assert!(first["decision"]["selected"].as_str().unwrap().contains("local_a"));
@@ -1953,14 +1960,22 @@ fn auto_opencode_silent_503_interrupt_replays_as_paused_without_duplicate() {
     assert!(d.events(&first_id).iter().all(|event| event["kind"] != "error"),
         "the installed OpenCode CLI has not surfaced its retry as a classified error yet");
     // The installed CLI retries a 503 without emitting an error promptly.
-    // An explicit stop must pause replay instead of starting another child.
-    d.call("run.interrupt", json!({"run_id":first_id}));
-    assert_eq!(d.wait_done(&first_id, 20)["status"], "interrupted");
+    // Restart must preserve the original deadline and stop that same child.
+    d.kill9();
+    d.spawn();
+    let ended = d.wait_done(&first_id, 20);
+    assert_eq!(ended["status"], "failed", "{ended}");
+    assert!(ended["exit_reason"].as_str().unwrap_or_default().contains("execution budget"));
+    assert!(d.events(&first_id).iter().any(|event| event["kind"] == "auto_execution_budget_exhausted"));
     let replay = d.call("auto.dispatch", request("local-503-first"));
     assert_eq!(replay["state"], "paused", "{replay}");
     assert_eq!(replay["run"]["id"], first_id);
+    let mut changed = request("local-503-first");
+    changed["execution_budget_ms"] = json!(6000);
+    assert!(d.try_call("auto.dispatch", changed).is_err(),
+        "replay must not change the persisted execution deadline");
     assert!(!healthy_log.exists(), "an uncertain stopped unit cannot silently try another endpoint");
-    assert_eq!(d.runs().len(), 2, "interrupted work must not create a second child");
+    assert_eq!(d.runs().len(), 2, "expired work must not create a second child");
 }
 
 #[test]

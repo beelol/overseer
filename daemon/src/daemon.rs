@@ -17,6 +17,7 @@ use tokio::sync::broadcast;
 
 pub const ACTIVE: &[&str] = &["queued", "starting", "running", "waiting_for_user"];
 const RAW_SEGMENTS_KEPT: u64 = 4;
+pub const DEFAULT_AUTO_EXECUTION_BUDGET_MS: u64 = 300_000;
 
 pub fn now() -> i64 {
     shim::now_ms() as i64
@@ -552,11 +553,19 @@ impl Daemon {
             "model":model,"effort":effort,"prompt":prompt,"title":title,"required_tools":required_tools});
         let mut request = request;
         if p["auto_selected"] == true {
+            let execution_budget_ms = match p.get("execution_budget_ms") {
+                None => DEFAULT_AUTO_EXECUTION_BUDGET_MS,
+                Some(value) => value.as_u64().ok_or_else(|| anyhow!("automatic execution budget must be an integer"))?,
+            };
+            if !(1_000..=1_800_000).contains(&execution_budget_ms) {
+                bail!("automatic execution budget must be 1000-1800000 ms");
+            }
             let requirements_hash = p["requirements_hash"].as_str().filter(|value| value.len() == 64
                 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
                 .ok_or_else(|| anyhow!("automatic delegation requires a requirements hash"))?;
             request["auto_selected"] = json!(true);
             request["requirements_hash"] = json!(requirements_hash);
+            request["execution_budget_ms"] = json!(execution_budget_ms);
             if harness == "opencode" {
                 let endpoint = p["auto_local_endpoint"].as_str()
                     .ok_or_else(|| anyhow!("automatic local OpenCode requires a selected endpoint"))?;
@@ -646,6 +655,7 @@ impl Daemon {
                 store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1",
                     rusqlite::params![run.id, json!({"approval":parent_approval,"extra_args":[],"required_tools":required_tools,
                         "auto_selected":p["auto_selected"] == true,"expected_account_generation":p["expected_account_generation"],
+                        "execution_budget_ms":request["execution_budget_ms"],
                         "auto_local_endpoint":request["auto_local_endpoint"],
                         "requirements_hash":p["requirements_hash"]}).to_string()])?;
                 Ok(())
@@ -922,6 +932,10 @@ impl Daemon {
     }
 
     pub fn interrupt(self: &Arc<Self>, run_id: &str) -> Result<Value> {
+        self.interrupt_with_origin(run_id, None)
+    }
+
+    fn interrupt_with_origin(self: &Arc<Self>, run_id: &str, auto_budget_ms: Option<u64>) -> Result<Value> {
         let run = self.run(run_id)?;
         if run.parent_run_id.is_some() && run.relation_source.as_deref() != Some("managed-delegation") {
             bail!("native children are interrupted through their parent run");
@@ -933,14 +947,27 @@ impl Daemon {
         if run.parent_run_id.is_none() {
             let children = self.store.lock().unwrap().children(run_id)?;
             for child in children.into_iter().filter(|child| child.relation_source.as_deref() == Some("managed-delegation") && ACTIVE.contains(&child.status.as_str())) {
-                if let Err(error) = self.interrupt(&child.id) {
+                if let Err(error) = self.interrupt_with_origin(&child.id, None) {
                     child_interrupt_errors.push(json!({"run_id":child.id,"error":error.to_string()}));
                 }
             }
         }
         let (dir, _, _) = self.store.lock().unwrap().run_process(run_id)?.ok_or_else(|| anyhow!("run has no process"))?;
+        let budget_marker = Path::new(&dir).join("auto-budget.requested");
+        let first_budget_stop = auto_budget_ms.is_some() && !budget_marker.exists();
+        if let Some(ms) = auto_budget_ms {
+            std::fs::write(&budget_marker, ms.to_string())?;
+            if first_budget_stop {
+                self.emit(Some(&run.task_id), Some(run_id), "auto_execution_budget_exhausted", "daemon", "exact",
+                    json!({"execution_budget_ms":ms,"outcome":"stopping_existing_child"}))?;
+            }
+        }
         std::fs::write(Path::new(&dir).join("interrupt.requested"), now().to_string())?;
-        self.emit(Some(&run.task_id), Some(run_id), "interrupt_requested", "user", "exact", json!({}))?;
+        if auto_budget_ms.is_none() || first_budget_stop {
+            self.emit(Some(&run.task_id), Some(run_id), "interrupt_requested",
+                if auto_budget_ms.is_some() { "daemon" } else { "user" }, "exact",
+                if auto_budget_ms.is_some() { json!({"reason":"auto_execution_budget"}) } else { json!({}) })?;
+        }
         let sock = self.control_socket(&run)?;
         let plan = if run.harness == "codex-app" {
             let turn = std::fs::read_to_string(Path::new(&dir).join("turn.id")).unwrap_or_default();
@@ -983,6 +1010,21 @@ impl Daemon {
                 }
             }
         });
+        if auto_budget_ms.is_some() {
+            let daemon = self.clone();
+            let run_id = run.id.clone();
+            let generation = run.process_generation;
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+                if let Ok(run) = daemon.run(&run_id) {
+                    if run.process_generation == generation && ACTIVE.contains(&run.status.as_str()) {
+                        if let Ok(sock) = daemon.control_socket(&run) {
+                            let _ = shim::control(&sock, &json!({"op":"signal","sig":libc::SIGKILL}));
+                        }
+                    }
+                }
+            });
+        }
         if !child_interrupt_errors.is_empty() {
             self.emit(Some(&run.task_id), Some(&run.id), "managed_child_interrupt_failed", "daemon", "exact",
                 json!({"children":child_interrupt_errors}))?;
@@ -1029,8 +1071,33 @@ impl Daemon {
         let mut last_liveness = std::time::Instant::now();
         let mut state = TailState::default();
         let mut announced = false;
+        let auto_deadline = {
+            let store = self.store.lock().unwrap();
+            let launch: Option<String> = store.conn.query_row(
+                "SELECT launch FROM runs WHERE id=?1", [run_id], |row| row.get(0))?;
+            let launch: Value = launch.as_deref().and_then(|value| serde_json::from_str(value).ok())
+                .unwrap_or(Value::Null);
+            let generic = launch.get("generic").unwrap_or(&launch);
+            if generic["auto_selected"] == true {
+                let budget = generic["execution_budget_ms"].as_i64();
+                let started = store.turns(run_id)?.first().map(|turn| turn.started_ms);
+                budget.zip(started).map(|(budget, started)| (budget, started.saturating_add(budget)))
+            } else { None }
+        };
+        let mut budget_stop_sent = false;
         loop {
             let run = self.run(run_id)?;
+            if let Some((budget_ms, deadline_ms)) = auto_deadline {
+                if !budget_stop_sent && now() >= deadline_ms && ACTIVE.contains(&run.status.as_str()) {
+                    let process = self.store.lock().unwrap().run_process(run_id)?;
+                    if let Some((dir, _, _)) = process {
+                        if !Path::new(&dir).join("exit.json").exists() {
+                            self.interrupt_with_origin(run_id, Some(budget_ms as u64))?;
+                            budget_stop_sent = true;
+                        }
+                    }
+                }
+            }
             if !announced && run.status == "starting" {
                 let process = self.store.lock().unwrap().run_process(run_id)?;
                 if let Some((dir, _, _)) = process {
@@ -1585,11 +1652,14 @@ impl Daemon {
 
     fn finalize(&self, run: &Run, dir: &Path, exit: &ExitInfo, state: &TailState) -> Result<()> {
         let interrupted = dir.join("interrupt.requested").exists();
+        let auto_budget = dir.join("auto-budget.requested").exists();
         let durable_turn_done = if state.turn_done.is_none() && run.harness != "generic" {
             self.store.lock().unwrap().last_turn_completion(&run.id)?
         } else { None };
         let (status, reason) = if let Some(err) = &exit.spawn_error {
             ("failed", format!("could not start harness: {err}"))
+        } else if auto_budget {
+            ("failed", format!("automatic execution budget elapsed; existing child stopped (exit {})", describe_exit(exit)))
         } else if interrupted {
             ("interrupted", format!("interrupted by user (exit {})", describe_exit(exit)))
         } else if dir.join("auto-account-timeout").exists() {

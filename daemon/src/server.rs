@@ -472,7 +472,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             for field in p.as_object().ok_or_else(|| anyhow!("automatic work request must be an object"))?.keys() {
                 if !matches!(field.as_str(), "work_unit_id" | "parent_run_id" | "prompt" | "title"
                     | "min_tier" | "required_tools" | "context_needed" | "requires_approvals"
-                    | "pinned_route" | "preferred_harness" | "allowed_profiles" | "sandbox") {
+                    | "pinned_route" | "preferred_harness" | "allowed_profiles" | "sandbox"
+                    | "execution_budget_ms") {
                     return Err(anyhow!("unsupported automatic work constraint: {field}"));
                 }
             }
@@ -514,6 +515,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let requires_approvals = match p.get("requires_approvals") {
                 None => false,
                 Some(value) => value.as_bool().ok_or_else(|| anyhow!("requires_approvals must be a boolean"))?,
+            };
+            let execution_budget_ms = match p.get("execution_budget_ms") {
+                None => crate::daemon::DEFAULT_AUTO_EXECUTION_BUDGET_MS,
+                Some(value) => value.as_u64().filter(|ms| (1_000..=1_800_000).contains(ms))
+                    .ok_or_else(|| anyhow!("execution_budget_ms must be 1000-1800000"))?,
             };
             let sandbox = match p.get("sandbox") {
                 None => Sandbox::WorkspaceWrite,
@@ -562,6 +568,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let mut requirements = requirements;
             if let Some(explicit) = &explicit_allowed_profiles { requirements["allowed_profiles"] = json!(explicit); }
             if p.get("sandbox").is_some() { requirements["sandbox"] = json!(sandbox); }
+            if p.get("execution_budget_ms").is_some() {
+                requirements["execution_budget_ms"] = json!(execution_budget_ms);
+            }
             let requirements_hash = Sha256::digest(serde_json::to_vec(&requirements)?)
                 .iter().map(|byte| format!("{byte:02x}")).collect::<String>();
             let saved_work_unit = {
@@ -734,7 +743,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         "attempt_limit_reached":attempt_limit_reached,
                         "deadline_exhausted":deadline_exhausted},
                     "requirements":{"min_tier":min_tier,"required_tools":required_tools,
-                        "context_needed":context_needed,"requires_approvals":requires_approvals},
+                        "context_needed":context_needed,"requires_approvals":requires_approvals,
+                        "execution_budget_ms":execution_budget_ms},
                     "evidence":evidence,"discovery_failures":discovery_failures,
                     "pre_effect_failures":pre_effect_failures,
                     "candidates":routes.iter().map(|route| json!({"id":route.id,"quota":route.quota,
@@ -752,6 +762,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         "parent_run_id":parent.id,"harness":route.harness,"profile_id":route.profile_id,
                         "model":route.model,"effort":route.effort,"prompt":prompt,"title":title,
                         "required_tools":required,"auto_selected":true,
+                        "execution_budget_ms":execution_budget_ms,
                         "requirements_hash":requirements_hash,"expected_account_generation":generation,
                         "auto_local_endpoint":if route.harness == "opencode" {
                             Some(route.endpoint.as_str()) } else { None }}))?;
