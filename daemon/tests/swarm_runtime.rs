@@ -118,16 +118,39 @@ fn admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart() {
         "active"
     );
     let sampled_by = std::time::Instant::now() + std::time::Duration::from_secs(5);
-    loop {
+    let first_sample = loop {
         let observation = d.call("swarm.worker.liveness",json!({"run_id":id,
             "job_id":"inspect","attempt_id":admitted["attempt_id"]}));
         if observation["state"] == "reachable" {
-            break;
+            break observation;
         }
         assert!(std::time::Instant::now() < sampled_by, "daemon did not sample worker reachability: {observation}");
         std::thread::sleep(std::time::Duration::from_millis(100));
+    };
+    let db_probe = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let run_dir: String = db_probe.query_row("SELECT run_dir FROM runs WHERE id=?1",
+        rusqlite::params![worker_run], |r|r.get(0)).unwrap();
+    let launch: serde_json::Value = serde_json::from_slice(&std::fs::read(
+        std::path::Path::new(&run_dir).join("launch.json")).unwrap()).unwrap();
+    let socket = std::path::PathBuf::from(launch["control_socket"].as_str().unwrap());
+    let hidden_socket = socket.with_extension("unreachable");
+    std::fs::rename(&socket, &hidden_socket).unwrap();
+    let poll_at = first_sample["last_sample_ms"].as_i64().unwrap() + 15_000;
+    for step in 0..=4 {
+        let polled = d.call("swarm.worker.liveness.poll",json!({"now_ms":poll_at+step*15_000}));
+        assert_eq!(polled["sampled"],1,"{polled}");
+        let state = d.call("swarm.worker.liveness",json!({"run_id":id,
+            "job_id":"inspect","attempt_id":admitted["attempt_id"]}));
+        assert_eq!(state["state"], if step == 4 { "unknown" } else { "suspect" }, "{state}");
     }
-    let probe_at = now() + 2_000;
+    assert_eq!(d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}))["status"], "unknown");
+    std::fs::rename(&hidden_socket, &socket).unwrap();
+    let recovered = d.call("swarm.worker.liveness.poll",json!({"now_ms":poll_at+75_000}));
+    assert_eq!(recovered["sampled"],1,"{recovered}");
+    assert_eq!(d.call("swarm.worker.liveness",json!({"run_id":id,
+        "job_id":"inspect","attempt_id":admitted["attempt_id"]}))["state"], "reachable");
+    let probe_at = poll_at + 75_001;
     let sample = |time, reachable| d.call("swarm.worker.liveness.sample", json!({
         "run_id":id,"job_id":"inspect","attempt_id":admitted["attempt_id"],
         "now_ms":time,"reachable":reachable}));

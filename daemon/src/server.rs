@@ -358,6 +358,16 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             crate::swarm::sample_liveness(&mut d.store.lock().unwrap(), p)?
         }
+        "swarm.worker.liveness.poll" => {
+            fixture_only()?;
+            let now_ms = p["now_ms"]
+                .as_i64()
+                .ok_or_else(|| anyhow!("missing poll time"))?;
+            if now_ms < 0 {
+                return Err(anyhow!("invalid poll time"));
+            }
+            json!({"sampled": crate::swarm::sample_due_workers(d, now_ms)?})
+        }
         "swarm.director.claim_batch" => {
             fixture_only()?;
             crate::swarm::claim_batch(&mut d.store.lock().unwrap(), p)?
