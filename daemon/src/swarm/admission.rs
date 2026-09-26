@@ -16,6 +16,44 @@ fn blocked(reason: &str) -> Value {
     json!({"status":"blocked","reason":reason})
 }
 
+/// Called while holding the daemon's launch lock, before an ordinary task
+/// creates a workspace. Swarm and ordinary admissions must serialize through
+/// that lock so both observe the same global occupancy.
+pub fn ordinary_slot_available(store: &Store) -> Result<bool> {
+    let mut policies = store.conn.prepare(
+        "SELECT policy FROM swarm_runs WHERE status IN ('running','paused','stalled','stopping')",
+    )?;
+    let limits = policies
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    if limits.is_empty() {
+        return Ok(true);
+    }
+    let cap = limits.into_iter().try_fold(i64::MAX, |cap, raw| -> Result<i64> {
+        let policy: Value = serde_json::from_str(&raw)?;
+        let max = policy["effective"]["max_executing"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("active swarm has no global agent limit"))?;
+        Ok(cap.min(max))
+    })?;
+    let workers: i64 = store.conn.query_row(
+        "SELECT COUNT(*) FROM swarm_attempts WHERE status='registered'", [], |r| r.get(0),
+    )?;
+    let directors: i64 = store.conn.query_row(
+        "SELECT COUNT(*) FROM swarm_runs WHERE status IN ('running','paused','stalled','stopping')",
+        [], |r| r.get(0),
+    )?;
+    let ordinary: i64 = store.conn.query_row(
+        "SELECT COUNT(*) FROM runs r WHERE r.status IN ('queued','starting','running','waiting_for_user')
+         AND NOT EXISTS (
+           SELECT 1 FROM swarm_worker_launches l JOIN swarm_attempts a ON a.id=l.attempt_id
+           WHERE l.overseer_run_id=r.id AND a.status='registered'
+         )",
+        [], |r| r.get(0),
+    )?;
+    Ok(workers + directors + ordinary < cap)
+}
+
 pub(super) struct ScheduledCommit<'a> {
     pub request_id: &'a str,
     pub request_sha256: &'a str,

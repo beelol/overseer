@@ -165,6 +165,49 @@ fn ordinary_run_occupies_global_slot_until_confirmed_exit() {
 }
 
 #[test]
+fn active_swarm_director_holds_global_slot_against_ordinary_launches() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("ordinary-after-swarm"));
+    let swarm = d.call("swarm.create", json!({"category":"Reverse shared slots",
+        "objective":"Audit", "allowed_targets":["codex-a"],
+        "policy":{"max_executing":2,"max_workers":1}}));
+    let id = swarm["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j0","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let first = admit(&d,id,"j0","codex-a","reserve-first",now(),100000,100).unwrap();
+    assert_eq!(first["status"],"admitted");
+    let denied = d.try_call("task.create",json!({"repo":checkout,
+        "harness":"generic","workspace_mode":"worktree", "program":"/bin/sleep",
+        "args":["2"],"prompt":"","title":"ordinary when full"})).unwrap_err();
+    assert!(denied.contains("global agent limit"),"{denied}");
+    assert!(d.call("state",json!({}))["runs"].as_array().unwrap().is_empty());
+
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"j0","attempt_id":first["attempt_id"]}));
+    let barrier = std::sync::Barrier::new(3);
+    let launches = std::thread::scope(|scope| {
+        let first = scope.spawn(|| {
+            barrier.wait();
+            d.try_call("task.create",json!({"repo":checkout,
+                "harness":"generic","workspace_mode":"worktree","program":"/bin/sleep",
+                "args":["2"],"prompt":"","title":"ordinary a"}))
+        });
+        let second = scope.spawn(|| {
+            barrier.wait();
+            d.try_call("task.create",json!({"repo":checkout,
+                "harness":"generic","workspace_mode":"worktree","program":"/bin/sleep",
+                "args":["2"],"prompt":"","title":"ordinary b"}))
+        });
+        barrier.wait();
+        [first.join().unwrap(),second.join().unwrap()]
+    });
+    assert_eq!(launches.iter().filter(|r| r.is_ok()).count(),1,"{launches:?}");
+    assert_eq!(launches.iter().filter(|r| r.as_ref().err().is_some_and(|e| e.contains("global agent limit"))).count(),1,"{launches:?}");
+}
+
+#[test]
 fn full_director_inbox_holds_new_admissions_but_keeps_terminal_reports() {
     let d = Daemon::start(&[]);
     let id = setup(&d, "Inbox pressure", 2);

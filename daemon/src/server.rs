@@ -367,10 +367,12 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.policy.set" => crate::swarm::set_policy(&mut d.store.lock().unwrap(), p)?,
         "swarm.admit" => {
             fixture_only()?;
+            let _serial = d.swarm_launch_lock.lock().unwrap();
             crate::swarm::admit(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.schedule.next" => {
             fixture_only()?;
+            let _serial = d.swarm_launch_lock.lock().unwrap();
             crate::swarm::schedule_next(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.dispatch.next" => {

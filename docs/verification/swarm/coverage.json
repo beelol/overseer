@@ -59,7 +59,7 @@
         "docs/verification/swarm/SWARM-08.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Fixture admission counts existing ordinary runs and counts a linked scripted worker only once alongside its Swarm attempt; reverse ordinary-launch gating, lower-maximum draining, reviewer/native-descendant control and live activation remain unimplemented."
+      "blocker": "Fixture Swarm and ordinary launches share the global slot check in both directions; lower-maximum draining, reviewer/native-descendant control and live activation remain unimplemented."
     },
     "SWARM-08": {
       "status": "partial",
@@ -69,7 +69,7 @@
         "docs/verification/swarm/SWARM-08.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Fixture swarm admissions share an atomic reservation transaction and count ordinary active runs while avoiding double-counting linked Swarm workers; ordinary task.create still lacks a shared atomic slot/account reservation, so reverse races remain possible."
+      "blocker": "Fixture swarm admissions and ordinary task.create serialize global slots, including concurrent ordinary launches after Swarm admission; ordinary tasks still lack shared account-quota reservations and live Auto Mode pool identity."
     },
     "SWARM-09": {
       "status": "partial",
@@ -213,7 +213,7 @@
         "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-7.md"
       ],
-      "blocker": "The fixture admission revalidates a target snapshot transactionally; the actual Auto Mode producer and shared ordinary-task authority are not integrated."
+      "blocker": "The fixture admission revalidates a target snapshot transactionally and ordinary launches share the global slot lock; the actual Auto Mode producer and shared account-quota authority are not integrated."
     },
     "SWARM-25": {
       "status": "unverified",
