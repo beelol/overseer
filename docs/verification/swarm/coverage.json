@@ -494,9 +494,13 @@
       "blocker": "No artifact destination ACL/revocation transition or supported interruption path exists."
     },
     "SWARM-58": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "No side-effect command journal or unknown-outcome reconciliation prevents a blind replay after lost acknowledgement."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_effects.rs",
+        "daemon/src/swarm/effects.rs",
+        "docs/verification/swarm/SWARM-58.md"
+      ],
+      "blocker": "A fixture-only durable intent journal blocks duplicate execution and replacement after a lost acknowledgement, including revision and restart. Actual tool calls are not intercepted, the external outcome probe is not independently qualified, and live S2 reconciliation remains unverified."
     },
     "SWARM-59": {
       "status": "unverified",
@@ -561,8 +565,11 @@
     },
     "S2": {
       "status": "unverified",
-      "evidence": [],
-      "blocker": "No versioned payment/side-effect fixture or command journal can reconcile a lost acknowledgement without double application."
+      "evidence": [
+        "daemon/tests/swarm_effects.rs",
+        "docs/verification/swarm/SWARM-58.md"
+      ],
+      "blocker": "The local evt-42 fixture proves one side-effect application across lost acknowledgement and restart, but the versioned S2 payment fixture, signed webhook, queue barrier, protected variant, independent outcome probe and full director trace are missing."
     },
     "S3": {
       "status": "unverified",
