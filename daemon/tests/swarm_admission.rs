@@ -70,6 +70,44 @@ fn one_run_freezes_allocation_and_dedupes_replayed_admission() {
 }
 
 #[test]
+fn quota_window_reset_does_not_grant_a_second_run_allocation() {
+    let d = Daemon::start(&[]);
+    let id = setup(&d, "Quota reset", 2);
+    let at = now();
+    let mut before_reset = snapshot(at, 1000);
+    before_reset["pools"][0]["windows"][0]["id"] = json!("week-old");
+    let request = |job: &str, request_id: &str, snapshot: Value, estimate: i64| {
+        json!({"run_id":id,"generation":1,"revision":1,"job_id":job,
+            "target_id":"codex-a","request_id":request_id,"snapshot":snapshot,
+            "now_ms":at,"required_capabilities":["code"],
+            "estimate_milli":{"points":estimate},"purpose":"worker"})
+    };
+    let first = d.call("swarm.admit", request("j0", "before-reset", before_reset, 60));
+    assert_eq!(first["status"], "admitted", "{first}");
+    assert_eq!(first["allocation_milli"], 100);
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"j0",
+        "attempt_id":first["attempt_id"],"token":first["token"],
+        "artifact_id":"first-evidence","source_revision":1,
+        "kind":"finding","content":"checked"}));
+    d.call("swarm.report", json!({"run_id":id,"job_id":"j0",
+        "attempt_id":first["attempt_id"],"token":first["token"],
+        "message_id":"first-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["first-evidence"]}}));
+    d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"j0","decision":"accept","evidence":["first-evidence"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"j0","attempt_id":first["attempt_id"]}));
+    let mut after_reset = snapshot(at, 2000);
+    after_reset["pools"][0]["windows"][0]["id"] = json!("week-new");
+    let held = d.call("swarm.admit", request("j1", "after-reset-large", after_reset.clone(), 70));
+    assert_eq!(held["status"], "blocked", "{held}");
+    assert_eq!(held["reason"], "finishing_reserve");
+    let within_cap = d.call("swarm.admit", request("j1", "after-reset-small", after_reset, 20));
+    assert_eq!(within_cap["status"], "admitted", "{within_cap}");
+    assert_eq!(within_cap["allocation_milli"], 100);
+}
+
+#[test]
 fn shared_pool_reservation_blocks_stale_capacity_across_categories() {
     let d = Daemon::start(&[]);
     let first = setup(&d, "Backend pool", 1);

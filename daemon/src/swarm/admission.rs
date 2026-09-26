@@ -345,17 +345,23 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
             "SELECT unit,allocation_milli,reserve_milli FROM swarm_allocations WHERE run_id=?1 AND pool_id=?2 AND window_id=?3",
             params![run,pool,window_id], |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
         ).optional()?;
+        let prior_cap: Option<i64> = tx.query_row(
+            "SELECT MIN(allocation_milli) FROM swarm_allocations
+             WHERE run_id=?1 AND pool_id=?2 AND unit=?3",
+            params![run,pool,unit], |r| r.get(0),
+        )?;
         let (allocation, reserve) = if let Some((old_unit, allocation, reserve)) = frozen {
             if old_unit != unit {
                 return Ok(blocked("quota_unit_changed"));
             }
             (allocation, reserve)
         } else {
-            let allocation = usable
+            let fresh_allocation = usable
                 .saturating_sub(global_reserved)
                 .max(0)
                 .saturating_mul(effective["run_allocation_percent"].as_i64().unwrap_or(10))
                 / 100;
+            let allocation = prior_cap.map_or(fresh_allocation, |cap| fresh_allocation.min(cap));
             let finish = p["finishing_estimate_milli"][unit].as_i64().unwrap_or(0);
             let minimum_reserve = allocation
                 .saturating_mul(effective["finishing_reserve_percent"].as_i64().unwrap_or(20))
@@ -363,8 +369,13 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
             (allocation, minimum_reserve.max(finish))
         };
         let own_reserved: i64 = tx.query_row(
-            "SELECT COALESCE(SUM(amount_milli),0) FROM swarm_reservations WHERE run_id=?1 AND pool_id=?2 AND window_id=?3 AND status IN ('active','uncertain')",
-            params![run,pool,window_id], |r|r.get(0),
+            "SELECT COALESCE(SUM(amount_milli),0) FROM (
+                SELECT attempt_id,MAX(amount_milli) AS amount_milli
+                FROM swarm_reservations
+                WHERE run_id=?1 AND pool_id=?2 AND unit=?3
+                  AND status IN ('active','uncertain')
+                GROUP BY attempt_id)",
+            params![run,pool,unit], |r|r.get(0),
         )?;
         let available = if p["purpose"] == "finishing" {
             allocation.saturating_sub(own_reserved)
