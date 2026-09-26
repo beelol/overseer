@@ -12,7 +12,7 @@ pub use artifacts::{confirm_exit, decide, put};
 pub use admission::admit;
 pub use broker::{ack, direct, messages, register, report};
 pub use control::{expire_due, off, pause, resume};
-pub use director::{claim_batch, complete_batch};
+pub use director::{claim_batch, complete_batch, recover};
 pub use policy::preview;
 pub use settings::set_policy;
 pub use revision::revise;
@@ -107,7 +107,7 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
     if revision != current.1 {
         bail!("stale plan revision");
     }
-    if !["planning", "running", "paused", "stalled"].contains(&current.2.as_str()) {
+    if !["planning", "running", "paused"].contains(&current.2.as_str()) {
         bail!("swarm run is not plannable");
     }
     let progressed: bool = tx.query_row(

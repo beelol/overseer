@@ -226,6 +226,9 @@ pub fn direct(store: &mut Store, p: &Value) -> Result<Value> {
     if p["revision"] != current["revision"] {
         bail!("stale plan revision");
     }
+    if current["status"] == "stalled" {
+        bail!("director is stalled pending recovery");
+    }
     if current["status"] == "stopping" && p["type"] != "stop" && p["type"] != "checkpoint" {
         bail!("swarm run is stopping");
     }
@@ -319,6 +322,9 @@ pub fn ack(store: &mut Store, p: &Value) -> Result<Value> {
         let current = get(store, run)?;
         if p["generation"] != current["generation"] {
             bail!("stale director generation");
+        }
+        if current["status"] == "stalled" {
+            bail!("director is stalled pending recovery");
         }
     }
     if !["delivered", "applied"].contains(&phase) {

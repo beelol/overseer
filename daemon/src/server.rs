@@ -289,6 +289,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             crate::swarm::complete_batch(&mut d.store.lock().unwrap(), p)?
         }
+        "swarm.director.recover" => {
+            fixture_only()?;
+            crate::swarm::recover(&mut d.store.lock().unwrap(), p)?
+        }
         "profile.create" => json!(d.create_profile(s(p, "name")?, s(p, "harness")?)?),
         "profile.rename" => {
             let name = s(p, "name")?.trim();

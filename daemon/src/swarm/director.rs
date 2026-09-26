@@ -31,6 +31,9 @@ pub fn claim_batch(store: &mut Store, p: &Value) -> Result<Value> {
     if current["revision"] != revision {
         bail!("stale plan revision");
     }
+    if current["status"] == "stalled" {
+        return Ok(json!({"status":"stalled","messages":[]}));
+    }
     if current["status"] == "stopping" || current["status"] == "stopped" {
         return Ok(json!({"status":"halted","messages":[]}));
     }
@@ -107,6 +110,83 @@ pub fn claim_batch(store: &mut Store, p: &Value) -> Result<Value> {
     )
 }
 
+/// Fixture recovery transition. A live caller must prove process termination before choosing
+/// `confirmed_dead`; an unreachable process remains `unknown` with its capacity reserved.
+pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
+    let run = required(p, "run_id")?;
+    let generation = p["generation"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing generation"))?;
+    let revision = p["revision"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing revision"))?;
+    let termination = required(p, "termination")?;
+    if termination != "unknown" && termination != "confirmed_dead" {
+        bail!("invalid director termination evidence");
+    }
+    let current = get(store, run)?;
+    if current["generation"] != generation {
+        bail!("stale director generation");
+    }
+    if current["revision"] != revision {
+        bail!("stale plan revision");
+    }
+    if !["planning", "running", "paused", "stalled", "draining"]
+        .contains(&current["status"].as_str().unwrap_or(""))
+    {
+        bail!("run cannot recover director in this state");
+    }
+    let now = crate::daemon::now();
+    let tx = store.conn.transaction()?;
+    if termination == "unknown" {
+        tx.execute(
+            "UPDATE swarm_runs SET status='stalled',updated_ms=?2 WHERE id=?1",
+            params![run, now],
+        )?;
+        tx.commit()?;
+        return Ok(json!({"status":"stalled","generation":generation,"reason":"director_termination_unknown"}));
+    }
+    let turn: Option<String> = tx
+        .query_row(
+            "SELECT id FROM swarm_director_turns WHERE run_id=?1 AND status='active'",
+            params![run],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if let Some(turn_id) = &turn {
+        tx.execute(
+            "UPDATE swarm_messages SET phase='queued',updated_ms=?2 WHERE seq IN
+             (SELECT seq FROM swarm_director_turn_messages WHERE turn_id=?1) AND phase='delivered'",
+            params![turn_id, now],
+        )?;
+        tx.execute(
+            "UPDATE swarm_director_turns SET status='complete',completed_ms=?2 WHERE id=?1",
+            params![turn_id, now],
+        )?;
+    }
+    let workers: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND status='registered'",
+        params![run],
+        |r| r.get(0),
+    )?;
+    let next_status = if current["status"] == "draining" {
+        "draining"
+    } else if current["status"] == "paused" {
+        "paused"
+    } else if workers > 0 {
+        "running"
+    } else {
+        "planning"
+    };
+    tx.execute(
+        "UPDATE swarm_runs SET generation=generation+1,status=?2,updated_ms=?3 WHERE id=?1",
+        params![run, next_status, now],
+    )?;
+    tx.commit()?;
+    Ok(json!({"status":next_status,"generation":generation+1,
+        "replayed_turn":turn,"workers_preserved":workers}))
+}
+
 pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
     let id = required(p, "turn_id")?;
@@ -117,6 +197,9 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     let current = get(store, run)?;
     if current["generation"] != generation {
         bail!("stale director generation");
+    }
+    if current["status"] == "stalled" {
+        bail!("director is stalled pending recovery");
     }
     let (stored_hash, status): (String, String) = store
         .conn

@@ -33,7 +33,7 @@ fn unfinished_runtime_transitions_are_disabled_without_fixture_opt_in() {
     let id=run["id"].as_str().unwrap();
     let plan=json!({"id":id,"generation":1,"revision":0,"jobs":[{"id":"audit","title":"Audit","acceptance":"report","deps":[]}]});
     assert!(d.try_call("swarm.plan",plan).unwrap_err().contains("fixture-only"));
-    for method in ["swarm.messages","swarm.direct","swarm.claim","swarm.decide","swarm.revise"] {
+    for method in ["swarm.messages","swarm.direct","swarm.claim","swarm.decide","swarm.revise","swarm.director.recover"] {
         assert!(d.try_call(method,json!({"run_id":id,"recipient":"director"})).unwrap_err().contains("fixture-only"),"{method}");
     }
     assert!(d.try_call("swarm.ack",json!({"run_id":id,"recipient":"director"})).unwrap_err().contains("fixture-only"));

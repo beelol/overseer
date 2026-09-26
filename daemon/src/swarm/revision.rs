@@ -44,7 +44,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     if expected != current.1 {
         bail!("stale plan revision");
     }
-    if !["planning", "running", "paused", "stalled"].contains(&current.2.as_str()) {
+    if !["planning", "running", "paused"].contains(&current.2.as_str()) {
         bail!("swarm run cannot be revised in this state");
     }
     let mut stmt = tx.prepare(
