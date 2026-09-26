@@ -76,6 +76,8 @@ pub struct AllowanceEstimate {
     pub pool_id: String,
     pub model: String,
     pub effort: String,
+    #[serde(default)]
+    pub plan_type: Option<String>,
     pub source: DrawSource,
     pub observed_ms: i64,
     pub windows: Vec<WindowDraw>,
@@ -110,7 +112,8 @@ pub fn assess_fit(
         return Fit::Unknown;
     }
     let applicable = snapshot.applicable_to(&route.model);
-    if applicable.is_empty() {
+    if applicable.is_empty() || estimate.plan_type.is_none()
+        || applicable.iter().any(|window| window.plan_type != estimate.plan_type) {
         return Fit::Unknown;
     }
     let mut unaffordable = false;
@@ -666,8 +669,8 @@ mod tests {
         let quota = parse_codex_rate_limits(&json!({
             "ordinaryUsageAllowed": true,
             "rateLimitsByLimitId": {
-                "shared": {"limitId":"shared", "primary":{"usedPercent":90,"resetsAt":1800003600}},
-                "model": {"limitId":"model", "normalModelSlug":"sol", "primary":{"usedPercent":50,"resetsAt":1800003600}}
+                "shared": {"limitId":"shared", "planType":"pro", "primary":{"usedPercent":90,"resetsAt":1800003600}},
+                "model": {"limitId":"model", "planType":"pro", "normalModelSlug":"sol", "primary":{"usedPercent":50,"resetsAt":1800003600}}
             }
         }), "pool-a", now).unwrap();
         let route = route(
@@ -682,6 +685,7 @@ mod tests {
             pool_id: "pool-a".into(),
             model: "sol".into(),
             effort: "medium".into(),
+            plan_type: Some("pro".into()),
             source: DrawSource::AttributedActualWork,
             observed_ms: now,
             windows: vec![
@@ -749,7 +753,7 @@ mod tests {
         use serde_json::json;
         let now = 1_800_000_000_000_i64;
         let quota = parse_codex_rate_limits(
-            &json!({"rateLimits":{"primary":{"usedPercent":50,"resetsAt":1800000010}}}),
+            &json!({"rateLimits":{"planType":"pro","primary":{"usedPercent":50,"resetsAt":1800000010}}}),
             "pool-a",
             now,
         )
@@ -767,6 +771,7 @@ mod tests {
             pool_id: "pool-a".into(),
             model: "sol".into(),
             effort: "medium".into(),
+            plan_type: Some("pro".into()),
             source: DrawSource::ProviderReported,
             observed_ms: now,
             windows: vec![WindowDraw {
@@ -789,6 +794,29 @@ mod tests {
             assess_fit(&quota, &route, Some(&estimate), &[], now),
             Fit::Unknown
         );
+    }
+
+    #[test]
+    fn allowance_fit_requires_the_same_known_account_plan() {
+        use crate::auto_quota::parse_codex_rate_limits;
+        use serde_json::json;
+        let now = 1_800_000_000_000_i64;
+        let quota = parse_codex_rate_limits(&json!({"rateLimits":{
+            "limitId":"codex","planType":"pro",
+            "primary":{"usedPercent":40,"resetsAt":1800003600}
+        }}), "pool-a", now).unwrap();
+        let route = route("sol", "codex", "pool-a", CapabilityTier::General,
+            "medium", &["browser"]);
+        let estimate = |plan: Option<&str>| -> AllowanceEstimate {
+            serde_json::from_value(json!({"pool_id":"pool-a","model":"sol",
+                "effort":"medium","source":"provider_reported","observed_ms":now,
+                "plan_type":plan,
+                "windows":[{"bucket_id":"codex","window":"primary","upper_percent":5.0}]
+            })).unwrap()
+        };
+        assert_eq!(assess_fit(&quota, &route, Some(&estimate(Some("pro"))), &[], now), Fit::Fits);
+        assert_eq!(assess_fit(&quota, &route, Some(&estimate(Some("plus"))), &[], now), Fit::Unknown);
+        assert_eq!(assess_fit(&quota, &route, Some(&estimate(None)), &[], now), Fit::Unknown);
     }
 
     #[test]

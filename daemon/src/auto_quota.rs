@@ -15,6 +15,8 @@ pub struct QuotaWindow {
     pub model: Option<String>,
     #[serde(default)]
     pub model_family: Option<String>,
+    #[serde(default)]
+    pub plan_type: Option<String>,
     pub used_percent: f64,
     pub reset_ms: Option<i64>,
     pub duration_mins: Option<i64>,
@@ -185,6 +187,12 @@ fn windows(
             .and_then(Value::as_str)
             .unwrap_or(fallback),
     )?;
+    // Plan changes invalidate learned draw rates. Retain only a bounded
+    // provider identifier; malformed/free-text values become unknown.
+    let plan_type = object.get("planType").and_then(Value::as_str)
+        .filter(|value| !value.is_empty() && value.len() <= 40
+            && value.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')))
+        .map(str::to_string);
     let model = match object.get("normalModelSlug") {
         None | Some(Value::Null) => None,
         Some(Value::String(s)) => Some(identifier(s)?),
@@ -228,6 +236,7 @@ fn windows(
             window: window.into(),
             model: model.clone(),
             model_family: None,
+            plan_type: plan_type.clone(),
             used_percent,
             reset_ms,
             duration_mins,
@@ -268,7 +277,7 @@ fn claude_meter(name: &str, value: &Value, pool: &str, observed_ms: i64) -> Resu
         .filter(|number| number.is_finite() && (0.0..=1.0).contains(number))
         .ok_or_else(|| anyhow!("invalid Claude rate-limit utilization"))? * 100.0;
     Ok(Some(QuotaWindow { pool_id:pool.into(), bucket_id:name.into(), window:name.into(),
-        model:None, model_family:model_family.map(str::to_string), used_percent,
+        model:None, model_family:model_family.map(str::to_string), plan_type:None, used_percent,
         reset_ms:claude_reset(object.get("resetsAt"), observed_ms)?, duration_mins:None,
         observed_ms, expires_ms:observed_ms.saturating_add(FRESH_MS) }))
 }
@@ -318,7 +327,8 @@ pub fn parse_claude_rate_limit_event(value: &Value, pool_id: &str, observed_ms: 
             } else {
                 out.push(QuotaWindow { pool_id:pool.clone(), bucket_id:name.into(), window:name.into(),
                     model:None, model_family:claude_window(name).flatten().map(str::to_string),
-                    used_percent:100.0, reset_ms:claude_reset(info.get("resetsAt"), observed_ms)?,
+                    plan_type:None, used_percent:100.0,
+                    reset_ms:claude_reset(info.get("resetsAt"), observed_ms)?,
                     duration_mins:None, observed_ms, expires_ms:observed_ms.saturating_add(FRESH_MS) });
             }
         }
@@ -451,6 +461,22 @@ mod tests {
         );
         assert_eq!(snapshot.windows[0].observed_ms, now);
         assert_eq!(snapshot.windows[0].expires_ms, now + 60_000);
+    }
+
+    #[test]
+    fn codex_plan_scope_is_retained_without_echoing_invalid_free_text() {
+        let now = 1_800_000_000_000_i64;
+        let reported = parse_codex_rate_limits(&json!({"rateLimits":{
+            "limitId":"codex","planType":"pro",
+            "primary":{"usedPercent":35,"resetsAt":1800003600}
+        }}), "pool-1", now).unwrap();
+        assert_eq!(serde_json::to_value(&reported.windows[0]).unwrap()["plan_type"], "pro");
+        let malformed = parse_codex_rate_limits(&json!({"rateLimits":{
+            "limitId":"codex","planType":"private-user@example.com",
+            "primary":{"usedPercent":35,"resetsAt":1800003600}
+        }}), "pool-1", now).unwrap();
+        assert!(serde_json::to_value(&malformed.windows[0]).unwrap()["plan_type"].is_null());
+        assert_eq!(malformed.state_for("gpt-6-sol", now), QuotaState::ObservedNonExhausted);
     }
 
     #[test]
