@@ -49,6 +49,8 @@ pub struct Item {
     pub text: String,
     /// Set when the event came from a native child (its title), shown indented.
     pub child: Option<String>,
+    /// A tool call's input and result as display text (shown when tools are expanded).
+    pub detail: Option<(String, String)>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -95,7 +97,7 @@ impl Feed {
         let p = &ev["payload"];
         let child = child.map(str::to_string);
         let push = |this: &mut Feed, kind: Kind, text: String| {
-            this.items.insert(seq, Item { seq, kind, text, child: child.clone() });
+            this.items.insert(seq, Item { seq, kind, text, child: child.clone(), detail: None });
         };
         // Harness housekeeping lines that say nothing about the work.
         if ev["kind"] == "output" && matches!(p["text"].as_str().map(str::trim), Some("Reading additional input from stdin...")) {
@@ -150,6 +152,8 @@ impl Feed {
                 let id = p["id"].as_str().unwrap_or_default();
                 let failed = p["is_error"].as_bool().unwrap_or(false) || matches!(p["status"].as_str(), Some("failed" | "error" | "declined"));
                 let done = failed || matches!(p["status"].as_str(), Some("completed" | "success"));
+                let root = self.root.clone();
+                let new_output = p["output"].as_str().map(|o| self.shorten(o.trim_end()));
                 if let Some(item) = self.tools.get(id).and_then(|s| self.items.get_mut(s)) {
                     if let Kind::Tool { status, .. } = &mut item.kind {
                         if failed {
@@ -158,6 +162,14 @@ impl Feed {
                             *status = ToolStatus::Done;
                         }
                     }
+                    let (mut input, mut output) = item.detail.take().unwrap_or_default();
+                    if !p["input"].is_null() {
+                        input = describe_input(&p["input"], root.as_deref());
+                    }
+                    if let Some(o) = new_output {
+                        output = o;
+                    }
+                    item.detail = Some((input, output));
                 }
             }
             "file_activity" => {
@@ -339,6 +351,29 @@ pub fn tool_target(name: &str, summary: &str, root: Option<&str>) -> (String, Op
     }
     let _ = name;
     (first_line(&body), status)
+}
+
+/// A tool input as a few readable lines: `$ command`, a path with the replaced text, or JSON.
+pub fn describe_input(input: &Value, root: Option<&str>) -> String {
+    if let Some(cmd) = input["command"].as_str() {
+        return format!("$ {}", cmd.trim());
+    }
+    if let Some(cmd) = input["command"].as_array() {
+        return format!("$ {}", cmd.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(" "));
+    }
+    if let Some(path) = input["file_path"].as_str().or(input["path"].as_str()) {
+        let mut out = short_path(path, root);
+        if let (Some(old), Some(new)) = (input["old_string"].as_str(), input["new_string"].as_str()) {
+            out.push_str(&format!("\n- {}\n+ {}", first_line(old), first_line(new)));
+        } else if let Some(content) = input["content"].as_str() {
+            out.push_str(&format!("\n{} line{}", content.lines().count(), if content.lines().count() == 1 { "" } else { "s" }));
+        }
+        return out;
+    }
+    if input.is_string() {
+        return input.as_str().unwrap_or_default().to_string();
+    }
+    serde_json::to_string_pretty(input).unwrap_or_default()
 }
 
 fn permission_summary(tool: &str, input: &Value, root: Option<&str>) -> String {

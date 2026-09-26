@@ -224,3 +224,25 @@ fn t14_changes_view_lists_files_and_diffs_like_the_review() {
     assert_eq!(tui.app.mode, Mode::Grid);
     d.ctl("run.interrupt", json!({ "run_id": run }));
 }
+
+#[test]
+fn t17_zoom_expands_tool_inputs_and_results() {
+    let t = tempfile::tempdir().unwrap();
+    let d = claude_daemon("permission");
+    let repo = repo(&t.path().join("tools"));
+    let run = claude_task(&d, &repo, "Writes a file");
+    d.wait_status(&run, |s| s == "waiting_for_user", 20);
+    let mut tui = Tui::attach(&d, 140, 40);
+    tui.until(10, |a| a.state.run(&run).is_some_and(|r| r.needs_you()));
+    tui.key(KeyCode::Char('a'));
+    tui.until(15, |a| a.state.run(&run).is_some_and(|r| r.status == "completed"));
+    tui.key(KeyCode::Char('z'));
+    let folded = tui.screen();
+    assert!(folded.contains("⚙ Write perm.txt ✓") && !folded.contains("│ perm.txt"), "{folded}");
+    tui.key(KeyCode::Char('e'));
+    let s = tui.screen();
+    assert!(s.contains("│ perm.txt") && s.contains("│ 1 line") && s.contains("│ File created successfully at: ./perm.txt"), "input and result under the tool call:\n{s}");
+    tui.snapshot("t17-expanded-tools");
+    tui.key(KeyCode::Char('e'));
+    assert!(!tui.screen().contains("│ perm.txt"), "e folds them again");
+}

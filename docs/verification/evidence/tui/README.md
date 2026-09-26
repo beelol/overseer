@@ -27,3 +27,4 @@ Run everything with `cargo test -p overseer-tui` (T-13 needs `OVERSEER_TUI_LIVE=
 | T-14 Changes view | `tests/control.rs` `t14_…` | [t14-changes](t14-changes.txt) | An agent's edited and added files with `+/−` counts, each file's diff, and "Since task start" as a second comparison. |
 | T-15 Search | `tests/interact.rs` `t15_…` | [t15-search](t15-search.txt) | Narrowed by title ("ref") and by repository ("payments"), kept after Enter, cleared by Esc. |
 | T-16 Accounts and sign-in | `tests/look.rs` `t16_…` | [t16-accounts](t16-accounts.txt) | Panel shows providers, kinds and statuses; the real binary in a pty suspends, runs the account's own login (only its `CODEX_HOME`), resumes; the daemon then reports it signed in (team) and the desktop login still Pro. |
+| T-17 Tool details | `tests/control.rs` `t17_…` | [t17-expanded-tools](t17-expanded-tools.txt) | The Write call expands to `perm.txt`, `1 line` and `File created successfully at: ./perm.txt`; `e` folds it. |

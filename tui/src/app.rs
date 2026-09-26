@@ -228,6 +228,8 @@ pub struct App {
     pub account_sel: usize,
     /// Set when a program must run with the terminal (the event loop suspends the TUI for it).
     pub exec: Option<Exec>,
+    /// Zoom shows tool inputs and results under each tool call.
+    pub expand_tools: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -273,6 +275,7 @@ impl App {
             accounts: Vec::new(),
             account_sel: 0,
             exec: None,
+            expand_tools: false,
         }
     }
 
@@ -1061,6 +1064,7 @@ impl App {
             KeyCode::Char('j') | KeyCode::Down if zoom => self.scroll(-1),
             KeyCode::PageUp if zoom => self.scroll(self.size.1 as i64 - 4),
             KeyCode::PageDown if zoom => self.scroll(-(self.size.1 as i64 - 4)),
+            KeyCode::Char('e') if zoom => self.expand_tools = !self.expand_tools,
             KeyCode::Char('g') if zoom => self.mode = Mode::Zoom { scroll: usize::MAX / 2 },
             KeyCode::Char('G') if zoom => self.mode = Mode::Zoom { scroll: 0 },
             // Grid navigation.

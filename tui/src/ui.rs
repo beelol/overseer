@@ -153,7 +153,7 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
     }
     let keys: &[(&str, &str)] = match app.mode {
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
-        Mode::Zoom { .. } => &[("j/k", "scroll"), ("g/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("z", "grid"), ("?", "help")],
+        Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("g/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
         Mode::Accounts => &[("j/k", "select"), ("s", "sign in"), ("S", "device code (ChatGPT)"), ("r", "refresh"), ("esc", "close")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
@@ -273,7 +273,7 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     let width = inner.width.saturating_sub(1) as usize;
     let lines = match (feed, zoomed) {
         (Some(feed), true) => {
-            let all = all_lines(feed, width);
+            let all = all_lines(feed, width, app.expand_tools);
             let h = inner.height as usize;
             let max_scroll = all.len().saturating_sub(h);
             let scroll = match app.mode {
@@ -293,7 +293,7 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
         let prompt = app.state.task(&run.task_id).map(|t| t.prompt.clone()).unwrap_or_default();
         let mut out = Vec::new();
         if !prompt.trim().is_empty() {
-            render_item(&Item { seq: 0, kind: Kind::User, text: prompt, child: None }, width, &mut out);
+            render_item(&Item { seq: 0, kind: Kind::User, text: prompt, child: None, detail: None }, width, &mut out);
         }
         out.push(Line::from(Span::styled(if run.active() { "working…" } else { "no output" }, Style::new().fg(MUTED))));
         out
@@ -410,6 +410,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("i  enter", "message the focused agent"),
         ("z", "zoom: full screen with scrollback"),
         ("v", "changes: files and diffs"),
+        ("e  (in zoom)", "expand tool inputs and results"),
         ("a / d", "allow / deny its permission request"),
         ("w", "next agent waiting for you"),
         ("x", "interrupt the focused agent"),
@@ -557,15 +558,19 @@ pub fn tail_lines(feed: &Feed, width: usize, height: usize) -> Vec<Line<'static>
     lines
 }
 
-pub fn all_lines(feed: &Feed, width: usize) -> Vec<Line<'static>> {
+pub fn all_lines(feed: &Feed, width: usize, expanded: bool) -> Vec<Line<'static>> {
     let mut out = Vec::new();
     for item in feed.items() {
-        render_item(item, width, &mut out);
+        render_item_ex(item, width, &mut out, expanded);
     }
     out
 }
 
 pub fn render_item(item: &Item, width: usize, out: &mut Vec<Line<'static>>) {
+    render_item_ex(item, width, out, false);
+}
+
+pub fn render_item_ex(item: &Item, width: usize, out: &mut Vec<Line<'static>>, expanded: bool) {
     let muted = Style::new().fg(MUTED);
     let mut prefix: Vec<Span<'static>> = Vec::new();
     if item.child.is_some() {
@@ -592,7 +597,23 @@ pub fn render_item(item: &Item, width: usize, out: &mut Vec<Line<'static>>) {
             let target = if text.is_empty() { String::new() } else { format!(" {text}") };
             // One line: truncate the target rather than wrapping it.
             let room = width.saturating_sub(prefix_width(&prefix) + name.width() + 3);
+            let indent = prefix_width(&prefix);
             wrap(prefix, &[(name.clone(), Style::new()), (fit(&target, room), muted), mark], width, out);
+            if expanded {
+                if let Some((input, output)) = &item.detail {
+                    let pad = vec![Span::styled(format!("{}│ ", " ".repeat(indent)), muted)];
+                    for l in input.lines().take(8) {
+                        wrap(pad.clone(), &[(l.to_string(), Style::new().fg(Color::Cyan))], width, out);
+                    }
+                    let lines: Vec<&str> = output.lines().collect();
+                    for l in lines.iter().take(10) {
+                        wrap(pad.clone(), &[(l.to_string(), muted)], width, out);
+                    }
+                    if lines.len() > 10 {
+                        wrap(pad.clone(), &[(format!("… {} more lines", lines.len() - 10), muted.add_modifier(Modifier::ITALIC))], width, out);
+                    }
+                }
+            }
         }
         Kind::Edit => {
             prefix.push(Span::styled("✎ ", Style::new().fg(Color::Yellow)));

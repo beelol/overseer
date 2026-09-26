@@ -45,6 +45,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | i, Enter | Compose a message to the focused agent (Enter sends, Esc closes, Alt-Enter new line) |
 | z | Zoom: focused agent full screen with scrollback (j/k, PgUp/PgDn, g/G; z or Esc returns) |
 | v | Changes: the focused agent's changed files and their diffs (j/k file, J/K scroll, c comparison) |
+| e (zoom) | Expand or fold every tool call's input and result |
 | a / d | Allow / deny the focused agent's pending permission |
 | w | Jump to the next agent waiting for you |
 | x | Interrupt the focused agent (asks y/n) |
@@ -149,3 +150,8 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   folder is touched; no API keys. **Verify:** the panel's statuses; the real binary in a
   terminal signs a fixed account in (fixture account CLI) and comes back, the daemon reports
   it signed in, and the desktop login is unchanged.
+- [x] **T-17 — Tool details in zoom.** In zoom, `e` expands every tool call to show its input
+  (`$ command`, the path with the replaced line, or the call's JSON) and the first lines of its
+  result under the call; `e` folds them again. Paths are shortened as elsewhere. **Verify:**
+  a Claude fixture Write call shows its path, size and result when expanded, and nothing extra
+  when folded.
