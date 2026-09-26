@@ -1,0 +1,133 @@
+{
+  "checks": [
+    {
+      "name": "your prompt is a bubble on the right; the agent reply is plain text in a centered column of about 720 px",
+      "ok": true,
+      "detail": {
+        "columnWidth": 550,
+        "available": 550,
+        "centered": true,
+        "userRight": 24,
+        "userBubble": true,
+        "agentPlain": true,
+        "h2": "Done: sessions refresh once",
+        "listItems": 3,
+        "tableRows": 3,
+        "codeLang": "ts",
+        "highlighted": true,
+        "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
+        "longPath": "…/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-MZvthG/overseer-home/worktrees/chat-repo-97eb28ed/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
+        "edits": [
+          "session-refresh-coordinator.ts",
+          "README.md"
+        ],
+        "foot": "Done0s20k tokens · $0.04",
+        "composerPinned": true
+      }
+    },
+    {
+      "name": "the reply renders as Markdown: heading, list, table, highlighted code with its language, link with its URL, long path shortened with the full path as tooltip",
+      "ok": true,
+      "detail": {
+        "columnWidth": 550,
+        "available": 550,
+        "centered": true,
+        "userRight": 24,
+        "userBubble": true,
+        "agentPlain": true,
+        "h2": "Done: sessions refresh once",
+        "listItems": 3,
+        "tableRows": 3,
+        "codeLang": "ts",
+        "highlighted": true,
+        "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
+        "longPath": "…/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-MZvthG/overseer-home/worktrees/chat-repo-97eb28ed/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
+        "edits": [
+          "session-refresh-coordinator.ts",
+          "README.md"
+        ],
+        "foot": "Done0s20k tokens · $0.04",
+        "composerPinned": true
+      }
+    },
+    {
+      "name": "consecutive tool calls fold into one line; edits are chips; the turn ends with a quiet footer; the composer stays pinned",
+      "ok": true,
+      "detail": {
+        "columnWidth": 550,
+        "available": 550,
+        "centered": true,
+        "userRight": 24,
+        "userBubble": true,
+        "agentPlain": true,
+        "h2": "Done: sessions refresh once",
+        "listItems": 3,
+        "tableRows": 3,
+        "codeLang": "ts",
+        "highlighted": true,
+        "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
+        "longPath": "…/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-MZvthG/overseer-home/worktrees/chat-repo-97eb28ed/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
+        "edits": [
+          "session-refresh-coordinator.ts",
+          "README.md"
+        ],
+        "foot": "Done0s20k tokens · $0.04",
+        "composerPinned": true
+      }
+    },
+    {
+      "name": "expanded tool rows read like \"Read README.md\", \"Ran npm test …\" (no raw JSON)",
+      "ok": true,
+      "detail": [
+        "ReadREADME.md",
+        "Searched“refreshToken|validateSession”",
+        "Found filessrc/**/*.ts",
+        "Createdsession-refresh-coordinator.ts+8−0",
+        "EditedREADME.md+1−1",
+        "Rannpm test -- --grep \"session refresh\""
+      ]
+    },
+    {
+      "name": "scrolled up, Jump to latest appears and returns to the newest message",
+      "ok": true,
+      "detail": {
+        "jump": true,
+        "atEnd": true
+      }
+    },
+    {
+      "name": "while a run streams, earlier content does not shift",
+      "ok": true,
+      "detail": {
+        "msgs": 2000,
+        "moved": [],
+        "movedCount": 0,
+        "observed": 50
+      }
+    },
+    {
+      "name": "a 2,000-event conversation scrolls with p95 frame time under 16 ms (refresh-rate frames, no dropped frames)",
+      "ok": true,
+      "detail": {
+        "frames": 235,
+        "p95": 9.6,
+        "median": 8.3,
+        "max": 10
+      }
+    },
+    {
+      "name": "appending a new event takes under 100 ms",
+      "ok": true,
+      "detail": {
+        "found": 20,
+        "perAppendMs": 2.7
+      }
+    }
+  ]
+}

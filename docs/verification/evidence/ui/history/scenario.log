@@ -1,0 +1,10 @@
+[2026-09-26T09:55:39.587Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T09:57:43.668Z] created 300 runs {"ms":121470}
+[2026-09-26T09:57:44.785Z] screenshot docs/verification/evidence/ui/history/01-search.png
+[2026-09-26T09:57:44.785Z] PASS with 300 runs, search answers in under 200 ms, by title and by text only in the agent output {"byTitle":{"ms":2,"titles":["History task 123"]},"byOutput":{"ms":69,"titles":["History task 237"]}}
+[2026-09-26T09:57:49.009Z] PASS a finished run is archived from the rail (hidden, still listed under Show archived) and restored {"archived":1790416665304,"hidden":true,"inArchive":["History task 005"],"restored":true}
+[2026-09-26T09:57:53.293Z] after cleanup command {"dialog":"Remove All, Discarding Uncommitted Work\nCancel\nRemove 2 Clean\nClean up worktrees of 3 archived agents?\nBranches are kept, so committed work stays in Git.\n\nClean (2):\n• History task 010\n• History task 011\n\nWith uncommitted work (1), kept unless you choose to discard it:\n• History task 012 (1 file)","toasts":[],"quick":"none","quickValue":">Overseer: Clean Up Archived Worktrees"}
+[2026-09-26T09:57:55.468Z] screenshot docs/verification/evidence/ui/history/02-cleanup.png
+[2026-09-26T09:57:55.468Z] PASS bulk cleanup removes only the clean archived worktrees; uncommitted work is kept unless confirmed; branches stay {"cleaned":{"a":true,"b":true,"c":false,"cFile":true,"branchesKept":true},"dialog":"Remove All, Discarding Uncommitted Work\nCancel\nRemove 2 Clean\nClean up worktrees of 3 archived agents?\nBranches are kept, so committed work stays in Git.\n\nClean (2):\n• History task 010\n• History task 011\n\nWith uncommitted work (1), kept unless you choose to discard it:\n• History task 012 (1 file)"}
+[2026-09-26T09:58:00.037Z] PASS discarding uncommitted work needs an explicit second confirmation, then the worktree is removed (branch kept) {"removed":true}
+[2026-09-26T09:58:13.552Z] PASS finished runs older than overseer.history.autoArchiveDays are archived automatically; the rail shows active and recent runs only {"archivedCount":300,"shown":0}

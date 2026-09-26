@@ -1,0 +1,91 @@
+{
+  "checks": [
+    {
+      "name": "a pasted image reaches the agent (an image block in the message)",
+      "ok": false,
+      "detail": [
+        "text"
+      ]
+    },
+    {
+      "name": "an @-mentioned worktree file is picked from the popup and named in the message",
+      "ok": false,
+      "detail": {
+        "text": "Compare the image with @README.md ",
+        "sent": "first turn"
+      }
+    },
+    {
+      "name": "per-turn model, reasoning effort and permission mode reach the harness",
+      "ok": false,
+      "detail": {
+        "argv": [
+          "-p",
+          "--output-format",
+          "stream-json",
+          "--input-format",
+          "stream-json",
+          "--verbose",
+          "--permission-prompt-tool",
+          "stdio"
+        ],
+        "tray": "red.pngopus · high effort · Plan only"
+      }
+    },
+    {
+      "name": "a message sent while the agent works is queued (shown) and sent when the turn ends",
+      "ok": false,
+      "detail": {
+        "queued": "Queuedqueued messageCancel",
+        "turns": [
+          [
+            1,
+            "first turn",
+            "completed"
+          ],
+          [
+            2,
+            "Compastart a slow turnre the image with @README.md\n\nFiles mentioned (paths relative to the repository root): `README.md`",
+            "completed"
+          ],
+          [
+            3,
+            "queued message",
+            "completed"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "⌥Enter stops the agent and sends the message right away",
+      "ok": false,
+      "detail": [
+        [
+          1,
+          "first turn",
+          "completed"
+        ],
+        [
+          2,
+          "Compastart a slow turnre the image with @README.md\n\nFiles mentioned (paths relative to the repository root): `README.md`",
+          "completed"
+        ],
+        [
+          3,
+          "queued message",
+          "completed"
+        ],
+        [
+          4,
+          "another slow turn",
+          "failed"
+        ],
+        [
+          5,
+          "stop and do this",
+          "completed"
+        ]
+      ]
+    }
+  ]
+}

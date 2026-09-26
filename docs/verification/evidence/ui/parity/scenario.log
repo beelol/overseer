@@ -1,0 +1,8 @@
+[2026-09-26T10:11:28.079Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T10:11:34.970Z] screenshot docs/verification/evidence/ui/parity/01-composer-tools.png
+[2026-09-26T10:11:44.234Z] FAIL a pasted image reaches the agent (an image block in the message) ["text"]
+[2026-09-26T10:11:44.234Z] FAIL an @-mentioned worktree file is picked from the popup and named in the message {"text":"Compare the image with @README.md ","sent":"first turn"}
+[2026-09-26T10:11:44.234Z] FAIL per-turn model, reasoning effort and permission mode reach the harness {"argv":["-p","--output-format","stream-json","--input-format","stream-json","--verbose","--permission-prompt-tool","stdio"],"tray":"red.pngopus · high effort · Plan only"}
+[2026-09-26T10:12:03.425Z] FAIL a message sent while the agent works is queued (shown) and sent when the turn ends {"queued":"Queuedqueued messageCancel","turns":[[1,"first turn","completed"],[2,"Compastart a slow turnre the image with @README.md\n\nFiles mentioned (paths relative to the repository root): `README.md`","completed"],[3,"queued message","completed"]]}
+[2026-09-26T10:12:22.546Z] FAIL ⌥Enter stops the agent and sends the message right away [[1,"first turn","completed"],[2,"Compastart a slow turnre the image with @README.md\n\nFiles mentioned (paths relative to the repository root): `README.md`","completed"],[3,"queued message","completed"],[4,"another slow turn","failed"],[5,"stop and do this","completed"]]
+[2026-09-26T10:12:22.619Z] screenshot docs/verification/evidence/ui/parity/02-steered.png

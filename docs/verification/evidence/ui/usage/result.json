@@ -1,0 +1,163 @@
+{
+  "checks": [
+    {
+      "name": "usage is what each harness reported: Claude 95% / 12% of 5 hours (rate_limit_event), Codex 20% (session log), OpenCode not reported",
+      "ok": true,
+      "detail": {
+        "claude": {
+          "limited": false,
+          "observed_ms": 1790417363567,
+          "reported": true,
+          "source": "Claude rate_limit_event",
+          "status": "allowed",
+          "windows": [
+            {
+              "label": "5 hours",
+              "resets_at_ms": 1790420963000,
+              "used": 0.95
+            },
+            {
+              "label": "week",
+              "resets_at_ms": 1790680163000,
+              "used": 0.4
+            }
+          ]
+        },
+        "second": {
+          "limited": false,
+          "observed_ms": 1790417364323,
+          "reported": true,
+          "source": "Claude rate_limit_event",
+          "status": "allowed",
+          "windows": [
+            {
+              "label": "5 hours",
+              "resets_at_ms": 1790420964000,
+              "used": 0.12
+            },
+            {
+              "label": "week",
+              "resets_at_ms": 1790680164000,
+              "used": 0.4
+            }
+          ]
+        },
+        "codex": {
+          "limited": false,
+          "observed_ms": 1790417366012,
+          "plan": "plus",
+          "reported": true,
+          "source": "Codex session log",
+          "windows": [
+            {
+              "label": "5 hours",
+              "resets_at_ms": 1790420966000,
+              "used": 0.2
+            },
+            {
+              "label": "week",
+              "resets_at_ms": 1790680166000,
+              "used": 0.4
+            }
+          ]
+        },
+        "opencode": {
+          "reported": false
+        }
+      }
+    },
+    {
+      "name": "the dashboard accounts menu shows reported usage per account, with reset times in the tooltip",
+      "ok": true,
+      "detail": [
+        {
+          "label": "claude (existing login)",
+          "hint": "5 hours 95% · week 40%",
+          "title": "claude (existing login) · signed in · max · cc6d9661\nUsage (Claude rate_limit_event)\n5 hours: 95% used, resets Sat 4:09 AM\nweek: 40% used, resets Tue 4:09 AM\nAs of Sat 3:09 AM"
+        },
+        {
+          "label": "codex (existing login)",
+          "hint": "5 hours 20% · week 40%",
+          "title": "codex (existing login) · signed in · pro · 55b9da0f\nUsage (Codex session log)\n5 hours: 20% used, resets Sat 4:09 AM\nweek: 40% used, resets Tue 4:09 AM\nAs of Sat 3:09 AM"
+        },
+        {
+          "label": "opencode (existing login)",
+          "hint": "sign in",
+          "title": "Sign in opencode (existing login)"
+        },
+        {
+          "label": "Claude Second",
+          "hint": "5 hours 12% · week 40%",
+          "title": "Claude Second · signed in · max · cc6d9661\nUsage (Claude rate_limit_event)\n5 hours: 12% used, resets Sat 4:09 AM\nweek: 40% used, resets Tue 4:09 AM\nAs of Sat 3:09 AM"
+        },
+        {
+          "label": "Add account…",
+          "hint": "",
+          "title": ""
+        },
+        {
+          "label": "Manage accounts",
+          "hint": "",
+          "title": ""
+        }
+      ]
+    },
+    {
+      "name": "per-run tokens and cost as the harness reported them (chat turn footer)",
+      "ok": true,
+      "detail": {
+        "text": "20k tokens · $0.04",
+        "title": "18,423 in · 1,204 out · 9,321 cached · $0.0412"
+      }
+    },
+    {
+      "name": "starting on an account near its limit warns (95% of 5 hours, reset time) and offers another compatible account; the warning does not block",
+      "ok": true,
+      "detail": {
+        "warn": {
+          "text": "claude (existing login) is at 95% of its 5 hours limit (resets 4:09 AM).Use Claude Second",
+          "fix": "Use Claude Second",
+          "cls": "composer-note warn",
+          "startDisabled": false
+        },
+        "switched": "Agent: Claude Code · Claude Second",
+        "agentMenu": [
+          "codex (existing login) | 5 hours 20% · week 40%",
+          "claude (existing login) | 5 hours 95% · week 40%",
+          "Claude Second | 5 hours 12% · week 40%",
+          "opencode (existing login) | signed out",
+          "Run a program | "
+        ]
+      }
+    },
+    {
+      "name": "the Accounts view marks an account near its limit",
+      "ok": true,
+      "detail": [
+        "Codex usage | overseer/codex-usage · usage-repo",
+        "codex | completed · codex (existing login)",
+        "Costed run | overseer/costed-run · usage-repo",
+        "claude | completed · claude (existing login)",
+        "Plenty left | overseer/plenty-left · usage-repo",
+        "claude | completed · Claude Second",
+        "Near the limit | overseer/near-the-limit · usage-repo",
+        "claude | completed · claude (existing login)",
+        "Worktree · overseer/costed-run | /private/tmp/ovs-ui-TWryvS/overseer-home/worktrees/usage-repo-9ec0092e/costed-run",
+        "Staged (HEAD → index) (0) | ",
+        "Unstaged (index → working tree) (1) | ",
+        "README.md | M",
+        "Untracked (1) | ",
+        "session-refresh-coordinator.ts | src/auth · ?",
+        "Conflicted (0) | ",
+        "Unsaved drafts (0) | ",
+        "ChatGPT | ",
+        "codex (existing login) | pro · 55b9da0f · desktop",
+        "Claude | ",
+        "claude (existing login) | max · cc6d9661 · desktop · 95% of 5 hours",
+        "Claude Second | max · cc6d9661",
+        "OpenCode | ",
+        "opencode (existing login) | signed out · desktop"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "checks": [
+    {
+      "name": "starting layout: side bar and panel open, two editor groups",
+      "ok": true,
+      "detail": {
+        "sidebar": true,
+        "panel": true,
+        "auxiliary": false,
+        "groups": 2,
+        "sizes": [
+          {
+            "w": 421,
+            "h": 468
+          },
+          {
+            "w": 421,
+            "h": 468
+          }
+        ]
+      }
+    },
+    {
+      "name": "dashboard mode hides side bar, panel and secondary side bar; the dashboard works in a window without a folder",
+      "ok": true,
+      "detail": {
+        "during": {
+          "sidebar": false,
+          "panel": false,
+          "auxiliary": false,
+          "groups": 2,
+          "sizes": [
+            {
+              "w": 708,
+              "h": 731
+            },
+            {
+              "w": 434,
+              "h": 731
+            }
+          ]
+        },
+        "agents": [
+          "Dashboard demo",
+          "Dashboard demo"
+        ]
+      }
+    },
+    {
+      "name": "the dashboard survives a window reload (still in dashboard mode)",
+      "ok": true,
+      "detail": {
+        "sidebar": false,
+        "panel": false,
+        "auxiliary": false,
+        "groups": 2,
+        "sizes": [
+          {
+            "w": 708,
+            "h": 731
+          },
+          {
+            "w": 434,
+            "h": 731
+          }
+        ]
+      }
+    },
+    {
+      "name": "Exit Dashboard restores the previous layout (side bar, panel, secondary side bar and editor groups)",
+      "ok": true,
+      "detail": {
+        "before": {
+          "sidebar": true,
+          "panel": true,
+          "auxiliary": false,
+          "groups": 2,
+          "sizes": [
+            {
+              "w": 421,
+              "h": 468
+            },
+            {
+              "w": 421,
+              "h": 468
+            }
+          ]
+        },
+        "after": {
+          "sidebar": true,
+          "panel": true,
+          "auxiliary": false,
+          "groups": 2,
+          "sizes": [
+            {
+              "w": 421,
+              "h": 469
+            },
+            {
+              "w": 421,
+              "h": 469
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "no setting changed (user settings identical apart from VS Code's own migration)",
+      "ok": true,
+      "detail": {
+        "before": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\"}",
+        "after": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\"}"
+      }
+    },
+    {
+      "name": "with overseer.dashboard.openOnStartup the dashboard opens when VS Code starts",
+      "ok": true
+    }
+  ]
+}

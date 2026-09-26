@@ -1,39 +1,39 @@
-[2026-09-26T08:30:23.553Z] installed "Installing extensions...\nExtension 'overseer-baseline-ce56432.vsix' was successfully installed."
-[2026-09-26T08:30:30.227Z] runs {"showcase":{"id":"r-58187d6b1919","status":"completed"},"permission":{"id":"r-6a33d1273c1c","status":"waiting_for_user"},"nested":{"id":"r-b3215a31634c","status":"completed"},"watch":{"id":"r-f698ae6bd18d","status":"running"},"failed":{"id":"r-c7cf71c9c7e5","status":"failed"}}
-[2026-09-26T08:30:37.953Z] screenshot docs/verification/evidence/ui/audit-baseline/01-dashboard-default-dark-modern-1280.png
-[2026-09-26T08:30:37.955Z] view agents Default Dark Modern@1280: 531 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:37.955Z] view files Default Dark Modern@1280: 127 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:37.956Z] view chat Default Dark Modern@1280: 2795 chars, 6 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:37.958Z] view review Default Dark Modern@1280: 685 chars, 1 long runs, 0 overflow, 2 unnamed
-[2026-09-26T08:30:39.572Z] screenshot docs/verification/evidence/ui/audit-baseline/02-dashboard-default-dark-modern-900.png
-[2026-09-26T08:30:39.573Z] view agents Default Dark Modern@900: 531 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:39.574Z] view files Default Dark Modern@900: 127 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:39.575Z] view chat Default Dark Modern@900: 2795 chars, 6 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:39.577Z] view review Default Dark Modern@900: 685 chars, 1 long runs, 0 overflow, 2 unnamed
-[2026-09-26T08:30:43.187Z] screenshot docs/verification/evidence/ui/audit-baseline/03-dashboard-default-light-modern-1280.png
-[2026-09-26T08:30:43.188Z] view agents Default Light Modern@1280: 531 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:43.189Z] view files Default Light Modern@1280: 127 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:43.190Z] view chat Default Light Modern@1280: 2795 chars, 6 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:43.191Z] view review Default Light Modern@1280: 685 chars, 1 long runs, 0 overflow, 2 unnamed
-[2026-09-26T08:30:44.801Z] screenshot docs/verification/evidence/ui/audit-baseline/04-dashboard-default-light-modern-900.png
-[2026-09-26T08:30:44.802Z] view agents Default Light Modern@900: 531 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:44.802Z] view files Default Light Modern@900: 127 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:44.803Z] view chat Default Light Modern@900: 2795 chars, 6 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:30:44.805Z] view review Default Light Modern@900: 685 chars, 1 long runs, 0 overflow, 2 unnamed
-[2026-09-26T08:30:50.617Z] screenshot docs/verification/evidence/ui/audit-baseline/05-new-agent-default-dark-modern-1280.png
-[2026-09-26T08:30:50.618Z] view new-agent Default Dark Modern@1280: 1037 chars, 0 long runs, 17 overflow, 0 unnamed
-[2026-09-26T08:30:52.218Z] screenshot docs/verification/evidence/ui/audit-baseline/06-new-agent-default-dark-modern-900.png
-[2026-09-26T08:30:52.219Z] view new-agent Default Dark Modern@900: 1037 chars, 0 long runs, 17 overflow, 0 unnamed
-[2026-09-26T08:30:55.844Z] screenshot docs/verification/evidence/ui/audit-baseline/07-new-agent-default-light-modern-1280.png
-[2026-09-26T08:30:55.846Z] view new-agent Default Light Modern@1280: 1037 chars, 0 long runs, 17 overflow, 0 unnamed
-[2026-09-26T08:30:57.455Z] screenshot docs/verification/evidence/ui/audit-baseline/08-new-agent-default-light-modern-900.png
-[2026-09-26T08:30:57.457Z] view new-agent Default Light Modern@900: 1037 chars, 0 long runs, 17 overflow, 0 unnamed
-[2026-09-26T08:31:05.443Z] screenshot docs/verification/evidence/ui/audit-baseline/09-accounts-default-dark-modern-1280.png
-[2026-09-26T08:31:05.444Z] view accounts Default Dark Modern@1280: 381 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:31:07.056Z] screenshot docs/verification/evidence/ui/audit-baseline/10-accounts-default-dark-modern-900.png
-[2026-09-26T08:31:07.058Z] view accounts Default Dark Modern@900: 381 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:31:10.699Z] screenshot docs/verification/evidence/ui/audit-baseline/11-accounts-default-light-modern-1280.png
-[2026-09-26T08:31:10.700Z] view accounts Default Light Modern@1280: 381 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:31:12.303Z] screenshot docs/verification/evidence/ui/audit-baseline/12-accounts-default-light-modern-900.png
-[2026-09-26T08:31:12.304Z] view accounts Default Light Modern@900: 381 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-26T08:31:12.320Z] summary {"agents":{"chars":531,"longRuns":[],"overflow":0,"unnamed":[]},"files":{"chars":127,"longRuns":[],"overflow":0,"unnamed":[]},"chat":{"chars":2795,"longRuns":["/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once","{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\"}","{\"output_mode\":\"files_with_matches\",\"path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-","}\\n}\\n\",\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/","{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\",\"new_","/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/session-refresh-coord"],"overflow":0,"unnamed":[]},"review":{"chars":685,"longRuns":["/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once"],"overflow":0,"unnamed":["<button class=\"fold\" aria-label=\"Collapse or expand README.md\" aria-expanded=\"true\">▾</button>","<button class=\"fold\" aria-label=\"Collapse or expand src/auth/session-refresh-coordinator.ts\" aria-ex"]},"new-agent":{"chars":1037,"longRuns":[],"overflow":68,"unnamed":[]},"accounts":{"chars":381,"longRuns":[],"overflow":0,"unnamed":[]}}
+[2026-09-26T09:02:23.957Z] installed "Installing extensions...\nExtension 'overseer-baseline-ce56432.vsix' was successfully installed."
+[2026-09-26T09:02:30.926Z] runs {"showcase":{"id":"r-3a2f16efa8e0","status":"completed"},"permission":{"id":"r-18173952fdef","status":"waiting_for_user"},"nested":{"id":"r-f7262d39c643","status":"completed"},"watch":{"id":"r-72f90d571661","status":"running"},"failed":{"id":"r-1dcc2b2a2aa2","status":"failed"}}
+[2026-09-26T09:02:38.634Z] screenshot docs/verification/evidence/ui/audit-baseline/01-dashboard-default-dark-modern-1280.png
+[2026-09-26T09:02:38.636Z] view agents Default Dark Modern@1280: 531 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:38.636Z] view files Default Dark Modern@1280: 127 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:38.638Z] view chat Default Dark Modern@1280: 2795 chars, 6 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:38.639Z] view review Default Dark Modern@1280: 350 chars, 1 long runs, 0 overflow, 2 unnamed
+[2026-09-26T09:02:40.234Z] screenshot docs/verification/evidence/ui/audit-baseline/02-dashboard-default-dark-modern-900.png
+[2026-09-26T09:02:40.235Z] view agents Default Dark Modern@900: 531 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:40.236Z] view files Default Dark Modern@900: 127 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:40.237Z] view chat Default Dark Modern@900: 2795 chars, 6 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:40.238Z] view review Default Dark Modern@900: 350 chars, 1 long runs, 0 overflow, 2 unnamed
+[2026-09-26T09:02:43.911Z] screenshot docs/verification/evidence/ui/audit-baseline/03-dashboard-default-light-modern-1280.png
+[2026-09-26T09:02:43.912Z] view agents Default Light Modern@1280: 531 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:43.913Z] view files Default Light Modern@1280: 127 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:43.913Z] view chat Default Light Modern@1280: 2795 chars, 6 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:43.915Z] view review Default Light Modern@1280: 350 chars, 1 long runs, 0 overflow, 2 unnamed
+[2026-09-26T09:02:45.548Z] screenshot docs/verification/evidence/ui/audit-baseline/04-dashboard-default-light-modern-900.png
+[2026-09-26T09:02:45.549Z] view agents Default Light Modern@900: 531 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:45.550Z] view files Default Light Modern@900: 127 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:45.551Z] view chat Default Light Modern@900: 2795 chars, 6 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:02:45.552Z] view review Default Light Modern@900: 350 chars, 1 long runs, 0 overflow, 2 unnamed
+[2026-09-26T09:02:51.367Z] screenshot docs/verification/evidence/ui/audit-baseline/05-new-agent-default-dark-modern-1280.png
+[2026-09-26T09:02:51.369Z] view new-agent Default Dark Modern@1280: 1037 chars, 0 long runs, 17 overflow, 0 unnamed
+[2026-09-26T09:02:52.992Z] screenshot docs/verification/evidence/ui/audit-baseline/06-new-agent-default-dark-modern-900.png
+[2026-09-26T09:02:52.993Z] view new-agent Default Dark Modern@900: 1037 chars, 0 long runs, 17 overflow, 0 unnamed
+[2026-09-26T09:02:56.650Z] screenshot docs/verification/evidence/ui/audit-baseline/07-new-agent-default-light-modern-1280.png
+[2026-09-26T09:02:56.652Z] view new-agent Default Light Modern@1280: 1037 chars, 0 long runs, 17 overflow, 0 unnamed
+[2026-09-26T09:02:58.267Z] screenshot docs/verification/evidence/ui/audit-baseline/08-new-agent-default-light-modern-900.png
+[2026-09-26T09:02:58.268Z] view new-agent Default Light Modern@900: 1037 chars, 0 long runs, 17 overflow, 0 unnamed
+[2026-09-26T09:03:06.273Z] screenshot docs/verification/evidence/ui/audit-baseline/09-accounts-default-dark-modern-1280.png
+[2026-09-26T09:03:06.274Z] view accounts Default Dark Modern@1280: 381 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:03:07.888Z] screenshot docs/verification/evidence/ui/audit-baseline/10-accounts-default-dark-modern-900.png
+[2026-09-26T09:03:07.889Z] view accounts Default Dark Modern@900: 381 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:03:11.603Z] screenshot docs/verification/evidence/ui/audit-baseline/11-accounts-default-light-modern-1280.png
+[2026-09-26T09:03:11.605Z] view accounts Default Light Modern@1280: 381 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:03:13.265Z] screenshot docs/verification/evidence/ui/audit-baseline/12-accounts-default-light-modern-900.png
+[2026-09-26T09:03:13.267Z] view accounts Default Light Modern@900: 381 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-26T09:03:13.294Z] summary {"agents":{"chars":531,"longRuns":[],"overflow":0,"unnamed":[]},"files":{"chars":127,"longRuns":[],"overflow":0,"unnamed":[]},"chat":{"chars":2795,"longRuns":["/private/tmp/ovs-ui-2BHGy1/overseer-home/worktrees/web-app-d32b6d82/refresh-sessions-once","{\"file_path\":\"/private/tmp/ovs-ui-2BHGy1/overseer-home/worktrees/web-app-d32b6d82/refresh-sessions-once/README.md\"}","{\"output_mode\":\"files_with_matches\",\"path\":\"/private/tmp/ovs-ui-2BHGy1/overseer-home/worktrees/web-app-d32b6d82/refresh-","}\\n}\\n\",\"file_path\":\"/private/tmp/ovs-ui-2BHGy1/overseer-home/worktrees/web-app-d32b6d82/refresh-sessions-once/src/auth/","{\"file_path\":\"/private/tmp/ovs-ui-2BHGy1/overseer-home/worktrees/web-app-d32b6d82/refresh-sessions-once/README.md\",\"new_","/private/tmp/ovs-ui-2BHGy1/overseer-home/worktrees/web-app-d32b6d82/refresh-sessions-once/src/auth/session-refresh-coord"],"overflow":0,"unnamed":[]},"review":{"chars":350,"longRuns":["/private/tmp/ovs-ui-2BHGy1/overseer-home/worktrees/web-app-d32b6d82/refresh-sessions-once"],"overflow":0,"unnamed":["<button class=\"fold\" aria-label=\"Collapse or expand README.md\" aria-expanded=\"true\">▾</button>","<button class=\"fold\" aria-label=\"Collapse or expand src/auth/session-refresh-coordinator.ts\" aria-ex"]},"new-agent":{"chars":1037,"longRuns":[],"overflow":68,"unnamed":[]},"accounts":{"chars":381,"longRuns":[],"overflow":0,"unnamed":[]}}

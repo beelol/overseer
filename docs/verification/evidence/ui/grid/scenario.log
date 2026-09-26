@@ -1,0 +1,11 @@
+[2026-09-26T10:09:45.550Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T10:10:02.545Z] screenshot docs/verification/evidence/ui/grid/01-grid-9-dark.png
+[2026-09-26T10:10:02.546Z] PASS nine agents tile as 3×3 {"tiles":9,"cols":"3","rows":"3"}
+[2026-09-26T10:10:02.546Z] FAIL nine concurrent streams: each tile shows a line within 250 ms (p95) and event-loop lag p95 stays under 50 ms {"lines":346,"latP95":853,"latMax":2279,"lagN":349,"lagP95":2,"lagMax":3}
+[2026-09-26T10:10:04.134Z] screenshot docs/verification/evidence/ui/grid/02-grid-9-light.png
+[2026-09-26T10:10:04.536Z] PASS a permission request is answered from its tile (Allow → the agent continues and writes the file) {"status":"completed","permFile":true}
+[2026-09-26T10:10:06.038Z] PASS a pinned finished run stays on the grid {"pinnedTile":true,"pressed":"true"}
+[2026-09-26T10:10:14.697Z] PASS with a maximum of 4, the grid shows 2×2 {"tiles":4,"cols":"2"}
+[2026-09-26T10:10:14.752Z] screenshot docs/verification/evidence/ui/grid/03-grid-4-light.png
+[2026-09-26T10:10:16.312Z] screenshot docs/verification/evidence/ui/grid/04-grid-4-dark.png
+[2026-09-26T10:10:18.441Z] PASS arrow keys move between tiles and Enter opens the agent in the chat {"first":"r-6f23aa136150","second":"r-ce5ea2ad5c13","opened":{"mode":"chat","title":"Short 2","selected":"r-ce5ea2ad5c13"}}

@@ -1,0 +1,10 @@
+[2026-09-26T09:55:14.491Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T09:55:21.507Z] screenshot docs/verification/evidence/ui/keyboard/01-needs-you.png
+[2026-09-26T09:55:21.508Z] PASS Needs you gathers permission requests, the failure and the finished run with changes, counted on the view and in the status bar {"list":[{"run":"r-e95938dd4ac4","why":"Approve"},{"run":"r-0477aca0e478","why":"Approve"},{"run":"r-c34b6bd33ecb","why":"Failed"},{"run":"r-071e0c9edcfe","why":"Review"}],"badge":"4","status":"eye  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."}
+[2026-09-26T09:55:25.408Z] PASS ⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request {"first":"r-e95938dd4ac4","second":"r-0477aca0e478","firstDone":"completed","secondDone":"completed","denied":true}
+[2026-09-26T09:55:30.140Z] PASS ⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each {"visited":["r-c34b6bd33ecb","r-e95938dd4ac4","r-071e0c9edcfe"],"left":[]}
+[2026-09-26T09:55:33.850Z] PASS ⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent {"switched":"r-6418f2bf31a4","stopped":"interrupted"}
+[2026-09-26T09:55:36.213Z] PASS ⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent {"created":"r-b1f8cdbbd47d","nowSelected":"r-b1f8cdbbd47d"}
+[2026-09-26T09:55:37.177Z] PASS Enter in the chat composer sends a follow-up {"turns":2}
+[2026-09-26T09:55:37.272Z] screenshot docs/verification/evidence/ui/keyboard/02-keyboard-done.png
+[2026-09-26T09:55:37.273Z] PASS every control in the dashboard has a screen-reader label {"checked":57,"bad":[]}

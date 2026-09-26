@@ -1041,9 +1041,9 @@ impl Daemon {
                 }
             }
             Norm::TurnDone { ok, summary } => {
+                let interrupted = store.run_process(&run.id)?.map(|(dir, _, _)| Path::new(&dir).join("interrupt.requested").exists()).unwrap_or(false);
                 if run.harness == "claude" {
                     state.expected_turns = state.expected_turns.saturating_sub(1);
-                    let interrupted = store.run_process(&run.id)?.map(|(dir, _, _)| Path::new(&dir).join("interrupt.requested").exists()).unwrap_or(false);
                     if !interrupted && (state.background > 0 || state.expected_turns > 0) {
                         // Claude reports an interim result while background subagents run, and
                         // continues with another turn for each finished one (even one that
@@ -1055,7 +1055,9 @@ impl Daemon {
                     }
                 }
                 state.turn_done = Some(ok);
-                store.finish_open_turns(&run.id, if ok { "completed" } else { "failed" }, now())?;
+                // A turn that ends because the user interrupted it (Claude reports it as an error
+                // result) is interrupted, not failed.
+                store.finish_open_turns(&run.id, if ok { "completed" } else if interrupted { "interrupted" } else { "failed" }, now())?;
                 ev("turn_done", "harness", "exact", json!({"ok": ok, "summary": summary}), None)?;
                 if run.harness == "claude" || run.harness == "codex-app" {
                     // One turn per process: closing stdin lets the session end cleanly.

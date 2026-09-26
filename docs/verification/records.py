@@ -616,43 +616,183 @@ rec(53, "Fixed Claude accounts", "partial", date="2026-09-25",
     evidence="[signin scenario](evidence/ui/signin/), [accounts scenario](evidence/ui/accounts/)", live="—",
     blocker="Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.")
 
-# Gate J (added by the owner on 2026-09-26; docs/rfcs/orchestrator-ui.md). Not started.
-rec(54, "Clean, calm presentation with less text", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
-rec(55, "A chat that feels great", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
-rec(56, "Overseer themes, light and dark", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
-rec(57, "Overseer dashboard", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
-rec(58, "Agent grid", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
-rec(59, "Start a new agent from the chat", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
-rec(60, "Native-CLI parity for everyday use", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
-rec(61, "Needs-you inbox and keyboard control", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
-rec(62, "Usage and limits", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
-rec(63, "History that stays tidy", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
+# Gate J (added by the owner on 2026-09-26; docs/rfcs/orchestrator-ui.md).
+FIX = "Fixture harnesses only (Claude fixture, synthetic account CLI, generic programs); no paid tokens"
+rec(54, "Clean, calm presentation with less text", "verified", commit="8bcac2f", date="2026-09-26",
+    harness=FIX,
+    steps="""1. `AUDIT_UI=baseline node test/ui/scenario-audit.js` with a VSIX built from ce56432 (the UI before Gate J), then `AUDIT_UI=new node test/ui/scenario-audit.js` with the Gate J VSIX, on the same fixture state (runs in two repositories, a nested Claude run, a permission request, a failure, a streaming run).
+2. Each view (agents, chat, files, review, new agent, accounts; plus dashboard and grid for the new UI) at 1280 and 900 px, in Overseer Dark, Overseer Light and Default Dark Modern (baseline: Dark and Light Modern). The audit (`test/ui/audit.js`) counts visible text outside the Monaco diff, fails on horizontal overflow, on text runs over 80 characters outside code, and on icon-only controls without an accessible name or tooltip.
+3. The odd-looking items in the baseline were listed and fixed ([docs/design/audit.md](../design/audit.md)); the other Gate J scenarios show no function was lost (chat, composer, dashboard, grid, keyboard, history, usage, accounts, review).""",
+    expected="No overflow, no long runs outside code, every icon-only control named; at least 40% less visible text per view than the baseline with no function lost; before/after screenshots; the odd-looking items listed and fixed.",
+    actual="""- **Visible text (characters, same fixture state):** agents 531 → 238 (−55%), chat 2,795 → 1,063 (−62%), files 127 → 59 (−54%), review 350 → 175 (−50%), new agent 1,037 → 133 (−87%), accounts 381 → 189 (−50%). The counts are the same at both widths and in every theme.
+- **Checks:** no overflow, no long runs and no unnamed icon controls in any view, width or theme (the new dashboard and grid included). The baseline new-task form had 68 overflowing elements at 900 px.
+- **Odd-looking items:** 15 found and fixed (full paths, run metadata sentences, five-button rows, raw Markdown, JSON tool calls, duplicate task/run rows, competing pills, the card-page New Task form, long account labels, a separate follow-up button, status-bar text, truncated headers, mixed disclosure glyphs, a crowded review header); see [audit.md](../design/audit.md).""",
+    evidence="[baseline audit](evidence/ui/audit-baseline/) (12 screenshots, result.json), [Gate J audit](evidence/ui/audit/) (24 screenshots, result.json), [audit list](../design/audit.md)",
+    live="Presentation does not depend on the harness; live runs render with the same components (AC-55 live screenshots).",
+    limits="Two items are still open for the owner's review: in the narrow review diff column the hunk Accept/Revert buttons overlap the start of the code line, and at 1280 px with the file list open the chat header shortens the title. Grid tile titles shorten to a letter or two at 3×3 in a 1280 px window.",
+    blocker="not blocked")
+
+rec(56, "Overseer themes, light and dark", "verified", commit="3f8c0f9", date="2026-09-26",
+    harness=FIX,
+    steps="""1. `node extension/design/build-themes.js` generates `themes/overseer-dark-color-theme.json`, `themes/overseer-light-color-theme.json` and `media/tokens.css` from one token set (`extension/design/tokens.js`).
+2. `node test/unit/theme-contrast.js`: every text foreground/background pair both themes define (workbench, editor, diff, terminal, notifications, lists, inputs, buttons, badges, syntax, ANSI) against WCAG AA.
+3. `node test/ui/scenario-look.js`: the dashboard with a chat and a diff, a terminal printing ANSI colors, the grid and the composer menu in Overseer Dark, Overseer Light and High Contrast; switch themes with Overseer views open.
+4. `node test/ui/scenario-theme.js`: the lint for hard-coded colors in webview sources and the accessible-name audit in stock themes.""",
+    expected="WCAG AA for every text pair in both themes; screenshots of the dashboard, a diff and a terminal in both themes; open Overseer views restyle live when the theme changes.",
+    actual="""- **Contrast:** 160 text pairs checked, 0 below AA (normal text 4.5:1, large and UI text 3:1).
+- **Screenshots:** dashboard + diff, terminal and grid in Overseer Dark, Overseer Light and High Contrast.
+- **Live switch:** the open dashboard's background changed from rgb(23, 22, 29) to rgb(251, 250, 253) when the theme changed, with no reload.
+- **Stock themes:** Overseer views use only VS Code theme variables (the lint found no hard-coded colors), so they follow Dark/Light Modern and both High Contrast themes (theme scenario).""",
+    evidence="[look scenario](evidence/ui/look/) (10 screenshots, result.json), [theme scenario](evidence/ui/theme/), `test/unit/theme-contrast.js` output",
+    live="Themes do not depend on the harness.",
+    limits="The themes are optional; Overseer never switches the user's theme.",
+    blocker="not blocked")
+
+rec(57, "Overseer dashboard", "verified", commit="3f8c0f9", date="2026-09-26",
+    harness=FIX,
+    steps="""`node test/ui/scenario-dashboard.js`: a window with no folder, the Explorer side bar, a terminal panel and two editor groups; **Overseer: Open Dashboard**; reload the window; **Overseer: Exit Dashboard**; compare the layout and user settings before and after; then set `overseer.dashboard.openOnStartup` and reload.""",
+    expected="Entering and exiting restores the prior layout; the dashboard survives a reload; it works in a window without a folder; no setting changes unless the user opts in.",
+    actual="""- **Enter:** side bar, panel and secondary side bar hidden; the dashboard fills the editor area and lists agents from a repository that is not open in the window.
+- **Reload:** after Developer: Reload Window the dashboard is back and still in dashboard mode (parts still hidden).
+- **Exit:** side bar, panel, secondary side bar and both editor groups restored (421×468 before, 421×469 after).
+- **Settings:** the user settings file is identical before and after (apart from VS Code's own migration of `extensions.autoUpdate`). Dashboard mode detects which parts were open by measuring its own webview, so it writes no settings.
+- **Open on startup:** with `overseer.dashboard.openOnStartup` the dashboard opens when the window starts.""",
+    evidence="[dashboard scenario](evidence/ui/dashboard/) (before, dashboard, after exit, open on startup; result.json)",
+    live="Layout does not depend on the harness.",
+    limits="VS Code gives extensions no way to hide the minimap or breadcrumbs without changing settings, so dashboard mode leaves them as they are.",
+    blocker="not blocked")
+
+rec(58, "Agent grid", "partial", commit="8bcac2f", date="2026-09-26",
+    proven="nine concurrent fixture streams tile 3×3 and a maximum of 4 tiles 2×2; a permission request is answered from its tile; a pinned finished run stays; arrow keys move between tiles and Enter opens the agent; webview event-loop lag p95 2 ms; screenshots at 4 and 9 tiles in both themes",
+    deferred="the per-tile update time: a streamed line reaches its tile in 853 ms at p95 (target 250 ms); the daemon records the same lines within 62 ms p95, so the delay is between the daemon and the webview",
+    harness=FIX,
+    steps="""`node test/ui/scenario-grid.js` with `overseer.grid.maxTiles` 9: a pinned finished run, a Claude fixture waiting for permission, and seven generic runs printing a millisecond timestamp every 200 ms. A MutationObserver in the webview measures, for each new tile line, now − printed time; a 25 ms timer measures event-loop lag. Then Allow from the tile, maximum 4, arrow keys and Enter. Separately, the same seven streams on an isolated daemon, comparing each event's recorded time with the printed time.""",
+    expected="Each tile updates within 250 ms of its event with event-loop lag p95 under 50 ms; permission answered from a tile; pinned finished run stays; screenshots at 4 and 9 tiles in both themes.",
+    actual="""- **Layout:** 9 tiles as 3×3; with a maximum of 4, 2×2.
+- **Timing:** 346 lines measured; tile latency p95 853 ms, max 2,279 ms; event-loop lag p95 2 ms. On the daemon alone the same streams are recorded within 34 ms median, 62 ms p95.
+- **Found and fixed on the way:** the extension's state refresh was a trailing debounce that never fired while events streamed, so new runs did not appear on the grid; it now refreshes at most every 120 ms and skips output-only events.
+- **Permission:** Allow on the Claude tile → the agent continued and wrote perm.txt.
+- **Pinned:** the finished, pinned run stayed with its pin pressed.
+- **Keyboard:** Right moved to the next tile; Enter opened that agent in the chat.""",
+    evidence="[grid scenario](evidence/ui/grid/) (9 and 4 tiles, dark and light; scenario.log with the latency numbers)",
+    live="Fixture streams; the grid uses the same feed as live runs.",
+    limits="Tile titles shorten to a letter or two at 3×3 in a 1280 px window.",
+    blocker="Per-tile latency 853 ms p95 vs 250 ms. Next: time each hop in the extension host (daemon socket → RunFeed batch → postMessage) and the tile renderer, and remove the slow hop.")
+
+rec(59, "Start a new agent from the chat", "partial", commit="3f8c0f9", date="2026-09-26",
+    proven="with no agent selected the middle is the composer; Claude and Codex agents start keyboard-only and stream in place as the selected agent; a signed-out account is shown inline with Sign in and Start disabled; a harness that is not installed is labelled so; the Full form link stays",
+    deferred="a generic program started keyboard-only (choosing Run a program from the agent menu left the chip on Codex) and defaults remembered across a reload (the composer did not finish loading after the reload in the scenario)",
+    harness="Synthetic account CLI standing in for codex and claude; generic /bin/echo",
+    steps="""`node test/ui/scenario-composer.js`: open the dashboard with no agent selected; for Claude, Codex and a generic program, pick the agent from the agent chip's menu with the keyboard, type the task and press Enter; pick a signed-out account; open the agent menu for OpenCode (not installed); reload and check the remembered defaults.""",
+    expected="Codex, Claude and generic runs started keyboard-only from the composer; defaults remembered across reloads; each problem case shown inline; the full New Task form reachable.",
+    actual="""- **Claude and Codex:** started from the composer with the keyboard; each became the selected agent and streamed in place.
+- **Problems inline:** "ChatGPT Signed Out is not signed in. Sign in", Start disabled; the agent menu heads OpenCode with "not installed". A missing harness path now reads as not installed in the daemon too (it used to be reported as installed).
+- **Default agent:** with nothing remembered, the composer now prefers a harness that has a signed-in account.
+- **Not yet:** choosing **Run a program** by keyboard did not switch the agent chip, and after a reload the composer stayed in its loading state in the scenario.""",
+    evidence="[composer scenario](evidence/ui/composer/)",
+    live="Fixture accounts; live starts through the same path are in the AC-60 live session.",
+    limits="—",
+    blocker="Keyboard selection of Run a program and remembered defaults after reload. Next: fix the agent-menu keyboard pick for the generic entry and the composer's reload state, then rerun scenario-composer.js.")
+
+rec(61, "Needs-you inbox and keyboard control", "verified", commit="3f8c0f9", date="2026-09-26",
+    harness="Claude fixture (two permission requests), generic runs (a failure, a finished edit, a long loop)",
+    steps="""`node test/ui/scenario-keyboard.js`: four runs need the user; then, with the keyboard only, ⌥⌘J (next that needs you), ⌥⌘Y (allow), ⌥⌘J, ⌥⌘⌫ (deny), ⌥⌘J until Needs you is empty, ⌥⌘A (switch agent, searchable), ⌥⌘. (stop), ⌥⌘N (new agent) and Enter, a follow-up with Enter; then an accessible-name audit of every visible control.""",
+    expected="A scripted keyboard-only session over three or more concurrent runs answers permissions, reviews changes and sends follow-ups without a click; all controls have screen-reader labels.",
+    actual="""- **Needs you:** 2 × Approve, 1 × Failed, 1 × Review, badge 4; the status bar reads "Overseer 3 active" with a bell and 4.
+- **Keyboard:** ⌥⌘J selected the first permission request; ⌥⌘Y allowed it (completed); ⌥⌘J moved to the second; ⌥⌘⌫ denied it (`permission_answered` allow=false). ⌥⌘J then visited the failure, the allowed run (now a Review, since it wrote a file) and the finished edit; Needs you emptied.
+- **Switch and stop:** ⌥⌘A → "Long loop" → ⌥⌘. interrupted it.
+- **New agent and follow-up:** ⌥⌘N focused the composer; typing and Enter started an agent that became selected; Enter in the chat sent a follow-up (2 turns).
+- **Labels:** 57 controls checked, none without a name.
+- **Fixed on the way:** ⌥⌘J now goes to the most urgent item that is not already open (it used to cycle past items).""",
+    evidence="[keyboard scenario](evidence/ui/keyboard/)",
+    live="Fixture runs; permissions from live Claude and Codex app-server use the same path (AC-43).",
+    limits="The follow-up step focuses the chat's prompt field from the test before typing (keyboard focus lands there after switching in normal use).",
+    blocker="not blocked")
+
+rec(63, "History that stays tidy", "verified", commit="3f8c0f9", date="2026-09-26",
+    harness="300 generic runs in worktrees, each printing a unique word",
+    steps="""1. `cargo test` — `ac63_search_finds_tasks_by_title_output_and_status_and_archive_hides_without_deleting` (output text, status, LIKE wildcards taken literally, archived tasks stay searchable, archive never deletes, restore).
+2. `node test/ui/scenario-history.js`: create 300 finished runs; search by title and by a word only in one run's output; archive a finished run from the rail with Delete and restore it under Show archived; archive three runs (one with uncommitted work) and run **Clean Up Archived Worktrees…** twice; set `overseer.history.autoArchiveDays` and reload.""",
+    expected="With 300 runs, search answers in under 200 ms; archive, restore and bulk cleanup never discard unmerged work without confirmation.",
+    actual="""- **Search:** by title in 2 ms, by output text in 69 ms (300 runs).
+- **Archive:** hidden from the rail, listed under Show archived, restored with Delete.
+- **Bulk cleanup:** the dialog lists 2 clean worktrees and 1 with uncommitted work; "Remove 2 Clean" removed only the clean ones; the file in the third stayed; branches kept. "Remove All, Discarding Uncommitted Work" asked again ("Discard and Remove") before removing it; its branch stayed.
+- **Automatic archive:** after the chosen age all 300 finished runs were archived after a reload and the rail showed only active and recent runs.
+- **Fixed on the way:** UI tests now use VS Code's in-window dialogs (`window.dialogStyle: custom`); the native macOS dialog is invisible to them.""",
+    evidence="[history scenario](evidence/ui/history/), `cargo test` ac63 tests",
+    live="Fixture runs.",
+    limits="Search also matches prompts, file activity, repository paths and account names (the daemon's search query covers them); only title, output text and status are asserted in tests.",
+    blocker="not blocked")
+
+rec(65, "Provider logos", "verified", commit="3f8c0f9", date="2026-09-26",
+    harness=FIX,
+    steps="""1. `node extension/design/build-logos.js` builds monochrome `currentColor` SVGs from Simple Icons (CC0: Claude, Claude Code, Anthropic, OpenCode, GitHub) and LobeHub Icons (MIT: OpenAI, Codex).
+2. `node test/ui/scenario-look.js`: check the installed VSIX for NOTICE.md and each license; collect the logo on agent rows, the chat header, the composer chip and agent menu, grid tiles and the Accounts view; screenshots in Overseer Dark, Overseer Light and High Contrast.""",
+    expected="The license and source of every bundled logo in a notices file shipped in the VSIX; screenshots of each place a logo appears in both Overseer themes and high contrast.",
+    actual="""- **Notices:** the VSIX ships `NOTICE.md` (source, version and license per logo), `media/vendor/licenses/simple-icons-LICENSE.md` and `lobehub-icons-LICENSE.txt`.
+- **Places:** agent rows (codex, claudecode), chat header (claudecode), composer chip (codex) and menu (codex, claudecode, opencode), Accounts view (openai, claude, opencode, light and dark variants), grid tiles (the Claude tile shows the Claude Code mark; generic tiles keep the terminal codicon).
+- **Themes:** logos are monochrome and follow the text color, so they read in Overseer Dark, Light and High Contrast (screenshots). Every other icon is a codicon.""",
+    evidence="[look scenario](evidence/ui/look/), [grid scenario](evidence/ui/grid/), `extension/NOTICE.md`",
+    live="Logos do not depend on the harness.",
+    limits="No suitably licensed Devin logo was needed (Devin is unavailable). Brand guidelines: marks are used only to identify the provider, unmodified apart from color.",
+    blocker="not blocked")
+
+rec(55, "A chat that feels great", "verified", commit="8bcac2f", date="2026-09-26",
+    harness="Claude fixture (showcase: Markdown, table, code, six tool calls, an edit) and generic streams; LIVE Claude Code (existing login, haiku) and Codex (gpt-5.6-luna, ChatGPT A) on the owner's daemon",
+    steps="""1. `node test/ui/scenario-chat.js` (packaged UI): the showcase conversation at 1600 and 900 px in Overseer Dark and Light; layout of bubbles and the column; Markdown; tool rows; Jump to latest; a 2,000-line stream (positions of the first 50 messages sampled while it streams); a 2,000-event conversation scrolled for frame times; 20 appended events timed.
+2. `node test/ui/scenario-live-gatej.js` (LIVE, owner's daemon, tiny prompts): Claude and Codex runs with an image, a mentioned file, a stopped turn and a resumed turn; each chat captured in Overseer Dark and Light at 1600 and 900 px.""",
+    expected="Live Claude Code and Codex runs and fixture runs rendered in light and dark at 900 and 1600 px; Markdown with code, tables and long lines correct; no layout shift while streaming; a 2,000-event conversation scrolls with p95 frame time under 16 ms and appends a new event in under 100 ms.",
+    actual="""- **Layout:** the user's message is a bubble on the right; agent replies are plain text in a centered column (720 px wide, or the available width when narrower).
+- **Markdown:** heading, list, table (3 rows), highlighted `ts` code with its language and Copy, a link with its URL, and a long path shortened with the full path in the tooltip.
+- **Tools:** six consecutive tool calls fold into "6 steps · Read · Searched · …"; expanded they read "Read README.md", "Ran npm test -- --grep …", "Created session-refresh-coordinator.ts +8 −0"; no raw JSON. Edits are chips; the turn ends with a quiet footer (status, time, tokens, cost).
+- **Scrolling:** scrolled up, Jump to latest appears and returns to the newest message.
+- **Streaming:** 0 of the first 50 messages moved while 2,000 lines streamed.
+- **Performance:** 2,000-event conversation: frame p95 9.6 ms (median 8.3, max 10); appending takes 2.7 ms per event.
+- **Live:** Claude's reply "…the image is red, and the first line of README.md is "# fixture"." and Codex's "Red; # fixture" render with their steps, stop and resume turns, in both themes at both widths (screenshots).""",
+    evidence="[chat scenario](evidence/ui/chat/) (4 screenshots, result.json), [live session](evidence/ui/live-gatej/) (8 live chat screenshots)",
+    live="Live Claude Code (haiku) and Codex (gpt-5.6-luna) runs on the owner's daemon, 2026-09-26.",
+    limits="A stopped Claude turn shows an empty Error card and \"Failed\" in its footer beside \"Stopped\" (the daemon now records the turn as interrupted); one \"Unparsed output\" row appears after a Claude reply. Both are for the owner's review.",
+    blocker="not blocked")
+
+rec(60, "Native-CLI parity for everyday use", "partial", commit="8bcac2f", date="2026-09-26",
+    proven="live Claude Code and Codex runs take model, reasoning effort and permission mode per turn (argv from each run's launch record), an attached image and a mentioned worktree file reach the agent (replies name the red color and README.md's first line), a running turn is stopped and the next message answered, and finished runs continue their session after the daemon restarts; support per harness is in docs/compatibility.md",
+    deferred="the same capabilities driven from the chat composer in the packaged UI: after the options menu closes, Enter does not send, so the paste, @-mention, options, queue and ⌥Enter checks in scenario-parity.js fail; the live turns used the daemon API the composer calls",
+    harness="LIVE Claude Code 2.1.x (existing login, haiku) and Codex (gpt-5.6-luna) on ChatGPT A, owner's daemon; Claude fixture (echo, slow) for the packaged-UI scenario",
+    steps="""1. `cargo test` — `ac60_turn_options_reach_claude_and_unsupported_ones_are_refused`, `ac60_repo_files_lists_mentionable_files_best_first`, `ac60_an_interrupted_claude_turn_is_interrupted_not_failed`, and the adapter tests for argv per harness.
+2. `node test/ui/scenario-live-gatej.js` (LIVE, owner's daemon after checking no runs were active and no window connected): per harness, a first turn; a follow-up with a 32×32 red PNG, "…first line of README.md?" naming the file, effort low and Plan only / Read only; a 60-item list interrupted after 3 s, then "Stop. Reply with exactly: stopped ok"; then `daemon.shutdown`, **Overseer: Start Daemon** and "Reply with exactly: resumed ok".
+3. `node test/ui/scenario-parity.js` (packaged UI, Claude echo fixture): paste, @-mention popup, options menu, queue while working, ⌥Enter.""",
+    expected="Tiny live Claude Code and Codex runs exercise each capability; support per harness recorded in docs/compatibility.md; a pasted image and an @-mentioned file demonstrably reach the agent (its reply refers to their content).",
+    actual="""- **Options per turn (live):** Claude argv `--model haiku --resume <session> --effort low --permission-mode plan`; Codex argv `exec resume <thread> … -c sandbox_mode="read-only" -m gpt-5.6-luna -c model_reasoning_effort="low" -i <attachment>`.
+- **Image and file (live):** Claude: "the image is red, and the first line of README.md is "# fixture""; Codex: "Red; # fixture". Attachments are stored in the run folder with mode 0600.
+- **First pass found two problems:** the test image was a corrupt PNG (bad IDAT checksum), which both agents correctly reported ("No image was actually attached", "corrupted attachment"); and a stopped Claude turn was recorded as failed. The image was replaced and the daemon now records an interrupted Claude turn as interrupted (new protocol test). Pass 1 is kept in [live-pass1](evidence/gate-j/live-pass1/).
+- **Stop and send (live):** turn 3 interrupted, turn 4 answered "stopped ok", for both harnesses.
+- **Resume (live):** after the daemon restarted, both runs continued their session (same session id) and replied "resumed ok".
+- **Packaged UI:** the paste shows an image chip and the @-mention popup inserts README.md, but after choosing options Enter does not send.""",
+    evidence="[live session](evidence/ui/live-gatej/) (result.json with argv and replies), [pass 1](evidence/gate-j/live-pass1/), [parity scenario](evidence/ui/parity/), [compatibility](../compatibility.md#everyday-parity-ac-60), `cargo test` ac60 tests",
+    live="Live on the owner's daemon, 2026-09-26: five tiny turns per harness per pass, one attempt per step; two passes (the second after replacing the corrupt test image), plus one turn per pass on ChatGPT B.",
+    limits="Queueing a message while the agent works is done by the extension (it sends when the turn ends); it is covered only by the packaged-UI scenario, which does not pass yet.",
+    blocker="Composer keyboard focus after the options menu (and the queue display). Next: keep focus in the prompt when the options menu closes, then rerun scenario-parity.js.")
+
+rec(62, "Usage and limits", "partial", commit="8bcac2f", date="2026-09-26",
+    proven="Claude's live usage (5 hours 17%, week 48%, reset times) is exactly its own rate_limit_event; both ChatGPT accounts report plan and usage from Codex's session log (ChatGPT A team 0%/0%, ChatGPT B plus 0%/16%); OpenCode says not reported; tokens and cost per turn are shown; near-limit warning with fixtures",
+    deferred="an independent check of the Codex numbers against the raw token_count line in each account's session log (those logs sit in the account folders next to the credentials, which this session does not read)",
+    harness="LIVE Claude Code (existing login, haiku) and Codex (ChatGPT A and B, gpt-5.6-luna) on the owner's daemon; Claude fixture limits modes and synthetic Codex session log for the packaged-UI scenario",
+    steps="""1. `cargo test` — `ac62_account_usage_is_what_the_harness_reports` and the `usage.rs` unit tests `codex_session_log_limits_are_read_from_the_newest_token_count`, `claude_rate_limit_info_is_normalized`.
+2. `node test/ui/scenario-usage.js` (packaged UI): a Claude account at 95% of 5 hours and another at 12%, a Codex account at 20%; the accounts menu, the chat footer, the composer's warning and the Accounts view.
+3. `node test/ui/scenario-live-gatej.js` (LIVE): after the runs, `account.usage` for claude (existing login), ChatGPT A, ChatGPT B and OpenCode; Claude's last `rate_limit_event` read from the run's raw output and compared window by window.""",
+    expected="Live Codex and Claude runs show the usage their harness reports (or \"not reported\"), matching the harness's own output; the near-limit warning with fixtures.",
+    actual="""- **Claude (live):** `account.usage` → 5 hours 0.17 (resets 1790429400000), week 0.48 (resets 1790568000000); the raw event has five_hour utilization 0.17 / resetsAt 1790429400 and seven_day 0.48 / 1790568000. Match.
+- **Codex (live):** ChatGPT A: plan team, 5 hours 0%, week 0%; ChatGPT B: plan plus, 5 hours 0%, week 16% (source: Codex session log). Codex's streamed `exec --json` output carries no limits; its session log is the only place it reports them.
+- **OpenCode:** not reported.
+- **Fixtures:** the accounts menu shows "5 hours 95% · week 40%" with reset times in the tooltip; the chat footer shows "20k tokens · $0.04" (18,423 in · 1,204 out · 9,321 cached · $0.0412); starting on the 95% account warns "…is at 95% of its 5 hours limit (resets 4:09 AM)" with "Use Claude Second" and does not block; the Accounts view marks the account.""",
+    evidence="[live session](evidence/ui/live-gatej/) (result.json, accounts menu screenshot), [usage scenario](evidence/ui/usage/), `cargo test` ac62 and usage tests",
+    live="Live Claude and Codex (both ChatGPT accounts) on the owner's daemon, 2026-09-26.",
+    limits="Codex limits appear after a Codex run writes its session log; before that the account says not reported.",
+    blocker="Independent Codex comparison. Next: have the daemon include the raw token_count line it read in account.usage (no credentials), then compare it in the live scenario.")
+
 rec(64, "Default-to-Overseer session (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
     actual="Not started.", live="—", blocker="Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.")
-rec(65, "Provider logos", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
 rec(66, "Design review against references (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
     actual="Not started.", live="—", blocker="Owner action after the Gate J build: review the published before/after page, mark what is not right, and confirm once it is.")

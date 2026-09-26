@@ -13,7 +13,7 @@ const path = require('path');
 const cp = require('child_process');
 const { Session, makeRepo, latestVsix, delay } = require('./harness');
 
-const RED_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR42mP4z8DAgAEYRqEAAKXxAf9L4zNXAAAAAElFTkSuQmCC';
+const RED_PNG = 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAKklEQVR4nGO4IydHU8QwasGoBaMWjFowasGoBaMWjFowasGoBaMWDBULAJI2YD1ZaHIvAAAAAElFTkSuQmCC';
 const DATA = path.join(os.homedir(), 'Library/Application Support/Overseer');
 const ACTIVE = ['queued', 'starting', 'running', 'waiting_for_user'];
 const CHATGPT_A = process.env.CHATGPT_A || 'p-f262c1bc4958';
@@ -148,8 +148,9 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
       for (const p of procs(result.runs.claude.id).reverse()) {
         const dir = path.join(DATA, 'runs', result.runs.claude.id, p);
         for (const f of fs.readdirSync(dir).filter(f => f.startsWith('output-')).sort().reverse()) {
-          const line = fs.readFileSync(path.join(dir, f), 'utf8').split('\n').reverse().find(l => l.includes('"rate_limit_event"'));
-          if (line && !raw.claude) raw.claude = line.slice(line.indexOf('{'));
+          // Shim records wrap each harness line: {"d": "<line>", "s": "o", "t": ms}.
+          const rec = fs.readFileSync(path.join(dir, f), 'utf8').split('\n').reverse().find(l => l.includes('rate_limit_event'));
+          if (rec && !raw.claude) { try { raw.claude = JSON.parse(JSON.parse(rec).d); } catch {} }
         }
         if (raw.claude) break;
       }
@@ -157,7 +158,9 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
     result.raw = raw;
     s.note('raw claude rate_limit_event', raw.claude);
     const cu = result.usage['system-claude'];
-    check('Claude usage matches its own rate_limit_event (or says not reported)', cu && (cu.reported ? !!raw.claude : !raw.claude), { usage: cu, raw: raw.claude && raw.claude.slice(0, 400) });
+    const win = raw.claude?.rate_limit_info?.unifiedWindows || {};
+    const same = (label, key) => { const w = (cu?.windows || []).find(x => x.label === label); return !win[key] || (w && Math.abs(w.used - win[key].utilization) < 1e-9 && w.resets_at_ms === win[key].resetsAt * 1000); };
+    check('Claude usage matches its own rate_limit_event (utilization and reset time per window)', cu && cu.reported && !!raw.claude && same('5 hours', 'five_hour') && same('week', 'seven_day'), { usage: cu, raw: raw.claude?.rate_limit_info });
     for (const id of [CHATGPT_A, CHATGPT_B]) {
       const u = result.usage[id];
       check(`Codex ${id === CHATGPT_A ? 'ChatGPT A' : 'ChatGPT B'} usage comes from its session log (or says not reported)`, u && (u.reported ? (u.windows || []).length > 0 && /session/.test(u.source || '') : true), u);

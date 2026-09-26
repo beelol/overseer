@@ -1,0 +1,84 @@
+{
+  "checks": [
+    {
+      "name": "Needs you gathers permission requests, the failure and the finished run with changes, counted on the view and in the status bar",
+      "ok": true,
+      "detail": {
+        "list": [
+          {
+            "run": "r-e95938dd4ac4",
+            "why": "Approve"
+          },
+          {
+            "run": "r-0477aca0e478",
+            "why": "Approve"
+          },
+          {
+            "run": "r-c34b6bd33ecb",
+            "why": "Failed"
+          },
+          {
+            "run": "r-071e0c9edcfe",
+            "why": "Review"
+          }
+        ],
+        "badge": "4",
+        "status": "eye  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."
+      }
+    },
+    {
+      "name": "⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request",
+      "ok": true,
+      "detail": {
+        "first": "r-e95938dd4ac4",
+        "second": "r-0477aca0e478",
+        "firstDone": "completed",
+        "secondDone": "completed",
+        "denied": true
+      }
+    },
+    {
+      "name": "⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each",
+      "ok": true,
+      "detail": {
+        "visited": [
+          "r-c34b6bd33ecb",
+          "r-e95938dd4ac4",
+          "r-071e0c9edcfe"
+        ],
+        "left": []
+      }
+    },
+    {
+      "name": "⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent",
+      "ok": true,
+      "detail": {
+        "switched": "r-6418f2bf31a4",
+        "stopped": "interrupted"
+      }
+    },
+    {
+      "name": "⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent",
+      "ok": true,
+      "detail": {
+        "created": "r-b1f8cdbbd47d",
+        "nowSelected": "r-b1f8cdbbd47d"
+      }
+    },
+    {
+      "name": "Enter in the chat composer sends a follow-up",
+      "ok": true,
+      "detail": {
+        "turns": 2
+      }
+    },
+    {
+      "name": "every control in the dashboard has a screen-reader label",
+      "ok": true,
+      "detail": {
+        "checked": 57,
+        "bad": []
+      }
+    }
+  ]
+}
