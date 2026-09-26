@@ -152,6 +152,18 @@ fn uncalibrated_or_mismatched_paired_estimates_are_rejected() {
 }
 
 #[test]
+fn app_limit_of_two_makes_a_two_job_benefit_decision_serial() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":2}));
+    let id = run(&d,"One worker plus director");
+    let decision = d.call("swarm.benefit.commit",json!({"run_id":id,
+        "generation":1,"revision":1,"estimate":pair()}));
+    assert_eq!(decision["decision"],"serial","{decision}");
+    assert_eq!(decision["reason"],"global_agent_limit");
+    assert_eq!(decision["max_parallel_workers"],1);
+}
+
+#[test]
 fn committed_benefit_bounds_admission_and_survives_restart() {
     let mut d = Daemon::start(&[]);
     let unproven = run(&d, "Unproven fanout");

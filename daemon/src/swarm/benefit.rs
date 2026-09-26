@@ -269,6 +269,7 @@ pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
     let policy_cap = current["policy"]["effective"]["max_workers"]
         .as_u64()
         .unwrap_or(8);
+    let concurrent_cap = (store.agent_limit()?.saturating_sub(1) as u64).min(policy_cap);
     let proposed_cap = object
         .get("max_workers")
         .and_then(Value::as_u64)
@@ -305,6 +306,13 @@ pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
         estimate["independent"] = json!(false);
     }
     let mut result = preview(&estimate)?;
+    if concurrent_cap == 0 {
+        result["decision"] = json!("blocked");
+        result["reason"] = json!("global_agent_limit");
+    } else if concurrent_cap == 1 && result["decision"] == "parallel" {
+        result["decision"] = json!("serial");
+        result["reason"] = json!("global_agent_limit");
+    }
     if resource_conflict && result["reason"] == "dependent_jobs" {
         result["reason"] = json!("resource_conflict");
     }
@@ -344,7 +352,7 @@ pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
     } else {
         1
     };
-    let max_parallel_workers = active.saturating_add(new_slots).min(policy_cap as i64);
+    let max_parallel_workers = active.saturating_add(new_slots).min(concurrent_cap as i64);
     value["run_id"] = json!(run_id);
     value["revision"] = json!(revision);
     value["wave"] = json!(wave);

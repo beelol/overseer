@@ -289,7 +289,8 @@ fn lowering_app_limit_holds_new_workers_until_existing_work_drains() {
     let d = Daemon::start(&[]);
     d.call("agents.limit.set",json!({"max_active":3}));
     let id = setup(&d,"Lower while active",3);
-    commit_beneficial_batch(&d,&id,&["j0".into(),"j1".into(),"j2".into()]);
+    let benefit=commit_beneficial_batch(&d,&id,&["j0".into(),"j1".into(),"j2".into()]);
+    assert_eq!(benefit["max_parallel_workers"],2);
     let at = now();
     let first = admit(&d,&id,"j0","codex-a","before-lower-0",at,100000,100).unwrap();
     let second = admit(&d,&id,"j1","codex-a","before-lower-1",at,100000,100).unwrap();
