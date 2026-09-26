@@ -317,6 +317,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             crate::swarm::claim(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.artifact.put" => crate::swarm::put(&mut d.store.lock().unwrap(), p)?,
+        "swarm.integrate" => {
+            fixture_only()?;
+            crate::swarm::integrate(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.decide" => {
             fixture_only()?;
             crate::swarm::decide(&mut d.store.lock().unwrap(), p)?

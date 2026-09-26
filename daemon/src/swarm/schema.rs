@@ -147,6 +147,25 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           PRIMARY KEY(run_id,id),
           FOREIGN KEY(run_id,job_id) REFERENCES swarm_jobs(run_id,id)
         );
+        CREATE TABLE IF NOT EXISTS swarm_integrations(
+          run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          repo_root TEXT NOT NULL,
+          base_commit TEXT NOT NULL,
+          workspace_path TEXT NOT NULL,
+          branch TEXT NOT NULL,
+          current_commit TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          updated_ms INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS swarm_integrated_artifacts(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          artifact_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          commit_sha TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,artifact_id),
+          FOREIGN KEY(run_id,artifact_id) REFERENCES swarm_artifacts(run_id,id)
+        );
         CREATE TABLE IF NOT EXISTS swarm_artifact_revocations(
           run_id TEXT NOT NULL,
           artifact_id TEXT NOT NULL,

@@ -223,13 +223,41 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
     Ok(json!({"job_id":job,"decision":decision,"status":next,"duplicate":false}))
 }
 
-fn release_and_unlock(tx: &Transaction<'_>, run: &str, job: &str, now: i64) -> Result<()> {
+pub(super) fn pending_patch_integration(conn: &rusqlite::Connection, run: &str, job: &str) -> Result<bool> {
+    let revision: i64 = conn.query_row(
+        "SELECT plan_revision FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+        params![run,job], |r| r.get(0),
+    )?;
+    let mut stmt = conn.prepare(
+        "SELECT evidence FROM swarm_decisions WHERE run_id=?1 AND job_id=?2
+         AND revision=?3 AND decision='accept'",
+    )?;
+    let reviewed = stmt.query_map(params![run,job,revision], |r| r.get::<_,String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    for raw in reviewed {
+        for id in serde_json::from_str::<Vec<String>>(&raw)? {
+            let pending: bool = conn.prepare(
+                "SELECT 1 FROM swarm_artifacts a
+                 WHERE a.run_id=?1 AND a.job_id=?2 AND a.id=?3 AND a.kind='patch'
+                 AND NOT EXISTS (SELECT 1 FROM swarm_integrated_artifacts i
+                                 WHERE i.run_id=a.run_id AND i.artifact_id=a.id)"
+            )?.exists(params![run,job,id])?;
+            if pending { return Ok(true); }
+        }
+    }
+    Ok(false)
+}
+
+pub(super) fn release_and_unlock(tx: &Transaction<'_>, run: &str, job: &str, now: i64) -> Result<()> {
     let active: i64 = tx.query_row(
         "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND job_id=?2 AND status='registered'",
         params![run, job],
         |r| r.get(0),
     )?;
     if active > 0 {
+        return Ok(());
+    }
+    if pending_patch_integration(tx,run,job)? {
         return Ok(());
     }
     tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'", params![run,job,now])?;

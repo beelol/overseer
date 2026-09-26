@@ -198,6 +198,9 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
         if reviewed != claimed {
             bail!("completion evidence differs from accepted review");
         }
+        if super::artifacts::pending_patch_integration(&tx,run,&job)? {
+            bail!("unintegrated patch blocks completion");
+        }
         for id in claimed {
             let artifact: Option<(String, i64, String, String)> = tx.query_row(
                 "SELECT attempt_id,source_revision,content,sha256 FROM swarm_artifacts WHERE run_id=?1 AND job_id=?2 AND id=?3",
