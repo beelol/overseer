@@ -459,3 +459,31 @@ fn explicit_ceiling_admits_thirty_two_fixture_workers_without_hidden_eight_cap()
         "worker_limit"
     );
 }
+
+#[test]
+fn planned_write_claim_cannot_be_omitted_at_admission() {
+    let d = Daemon::start(&[]);
+    let planned = |category: &str| {
+        let run = d.call("swarm.create", json!({"category":category,"objective":"Audit",
+            "allowed_targets":["codex-a"]}));
+        let id = run["id"].as_str().unwrap().to_string();
+        d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,
+            "jobs":[{"id":"j0","title":"Inspect","acceptance":"evidence","deps":[],
+                "resource_claims":[{"resource":"db:tenant-fixture","mode":"write"}]}]}));
+        id
+    };
+    let first = planned("Plan claims A");
+    let second = planned("Plan claims B");
+    let at = now();
+    let downgraded = json!({"run_id":first,"generation":1,"revision":1,
+        "job_id":"j0","target_id":"codex-a","request_id":"downgraded",
+        "snapshot":snapshot(at,1_000_000),"now_ms":at,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker","resource_claims":[{"resource":"db:tenant-fixture","mode":"read"}]});
+    assert!(d.try_call("swarm.admit",downgraded).unwrap_err().contains("cannot change a planned resource claim"));
+    assert_eq!(admit(&d,&first,"j0","codex-a","first",at,1_000_000,100)
+        .unwrap()["status"],"admitted");
+    let held = admit(&d,&second,"j0","codex-a","second",at,1_000_000,100).unwrap();
+    assert_eq!(held["status"],"blocked");
+    assert_eq!(held["reason"],"resource_conflict");
+}

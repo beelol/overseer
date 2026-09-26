@@ -295,3 +295,17 @@ fn unchanged_ready_job_keeps_its_assignment_revision_after_another_job_changes()
     d.call("swarm.report",json!({"run_id":id,"job_id":"b","attempt_id":aid,"token":token,"message_id":"b-result","type":"result","revision":1,"payload":{"artifact_ids":["b-proof"]}}));
     d.call("swarm.decide",json!({"run_id":id,"generation":1,"revision":2,"job_id":"b","decision":"accept","evidence":["b-proof"]}));
 }
+
+#[test]
+fn planned_resource_ownership_is_visible_in_job_ledger() {
+    let d = Daemon::start(&[]);
+    let created = d.call("swarm.create",json!({"category":"Visible resource plan",
+        "objective":"Audit","allowed_targets":["fixture"]}));
+    let id=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j0","title":"Inspect","acceptance":"evidence","deps":[],
+         "resource_claims":[{"resource":"db:tenant-fixture","mode":"write"}]}
+    ]}));
+    assert_eq!(d.call("swarm.jobs",json!({"id":id}))["jobs"][0]["resource_claims"],
+        json!([{"resource":"db:tenant-fixture","mode":"write"}]));
+}

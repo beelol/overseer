@@ -248,6 +248,34 @@ fn committed_serial_choice_holds_second_worker() {
 }
 
 #[test]
+fn planned_exclusive_claim_overrides_director_parallel_estimate() {
+    let mut d = Daemon::start(&[]);
+    let created = d.call(
+        "swarm.create",
+        json!({"category":"Shared fixture database","objective":"Audit two routes",
+            "allowed_targets":["fixture"]}),
+    );
+    let id = created["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":id,"generation":1,"revision":0,"jobs":[
+            {"id":"a","title":"Route A","acceptance":"evidence","deps":[],
+             "resource_claims":[{"resource":"db:shared","mode":"write"}]},
+            {"id":"b","title":"Route B","acceptance":"evidence","deps":[],
+             "resource_claims":[{"resource":"db:shared","mode":"write"}]}
+        ]}),
+    );
+    d.kill9();
+    d.spawn();
+    let decision = d.call(
+        "swarm.benefit.commit",
+        json!({"run_id":id,"generation":1,"revision":1,"estimate":pair()}),
+    );
+    assert_eq!(decision["decision"], "serial");
+    assert_eq!(decision["reason"], "resource_conflict");
+}
+
+#[test]
 fn supervised_exit_retains_measured_elapsed_but_not_invented_usage() {
     let mut d = Daemon::start(&[]);
     let id = run(&d, "Measured worker");

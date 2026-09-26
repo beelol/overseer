@@ -174,6 +174,23 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
     if job_status != "ready" {
         return Ok(blocked("job_not_ready"));
     }
+    let planned_claims: String = tx.query_row(
+        "SELECT resource_claims FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+        params![run,job], |r| r.get(0),
+    )?;
+    let planned_claims: Vec<super::plan::ResourceClaim> = serde_json::from_str(&planned_claims)?;
+    for claim in planned_claims {
+        if let Some((_, mode)) = resource_claims.iter().find(|(resource, _)| resource == &claim.resource) {
+            if mode != &claim.mode {
+                bail!("admission cannot change a planned resource claim");
+            }
+        } else {
+            resource_claims.push((claim.resource, claim.mode));
+        }
+    }
+    if resource_claims.len() > 32 {
+        bail!("too many resource claims");
+    }
     let unsafe_effects: i64 = tx.query_row(
         "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
         params![run,job], |r| r.get(0),

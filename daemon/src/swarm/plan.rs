@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 
@@ -10,6 +10,14 @@ pub struct JobSpec {
     pub acceptance: String,
     #[serde(default)]
     pub deps: Vec<String>,
+    #[serde(default)]
+    pub resource_claims: Vec<ResourceClaim>,
+}
+
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct ResourceClaim {
+    pub resource: String,
+    pub mode: String,
 }
 
 /// Keep only independent valid components when the director explicitly opts into a partial
@@ -148,6 +156,21 @@ fn basic_error(job: &JobSpec) -> Option<String> {
     }
     if job.acceptance.trim().is_empty() || job.acceptance.len() > 4000 {
         return Some(format!("job {} requires an acceptance check", job.id));
+    }
+    if job.resource_claims.len() > 32 {
+        return Some(format!("job {} has too many resource claims", job.id));
+    }
+    let mut resources = HashSet::new();
+    for claim in &job.resource_claims {
+        if claim.resource.is_empty()
+            || claim.resource.trim() != claim.resource
+            || claim.resource.len() > 512
+            || claim.resource.chars().any(char::is_control)
+            || !resources.insert(claim.resource.as_str())
+            || (claim.mode != "read" && claim.mode != "write")
+        {
+            return Some(format!("job {} has an invalid resource claim", job.id));
+        }
     }
     None
 }

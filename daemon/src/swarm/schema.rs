@@ -76,6 +76,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           title TEXT NOT NULL,
           acceptance TEXT NOT NULL,
           deps TEXT NOT NULL,
+          resource_claims TEXT NOT NULL DEFAULT '[]',
           status TEXT NOT NULL,
           attempt_count INTEGER NOT NULL DEFAULT 0,
           deadline_at_ms INTEGER,
@@ -355,6 +356,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         .exists([])?;
     if !has_job_stop_reason {
         conn.execute_batch("ALTER TABLE swarm_jobs ADD COLUMN stop_reason TEXT;")?;
+    }
+    let has_job_resource_claims = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_jobs') WHERE name='resource_claims'")?
+        .exists([])?;
+    if !has_job_resource_claims {
+        conn.execute_batch(
+            "ALTER TABLE swarm_jobs ADD COLUMN resource_claims TEXT NOT NULL DEFAULT '[]';",
+        )?;
     }
     Ok(())
 }

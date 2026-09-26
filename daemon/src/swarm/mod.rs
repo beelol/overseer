@@ -170,14 +170,15 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
     if progressed {
         bail!("cannot replace a plan with active or completed jobs; use a revision transition");
     }
-    let mut stmt = tx.prepare("SELECT id,title,acceptance,deps FROM swarm_jobs WHERE run_id=?1 ORDER BY id")?;
+    let mut stmt = tx.prepare("SELECT id,title,acceptance,deps,resource_claims FROM swarm_jobs WHERE run_id=?1 ORDER BY id")?;
     let rows = stmt.query_map(params![id], |r| {
         Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,
-            r.get::<_,String>(2)?,r.get::<_,String>(3)?))
+            r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?))
     })?.collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
-    let existing = rows.into_iter().map(|(id,title,acceptance,deps)| {
-        Ok(JobSpec { id,title,acceptance,deps:serde_json::from_str(&deps)? })
+    let existing = rows.into_iter().map(|(id,title,acceptance,deps,resource_claims)| {
+        Ok(JobSpec { id,title,acceptance,deps:serde_json::from_str(&deps)?,
+            resource_claims:serde_json::from_str(&resource_claims)? })
     }).collect::<Result<Vec<_>>>()?;
     let mut proposed = jobs.clone();
     proposed.sort_by(|a,b| a.id.cmp(&b.id));
@@ -194,8 +195,8 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
             "planned"
         };
         tx.execute(
-            "INSERT INTO swarm_jobs(run_id,id,plan_revision,title,acceptance,deps,status,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?8)",
-            params![id,job.id,revision+1,job.title,job.acceptance,serde_json::to_string(&job.deps)?,status,now],
+            "INSERT INTO swarm_jobs(run_id,id,plan_revision,title,acceptance,deps,resource_claims,status,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?9)",
+            params![id,job.id,revision+1,job.title,job.acceptance,serde_json::to_string(&job.deps)?,serde_json::to_string(&job.resource_claims)?,status,now],
         )?;
     }
     tx.execute(
@@ -228,11 +229,13 @@ pub fn jobs(store: &Store, p: &Value) -> Result<Value> {
         .prepare("SELECT * FROM swarm_jobs WHERE run_id=?1 AND id>?2 ORDER BY id LIMIT ?3")?;
     let rows = stmt.query_map(params![id,cursor,limit+1], |r| {
         let deps: String = r.get("deps")?;
+        let resource_claims: String = r.get("resource_claims")?;
         Ok(json!({
             "id":r.get::<_,String>("id")?,"run_id":r.get::<_,String>("run_id")?,
             "plan_revision":r.get::<_,i64>("plan_revision")?,
             "title":r.get::<_,String>("title")?,"acceptance":r.get::<_,String>("acceptance")?,
             "deps":serde_json::from_str::<Value>(&deps).unwrap_or(Value::Null),
+            "resource_claims":serde_json::from_str::<Value>(&resource_claims).unwrap_or(Value::Null),
             "status":r.get::<_,String>("status")?,"attempt_count":r.get::<_,i64>("attempt_count")?,
             "deadline_at_ms":r.get::<_,Option<i64>>("deadline_at_ms")?,
             "stop_reason":r.get::<_,Option<String>>("stop_reason")?,

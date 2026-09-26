@@ -280,8 +280,40 @@ pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
         .and_then(Value::as_u64)
         .ok_or_else(|| anyhow!("missing benefit worker ceiling"))?;
     object.insert("max_workers".into(), json!(proposed_cap.min(policy_cap)));
-    let result = preview(&estimate)?;
-    let jobs = result["job_ids"].as_array().unwrap().clone();
+    let initial = preview(&estimate)?;
+    let jobs = initial["job_ids"].as_array().unwrap().clone();
+    let mut claimed: BTreeMap<String, String> = BTreeMap::new();
+    let mut resource_conflict = false;
+    let mut job_statuses = Vec::new();
+    for job in &jobs {
+        let id = job.as_str().unwrap();
+        let row: Option<(String, String)> = store
+            .conn
+            .query_row(
+                "SELECT resource_claims,status FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+                params![run_id, id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?;
+        let (raw, status) = row.ok_or_else(|| anyhow!("benefit job is not ready"))?;
+        job_statuses.push(status);
+        let claims: Vec<super::plan::ResourceClaim> = serde_json::from_str(&raw)?;
+        for claim in claims {
+            if let Some(prior_mode) = claimed.get(&claim.resource) {
+                if prior_mode == "write" || claim.mode == "write" {
+                    resource_conflict = true;
+                }
+            }
+            claimed.insert(claim.resource, claim.mode);
+        }
+    }
+    if resource_conflict {
+        estimate["independent"] = json!(false);
+    }
+    let mut result = preview(&estimate)?;
+    if resource_conflict && result["reason"] == "dependent_jobs" {
+        result["reason"] = json!("resource_conflict");
+    }
     let request_sha256 = format!("{:x}", Sha256::digest(estimate.to_string().as_bytes()));
     let old: Option<(i64, String, String)> = store
         .conn
@@ -307,19 +339,8 @@ pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
     if active > 0 {
         bail!("commit benefit decision before admitting a batch");
     }
-    for job in &jobs {
-        let id = job.as_str().unwrap();
-        let status: Option<String> = store
-            .conn
-            .query_row(
-                "SELECT status FROM swarm_jobs WHERE run_id=?1 AND id=?2",
-                params![run_id, id],
-                |r| r.get(0),
-            )
-            .optional()?;
-        if status.as_deref() != Some("ready") {
-            bail!("benefit job is not ready");
-        }
+    if job_statuses.iter().any(|status| status != "ready") {
+        bail!("benefit job is not ready");
     }
     let wave = old.map(|(wave, _, _)| wave + 1).unwrap_or(1);
     let mut value = result;
