@@ -238,3 +238,162 @@ fn confirmed_director_replacement_preserves_a_paused_run() {
     assert_eq!(replaced["status"], "paused");
     assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "paused");
 }
+#[test]
+fn two_no_progress_director_turns_stall_durably_without_replaying_completion() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call(
+        "swarm.create",
+        json!({"category":"Stalled director", "objective":"Audit",
+        "allowed_targets":["system-codex"]}),
+    );
+    let id = run["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":id,"generation":1,"revision":0,"jobs":[
+            {"id":"j","title":"Inspect","acceptance":"evidence","deps":[]}
+        ]}),
+    );
+    let attempt = d.call(
+        "swarm.attempt.register",
+        json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"j"}),
+    );
+    for n in 0..2 {
+        d.call(
+            "swarm.report",
+            json!({"run_id":id,"job_id":"j","attempt_id":attempt["id"],
+            "token":attempt["token"],"message_id":format!("no-progress-{n}"),
+            "type":"progress","revision":1,"payload":{"note":"still investigating"}}),
+        );
+        let turn = d.call(
+            "swarm.director.claim_batch",
+            json!({"run_id":id,
+            "generation":1,"revision":1,"now_ms":now()+6000}),
+        );
+        assert_eq!(turn["status"], "claimed");
+        let done = d.call(
+            "swarm.director.complete_batch",
+            json!({"run_id":id,"generation":1,
+            "turn_id":turn["turn_id"],"token":turn["token"],"outcome":"no_progress"}),
+        );
+        assert_eq!(done["no_progress_turns"], n + 1);
+        assert_eq!(done["status"], if n == 0 { "planning" } else { "stalled" });
+        assert_eq!(
+            d.call(
+                "swarm.director.complete_batch",
+                json!({"run_id":id,
+            "generation":1,"turn_id":turn["turn_id"],"token":turn["token"],
+            "outcome":"no_progress"})
+            )["duplicate"],
+            true
+        );
+    }
+    d.kill9();
+    d.spawn();
+    let stalled = d.call("swarm.get", json!({"id":id}));
+    assert_eq!(stalled["status"], "stalled");
+    assert_eq!(stalled["stall_reason"], "director_no_progress");
+    assert_eq!(stalled["no_progress_turns"], 2);
+    assert_eq!(
+        d.call(
+            "swarm.director.claim_batch",
+            json!({"run_id":id,
+        "generation":1,"revision":1,"now_ms":now()+12000})
+        )["status"],
+        "stalled"
+    );
+    assert!(d
+        .try_call(
+            "swarm.director.recover",
+            json!({"run_id":id,
+        "generation":1,"revision":1,"termination":"confirmed_dead"})
+        )
+        .is_err());
+    assert_eq!(
+        d.call(
+            "swarm.stop",
+            json!({"run_id":id,"generation":1,
+        "revision":1})
+        )["status"],
+        "stopping"
+    );
+}
+
+#[test]
+fn declared_progress_resets_the_fixture_director_stall_counter() {
+    let d = Daemon::start(&[]);
+    let run = d.call(
+        "swarm.create",
+        json!({"category":"Director progress", "objective":"Audit",
+        "allowed_targets":["system-codex"]}),
+    );
+    let id = run["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":id,"generation":1,"revision":0,"jobs":[
+            {"id":"j","title":"Inspect","acceptance":"evidence","deps":[]}
+        ]}),
+    );
+    let attempt = d.call(
+        "swarm.attempt.register",
+        json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"j"}),
+    );
+    for (n, outcome, expected) in [
+        (0, "no_progress", 1),
+        (1, "progress", 0),
+        (2, "no_progress", 1),
+    ] {
+        d.call(
+            "swarm.report",
+            json!({"run_id":id,"job_id":"j","attempt_id":attempt["id"],
+            "token":attempt["token"],"message_id":format!("progress-reset-{n}"),
+            "type":"progress","revision":1,"payload":{"step":n}}),
+        );
+        let turn = d.call(
+            "swarm.director.claim_batch",
+            json!({"run_id":id,
+            "generation":1,"revision":1,"now_ms":now()+6000}),
+        );
+        let done = d.call(
+            "swarm.director.complete_batch",
+            json!({"run_id":id,"generation":1,
+            "turn_id":turn["turn_id"],"token":turn["token"],"outcome":outcome}),
+        );
+        assert_eq!(done["no_progress_turns"], expected);
+        assert_eq!(done["status"], "planning");
+    }
+    assert_eq!(
+        d.call("swarm.get", json!({"id":id}))["no_progress_turns"],
+        1
+    );
+}
+
+#[test]
+fn stop_wins_over_a_late_no_progress_turn_completion() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Stop director", "objective":"Audit",
+        "allowed_targets":["system-codex"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let attempt = d.call("swarm.attempt.register", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"j"}));
+    for n in 0..2 {
+        d.call("swarm.report", json!({"run_id":id,"job_id":"j","attempt_id":attempt["id"],
+            "token":attempt["token"],"message_id":format!("stop-turn-{n}"),
+            "type":"progress","revision":1,"payload":{"step":n}}));
+        let turn = d.call("swarm.director.claim_batch", json!({"run_id":id,
+            "generation":1,"revision":1,"now_ms":now()+6000}));
+        if n == 1 {
+            d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
+        }
+        let done = d.call("swarm.director.complete_batch", json!({"run_id":id,"generation":1,
+            "turn_id":turn["turn_id"],"token":turn["token"],"outcome":"no_progress"}));
+        assert_eq!(done["status"], if n == 0 { "planning" } else { "stopping" });
+    }
+    let state = d.call("swarm.get", json!({"id":id}));
+    assert_eq!(state["status"], "stopping");
+    assert_eq!(state["stop_reason"], "requested");
+}

@@ -136,16 +136,21 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
     {
         bail!("run cannot recover director in this state");
     }
+    if current["status"] == "stalled" && current["stall_reason"] == "director_no_progress" {
+        bail!("director stalled after two no-progress turns; process recovery cannot clear it");
+    }
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
     if termination == "unknown" {
         tx.execute(
             "UPDATE swarm_runs SET stalled_from=CASE WHEN status='stalled' THEN stalled_from ELSE status END,
-             status='stalled',updated_ms=?2 WHERE id=?1",
+             status='stalled',stall_reason='director_termination_unknown',updated_ms=?2 WHERE id=?1",
             params![run, now],
         )?;
         tx.commit()?;
-        return Ok(json!({"status":"stalled","generation":generation,"reason":"director_termination_unknown"}));
+        return Ok(
+            json!({"status":"stalled","generation":generation,"reason":"director_termination_unknown"}),
+        );
     }
     let turn: Option<String> = tx
         .query_row(
@@ -185,7 +190,7 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
         "planning"
     };
     tx.execute(
-        "UPDATE swarm_runs SET generation=generation+1,status=?2,stalled_from=NULL,updated_ms=?3 WHERE id=?1",
+        "UPDATE swarm_runs SET generation=generation+1,status=?2,stalled_from=NULL,stall_reason=NULL,updated_ms=?3 WHERE id=?1",
         params![run, next_status, now],
     )?;
     tx.commit()?;
@@ -200,12 +205,13 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     let generation = p["generation"]
         .as_i64()
         .ok_or_else(|| anyhow!("missing generation"))?;
+    let outcome = p["outcome"].as_str().unwrap_or("no_progress");
+    if outcome != "progress" && outcome != "no_progress" {
+        bail!("invalid director turn outcome");
+    }
     let current = get(store, run)?;
     if current["generation"] != generation {
         bail!("stale director generation");
-    }
-    if current["status"] == "stalled" {
-        bail!("director is stalled pending recovery");
     }
     let (stored_hash, status): (String, String) = store
         .conn
@@ -225,12 +231,47 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
         |r| r.get(0),
     )?;
     if status == "complete" {
-        return Ok(json!({"turn_id":id,"applied":count,"duplicate":true}));
+        return Ok(json!({"turn_id":id,"applied":count,"duplicate":true,
+            "status":current["status"],"no_progress_turns":current["no_progress_turns"]}));
+    }
+    if current["status"] == "stalled" {
+        bail!("director is stalled pending recovery");
     }
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
     tx.execute("UPDATE swarm_messages SET phase='applied',updated_ms=?2 WHERE seq IN (SELECT seq FROM swarm_director_turn_messages WHERE turn_id=?1) AND phase='delivered'",params![id,now])?;
     tx.execute("UPDATE swarm_director_turns SET status='complete',completed_ms=?2 WHERE id=?1 AND status='active'",params![id,now])?;
+    if current["status"] == "stopping" || current["status"] == "stopped" {
+        tx.commit()?;
+        return Ok(json!({"turn_id":id,"applied":count,"duplicate":false,
+            "status":current["status"],"no_progress_turns":current["no_progress_turns"]}));
+    }
+    let turns = if outcome == "no_progress" {
+        current["no_progress_turns"]
+            .as_i64()
+            .unwrap_or(0)
+            .saturating_add(1)
+    } else {
+        0
+    };
+    let next_status = if turns >= 2 {
+        "stalled"
+    } else {
+        current["status"].as_str().unwrap_or("running")
+    };
+    if turns >= 2 {
+        tx.execute(
+            "UPDATE swarm_runs SET status='stalled',stalled_from=status,
+            stall_reason='director_no_progress',no_progress_turns=?2,updated_ms=?3 WHERE id=?1",
+            params![run, turns, now],
+        )?;
+    } else {
+        tx.execute(
+            "UPDATE swarm_runs SET no_progress_turns=?2,updated_ms=?3 WHERE id=?1",
+            params![run, turns, now],
+        )?;
+    }
     tx.commit()?;
-    Ok(json!({"turn_id":id,"applied":count,"duplicate":false}))
+    Ok(json!({"turn_id":id,"applied":count,"duplicate":false,
+        "status":next_status,"no_progress_turns":turns}))
 }

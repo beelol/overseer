@@ -41,6 +41,8 @@ fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
         "status": row.get::<_, String>("status")?,
         "stop_reason": row.get::<_, Option<String>>("stop_reason")?,
         "stalled_from": row.get::<_, Option<String>>("stalled_from")?,
+        "stall_reason": row.get::<_, Option<String>>("stall_reason")?,
+        "no_progress_turns": row.get::<_, i64>("no_progress_turns")?,
         "generation": row.get::<_, i64>("generation")?,
         "revision": row.get::<_, i64>("revision")?,
         "allowed_targets": serde_json::from_str::<Value>(&targets).unwrap_or(Value::Null),

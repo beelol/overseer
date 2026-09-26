@@ -12,6 +12,8 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           status TEXT NOT NULL,
           stop_reason TEXT,
           stalled_from TEXT,
+          stall_reason TEXT,
+          no_progress_turns INTEGER NOT NULL DEFAULT 0,
           generation INTEGER NOT NULL,
           revision INTEGER NOT NULL,
           allowed_targets TEXT NOT NULL,
@@ -189,6 +191,20 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         .exists([])?;
     if !has_stalled_from {
         conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN stalled_from TEXT;")?;
+    }
+    let has_stall_reason = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='stall_reason'")?
+        .exists([])?;
+    if !has_stall_reason {
+        conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN stall_reason TEXT;")?;
+    }
+    let has_no_progress_turns = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='no_progress_turns'")?
+        .exists([])?;
+    if !has_no_progress_turns {
+        conn.execute_batch(
+            "ALTER TABLE swarm_runs ADD COLUMN no_progress_turns INTEGER NOT NULL DEFAULT 0;",
+        )?;
     }
     Ok(())
 }
