@@ -132,6 +132,68 @@ fn job_deadline_never_accepts_a_worker_that_ignores_interrupt() {
 }
 
 #[test]
+fn explicit_ceiling_runs_thirty_two_supervised_workers() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("large-swarm-source"));
+    let run = d.call("swarm.create", json!({"category":"Large local swarm",
+        "objective":"Inspect 32 modules","allowed_targets":["fixture-local"],
+        "policy":{"max_workers":32,"max_executing":33,"deadline_ms":120000}}));
+    let id = run["id"].as_str().unwrap();
+    let jobs: Vec<_> = (0..33).map(|n| json!({"id":format!("j{n}"),
+        "title":format!("Inspect {n}"),"acceptance":"evidence","deps":[]})).collect();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":jobs}));
+    let at = now();
+    let admit = |n: usize| d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":format!("j{n}"),"target_id":"fixture-local",
+        "request_id":format!("large-runtime-{n}"),
+        "now_ms":at + (n / 4) as i64 * 5000,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+120000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    let mut workers = Vec::new();
+    for n in 0..32 {
+        let admitted = admit(n);
+        assert_eq!(admitted["status"], "admitted", "job {n}: {admitted}");
+        let launched = d.call("swarm.worker.launch", json!({"run_id":id,
+            "job_id":format!("j{n}"),"attempt_id":admitted["attempt_id"],
+            "token":admitted["token"],"repo":checkout,
+            "program":"/bin/sleep","args":["60"],"prompt":"Inspect",
+            "title":format!("Fixture worker {n}")}));
+        assert_eq!(launched["status"], "launched", "job {n}: {launched}");
+        workers.push(launched["overseer_run_id"].as_str().unwrap().to_owned());
+    }
+    assert_eq!(workers.len(), 32);
+    assert_eq!(workers.iter().collect::<std::collections::HashSet<_>>().len(), 32);
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    loop {
+        let running = workers.iter().filter(|worker| d.run(worker)["status"] == "running").count();
+        if running == 32 { break; }
+        assert!(std::time::Instant::now() < until, "only {running}/32 workers running");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    let db_probe = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    for worker in &workers {
+        let run_dir: String = db_probe.query_row("SELECT run_dir FROM runs WHERE id=?1",
+            [worker], |row| row.get(0)).unwrap();
+        let shim: serde_json::Value = serde_json::from_slice(&std::fs::read(
+            std::path::Path::new(&run_dir).join("shim.json")).unwrap()).unwrap();
+        assert!(pid_alive(shim["child_pid"].as_i64().unwrap()),
+            "worker {worker} has no live supervised process");
+    }
+    assert_eq!(admit(32)["reason"], "worker_limit");
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "running");
+    d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
+    for worker in &workers {
+        assert_ne!(d.wait_done(worker, 10)["status"], "completed");
+    }
+}
+
+#[test]
 fn job_deadline_interrupts_only_its_worker_despite_progress() {
     let d = Daemon::start(&[]);
     let temp = tmp();
