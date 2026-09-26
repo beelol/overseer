@@ -512,7 +512,7 @@
         "daemon/src/swarm/context.rs",
         "docs/verification/swarm/SWARM-57.md"
       ],
-      "blocker": "Durable fixture destination grants transfer only accepted evidence to an admitted dependent target, survive restart, and yield to revocation; revocation blocks context delivery, later dependent admission and a linked local worker while unrelated work continues. Live cross-target ACL/credential isolation, secret audits, peer bypass resistance, S4 replay and Stop/revocation/result races remain unverified."
+      "blocker": "Durable fixture destination grants transfer only accepted evidence to an admitted dependent target, survive restart, and yield to revocation. Revocation blocks context delivery and dependent admission, interrupts a linked worker, and retries after daemon crash while an unrelated worker remains active. Live cross-target ACL/credential isolation, secret audits, peer bypass resistance, S4 replay and combined Stop/revocation/result races remain unverified."
     },
     "SWARM-58": {
       "status": "partial",
@@ -553,7 +553,7 @@
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/swarm_plan.rs"
       ],
-      "blocker": "Pending local launch replay is rejected after Stop, a linked scripted worker is interrupted, and rejected/superseded work does not requeue after cancellation; a separate fixture revokes artifact delivery and interrupts a dependent worker. The combined Stop/revocation/result/acceptance race, native descendants and unreachable-process retry remain unverified."
+      "blocker": "Pending local launch replay is rejected after Stop, a linked scripted worker is interrupted, and rejected/superseded work does not requeue after cancellation. A separate crash fixture persists revocation, retries the dependent-worker interrupt after restart, and leaves an unrelated worker running. The combined Stop/revocation/result/acceptance race, native descendants and initially unreachable-process retry remain unverified."
     },
     "SWARM-62": {
       "status": "partial",
