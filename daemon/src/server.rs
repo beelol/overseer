@@ -757,6 +757,12 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "auto.opencode.local.inspect" => {
             use std::collections::BTreeMap;
+            let timeout_ms = match p.get("timeout_ms") {
+                None => 8000,
+                Some(value) => value.as_u64().filter(|ms| (1..=8000).contains(ms))
+                    .ok_or_else(|| anyhow!("timeout_ms must be between 1 and 8000"))?,
+            };
+            let deadline = Instant::now() + Duration::from_millis(timeout_ms);
             let profile = d.profile(s(p, "profile_id")?)?;
             if profile.harness != "opencode" {
                 return Err(anyhow!("local OpenCode discovery requires an OpenCode profile"));
@@ -764,7 +770,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let workspace = d.workspace(s(p, "workspace_id")?)?;
             if workspace.removed_ms.is_some() { return Err(anyhow!("workspace was removed")); }
             let gate = d.profile_gate(&profile.id);
-            let _profile_guard = gate.lock().unwrap();
+            let _profile_guard = lock_gate_until(&gate, deadline)?;
             if d.store.lock().unwrap().runs()?.iter().any(|run| run.profile_id.as_deref() == Some(profile.id.as_str())
                 && crate::daemon::ACTIVE.contains(&run.status.as_str())) {
                 return Err(anyhow!("OpenCode profile has an active run"));
@@ -773,10 +779,21 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 .ok_or_else(|| anyhow!("OpenCode is not installed"))?;
             let mut env = crate::adapters::base_env(&program.display().to_string());
             env.extend(Daemon::profile_env(&profile));
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining < Duration::from_millis(20) {
+                return Err(anyhow!("OpenCode local metadata deadline elapsed"));
+            }
             let catalog = crate::auto_collect::opencode_local_catalog(&program, &env,
-                std::path::Path::new(&workspace.path), std::time::Duration::from_secs(8), crate::daemon::now())?;
+                std::path::Path::new(&workspace.path), remaining, crate::daemon::now())?;
             let mut endpoint_health = BTreeMap::new();
+            let mut local_execution_config_verified = BTreeMap::new();
+            let mut local_execution_config_reason = BTreeMap::new();
             for model in &catalog.models {
+                let eligibility = crate::auto_opencode::auto_local_execution_guard(&profile,
+                    std::path::Path::new(&workspace.path), &model.model, &model.endpoint);
+                local_execution_config_reason.insert(model.model.clone(), eligibility.as_ref().err()
+                    .map(ToString::to_string));
+                local_execution_config_verified.insert(model.model.clone(), eligibility.is_ok());
                 if endpoint_health.contains_key(&model.provider_id) { continue; }
                 let state = if endpoint_health.len() >= 4 { "unprobed" } else {
                     match crate::auto_opencode::probe_local_endpoint(&model.endpoint) {
@@ -789,7 +806,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             }
             json!({"profile_id":profile.id,"workspace_id":workspace.id,
                 "source":"opencode/config-providers","catalog":catalog,
-                "endpoint_health":endpoint_health,"allowance":"unknown",
+                "endpoint_health":endpoint_health,"local_execution_config_verified":local_execution_config_verified,
+                "local_execution_config_reason":local_execution_config_reason,
+                "allowance":"unknown",
                 "limitation":"loopback reachability and model metadata do not prove task capability or tool permissions"})
         }
         "auto.tools.inspect" => {

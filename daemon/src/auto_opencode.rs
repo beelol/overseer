@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::net::{Ipv4Addr, SocketAddrV4, TcpStream};
+use std::path::Path;
 use std::time::Duration;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -130,6 +131,118 @@ pub fn parse_local_catalog(config: &Value, response: &Value, observed_ms: i64) -
     Ok(LocalCatalog { observed_ms, expires_ms:observed_ms.saturating_add(60_000), models })
 }
 
+/// Narrow execution boundary for an explicit local OpenCode profile. The
+/// metadata catalog alone cannot prove which secondary model, plugin, or
+/// credential an actual `opencode run` will use. Recheck the child workspace
+/// immediately before launch; this does not establish that a loopback proxy
+/// itself is free or trustworthy.
+pub fn auto_local_execution_guard(profile: &crate::store::Profile, project: &Path,
+    model: &str, endpoint: &str) -> Result<()> {
+    if profile.harness != "opencode" || profile.is_system {
+        return Err(anyhow!("automatic local OpenCode requires an isolated profile"));
+    }
+    let home = profile.home.as_deref().map(Path::new)
+        .ok_or_else(|| anyhow!("isolated OpenCode profile home is unavailable"))?;
+    for dir in [home.to_path_buf(), home.join("data"), home.join("config")] {
+        let metadata = std::fs::symlink_metadata(&dir)?;
+        if !metadata.file_type().is_dir() { return Err(anyhow!("OpenCode profile path is not an owned directory")); }
+    }
+    match std::fs::symlink_metadata(home.join("data/opencode/auth.json")) {
+        Ok(_) => return Err(anyhow!("automatic local OpenCode profile contains credentials")),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    let config_home = home.join("config/opencode");
+    match std::fs::symlink_metadata(&config_home) {
+        Ok(metadata) if !metadata.file_type().is_dir() => {
+            return Err(anyhow!("automatic local OpenCode profile config is not a directory"));
+        }
+        Ok(_) => {
+            for entry in std::fs::read_dir(&config_home)? {
+                let entry = entry?;
+                let metadata = std::fs::symlink_metadata(entry.path())?;
+                match entry.file_name().to_str() {
+                    Some(".gitignore") if metadata.file_type().is_file() && metadata.len() <= 4096 => {}
+                    Some("opencode.jsonc") if metadata.file_type().is_file() && metadata.len() <= 4096 => {
+                        let generated: Value = serde_json::from_slice(&std::fs::read(entry.path())?)?;
+                        if generated.as_object().is_none_or(|map| map.len() != 1
+                            || map.get("$schema").and_then(Value::as_str) != Some("https://opencode.ai/config.json")) {
+                            return Err(anyhow!("automatic local OpenCode profile config was modified"));
+                        }
+                    }
+                    _ => return Err(anyhow!("automatic local OpenCode profile has unverified configuration")),
+                }
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    // OpenCode may load either alternate project file and project-specific
+    // agents/plugins. A narrow local route cannot validate their effects.
+    for name in ["opencode.jsonc", ".opencode"] {
+        match std::fs::symlink_metadata(project.join(name)) {
+            Ok(_) => return Err(anyhow!("automatic local OpenCode project has alternate configuration")),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    let config_path = project.join("opencode.json");
+    let metadata = std::fs::symlink_metadata(&config_path)?;
+    if !metadata.file_type().is_file() || metadata.len() > 128 * 1024 {
+        return Err(anyhow!("automatic local OpenCode project config is unavailable"));
+    }
+    let config: Value = serde_json::from_slice(&std::fs::read(config_path)?)?;
+    let root = config.as_object().ok_or_else(|| anyhow!("invalid OpenCode project config"))?;
+    if root.keys().any(|key| !matches!(key.as_str(), "$schema" | "provider" | "model" | "small_model" | "autoupdate" | "share"))
+        || root.get("$schema").is_some_and(|value| value != "https://opencode.ai/config.json") {
+        return Err(anyhow!("automatic local OpenCode config has unverified fields"));
+    }
+    if config["autoupdate"] != false || config["share"] != "disabled" {
+        return Err(anyhow!("automatic local OpenCode updates or sharing are not disabled"));
+    }
+    if config["model"] != model || config["small_model"] != model {
+        return Err(anyhow!("automatic local OpenCode selected and small models disagree"));
+    }
+    let (selected_provider, selected_model) = model.split_once('/')
+        .ok_or_else(|| anyhow!("invalid OpenCode model identity"))?;
+    if !identifier(selected_provider, false) || !identifier(selected_model, true)
+        || loopback_port(endpoint).is_none() {
+        return Err(anyhow!("invalid local OpenCode route"));
+    }
+    let providers = config["provider"].as_object()
+        .filter(|map| !map.is_empty() && map.len() <= 128)
+        .ok_or_else(|| anyhow!("automatic local OpenCode provider map is unavailable"))?;
+    let mut selected_found = false;
+    for (id, provider) in providers {
+        if !identifier(id, false) { return Err(anyhow!("invalid local OpenCode provider")); }
+        let object = provider.as_object().ok_or_else(|| anyhow!("invalid local OpenCode provider"))?;
+        if object.keys().any(|key| !matches!(key.as_str(), "npm" | "options" | "models"))
+            || provider["npm"] != "@ai-sdk/openai-compatible" {
+            return Err(anyhow!("automatic OpenCode provider is not a credential-free local adapter"));
+        }
+        let options = provider["options"].as_object().filter(|map| map.len() == 1 && map.contains_key("baseURL"))
+            .ok_or_else(|| anyhow!("automatic OpenCode provider has unverified options"))?;
+        let url = options["baseURL"].as_str().filter(|url| loopback_port(url).is_some())
+            .ok_or_else(|| anyhow!("automatic OpenCode provider has a nonlocal endpoint"))?;
+        let models = provider["models"].as_object().filter(|map| !map.is_empty() && map.len() <= 128)
+            .ok_or_else(|| anyhow!("automatic OpenCode provider has no bounded models"))?;
+        for (model_id, model_config) in models {
+            if !identifier(model_id, true) || !model_config.as_object().is_some_and(|item|
+                item.keys().all(|key| matches!(key.as_str(), "name" | "tool_call" | "reasoning" | "limit" | "variants"))) {
+                return Err(anyhow!("automatic OpenCode model config has unverified fields"));
+            }
+        }
+        if id == selected_provider {
+            if url != endpoint || !models.contains_key(selected_model) {
+                return Err(anyhow!("selected OpenCode route changed before launch"));
+            }
+            selected_found = true;
+        }
+    }
+    if !selected_found { return Err(anyhow!("selected OpenCode provider is unavailable")); }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,5 +338,62 @@ mod tests {
                 "capabilities":{"toolcall":true},"variants":{}}}});
         let response = json!({"providers":[provider.clone(),provider]});
         assert!(parse_local_catalog(&config, &response, 1000).is_err());
+    }
+
+    #[test]
+    fn automatic_local_execution_requires_isolated_credentials_and_only_local_config() {
+        let root = tempfile::tempdir().unwrap();
+        let home = root.path().join("profile");
+        let project = root.path().join("project");
+        std::fs::create_dir_all(home.join("data/opencode")).unwrap();
+        std::fs::create_dir_all(home.join("config")).unwrap();
+        std::fs::create_dir(&project).unwrap();
+        let profile = crate::store::Profile { id:"p-local".into(), name:"Local".into(),
+            harness:"opencode".into(), home:Some(home.display().to_string()),
+            is_system:false, created_ms:0 };
+        let endpoint = "http://127.0.0.1:47811/v1";
+        let config = serde_json::json!({"provider":{
+            "local_a":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":endpoint},
+                "models":{"fixture-a":{"name":"Fixture A","tool_call":true}}},
+            "local_b":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://127.0.0.1:47812/v1"},
+                "models":{"fixture-b":{"name":"Fixture B","tool_call":true}}}
+        },"model":"local_a/fixture-a","small_model":"local_a/fixture-a",
+            "autoupdate":false,"share":"disabled"});
+        let save = |value: &Value| std::fs::write(project.join("opencode.json"), value.to_string()).unwrap();
+        save(&config);
+        assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_ok());
+        let generated = home.join("config/opencode");
+        std::fs::create_dir_all(&generated).unwrap();
+        std::fs::write(generated.join(".gitignore"), "node_modules\n").unwrap();
+        std::fs::write(generated.join("opencode.jsonc"),
+            r#"{"$schema":"https://opencode.ai/config.json"}"#).unwrap();
+        assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_ok());
+        std::fs::write(generated.join("opencode.jsonc"),
+            r#"{"$schema":"https://opencode.ai/config.json","plugin":["unsafe"]}"#).unwrap();
+        assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_err());
+        std::fs::write(generated.join("opencode.jsonc"),
+            r#"{"$schema":"https://opencode.ai/config.json"}"#).unwrap();
+        let mut remote = config.clone();
+        remote["provider"]["cloud"] = serde_json::json!({"npm":"@ai-sdk/openai-compatible",
+            "options":{"baseURL":"https://api.example.test/v1"},"models":{"paid":{}}});
+        save(&remote);
+        assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_err());
+        let mut plugin = config.clone();
+        plugin["plugin"] = serde_json::json!(["some-plugin"]);
+        save(&plugin);
+        assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_err());
+        save(&config);
+        std::fs::write(project.join("opencode.jsonc"), "{}").unwrap();
+        assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_err());
+        std::fs::remove_file(project.join("opencode.jsonc")).unwrap();
+        std::fs::create_dir(project.join(".opencode")).unwrap();
+        assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_err());
+        std::fs::remove_dir(project.join(".opencode")).unwrap();
+        std::fs::write(home.join("data/opencode/auth.json"), "secret-auth-sentinel").unwrap();
+        assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_err());
+        std::fs::remove_file(home.join("data/opencode/auth.json")).unwrap();
+        let mut system = profile.clone();
+        system.is_system = true;
+        assert!(auto_local_execution_guard(&system, &project, "local_a/fixture-a", endpoint).is_err());
     }
 }

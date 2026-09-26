@@ -1646,7 +1646,74 @@ fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_rout
     assert_eq!(inspected["endpoint_health"]["local_b"], "unavailable");
     assert_eq!(inspected["allowance"], "unknown",
         "a loopback address alone does not prove the server is free local inference rather than a cloud proxy");
+    assert_eq!(inspected["local_execution_config_verified"]["local_a/fixture-a"], false,
+        "a system profile may have uninspected cloud credentials");
     assert!(!inspected.to_string().contains("openai/"));
+    let isolated = d.call("profile.create", json!({"name":"Isolated local provider",
+        "harness":"opencode"}));
+    let profile_id = isolated["id"].as_str().unwrap();
+    let isolated_read = d.call("auto.opencode.local.inspect", json!({"profile_id":profile_id,
+        "workspace_id":workspace_id}));
+    assert_eq!(isolated_read["local_execution_config_verified"]["local_a/fixture-a"], true,
+        "credential-free isolated local provider can be considered for a future Auto route: {isolated_read}");
+    assert_eq!(isolated_read["local_execution_config_verified"]["local_b/fixture-b"], false,
+        "the selected and secondary models must both point to this route before execution");
+    assert_eq!(isolated_read["endpoint_health"]["local_b"], "unavailable");
+    let auth_file = Path::new(isolated["home"].as_str().unwrap()).join("data/opencode/auth.json");
+    std::fs::create_dir_all(auth_file.parent().unwrap()).unwrap();
+    std::fs::write(&auth_file, "secret-auth-sentinel").unwrap();
+    let credentialed = d.try_call("auto.opencode.local.inspect", json!({"profile_id":profile_id,
+        "workspace_id":workspace_id}));
+    match credentialed {
+        Ok(value) => {
+            assert_eq!(value["local_execution_config_verified"]["local_a/fixture-a"], false);
+            assert!(!value.to_string().contains("secret-auth-sentinel"));
+        }
+        Err(reason) => assert!(!reason.contains("secret-auth-sentinel"), "{reason}"),
+    }
+}
+
+#[test]
+fn auto_opencode_isolated_local_provider_executes_real_harness_against_a_mock_endpoint() {
+    let Some(program) = std::env::var_os("PATH").and_then(|path| std::env::split_paths(&path)
+        .map(|dir| dir.join("opencode")).find(|candidate| candidate.is_file())) else { return };
+    struct MockServer(std::process::Child);
+    impl Drop for MockServer {
+        fn drop(&mut self) { let _ = self.0.kill(); let _ = self.0.wait(); }
+    }
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let port_file = r.path().join("mock-port");
+    let mock_log = r.path().join("mock-log.jsonl");
+    let _mock = MockServer(std::process::Command::new("node")
+        .arg(fixture("mock-openai/server.js"))
+        .env("MOCK_PORT_FILE", &port_file).env("MOCK_LOG", &mock_log)
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+        .spawn().unwrap());
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while !port_file.exists() {
+        assert!(std::time::Instant::now() < deadline, "local mock provider did not start");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let port = std::fs::read_to_string(&port_file).unwrap();
+    std::fs::write(repo.join("opencode.json"), json!({"provider":{
+        "local_a":{"npm":"@ai-sdk/openai-compatible",
+            "options":{"baseURL":format!("http://127.0.0.1:{port}/v1")},
+            "models":{"fixture-a":{"name":"Fixture A","tool_call":true}}}
+    },"model":"local_a/fixture-a","small_model":"local_a/fixture-a",
+        "autoupdate":false,"share":"disabled"}).to_string()).unwrap();
+    git(&repo, &["add", "opencode.json"]);
+    git(&repo, &["commit", "-q", "-m", "local provider fixture"]);
+    let d = Daemon::start(&[("OVERSEER_OPENCODE_PATH",program.to_str().unwrap())]);
+    let profile = d.call("profile.create", json!({"name":"Mock local","harness":"opencode"}));
+    let created = d.call("task.create", json!({"repo":repo,"harness":"opencode",
+        "profile_id":profile["id"],"model":"local_a/fixture-a","prompt":"reply hello"}));
+    let run = run_id(&created);
+    let done = d.wait_done(&run, 60);
+    assert_eq!(done["status"], "completed", "{done} events: {:?}", d.events(&run));
+    assert!(d.events(&run).iter().any(|event| event["kind"] == "output"
+        && event["payload"]["text"].as_str().is_some_and(|text| text.contains("hello from mock"))));
+    assert!(std::fs::read_to_string(&mock_log).unwrap().contains("/v1/chat/completions"));
 }
 
 #[test]
