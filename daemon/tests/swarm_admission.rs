@@ -263,6 +263,51 @@ fn concurrent_manual_starts_cannot_claim_the_same_last_slot() {
 }
 
 #[test]
+fn stopped_swarm_releases_director_slot_after_attempt_exit() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":2}));
+    let first = setup(&d,"First director",1);
+    let second = setup(&d,"Second director",1);
+    let attempt = admit(&d,&first,"j0","codex-a","first-director",now(),100000,100).unwrap();
+    assert_eq!(attempt["status"],"admitted");
+    let held = admit(&d,&second,"j0","codex-a","second-held",now(),100000,100).unwrap();
+    assert_eq!(held["reason"],"global_agent_limit");
+    let stopping = d.call("swarm.stop",json!({"run_id":first,"generation":1,"revision":1}));
+    assert_eq!(stopping["status"],"stopping");
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],2);
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":first,"generation":1,
+        "revision":1,"job_id":"j0","attempt_id":attempt["attempt_id"]}));
+    assert_eq!(d.call("swarm.get",json!({"id":first}))["status"],"stopped");
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],0);
+    let admitted = admit(&d,&second,"j0","codex-a","second-started",now(),100000,100).unwrap();
+    assert_eq!(admitted["status"],"admitted","{admitted}");
+}
+
+#[test]
+fn lowering_app_limit_holds_new_workers_until_existing_work_drains() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":3}));
+    let id = setup(&d,"Lower while active",3);
+    commit_beneficial_batch(&d,&id,&["j0".into(),"j1".into(),"j2".into()]);
+    let at = now();
+    let first = admit(&d,&id,"j0","codex-a","before-lower-0",at,100000,100).unwrap();
+    let second = admit(&d,&id,"j1","codex-a","before-lower-1",at,100000,100).unwrap();
+    assert_eq!(first["status"],"admitted");
+    assert_eq!(second["status"],"admitted","{second}");
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],3);
+    d.call("agents.limit.set",json!({"max_active":2}));
+    assert_eq!(admit(&d,&id,"j2","codex-a","lower-held",at,100000,100).unwrap()["reason"],"global_agent_limit");
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"j0","attempt_id":first["attempt_id"]}));
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],2);
+    assert_eq!(admit(&d,&id,"j2","codex-a","still-held",at,100000,100).unwrap()["reason"],"global_agent_limit");
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"j1","attempt_id":second["attempt_id"]}));
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],1);
+    assert_eq!(admit(&d,&id,"j2","codex-a","drained",at,100000,100).unwrap()["status"],"admitted");
+}
+
+#[test]
 fn ordinary_launches_take_priority_over_active_swarm_capacity() {
     let d = Daemon::start(&[]);
     let temp = tmp();
