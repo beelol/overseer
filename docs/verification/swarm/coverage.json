@@ -212,9 +212,10 @@
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
-        "daemon/tests/swarm_dispatch.rs"
+        "daemon/tests/swarm_dispatch.rs",
+        "docs/verification/swarm/SWARM-27.md"
       ],
-      "blocker": "Category and job identity persist; fixture dispatch selects a ready job and launches it without a per-worker job choice. A live director still cannot decompose, route, review and synthesize the objective or complete it by checks."
+      "blocker": "Supervised scripted workers now submit evidence/results into the director inbox and accepted contract work unlocks a dependent job without per-worker user launches. A live director still cannot decompose, route, review, synthesize or complete the objective by its checks."
     },
     "SWARM-28": {
       "status": "unverified",
@@ -333,9 +334,10 @@
         "docs/verification/swarm/milestone-1.md",
         "daemon/tests/swarm_director.rs",
         "docs/verification/swarm/milestone-5.md",
-        "docs/verification/swarm/SWARM-41.md"
+        "docs/verification/swarm/SWARM-41.md",
+        "daemon/tests/swarm_dispatch.rs"
       ],
-      "blocker": "Durable bounded batching, one active fixture turn and targeted acknowledged advisories pass; live notification, harness delivery and actual director inference remain unimplemented."
+      "blocker": "A supervised scripted worker receives and applies a targeted advisory through the broker; durable bounded batching and one active fixture turn pass. Live harness delivery, semantic recipient choice and actual director inference remain unimplemented."
     },
     "SWARM-42": {
       "status": "partial",
@@ -355,9 +357,10 @@
         "daemon/tests/swarm_broker.rs",
         "daemon/tests/swarm_plan.rs",
         "docs/verification/swarm/milestone-1.md",
-        "docs/verification/swarm/milestone-3.md"
+        "docs/verification/swarm/milestone-3.md",
+        "daemon/tests/swarm_dispatch.rs"
       ],
-      "blocker": "Delivered/applied states are distinct and a revision redirect is queued; live turn-boundary delivery and timeout response are not implemented."
+      "blocker": "A supervised scripted worker acknowledges a targeted advisory as delivered then applied, and a revision redirect is queued in fixtures. Redirect during a long tool call, the 30-second applied-ack timeout and qualification of live harness delivery remain unimplemented."
     },
     "SWARM-44": {
       "status": "partial",
