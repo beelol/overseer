@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **76 / 108** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-81, AC-82, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97, AC-98, AC-99, AC-100, AC-101, AC-102, AC-103, AC-104, AC-105, AC-106, AC-107, AC-108. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **76 / 114** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-81, AC-82, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97, AC-98, AC-99, AC-100, AC-101, AC-102, AC-103, AC-104, AC-105, AC-106, AC-107, AC-108, AC-109, AC-110, AC-111, AC-112, AC-113, AC-114. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -127,6 +127,12 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-106** Never lose track of windows — not started (Gate M, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-106.md)
 - [ ] **AC-107** Talk to Overseer — not started (Gate M, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-107.md)
 - [ ] **AC-108** Gate M design review (owner-confirmed) — not started (Gate M, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-108.md)
+- [ ] **AC-109** A composer that does not wrap — not started (Gate K follow-up from the owner's marks) — [evidence](docs/verification/AC-109.md)
+- [ ] **AC-110** Account names read once — not started (Gate K follow-up from the owner's marks) — [evidence](docs/verification/AC-110.md)
+- [ ] **AC-111** The composer says what's next — not started (Gate K follow-up from the owner's marks) — [evidence](docs/verification/AC-111.md)
+- [ ] **AC-112** Search you can see — not started (Gate K follow-up from the owner's marks) — [evidence](docs/verification/AC-112.md)
+- [ ] **AC-113** No empty grid — not started (Gate K follow-up from the owner's marks) — [evidence](docs/verification/AC-113.md)
+- [ ] **AC-114** Gate K in the owner's VS Code (owner-confirmed) — not started (Gate K follow-up from the owner's marks) — [evidence](docs/verification/AC-114.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -258,7 +264,7 @@ the owner action or decision each one needs.
 - [ ] [AC-64](docs/verification/AC-64.md) (Default-to-Overseer session (owner-confirmed)): Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.
 - [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.
 - [ ] [AC-81](docs/verification/AC-81.md) (Gate J still holds): Next: rerun scenario-live-gatej.js on the Gate K build when paid turns on both ChatGPT accounts are wanted.
-- [ ] [AC-82](docs/verification/AC-82.md) (Gate K design review (owner-confirmed)): Next: change the three Needs work items on the Gate K branch, show them again on the page, and get the owner's confirmation.
+- [ ] [AC-82](docs/verification/AC-82.md) (Gate K design review (owner-confirmed)): Next: the three Needs work items are AC-109 to AC-113 (after the Gate K merge, #7); show them again on the page and get the owner's confirmation.
 - [ ] [AC-83](docs/verification/AC-83.md) (Offline is not an outage): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
 - [ ] [AC-84](docs/verification/AC-84.md) (Fail over to the best working provider): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
 - [ ] [AC-85](docs/verification/AC-85.md) (Local inventory read from the machine): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
@@ -285,6 +291,12 @@ the owner action or decision each one needs.
 - [ ] [AC-106](docs/verification/AC-106.md) (Never lose track of windows): Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).
 - [ ] [AC-107](docs/verification/AC-107.md) (Talk to Overseer): Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).
 - [ ] [AC-108](docs/verification/AC-108.md) (Gate M design review (owner-confirmed)): Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-109](docs/verification/AC-109.md) (A composer that does not wrap): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
+- [ ] [AC-110](docs/verification/AC-110.md) (Account names read once): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
+- [ ] [AC-111](docs/verification/AC-111.md) (The composer says what's next): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
+- [ ] [AC-112](docs/verification/AC-112.md) (Search you can see): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
+- [ ] [AC-113](docs/verification/AC-113.md) (No empty grid): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
+- [ ] [AC-114](docs/verification/AC-114.md) (Gate K in the owner's VS Code (owner-confirmed)): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.

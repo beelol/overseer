@@ -994,7 +994,7 @@ rec(82, "Gate K design review (owner-confirmed)", "partial", commit=GK, date="20
 - **Needs work, grid and dashboard mode:** the empty grid ("No agents running", "New agent") is confusing and should lead back to the home chat; the screenshots had too little data to follow.
 - **Also from the owner's review (spoken):** the review should be where files live, nothing shown twice, a less VS Code-like editor area with a bold third theme, the grid built by dragging (16 at most), tracking an agent from the grid, not losing track of windows, and a chat with Overseer itself. These became Gate M (AC-99 to AC-108).""",
     evidence="https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv, [owner marks](evidence/ac-82/owner-marks-2026-09-26.json)", live="—",
-    blocker="Next: change the three Needs work items on the Gate K branch, show them again on the page, and get the owner's confirmation.")
+    blocker="Next: the three Needs work items are AC-109 to AC-113 (after the Gate K merge, #7); show them again on the page and get the owner's confirmation.")
 
 # Gate L, Continuity (added by the owner on 2026-09-26; docs/rfcs/offline-mode.md). Not started; built in its own worktree and pull request.
 rec(83, "Offline is not an outage", "not started", date="—", commit="—",
@@ -1078,6 +1078,26 @@ rec(108, "Gate M design review (owner-confirmed)", "not started", date="—", co
     expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
     actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
 
+# Gate K follow-ups from the owner's marks (2026-09-26). Not started; land after the merged Gate K pull request (#7).
+rec(109, "A composer that does not wrap", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+rec(110, "Account names read once", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+rec(111, "The composer says what's next", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+rec(112, "Search you can see", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+rec(113, "No empty grid", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+rec(114, "Gate K in the owner's VS Code (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+
 SHORT_BLOCKERS = {
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
@@ -1102,7 +1122,7 @@ SHORT_BLOCKERS = {
     65: "not started (added by the owner on 2026-09-26)",
     66: "owner design review after the Gate J build",
     81: "partial: the live Gate J scenario not rerun on the Gate K build",
-    82: "owner marked 19 views: 16 Looks right, 3 Needs work being changed",
+    82: "owner marked 19 views: 16 Looks right, 3 Needs work (AC-109 to AC-113)",
     83: "not started (Gate L, added by the owner on 2026-09-26)",
     84: "not started (Gate L, added by the owner on 2026-09-26)",
     85: "not started (Gate L, added by the owner on 2026-09-26)",
@@ -1129,6 +1149,12 @@ SHORT_BLOCKERS = {
     106: "not started (Gate M, added by the owner on 2026-09-26)",
     107: "not started (Gate M, added by the owner on 2026-09-26)",
     108: "not started (Gate M, added by the owner on 2026-09-26)",
+    109: "not started (Gate K follow-up from the owner's marks)",
+    110: "not started (Gate K follow-up from the owner's marks)",
+    111: "not started (Gate K follow-up from the owner's marks)",
+    112: "not started (Gate K follow-up from the owner's marks)",
+    113: "not started (Gate K follow-up from the owner's marks)",
+    114: "not started (Gate K follow-up from the owner's marks)",
 }
 TOTAL = 53
 
