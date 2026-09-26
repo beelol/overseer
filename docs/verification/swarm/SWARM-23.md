@@ -1,6 +1,6 @@
 # SWARM-23 — visible Swarm status
 
-Status: partial. Revision: pending.
+Status: partial. Revision: `0997e20`.
 
 Input: a category with one admitted local worker, and a separate category with a planned job but no worker process. Both use the deterministic `OVERSEER_NOTIFY_COMMAND=/usr/bin/true` fixture. The tests call `daemon.background_notice`; the active-worker case is `daemon_stop_all_preserves_unconfirmed_swarm_worker_after_control_loss`, and the queued case is `background_notice_names_queued_swarm_without_a_worker_process` in `daemon/tests/swarm_control.rs`.
 
