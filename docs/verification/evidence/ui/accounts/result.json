@@ -65,6 +65,15 @@
       }
     },
     {
+      "name": "a signed-out account offers Sign In, not Sign Out",
+      "ok": true,
+      "detail": [
+        "Sign In…",
+        "Rename Account…",
+        "Remove Account…"
+      ]
+    },
+    {
       "name": "sign-out and re-sign-in affect only that account",
       "ok": true,
       "detail": {
@@ -84,10 +93,10 @@
         "afterRemove": [
           "Select an agent run to see its workspace. ",
           "Sign-in: ChatGPT sign-in in the browser, or a device code. Account login only; no API keys., has actions",
-          "codex (existing login) signed in · plus · d1dddc49 · follows app, has actions",
-          "Work ChatGPT signed in · plus · 5ac9196f, has actions",
+          "codex (existing login) signed in · plus · d1dddc49 · follows app",
+          "Work ChatGPT signed in · plus · 5ac9196f",
           "Sign-in: Claude account sign-in (claude auth login). Account login only; no API keys., has actions",
-          "claude (existing login) signed in · max · 49d8e90c · follows app, has actions",
+          "claude (existing login) signed in · max · 49d8e90c · follows app",
           "Sign-in: none: local providers and mocks (owner decision 2026-09-25). Account login only; no API keys.",
           "opencode (existing login) not signed in · follows app, has actions",
           "Devin has no account-login CLI yet (only API keys, which Overseer does not use)"

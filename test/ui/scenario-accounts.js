@@ -43,6 +43,15 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       const pt = await cdp.waitFor(`(() => { const t = [...document.querySelectorAll('.notification-toast')].find(t => ${pattern}.test(t.innerText)); if (!t) return null; const b = [...t.querySelectorAll('.monaco-button')].find(b => b.textContent.trim() === ${JSON.stringify(button)}); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`, 20000, 'toast ' + button);
       await cdp.click(pt.x, pt.y); await delay(800);
     };
+    const menuEntries = async name => {
+      const pt = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && (r.querySelector('.label-name')?.textContent || '').trim() === ${JSON.stringify(name)}); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2 }; })()`, 10000);
+      await cdp.click(pt.x, pt.y); await delay(300);
+      await cdp.key('F10', { shift: true });
+      await cdp.waitFor(`!!document.querySelector('.monaco-menu .action-item')`, 10000, 'context menu');
+      const entries = await cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-menu .action-item .action-label')].map(e => e.textContent.trim()).filter(Boolean)`);
+      await cdp.key('Escape'); await delay(300);
+      return entries;
+    };
     const contextMenu = async (name, entry) => {
       const pt = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && (r.querySelector('.label-name')?.textContent || '').trim() === ${JSON.stringify(name)}); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2 }; })()`, 10000);
       await cdp.click(pt.x, pt.y); await delay(300);
@@ -120,6 +129,9 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await dialog('Sign Out');
     await refresh();
     const signedOut = await accountRow('Work ChatGPT');
+    // A signed-out account's menu offers Sign In, not Sign Out.
+    const outMenu = await menuEntries('Work ChatGPT');
+    check('a signed-out account offers Sign In, not Sign Out', outMenu.some(e => e.startsWith('Sign In')) && !outMenu.some(e => e.startsWith('Sign Out')), outMenu);
     const othersAfterOut = [await accountRow('Claude fixed'), await accountRow('codex (existing login)')];
     fs.writeFileSync(next, 'work-again:plus');
     await cdp.command('Overseer: Sign In');

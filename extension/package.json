@@ -81,9 +81,10 @@
         { "command": "overseer.mergeBack", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "1_control@3" },
         { "command": "overseer.openPullRequest", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "1_control@4" },
         { "command": "overseer.cleanupWorkspace", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "9_cleanup@1" },
-        { "command": "overseer.signIn", "when": "view == overseer.accounts && viewItem =~ /profile/", "group": "inline@1" },
+        { "command": "overseer.signIn", "when": "view == overseer.accounts && viewItem =~ /^profile-.*-signedout$/", "group": "inline@1" },
+        { "command": "overseer.signIn", "when": "view == overseer.accounts && viewItem =~ /^profile-/", "group": "1_edit@0" },
         { "command": "overseer.renameProfile", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@1" },
-        { "command": "overseer.signOut", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@2" },
+        { "command": "overseer.signOut", "when": "view == overseer.accounts && viewItem =~ /^profile-isolated-signedin$/", "group": "1_edit@2" },
         { "command": "overseer.removeAccount", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "9_remove@1" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts && viewItem == provider", "group": "inline@1" }
       ],

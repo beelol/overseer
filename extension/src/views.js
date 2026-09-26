@@ -223,7 +223,8 @@ class AccountsProvider {
       item.description = `${detail}${a.kind === 'follows-app' ? ' · follows app' : ''}`;
       item.iconPath = new vscode.ThemeIcon(st?.logged_in ? (a.kind === 'follows-app' ? 'link' : 'account') : 'circle-slash', st?.logged_in ? new vscode.ThemeColor('charts.green') : undefined);
       item.tooltip = new vscode.MarkdownString(`**${a.name}** — ${node.provider.label}\n\n${a.kind === 'follows-app' ? `Follows ${a.follows}. It changes when that app switches accounts; Overseer never signs it out.` : `Fixed account with its own credential folder: \`${p.home || ''}\`. The desktop app switching accounts does not change it.`}\n\nUsable by: ${(a.harnesses || []).join(', ')}${a.last_used_ms ? `\n\nLast used ${new Date(a.last_used_ms).toLocaleString()}` : ''}${st ? '\n\n```\n' + (st.detail || '') + '\n```' : ''}`);
-      item.contextValue = a.kind === 'follows-app' ? 'profile-system' : 'profile-isolated';
+      // The sign-in state picks the menu: Sign In for a signed-out account, Sign Out only for a signed-in one.
+      item.contextValue = `${a.kind === 'follows-app' ? 'profile-system' : 'profile-isolated'}-${st?.logged_in ? 'signedin' : 'signedout'}`;
       return { item, profile: p, account: a };
     });
   }
