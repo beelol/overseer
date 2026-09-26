@@ -46,7 +46,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/SWARM-05.md"
       ],
-      "blocker": "A fixture-only decision persists cost estimates by revision and batch, gates second-worker admission, and now refills a completed slot while other workers stay active. Planned exact-name write conflicts force serial choice. Supervised worker wall time is measured, but actual native usage and phase costs, undeclared-resource independence, live calibrated estimates and shared Auto Mode quota input remain absent."
+      "blocker": "Fixture benefit decisions now bound reported worker concurrency by the app cap, choose serial when only one worker can fit, and refill completed slots. The elapsed-time estimate can still assume more simultaneous jobs than capacity permits; actual native usage and phase costs, undeclared-resource independence, live calibrated estimates and shared Auto Mode quota input remain absent."
     },
     "SWARM-06": {
       "status": "partial",
@@ -65,7 +65,7 @@
         "docs/verification/swarm/SWARM-08.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "The app setting is now the sole total-agent ceiling; fixture tests cover pending manual reservations, native-child exclusion, stopped-director release, lower-maximum drain and old saved-policy compatibility. Separate reviewer execution, max=1 serial director work and real director activation remain unverified; benefit planning still overstates capacity before admission."
+      "blocker": "The app setting is now the sole total-agent ceiling; fixture tests cover pending manual reservations, native-child exclusion, stopped-director release, lower-maximum drain, old saved-policy compatibility and app-bounded benefit worker counts. Separate reviewer execution, max=1 serial director work and real director activation remain unverified; estimated time gain can still assume full batch overlap."
     },
     "SWARM-08": {
       "status": "partial",

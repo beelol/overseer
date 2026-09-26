@@ -10,4 +10,6 @@ Actual: focused tests first found missing app-limit RPCs, duplicate per-Swarm po
 
 Evidence: `daemon/tests/swarm_admission.rs`, `daemon/tests/swarm_settings.rs`, `daemon/tests/swarm_runtime.rs`, `daemon/src/store.rs`, `daemon/src/daemon.rs`, `daemon/src/swarm/admission.rs`, `daemon/src/swarm/settings.rs`. Run `cargo test --offline -p overseerd --test swarm_admission --test swarm_settings --test swarm_runtime -q` for the focused fixtures. `cargo test --workspace --offline -q -- --test-threads=1` passed 198 tests with 11 ignored at `5b39f0f`; no paid model was used.
 
-Remaining: a real director process does not yet consume and release its slot through normal launch/recovery, separately launched reviewer capacity is not qualified, and `max_active=1` serial director execution is not demonstrated. Benefit planning can still overstate the parallel pool before app admission clamps it. Keep SWARM-07 unchecked.
+Follow-up at `17be43e`: committed benefit decisions now bound the simultaneous worker count by `agents.max_active - 1`; at one available worker they record a serial decision. The full offline suite passed 199 tests with 11 ignored. Expected time gain can still be optimistic for multi-wave batches, and current occupancy from other tasks is checked at admission.
+
+Remaining: a real director process does not yet consume and release its slot through normal launch/recovery, separately launched reviewer capacity is not qualified, and `max_active=1` serial director execution is not demonstrated. Keep SWARM-07 unchecked.
