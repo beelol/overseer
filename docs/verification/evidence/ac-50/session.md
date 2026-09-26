@@ -43,3 +43,7 @@ and reads GitHub with `gh` (read-only).
    (quote): "Yes clean up the pr". Agent: `gh pr close 1 --delete-branch` → PR #1 CLOSED, not merged; remote
    branches: `master` only; `master` still `78db700`. The private repository `beelol/overseer-pr-sandbox` is kept
    (repository deletion was not asked for).
+9. Owner (quote): "Yes plus repo on the pr cleanup." Agent: `gh repo delete beelol/overseer-pr-sandbox --yes` was
+   refused: GitHub requires the `delete_repo` scope, which this `gh` login does not have. The repository is still
+   there (private, PR #1 closed, branch deleted). Owner action to finish: run
+   `gh auth refresh -h github.com -s delete_repo` (browser approval), then the agent (or the owner) deletes it.
