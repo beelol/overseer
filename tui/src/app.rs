@@ -58,6 +58,8 @@ pub enum Mode {
     NewAgent,
     /// What the focused agent changed: files and their diff against a comparison base.
     Changes,
+    /// Typing a search (`/`): agents filter as you type.
+    Search,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -194,6 +196,8 @@ pub struct App {
     /// Typing a new repository path in the New Agent form.
     editing_repo: bool,
     pub changes: ChangesView,
+    /// Search text (`/`): agents whose title, repository, harness, model or prompt contain it.
+    pub search: String,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -235,6 +239,7 @@ impl App {
             zoom_return: false,
             editing_repo: false,
             changes: ChangesView::default(),
+            search: String::new(),
         }
     }
 
@@ -252,7 +257,36 @@ impl App {
 
     /// Agents shown with the current filter, newest first.
     pub fn visible(&self) -> Vec<&Run> {
-        self.state.agents().into_iter().filter(|r| self.filter.keeps(r)).collect()
+        let q = self.search.trim().to_lowercase();
+        self.state.agents().into_iter().filter(|r| self.filter.keeps(r) && (q.is_empty() || self.matches(r, &q))).collect()
+    }
+
+    fn matches(&self, r: &Run, q: &str) -> bool {
+        let task = self.state.task(&r.task_id);
+        let repo = task.map(|t| t.repo_root.rsplit('/').next().unwrap_or_default()).unwrap_or_default();
+        let account = r.profile_id.as_deref().and_then(|p| self.state.profile(p)).map(|p| p.name.as_str()).unwrap_or_default();
+        [r.title.as_str(), repo, r.harness.as_str(), r.model.as_deref().unwrap_or_default(), account, task.map(|t| t.prompt.as_str()).unwrap_or_default(), r.status.as_str()]
+            .iter()
+            .any(|f| f.to_lowercase().contains(q))
+    }
+
+    fn search_key(&mut self, k: KeyEvent) {
+        match k.code {
+            KeyCode::Esc => {
+                self.search.clear();
+                self.mode = Mode::Grid;
+            }
+            KeyCode::Enter => self.mode = Mode::Grid,
+            KeyCode::Backspace => {
+                self.search.pop();
+            }
+            KeyCode::Char(c) if !c.is_control() => self.search.push(c),
+            _ => return,
+        }
+        self.page = 0;
+        self.focus = None;
+        self.settle_focus();
+        self.ensure_history();
     }
 
     pub fn pages(&self) -> usize {
@@ -856,6 +890,7 @@ impl App {
             Mode::Compose => self.compose_key(k),
             Mode::NewAgent => self.form_key(k),
             Mode::Changes => self.changes_key(k),
+            Mode::Search => self.search_key(k),
             Mode::Grid | Mode::Zoom { .. } => self.nav_key(k),
         }
     }
@@ -898,6 +933,15 @@ impl App {
             }
             KeyCode::Char('n') => self.open_new_agent(),
             KeyCode::Char('v') => self.open_changes(),
+            KeyCode::Char('/') => {
+                self.mode = Mode::Search;
+                self.page = 0;
+            }
+            KeyCode::Esc if !self.search.is_empty() => {
+                self.search.clear();
+                self.settle_focus();
+                self.ensure_history();
+            }
             KeyCode::Char('f') => {
                 self.filter = self.filter.next();
                 self.page = 0;

@@ -127,6 +127,13 @@ fn header(f: &mut Frame, app: &App, area: Rect) {
         spans.push(Span::styled(" · ", dot));
         spans.push(Span::styled(format!("◆ {needs} need{} you", if needs == 1 { "s" } else { "" }), Style::new().fg(waiting()).add_modifier(Modifier::BOLD)));
     }
+    if !app.search.is_empty() || app.mode == Mode::Search {
+        spans.push(Span::styled(" · ", dot));
+        spans.push(Span::styled(format!("/{}", app.search), Style::new().fg(accent()).add_modifier(Modifier::BOLD)));
+        if app.mode == Mode::Search {
+            spans.push(Span::styled("▌", Style::new().fg(accent())));
+        }
+    }
     if app.filter != crate::app::Filter::All {
         spans.push(Span::styled(" · ", dot));
         spans.push(Span::styled(format!("filter: {}", app.filter.label()), Style::new().fg(accent())));
@@ -147,6 +154,7 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
         Mode::Zoom { .. } => &[("j/k", "scroll"), ("g/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
+        Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
         Mode::Changes => &[("j/k", "file"), ("J/K", "scroll diff"), ("c", "comparison"), ("r", "refresh"), ("v/esc", "back")],
         _ if area.width < 110 => &[("i", "message"), ("z", "zoom"), ("a/d", "answer"), ("n", "new"), ("?", "keys"), ("q", "quit")],
         _ => &[("←↑↓→", "move"), ("i", "message"), ("z", "zoom"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
@@ -163,7 +171,7 @@ fn empty(f: &mut Frame, app: &App, area: Rect) {
     let msg = if app.state.runs.is_empty() {
         if app.connected { "No agents yet. Press n to start one." } else { "Connecting to overseerd…" }
     } else {
-        "No agents match this filter. Press f to change it."
+        "No agents match. Press f to change the filter, or esc to clear the search."
     };
     let y = area.y + area.height / 2;
     f.render_widget(Paragraph::new(Line::from(Span::styled(msg, Style::new().fg(MUTED)))).alignment(Alignment::Center), Rect { y, height: 1, ..area });
@@ -405,6 +413,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("x", "interrupt the focused agent"),
         ("n", "start a new agent"),
         ("f", "filter: all → active → needs you"),
+        ("/", "search agents (esc clears)"),
         ("r", "reload from the daemon"),
         ("q", "quit (agents keep running)"),
     ];

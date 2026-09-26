@@ -69,7 +69,7 @@ fn t02_pages_of_nine_newest_first() {
     let s = tui.screen();
     assert!(s.contains("filter: active") && s.contains("agent 21") && !s.contains("agent 20"), "{s}");
     tui.key(KeyCode::Char('f'));
-    assert!(tui.screen().contains("No agents match this filter"));
+    assert!(tui.screen().contains("No agents match"));
     tui.key(KeyCode::Char('f'));
     assert_eq!(tui.app.filter, Filter::All);
     d.ctl("run.interrupt", json!({ "run_id": newest }));
@@ -203,4 +203,36 @@ fn t05_messages_go_to_the_focused_agent_only_and_drafts_are_kept() {
     assert_eq!(tui.app.drafts.get(&busy).map(String::as_str), Some("are you there?"), "the draft is kept");
     tui.key(KeyCode::Esc);
     d.ctl("run.interrupt", json!({ "run_id": busy }));
+}
+
+#[test]
+fn t15_search_filters_agents_as_you_type() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let web = repo(&t.path().join("web-app"));
+    let api = repo(&t.path().join("payments-api"));
+    for (r, title) in [(&web, "Fix login redirect"), (&api, "Retry refunds"), (&web, "Refresh sessions once"), (&api, "Add idempotency keys")] {
+        d.sh(r, title, "echo ok");
+    }
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.until(10, |a| a.visible().len() == 4);
+    tui.key(KeyCode::Char('/'));
+    assert_eq!(tui.app.mode, Mode::Search);
+    tui.type_text("ref");
+    let s = tui.screen();
+    assert!(s.contains("/ref▌") && s.contains("Retry refunds") && s.contains("Refresh sessions once") && !s.contains("Fix login redirect"), "{s}");
+    // Repository names match too.
+    tui.key(KeyCode::Backspace);
+    tui.key(KeyCode::Backspace);
+    tui.key(KeyCode::Backspace);
+    tui.type_text("payments");
+    assert_eq!(tui.app.visible().len(), 2);
+    tui.key(KeyCode::Enter);
+    assert_eq!(tui.app.mode, Mode::Grid);
+    let s = tui.screen();
+    assert!(s.contains("/payments") && s.contains("2 agents"), "the search stays applied:\n{s}");
+    tui.snapshot("t15-search");
+    assert!(tui.app.visible().iter().any(|r| Some(r.id.as_str()) == tui.app.focus.as_deref()), "focus is on a match");
+    tui.key(KeyCode::Esc);
+    assert!(tui.app.search.is_empty() && tui.app.visible().len() == 4, "esc clears it");
 }

@@ -57,4 +57,4 @@
 │                                                                 ││                                                                ││                                                                 │
 │                                                                 ││                                                                ││                                                                 │
 ╰ completed ──────────────────────────────────────────────────────╯╰ completed ─────────────────────────────────────────────────────╯╰ completed ──────────────────────────────────────────────────────╯
- ←↑↓→ move   i message   z zoom   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                                                       
+ ←↑↓→ move   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                                           
