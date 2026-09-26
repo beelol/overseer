@@ -2,7 +2,7 @@
 
 Status: **draft; local implementation and verification in progress under the owner’s later goal**.
 Requested by the owner on 2026-09-25. Baseline: `2c2c7cf`. Revised after owner feedback: continuously assign the right model/effort to each work unit; no user-maintained routing policy; prefer evaluating XCB reuse or a pinned fork.
-Acceptance criteria: **5 / 40 core criteria verified**; AUTO-AC-30 remains conditionally deferred, tracked independently below as `AUTO-AC-NN`.
+Acceptance criteria: **7 / 40 core criteria verified**; AUTO-AC-30 remains conditionally deferred, tracked independently below as `AUTO-AC-NN`.
 
 Local revision: based on the complete fetched draft at `c76938360352909c6157aae359bf811fa8b7405e`. Preserve all original sections and AUTO-AC-01 through AUTO-AC-36. This revision adds local-only telemetry and AUTO-AC-37 through AUTO-AC-41; condensed chat drafts do not replace the full RFC. The owner has requested a draft PR once implementation and verification are complete. Until then, drafting and implementation stay local.
 
