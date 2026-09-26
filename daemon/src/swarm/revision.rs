@@ -11,8 +11,21 @@ struct OldJob {
     acceptance: String,
     deps: Vec<String>,
     resource_claims: Vec<plan::ResourceClaim>,
-    status: String,
     attempts: i64,
+}
+
+fn deps_satisfied(
+    conn: &rusqlite::Connection,
+    run: &str,
+    deps: &[String],
+    affected: &HashSet<String>,
+) -> Result<bool> {
+    for dep in deps {
+        if affected.contains(dep) || !super::artifacts::dep_satisfied(conn, run, dep)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
@@ -69,7 +82,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         bail!("swarm run cannot be revised in this state");
     }
     let mut stmt = tx.prepare(
-        "SELECT id,title,acceptance,deps,resource_claims,status,attempt_count FROM swarm_jobs WHERE run_id=?1",
+        "SELECT id,title,acceptance,deps,resource_claims,attempt_count FROM swarm_jobs WHERE run_id=?1",
     )?;
     let rows = stmt
         .query_map(params![id], |r| {
@@ -79,14 +92,13 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
                 r.get::<_, String>(2)?,
                 r.get::<_, String>(3)?,
                 r.get::<_, String>(4)?,
-                r.get::<_, String>(5)?,
-                r.get::<_, i64>(6)?,
+                r.get::<_, i64>(5)?,
             ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
     let mut old = HashMap::new();
-    for (job_id, title, acceptance, raw_deps, raw_claims, status, attempts) in rows {
+    for (job_id, title, acceptance, raw_deps, raw_claims, attempts) in rows {
         old.insert(
             job_id,
             OldJob {
@@ -94,7 +106,6 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
                 acceptance,
                 deps: serde_json::from_str(&raw_deps)?,
                 resource_claims: serde_json::from_str(&raw_claims)?,
-                status,
                 attempts,
             },
         );
@@ -136,10 +147,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     let mut redirected = 0;
     for job in &jobs {
         let Some(previous) = old.get(&job.id) else {
-            let ready = job.deps.iter().all(|dep| {
-                old.get(dep)
-                    .is_some_and(|o| o.status == "accepted" && !affected.contains(dep))
-            });
+            let ready = deps_satisfied(&tx, id, &job.deps, &affected)?;
             let state = if ready { "ready" } else { "planned" };
             tx.execute("INSERT INTO swarm_jobs(run_id,id,plan_revision,title,acceptance,deps,resource_claims,status,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?9)",
                 params![id,job.id,revision,job.title,job.acceptance,serde_json::to_string(&job.deps)?,serde_json::to_string(&job.resource_claims)?,state,now])?;
@@ -155,10 +163,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
             .query_map(params![id, job.id], |r| r.get::<_, String>(0))?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         drop(stmt);
-        let deps_satisfied = job.deps.iter().all(|dep| {
-            old.get(dep)
-                .is_some_and(|o| o.status == "accepted" && !affected.contains(dep))
-        });
+        let deps_satisfied = deps_satisfied(&tx, id, &job.deps, &affected)?;
         let unsafe_effects: i64 = tx.query_row(
             "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
             params![id,job.id], |r| r.get(0),

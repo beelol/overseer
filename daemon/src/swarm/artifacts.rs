@@ -249,6 +249,16 @@ pub(super) fn pending_patch_integration(conn: &rusqlite::Connection, run: &str, 
     Ok(false)
 }
 
+pub(super) fn dep_satisfied(conn: &rusqlite::Connection, run: &str, job: &str) -> Result<bool> {
+    let state: Option<(String, i64)> = conn.query_row(
+        "SELECT j.status,(SELECT COUNT(*) FROM swarm_attempts a WHERE a.run_id=j.run_id AND a.job_id=j.id AND a.status='registered') FROM swarm_jobs j WHERE j.run_id=?1 AND j.id=?2",
+        params![run, job],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    ).optional()?;
+    let Some((status, active)) = state else { return Ok(false); };
+    Ok(status == "accepted" && active == 0 && !pending_patch_integration(conn, run, job)?)
+}
+
 pub(super) fn release_and_unlock(tx: &Transaction<'_>, run: &str, job: &str, now: i64) -> Result<()> {
     let active: i64 = tx.query_row(
         "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND job_id=?2 AND status='registered'",
@@ -277,11 +287,7 @@ pub(super) fn release_and_unlock(tx: &Transaction<'_>, run: &str, job: &str, now
         }
         let mut ready = true;
         for dep in deps {
-            let (state,active): (String,i64) = tx.query_row(
-                "SELECT j.status,(SELECT COUNT(*) FROM swarm_attempts a WHERE a.run_id=j.run_id AND a.job_id=j.id AND a.status='registered') FROM swarm_jobs j WHERE j.run_id=?1 AND j.id=?2",
-                params![run,dep], |r| Ok((r.get(0)?,r.get(1)?)),
-            )?;
-            if state != "accepted" || active > 0 {
+            if !dep_satisfied(tx, run, &dep)? {
                 ready = false;
                 break;
             }

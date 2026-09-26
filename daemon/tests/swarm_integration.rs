@@ -43,6 +43,91 @@ fn accepted_patch(d: &Daemon, run: &str, job: &str, artifact: &str, patch: &str)
 }
 
 #[test]
+fn accepting_an_unrelated_job_does_not_unlock_a_pending_patch_dependency() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("pending-patch-source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call("swarm.create", json!({"category":"Pending patch dependency",
+        "objective":"Change a.txt and inspect b.txt","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"patch","title":"Change a.txt","acceptance":"patch","deps":[]},
+        {"id":"other","title":"Inspect b.txt","acceptance":"evidence","deps":[]},
+        {"id":"dependent","title":"Use both","acceptance":"result","deps":["patch","other"]}
+    ]}));
+    accepted_patch(&d, run, "patch", "pending-patch", &patch);
+    let attempt = d.call("swarm.attempt.register", json!({"run_id":run,"job_id":"other",
+        "generation":1,"revision":1}));
+    d.call("swarm.artifact.put", json!({"run_id":run,"job_id":"other",
+        "attempt_id":attempt["id"],"token":attempt["token"],"artifact_id":"other-proof",
+        "source_revision":1,"kind":"finding","content":"b.txt inspected"}));
+    d.call("swarm.report", json!({"run_id":run,"job_id":"other",
+        "attempt_id":attempt["id"],"token":attempt["token"],"message_id":"other-result",
+        "type":"result","revision":1,"payload":{"artifact_ids":["other-proof"]}}));
+    d.call("swarm.decide", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"other","decision":"accept","evidence":["other-proof"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"other","attempt_id":attempt["id"]}));
+    let jobs = d.call("swarm.jobs", json!({"id":run}));
+    let dependent = jobs["jobs"].as_array().unwrap().iter()
+        .find(|job| job["id"] == "dependent").unwrap();
+    assert_eq!(dependent["status"], "planned", "{jobs}");
+    d.call("swarm.integrate", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"patch","artifact_id":"pending-patch","repo":checkout,
+        "base_revision":base}));
+    let jobs = d.call("swarm.jobs", json!({"id":run}));
+    let dependent = jobs["jobs"].as_array().unwrap().iter()
+        .find(|job| job["id"] == "dependent").unwrap();
+    assert_eq!(dependent["status"], "ready", "{jobs}");
+}
+
+#[test]
+fn revision_does_not_ready_new_or_changed_dependents_of_an_unintegrated_patch() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("revised-patch-source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call("swarm.create", json!({"category":"Revised patch dependency",
+        "objective":"Change a.txt","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"patch","title":"Change a.txt","acceptance":"patch","deps":[]},
+        {"id":"existing","title":"Existing follow-up","acceptance":"result","deps":[]}
+    ]}));
+    accepted_patch(&d, run, "patch", "revised-patch", &patch);
+    d.call("swarm.revise", json!({"id":run,"generation":1,"expected_revision":1,
+        "reason":"Add post-integration checks","jobs":[
+        {"id":"patch","title":"Change a.txt","acceptance":"patch","deps":[]},
+        {"id":"existing","title":"Existing follow-up","acceptance":"result","deps":["patch"]},
+        {"id":"added","title":"New follow-up","acceptance":"result","deps":["patch"]}
+    ]}));
+    let jobs = d.call("swarm.jobs", json!({"id":run}));
+    for id in ["existing", "added"] {
+        let dependent = jobs["jobs"].as_array().unwrap().iter()
+            .find(|job| job["id"] == id).unwrap();
+        assert_eq!(dependent["status"], "planned", "{id}: {jobs}");
+    }
+    d.call("swarm.integrate", json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":"patch","artifact_id":"revised-patch","repo":checkout,
+        "base_revision":base}));
+    let jobs = d.call("swarm.jobs", json!({"id":run}));
+    for id in ["existing", "added"] {
+        let dependent = jobs["jobs"].as_array().unwrap().iter()
+            .find(|job| job["id"] == id).unwrap();
+        assert_eq!(dependent["status"], "ready", "{id}: {jobs}");
+    }
+}
+
+#[test]
 fn audit_only_run_cannot_integrate_a_worker_patch() {
     let mut d = Daemon::start(&[]);
     let temp = tmp();
