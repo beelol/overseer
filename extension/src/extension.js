@@ -33,7 +33,7 @@ async function activate(context) {
   const review = new Review(context, client, model, say);
   let selectedRun;
   // With the Overseer view open, reviews go to its review column and run panels to its conversation column.
-  const center = new CommandCenter(context, model, { select: runId => selectRun(runId, { preserveFocus: true }), selected: () => selectedRun });
+  const center = new CommandCenter(context, model, { select: runId => selectRun(runId, { preserveFocus: true }), selected: () => selectedRun, client });
   review.reviewColumn = () => center.active ? COLUMNS.review : undefined;
   outputs.column = () => center.active ? COLUMNS.conversation : undefined;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));

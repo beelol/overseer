@@ -2,6 +2,7 @@ mod accounts;
 mod adapters;
 mod background;
 mod daemon;
+mod files;
 mod git;
 mod merge;
 mod paths;

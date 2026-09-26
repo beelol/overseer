@@ -33,3 +33,23 @@ button:focus-visible, .row:focus-visible { outline: 1px solid var(--vscode-focus
 .badge.attention { background: var(--vscode-statusBarItem-warningBackground, var(--vscode-charts-orange)); color: var(--vscode-statusBarItem-warningForeground, var(--vscode-editor-background)); }
 .empty { color: var(--vscode-descriptionForeground); padding: 12px 6px; line-height: 1.5; }
 body.vscode-high-contrast .row[aria-selected="true"], body.vscode-high-contrast-light .row[aria-selected="true"] { outline: 1px solid var(--vscode-contrastActiveBorder); }
+
+/* Files pane (AC-51) */
+body { display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+#tree { flex: 0 0 auto; max-height: 45vh; overflow: auto; }
+#files-section { flex: 1 1 0; min-height: 160px; display: flex; flex-direction: column; margin-top: 8px; border-top: 1px solid var(--vscode-sideBarSectionHeader-border, var(--vscode-panel-border, transparent)); }
+.bar.sub { position: static; border-bottom: none; padding-bottom: 2px; }
+.bar.sub .desc { font-size: .9em; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--vscode-descriptionForeground); }
+.note { margin: 0 2px 4px; font-size: .9em; color: var(--vscode-descriptionForeground); }
+#files { flex: 1; overflow: auto; }
+.row.muted { color: var(--vscode-descriptionForeground); font-style: italic; cursor: default; }
+.ficon { width: 14px; flex: none; text-align: center; color: var(--vscode-descriptionForeground); font-size: 11px; }
+.row.file .label { max-width: none; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.row.file.changed .label { font-weight: 600; }
+.row.file.deleted .label { text-decoration: line-through; opacity: .75; }
+.fstatus { flex: none; font-size: 11px; font-weight: 700; width: 14px; text-align: center; }
+.st-A, .st-U { color: var(--vscode-gitDecoration-addedResourceForeground); }
+.st-M, .st-T { color: var(--vscode-gitDecoration-modifiedResourceForeground); }
+.st-D { color: var(--vscode-gitDecoration-deletedResourceForeground); }
+.st-R { color: var(--vscode-gitDecoration-renamedResourceForeground); }
+.fcount { flex: none; font-size: 10.5px; padding: 0 6px; border-radius: 9px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }

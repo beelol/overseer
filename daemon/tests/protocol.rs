@@ -1203,3 +1203,47 @@ extern "C" {
     #[link_name = "getuid"]
     fn libc_getuid() -> u32;
 }
+
+// ---------------------------------------------------------------- AC-51 worktree file tree
+
+#[test]
+fn ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::create_dir_all(repo.join("src/deep")).unwrap();
+    std::fs::write(repo.join("src/deep/x.txt"), "x\n").unwrap();
+    std::fs::write(repo.join("src/keep.txt"), "k\n").unwrap();
+    std::fs::write(repo.join("gone.txt"), "g\n").unwrap();
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-qm", "more"]);
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &repo, "worktree", "printf 'changed\\n' > src/deep/x.txt; printf 'new\\n' > added.txt; rm gone.txt");
+    d.wait_done(&run_id(&created), 20);
+    let id = ws_id(&created);
+    let root = d.call("workspace.tree", json!({"workspace_id": id}));
+    let names: Vec<&str> = root["entries"].as_array().unwrap().iter().map(|e| e["name"].as_str().unwrap()).collect();
+    assert_eq!(names[0], "src", "directories first: {names:?}");
+    assert!(!names.contains(&".git"));
+    let find = |v: &serde_json::Value, n: &str| v["entries"].as_array().unwrap().iter().find(|e| e["name"] == n).cloned().unwrap();
+    assert_eq!(find(&root, "src")["changes_inside"], 1);
+    assert_eq!(find(&root, "added.txt")["status"], "A");
+    assert_eq!(find(&root, "gone.txt")["status"], "D");
+    assert_eq!(find(&root, "gone.txt")["deleted"], true);
+    assert!(find(&root, "a.txt")["status"].is_null());
+    let deep = d.call("workspace.tree", json!({"workspace_id": id, "dir": "src/deep"}));
+    assert_eq!(find(&deep, "x.txt")["status"], "M");
+    assert_eq!(find(&deep, "x.txt")["path"], "src/deep/x.txt");
+    for bad in ["..", "../..", "/etc", ".git", "src/../../x"] {
+        assert!(d.try_call("workspace.tree", json!({"workspace_id": id, "dir": bad})).is_err(), "{bad} must be refused");
+    }
+    // Large directory: capped, counted, and fast.
+    let big = ws_path(&d, &created).join("big");
+    std::fs::create_dir_all(&big).unwrap();
+    for i in 0..6000 { std::fs::write(big.join(format!("f{i:05}.txt")), "").unwrap(); }
+    let t0 = std::time::Instant::now();
+    let listing = d.call("workspace.tree", json!({"workspace_id": id, "dir": "big"}));
+    assert!(t0.elapsed() < Duration::from_secs(2), "{:?}", t0.elapsed());
+    assert_eq!(listing["total"], 6000);
+    assert_eq!(listing["truncated"], true);
+    assert_eq!(listing["entries"].as_array().unwrap().len(), 5000);
+}

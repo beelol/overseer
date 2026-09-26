@@ -4,13 +4,14 @@
 // run opens its live review and its conversation in the columns to the right.
 (function () {
   const vscode = acquireVsCodeApi();
+  window.overseerApi = vscode; // shared with the Files pane (files.js); the API can only be acquired once
   const saved = vscode.getState() || {};
   const collapsed = new Set(saved.collapsed || []);
   let state = { tasks: [], runs: [], workspaces: [], profiles: [] }, selected = saved.selected, focusId = saved.focus;
   const tree = document.getElementById('tree');
   const ACTIVE = new Set(['queued', 'starting', 'running', 'waiting_for_user']);
   const STATUS = { queued: 'queued', starting: 'starting', running: 'running', waiting_for_user: 'waiting for you', completed: 'completed', failed: 'failed', interrupted: 'interrupted', disconnected: 'disconnected', unknown: 'unknown' };
-  const persist = () => vscode.setState({ collapsed: [...collapsed], selected, focus: focusId });
+  const persist = () => vscode.setState({ ...(vscode.getState() || {}), collapsed: [...collapsed], selected, focus: focusId });
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
 
   function children(runId) { return state.runs.filter(r => r.parent_run_id === runId); }
@@ -91,6 +92,7 @@
     selected = row.dataset.run; persist();
     for (const r of rowsList()) r.setAttribute('aria-selected', String(r.dataset.run === selected));
     vscode.postMessage({ type: 'select', runId: selected });
+    window.overseerFiles?.show(selected);
   }
   tree.addEventListener('click', e => {
     const row = e.target.closest('.row'); if (!row) return;
@@ -115,8 +117,8 @@
   document.getElementById('collapse').addEventListener('click', () => { for (const r of rowsList()) if (r.hasAttribute('aria-expanded') && r.dataset.level !== '1') collapsed.add(r.dataset.id); persist(); render(); });
   window.addEventListener('message', e => {
     const m = e.data;
-    if (m.type === 'state') { state = m.state; if (m.selected) selected = m.selected; render(); document.body.dataset.ready = '1'; }
-    else if (m.type === 'selected') { selected = m.runId; persist(); render(); }
+    if (m.type === 'state') { state = m.state; if (m.selected) selected = m.selected; render(); document.body.dataset.ready = '1'; window.overseerFiles?.onState(state, selected); }
+    else if (m.type === 'selected') { selected = m.runId; persist(); render(); window.overseerFiles?.show(selected); }
   });
   vscode.postMessage({ type: 'ready' });
 })();
