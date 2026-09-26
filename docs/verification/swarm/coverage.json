@@ -507,9 +507,13 @@
       "blocker": "A fixture-only durable intent journal blocks duplicate execution and replacement after a lost acknowledgement, including revision and restart; Stop and revision preserve a conflicting resource claim. Actual tool calls are not intercepted, the external outcome probe is not independently qualified, safe claim release after quarantine is missing, and live S2 reconciliation remains unverified."
     },
     "SWARM-59": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "Policy preview explains ineligible targets, but no durable blocked run state/change-triggered wakeup and finishing-capacity recovery exists."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_availability.rs",
+        "daemon/src/swarm/availability.rs",
+        "docs/verification/swarm/SWARM-59.md"
+      ],
+      "blocker": "Fixture observations now persist a specific availability block, hold admission and idle director turns, preserve active worker evidence, and wake once when eligibility or finishing headroom returns within the original deadline. Live Auto Mode updates, a normal status UI, user-triggered target changes and live director behavior remain unverified."
     },
     "SWARM-60": {
       "status": "partial",
