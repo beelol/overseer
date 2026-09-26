@@ -758,7 +758,7 @@ impl Store {
         // The daemon already batches normalized events in an outer transaction.
         // A savepoint keeps detail and aggregate writes atomic in either context.
         self.conn.execute_batch("SAVEPOINT auto_measurement_write")?;
-        let result = (|| -> Result<(usize, i64)> {
+        let result = (|| -> Result<usize> {
         let inserted = self.conn.execute(
             "INSERT OR IGNORE INTO auto_measurements(event_seq,observed_ms,task_id,run_id,harness,profile_id,model,effort,input_tokens,output_tokens,cached_input_tokens,reasoning_output_tokens,cost_usd) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)",
             params![event_seq, m.observed_ms, m.task_id, m.run_id, m.harness, m.profile_id, m.model, m.effort,
@@ -776,13 +776,27 @@ impl Store {
                     i64::from(m.cost_usd.is_some()), m.cost_usd.unwrap_or(0.0)],
             )?;
         }
-        let count = if inserted == 1 {
+        let count: i64 = if inserted == 1 {
             self.conn.execute("INSERT INTO meta(key,value) VALUES('auto_learning_samples_inserted','1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1", [])?;
             self.conn.query_row("SELECT CAST(value AS INTEGER) FROM meta WHERE key='auto_learning_samples_inserted'", [], |row| row.get(0))?
         } else { 0 };
-        Ok((inserted, count))
+        if inserted == 1 {
+            let now = crate::daemon::now();
+            // Exact row caps are enforced in the same savepoint as the write.
+            // A count query is cheap at these bounded table sizes and avoids
+            // overshoot between periodic age-maintenance passes.
+            let details: i64 = self.conn.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get(0))?;
+            if details > 50_000 || count % 100 == 0 {
+                self.prune_auto_measurements(now, 50_000)?;
+            }
+            let summaries: i64 = self.conn.query_row("SELECT COUNT(*) FROM auto_daily_aggregates", [], |row| row.get(0))?;
+            if summaries > 10_000 || count % 100 == 0 {
+                self.prune_auto_daily_aggregates(now, 10_000)?;
+            }
+        }
+        Ok(inserted)
         })();
-        let (inserted, count) = match result {
+        let inserted = match result {
             Ok(value) => {
                 self.conn.execute_batch("RELEASE auto_measurement_write")?;
                 value
@@ -792,10 +806,6 @@ impl Store {
                 return Err(error);
             }
         };
-        if inserted == 1 && count % 100 == 0 {
-            self.prune_auto_measurements(crate::daemon::now(), 50_000)?;
-            self.prune_auto_daily_aggregates(crate::daemon::now(), 10_000)?;
-        }
         Ok(inserted == 1)
     }
 
@@ -1089,6 +1099,36 @@ mod auto_measurement_tests {
         let rows = store.auto_measurements(10).unwrap();
         assert_eq!(rows.iter().map(|r| r.measurement.input_tokens.unwrap()).collect::<Vec<_>>(), vec![5, 4]);
         assert_eq!(store.events_after(0, Some("r-1"), 10).unwrap().len(), 5);
+    }
+
+    #[test]
+    fn inserted_learning_never_exceeds_its_detail_or_summary_row_limits() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
+        let now = crate::daemon::now();
+        store.conn.execute(
+            "WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<50000)
+             INSERT INTO auto_measurements(event_seq,observed_ms,task_id,run_id,harness,input_tokens)
+             SELECT x,?1,'task','run','codex',1 FROM n",
+            params![now],
+        ).unwrap();
+        store.conn.execute(
+            "WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<10000)
+             INSERT INTO auto_daily_aggregates(day_ms,harness,profile_id,model,effort,last_observed_ms,samples,
+               input_observations,input_tokens,output_observations,output_tokens,cached_input_observations,
+               cached_input_tokens,reasoning_output_observations,reasoning_output_tokens,cost_observations,cost_usd)
+             SELECT 0,'codex','','model-'||x,'',?1,1,1,1,0,0,0,0,0,0,0,0 FROM n",
+            params![now],
+        ).unwrap();
+        let measurement = from_usage(now, "task", "run", "codex", None, Some("new-model"),
+            &json!({"input_tokens": 1})).unwrap();
+        assert!(store.insert_auto_measurement(50_001, &measurement).unwrap());
+        let details: i64 = store.conn.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get(0)).unwrap();
+        let summaries: i64 = store.conn.query_row("SELECT COUNT(*) FROM auto_daily_aggregates", [], |row| row.get(0)).unwrap();
+        assert_eq!(details, 50_000);
+        assert_eq!(summaries, 10_000);
+        assert!(store.auto_measurements(1).unwrap().iter().any(|row| row.event_seq == 50_001));
+        assert!(store.auto_daily_aggregates(10_000).unwrap().iter().any(|row| row.model.as_deref() == Some("new-model")));
     }
 
     #[test]
