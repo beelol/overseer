@@ -773,9 +773,10 @@ fn completion_requires_a_current_passed_combined_check() {
         .unwrap()
         .execute("UPDATE swarm_runs SET status='running' WHERE id=?1", [run])
         .unwrap();
+    let secret = "sk-abcdefghijklmnopqrstuv";
     let completion = json!({"run_id":run,"generation":1,"revision":1,
-    "request_id":"finish-verified-patch","summary":"Patch verified",
-    "verification":"Combined a.txt check passed","checks":[
+    "request_id":"finish-verified-patch","summary":format!("Patch verified {secret}"),
+    "verification":"Combined a.txt check passed with Bearer abcdefghijklmnopqrstuvwxyz","checks":[
         {"job_id":"writer","outcome":"passed","evidence":["writer-patch"]}
     ]});
     assert!(d
@@ -794,6 +795,14 @@ fn completion_requires_a_current_passed_combined_check() {
         .contains("combined verification"));
     std::fs::write(&verifier, script).unwrap();
     assert_eq!(d.call("swarm.complete", completion)["status"], "completed");
+    let saved = d.call("swarm.get", json!({"id":run}))["completion"].clone();
+    assert_eq!(saved["summary"], "Patch verified [redacted]");
+    assert_eq!(saved["verification"], "Combined a.txt check passed with [redacted]");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let stored: (String, String) = db.query_row(
+        "SELECT summary,verification FROM swarm_completions WHERE run_id=?1", [run],
+        |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    assert!(!stored.0.contains(secret) && !stored.1.contains("abcdefghijklmnopqrstuvwxyz"));
 }
 
 #[test]

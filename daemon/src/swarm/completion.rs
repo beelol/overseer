@@ -223,10 +223,12 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
     if integrated_patches > 0 && !super::verification::completion_passed(&tx, run, revision)? {
         bail!("combined verification has not passed for the current integration commit");
     }
+    let safe_summary = crate::redact::redact(summary);
+    let safe_verification = crate::redact::redact(verification);
     let now = crate::daemon::now();
     tx.execute(
         "INSERT INTO swarm_completions(run_id,request_sha256,generation,revision,summary,verification,checks,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
-        params![run,request_sha256,generation,revision,summary,verification,p["checks"].to_string(),now],
+        params![run,request_sha256,generation,revision,safe_summary,safe_verification,p["checks"].to_string(),now],
     )?;
     tx.execute(
         "UPDATE swarm_runs SET status='completed',updated_ms=?2 WHERE id=?1 AND status='running'",
