@@ -49,17 +49,19 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_admission.rs",
-        "docs/verification/swarm/milestone-7.md"
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-08.md"
       ],
-      "blocker": "Fixture admission counts director and worker slots and enforces per-run/global ceilings; reviewers, native descendants, drain on lower maximum and live activation remain unimplemented."
+      "blocker": "Fixture admission counts director, worker and existing ordinary-run slots and enforces per-run/global ceilings; reverse ordinary-launch gating, lower-maximum draining, actual reviewer/descendant control and live activation remain unimplemented."
     },
     "SWARM-08": {
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_admission.rs",
-        "docs/verification/swarm/milestone-7.md"
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-08.md"
       ],
-      "blocker": "Concurrent fixture swarm admissions share an atomic reservation transaction; ordinary task.create does not yet participate in this ledger."
+      "blocker": "Concurrent fixture swarm admissions share an atomic reservation transaction and count active ordinary runs toward the global slot ceiling; ordinary task.create does not yet reserve a slot/account window atomically, so reverse races remain possible."
     },
     "SWARM-09": {
       "status": "partial",
