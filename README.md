@@ -5,9 +5,9 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **58 / 66** · **6** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-58, AC-59, AC-60, AC-62, AC-64, AC-66. The biggest gaps are the daily-driver UI (Gate J, AC-54 to AC-66, added by the
-owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md)), fixed Claude accounts (AC-53, partial;
+criteria: **58 / 82** · **6** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-58, AC-59, AC-60, AC-62, AC-64, AC-66, AC-67, AC-68, AC-69, AC-70, AC-71, AC-72, AC-73, AC-74, AC-75, AC-76, AC-77, AC-78, AC-79, AC-80, AC-81, AC-82. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
@@ -85,6 +85,22 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-64** Default-to-Overseer session (owner-confirmed) — owner session after the rest of Gate J — [evidence](docs/verification/AC-64.md)
 - [x] **AC-65** Provider logos — [evidence](docs/verification/AC-65.md)
 - [ ] **AC-66** Design review against references (owner-confirmed) — ◐ partial: the references are studied and what Overseer adopts is written down (docs/design/references.md, the RFC's "What Overseer adopts"); the review page shows every view before and after in both Overseer themes and a stock theme, plus the new views (chat, live chats, grid, dashboard mode, composer, Needs you, history, usage, themes and logos), with a Looks right / Needs work mark and a note per view saved for the owner / deferred: the owner's marks, the changes they ask for, and the owner's dated confirmation that the UI looks clean and polished — [evidence](docs/verification/AC-66.md)
+- [ ] **AC-67** One agents list: the native side bar — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-67.md)
+- [ ] **AC-68** Provider logos in the side bar — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-68.md)
+- [ ] **AC-69** Search and filter in the side bar — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-69.md)
+- [ ] **AC-70** Quiet row actions — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-70.md)
+- [ ] **AC-71** Take an agent out — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-71.md)
+- [ ] **AC-72** Chat in the middle when there is nothing to review — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-72.md)
+- [ ] **AC-73** Changes bring the diff forward — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-73.md)
+- [ ] **AC-74** Follow or manual review — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-74.md)
+- [ ] **AC-75** One place for changes — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-75.md)
+- [ ] **AC-76** Review that stays clean at any width — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-76.md)
+- [ ] **AC-77** Chat that works beside a diff — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-77.md)
+- [ ] **AC-78** Quiet turn endings — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-78.md)
+- [ ] **AC-79** Grid and dashboard mode in the new layout — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-79.md)
+- [ ] **AC-80** Remembered place — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-80.md)
+- [ ] **AC-81** Gate J still holds — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-81.md)
+- [ ] **AC-82** Gate K design review (owner-confirmed) — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-82.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -219,6 +235,22 @@ the owner action or decision each one needs.
 - [ ] [AC-62](docs/verification/AC-62.md) (Usage and limits): Independent Codex comparison. Next: have the daemon include the raw token_count line it read in account.usage (no credentials), then compare it in the live scenario.
 - [ ] [AC-64](docs/verification/AC-64.md) (Default-to-Overseer session (owner-confirmed)): Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.
 - [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.
+- [ ] [AC-67](docs/verification/AC-67.md) (One agents list: the native side bar): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-68](docs/verification/AC-68.md) (Provider logos in the side bar): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-69](docs/verification/AC-69.md) (Search and filter in the side bar): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-70](docs/verification/AC-70.md) (Quiet row actions): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-71](docs/verification/AC-71.md) (Take an agent out): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-72](docs/verification/AC-72.md) (Chat in the middle when there is nothing to review): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-73](docs/verification/AC-73.md) (Changes bring the diff forward): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-74](docs/verification/AC-74.md) (Follow or manual review): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-75](docs/verification/AC-75.md) (One place for changes): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-76](docs/verification/AC-76.md) (Review that stays clean at any width): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-77](docs/verification/AC-77.md) (Chat that works beside a diff): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-78](docs/verification/AC-78.md) (Quiet turn endings): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-79](docs/verification/AC-79.md) (Grid and dashboard mode in the new layout): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-80](docs/verification/AC-80.md) (Remembered place): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-81](docs/verification/AC-81.md) (Gate J still holds): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-82](docs/verification/AC-82.md) (Gate K design review (owner-confirmed)): Not started (added by the owner on 2026-09-26; built in its own pull request).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
