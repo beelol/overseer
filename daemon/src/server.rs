@@ -214,6 +214,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
         "state" => d.state()?,
+        "audio.get" => crate::audio::get(d)?,
+        "audio.set" => crate::audio::set(d, p)?,
+        "audio.preview" => crate::audio::preview(p)?,
         "harness.list" => {
             let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "generic"]
                 .iter()

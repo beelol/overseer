@@ -72,6 +72,7 @@
       { "command": "overseer.mergeBack", "title": "Merge Back…", "category": "Overseer", "icon": "$(git-merge)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.stopAll", "title": "Stop Agents and Daemon…", "category": "Overseer", "icon": "$(debug-stop)" },
       { "command": "overseer.startDaemon", "title": "Start Daemon", "category": "Overseer" },
+      { "command": "overseer.audioMode", "title": "Audio Mode and Reactor Cues…", "category": "Overseer", "icon": "$(unmute)" },
       { "command": "overseer.testNotification", "title": "Test Notification", "category": "Overseer", "icon": "$(bell)" },
       { "command": "overseer.showLog", "title": "Show Daemon Log", "category": "Overseer" },
       { "command": "overseer.restartDaemonConnection", "title": "Reconnect to Daemon", "category": "Overseer" }
@@ -93,6 +94,7 @@
         { "command": "overseer.switchAgent", "when": "view == overseer.agents", "group": "navigation@4" },
         { "command": "overseer.refresh", "when": "view == overseer.agents", "group": "navigation@2" },
         { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "navigation@3" },
+        { "command": "overseer.audioMode", "when": "view == overseer.agents", "group": "navigation@5" },
         { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
         { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
