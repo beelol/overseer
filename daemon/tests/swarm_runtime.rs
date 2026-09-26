@@ -719,9 +719,19 @@ fn stop_retries_an_initially_unreachable_worker_after_daemon_restart() {
         "SELECT attempts,last_outcome FROM swarm_stop_signals WHERE run_id=?1 AND overseer_run_id=?2",
         rusqlite::params![id,worker], |r| Ok((r.get(0)?,r.get(1)?))).unwrap();
     assert_eq!(first, (1,"unconfirmed".into()));
+    let reservation_before: String = db.query_row(
+        "SELECT status FROM swarm_reservations WHERE attempt_id=?1",
+        [admitted["attempt_id"].as_str().unwrap()], |r| r.get(0)).unwrap();
+    assert_eq!(reservation_before, "active");
     d.kill9();
     d.spawn();
     assert_eq!(d.wait_done(worker, 12)["status"], "interrupted");
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"generation":1,"revision":1}));
+    let reservation_after: String = db.query_row(
+        "SELECT status FROM swarm_reservations WHERE attempt_id=?1",
+        [admitted["attempt_id"].as_str().unwrap()], |r| r.get(0)).unwrap();
+    assert_eq!(reservation_after, "uncertain");
     let later: (i64,String) = db.query_row(
         "SELECT attempts,last_outcome FROM swarm_stop_signals WHERE run_id=?1 AND overseer_run_id=?2",
         rusqlite::params![id,worker], |r| Ok((r.get(0)?,r.get(1)?))).unwrap();

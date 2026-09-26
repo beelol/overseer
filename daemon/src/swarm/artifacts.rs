@@ -318,6 +318,13 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
         "UPDATE swarm_attempts SET status='finished' WHERE id=?1",
         params![attempt],
     )?;
+    // A confirmed process exit is not a usage measurement. Keep its upper reservation
+    // binding until the shared account authority reconciles native consumption.
+    tx.execute(
+        "UPDATE swarm_reservations SET status='uncertain'
+         WHERE attempt_id=?1 AND run_id=?2 AND status='active'",
+        params![attempt,run],
+    )?;
     let (job_status, count, job_revision, job_stop_reason, job_deadline): (String, i64, i64, Option<String>, Option<i64>) = tx.query_row(
         "SELECT status,attempt_count,plan_revision,stop_reason,deadline_at_ms FROM swarm_jobs WHERE run_id=?1 AND id=?2",
         params![run, job],
