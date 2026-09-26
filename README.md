@@ -5,11 +5,11 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **51 / 53** · **1** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53. One criterion is partial, with its proven part and the owner's step in
-[Follow-ups](#follow-ups): fixed Claude accounts (AC-53,
-[design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account. Linux (AC-41)
-is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
+criteria: **51 / 64** · **1** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-54, AC-55, AC-56, AC-57, AC-58, AC-59, AC-60, AC-61, AC-62, AC-63, AC-64. The biggest gaps are the daily-driver UI (Gate J, AC-54 to AC-64, added by the
+owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md)), fixed Claude accounts (AC-53, partial;
+[design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
+which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
 ## Acceptance criteria
 
@@ -72,6 +72,17 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-51** Worktree file hierarchy — [evidence](docs/verification/AC-51.md)
 - [x] **AC-52** Native Overseer notifications (macOS) — [evidence](docs/verification/AC-52.md)
 - [ ] **AC-53** Fixed Claude accounts — ◐ partial: the design for keeping each Claude account's credentials separate is written (docs/rfcs/claude-credentials.md: check per-folder Keychain entries first, otherwise Overseer-managed credentials); the account flows it builds on (Add Account → Anthropic → Sign In with its own CLAUDE_CONFIG_DIR, sign-out, expiry and Sign in again) pass with the synthetic account CLI / deferred: a live test with a second Claude account (the owner asked not to test Claude yet, and has one Claude account) — [evidence](docs/verification/AC-53.md)
+- [ ] **AC-54** Clean, compact presentation — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-54.md)
+- [ ] **AC-55** Chat-style conversation — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-55.md)
+- [ ] **AC-56** Overseer themes, light and dark — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-56.md)
+- [ ] **AC-57** Overseer dashboard — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-57.md)
+- [ ] **AC-58** Agent grid — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-58.md)
+- [ ] **AC-59** Start a new agent from the chat — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-59.md)
+- [ ] **AC-60** Native-CLI parity for everyday use — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-60.md)
+- [ ] **AC-61** Needs-you inbox and keyboard control — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-61.md)
+- [ ] **AC-62** Usage and limits — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-62.md)
+- [ ] **AC-63** History that stays tidy — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-63.md)
+- [ ] **AC-64** Default-to-Overseer session (owner-confirmed) — owner session after the rest of Gate J — [evidence](docs/verification/AC-64.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -200,6 +211,17 @@ the owner action or decision each one needs.
 
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
 - [ ] [AC-53](docs/verification/AC-53.md) (Fixed Claude accounts): Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.
+- [ ] [AC-54](docs/verification/AC-54.md) (Clean, compact presentation): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-55](docs/verification/AC-55.md) (Chat-style conversation): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-56](docs/verification/AC-56.md) (Overseer themes, light and dark): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-57](docs/verification/AC-57.md) (Overseer dashboard): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-58](docs/verification/AC-58.md) (Agent grid): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-59](docs/verification/AC-59.md) (Start a new agent from the chat): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-60](docs/verification/AC-60.md) (Native-CLI parity for everyday use): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-61](docs/verification/AC-61.md) (Needs-you inbox and keyboard control): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-62](docs/verification/AC-62.md) (Usage and limits): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-63](docs/verification/AC-63.md) (History that stays tidy): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-64](docs/verification/AC-64.md) (Default-to-Overseer session (owner-confirmed)): Owner action after the rest of Gate J: work for an hour using only Overseer for Claude Code and Codex; log friction.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
@@ -213,6 +235,7 @@ the owner action or decision each one needs.
 - [Side RFC: simple account governance](docs/rfcs/account-governance.md)
 - [Side RFC: native Overseer notifications on macOS](docs/rfcs/native-notifications.md)
 - [Side RFC: Overseer-managed Claude credentials](docs/rfcs/claude-credentials.md)
+- [Side RFC: daily-driver orchestrator UI](docs/rfcs/orchestrator-ui.md)
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 
 Design targets macOS and Linux; only macOS is verified. Auto routing, a TUI, VSCodium,
