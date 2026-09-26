@@ -303,6 +303,7 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
          LEFT JOIN runs r ON r.id=l.overseer_run_id WHERE l.attempt_id=?1 AND l.run_id=?2",
         params![attempt,run], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
     ).optional()?;
+    let linked_status = linked.as_ref().and_then(|(_, status, _)| status.clone());
     if let Some((linked_run,status,ended)) = linked {
         if linked_run.is_none()
             || status.as_deref().is_none_or(|s| crate::daemon::ACTIVE.contains(&s) || s == "disconnected")
@@ -343,6 +344,25 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
         tx.execute(
             "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
             params![run,job,if unsafe_effects > 0 { "blocked" } else { "failed" },now],
+        )?;
+        if unsafe_effects == 0 {
+            tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        }
+    } else if linked_status.as_deref() == Some("failed") && ["reserved", "launching", "running"].contains(&job_status.as_str()) {
+        let unsafe_effects: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+            params![run,job], |r| r.get(0),
+        )?;
+        let next = if unsafe_effects > 0 {
+            "blocked"
+        } else if count < 2 && job_deadline.is_none_or(|deadline| now < deadline) {
+            "ready"
+        } else {
+            "failed"
+        };
+        tx.execute(
+            "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
+            params![run,job,next,now],
         )?;
         if unsafe_effects == 0 {
             tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
