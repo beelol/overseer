@@ -91,7 +91,6 @@
       "detail": {
         "removeText": "Cancel\nRemove Account\nRemove the account Claude fixed?\nIts own credential folder is deleted. Runs keep their history. No other account, and no desktop-app login, is affected.",
         "afterRemove": [
-          "Select an agent run to see its workspace. ",
           "OpenAI / ChatGPT\nSign-in: ChatGPT sign-in in the browser, or a device code. Account login only; no API keys., has actions",
           "codex (existing login), signed in, plus · d1dddc49, follows the desktop app",
           "Work ChatGPT, signed in, plus · 5ac9196f",

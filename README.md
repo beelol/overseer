@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **58 / 97** · **6** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-58, AC-59, AC-60, AC-62, AC-64, AC-66, AC-67, AC-68, AC-69, AC-70, AC-71, AC-72, AC-73, AC-74, AC-75, AC-76, AC-77, AC-78, AC-79, AC-80, AC-81, AC-82, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **76 / 97** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-81, AC-82, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), offline mode and local models (Gate L, AC-83 to AC-97, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -76,31 +76,31 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-55** A chat that feels great — [evidence](docs/verification/AC-55.md)
 - [x] **AC-56** Overseer themes, light and dark — [evidence](docs/verification/AC-56.md)
 - [x] **AC-57** Overseer dashboard — [evidence](docs/verification/AC-57.md)
-- [ ] **AC-58** Agent grid — ◐ partial: nine concurrent fixture streams tile 3×3 and a maximum of 4 tiles 2×2; a permission request is answered from its tile; a pinned finished run stays; arrow keys move between tiles and Enter opens the agent; webview event-loop lag p95 2 ms; screenshots at 4 and 9 tiles in both themes / deferred: the per-tile update time: a streamed line reaches its tile in 853 ms at p95 (target 250 ms); the daemon records the same lines within 62 ms p95, so the delay is between the daemon and the webview — [evidence](docs/verification/AC-58.md)
-- [ ] **AC-59** Start a new agent from the chat — ◐ partial: with no agent selected the middle is the composer; Claude and Codex agents start keyboard-only and stream in place as the selected agent; a signed-out account is shown inline with Sign in and Start disabled; a harness that is not installed is labelled so; the Full form link stays / deferred: a generic program started keyboard-only (choosing Run a program from the agent menu left the chip on Codex) and defaults remembered across a reload (the composer did not finish loading after the reload in the scenario) — [evidence](docs/verification/AC-59.md)
-- [ ] **AC-60** Native-CLI parity for everyday use — ◐ partial: live Claude Code and Codex runs take model, reasoning effort and permission mode per turn (argv from each run's launch record), an attached image and a mentioned worktree file reach the agent (replies name the red color and README.md's first line), a running turn is stopped and the next message answered, and finished runs continue their session after the daemon restarts; support per harness is in docs/compatibility.md / deferred: the same capabilities driven from the chat composer in the packaged UI: after the options menu closes, Enter does not send, so the paste, @-mention, options, queue and ⌥Enter checks in scenario-parity.js fail; the live turns used the daemon API the composer calls — [evidence](docs/verification/AC-60.md)
+- [x] **AC-58** Agent grid — [evidence](docs/verification/AC-58.md)
+- [x] **AC-59** Start a new agent from the chat — [evidence](docs/verification/AC-59.md)
+- [x] **AC-60** Native-CLI parity for everyday use — [evidence](docs/verification/AC-60.md)
 - [x] **AC-61** Needs-you inbox and keyboard control — [evidence](docs/verification/AC-61.md)
-- [ ] **AC-62** Usage and limits — ◐ partial: Claude's live usage (5 hours 17%, week 48%, reset times) is exactly its own rate_limit_event; both ChatGPT accounts report plan and usage from Codex's session log (ChatGPT A team 0%/0%, ChatGPT B plus 0%/16%); OpenCode says not reported; tokens and cost per turn are shown; near-limit warning with fixtures / deferred: an independent check of the Codex numbers against the raw token_count line in each account's session log (those logs sit in the account folders next to the credentials, which this session does not read) — [evidence](docs/verification/AC-62.md)
+- [x] **AC-62** Usage and limits — [evidence](docs/verification/AC-62.md)
 - [x] **AC-63** History that stays tidy — [evidence](docs/verification/AC-63.md)
 - [ ] **AC-64** Default-to-Overseer session (owner-confirmed) — owner session after the rest of Gate J — [evidence](docs/verification/AC-64.md)
 - [x] **AC-65** Provider logos — [evidence](docs/verification/AC-65.md)
 - [ ] **AC-66** Design review against references (owner-confirmed) — ◐ partial: the references are studied and what Overseer adopts is written down (docs/design/references.md, the RFC's "What Overseer adopts"); the review page shows every view before and after in both Overseer themes and a stock theme, plus the new views (chat, live chats, grid, dashboard mode, composer, Needs you, history, usage, themes and logos), with a Looks right / Needs work mark and a note per view saved for the owner / deferred: the owner's marks, the changes they ask for, and the owner's dated confirmation that the UI looks clean and polished — [evidence](docs/verification/AC-66.md)
-- [ ] **AC-67** One agents list: the native side bar — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-67.md)
-- [ ] **AC-68** Provider logos in the side bar — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-68.md)
-- [ ] **AC-69** Search and filter in the side bar — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-69.md)
-- [ ] **AC-70** Quiet row actions — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-70.md)
-- [ ] **AC-71** Take an agent out — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-71.md)
-- [ ] **AC-72** Chat in the middle when there is nothing to review — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-72.md)
-- [ ] **AC-73** Changes bring the diff forward — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-73.md)
-- [ ] **AC-74** Follow or manual review — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-74.md)
-- [ ] **AC-75** One place for changes — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-75.md)
-- [ ] **AC-76** Review that stays clean at any width — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-76.md)
-- [ ] **AC-77** Chat that works beside a diff — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-77.md)
-- [ ] **AC-78** Quiet turn endings — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-78.md)
-- [ ] **AC-79** Grid and dashboard mode in the new layout — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-79.md)
-- [ ] **AC-80** Remembered place — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-80.md)
-- [ ] **AC-81** Gate J still holds — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-81.md)
-- [ ] **AC-82** Gate K design review (owner-confirmed) — not started (Gate K, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-82.md)
+- [x] **AC-67** One agents list: the native side bar — [evidence](docs/verification/AC-67.md)
+- [x] **AC-68** Provider logos in the side bar — [evidence](docs/verification/AC-68.md)
+- [x] **AC-69** Search and filter in the side bar — [evidence](docs/verification/AC-69.md)
+- [x] **AC-70** Quiet row actions — [evidence](docs/verification/AC-70.md)
+- [x] **AC-71** Take an agent out — [evidence](docs/verification/AC-71.md)
+- [x] **AC-72** Chat in the middle when there is nothing to review — [evidence](docs/verification/AC-72.md)
+- [x] **AC-73** Changes bring the diff forward — [evidence](docs/verification/AC-73.md)
+- [x] **AC-74** Follow or manual review — [evidence](docs/verification/AC-74.md)
+- [x] **AC-75** One place for changes — [evidence](docs/verification/AC-75.md)
+- [x] **AC-76** Review that stays clean at any width — [evidence](docs/verification/AC-76.md)
+- [x] **AC-77** Chat that works beside a diff — [evidence](docs/verification/AC-77.md)
+- [x] **AC-78** Quiet turn endings — [evidence](docs/verification/AC-78.md)
+- [x] **AC-79** Grid and dashboard mode in the new layout — [evidence](docs/verification/AC-79.md)
+- [x] **AC-80** Remembered place — [evidence](docs/verification/AC-80.md)
+- [ ] **AC-81** Gate J still holds — ◐ partial: every fixture scenario passes against the Gate K build: the Gate J scenarios (Gate K audit with a new baseline, chat, parity, composer, grid, dashboard, keyboard with the shortcuts also from the side bar, history, usage, look, theme) and the earlier ones (review, main, center, conversation, files, hunks, pr, notify, signin, accounts, trust); the text budget re-measured per view is no higher than Gate J (agents 225, chat 1,063, files 59, review 150, grid 993, new agent 133, accounts 189) / deferred: the live Gate J scenario (scenario-live-gatej.js: Claude and both ChatGPT accounts, several paid turns) was not rerun on the Gate K build; its fixture counterparts pass and the Codex usage part was rerun live (AC-62) — [evidence](docs/verification/AC-81.md)
+- [ ] **AC-82** Gate K design review (owner-confirmed) — ◐ partial: the review page shows every view in Gate J and Gate K in both Overseer themes (and High Contrast where captured), with a Looks right / Needs work mark and a note per view saved for the owner: https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv / deferred: the owner's marks, the changes they ask for, and the owner's dated confirmation — [evidence](docs/verification/AC-82.md)
 - [ ] **AC-83** Offline is not an outage — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-83.md)
 - [ ] **AC-84** Fail over to the best working provider — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-84.md)
 - [ ] **AC-85** Local inventory — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-85.md)
@@ -244,28 +244,10 @@ the owner action or decision each one needs.
 
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
 - [ ] [AC-53](docs/verification/AC-53.md) (Fixed Claude accounts): Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.
-- [ ] [AC-58](docs/verification/AC-58.md) (Agent grid): Per-tile latency 853 ms p95 vs 250 ms. Next: time each hop in the extension host (daemon socket → RunFeed batch → postMessage) and the tile renderer, and remove the slow hop.
-- [ ] [AC-59](docs/verification/AC-59.md) (Start a new agent from the chat): Keyboard selection of Run a program and remembered defaults after reload. Next: fix the agent-menu keyboard pick for the generic entry and the composer's reload state, then rerun scenario-composer.js.
-- [ ] [AC-60](docs/verification/AC-60.md) (Native-CLI parity for everyday use): Composer keyboard focus after the options menu (and the queue display). Next: keep focus in the prompt when the options menu closes, then rerun scenario-parity.js.
-- [ ] [AC-62](docs/verification/AC-62.md) (Usage and limits): Independent Codex comparison. Next: have the daemon include the raw token_count line it read in account.usage (no credentials), then compare it in the live scenario.
 - [ ] [AC-64](docs/verification/AC-64.md) (Default-to-Overseer session (owner-confirmed)): Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.
 - [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.
-- [ ] [AC-67](docs/verification/AC-67.md) (One agents list: the native side bar): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-68](docs/verification/AC-68.md) (Provider logos in the side bar): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-69](docs/verification/AC-69.md) (Search and filter in the side bar): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-70](docs/verification/AC-70.md) (Quiet row actions): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-71](docs/verification/AC-71.md) (Take an agent out): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-72](docs/verification/AC-72.md) (Chat in the middle when there is nothing to review): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-73](docs/verification/AC-73.md) (Changes bring the diff forward): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-74](docs/verification/AC-74.md) (Follow or manual review): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-75](docs/verification/AC-75.md) (One place for changes): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-76](docs/verification/AC-76.md) (Review that stays clean at any width): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-77](docs/verification/AC-77.md) (Chat that works beside a diff): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-78](docs/verification/AC-78.md) (Quiet turn endings): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-79](docs/verification/AC-79.md) (Grid and dashboard mode in the new layout): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-80](docs/verification/AC-80.md) (Remembered place): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-81](docs/verification/AC-81.md) (Gate J still holds): Not started (added by the owner on 2026-09-26; built in its own pull request).
-- [ ] [AC-82](docs/verification/AC-82.md) (Gate K design review (owner-confirmed)): Not started (added by the owner on 2026-09-26; built in its own pull request).
+- [ ] [AC-81](docs/verification/AC-81.md) (Gate J still holds): Next: rerun scenario-live-gatej.js on the Gate K build when paid turns on both ChatGPT accounts are wanted.
+- [ ] [AC-82](docs/verification/AC-82.md) (Gate K design review (owner-confirmed)): Owner review. Next: the owner marks each view; each Needs work is changed and shown again until the owner confirms.
 - [ ] [AC-83](docs/verification/AC-83.md) (Offline is not an outage): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
 - [ ] [AC-84](docs/verification/AC-84.md) (Fail over to the best working provider): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
 - [ ] [AC-85](docs/verification/AC-85.md) (Local inventory): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).

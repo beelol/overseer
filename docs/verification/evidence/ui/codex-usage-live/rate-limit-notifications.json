@@ -1,0 +1,26 @@
+[
+  {
+    "limitId": "codex",
+    "limitName": null,
+    "normalModelSlug": null,
+    "primary": {
+      "usedPercent": 0,
+      "windowDurationMins": 300,
+      "resetsAt": 1790474011
+    },
+    "secondary": {
+      "usedPercent": 0,
+      "windowDurationMins": 10080,
+      "resetsAt": 1791022451
+    },
+    "credits": {
+      "hasCredits": true,
+      "unlimited": false,
+      "balance": null
+    },
+    "individualLimit": null,
+    "spendControlReached": null,
+    "planType": "team",
+    "rateLimitReachedType": null
+  }
+]
