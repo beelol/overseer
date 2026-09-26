@@ -43,6 +43,7 @@ fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
         "stalled_from": row.get::<_, Option<String>>("stalled_from")?,
         "stall_reason": row.get::<_, Option<String>>("stall_reason")?,
         "no_progress_turns": row.get::<_, i64>("no_progress_turns")?,
+        "failed_planning_turns": row.get::<_, i64>("failed_planning_turns")?,
         "generation": row.get::<_, i64>("generation")?,
         "revision": row.get::<_, i64>("revision")?,
         "allowed_targets": serde_json::from_str::<Value>(&targets).unwrap_or(Value::Null),
@@ -94,13 +95,33 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
     let revision = p["revision"]
         .as_i64()
         .ok_or_else(|| anyhow!("missing revision"))?;
-    let (jobs, rejected): (Vec<JobSpec>, Vec<Value>) = if p["allow_partial"] == true {
-        plan::select_valid(&p["jobs"])?
-    } else {
-        (serde_json::from_value(p["jobs"].clone())
-            .map_err(|e| anyhow!("invalid jobs: {e}"))?, Vec::new())
+    let prior = get(store, id)?;
+    if prior["generation"] != generation {
+        bail!("stale director generation");
+    }
+    if prior["revision"] != revision {
+        bail!("stale plan revision");
+    }
+    if !["planning", "running", "paused"].contains(&prior["status"].as_str().unwrap_or("")) {
+        bail!("swarm run is not plannable");
+    }
+    let parsed: Result<(Vec<JobSpec>, Vec<Value>)> = (|| {
+        let (jobs, rejected): (Vec<JobSpec>, Vec<Value>) = if p["allow_partial"] == true {
+            plan::select_valid(&p["jobs"])?
+        } else {
+            (serde_json::from_value(p["jobs"].clone())
+                .map_err(|e| anyhow!("invalid jobs: {e}"))?, Vec::new())
+        };
+        plan::validate(&jobs)?;
+        Ok((jobs, rejected))
+    })();
+    let (jobs, rejected) = match parsed {
+        Ok(valid) => valid,
+        Err(error) => {
+            record_planning_failure(store, id)?;
+            return Err(error);
+        }
     };
-    plan::validate(&jobs)?;
     let tx = store.conn.transaction()?;
     let current: (i64, i64, String) = tx
         .query_row(
@@ -126,6 +147,21 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
     if progressed {
         bail!("cannot replace a plan with active or completed jobs; use a revision transition");
     }
+    let mut stmt = tx.prepare("SELECT id,title,acceptance,deps FROM swarm_jobs WHERE run_id=?1 ORDER BY id")?;
+    let rows = stmt.query_map(params![id], |r| {
+        Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,
+            r.get::<_,String>(2)?,r.get::<_,String>(3)?))
+    })?.collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    let existing = rows.into_iter().map(|(id,title,acceptance,deps)| {
+        Ok(JobSpec { id,title,acceptance,deps:serde_json::from_str(&deps)? })
+    }).collect::<Result<Vec<_>>>()?;
+    let mut proposed = jobs.clone();
+    proposed.sort_by(|a,b| a.id.cmp(&b.id));
+    if revision > 0 && existing == proposed {
+        return Ok(json!({"id":id,"generation":generation,"revision":revision,
+            "job_count":jobs.len(),"rejected":rejected,"unchanged":true}));
+    }
     tx.execute("DELETE FROM swarm_jobs WHERE run_id=?1", params![id])?;
     let now = crate::daemon::now();
     for job in &jobs {
@@ -140,11 +176,23 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
         )?;
     }
     tx.execute(
-        "UPDATE swarm_runs SET revision=?2,updated_ms=?3 WHERE id=?1",
+        "UPDATE swarm_runs SET revision=?2,failed_planning_turns=0,no_progress_turns=0,updated_ms=?3 WHERE id=?1",
         params![id, revision + 1, now],
     )?;
     tx.commit()?;
     Ok(json!({"id":id,"generation":generation,"revision":revision+1,"job_count":jobs.len(),"rejected":rejected}))
+}
+
+pub(super) fn record_planning_failure(store: &mut Store, id: &str) -> Result<()> {
+    let now = crate::daemon::now();
+    let tx = store.conn.transaction()?;
+    tx.execute("UPDATE swarm_runs SET failed_planning_turns=failed_planning_turns+1,
+        updated_ms=?2 WHERE id=?1",params![id,now])?;
+    tx.execute("UPDATE swarm_runs SET stalled_from=status,status='stalled',
+        stall_reason='planning_failed',updated_ms=?2 WHERE id=?1 AND failed_planning_turns>=2",
+        params![id,now])?;
+    tx.commit()?;
+    Ok(())
 }
 
 pub fn jobs(store: &Store, p: &Value) -> Result<Value> {

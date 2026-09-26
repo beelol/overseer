@@ -320,7 +320,7 @@ fn two_no_progress_director_turns_stall_durably_without_replaying_completion() {
 }
 
 #[test]
-fn declared_progress_resets_the_fixture_director_stall_counter() {
+fn unsupported_progress_claim_does_not_reset_the_director_stall_counter() {
     let d = Daemon::start(&[]);
     let run = d.call(
         "swarm.create",
@@ -339,11 +339,7 @@ fn declared_progress_resets_the_fixture_director_stall_counter() {
         json!({"run_id":id,"generation":1,
         "revision":1,"job_id":"j"}),
     );
-    for (n, outcome, expected) in [
-        (0, "no_progress", 1),
-        (1, "progress", 0),
-        (2, "no_progress", 1),
-    ] {
+    for (n, outcome, expected) in [(0, "no_progress", 1), (1, "progress", 2)] {
         d.call(
             "swarm.report",
             json!({"run_id":id,"job_id":"j","attempt_id":attempt["id"],
@@ -361,12 +357,54 @@ fn declared_progress_resets_the_fixture_director_stall_counter() {
             "turn_id":turn["turn_id"],"token":turn["token"],"outcome":outcome}),
         );
         assert_eq!(done["no_progress_turns"], expected);
-        assert_eq!(done["status"], "planning");
+        assert_eq!(done["status"], if n == 0 { "planning" } else { "stalled" });
+        if n == 0 {
+            let replay=d.call("swarm.revise",json!({"id":id,"generation":1,
+                "expected_revision":1,"reason":"repeat unchanged work","jobs":[
+                {"id":"j","title":"Inspect","acceptance":"evidence","deps":[]}
+            ]}));
+            assert_eq!(replay["unchanged"],true);
+            assert_eq!(d.call("swarm.get",json!({"id":id}))["no_progress_turns"],1);
+        }
     }
     assert_eq!(
         d.call("swarm.get", json!({"id":id}))["no_progress_turns"],
-        1
+        2
     );
+}
+
+#[test]
+fn accepted_evidence_resets_the_director_stall_counter() {
+    let d=Daemon::start(&[]);
+    let run=d.call("swarm.create",json!({"category":"Accepted progress","objective":"Audit",
+        "allowed_targets":["system-codex"]}));
+    let id=run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let attempt=d.call("swarm.attempt.register",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"j"}));
+    d.call("swarm.report",json!({"run_id":id,"job_id":"j","attempt_id":attempt["id"],
+        "token":attempt["token"],"message_id":"initial-progress","type":"progress",
+        "revision":1,"payload":{"note":"investigating"}}));
+    let first=d.call("swarm.director.claim_batch",json!({"run_id":id,"generation":1,
+        "revision":1,"now_ms":now()+6000}));
+    assert_eq!(d.call("swarm.director.complete_batch",json!({"run_id":id,"generation":1,
+        "turn_id":first["turn_id"],"token":first["token"],"outcome":"no_progress"}))["no_progress_turns"],1);
+    d.call("swarm.artifact.put",json!({"run_id":id,"job_id":"j",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "artifact_id":"proof","source_revision":1,"kind":"finding","content":"reproduced"}));
+    d.call("swarm.report",json!({"run_id":id,"job_id":"j","attempt_id":attempt["id"],
+        "token":attempt["token"],"message_id":"proof-result","type":"result",
+        "revision":1,"payload":{"artifact_ids":["proof"]}}));
+    let second=d.call("swarm.director.claim_batch",json!({"run_id":id,"generation":1,
+        "revision":1,"now_ms":now()+6000}));
+    d.call("swarm.decide",json!({"run_id":id,"generation":1,"revision":1,"job_id":"j",
+        "decision":"accept","evidence":["proof"]}));
+    let done=d.call("swarm.director.complete_batch",json!({"run_id":id,"generation":1,
+        "turn_id":second["turn_id"],"token":second["token"],"outcome":"progress"}));
+    assert_eq!(done["no_progress_turns"],0);
+    assert_eq!(done["status"],"planning");
 }
 
 #[test]

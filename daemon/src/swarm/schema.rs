@@ -14,6 +14,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           stalled_from TEXT,
           stall_reason TEXT,
           no_progress_turns INTEGER NOT NULL DEFAULT 0,
+          failed_planning_turns INTEGER NOT NULL DEFAULT 0,
           generation INTEGER NOT NULL,
           revision INTEGER NOT NULL,
           allowed_targets TEXT NOT NULL,
@@ -111,6 +112,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           revision INTEGER NOT NULL,
           token_sha256 TEXT NOT NULL,
           status TEXT NOT NULL CHECK(status IN ('active','complete')),
+          accepted_decision_id_at_claim INTEGER NOT NULL DEFAULT 0,
           created_ms INTEGER NOT NULL,
           completed_ms INTEGER
         );
@@ -205,6 +207,18 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         conn.execute_batch(
             "ALTER TABLE swarm_runs ADD COLUMN no_progress_turns INTEGER NOT NULL DEFAULT 0;",
         )?;
+    }
+    let has_failed_planning_turns = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='failed_planning_turns'")?
+        .exists([])?;
+    if !has_failed_planning_turns {
+        conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN failed_planning_turns INTEGER NOT NULL DEFAULT 0;")?;
+    }
+    let has_decision_snapshot = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_director_turns') WHERE name='accepted_decision_id_at_claim'")?
+        .exists([])?;
+    if !has_decision_snapshot {
+        conn.execute_batch("ALTER TABLE swarm_director_turns ADD COLUMN accepted_decision_id_at_claim INTEGER NOT NULL DEFAULT 0;")?;
     }
     Ok(())
 }

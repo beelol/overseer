@@ -94,8 +94,11 @@ pub fn claim_batch(store: &mut Store, p: &Value) -> Result<Value> {
     }
     let id = format!("dt-{}", &uuid::Uuid::new_v4().simple().to_string()[..16]);
     let token = uuid::Uuid::new_v4().simple().to_string();
-    tx.execute("INSERT INTO swarm_director_turns(id,run_id,generation,revision,token_sha256,status,created_ms) VALUES(?1,?2,?3,?4,?5,'active',?6)",
-        params![id,run,generation,revision,hash(&token),now])?;
+    let accepted_at_claim: i64 = tx.query_row(
+        "SELECT COALESCE(MAX(id),0) FROM swarm_decisions WHERE run_id=?1 AND decision='accept'",
+        params![run], |r| r.get(0))?;
+    tx.execute("INSERT INTO swarm_director_turns(id,run_id,generation,revision,token_sha256,status,accepted_decision_id_at_claim,created_ms) VALUES(?1,?2,?3,?4,?5,'active',?6,?7)",
+        params![id,run,generation,revision,hash(&token),accepted_at_claim,now])?;
     for seq in seqs {
         tx.execute(
             "INSERT INTO swarm_director_turn_messages(turn_id,seq) VALUES(?1,?2)",
@@ -136,8 +139,8 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
     {
         bail!("run cannot recover director in this state");
     }
-    if current["status"] == "stalled" && current["stall_reason"] == "director_no_progress" {
-        bail!("director stalled after two no-progress turns; process recovery cannot clear it");
+    if current["status"] == "stalled" && current["stall_reason"] != "director_termination_unknown" {
+        bail!("director is stalled by planning or no-progress policy; process recovery cannot clear it");
     }
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
@@ -213,12 +216,12 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     if current["generation"] != generation {
         bail!("stale director generation");
     }
-    let (stored_hash, status): (String, String) = store
+    let (stored_hash, status, turn_revision, accepted_at_claim): (String, String, i64, i64) = store
         .conn
         .query_row(
-            "SELECT token_sha256,status FROM swarm_director_turns WHERE id=?1 AND run_id=?2 AND generation=?3",
+            "SELECT token_sha256,status,revision,accepted_decision_id_at_claim FROM swarm_director_turns WHERE id=?1 AND run_id=?2 AND generation=?3",
             params![id,run,generation],
-            |r| Ok((r.get(0)?, r.get(1)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )
         .optional()?
         .ok_or_else(|| anyhow!("unknown director turn"))?;
@@ -246,7 +249,12 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
         return Ok(json!({"turn_id":id,"applied":count,"duplicate":false,
             "status":current["status"],"no_progress_turns":current["no_progress_turns"]}));
     }
-    let turns = if outcome == "no_progress" {
+    let accepted_now: i64 = tx.query_row(
+        "SELECT COALESCE(MAX(id),0) FROM swarm_decisions WHERE run_id=?1 AND decision='accept'",
+        params![run], |r| r.get(0))?;
+    let material_progress = current["revision"].as_i64().unwrap_or(0) > turn_revision
+        || accepted_now > accepted_at_claim;
+    let turns = if !material_progress {
         current["no_progress_turns"]
             .as_i64()
             .unwrap_or(0)
@@ -273,5 +281,6 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     }
     tx.commit()?;
     Ok(json!({"turn_id":id,"applied":count,"duplicate":false,
-        "status":next_status,"no_progress_turns":turns}))
+        "status":next_status,"no_progress_turns":turns,
+        "material_progress":material_progress,"declared_outcome":outcome}))
 }

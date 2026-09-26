@@ -1,4 +1,4 @@
-use super::{plan, required};
+use super::{get, plan, record_planning_failure, required};
 use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
@@ -26,9 +26,29 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     if reason.is_empty() || reason.len() > 2000 {
         bail!("revision requires a bounded reason");
     }
-    let jobs: Vec<plan::JobSpec> =
-        serde_json::from_value(p["jobs"].clone()).map_err(|e| anyhow!("invalid jobs: {e}"))?;
-    plan::validate(&jobs)?;
+    let prior = get(store, id)?;
+    if prior["generation"] != generation {
+        bail!("stale director generation");
+    }
+    if prior["revision"] != expected {
+        bail!("stale plan revision");
+    }
+    if !["planning", "running", "paused"].contains(&prior["status"].as_str().unwrap_or("")) {
+        bail!("swarm run cannot be revised in this state");
+    }
+    let parsed: Result<Vec<plan::JobSpec>> = (|| {
+        let jobs: Vec<plan::JobSpec> = serde_json::from_value(p["jobs"].clone())
+            .map_err(|e| anyhow!("invalid jobs: {e}"))?;
+        plan::validate(&jobs)?;
+        Ok(jobs)
+    })();
+    let jobs = match parsed {
+        Ok(jobs) => jobs,
+        Err(error) => {
+            record_planning_failure(store, id)?;
+            return Err(error);
+        }
+    };
     let tx = store.conn.transaction()?;
     let current: (i64, i64, String) = tx
         .query_row(
@@ -100,6 +120,10 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
             break;
         }
     }
+    if affected.is_empty() && new_ids.len() == old.len() {
+        return Ok(json!({"id":id,"generation":generation,"revision":expected,
+            "affected":0,"redirected":0,"unchanged":true}));
+    }
     let now = crate::daemon::now();
     let revision = expected + 1;
     let safe_reason = crate::redact::redact(reason);
@@ -152,7 +176,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         }
     }
     tx.execute(
-        "UPDATE swarm_runs SET revision=?2,updated_ms=?3 WHERE id=?1",
+        "UPDATE swarm_runs SET revision=?2,failed_planning_turns=0,no_progress_turns=0,updated_ms=?3 WHERE id=?1",
         params![id, revision, now],
     )?;
     tx.commit()?;

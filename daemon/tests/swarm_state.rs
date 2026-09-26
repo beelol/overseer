@@ -40,11 +40,17 @@ fn earlier_swarm_database_gains_recovery_columns_without_losing_its_run() {
     let id = made["id"].as_str().unwrap();
     d.kill9();
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
-    db.execute_batch("ALTER TABLE swarm_runs DROP COLUMN stop_reason; ALTER TABLE swarm_runs DROP COLUMN stalled_from;").unwrap();
+    db.execute_batch("ALTER TABLE swarm_runs DROP COLUMN stop_reason;
+        ALTER TABLE swarm_runs DROP COLUMN stalled_from;
+        ALTER TABLE swarm_runs DROP COLUMN stall_reason;
+        ALTER TABLE swarm_runs DROP COLUMN no_progress_turns;
+        ALTER TABLE swarm_runs DROP COLUMN failed_planning_turns;
+        ALTER TABLE swarm_director_turns DROP COLUMN accepted_decision_id_at_claim;").unwrap();
     drop(db);
     d.spawn();
     assert_eq!(d.call("swarm.get",json!({"id":id}))["objective"],"Audit");
     assert!(d.call("swarm.get",json!({"id":id}))["stop_reason"].is_null());
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["failed_planning_turns"],0);
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     let version: String = db.query_row("SELECT value FROM meta WHERE key='schema_version'",[],|row|row.get(0)).unwrap();
     assert_eq!(version,"4");
@@ -65,15 +71,7 @@ fn plan_validates_dependencies_and_revision_before_dispatch() {
         .try_call("swarm.plan", cycle)
         .unwrap_err()
         .contains("cycle"));
-    assert!(d
-        .try_call(
-            "swarm.plan",
-            json!({"id":id,"generation":1,"revision":0,"jobs":[
-                {"id":"orphan","title":"Orphan","acceptance":"evidence","deps":["missing"]}
-            ]})
-        )
-        .unwrap_err()
-        .contains("unknown dependency"));
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["failed_planning_turns"],1);
     let planned = d.call(
         "swarm.plan",
         json!({"id":id,"generation":1,"revision":0,"jobs":[
@@ -82,10 +80,17 @@ fn plan_validates_dependencies_and_revision_before_dispatch() {
         ]}),
     );
     assert_eq!(planned["revision"], 1);
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["failed_planning_turns"],0);
     let jobs = d.call("swarm.jobs", json!({"id":id,"limit":10}));
     assert_eq!(jobs["jobs"].as_array().unwrap().len(), 2);
     assert_eq!(jobs["jobs"][0]["status"], "ready");
     assert_eq!(jobs["jobs"][1]["status"], "planned");
+    let unchanged=d.call("swarm.plan",json!({"id":id,"generation":1,"revision":1,"jobs":[
+        {"id":"routes","title":"Inspect routes","acceptance":"route matrix","deps":[]},
+        {"id":"verify","title":"Verify findings","acceptance":"reproduction","deps":["routes"]}
+    ]}));
+    assert_eq!(unchanged["unchanged"],true);
+    assert_eq!(unchanged["revision"],1);
     assert!(d
         .try_call(
             "swarm.plan",
@@ -100,6 +105,66 @@ fn plan_validates_dependencies_and_revision_before_dispatch() {
         )
         .unwrap_err()
         .contains("generation"));
+}
+
+#[test]
+fn two_invalid_planning_turns_stall_but_stale_calls_do_not_count() {
+    let mut d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Planning failures","objective":"Audit",
+        "allowed_targets":["system-codex"]}));
+    let id=made["id"].as_str().unwrap();
+    let bad=json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"orphan","title":"Orphan","acceptance":"evidence","deps":["missing"]}
+    ]});
+    assert!(d.try_call("swarm.plan",json!({"id":id,"generation":0,"revision":0,
+        "jobs":bad["jobs"]})).is_err());
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["failed_planning_turns"],0);
+    assert!(d.try_call("swarm.plan",bad.clone()).unwrap_err().contains("unknown dependency"));
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["failed_planning_turns"],1);
+    d.kill9();
+    d.spawn();
+    assert!(d.try_call("swarm.plan",bad).unwrap_err().contains("unknown dependency"));
+    let stalled=d.call("swarm.get",json!({"id":id}));
+    assert_eq!(stalled["status"],"stalled");
+    assert_eq!(stalled["stall_reason"],"planning_failed");
+    assert_eq!(stalled["failed_planning_turns"],2);
+    assert!(d.try_call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"valid","title":"Valid","acceptance":"evidence","deps":[]}
+    ]})).is_err());
+    assert!(d.try_call("swarm.director.recover",json!({"run_id":id,"generation":1,
+        "revision":0,"termination":"confirmed_dead"})).is_err());
+    assert_eq!(d.call("swarm.stop",json!({"run_id":id,"generation":1,
+        "revision":0}))["status"],"stopping");
+}
+
+#[test]
+fn two_invalid_repair_revisions_share_the_planning_stall_limit() {
+    let d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Repair failures","objective":"Audit",
+        "allowed_targets":["system-codex"]}));
+    let id=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let unchanged=d.call("swarm.revise",json!({"id":id,"generation":1,
+        "expected_revision":1,"reason":"repeat","jobs":[
+        {"id":"j","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    assert_eq!(unchanged["unchanged"],true);
+    assert_eq!(unchanged["revision"],1);
+    let bad=json!({"id":id,"generation":1,"expected_revision":1,"reason":"repair",
+        "jobs":[{"id":"j","title":"Inspect","acceptance":"evidence","deps":["missing"]}]});
+    assert!(d.try_call("swarm.revise",json!({"id":id,"generation":0,
+        "expected_revision":1,"reason":"repair","jobs":bad["jobs"]})).is_err());
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["failed_planning_turns"],0);
+    for n in 1..=2 {
+        assert!(d.try_call("swarm.revise",bad.clone()).unwrap_err().contains("unknown dependency"));
+        assert_eq!(d.call("swarm.get",json!({"id":id}))["failed_planning_turns"],n);
+    }
+    let state=d.call("swarm.get",json!({"id":id}));
+    assert_eq!(state["status"],"stalled");
+    assert_eq!(state["stall_reason"],"planning_failed");
+    assert_eq!(d.call("swarm.jobs",json!({"id":id}))["jobs"][0]["status"],"ready");
 }
 
 #[test]
