@@ -433,9 +433,13 @@
       "blocker": "Injected SQLite failures during result state update and reservation insertion roll back atomically; live launch intent, disk-full recovery, and persisted blocked-state UX remain unimplemented."
     },
     "SWARM-51": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "No Swarm process/transport liveness sampler or 60-second reachability transition exists; fixture director recovery is not live worker liveness."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/src/swarm/runtime.rs",
+        "docs/verification/swarm/SWARM-51.md"
+      ],
+      "blocker": "A disconnected supervised worker now stays unknown with its attempt and reservation held, but separate silence/reachability sampling, a 60-second threshold, live dead-process reconciliation and progress-spam deadlines remain unverified."
     },
     "SWARM-52": {
       "status": "unverified",
