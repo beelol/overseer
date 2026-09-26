@@ -39,9 +39,10 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_benefit.rs",
+        "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/SWARM-05.md"
       ],
-      "blocker": "A fixture-only decision persists cost estimates by revision and batch, gates second-worker admission, and preserves behavior over restart and refill. Planned exact-name write conflicts now force serial choice. Supervised worker wall time is measured, but actual native usage and phase costs, undeclared-resource independence, live calibrated estimates and shared Auto Mode quota input remain absent."
+      "blocker": "A fixture-only decision persists cost estimates by revision and batch, gates second-worker admission, and now refills a completed slot while other workers stay active. Planned exact-name write conflicts force serial choice. Supervised worker wall time is measured, but actual native usage and phase costs, undeclared-resource independence, live calibrated estimates and shared Auto Mode quota input remain absent."
     },
     "SWARM-06": {
       "status": "partial",
@@ -366,9 +367,10 @@
         "daemon/tests/swarm_director.rs",
         "docs/verification/swarm/milestone-5.md",
         "docs/verification/swarm/SWARM-41.md",
-        "daemon/tests/swarm_dispatch.rs"
+        "daemon/tests/swarm_dispatch.rs",
+        "daemon/tests/swarm_atlas.rs"
       ],
-      "blocker": "A supervised scripted worker receives and applies a targeted advisory through the broker; durable bounded batching and one active fixture turn pass. Live harness delivery, semantic recipient choice and actual director inference remain unimplemented."
+      "blocker": "The joined S1 replay deduplicates D1, claims it before J2 finishes, and records targeted J1/J4 advisory receipts; a separate supervised scripted worker applies broker messages. Live harness delivery, semantic recipient choice and actual director inference remain unimplemented."
     },
     "SWARM-42": {
       "status": "partial",
@@ -377,9 +379,10 @@
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
         "docs/verification/swarm/milestone-15.md",
-        "docs/verification/swarm/SWARM-42.md"
+        "docs/verification/swarm/SWARM-42.md",
+        "daemon/tests/swarm_atlas.rs"
       ],
-      "blocker": "Stable-ID dedupe, terminal exact-receipt replay after restart, stale generation checks and late finished-attempt result isolation pass; live dispatch/accounting and broader delayed/reordered message traces remain untested."
+      "blocker": "Stable-ID dedupe, terminal exact-receipt replay after restart, stale generation checks and late finished-attempt result isolation pass; the joined S1 replay includes duplicate D1. Live dispatch/accounting and broader delayed/reordered message traces remain untested."
     },
     "SWARM-43": {
       "status": "partial",
@@ -389,25 +392,28 @@
         "daemon/tests/swarm_plan.rs",
         "docs/verification/swarm/milestone-1.md",
         "docs/verification/swarm/milestone-3.md",
-        "daemon/tests/swarm_dispatch.rs"
+        "daemon/tests/swarm_dispatch.rs",
+        "daemon/tests/swarm_atlas.rs"
       ],
-      "blocker": "A supervised scripted worker acknowledges a targeted advisory as delivered then applied, and a revision redirect is queued in fixtures. Redirect during a long tool call, the 30-second applied-ack timeout and qualification of live harness delivery remain unimplemented."
+      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect; a separate supervised scripted worker acknowledges a targeted advisory. The specified revision-2 assignment, redirect during a long tool call, the 30-second applied-ack timeout and qualified live delivery remain unimplemented."
     },
     "SWARM-44": {
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/milestone-2.md"
       ],
-      "blocker": "Cross-category read/write claims and duplicate hypothesis ownership pass; director redirection is not connected to live workers."
+      "blocker": "Cross-category read/write claims and duplicate hypothesis ownership pass; joined S1 records J4 overlap and scripted redirect while J1 separately checks project middleware. Director redirection is not connected to live workers."
     },
     "SWARM-45": {
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/milestone-2.md"
       ],
-      "blocker": "Independent reproduction claim can coexist with one hypothesis owner; budgeted job creation and finding merge remain unimplemented."
+      "blocker": "Joined S1 adds J7 after J2's task result and independently reproduces it from a fresh PostgreSQL schema within the worker ceiling. Director-selected budgeted creation, contradiction handling and finding merge remain unimplemented."
     },
     "SWARM-46": {
       "status": "partial",
@@ -600,9 +606,12 @@
         "fixtures/swarm/catalog-v1/",
         "daemon/tests/swarm_scenarios.rs",
         "docs/verification/swarm/S3.md",
+        "fixtures/swarm/atlas-v1/",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S1.md",
         "docs/verification/swarm/SWARM-64.md"
       ],
-      "blocker": "S3 has a versioned backend and a joined scripted run; S1 now has a versioned Express/PostgreSQL backend with seven isolated service checks. S0/S2/S4/S5, the S1 director/message/acceptance trace, and the complete S3 autonomous director, fault and user-facing artifact trace remain unverified."
+      "blocker": "S3 and S1 have versioned backends and joined scripted runs. S1 covers seven isolated database probes, D1/overlap messages, slot refill, J7 reproduction and evidence-gated completion. Autonomous decisions, full S1/S3 fault and report traces, live communication and S0/S2/S4/S5 remain unverified."
     }
   },
   "scenarios": {
@@ -616,9 +625,11 @@
       "evidence": [
         "fixtures/swarm/atlas-v1/manifest.json",
         "fixtures/swarm/atlas-v1/acceptance.test.mjs",
+        "fixtures/swarm/atlas-v1/probe.test.mjs",
+        "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S1.md"
       ],
-      "blocker": "Versioned Express/PostgreSQL backend checks pass for seeded findings, protected paths and isolated J2/J7 schemas. No Swarm dispatch, broker coordination, review, final report, missing-queue variant or S1 fault replay exists."
+      "blocker": "Versioned Express/PostgreSQL probes feed a joined scripted Swarm run with four initial workers, D1 and overlap coordination, slot refill, J7 reproduction and seven accepted checks. Profile/director choices are scripted; revision-2 assignment, detailed final report, missing-queue and fault variants, and live communication remain open."
     },
     "S2": {
       "status": "unverified",
