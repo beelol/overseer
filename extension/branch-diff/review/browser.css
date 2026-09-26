@@ -104,3 +104,9 @@ button.icon:hover { background: var(--vscode-toolbar-hoverBackground, var(--vsco
 /* Overseer: quieter file headers (AC-54) — Save appears only when there is something to save. */
 .save-file:disabled { display: none; }
 button.open-native { min-width: 26px; }
+
+/* Overseer: scope picker and file markers (AC-75, AC-76). */
+#scope { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border, transparent); border-radius: 4px; padding: 3px 4px; }
+.file .codicon { font-size: 14px; opacity: .75; flex: none; }
+.file .marker { font-size: 8px; opacity: .9; }
+.file.conflicted .codicon-warning { color: var(--vscode-editorWarning-foreground); opacity: 1; }

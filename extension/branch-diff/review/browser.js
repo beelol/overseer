@@ -139,9 +139,15 @@ function renderTree() {
     }
     for (const entry of dir.files) {
       const button = node('button', 'file' + (entry.id === selected ? ' active' : ''));
-      button.dataset.id = entry.id; button.title = entry.path + (entry.unsaved ? ' (unsaved)' : '');
+      button.dataset.id = entry.id; button.title = entry.path + (entry.unsaved ? ' (unsaved)' : '') + (entry.conflicted ? ' (conflicted)' : '') + (entry.readOnly ? ' (staged: read-only)' : '');
       button.setAttribute('role', 'treeitem'); button.setAttribute('aria-selected', String(entry.id === selected));
-      button.append(node('span', 'file-name', entry.path.split('/').pop()), node('span', 'status status-' + entry.status, entry.status + (entry.unsaved ? ' •' : '')));
+      button.setAttribute('aria-label', [entry.path, entry.status, entry.unsaved && 'unsaved', entry.conflicted && 'conflicted'].filter(Boolean).join(', '));
+      // Codicon per file, plus markers: conflicted (warning) and unsaved (filled dot).
+      const icon = node('span', 'codicon codicon-' + (entry.conflicted ? 'warning' : 'file')); icon.setAttribute('aria-hidden', 'true');
+      button.append(icon, node('span', 'file-name', entry.path.split('/').pop()));
+      if (entry.unsaved) { const m = node('span', 'marker codicon codicon-circle-filled'); m.title = 'Unsaved edits'; m.setAttribute('aria-hidden', 'true'); button.append(m); }
+      button.append(node('span', 'status status-' + entry.status, entry.status));
+      if (entry.conflicted) button.classList.add('conflicted');
       button.addEventListener('click', () => jump(entry.id)); parent.append(button);
     }
   };
@@ -511,7 +517,7 @@ async function reconcile() {
         manual.clear(); queued.clear();
         for (const row of rows.values()) { release(row); row.renderedRevision = undefined; row.classification = undefined; }
       }
-      const oldStructure = snapshot?.entries.map(e => [e.id, e.path, e.status, e.unsaved]);
+      const oldStructure = snapshot?.entries.map(e => [e.id, e.path, e.status, e.unsaved, e.conflicted]);
       snapshot = next;
       Object.assign(identity, { repository: next.repository, mode: next.mode, target: next.target, runId: next.overseer?.runId || identity.runId });
       updateSettings(next.settings);
@@ -529,7 +535,7 @@ async function reconcile() {
       for (const [id, row] of rows) if (!ids.has(id)) { release(row); row.element.remove(); rows.delete(id); }
       diffs.querySelector('.empty')?.remove();
       // Metadata-only validation updates reuse the existing navigator DOM.
-      if (JSON.stringify(oldStructure) !== JSON.stringify(next.entries.map(e => [e.id, e.path, e.status, e.unsaved]))) renderTree();
+      if (JSON.stringify(oldStructure) !== JSON.stringify(next.entries.map(e => [e.id, e.path, e.status, e.unsaved, e.conflicted]))) renderTree();
       let previous = null, batchStart = performance.now();
       for (let index = 0; index < next.entries.length; index++) {
         const entry = next.entries[index];
@@ -600,6 +606,9 @@ function applyOverseer(o) {
   label.textContent = c.label || 'Comparison';
   document.getElementById('base').title = [c.label, c.base ? 'Base: ' + c.base : 'Base unavailable', c.detail, c.provenance ? 'Provenance: ' + c.provenance : ''].filter(Boolean).join('\n') + '\nClick to choose another comparison.';
   document.getElementById('comparison').textContent = o.runTitle || 'Run';
+  const scope = document.getElementById('scope');
+  if (scope && o.scope && scope.value !== o.scope) scope.value = o.scope;
+  document.body.dataset.scope = o.scope || 'all';
   document.getElementById('comparison').title = [o.runTitle, o.harness, o.workspacePath].filter(Boolean).join('\n');
   // The full path is in the tooltip and data-workspace; the note shows ~/…/last/two.
   const note = document.getElementById('workspace-note');
@@ -628,6 +637,7 @@ followButton.addEventListener('click', () => {
   else vscode.postMessage({ type: 'follow', enabled: followState !== 'following' });
 });
 document.getElementById('base').addEventListener('click', () => vscode.postMessage({ type: 'pickComparison' }));
+document.getElementById('scope').addEventListener('change', event => vscode.postMessage({ type: 'scope', scope: event.target.value }));
 diffs.addEventListener('wheel', () => userNavigated('scroll'), { passive: true });
 diffs.addEventListener('touchstart', () => userNavigated('scroll'), { passive: true });
 diffs.addEventListener('mousedown', event => { if (!event.target.closest('button')) userNavigated('pointer'); });

@@ -550,7 +550,6 @@ async function activate(context) {
       await model.refresh();
     })),
     vscode.commands.registerCommand('overseer.refreshAccounts', guard(refreshAccounts)),
-    vscode.commands.registerCommand('overseer.openDirtyDiff', guard((kind, root, file) => review.openDirtyDiff(kind, root, file))),
     vscode.commands.registerCommand('overseer.showCapabilities', guard(async () => {
       const list = await client.request('harness.list');
       const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: '# Harness capabilities (reported by this Overseer build)\n\n' + list.map(h =>

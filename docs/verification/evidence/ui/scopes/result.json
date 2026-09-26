@@ -1,0 +1,129 @@
+{
+  "checks": [
+    {
+      "name": "the Workspace Dirty view is gone; the side bar shows Agents and Accounts",
+      "ok": true,
+      "detail": [
+        "Agents",
+        "Accounts"
+      ]
+    },
+    {
+      "name": "Staged shows the staged edit and the staged rename",
+      "ok": true,
+      "detail": [
+        {
+          "name": "b-renamed.txt",
+          "status": "A",
+          "conflicted": false,
+          "unsaved": false,
+          "title": "b-renamed.txt (staged: read-only)"
+        },
+        {
+          "name": "b.txt",
+          "status": "D",
+          "conflicted": false,
+          "unsaved": false,
+          "title": "b.txt (staged: read-only)"
+        },
+        {
+          "name": "c.txt",
+          "status": "M",
+          "conflicted": false,
+          "unsaved": false,
+          "title": "c.txt (staged: read-only)"
+        },
+        {
+          "name": "README.md",
+          "status": "M",
+          "conflicted": false,
+          "unsaved": true,
+          "title": "README.md (unsaved)"
+        }
+      ]
+    },
+    {
+      "name": "Unstaged shows the unstaged edit and the unstaged deletion",
+      "ok": true,
+      "detail": [
+        {
+          "name": "a.txt",
+          "status": "M",
+          "conflicted": false,
+          "unsaved": false,
+          "title": "a.txt"
+        },
+        {
+          "name": "gone.txt",
+          "status": "D",
+          "conflicted": false,
+          "unsaved": false,
+          "title": "gone.txt"
+        },
+        {
+          "name": "README.md",
+          "status": "M",
+          "conflicted": false,
+          "unsaved": true,
+          "title": "README.md (unsaved)"
+        }
+      ]
+    },
+    {
+      "name": "Untracked shows the untracked file only",
+      "ok": true,
+      "detail": [
+        {
+          "name": "notes.txt",
+          "status": "A",
+          "conflicted": false,
+          "unsaved": false,
+          "title": "notes.txt"
+        },
+        {
+          "name": "README.md",
+          "status": "M",
+          "conflicted": false,
+          "unsaved": true,
+          "title": "README.md (unsaved)"
+        }
+      ]
+    },
+    {
+      "name": "All changes marks the conflicted file and the unsaved editor",
+      "ok": true,
+      "detail": [
+        {
+          "name": "conflict.txt",
+          "status": "M",
+          "conflicted": true,
+          "unsaved": false,
+          "title": "conflict.txt (conflicted)"
+        },
+        {
+          "name": "README.md",
+          "status": "M",
+          "conflicted": false,
+          "unsaved": true,
+          "title": "README.md (unsaved)"
+        }
+      ]
+    },
+    {
+      "name": "a staged file is read-only (no Save); an unstaged file stays editable",
+      "ok": true,
+      "detail": {
+        "staged": {
+          "save": false,
+          "editable": "false"
+        },
+        "unstagedEditable": "true"
+      }
+    },
+    {
+      "name": "the scope is remembered for the agent",
+      "ok": true,
+      "detail": "untracked"
+    }
+  ]
+}

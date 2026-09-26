@@ -26,6 +26,8 @@ class Review {
     // Comparison choice and Follow survive reloads and restarts (workspace state). Follow is
     // never auto-resumed: a run that was being followed comes back paused.
     this.comparisons = new Map(Object.entries(context.workspaceState.get('overseer.comparisons', {}))); // runId -> { mode, branch }
+    // Which changes the review shows (AC-75): all (against the comparison), staged, unstaged or untracked.
+    this.scopes = new Map(Object.entries(context.workspaceState.get('overseer.scopes', {})));
     this.follow = new Map(); // runId -> 'off' | 'following' | 'paused'
     this.followNotes = new Map();
     for (const [runId, state] of Object.entries(context.workspaceState.get('overseer.follow', {}))) {
@@ -48,6 +50,7 @@ class Review {
       reviewedKeys: runId => Object.keys(this.reviewed()[runId] || {}),
       reviewHunk: (session, message) => this.reviewHunk(session, message),
       closed: runId => this.onClosed?.(runId),
+      setScope: (runId, scope) => this.setScope(runId, scope),
     });
     context.subscriptions.push(this.manager,
       vscode.window.registerWebviewPanelSerializer('overseer.review', this.manager),
@@ -62,7 +65,7 @@ class Review {
     return {
       skipRepoStatus: true,
       async comparisonKey(repo, target) {
-        return JSON.stringify([target, repo.state.HEAD?.commit, holder.session?.overseer?.workspaceId]);
+        return JSON.stringify([target, repo.state.HEAD?.commit, holder.session?.overseer?.workspaceId, holder.session?.overseer?.scope]);
       },
       async resolveContext(target, repo) {
         const git = await self.gitApi();
@@ -72,16 +75,23 @@ class Review {
       },
       async getChangeEntries(git, repo, mode, base) {
         const workspaceId = holder.session?.overseer?.workspaceId;
-        const diff = await self.client.request('workspace.diff', { workspace_id: workspaceId, base, status: false });
+        const scope = holder.session?.overseer?.scope || 'all';
         const root = repo.rootUri;
-        return diff.changes.map(change => {
-          const uri = vscode.Uri.joinPath(root, ...change.path.split('/'));
-          const original = change.old_path ? vscode.Uri.joinPath(root, ...change.old_path.split('/')) : uri;
-          const status = STATUS[change.status] ?? 5;
-          return { uri, relPath: change.path, status,
+        const at = rel => vscode.Uri.joinPath(root, ...rel.split('/'));
+        const status = await self.client.request('workspace.status', { workspace_id: workspaceId }).catch(() => undefined);
+        const conflicted = new Set(status?.conflicted || []);
+        if (scope !== 'all' && status) return self.scopeEntries(git, scope, status, at);
+        const diff = await self.client.request('workspace.diff', { workspace_id: workspaceId, base, status: false });
+        const entries = diff.changes.map(change => {
+          const uri = at(change.path);
+          const original = change.old_path ? at(change.old_path) : uri;
+          return { uri, relPath: change.path, status: STATUS[change.status] ?? 5, conflicted: conflicted.has(change.path),
             left: change.status === 'A' ? null : git.toGitUri(original, base),
             right: change.status === 'D' ? null : uri };
         });
+        // A conflicted file stays in the list even when the comparison does not include it.
+        for (const rel of conflicted) if (!entries.some(e => e.relPath === rel)) entries.push({ uri: at(rel), relPath: rel, status: STATUS.U, conflicted: true, left: git.toGitUri(at(rel), 'HEAD'), right: at(rel) });
+        return entries;
       },
       async describeComparison(repo, base, mergeBase, mode) {
         return { base, mergeBase, headName: repo.state.HEAD?.name, headSha: repo.state.HEAD?.commit, mode };
@@ -145,6 +155,24 @@ class Review {
     await this.context.workspaceState.update('overseer.reviewedHunks', Object.fromEntries(runs.map(id => [id, next[id]])));
   }
 
+  /** Staged (HEAD → index, read-only), unstaged (index → working tree) or untracked files. */
+  scopeEntries(git, scope, st, at) {
+    const conflicted = new Set(st.conflicted || []);
+    if (scope === 'staged') return (st.staged || []).map(f => ({ uri: at(f.path), relPath: f.path, status: STATUS[f.status] ?? 5, readOnly: true, conflicted: conflicted.has(f.path),
+      left: f.status === 'A' ? null : git.toGitUri(at(f.old_path || f.path), 'HEAD'), right: f.status === 'D' ? null : git.toGitUri(at(f.path), '') }));
+    if (scope === 'unstaged') return (st.unstaged || []).map(f => ({ uri: at(f.path), relPath: f.path, status: STATUS[f.status] ?? 5, conflicted: conflicted.has(f.path),
+      left: git.toGitUri(at(f.path), ''), right: f.status === 'D' ? null : at(f.path) }));
+    return (st.untracked || []).map(rel => ({ uri: at(rel), relPath: rel, status: STATUS.A, left: null, right: at(rel) }));
+  }
+
+  setScope(runId, scope) {
+    if (!runId || !['all', 'staged', 'unstaged', 'untracked'].includes(scope)) return;
+    this.scopes.set(runId, scope);
+    this.context.workspaceState.update('overseer.scopes', Object.fromEntries([...this.scopes].slice(-200)));
+    const found = this.manager.panelFor(runId);
+    if (found) { found.session.overseer.scope = scope; found.session.invalidate(true); this.manager.postOverseer(found.session); }
+  }
+
   persistFollow() {
     const saved = {};
     for (const [runId, state] of this.follow) if (state !== 'off') saved[runId] = state;
@@ -188,7 +216,7 @@ class Review {
     const comparison = await this.currentComparison(runId);
     if (follow !== undefined) { this.follow.set(runId, follow ? 'following' : 'off'); this.persistFollow(); }
     if (String(run.capabilities?.file_activity || '').startsWith('unknown')) this.followNotes.set(runId, 'Filesystem evidence only: this harness does not report its edits, so Follow cannot attribute or jump to them. The file list still refreshes live.');
-    return this.manager.open({ repo, workspaceId: ws.id, runId, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison }, { preserveFocus, viewColumn: viewColumn || this.reviewColumn?.() });
+    return this.manager.open({ repo, workspaceId: ws.id, runId, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison, scope: this.scopes.get(runId) || 'all' }, { preserveFocus, viewColumn: viewColumn || this.reviewColumn?.() });
   }
 
   /** Opens the run's review at the first changed hunk of `rel` (a file edit clicked in the conversation). */
@@ -246,17 +274,6 @@ class Review {
     return gitShow(q.root, `${q.ref}:${q.path}`).then(b => b.toString('utf8'), () => '');
   }
 
-  /** Native diffs for the Workspace Dirty layers. The right side is the editable file when it is the working tree. */
-  async openDirtyDiff(kind, root, file) {
-    const rel = file.path;
-    const abs = vscode.Uri.file(path.join(root, rel));
-    const at = ref => vscode.Uri.from({ scheme: 'overseer-git', path: '/' + rel, query: JSON.stringify({ root, ref, path: rel }) });
-    const name = path.basename(rel);
-    if (kind === 'staged') await vscode.commands.executeCommand('vscode.diff', at('HEAD'), at(''), `${name} (HEAD ↔ index, staged)`);
-    else if (kind === 'unstaged') await vscode.commands.executeCommand('vscode.diff', at(''), abs, `${name} (index ↔ working tree, unstaged)`);
-    else await vscode.commands.executeCommand('vscode.open', abs);
-  }
-
   async restore(state) {
     // Serializers run during activation, possibly before the daemon connection is up.
     await this.client.waitConnected(20000);
@@ -271,7 +288,7 @@ class Review {
     const ws = this.model.workspace(run.workspace_id);
     const why = this.unavailable(run, ws);
     if (why) throw Object.assign(new Error(why), { runTitle: run.title });
-    return { repo: await this.repoFor(ws.path), workspaceId: ws.id, runId: run.id, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison: await this.currentComparison(run.id) };
+    return { repo: await this.repoFor(ws.path), workspaceId: ws.id, runId: run.id, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison: await this.currentComparison(run.id), scope: this.scopes.get(run.id) || 'all' };
   }
 
   // ---------------------------------------------------------------- Follow

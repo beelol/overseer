@@ -232,59 +232,6 @@ class AgentsProvider {
   }
 }
 
-class DirtyProvider {
-  constructor(model, client) {
-    this.model = model; this.client = client;
-    this.emitter = new vscode.EventEmitter();
-    this.onDidChangeTreeData = this.emitter.event;
-    this.status = undefined;
-  }
-  select(runId) { this.runId = runId; this.refresh(); }
-  async refresh() {
-    const run = this.runId && this.model.run(this.runId);
-    if (!run) { this.status = undefined; this.emitter.fire(); return; }
-    try { this.status = await this.client.request('workspace.status', { workspace_id: run.workspace_id }); this.error = undefined; }
-    catch (error) { this.error = error.message; }
-    const fingerprint = JSON.stringify([this.status, this.error, this.drafts()]);
-    if (fingerprint !== this.last) { this.last = fingerprint; this.emitter.fire(); }
-  }
-  workspace() { const run = this.runId && this.model.run(this.runId); return run && this.model.workspace(run.workspace_id); }
-  drafts() {
-    const ws = this.workspace(); if (!ws) return [];
-    return vscode.workspace.textDocuments.filter(d => d.isDirty && d.uri.scheme === 'file' && !path.relative(ws.path, d.uri.fsPath).startsWith('..'))
-      .map(d => path.relative(ws.path, d.uri.fsPath));
-  }
-  getTreeItem(node) { return node.item; }
-  getChildren(node) {
-    const ws = this.workspace();
-    if (!ws) return [{ item: new vscode.TreeItem('Select an agent run to see its workspace.') }];
-    if (this.error) return [{ item: new vscode.TreeItem('Status unavailable: ' + this.error) }];
-    const st = this.status || { staged: [], unstaged: [], untracked: [], conflicted: [] };
-    if (!node) {
-      const group = (key, label, files, icon) => {
-        const item = new vscode.TreeItem(`${label} (${files.length})`, files.length ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None);
-        item.iconPath = new vscode.ThemeIcon(icon); item.contextValue = 'dirty-group';
-        return { item, key, files };
-      };
-      const header = new vscode.TreeItem(`${ws.kind === 'current' ? 'Current checkout' : 'Worktree'} · ${st.branch || 'detached'}`);
-      header.description = ws.path; header.tooltip = ws.path; header.iconPath = new vscode.ThemeIcon('folder-opened');
-      return [{ item: header },
-        group('staged', 'Staged (HEAD → index)', st.staged, 'diff-added'),
-        group('unstaged', 'Unstaged (index → working tree)', st.unstaged, 'diff-modified'),
-        group('untracked', 'Untracked', st.untracked.map(p => ({ path: p, status: '?' })), 'diff-ignored'),
-        group('conflicted', 'Conflicted', st.conflicted.map(p => ({ path: p, status: 'U' })), 'warning'),
-        group('drafts', 'Unsaved drafts', this.drafts().map(p => ({ path: p, status: '•' })), 'circle-filled')];
-    }
-    return (node.files || []).map(f => {
-      const item = new vscode.TreeItem(path.basename(f.path));
-      item.description = `${path.dirname(f.path) === '.' ? '' : path.dirname(f.path) + ' · '}${f.status}${f.old_path ? ' ← ' + f.old_path : ''}`;
-      item.resourceUri = vscode.Uri.file(path.join(ws.path, f.path));
-      item.command = { command: 'overseer.openDirtyDiff', title: 'Open Diff', arguments: [node.key, ws.path, f] };
-      return { item };
-    });
-  }
-}
-
 const LOGO = { openai: 'openai', anthropic: 'claude', local: 'opencode', devin: undefined };
 const SHORT = { openai: 'ChatGPT', anthropic: 'Claude', local: 'OpenCode' };
 
@@ -344,4 +291,4 @@ class AccountsProvider {
   }
 }
 
-module.exports = { Model, AgentsProvider, DirtyProvider, AccountsProvider, ACTIVE, statusIcon, ago };
+module.exports = { Model, AgentsProvider, AccountsProvider, ACTIVE, statusIcon, ago };

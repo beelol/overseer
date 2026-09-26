@@ -70,7 +70,7 @@ class ReviewManager {
   overseerInfo(session) {
     const o = session.overseer || {};
     return { runId: o.runId, runTitle: o.runTitle, harness: o.harness, workspacePath: session.repo.rootUri.fsPath, workspaceKind: o.workspaceKind,
-      comparison: o.comparison, follow: this.host.followState(o.runId), followNote: this.host.followNote(o.runId), reviewed: this.host.reviewedKeys(o.runId) };
+      comparison: o.comparison, scope: o.scope || 'all', follow: this.host.followState(o.runId), followNote: this.host.followNote(o.runId), reviewed: this.host.reviewedKeys(o.runId) };
   }
 
   message(session, snapshot) {
@@ -78,7 +78,7 @@ class ReviewManager {
       repository: session.repo.rootUri.toString(), target: session.target || '', overseer: this.overseerInfo(session),
       checking: !!snapshot.checking, warning: snapshot.warning, error: snapshot.error, settings: this.settings(session.repo),
       entries: snapshot.entries.map(e => ({ id: e.id, path: e.relPath, status: this.host.statusLetter(e.status),
-        pending: !!e.pending, unsaved: !!e.unsaved, revision: e.revision, problem: e.problem })) };
+        pending: !!e.pending, unsaved: !!e.unsaved, conflicted: !!e.conflicted, readOnly: !!e.readOnly, revision: e.revision, problem: e.problem })) };
   }
 
   postOverseer(session) {
@@ -120,6 +120,7 @@ class ReviewManager {
           if (message.type === 'ready') { this.editing.recoverStored(session).then(async drafts => send({ type: 'editRecovery', drafts, handedOff: await this.editing.handoffDrafts(session, message.drafts) })).catch(() => {}); await panel.webview.postMessage({ type: 'progress', stage: session.stage || 'Finding changed files…' }); await sendSnapshot(); this.host.followReady(session.overseer?.runId); return; }
           if (message.type === 'refresh') { session.invalidate(true); await sendSnapshot(); return; }
           if (message.type === 'pickComparison') { await this.host.pickComparison(session.overseer?.runId); return; }
+          if (message.type === 'scope') { this.host.setScope?.(session.overseer?.runId, String(message.scope)); await sendSnapshot(); return; }
           if (message.type === 'follow') { this.host.setFollow(session.overseer?.runId, message.enabled ? 'following' : 'off'); this.postOverseer(session); return; }
           if (message.type === 'followPause') { this.host.pauseFollow(session.overseer?.runId, String(message.reason || 'navigation')); this.postOverseer(session); return; }
           if (message.type === 'hunkReview') {
@@ -152,7 +153,8 @@ class ReviewManager {
             if (body && !body.problem) {
               const entry = session.display?.entries.find(e => e.id === message.id);
               body.editable = false;
-              if (entry?.right && !entry.pending && !entry.symbolicLink && this.editing.enabled(session)) {
+              // Only the working-tree file is editable (a staged side is the index).
+              if (entry?.right && entry.right.scheme === 'file' && !entry.readOnly && !entry.pending && !entry.symbolicLink && this.editing.enabled(session)) {
                 try { await this.editing.writable(session, entry.uri); body.editable = true; } catch { /* The native editor explains unavailable write access. */ }
               }
               body.documentVersion = entry && vscode.workspace.textDocuments.find(doc => doc.uri.toString() === entry.uri.toString())?.version;
@@ -173,7 +175,7 @@ class ReviewManager {
     panel.webview.html = `<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${panel.webview.cspSource} 'unsafe-inline'; font-src ${panel.webview.cspSource}; img-src ${panel.webview.cspSource} data:; worker-src blob:; connect-src 'none';">
 <link rel="stylesheet" href="${escapeAttribute(panel.webview.asWebviewUri(vscode.Uri.joinPath(codicons, 'codicon.css')))}"><link rel="stylesheet" href="${asset('review.css')}"><title>Overseer Review</title></head>
-<body data-home="${escapeAttribute(require('os').homedir())}" data-run-id="${escapeAttribute(session.overseer?.runId || '')}" data-monaco="${asset('monaco.js')}" data-monaco-css="${asset('monaco.css')}" data-repository="${escapeAttribute(session.repo.rootUri.toString())}" data-mode="${escapeAttribute(session.mode)}" data-target="${escapeAttribute(session.target || '')}"><header id="toolbar"><button id="toggle-navigator" class="icon" aria-label="Toggle file navigator" title="Toggle file list" aria-expanded="true"><span class="codicon codicon-list-tree" aria-hidden="true"></span></button><button id="base" class="base" title="Comparison base">${baseIcon}<span id="base-label">Comparison</span></button><strong id="comparison">Review</strong><span id="total"></span><span id="loading-stage" role="status"></span><span class="spacer"></span><button id="follow" class="icon" aria-pressed="false" aria-label="Follow the agent" title="Follow the agent's edits"><span class="codicon codicon-eye-closed" aria-hidden="true"></span></button><span id="follow-state" class="visually-hidden" role="status"></span><select id="layout" aria-label="Diff layout" title="Diff layout"><option value="unified">Unified</option><option value="split">Split</option></select><button id="refresh" class="icon" aria-label="Refresh" title="Refresh"><span class="codicon codicon-refresh" aria-hidden="true"></span></button></header>
+<body data-home="${escapeAttribute(require('os').homedir())}" data-run-id="${escapeAttribute(session.overseer?.runId || '')}" data-monaco="${asset('monaco.js')}" data-monaco-css="${asset('monaco.css')}" data-repository="${escapeAttribute(session.repo.rootUri.toString())}" data-mode="${escapeAttribute(session.mode)}" data-target="${escapeAttribute(session.target || '')}"><header id="toolbar"><button id="toggle-navigator" class="icon" aria-label="Toggle file navigator" title="Toggle file list" aria-expanded="true"><span class="codicon codicon-list-tree" aria-hidden="true"></span></button><button id="base" class="base" title="Comparison base">${baseIcon}<span id="base-label">Comparison</span></button><select id="scope" aria-label="Changes to show" title="Changes to show"><option value="all">All changes</option><option value="staged">Staged</option><option value="unstaged">Unstaged</option><option value="untracked">Untracked</option></select><strong id="comparison">Review</strong><span id="total"></span><span id="loading-stage" role="status"></span><span class="spacer"></span><button id="follow" class="icon" aria-pressed="false" aria-label="Follow the agent" title="Follow the agent's edits"><span class="codicon codicon-eye-closed" aria-hidden="true"></span></button><span id="follow-state" class="visually-hidden" role="status"></span><select id="layout" aria-label="Diff layout" title="Diff layout"><option value="unified">Unified</option><option value="split">Split</option></select><button id="refresh" class="icon" aria-label="Refresh" title="Refresh"><span class="codicon codicon-refresh" aria-hidden="true"></span></button></header>
 <div id="notice" role="status" hidden></div><div id="workspace-note" role="note"></div><main id="review"><nav id="navigator" aria-label="Changed files"><input id="filter" placeholder="Filter files…" aria-label="Filter changed files"><div id="tree" role="tree" aria-label="Changed file tree"></div></nav><div id="resize" role="separator" tabindex="0" aria-label="Resize file navigator" aria-orientation="vertical"></div><section id="diffs" aria-label="All file diffs" tabindex="0"><p class="empty" role="status">Finding changed files…</p></section></main>
 <script type="module" nonce="${nonce}" src="${asset('review.js')}"></script></body></html>`;
     if (waitForComparison) await session.ready(); else session.ready().catch(() => {});
