@@ -482,8 +482,10 @@ mod tests {
 
             candidate.quota = Allowance::Unknown;
             candidate.health = Health::Healthy;
-            assert_eq!(select(&work, &[candidate]).selected.as_deref(), Some("candidate"),
+            let cold_start = select(&work, &[candidate]);
+            assert_eq!(cold_start.selected.as_deref(), Some("candidate"),
                 "unknown allowance stays a disclosed cold-start candidate for {harness}");
+            assert_eq!(cold_start.reason, "cold_start_allowance_unknown", "{harness}");
         }
     }
 
