@@ -505,9 +505,13 @@
       "blocker": "Local fixtures enforce review pressure, preserve ten already-admitted results across the eight-result threshold and daemon restart, and launch 32 live supervised workers with explicit ceilings. Live account usage, director/reviewer operation at scale and versioned qualification remain unverified."
     },
     "SWARM-57": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "No artifact destination ACL/revocation transition or supported interruption path exists."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_context.rs",
+        "daemon/src/swarm/context.rs",
+        "docs/verification/swarm/SWARM-57.md"
+      ],
+      "blocker": "Durable fixture destination revocation blocks context delivery, later dependent admission and a linked local worker while unrelated work continues. Live cross-target ACL/credential isolation, secret audits, peer bypass resistance, S4 replay and Stop/revocation/result races remain unverified."
     },
     "SWARM-58": {
       "status": "partial",
@@ -548,7 +552,7 @@
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/swarm_plan.rs"
       ],
-      "blocker": "Pending local launch replay is rejected after Stop, a linked scripted worker is interrupted, and rejected/superseded work does not requeue after cancellation; permission revocation, result/acceptance races, native descendants and unreachable-process retry remain unverified."
+      "blocker": "Pending local launch replay is rejected after Stop, a linked scripted worker is interrupted, and rejected/superseded work does not requeue after cancellation; a separate fixture revokes artifact delivery and interrupts a dependent worker. The combined Stop/revocation/result/acceptance race, native descendants and unreachable-process retry remain unverified."
     },
     "SWARM-62": {
       "status": "partial",
