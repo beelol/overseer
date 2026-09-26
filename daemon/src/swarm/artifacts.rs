@@ -429,6 +429,20 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
             tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
         }
     }
+    let elapsed: Option<i64> = tx.query_row(
+        "SELECT MAX(0,r.ended_ms-r.created_ms) FROM swarm_worker_launches l
+         JOIN runs r ON r.id=l.overseer_run_id
+         WHERE l.attempt_id=?1 AND l.run_id=?2 AND r.ended_ms IS NOT NULL",
+        params![attempt,run], |r| r.get(0),
+    ).optional()?;
+    if let Some(actual_elapsed_ms) = elapsed {
+        tx.execute(
+            "UPDATE swarm_benefit_attempt_outcomes
+             SET actual_elapsed_ms=?2,actual_source='supervised_run_wall',observed_ms=?3
+             WHERE attempt_id=?1 AND actual_elapsed_ms IS NULL",
+            params![attempt,actual_elapsed_ms,now],
+        )?;
+    }
     tx.commit()?;
     Ok(json!({"attempt_id":attempt,"status":"finished","duplicate":false}))
 }

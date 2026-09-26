@@ -197,18 +197,54 @@ pub fn preview(p: &Value) -> Result<Value> {
 }
 
 pub fn get_state(store: &Store, run_id: &str, revision: i64) -> Result<Value> {
-    let raw: Option<String> = store
+    let row: Option<(i64, String)> = store
         .conn
         .query_row(
-            "SELECT result_json FROM swarm_benefit_decisions WHERE run_id=?1 AND revision=?2
+            "SELECT wave,result_json FROM swarm_benefit_decisions WHERE run_id=?1 AND revision=?2
          ORDER BY wave DESC LIMIT 1",
             params![run_id, revision],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .optional()?;
-    raw.map(|text| serde_json::from_str(&text).map_err(Into::into))
-        .transpose()
-        .map(|value| value.unwrap_or(Value::Null))
+    let Some((wave, raw)) = row else {
+        return Ok(Value::Null);
+    };
+    let mut result: Value = serde_json::from_str(&raw)?;
+    let mut stmt = store.conn.prepare(
+        "SELECT attempt_id,job_id,estimate_elapsed_ms,estimate_usage_milli,
+                actual_elapsed_ms,actual_usage_milli,actual_source
+         FROM swarm_benefit_attempt_outcomes
+         WHERE run_id=?1 AND revision=?2 AND wave=?3
+         ORDER BY job_id,attempt_id LIMIT 101",
+    )?;
+    let rows = stmt
+        .query_map(params![run_id, revision, wave], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, i64>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, Option<i64>>(4)?,
+                r.get::<_, Option<String>>(5)?,
+                r.get::<_, Option<String>>(6)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut outcomes = Vec::new();
+    for (attempt, job, estimated_ms, estimated_usage, actual_ms, actual_usage, source) in rows {
+        let estimated_usage: Value = serde_json::from_str(&estimated_usage)?;
+        let actual_usage: Option<Value> = actual_usage
+            .map(|text| serde_json::from_str(&text))
+            .transpose()?;
+        outcomes.push(json!({"attempt_id":attempt,"job_id":job,
+            "estimate_elapsed_ms":estimated_ms,"estimate_usage_milli":estimated_usage,
+            "actual_elapsed_ms":actual_ms,"actual_usage_milli":actual_usage,
+            "actual_source":source}));
+    }
+    result["outcomes_truncated"] = json!(outcomes.len() > 100);
+    outcomes.truncate(100);
+    result["outcomes"] = json!(outcomes);
+    Ok(result)
 }
 
 pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {

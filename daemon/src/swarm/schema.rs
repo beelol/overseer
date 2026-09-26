@@ -52,6 +52,23 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           PRIMARY KEY(run_id,revision,wave)
         );
+        CREATE TABLE IF NOT EXISTS swarm_benefit_attempt_outcomes(
+          attempt_id TEXT PRIMARY KEY REFERENCES swarm_attempts(id) ON DELETE CASCADE,
+          run_id TEXT NOT NULL,
+          revision INTEGER NOT NULL,
+          wave INTEGER NOT NULL,
+          job_id TEXT NOT NULL,
+          estimate_elapsed_ms INTEGER NOT NULL,
+          estimate_usage_milli TEXT NOT NULL,
+          actual_elapsed_ms INTEGER,
+          actual_usage_milli TEXT,
+          actual_source TEXT,
+          observed_ms INTEGER,
+          FOREIGN KEY(run_id,revision,wave)
+            REFERENCES swarm_benefit_decisions(run_id,revision,wave)
+        );
+        CREATE INDEX IF NOT EXISTS swarm_benefit_outcomes_run
+          ON swarm_benefit_attempt_outcomes(run_id,revision,wave);
         CREATE TABLE IF NOT EXISTS swarm_jobs(
           run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
           id TEXT NOT NULL,

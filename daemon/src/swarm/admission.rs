@@ -368,13 +368,14 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
             estimate,
         ));
     }
-    let benefit: Option<(String, i64, String)> = tx.query_row(
-        "SELECT decision,max_parallel_workers,job_ids FROM swarm_benefit_decisions
+    let benefit: Option<(i64, String, i64, String, String)> = tx.query_row(
+        "SELECT wave,decision,max_parallel_workers,job_ids,estimate_json FROM swarm_benefit_decisions
          WHERE run_id=?1 AND revision=?2 ORDER BY wave DESC LIMIT 1",
         params![run,revision],
-        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
     ).optional()?;
-    if let Some((decision, cap, jobs)) = benefit {
+    let mut benefit_assignment = None;
+    if let Some((wave, decision, cap, jobs, estimate_json)) = benefit {
         let jobs: Vec<String> = serde_json::from_str(&jobs)?;
         if !jobs.iter().any(|id| id == job) {
             return Ok(blocked("benefit_job_not_estimated"));
@@ -385,6 +386,13 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
         if workers >= cap {
             return Ok(blocked(if decision == "serial" { "benefit_serial" } else { "benefit_batch_full" }));
         }
+        let estimate: Value = serde_json::from_str(&estimate_json)?;
+        let worker = estimate[if decision == "parallel" { "parallel" } else { "serial" }]["workers"]
+            .as_array().and_then(|workers| workers.iter().find(|worker| worker["id"] == job))
+            .ok_or_else(|| anyhow!("committed benefit job estimate missing"))?;
+        benefit_assignment = Some((wave,
+            worker["elapsed_ms"].as_i64().ok_or_else(|| anyhow!("committed elapsed estimate missing"))?,
+            worker["usage_milli"].to_string()));
     } else if workers > 0 {
         return Ok(blocked("benefit_unproven"));
     }
@@ -392,6 +400,11 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
     let token = uuid::Uuid::new_v4().simple().to_string();
     tx.execute("INSERT INTO swarm_attempts(id,run_id,job_id,revision,token_sha256,status,created_ms) VALUES(?1,?2,?3,?4,?5,'registered',?6)",
         params![attempt_id,run,job,job_revision,hash(&token),now])?;
+    if let Some((wave, estimate_elapsed_ms, estimate_usage_milli)) = benefit_assignment {
+        tx.execute("INSERT INTO swarm_benefit_attempt_outcomes(attempt_id,run_id,revision,wave,job_id,estimate_elapsed_ms,estimate_usage_milli)
+            VALUES(?1,?2,?3,?4,?5,?6,?7)",
+            params![attempt_id,run,revision,wave,job,estimate_elapsed_ms,estimate_usage_milli])?;
+    }
     for (resource, mode) in &resource_claims {
         tx.execute(
             "INSERT INTO swarm_claims(resource,run_id,job_id,mode,status,revision,created_ms,updated_ms)

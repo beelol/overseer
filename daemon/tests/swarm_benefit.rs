@@ -246,3 +246,60 @@ fn committed_serial_choice_holds_second_worker() {
     assert_eq!(admit(&d, &id, "a", at)["status"], "admitted");
     assert_eq!(admit(&d, &id, "b", at)["reason"], "benefit_serial");
 }
+
+#[test]
+fn supervised_exit_retains_measured_elapsed_but_not_invented_usage() {
+    let mut d = Daemon::start(&[]);
+    let id = run(&d, "Measured worker");
+    d.call(
+        "swarm.benefit.commit",
+        json!({"run_id":id,
+        "generation":1,"revision":1,"estimate":pair()}),
+    );
+    let admitted = admit(&d, &id, "a", now());
+    assert_eq!(admitted["status"], "admitted");
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("benefit-worker"));
+    let launched = d.call(
+        "swarm.worker.launch",
+        json!({"run_id":id,"job_id":"a",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "repo":checkout,"program":"/bin/sleep","args":["1"],
+        "prompt":"Check one path","title":"Benefit worker"}),
+    );
+    let worker = launched["overseer_run_id"].as_str().unwrap();
+    assert_eq!(d.wait_done(worker, 5)["status"], "completed");
+    d.call(
+        "swarm.worker.reconcile",
+        json!({"run_id":id,"job_id":"a",
+        "attempt_id":admitted["attempt_id"],"generation":1,"revision":1}),
+    );
+    d.kill9();
+    d.spawn();
+    let state = d.call("swarm.get", json!({"id":id}));
+    assert!(
+        state["benefit"]["outcomes"][0]["actual_elapsed_ms"]
+            .as_i64()
+            .unwrap()
+            >= 1000
+    );
+    assert!(state["benefit"]["outcomes"][0]["actual_usage_milli"].is_null());
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let outcome: (i64, String, i64, Option<String>, String) = db
+        .query_row(
+            "SELECT estimate_elapsed_ms,estimate_usage_milli,actual_elapsed_ms,
+                actual_usage_milli,actual_source FROM swarm_benefit_attempt_outcomes
+         WHERE attempt_id=?1",
+            [admitted["attempt_id"].as_str().unwrap()],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+        )
+        .unwrap();
+    assert_eq!(outcome.0, 100);
+    assert_eq!(
+        serde_json::from_str::<Value>(&outcome.1).unwrap()["points"],
+        10
+    );
+    assert!(outcome.2 >= 1000);
+    assert_eq!(outcome.3, None);
+    assert_eq!(outcome.4, "supervised_run_wall");
+}
