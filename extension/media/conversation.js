@@ -267,7 +267,8 @@
       const p = ev.payload || {};
       const child = ev.run_id && ev.run_id !== this.rootId;
       switch (ev.kind) {
-        case 'turn_started': if (!child) { this.newTurn(p.turn || { n: this.turns.length + 1, prompt: '' }, false, ev); this.active = true; this.updateWorking('Working…'); } break;
+        case 'turn_started': if (!child) { this.stopping = false; this.newTurn(p.turn || { n: this.turns.length + 1, prompt: '' }, false, ev); this.active = true; this.updateWorking('Working…'); } break;
+        case 'interrupt_requested': if (!child) this.stopping = true; break;
         case 'output': {
           const role = p.role || 'assistant';
           if (role === 'system') break; // session notes stay in the event log
@@ -335,6 +336,9 @@
           break;
         }
         case 'error': {
+          // Quiet endings (AC-78): a stop is not an error, and an error with nothing to say shows nothing.
+          if (!child && (this.stopping || !String(p.message || '').trim())) break;
+          if (!child) this.turn().hadError = true;
           const TITLES = { auth: 'Signed out', rate_limit: 'Rate limited', quota: 'Usage limit reached', network: 'Connection problem' };
           const e = el('div', 'error-block'); e.setAttribute('role', 'alert');
           const head = el('div', 'error-head'); head.append(ui.icon('error', 'sm'), el('strong', null, TITLES[p.class] || 'Error'));
@@ -365,10 +369,15 @@
         }
         case 'turn_done': {
           if (child) break;
-          const t = this.turn(); t.foot.hidden = false;
-          t.done.replaceChildren(ui.icon(p.ok ? 'check' : 'error', 'xs'), el('span', null, p.ok ? 'Done' : 'Failed'));
-          t.done.className = 'done ' + (p.ok ? 'ok' : 'fail');
+          const t = this.turn(); t.foot.hidden = false; t.ended = true;
+          // A turn the user stopped reads "Stopped"; a failed one shows its reason once.
+          const stopped = !p.ok && this.stopping;
+          const label = p.ok ? 'Done' : stopped ? 'Stopped' : 'Failed';
+          const reason = !p.ok && !stopped && !t.hadError && p.summary ? String(p.summary).split('\n')[0].slice(0, 160) : '';
+          t.done.replaceChildren(ui.icon(p.ok ? 'check' : stopped ? 'circle-slash' : 'error', 'xs'), el('span', null, reason ? `${label}: ${reason}` : label));
+          t.done.className = 'done ' + (p.ok ? 'ok' : stopped ? 'stopped' : 'fail');
           if (p.summary && !p.ok) t.done.title = p.summary;
+          this.stopping = false;
           const end = ev.ts_ms || ev.ts;
           if (t.started && end && end > t.started) t.dur.textContent = ui.duration(end - t.started);
           this.active = false; this.updateWorking();
@@ -376,13 +385,8 @@
           break;
         }
         case 'retention': this.truncated('Older history was trimmed. Raw output keeps everything.'); break;
-        case 'raw_unparsed': {
-          const d = el('details', 'thinking unparsed'); const s = el('summary');
-          s.append(ui.icon('question', 'sm'), el('span', null, 'Unparsed output'));
-          d.append(s, el('pre', 'code', p.text || '')); d.title = p.parser_version || '';
-          this.container(ev).append(d);
-          break;
-        }
+        // Lines the parser does not understand stay in the event log and raw output, not the chat.
+        case 'raw_unparsed': break;
         default: break;
       }
       if (ev.kind === 'status') this.status_(ev, p, child);
@@ -400,6 +404,10 @@
       if (['running', 'starting'].includes(p.status)) { this.active = true; this.updateWorking(); }
       if (p.status === 'waiting_for_user') { this.active = false; this.updateWorking(); }
       if (['interrupted', 'failed', 'disconnected', 'unknown'].includes(p.status)) {
+        const t = this.turns.length ? this.turn() : undefined;
+        // The turn's footer already says how it ended; one line is enough.
+        if (t && t.ended && ['interrupted', 'failed'].includes(p.status)) return;
+        if (t && p.status === 'interrupted') { t.foot.hidden = false; t.ended = true; t.done.replaceChildren(ui.icon('circle-slash', 'xs'), el('span', null, 'Stopped')); t.done.className = 'done stopped'; this.stopping = false; return; }
         const line = el('div', `sys status-line status-${p.status}`);
         line.append(ui.icon(p.status === 'interrupted' ? 'circle-slash' : 'error', 'xs'), el('span', null, ui.statusText(p.status)));
         if (p.reason) line.title = p.reason;

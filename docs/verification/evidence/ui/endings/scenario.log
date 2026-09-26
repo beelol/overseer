@@ -1,0 +1,10 @@
+[2026-09-26T20:05:12.194Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T20:05:24.918Z] screenshot docs/verification/evidence/ui/endings/01-claude-stopped-dark.png
+[2026-09-26T20:05:24.927Z] PASS a stopped Claude turn reads "Stopped": no empty error card, no "Failed", one ending line {"status":"interrupted","errors":[],"foot":["Stopped"],"statusLines":[],"unparsed":0}
+[2026-09-26T20:05:32.798Z] screenshot docs/verification/evidence/ui/endings/02-codex-stopped-dark.png
+[2026-09-26T20:05:32.809Z] PASS a stopped Codex turn reads "Stopped" (no "Failed", no error card) {"status":"interrupted","errors":[],"foot":["Stopped"],"statusLines":[],"unparsed":0}
+[2026-09-26T20:05:39.964Z] PASS a line the parser does not understand stays out of the chat and is in the event log {"raw":"Warning: telemetry flush skipped (fixture)","inChat":0}
+[2026-09-26T20:05:45.760Z] screenshot docs/verification/evidence/ui/endings/03-failed-dark.png
+[2026-09-26T20:05:45.760Z] PASS a failed turn shows its reason once {"times":1,"foot":["Failed"],"errors":["Error\nMigration failed: relation users_v2 does not exist"],"statusLines":[]}
+[2026-09-26T20:05:50.839Z] screenshot docs/verification/evidence/ui/endings/04-claude-stopped-light.png
+[2026-09-26T20:05:54.367Z] screenshot docs/verification/evidence/ui/endings/05-failed-light.png
