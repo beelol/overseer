@@ -36,7 +36,7 @@ pub use dispatch::recover_pending as recover_pending_dispatches;
 pub use effects::{begin as begin_effect, reconcile as reconcile_effect};
 pub use integration::integrate;
 pub use verification::{prepare as prepare_verification, run as run_verification,
-    record as record_verification, PreparedVerification};
+    record as record_verification, reconcile_control_verifications, PreparedVerification};
 pub use policy::preview;
 pub use settings::set_policy;
 pub use revision::revise;

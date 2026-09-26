@@ -41,6 +41,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
             interval.tick().await;
             let daemon = deadline_daemon.clone();
             match tokio::task::spawn_blocking(move || {
+                crate::swarm::reconcile_control_verifications(&mut daemon.store.lock().unwrap())?;
                 let _serial = daemon.swarm_launch_lock.lock().unwrap();
                 let expired = crate::swarm::expire_due(
                     &mut daemon.store.lock().unwrap(),

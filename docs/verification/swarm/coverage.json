@@ -190,7 +190,7 @@
         "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/SWARM-20.md"
       ],
-      "blocker": "Stop interrupts linked scripted local workers, blocks pending launch replay, and retries a simulated failed first signal after daemon restart. A fresh readout exposes unconfirmed linked workers. Local fixtures now terminalize idle Stop/Off runs, wait for active worker exit, review and checker completion, and release safe cancelled-job claims. Live Pause checkpoints, native descendants and VS Code display remain unverified; orphaned checker reconciliation needs further recovery coverage."
+      "blocker": "Stop interrupts linked scripted local workers, blocks pending launch replay, and retries a simulated failed first signal after daemon restart. A fresh readout exposes unconfirmed linked workers. Local fixtures terminalize idle Stop/Off runs, wait for active worker exit, review and checker completion, release safe cancelled-job claims, and reconcile a checker orphaned by daemon death. Live Pause checkpoints, native descendants and VS Code display remain unverified."
     },
     "SWARM-21": {
       "status": "partial",

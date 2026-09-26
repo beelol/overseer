@@ -113,6 +113,25 @@ fn reconcile_abandoned(store: &mut Store, run: &str) -> Result<()> {
     Ok(())
 }
 
+/// Stop and Off cannot start another verifier request, so their orphaned
+/// checker rows must be reconciled by the daemon's periodic recovery pass.
+pub fn reconcile_control_verifications(store: &mut Store) -> Result<()> {
+    let mut statement = store.conn.prepare(
+        "SELECT DISTINCT v.run_id FROM swarm_verifications v
+         JOIN swarm_runs r ON r.id=v.run_id
+         WHERE v.status='running' AND r.status IN ('stopping','draining')",
+    )?;
+    let runs = statement
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(statement);
+    for run in runs {
+        reconcile_abandoned(store, &run)?;
+        super::finalize_control_if_idle(&store.conn, &run, crate::daemon::now())?;
+    }
+    Ok(())
+}
+
 pub fn prepare(store: &mut Store, p: &Value) -> Result<PreparedVerification> {
     let run = required(p, "run_id")?;
     let request_id = required(p, "request_id")?;
