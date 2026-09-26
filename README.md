@@ -259,22 +259,22 @@ the owner action or decision each one needs.
 - [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.
 - [ ] [AC-81](docs/verification/AC-81.md) (Gate J still holds): Next: rerun scenario-live-gatej.js on the Gate K build when paid turns on both ChatGPT accounts are wanted.
 - [ ] [AC-82](docs/verification/AC-82.md) (Gate K design review (owner-confirmed)): Next: change the three Needs work items on the Gate K branch, show them again on the page, and get the owner's confirmation.
-- [ ] [AC-83](docs/verification/AC-83.md) (Offline is not an outage): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-84](docs/verification/AC-84.md) (Fail over to the best working provider): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-85](docs/verification/AC-85.md) (Local inventory read from the machine): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-86](docs/verification/AC-86.md) (Memory budget and fit): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-87](docs/verification/AC-87.md) (Verified local catalogue, Qwen coders first): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-88](docs/verification/AC-88.md) (Settings the daemon enforces): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-89](docs/verification/AC-89.md) (Download models only when allowed): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-90](docs/verification/AC-90.md) (Install and run Ollama only when allowed): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-91](docs/verification/AC-91.md) (Transition to local when offline): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-92](docs/verification/AC-92.md) (Wait and retry, never fail (for 36 hours)): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-93](docs/verification/AC-93.md) (Back online): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-94](docs/verification/AC-94.md) (Local models as a first-class choice): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-95](docs/verification/AC-95.md) (Honest offline UI): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-96](docs/verification/AC-96.md) (Several local agents): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-97](docs/verification/AC-97.md) (Offline session (owner-confirmed)): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
-- [ ] [AC-98](docs/verification/AC-98.md) (On by default, explained once): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-83](docs/verification/AC-83.md) (Offline is not an outage): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-84](docs/verification/AC-84.md) (Fail over to the best working provider): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-85](docs/verification/AC-85.md) (Local inventory read from the machine): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-86](docs/verification/AC-86.md) (Memory budget and fit): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-87](docs/verification/AC-87.md) (Verified local catalogue, Qwen coders first): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-88](docs/verification/AC-88.md) (Settings the daemon enforces): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-89](docs/verification/AC-89.md) (Download models only when allowed): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-90](docs/verification/AC-90.md) (Install and run Ollama only when allowed): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-91](docs/verification/AC-91.md) (Transition to local when offline): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-92](docs/verification/AC-92.md) (Wait and retry, never fail (for 36 hours)): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-93](docs/verification/AC-93.md) (Back online): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-94](docs/verification/AC-94.md) (Local models as a first-class choice): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-95](docs/verification/AC-95.md) (Honest offline UI): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-96](docs/verification/AC-96.md) (Several local agents): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-97](docs/verification/AC-97.md) (Offline session (owner-confirmed)): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-98](docs/verification/AC-98.md) (On by default, explained once): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
 - [ ] [AC-99](docs/verification/AC-99.md) (The review is where files live): Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).
 - [ ] [AC-100](docs/verification/AC-100.md) (Nothing shown twice): Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).
 - [ ] [AC-101](docs/verification/AC-101.md) (Overseer's own reviewer): Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).

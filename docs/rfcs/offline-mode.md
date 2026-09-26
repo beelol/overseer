@@ -3,7 +3,7 @@
 Status: proposed by the owner on 2026-09-26; decisions taken the same day (below). Acceptance
 criteria: AC-83 to AC-98 (Gate L) in the
 [main RFC](../overseer-rfc.md#gate-l--continuity-offline-mode-and-local-models-added-by-the-owner-2026-09-26).
-Implementation: **its own worktree** (owner, 2026-09-26). Builds on the verified OpenCode + Ollama
+Implementation: **its own worktree and pull request** (owner, 2026-09-26). Builds on the verified OpenCode + Ollama
 path ([AC-14](../verification/AC-14.md), the [Ollama log](../verification/evidence/ac-14/opencode-ollama.log)),
 the account model ([account governance RFC](account-governance.md)) and usage reporting
 ([AC-62](../verification/AC-62.md)).
@@ -41,9 +41,9 @@ under `overseer.continuity.*`. The chat still uses the owner's verb for the mome
 | Models | Start with the Qwen coder family. |
 | Retry | Keep retrying for **36 hours** at most. |
 | Failover order | OpenAI, then Anthropic, then whatever other providers have accounts, then local. |
-| Prefetch | Yes: keep a fitting local model downloaded while online, once downloads are allowed. |
+| Prefetch | Kept as a feature, **off until asked**: Overseer offers it once when downloads are first allowed, and only then keeps a fitting local model downloaded. |
 | Downloads and Ollama install | Opt-in settings, off by default, offered in the first-use notice. |
-| Where it is built | In its own worktree. |
+| Where it is built | In its own worktree, landing through a pull request. |
 | Other proposals in this RFC | Accepted as written (budget, handoff, catalogue verification, out-of-scope items). |
 
 ## Goal
@@ -328,10 +328,12 @@ gate it, both off by default and both offered in the first-use notice.
   qwen2.5-coder:14b · 3.2 of 9.0 GB* with **Cancel**. Partial downloads resume.
 - Disk space is checked first; a refused pull says how much is missing.
 - The first pull ever asks once in a dialog with the size; later pulls rely on the setting.
-- **Prefetch** (`continuity.prefetch`, on; effective once downloads are allowed): while online, keep
-  the best-fitting eligible model for this machine downloaded, so going offline works without a
-  download. Recomputed when the catalogue, the settings or the machine's memory change. Never runs
-  while a paid run is streaming.
+- **Prefetch** (`continuity.prefetch`, off until asked): while online, keep the best-fitting
+  eligible model for this machine downloaded, so going offline works without a download. Overseer
+  offers it once, when downloads are first allowed, naming the model and its size (*Keep
+  qwen3-coder:30b ready for offline? 17 GB*); declining leaves it off, and it can be turned on later
+  in settings. When on, it is recomputed when the catalogue, the settings or the machine's memory
+  change, and never runs while a paid run is streaming.
 
 **Ollama** (`continuity.allowOllamaInstall`):
 - Homebrew when present (`brew install --cask ollama`); otherwise the official macOS archive from
@@ -468,7 +470,7 @@ state, the budget and the current pick.
 | `providerOrder` | `["openai", "anthropic"]` | Preference among working providers for failover; providers with accounts that are not listed follow in the order their accounts were added; `local` is always last. |
 | `allowModelDownloads` | `false` | Pull models from the Ollama registry when a pick or prefetch needs one. |
 | `allowOllamaInstall` | `false` | Install Ollama (Homebrew or the verified official archive) when none is found. |
-| `prefetch` | `true` | While online and downloads are allowed, keep the best-fitting eligible model downloaded. |
+| `prefetch` | `false` | While online and downloads are allowed, keep the best-fitting eligible model downloaded. Offered once when downloads are first allowed. |
 | `ramCeilingPercent` | `40` (maximum `50`) | Share of total memory one local model may take. |
 | `ramHeadroomGiB` | `max(4, 10% of total)` | Free memory that must remain after loading. |
 | `contextTarget` | `65536` | Preferred context length. |
@@ -571,7 +573,7 @@ prefetch and the catalogue's starting family. Still open:
 ## Phases (goal candidates)
 
 Each phase is independently useful and verifiable; the criteria are in the main RFC. All of it is
-built in its own worktree.
+built in its own worktree and lands through a pull request.
 
 | Phase | Criteria | Outcome |
 | --- | --- | --- |
@@ -593,8 +595,8 @@ AC-83 to AC-98 in the main RFC are the acceptance criteria. Their Verify clauses
   budget formula against machine profiles (16, 32, 64 and 128 GiB); estimates within 15% of measured;
 - every Qwen coder this machine can run passing or failing the write check, recorded;
 - settings enforced by the daemon with VS Code closed; no download or install without its setting;
-- a download with progress and cancel; prefetch; an Ollama install with signature verification;
-  loopback only;
+- a download with progress and cancel; prefetch off until asked; an Ollama install with signature
+  verification; loopback only;
 - a real transition to OpenCode + Ollama with the picked model when the system reports no network,
   announced in the owner's words, in the same worktree, with the run tree showing predecessor and
   successor;
