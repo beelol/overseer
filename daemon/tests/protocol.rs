@@ -1376,3 +1376,27 @@ fn ac50_pr_plan_explains_refusals_and_prepares_a_github_branch_without_merging()
     d.wait_done(&run_id(&cur), 20);
     assert!(d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&cur)}))["reason"].as_str().unwrap().contains("current checkout"));
 }
+
+#[test]
+fn ac50_pr_plan_targets_the_branch_name_in_a_fresh_clone() {
+    // Found live: in a fresh clone the default branch is the remote-tracking `origin/master`, and the
+    // plan passed that to GitHub as the base, which GitHub rejects. The target must be the branch name.
+    let r = tmp();
+    let src = repo(&r.path().join("src"));
+    let bare = r.path().join("remote.git");
+    std::process::Command::new("git").args(["clone", "-q", "--bare", src.to_str().unwrap(), bare.to_str().unwrap()]).status().unwrap();
+    let clone = r.path().join("clone");
+    std::process::Command::new("git").args(["clone", "-q", bare.to_str().unwrap(), clone.to_str().unwrap()]).status().unwrap();
+    git(&clone, &["remote", "set-url", "origin", "https://github.com/test-owner/test-repo.git"]);
+    git(&clone, &["config", &format!("url.{}.insteadOf", bare.display()), "https://github.com/test-owner/test-repo.git"]);
+    assert_eq!(git(&clone, &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]), "origin/main");
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &clone, "worktree", "printf 'agent line\\n' >> a.txt");
+    d.wait_done(&run_id(&created), 20);
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(plan["ok"], true, "{plan}");
+    assert_eq!(plan["target"], "main", "{plan}");
+    let prep = d.call("workspace.pr_prepare", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(prep["files"][0]["path"], "a.txt", "{prep}");
+    assert_eq!(prep["commits"].as_array().map(Vec::len), Some(1), "only the run's commit, compared against main: {prep}");
+}

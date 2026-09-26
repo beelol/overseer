@@ -55,12 +55,17 @@ impl Daemon {
         let target = task.target_ref.clone().filter(|t| !t.is_empty() && !t.contains("..")).and_then(|t| {
             let local = git::git(Path::new(&task.repo_root), &["show-ref", "--verify", "--quiet", &format!("refs/heads/{t}")]).is_ok();
             local.then_some(t)
-        }).or_else(|| git::default_branch(Path::new(&task.repo_root)).map(|d| d.strip_prefix(&format!("{remote}/")).unwrap_or(&d).strip_prefix("origin/").unwrap_or(&d).to_string()))
+        }).or_else(|| git::default_branch(Path::new(&task.repo_root)).map(|d| {
+            // A clone's default is the remote-tracking `origin/master`; GitHub wants the branch name.
+            d.strip_prefix(&format!("{remote}/")).or_else(|| d.strip_prefix("origin/")).unwrap_or(&d).to_string()
+        }))
           .or_else(|| git::head_branch(Path::new(&task.repo_root)))
           .ok_or_else(|| anyhow!("no target branch"))?;
+        // What to compare against locally: the branch if it exists here, else its remote-tracking ref.
+        let base_ref = if git::git(Path::new(&task.repo_root), &["show-ref", "--verify", "--quiet", &format!("refs/heads/{target}")]).is_ok() { target.clone() } else { format!("{remote}/{target}") };
         let st = git::status(path)?;
         let uncommitted: Vec<String> = st.staged.iter().chain(st.unstaged.iter()).map(|c| c.path.clone()).chain(st.untracked.iter().cloned()).collect();
-        let base = git::merge_base(path, "HEAD", &target);
+        let base = git::merge_base(path, "HEAD", &base_ref);
         let commits: Vec<String> = base.as_ref().map(|b| git::git(path, &["log", "--format=%s", &format!("{b}..HEAD")]).unwrap_or_default().lines().map(str::to_string).collect()).unwrap_or_default();
         if uncommitted.is_empty() && commits.is_empty() {
             return refuse(format!("Nothing to propose: {branch} has no changes that are not already on {target}."));
@@ -69,7 +74,7 @@ impl Daemon {
         Ok(json!({
             "ok": true, "workspace": ws, "run_id": root.map(|r| r.id.clone()), "title": root.map(|r| r.title.clone()).unwrap_or_else(|| task.title.clone()),
             "prompt": task.prompt, "harness": root.map(|r| r.harness.clone()), "model": root.and_then(|r| r.model.clone()),
-            "remote": remote, "remote_url": url, "owner": owner, "repo": repo, "branch": branch, "target": target,
+            "remote": remote, "remote_url": url, "owner": owner, "repo": repo, "branch": branch, "target": target, "base_ref": base_ref,
             "uncommitted": uncommitted, "commits": commits,
         }))
     }
@@ -84,7 +89,7 @@ impl Daemon {
         let path = Path::new(&ws.path);
         let committed = crate::merge::commit_worktree(path, plan["title"].as_str().unwrap_or("Overseer run"))?;
         let head = git::head(path).ok_or_else(|| anyhow!("no HEAD"))?;
-        let base = git::merge_base(path, "HEAD", plan["target"].as_str().unwrap_or("HEAD"));
+        let base = git::merge_base(path, "HEAD", plan["base_ref"].as_str().unwrap_or("HEAD"));
         let files: Vec<Value> = match &base { Some(b) => serde_json::to_value(git::diff_trees(path, b, &head)?)?.as_array().cloned().unwrap_or_default(), None => vec![] };
         let commits: Vec<String> = base.as_ref().map(|b| git::git(path, &["log", "--format=%s", &format!("{b}..HEAD")]).unwrap_or_default().lines().map(str::to_string).collect()).unwrap_or_default();
         Ok(json!({"plan": plan, "committed": committed, "head": head, "files": files, "commits": commits}))
