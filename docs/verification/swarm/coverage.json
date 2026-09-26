@@ -410,9 +410,12 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
-        "docs/verification/swarm/milestone-2.md"
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-2.md",
+        "docs/verification/swarm/milestone-13.md",
+        "docs/verification/swarm/SWARM-53.md"
       ],
-      "blocker": "Global exclusive resource claim rejects a second writer; contamination detection/replay remains unimplemented."
+      "blocker": "Fixture admission atomically acquires declared resource claims before reserving an attempt, and conflicting read/write requests wait until release; real tool/resource discovery, contamination detection and selective rerun remain unimplemented."
     },
     "SWARM-54": {
       "status": "partial",
