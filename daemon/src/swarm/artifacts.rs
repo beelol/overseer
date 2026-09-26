@@ -84,6 +84,15 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
     {
         bail!("decision requires artifact evidence");
     }
+    let job_revision: i64 = store
+        .conn
+        .query_row(
+            "SELECT plan_revision FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            params![run, job],
+            |r| r.get(0),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("unknown job"))?;
     let mut attempt_id: Option<String> = None;
     for artifact in evidence {
         let id = artifact.as_str().unwrap();
@@ -93,7 +102,7 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
         ).optional()?;
         let (attempt, source_rev) =
             found.ok_or_else(|| anyhow!("missing artifact evidence {id}"))?;
-        if source_rev != revision {
+        if source_rev != job_revision {
             bail!("stale artifact source revision");
         }
         if attempt_id.as_deref().is_some_and(|a| a != attempt) {
@@ -106,7 +115,7 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
         "SELECT payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND kind IN ('result','submit') AND revision=?4"
     )?;
     let submitted = stmt
-        .query_map(params![run, job, attempt, revision], |r| {
+        .query_map(params![run, job, attempt, job_revision], |r| {
             r.get::<_, String>(0)
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -241,10 +250,15 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
     if current["revision"] != revision {
         bail!("stale plan revision");
     }
-    let attempt_status: String=store.conn.query_row(
-        "SELECT status FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3 AND revision=?4",
-        params![attempt,run,job,revision], |r|r.get(0),
-    ).optional()?.ok_or_else(||anyhow!("unknown attempt"))?;
+    let (attempt_status, attempt_revision): (String, i64) = store
+        .conn
+        .query_row(
+            "SELECT status,revision FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3",
+            params![attempt, run, job],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("unknown attempt"))?;
     if attempt_status == "finished" {
         return Ok(json!({"attempt_id":attempt,"status":"finished","duplicate":true}));
     }
@@ -257,15 +271,49 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
         "UPDATE swarm_attempts SET status='finished' WHERE id=?1",
         params![attempt],
     )?;
-    let (job_status, count): (String, i64) = tx.query_row(
-        "SELECT status,attempt_count FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+    let (job_status, count, job_revision): (String, i64, i64) = tx.query_row(
+        "SELECT status,attempt_count,plan_revision FROM swarm_jobs WHERE run_id=?1 AND id=?2",
         params![run, job],
-        |r| Ok((r.get(0)?, r.get(1)?)),
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
     )?;
     if job_status == "accepted" {
         release_and_unlock(&tx, run, job, now)?;
     } else if job_status == "rejected" {
         let next = if count < 2 { "ready" } else { "failed" };
+        tx.execute(
+            "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
+            params![run, job, next, now],
+        )?;
+        tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+    } else if job_status == "cancel_requested" && job_revision > attempt_revision {
+        let deps_raw: String = tx.query_row(
+            "SELECT deps FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            params![run, job],
+            |r| r.get(0),
+        )?;
+        let deps: Vec<String> = serde_json::from_str(&deps_raw)?;
+        let mut ready = deps.is_empty();
+        if !deps.is_empty() {
+            ready = true;
+            for dep in deps {
+                let dep_status: String = tx.query_row(
+                    "SELECT status FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+                    params![run, dep],
+                    |r| r.get(0),
+                )?;
+                if dep_status != "accepted" {
+                    ready = false;
+                    break;
+                }
+            }
+        }
+        let next = if count >= 2 {
+            "failed"
+        } else if ready {
+            "ready"
+        } else {
+            "planned"
+        };
         tx.execute(
             "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
             params![run, job, next, now],

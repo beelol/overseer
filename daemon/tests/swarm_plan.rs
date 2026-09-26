@@ -133,3 +133,115 @@ fn evidence_review_and_confirmed_exit_gate_dependent_work() {
     d.call("swarm.report",json!({"run_id":run_id,"job_id":"interface","attempt_id":retry_id,"token":retry_token,
         "message_id":"late-tail","type":"progress","revision":1,"payload":{"note":"tool log arrived after exit"}}));
 }
+
+#[test]
+fn revision_invalidates_affected_work_and_preserves_unrelated_acceptance() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Catalog revision","objective":"Change paging","allowed_targets":["system-codex"]}));
+    let run_id = run["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run_id,"generation":1,"revision":0,"jobs":[
+            {"id":"interface","title":"Interface","acceptance":"original contract","deps":[]},
+            {"id":"consumer","title":"Consumer","acceptance":"consumer test","deps":["interface"]},
+            {"id":"unrelated","title":"Unrelated","acceptance":"separate check","deps":[]}
+        ]}),
+    );
+    let finish = |job: &str, artifact: &str| {
+        let attempt = d.call(
+            "swarm.attempt.register",
+            json!({"run_id":run_id,"generation":1,"revision":1,"job_id":job}),
+        );
+        let aid = attempt["id"].as_str().unwrap();
+        let token = attempt["token"].as_str().unwrap();
+        d.call("swarm.artifact.put",json!({"run_id":run_id,"job_id":job,"attempt_id":aid,"token":token,"artifact_id":artifact,"source_revision":1,"kind":"finding","content":"verified"}));
+        d.call("swarm.report",json!({"run_id":run_id,"job_id":job,"attempt_id":aid,"token":token,"message_id":format!("result-{job}"),"type":"result","revision":1,"payload":{"artifact_ids":[artifact]}}));
+        d.call("swarm.decide",json!({"run_id":run_id,"generation":1,"revision":1,"job_id":job,"decision":"accept","evidence":[artifact]}));
+        d.call(
+            "swarm.attempt.confirm_exit",
+            json!({"run_id":run_id,"job_id":job,"attempt_id":aid,"generation":1,"revision":1}),
+        );
+    };
+    finish("interface", "original-interface");
+    finish("unrelated", "unrelated-proof");
+    let consumer = d.call(
+        "swarm.attempt.register",
+        json!({"run_id":run_id,"generation":1,"revision":1,"job_id":"consumer"}),
+    );
+    let consumer_id = consumer["id"].as_str().unwrap();
+    let consumer_token = consumer["token"].as_str().unwrap();
+    let revised=d.call("swarm.revise",json!({"id":run_id,"generation":1,"expected_revision":1,"reason":"cursor contract changed","jobs":[
+        {"id":"interface","title":"Interface","acceptance":"new cursor contract","deps":[]},
+        {"id":"consumer","title":"Consumer","acceptance":"consumer test","deps":["interface"]},
+        {"id":"unrelated","title":"Unrelated","acceptance":"separate check","deps":[]}
+    ]}));
+    assert_eq!(revised["revision"], 2);
+    let jobs = d.call("swarm.jobs", json!({"id":run_id}));
+    let find = |id: &str| {
+        jobs["jobs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|j| j["id"] == id)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(find("interface")["status"], "ready");
+    assert_eq!(find("interface")["plan_revision"], 2);
+    assert_eq!(find("consumer")["status"], "cancel_requested");
+    assert_eq!(find("consumer")["plan_revision"], 2);
+    assert_eq!(find("unrelated")["status"], "accepted");
+    assert_eq!(find("unrelated")["plan_revision"], 1);
+    let msg = d.call(
+        "swarm.messages",
+        json!({"run_id":run_id,"recipient":consumer_id}),
+    );
+    assert!(msg["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|m| m["type"] == "redirect"));
+    d.call("swarm.artifact.put",json!({"run_id":run_id,"job_id":"consumer","attempt_id":consumer_id,"token":consumer_token,"artifact_id":"old-consumer","source_revision":1,"kind":"finding","content":"old contract result"}));
+    d.call("swarm.report",json!({"run_id":run_id,"job_id":"consumer","attempt_id":consumer_id,"token":consumer_token,"message_id":"late-old","type":"result","revision":1,"payload":{"artifact_ids":["old-consumer"]}}));
+    assert!(d.try_call("swarm.decide",json!({"run_id":run_id,"generation":1,"revision":2,"job_id":"consumer","decision":"accept","evidence":["old-consumer"]})).unwrap_err().contains("stale"));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run_id,"job_id":"consumer","attempt_id":consumer_id,"generation":1,"revision":2}));
+    let jobs = d.call("swarm.jobs", json!({"id":run_id}));
+    let consumer_job = jobs["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|j| j["id"] == "consumer")
+        .unwrap();
+    assert_eq!(consumer_job["status"], "planned");
+}
+
+#[test]
+fn unchanged_ready_job_keeps_its_assignment_revision_after_another_job_changes() {
+    let d = Daemon::start(&[]);
+    let run=d.call("swarm.create",json!({"category":"Split work","objective":"Check two independent paths","allowed_targets":["system-codex"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":id,"generation":1,"revision":0,"jobs":[
+            {"id":"a","title":"A","acceptance":"old A","deps":[]},
+            {"id":"b","title":"B","acceptance":"B check","deps":[]}
+        ]}),
+    );
+    d.call(
+        "swarm.revise",
+        json!({"id":id,"generation":1,"expected_revision":1,"reason":"A changed","jobs":[
+            {"id":"a","title":"A","acceptance":"new A","deps":[]},
+            {"id":"b","title":"B","acceptance":"B check","deps":[]}
+        ]}),
+    );
+    let attempt = d.call(
+        "swarm.attempt.register",
+        json!({"run_id":id,"generation":1,"revision":2,"job_id":"b"}),
+    );
+    assert_eq!(attempt["revision"], 1);
+    let aid = attempt["id"].as_str().unwrap();
+    let token = attempt["token"].as_str().unwrap();
+    d.call("swarm.artifact.put",json!({"run_id":id,"job_id":"b","attempt_id":aid,"token":token,"artifact_id":"b-proof","source_revision":1,"kind":"finding","content":"B is verified"}));
+    d.call("swarm.report",json!({"run_id":id,"job_id":"b","attempt_id":aid,"token":token,"message_id":"b-result","type":"result","revision":1,"payload":{"artifact_ids":["b-proof"]}}));
+    d.call("swarm.decide",json!({"run_id":id,"generation":1,"revision":2,"job_id":"b","decision":"accept","evidence":["b-proof"]}));
+}

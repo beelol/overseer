@@ -216,6 +216,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.artifact.put" => crate::swarm::put(&mut d.store.lock().unwrap(), p)?,
         "swarm.decide" => crate::swarm::decide(&mut d.store.lock().unwrap(), p)?,
         "swarm.attempt.confirm_exit" => crate::swarm::confirm_exit(&mut d.store.lock().unwrap(), p)?,
+        "swarm.revise" => crate::swarm::revise(&mut d.store.lock().unwrap(), p)?,
         "profile.create" => json!(d.create_profile(s(p, "name")?, s(p, "harness")?)?),
         "profile.rename" => {
             let name = s(p, "name")?.trim();

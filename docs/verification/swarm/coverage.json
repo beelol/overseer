@@ -120,9 +120,11 @@
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/milestone-3.md"
       ],
-      "blocker": "Revision CAS exists; active-job invalidation and stale result acceptance are not implemented."
+      "blocker": "Revision CAS, affected-job invalidation and stale result rejection pass; user-message intake, live delivery, and job removal remain unimplemented."
     },
     "SWARM-22": {
       "status": "partial",
@@ -205,9 +207,10 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
-        "docs/verification/swarm/milestone-2.md"
+        "docs/verification/swarm/milestone-2.md",
+        "docs/verification/swarm/milestone-3.md"
       ],
-      "blocker": "Rejected results do not unlock dependents; contract revision propagation and session reuse remain unimplemented."
+      "blocker": "Rejected results do not unlock dependents and contract revisions invalidate affected jobs; session reuse and integration remain unimplemented."
     },
     "SWARM-36": {
       "status": "unverified",
@@ -257,9 +260,11 @@
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/milestone-3.md"
       ],
-      "blocker": "Delivered/applied states are distinct; live turn-boundary delivery and timeout response are not implemented."
+      "blocker": "Delivered/applied states are distinct and a revision redirect is queued; live turn-boundary delivery and timeout response are not implemented."
     },
     "SWARM-44": {
       "status": "partial",
@@ -278,9 +283,12 @@
       "blocker": "Independent reproduction claim can coexist with one hypothesis owner; budgeted job creation and finding merge remain unimplemented."
     },
     "SWARM-46": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-3.md"
+      ],
+      "blocker": "Affected jobs are invalidated while unrelated accepted jobs persist; live notifications and withdrawn-conclusion retractions remain unimplemented."
     },
     "SWARM-47": {
       "status": "partial",
