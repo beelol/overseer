@@ -10,6 +10,8 @@ Actual: Stop returns the worker in `unconfirmed` and leaves the job `cancel_requ
 
 At `f6886d0`, the same fixture verifies that a fresh `swarm.get` call exposes the unconfirmed worker, its job and attempt IDs, process state and last signal outcome after the first failed signal. Once the worker's exit is confirmed after restart, the unconfirmed count falls to zero. The response caps details at 100 workers and reports whether more exist. The full offline Rust suite passed 160 tests (`cargo test --workspace --offline -q`); `git diff --check` passed.
 
+At `14c62f6`, the fixture verifies the quota reservation remains `active` while exit is unconfirmed and becomes `uncertain` after confirmed exit. This keeps capacity held until account usage can be reconciled. The full offline Rust suite passed 160 tests.
+
 Evidence: `daemon/tests/swarm_runtime.rs`, `daemon/src/swarm/runtime.rs`, `daemon/src/swarm/schema.rs`, `daemon/src/server.rs`.
 
 Remaining: this fixture uses a scripted local worker and simulated first signal failure. Live Pause checkpoints, native descendants, reservation/exit display in VS Code, and full Swarm-off drain remain unverified. This criterion remains unchecked.
