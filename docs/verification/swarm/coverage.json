@@ -451,7 +451,7 @@
         "docs/verification/swarm/milestone-9.md",
         "docs/verification/swarm/SWARM-49.md"
       ],
-      "blocker": "Payload and inbox bounds, dedupe of 2,000 local-socket replays, Stop under two seconds during that flood, bounded director batches, admission hold at a full inbox, and terminal report persistence pass in fixtures; live inference/context controls and malformed permission cases remain unverified."
+      "blocker": "Malformed or unauthorized worker reports get bounded non-leaking diagnostics and no inbox effect; payload/inbox bounds, dedupe of 2,000 local-socket replays, Stop under two seconds during that flood, bounded director batches, admission hold at a full inbox, and terminal report persistence pass in fixtures. Live inference/context controls and broader permission paths remain unverified."
     },
     "SWARM-50": {
       "status": "partial",

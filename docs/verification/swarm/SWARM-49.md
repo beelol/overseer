@@ -10,6 +10,8 @@ Actual: `swarm.admit` returns `director_inbox_full` for the second job, and the 
 
 Follow-up revision `a0ef330`: `stop_is_not_starved_by_two_thousand_duplicate_progress_replays` sends 2,000 duplicate progress envelopes over real local daemon socket connections while issuing Stop after the flood has begun. Every replay receives a duplicate receipt, the director inbox retains one event, and Stop returns `stopping` within the RFC's two-second bound. The full offline Rust suite passed 178 non-ignored tests. This measures the local fixture machine and does not qualify a live director model's context behavior.
 
+Follow-up revision `66238db`: `malformed_and_unauthorized_reports_return_bounded_errors_without_inbox_effects` submits seven invalid envelopes, including wrong worker identity, missing/oversized message ID, a worker-spoofed director command, wrong revision, non-object payload and oversized payload. Every rejection is at most 160 characters, echoes neither the supplied token nor payload sentinel, leaves the director inbox empty, and does not prevent a later valid report. The focused test and full offline Rust suite pass (179 non-ignored tests). This exercises local broker authorization and diagnostics, not cross-harness delivery.
+
 Evidence: `daemon/tests/swarm_admission.rs`, `daemon/tests/swarm_broker.rs`, `docs/verification/swarm/milestone-9.md`.
 
-Remaining: malformed permission cases and live director inference/context limits remain unverified. Stop responsiveness under this local duplicate flood is covered; broader load behavior is not.
+Remaining: live director inference/context limits and broader permission paths remain unverified. Stop responsiveness under this local duplicate flood is covered; broader load behavior is not.
