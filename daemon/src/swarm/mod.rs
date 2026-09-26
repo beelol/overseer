@@ -354,27 +354,31 @@ pub fn jobs(store: &Store, p: &Value) -> Result<Value> {
 }
 
 pub fn stop(store: &mut Store, p: &Value) -> Result<Value> {
-    stop_with_reason(store, p, "requested")
+    stop_with_reason(store, p, "requested", false)
 }
 
 pub(super) fn stop_for_deadline(store: &mut Store, p: &Value) -> Result<Value> {
-    stop_with_reason(store, p, "deadline")
+    stop_with_reason(store, p, "deadline", true)
 }
 
-fn stop_with_reason(store: &mut Store, p: &Value, reason: &str) -> Result<Value> {
+fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version: bool) -> Result<Value> {
     let id = required(p, "run_id")?;
-    let generation = p["generation"]
-        .as_i64()
-        .ok_or_else(|| anyhow!("missing generation"))?;
-    let revision = p["revision"]
-        .as_i64()
-        .ok_or_else(|| anyhow!("missing revision"))?;
     let current = get(store, id)?;
-    if current["generation"] != generation {
-        bail!("stale director generation");
-    }
-    if current["revision"] != revision {
-        bail!("stale plan revision");
+    // Stop is a user safety control. A stale view must not prevent it; only
+    // internal deadline transitions carry a director-version precondition.
+    if require_version {
+        let generation = p["generation"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("missing generation"))?;
+        let revision = p["revision"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("missing revision"))?;
+        if current["generation"] != generation {
+            bail!("stale director generation");
+        }
+        if current["revision"] != revision {
+            bail!("stale plan revision");
+        }
     }
     if current["status"] == "stopping" {
         return Ok(json!({"id":id,"status":"stopping","duplicate":true}));

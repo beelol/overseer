@@ -752,7 +752,7 @@ fn stop_retries_an_initially_unreachable_worker_after_daemon_restart() {
         "title":"Stop retry worker"}));
     let worker = launched["overseer_run_id"].as_str().unwrap();
     d.wait_status(worker, |status| status == "running", 10);
-    let stopped = d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1,
+    let stopped = d.call("swarm.stop", json!({"run_id":id,
         "fault_interrupt_once":true}));
     assert_eq!(stopped["workers"]["unconfirmed"], json!([worker]));
     assert_eq!(d.run(worker)["status"], "running");
@@ -789,6 +789,78 @@ fn stop_retries_an_initially_unreachable_worker_after_daemon_restart() {
     assert_eq!(after["status"], "stopped");
     assert_eq!(after["unconfirmed_exit_count"], 0);
     assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["attempt_count"], 1);
+}
+
+#[test]
+fn slow_worker_stop_signal_does_not_hold_other_swarm_admissions() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::time::{Duration, Instant};
+
+    struct ResumeShim(i64);
+    impl Drop for ResumeShim {
+        fn drop(&mut self) { signal(self.0, libc::SIGCONT); }
+    }
+
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("slow-stop-source"));
+    let made = d.call("swarm.create",json!({"category":"Slow stop socket",
+        "objective":"Audit", "allowed_targets":["fixture-local"]}));
+    let id = made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}]}));
+    let at = now();
+    let admitted = d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"inspect","target_id":"fixture-local","request_id":"slow-stop",
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    let launched = d.call("swarm.worker.launch",json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],"repo":checkout,
+        "program":"/bin/sleep","args":["30"],"prompt":"Inspect","title":"Slow socket worker"}));
+    let worker = launched["overseer_run_id"].as_str().unwrap();
+    d.wait_status(worker, |status| status == "running", 10);
+    let (shim, run_dir) = launch_info(&d, worker);
+    let control: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(run_dir.join("launch.json")).unwrap()).unwrap();
+    let mut ping = UnixStream::connect(control["control_socket"].as_str().unwrap()).unwrap();
+    ping.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
+    ping.write_all(b"{\"op\":\"ping\"}\n").unwrap();
+    let mut reply = String::new();
+    BufReader::new(ping).read_line(&mut reply).unwrap();
+    assert!(reply.contains("\"ok\":true"),"{reply}");
+
+    let shim_pid = shim["shim_pid"].as_i64().unwrap();
+    signal(shim_pid, libc::SIGSTOP);
+    let resume = ResumeShim(shim_pid);
+    let socket = d.socket();
+    let id_for_stop = id.to_string();
+    let stop = std::thread::spawn(move || {
+        let mut conn = UnixStream::connect(socket).unwrap();
+        conn.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+        conn.write_all(format!("{}\n",json!({"id":1,"method":"swarm.stop",
+            "params":{"run_id":id_for_stop}})).as_bytes()).unwrap();
+        let mut reply = String::new();
+        BufReader::new(conn).read_line(&mut reply).unwrap();
+        serde_json::from_str::<serde_json::Value>(&reply).unwrap()
+    });
+    let ready_by = Instant::now() + Duration::from_secs(3);
+    while d.call("swarm.get",json!({"id":id}))["status"] != "stopping" {
+        assert!(Instant::now() < ready_by,"Stop did not commit before worker control I/O");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let started = Instant::now();
+    assert!(d.try_call("swarm.admit",json!({})).unwrap_err().contains("run_id"));
+    assert!(started.elapsed() < Duration::from_secs(3),
+        "a blocked worker control socket held the launch lock for another request");
+    drop(resume);
+    let stopped = stop.join().unwrap();
+    assert_eq!(stopped["result"]["status"],"stopping","{stopped}");
 }
 
 #[test]

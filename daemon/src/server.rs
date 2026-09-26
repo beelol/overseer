@@ -42,18 +42,19 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
             let daemon = deadline_daemon.clone();
             match tokio::task::spawn_blocking(move || {
                 crate::swarm::reconcile_control_verifications(&mut daemon.store.lock().unwrap())?;
-                let _serial = daemon.swarm_launch_lock.lock().unwrap();
-                let expired = crate::swarm::expire_due(
-                    &mut daemon.store.lock().unwrap(),
-                    crate::daemon::now(),
-                )?;
+                let (expired, timed_out_workers) = {
+                    let _serial = daemon.swarm_launch_lock.lock().unwrap();
+                    let mut store = daemon.store.lock().unwrap();
+                    let now = crate::daemon::now();
+                    (crate::swarm::expire_due(&mut store, now)?,
+                     crate::swarm::expire_jobs_due(&mut store, now)?)
+                };
+                // State is committed before control sockets are contacted. A slow
+                // or unreachable worker must not hold the launch lock while the
+                // timer interrupts, reconciles, or samples processes.
                 for run in expired {
                     crate::swarm::interrupt_workers(&daemon, &run)?;
                 }
-                let timed_out_workers = crate::swarm::expire_jobs_due(
-                    &mut daemon.store.lock().unwrap(),
-                    crate::daemon::now(),
-                )?;
                 for worker in timed_out_workers {
                     if let Err(error) = daemon.interrupt(&worker) {
                         crate::log(&format!("swarm job deadline interrupt {worker} failed: {error}"));
@@ -312,8 +313,13 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.stop" => {
             let fault_interrupt_once = p["fault_interrupt_once"] == true;
             if fault_interrupt_once { fixture_only()?; }
-            let _serial = d.swarm_launch_lock.lock().unwrap();
-            let mut stopped = crate::swarm::stop(&mut d.store.lock().unwrap(), p)?;
+            let mut stopped = {
+                let _serial = d.swarm_launch_lock.lock().unwrap();
+                crate::swarm::stop(&mut d.store.lock().unwrap(), p)?
+            };
+            // The stop transition is committed before socket control. Keeping the
+            // launch lock during an unresponsive worker's I/O would hold unrelated
+            // admission and safety controls behind that worker.
             stopped["workers"] = crate::swarm::interrupt_workers_with_fault(
                 d, s(p,"run_id")?, fault_interrupt_once)?;
             stopped

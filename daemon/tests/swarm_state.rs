@@ -48,6 +48,24 @@ fn stopped_empty_swarm_is_terminal_and_releases_category() {
 }
 
 #[test]
+fn user_stop_needs_only_the_run_id_even_after_a_plan_revision() {
+    let d = Daemon::start(&[]);
+    let made = d.call("swarm.create", json!({"category":"Stop from stale view",
+        "objective":"Audit", "allowed_targets":[]}));
+    let id = made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let stopped = d.call("swarm.stop",json!({"run_id":id}));
+    assert_eq!(stopped["status"],"stopped","{stopped}");
+    assert_eq!(stopped["stop_reason"],"requested");
+    let duplicate = d.call("swarm.stop",json!({"run_id":id,
+        "generation":0,"revision":0}));
+    assert_eq!(duplicate["status"],"stopped");
+    assert_eq!(duplicate["duplicate"],true);
+}
+
+#[test]
 fn cancelled_jobs_release_claims_for_later_swarms() {
     let d = Daemon::start(&[]);
     for (category, action) in [("Stop claim", "swarm.stop"), ("Off claim", "swarm.off")] {
