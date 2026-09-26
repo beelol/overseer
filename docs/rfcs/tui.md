@@ -50,6 +50,8 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | x | Interrupt the focused agent (asks y/n) |
 | n | New agent (repository, harness, account, model, prompt) |
 | f | Filter: All → Active → Needs you |
+| / | Search agents by title, repository, harness, model, account or prompt (Esc clears) |
+| A | Accounts: sign-in status; `s` signs in (the provider's own login, in this terminal), `S` device code for ChatGPT |
 | ? | Help |
 | q | Quit (agents keep running) |
 
@@ -136,3 +138,14 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   (`comparison.options`, `workspace.diff`) and the diff from read-only Git. **Verify:** an agent
   that edits one file and adds another shows both with `+/−` counts, each file's diff, and a
   second comparison.
+- [x] **T-15 — Search.** `/` filters agents as you type by title, repository, harness, model,
+  account, prompt or status; Enter keeps the search (shown in the header), Esc clears it, and
+  focus lands on a match. **Verify:** four agents in two repositories narrowed by title and by
+  repository name; kept after Enter; cleared by Esc.
+- [x] **T-16 — Accounts and sign-in.** `A` lists accounts by provider with their kind (follows the
+  desktop app, or fixed) and sign-in status (plan and fingerprint, never tokens); `s` signs the
+  selected account in with its provider's own login, run in this terminal while the TUI is
+  suspended, then resumes and refreshes; `S` uses ChatGPT's device code. Only that account's
+  folder is touched; no API keys. **Verify:** the panel's statuses; the real binary in a
+  terminal signs a fixed account in (fixture account CLI) and comes back, the daemon reports
+  it signed in, and the desktop login is unchanged.

@@ -103,6 +103,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     match app.mode {
         Mode::Help => help(f, area),
         Mode::NewAgent => new_agent(f, &app.form, area),
+        Mode::Accounts => accounts(f, app, area),
         _ => {}
     }
 }
@@ -154,6 +155,7 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
         Mode::Zoom { .. } => &[("j/k", "scroll"), ("g/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
+        Mode::Accounts => &[("j/k", "select"), ("s", "sign in"), ("S", "device code (ChatGPT)"), ("r", "refresh"), ("esc", "close")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
         Mode::Changes => &[("j/k", "file"), ("J/K", "scroll diff"), ("c", "comparison"), ("r", "refresh"), ("v/esc", "back")],
         _ if area.width < 110 => &[("i", "message"), ("z", "zoom"), ("a/d", "answer"), ("n", "new"), ("?", "keys"), ("q", "quit")],
@@ -414,6 +416,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("n", "start a new agent"),
         ("f", "filter: all → active → needs you"),
         ("/", "search agents (esc clears)"),
+        ("A", "accounts and sign-in"),
         ("r", "reload from the daemon"),
         ("q", "quit (agents keep running)"),
     ];
@@ -425,6 +428,52 @@ fn help(f: &mut Frame, area: Rect) {
         lines.push(Line::from(vec![Span::styled(format!("  {k:<18}"), Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::raw(*v)]));
     }
     let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent())).title(Span::styled(" keys ", Style::new().add_modifier(Modifier::BOLD))).title_bottom(Line::from(Span::styled(" any key closes ", Style::new().fg(MUTED))).right_aligned());
+    f.render_widget(Clear, r);
+    f.render_widget(Paragraph::new(lines).block(block), r);
+}
+
+/// Accounts panel: each account's provider, kind and sign-in status; `s` signs in.
+fn accounts(f: &mut Frame, app: &App, area: Rect) {
+    let w = 96.min(area.width.saturating_sub(4));
+    // Rows, plus a header and a gap per provider, plus borders and padding.
+    let providers = app.accounts.iter().map(|a| a.provider.as_str()).collect::<std::collections::HashSet<_>>().len() as u16;
+    let h = (app.accounts.len() as u16 + providers * 2 + 3).clamp(8, area.height.saturating_sub(2));
+    let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
+    let mut lines = vec![Line::raw("")];
+    let mut last_provider = String::new();
+    for (i, a) in app.accounts.iter().enumerate() {
+        if a.provider != last_provider {
+            if !last_provider.is_empty() {
+                lines.push(Line::raw(""));
+            }
+            let label = match a.provider.as_str() { "openai" => "OpenAI / ChatGPT", "anthropic" => "Anthropic / Claude", "local" => "OpenCode (local models)", p => p };
+            lines.push(Line::from(Span::styled(format!("  {label}"), Style::new().fg(MUTED).add_modifier(Modifier::BOLD))));
+            last_provider = a.provider.clone();
+        }
+        let sel = i == app.account_sel;
+        let st = a.status.as_ref();
+        let signed = st.and_then(|s| s["logged_in"].as_bool());
+        let plan = st.and_then(|s| s["identity"]["plan"].as_str()).unwrap_or_default();
+        let fp = st.and_then(|s| s["identity"]["account_fingerprint"].as_str().or(s["identity"]["fingerprint"].as_str())).map(|f| f.chars().take(8).collect::<String>()).unwrap_or_default();
+        let (mark, color, text) = match signed {
+            Some(true) => ("✓", Color::Green, [Some("signed in"), (!plan.is_empty()).then_some(plan), (!fp.is_empty()).then_some(fp.as_str())].into_iter().flatten().collect::<Vec<_>>().join(" · ")),
+            Some(false) => ("✗", Color::Red, "not signed in".to_string()),
+            None => ("…", MUTED, "checking".to_string()),
+        };
+        lines.push(Line::from(vec![
+            Span::styled(if sel { "  › " } else { "    " }, Style::new().fg(accent())),
+            Span::styled(format!("{:<28}", fit(&a.name, 28)), if sel { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new() }),
+            Span::styled(format!("{:<14}", if a.follows_app { "follows app" } else { "fixed" }), Style::new().fg(MUTED)),
+            Span::styled(format!("{mark} "), Style::new().fg(color)),
+            Span::styled(text, Style::new().fg(if signed == Some(true) { Color::Reset } else { color })),
+        ]));
+    }
+    if app.accounts.is_empty() {
+        lines.push(Line::from(Span::styled("  loading…", Style::new().fg(MUTED))));
+    }
+    let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent()))
+        .title(Span::styled(" accounts ", Style::new().add_modifier(Modifier::BOLD)))
+        .title_bottom(Line::from(Span::styled(" account login only · never API keys · s signs in · esc closes ", Style::new().fg(MUTED))).right_aligned());
     f.render_widget(Clear, r);
     f.render_widget(Paragraph::new(lines).block(block), r);
 }

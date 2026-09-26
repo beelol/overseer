@@ -1,0 +1,40 @@
+ ◆ Overseer  page 1/1 · 0 agents                                                                                                ● connected 
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                      ╭ accounts ────────────────────────────────────────────────────────────────────────────────────╮                      
+                      │                                                                                              │                      
+                      │  OpenAI / ChatGPT                                                                            │                      
+                      │  › codex (existing login)      follows app   ✓ signed in · pro · 55b9da0f                    │                      
+                      │    ChatGPT Work                fixed         ✗ not signed in                                 │                      
+                      │                                                                                              │                      
+                      │  Anthropic / Claude                                                                          │                      
+                      │    claude (existing login)     follows app   ✗ not signed in                                 │                      
+                      │                                                                                              │                      
+                      │  OpenCode (local models)                                                                     │                      
+                      │    opencode (existing login)   follows app   ✗ not signed in                                 │                      
+                      │                                                                                              │                      
+                      ╰─────────────────────────────── account login only · never API keys · s signs in · esc closes ╯                      
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+                                                                                                                                            
+ j/k select   s sign in   S device code (ChatGPT)   r refresh   esc close                                                                   

@@ -60,6 +60,29 @@ pub enum Mode {
     Changes,
     /// Typing a search (`/`): agents filter as you type.
     Search,
+    /// Accounts and their sign-in status (`A`).
+    Accounts,
+}
+
+/// A program to run in the terminal with the TUI suspended (a provider's own sign-in).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Exec {
+    pub title: String,
+    pub program: String,
+    pub args: Vec<String>,
+    pub env: Vec<(String, String)>,
+}
+
+/// One row of the Accounts panel.
+#[derive(Debug, Clone, Default)]
+pub struct AccountRow {
+    pub id: String,
+    pub name: String,
+    pub provider: String,
+    pub family: String,
+    pub follows_app: bool,
+    /// `profile.status` once loaded.
+    pub status: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,6 +105,9 @@ enum Pending {
     Create,
     Comparisons { run: String },
     Diff { run: String },
+    AccountList,
+    AccountStatus(String),
+    Login(String),
 }
 
 /// The New Agent form.
@@ -198,6 +224,10 @@ pub struct App {
     pub changes: ChangesView,
     /// Search text (`/`): agents whose title, repository, harness, model or prompt contain it.
     pub search: String,
+    pub accounts: Vec<AccountRow>,
+    pub account_sel: usize,
+    /// Set when a program must run with the terminal (the event loop suspends the TUI for it).
+    pub exec: Option<Exec>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -240,6 +270,9 @@ impl App {
             editing_repo: false,
             changes: ChangesView::default(),
             search: String::new(),
+            accounts: Vec::new(),
+            account_sel: 0,
+            exec: None,
         }
     }
 
@@ -650,6 +683,39 @@ impl App {
                 self.changes.error = None;
                 self.load_file_diff();
             }
+            (Pending::AccountList, Ok(v)) => {
+                let keep = self.accounts.get(self.account_sel).map(|a| a.id.clone());
+                self.accounts = v["accounts"].as_array().cloned().unwrap_or_default().iter().map(|a| AccountRow {
+                    id: a["id"].as_str().unwrap_or_default().to_string(),
+                    name: a["name"].as_str().unwrap_or_default().to_string(),
+                    provider: a["provider"].as_str().unwrap_or_default().to_string(),
+                    family: a["harness_family"].as_str().unwrap_or_default().to_string(),
+                    follows_app: a["kind"] == "follows-app",
+                    status: self.accounts.iter().find(|o| o.id == a["id"].as_str().unwrap_or_default()).and_then(|o| o.status.clone()),
+                }).collect();
+                // Grouped by provider, as in VS Code.
+                let rank = |p: &str| match p { "openai" => 0, "anthropic" => 1, _ => 2 };
+                self.accounts.sort_by(|a, b| rank(&a.provider).cmp(&rank(&b.provider)).then(b.follows_app.cmp(&a.follows_app)).then(a.name.cmp(&b.name)));
+                self.account_sel = keep.and_then(|k| self.accounts.iter().position(|a| a.id == k)).unwrap_or(0);
+                let ids: Vec<String> = self.accounts.iter().map(|a| a.id.clone()).collect();
+                for id in ids {
+                    self.request("profile.status", json!({ "id": id }), Pending::AccountStatus(id.clone()));
+                }
+            }
+            (Pending::AccountStatus(id), Ok(v)) => {
+                if let Some(a) = self.accounts.iter_mut().find(|a| a.id == id) {
+                    a.status = Some(v);
+                }
+            }
+            (Pending::Login(name), Ok(v)) => {
+                let env: Vec<(String, String)> = v["env"].as_object().map(|m| m.iter().filter_map(|(k, x)| x.as_str().map(|x| (k.clone(), x.to_string()))).collect()).unwrap_or_default();
+                self.exec = Some(Exec {
+                    title: format!("Signing in {name}"),
+                    program: v["program"].as_str().unwrap_or_default().to_string(),
+                    args: v["args"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+                    env,
+                });
+            }
             (Pending::Comparisons { .. } | Pending::Diff { .. }, Err(e)) => {
                 self.changes.loading = false;
                 self.changes.error = Some(e);
@@ -820,6 +886,45 @@ impl App {
         }
     }
 
+    fn open_accounts(&mut self) {
+        self.mode = Mode::Accounts;
+        self.request("account.list", json!({}), Pending::AccountList);
+    }
+
+    /// Called by the event loop after a suspended program (a sign-in) finished.
+    pub fn after_exec(&mut self, result: Result<i32, String>) {
+        match result {
+            Ok(0) => self.say("Sign-in finished", false),
+            Ok(code) => self.say(format!("Sign-in exited with code {code}"), true),
+            Err(e) => self.say(format!("Could not run the sign-in: {e}"), true),
+        }
+        if self.mode == Mode::Accounts {
+            self.request("account.list", json!({}), Pending::AccountList);
+        }
+        self.dirty = true;
+    }
+
+    fn accounts_key(&mut self, k: KeyEvent) {
+        let n = self.accounts.len();
+        match k.code {
+            KeyCode::Esc | KeyCode::Char('A') | KeyCode::Char('q') => self.mode = Mode::Grid,
+            KeyCode::Down | KeyCode::Char('j') if n > 0 => self.account_sel = (self.account_sel + 1) % n,
+            KeyCode::Up | KeyCode::Char('k') if n > 0 => self.account_sel = (self.account_sel + n - 1) % n,
+            KeyCode::Char('r') => self.request("account.list", json!({}), Pending::AccountList),
+            KeyCode::Char(c @ ('s' | 'S')) => {
+                let Some(a) = self.accounts.get(self.account_sel).cloned() else { return };
+                if a.provider == "local" {
+                    self.say("Local model accounts have no sign-in", false);
+                    return;
+                }
+                // S: ChatGPT's device-code sign-in (for another browser or device).
+                let device = c == 'S' && a.family == "codex";
+                self.request("profile.login_command", json!({ "id": a.id, "device": device }), Pending::Login(a.name.clone()));
+            }
+            _ => {}
+        }
+    }
+
     fn changes_key(&mut self, k: KeyEvent) {
         let n = self.changes.files.len();
         match k.code {
@@ -891,6 +996,7 @@ impl App {
             Mode::NewAgent => self.form_key(k),
             Mode::Changes => self.changes_key(k),
             Mode::Search => self.search_key(k),
+            Mode::Accounts => self.accounts_key(k),
             Mode::Grid | Mode::Zoom { .. } => self.nav_key(k),
         }
     }
@@ -933,6 +1039,7 @@ impl App {
             }
             KeyCode::Char('n') => self.open_new_agent(),
             KeyCode::Char('v') => self.open_changes(),
+            KeyCode::Char('A') => self.open_accounts(),
             KeyCode::Char('/') => {
                 self.mode = Mode::Search;
                 self.page = 0;

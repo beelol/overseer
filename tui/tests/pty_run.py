@@ -1,24 +1,32 @@
 #!/usr/bin/env python3
-"""Runs a command in a pseudo-terminal of a given size, types input after a delay, and prints
-everything the command wrote. Exit code: the command's (1 on timeout).
-Usage: pty_run.py ROWS COLS DELAY_SECONDS INPUT -- CMD [ARGS...]"""
+"""Runs a command in a pseudo-terminal of a given size, types timed input, and prints everything
+the command wrote. Exit code: the command's (1 on timeout).
+Usage: pty_run.py ROWS COLS [SECONDS INPUT]... -- CMD [ARGS...]
+Each INPUT is typed SECONDS after the previous one."""
 import fcntl, os, pty, select, struct, sys, termios, time
 
-rows, cols, delay, text = int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]), sys.argv[4]
-cmd = sys.argv[sys.argv.index("--") + 1:]
+rows, cols = int(sys.argv[1]), int(sys.argv[2])
+sep = sys.argv.index("--")
+pairs = sys.argv[3:sep]
+steps = [(float(pairs[i]), pairs[i + 1]) for i in range(0, len(pairs), 2)]
+cmd = sys.argv[sep + 1:]
+delay = sum(d for d, _ in steps)
 pid, fd = pty.fork()
 if pid == 0:
     os.execvp(cmd[0], cmd)
 fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
 out = bytearray()
 start = time.time()
-sent = False
+step = 0
+due = start + (steps[0][0] if steps else 0)
 status = None
 while True:
-    if not sent and time.time() - start >= delay:
-        if text:
-            os.write(fd, text.encode())
-        sent = True
+    if step < len(steps) and time.time() >= due:
+        if steps[step][1]:
+            os.write(fd, steps[step][1].encode())
+        step += 1
+        if step < len(steps):
+            due = time.time() + steps[step][0]
     r, _, _ = select.select([fd], [], [], 0.05)
     if r:
         try:
@@ -43,7 +51,7 @@ while True:
         except OSError:
             pass
         break
-    if time.time() - start > delay + 10:
+    if time.time() - start > delay + 15:
         os.kill(pid, 9)
         break
 if status is None:

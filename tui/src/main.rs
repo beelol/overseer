@@ -9,6 +9,7 @@ use overseer_tui::client::{Client, Msg};
 use overseer_tui::locate::Daemon;
 use overseer_tui::ui;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -93,12 +94,26 @@ fn main() -> Result<()> {
     if std::env::var_os("OVERSEER_TUI_TEST_PANIC").is_some() {
         panic!("overseer-tui test panic");
     }
+    // Reads keys unless paused (while a sign-in owns the terminal, its keys are its own).
+    let paused = Arc::new(AtomicBool::new(false));
     let input = tx.clone();
-    std::thread::spawn(move || {
-        while let Ok(e) = event::read() {
-            if input.send(Ev::Term(e)).is_err() {
-                break;
-            }
+    let reader_paused = paused.clone();
+    std::thread::spawn(move || loop {
+        if reader_paused.load(Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(50));
+            continue;
+        }
+        match event::poll(Duration::from_millis(50)) {
+            Ok(true) if !reader_paused.load(Ordering::SeqCst) => match event::read() {
+                Ok(e) => {
+                    if input.send(Ev::Term(e)).is_err() {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            },
+            Ok(_) => {}
+            Err(_) => break,
         }
     });
 
@@ -138,6 +153,28 @@ fn main() -> Result<()> {
                 if app.state.runs.iter().any(|r| r.active()) {
                     app.dirty = true;
                 }
+            }
+            if let Some(exec) = app.exec.take() {
+                // Hand the terminal to the program (a provider's own sign-in), then come back.
+                paused.store(true, Ordering::SeqCst);
+                std::thread::sleep(Duration::from_millis(120));
+                if mouse {
+                    let _ = execute!(std::io::stdout(), DisableMouseCapture);
+                }
+                let _ = execute!(std::io::stdout(), DisableBracketedPaste);
+                ratatui::restore();
+                println!("{} — Overseer resumes when it finishes.\n", exec.title);
+                let status = std::process::Command::new(&exec.program).args(&exec.args).envs(exec.env.iter().map(|(k, v)| (k, v))).status();
+                terminal = ratatui::init();
+                let _ = execute!(std::io::stdout(), EnableBracketedPaste);
+                if mouse {
+                    let _ = execute!(std::io::stdout(), EnableMouseCapture);
+                }
+                // A plain clear: no cursor-position query, which not every terminal answers.
+                let _ = execute!(std::io::stdout(), crossterm::terminal::Clear(crossterm::terminal::ClearType::All));
+                paused.store(false, Ordering::SeqCst);
+                app.dirty = true;
+                app.after_exec(status.map(|s| s.code().unwrap_or(-1)).map_err(|e| e.to_string()));
             }
             if app.quit {
                 return Ok(());

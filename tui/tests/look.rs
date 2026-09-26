@@ -206,3 +206,62 @@ fn t12_help_explains_options_and_keys() {
     let v = Command::new(env!("CARGO_BIN_EXE_overseer-tui")).arg("--version").output().unwrap();
     assert!(String::from_utf8_lossy(&v.stdout).starts_with("overseer-tui 0.1.0"));
 }
+
+#[test]
+fn t16_accounts_panel_and_sign_in_from_the_terminal() {
+    let t = tempfile::tempdir().unwrap();
+    let cli = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("fixtures/fake-harness/account-cli.js").display().to_string();
+    let sys = t.path().join("desktop-home");
+    let next = t.path().join("next-login");
+    std::fs::create_dir_all(&sys).unwrap();
+    // The desktop app is signed in before Overseer starts (fixture account "desk", Pro).
+    std::fs::write(&next, "desk:pro").unwrap();
+    assert!(Command::new(&cli).arg("login").env("OVERSEER_TEST_SYSTEM_HOME", &sys).env("FIXTURE_LOGIN_ACCOUNT_FILE", &next).status().unwrap().success());
+    let sys_s = sys.display().to_string();
+    let next_s = next.display().to_string();
+    let env = [("OVERSEER_CODEX_PATH", cli.as_str()), ("OVERSEER_CLAUDE_PATH", cli.as_str()), ("OVERSEER_TEST_SYSTEM_HOME", sys_s.as_str()), ("FIXTURE_LOGIN_ACCOUNT_FILE", next_s.as_str()), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_LOGIN_ACCOUNT_FILE,OVERSEER_TEST_SYSTEM_HOME")];
+    let d = Daemon::start(&env);
+    let work = d.ctl("account.create", json!({ "provider": "openai", "name": "ChatGPT Work" }))["account"]["id"].as_str().unwrap().to_string();
+    std::fs::write(&next, "work:team").unwrap();
+
+    // The panel: providers, kinds and statuses; `s` asks for the account's own login command.
+    let mut tui = Tui::attach(&d, 140, 40);
+    tui.key(KeyCode::Char('A'));
+    assert_eq!(tui.app.mode, Mode::Accounts);
+    tui.until(10, |a| a.accounts.len() >= 3 && a.accounts.iter().all(|x| x.status.is_some()));
+    let s = tui.screen();
+    assert!(s.contains("OpenAI / ChatGPT") && s.contains("Anthropic / Claude"), "{s}");
+    assert!(s.contains("codex (existing login)") && s.contains("follows app") && s.contains("✓ signed in · pro"), "{s}");
+    assert!(s.contains("ChatGPT Work") && s.contains("fixed") && s.contains("✗ not signed in"), "{s}");
+    assert!(s.contains("never API keys"), "{s}");
+    tui.snapshot("t16-accounts");
+    let i = tui.app.accounts.iter().position(|a| a.id == work).unwrap();
+    while tui.app.account_sel != i {
+        tui.key(KeyCode::Char('j'));
+    }
+    tui.key(KeyCode::Char('s'));
+    tui.until(10, |a| a.exec.is_some());
+    let exec = tui.app.exec.clone().unwrap();
+    assert!(exec.program.ends_with("account-cli.js") && exec.args == vec!["login".to_string()], "{exec:?}");
+    assert!(exec.env.iter().any(|(k, v)| k == "CODEX_HOME" && v.contains(&work)), "signs in only this account's folder: {exec:?}");
+    drop(tui);
+
+    // The real binary in a terminal: A, select the account, s — the TUI suspends, the
+    // provider's sign-in runs, and the TUI comes back.
+    let bin = env!("CARGO_BIN_EXE_overseer-tui");
+    let helper = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/pty_run.py");
+    let mut cmd = Command::new("python3");
+    cmd.arg(helper).args(["40", "140", "2.0", "A", "1.5"]).arg("j".repeat(i)).args(["0.8", "s", "3.0", "\u{1b}", "0.8", "q", "--", bin, "--daemon"]).arg(&d.bin).arg("--home").arg(d.home.path());
+    cmd.env("TERM", "xterm-256color").env("FIXTURE_LOGIN_ACCOUNT_FILE", &next).env("OVERSEER_TEST_SYSTEM_HOME", &sys).stdin(Stdio::null());
+    let out = cmd.output().unwrap();
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "{text}");
+    assert!(text.contains("Signing in ChatGPT Work") && text.contains("Successfully logged in"), "the sign-in ran in the terminal");
+    let after = text.rfind("Successfully logged in").unwrap();
+    assert!(text[after..].contains("\u{1b}[?1049h"), "the TUI came back after the sign-in");
+    let st = d.ctl("profile.status", json!({ "id": work }));
+    assert_eq!(st["logged_in"], true, "{st}");
+    assert_eq!(st["identity"]["plan"], "team", "{st}");
+    let desk = d.ctl("profile.status", json!({ "id": "system-codex" }));
+    assert_eq!(desk["identity"]["plan"], "pro", "the desktop login is untouched: {desk}");
+}
