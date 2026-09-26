@@ -1,7 +1,7 @@
 {
   "base_commit": "19edf57ca4c30b0b4788b5416bb5d949a2cdff6c",
   "rfc_sha256": {
-    "swarm-mode.md": "45e0f177c081d24e236bb682c3f8662dcd8f7d063f819f85e248921cd76c629d",
+    "swarm-mode.md": "51ea058216c7daf96b33288b8e611313b4c72815f0a300dbeb7022a0e26f291f",
     "swarm-mode-scenarios.md": "c937732f9053bd16ab92cd6968ed5b30837e7e01947f90e1f46d614b2c58a9cc",
     "swarm-mode-goal.md": "fb1bcf183e39e2edeb27b6d5f641eb8daf639bbaf271f5a4afbc15bcb01de08a"
   },

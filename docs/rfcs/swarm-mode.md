@@ -1,6 +1,7 @@
 # RFC: category-directed adaptive Swarm mode
 
-Status: draft product recommendation; implementation not authorized by this RFC.
+Status: draft RFC with a fixture-only implementation in draft PR #3. All SWARM
+criteria remain partial or unverified; live behavior is not certified.
 Date: 2026-09-25
 Scope: product behavior, integration boundaries, and acceptance criteria only.
 Revision: director-led many-worker scope, continuous coordination, usable defaults, and
@@ -29,9 +30,9 @@ closes the user's editor or runs Overseer's own UI/recovery test suite. Recovery
 are requirements for developing this feature, executed in isolated test environments.
 
 The owner requested this RFC alongside separate automode and VS Code production-readiness
-work. This document introduces no implementation changes and does not amend their acceptance
-criteria. All numerical defaults below are proposed product policy, not previously approved
-requirements or claims about provider limits.
+work. Its implementation is tracked separately by the Swarm verification ledger and
+does not amend the other efforts' acceptance criteria. The numerical defaults below
+are product policy for Swarm, not claims about provider limits.
 
 ## Product decision
 
@@ -44,7 +45,7 @@ condition. Keep execution-target selection separate:
 | Selection | Swarm off | Swarm on |
 | --- | --- | --- |
 | Manual target | Existing selected-target behavior | Divide work only within the explicitly allowed target pool; a single selected target remains a valid pool |
-| Auto target | Automode routes one logical job | Swarm creates bounded jobs; automode routes each job within the same allowed pool |
+| Auto target | Automode routes one logical job at a time; Swarm adds no worker fan-out | Swarm creates bounded jobs; automode routes each job within the same allowed pool |
 
 Allow one active swarm run per category in v1; additional requests join its backlog or queue
 for a later run. This keeps one director responsible for that category's active objective.
@@ -124,6 +125,11 @@ take effect through a recorded revision. Permission revocations apply immediatel
 | Routine messages | Director batches up to 20 envelopes or 32 KiB of inline summaries, whichever comes first. Wake when full or after 5 seconds; while a director turn is running, queue the next batch rather than starting a second director. |
 | Context | Maximum 32 KiB inline worker brief, including injected coordination instructions, plus permission-checked artifact references. Fetch additional relevant context on demand; never silently truncate required constraints. |
 | Job backlog | At most 1,000 nonterminal logical jobs per run; 100 ready jobs materialized at once, remainder durable. Expansion beyond the cap is blocked visibly pending an explicit limit change. |
+
+By default, a live Swarm remains serial until the required job-consumption estimates
+and fresh comparable account allowance are available. The director may still plan
+and work through an authorized single-agent path; an unknown balance does not become
+permission to launch more workers.
 
 The 10% default is an allocation policy, not a token conversion: 60 percentage points of
 unreserved remaining weekly allowance yield at most 6 percentage points for this run. Every

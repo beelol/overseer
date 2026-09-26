@@ -1,6 +1,9 @@
 # Swarm verification ledger
 
 [The RFC](../../rfcs/swarm-mode.md) is authoritative for SWARM-01–64.
+The [shared Auto–Swarm contract](../../rfcs/swarm-auto-contract.md) owns
+CONTRACT-01–05, with one evidence record per criterion in this folder. Both RFCs
+cite those records; neither may count a partial fixture as integrated proof.
 `coverage.json` starts every item unverified and records the RFC hashes and base revision.
 Create `SWARM-XX.md` when work begins on that criterion; each record must include revision,
 fixture or live support level, inputs, exact commands, expected/actual result, evidence, and

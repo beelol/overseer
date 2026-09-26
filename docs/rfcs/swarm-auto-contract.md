@@ -91,15 +91,39 @@ into a versioned snapshot and submit both Auto and Swarm launches to the same
 transaction. It must not infer a balance from `account.usage` tokens or replace
 Auto's collector with another parser.
 
-Shared proof is recorded once for each boundary, then cited by both RFC ledgers:
+Shared proof is recorded once for each boundary, then cited by both RFC ledgers.
+These CONTRACT criteria remain unchecked until a single integrated implementation
+passes the specified tests. Their records use the status vocabulary and evidence
+fields from `docs/verification/README.md`.
 
-| Shared contract proof | Auto criterion | Swarm criterion |
+| Shared contract criterion | Auto criterion | Swarm criterion |
 | --- | --- | --- |
-| Concurrent ordinary/Auto/Swarm launches and changed identity cannot double-commit a binding window or writer | AUTO-AC-17 | SWARM-08, SWARM-24 |
-| Verified linked accounts share one pool; independent accounts do not; unresolved identity adds no capacity | AUTO-AC-04 | SWARM-09 |
-| Failure exclusions respect account, endpoint, model, and harness scope while unrelated targets continue | AUTO-AC-19 | SWARM-14 |
-| Confirmed pre-effect fallback has a durable logical-job attempt cap; uncertain effects do not reroute or spin | AUTO-AC-19, AUTO-AC-20 | SWARM-15 |
-| Crash/reconnect retains one intent and commitment, reconciles process/workspace effects, and does not duplicate a launch | AUTO-AC-24 | SWARM-22, SWARM-24 |
+| [CONTRACT-01](../verification/swarm/CONTRACT-01.md): concurrent ordinary/Auto/Swarm launches and changed identity cannot double-commit a binding window or writer | AUTO-AC-17 | SWARM-08, SWARM-24 |
+| [CONTRACT-02](../verification/swarm/CONTRACT-02.md): verified linked accounts share one pool; independent accounts do not; unresolved identity adds no capacity | AUTO-AC-04 | SWARM-09 |
+| [CONTRACT-03](../verification/swarm/CONTRACT-03.md): failure exclusions respect account, endpoint, model, and harness scope while unrelated targets continue | AUTO-AC-19 | SWARM-14 |
+| [CONTRACT-04](../verification/swarm/CONTRACT-04.md): confirmed pre-effect fallback has a durable logical-job attempt cap; uncertain effects do not reroute or spin | AUTO-AC-19, AUTO-AC-20 | SWARM-15 |
+| [CONTRACT-05](../verification/swarm/CONTRACT-05.md): crash/reconnect retains one intent and commitment, reconciles process/workspace effects, and does not duplicate a launch | AUTO-AC-24 | SWARM-22, SWARM-24 |
+
+- [ ] **CONTRACT-01:** Two concurrent launches from different callers, including
+  ordinary and Swarm, compete for one known limiting account window and one writer.
+  Exactly one commits. A profile/account generation change between route and launch
+  blocks admission; replay returns the same intent. Repeat with short and long windows.
+- [ ] **CONTRACT-02:** Two linked profiles/harnesses with proven shared pool identity
+  consume one allowance; an independent account retains its own. Unresolved identity
+  never becomes an additional allowance after quota failure or restart.
+- [ ] **CONTRACT-03:** Inject harness-local, endpoint, account-auth, account-quota,
+  model-window, and ordinary job failures separately. Only matching routes are
+  excluded; an unrelated healthy route and running job continue. Distinguish stale
+  known blocks from never-known data and public incident advisories.
+- [ ] **CONTRACT-04:** A confirmed pre-effect failure may select another eligible
+  route within the same logical job's remaining attempt budget. Two execution
+  attempts are the maximum across targets, revisions and restart. An uncertain
+  process, tool or external effect pauses without a second launch or planning spin.
+- [ ] **CONTRACT-05:** Crash before commitment, after commitment, after external
+  workspace effect, after child-row commit and after process start. Two reconnecting
+  clients see one durable intent/commitment and one child, or a visible uncertain
+  effect requiring reconciliation. Release only after confirmed settlement; no
+  duplicate writer, process or model request occurs.
 
 These are common tests with both ordinary and Swarm callers, not two independent
 implementations or automatic checkmarks in either ledger. Current fixture tests
