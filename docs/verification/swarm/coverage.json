@@ -370,20 +370,24 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_broker.rs",
+        "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-1.md",
         "daemon/tests/swarm_director.rs",
-        "docs/verification/swarm/milestone-5.md"
+        "docs/verification/swarm/milestone-5.md",
+        "docs/verification/swarm/milestone-9.md"
       ],
-      "blocker": "Payload and inbox bounds, dedupe, and director batch size pass; live inference/context controls, malformed permission cases and Stop latency remain unverified."
+      "blocker": "Payload and inbox bounds, dedupe, bounded director batches, admission hold at a full inbox, and terminal report persistence pass in fixtures; live inference/context controls, malformed permission cases and Stop latency remain unverified."
     },
     "SWARM-50": {
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "daemon/tests/swarm_faults.rs",
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/milestone-9.md"
       ],
-      "blocker": "Message insert precedes receipt; storage-full and launch-intent fault tests are not implemented."
+      "blocker": "Injected SQLite failures during result state update and reservation insertion roll back atomically; live launch intent, disk-full recovery, and persisted blocked-state UX remain unimplemented."
     },
     "SWARM-51": {
       "status": "unverified",

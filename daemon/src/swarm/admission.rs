@@ -119,6 +119,14 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
     if attempts >= effective["max_attempts"].as_i64().unwrap_or(2).min(2) {
         return Ok(blocked("attempt_limit"));
     }
+    let queued_inbox: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND recipient='director' AND phase='queued'",
+        params![run],
+        |r| r.get(0),
+    )?;
+    if queued_inbox >= 1000 {
+        return Ok(blocked("director_inbox_full"));
+    }
     let pending: i64 = tx.query_row(
         "SELECT COUNT(*) FROM swarm_jobs WHERE run_id=?1 AND status='submitted'",
         params![run],

@@ -212,28 +212,51 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "profile.list" => json!(d.store.lock().unwrap().profiles()?),
         "swarm.create" => crate::swarm::create(&mut d.store.lock().unwrap(), p)?,
         "swarm.get" => crate::swarm::get(&d.store.lock().unwrap(), s(p, "id")?)?,
-        "swarm.plan" => crate::swarm::plan(&mut d.store.lock().unwrap(), p)?,
+        "swarm.plan" => {
+            fixture_only()?;
+            crate::swarm::plan(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.jobs" => crate::swarm::jobs(&d.store.lock().unwrap(), p)?,
         "swarm.attempt.register" => {
             fixture_only()?;
             crate::swarm::register(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.report" => crate::swarm::report(&mut d.store.lock().unwrap(), p)?,
-        "swarm.direct" => crate::swarm::direct(&mut d.store.lock().unwrap(), p)?,
-        "swarm.messages" => crate::swarm::messages(&d.store.lock().unwrap(), p)?,
-        "swarm.ack" => crate::swarm::ack(&mut d.store.lock().unwrap(), p)?,
+        "swarm.direct" => {
+            fixture_only()?;
+            crate::swarm::direct(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.messages" => {
+            fixture_only()?;
+            crate::swarm::messages(&d.store.lock().unwrap(), p)?
+        }
+        "swarm.ack" => {
+            if p["recipient"] == "director" {
+                fixture_only()?;
+            }
+            crate::swarm::ack(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.stop" => crate::swarm::stop(&mut d.store.lock().unwrap(), p)?,
         "swarm.pause" => crate::swarm::pause(&mut d.store.lock().unwrap(), p)?,
         "swarm.resume" => crate::swarm::resume(&mut d.store.lock().unwrap(), p)?,
         "swarm.off" => crate::swarm::off(&mut d.store.lock().unwrap(), p)?,
-        "swarm.claim" => crate::swarm::claim(&mut d.store.lock().unwrap(), p)?,
+        "swarm.claim" => {
+            fixture_only()?;
+            crate::swarm::claim(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.artifact.put" => crate::swarm::put(&mut d.store.lock().unwrap(), p)?,
-        "swarm.decide" => crate::swarm::decide(&mut d.store.lock().unwrap(), p)?,
+        "swarm.decide" => {
+            fixture_only()?;
+            crate::swarm::decide(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.attempt.confirm_exit" => {
             fixture_only()?;
             crate::swarm::confirm_exit(&mut d.store.lock().unwrap(), p)?
         }
-        "swarm.revise" => crate::swarm::revise(&mut d.store.lock().unwrap(), p)?,
+        "swarm.revise" => {
+            fixture_only()?;
+            crate::swarm::revise(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.policy.preview" => crate::swarm::preview(p)?,
         "swarm.policy.set" => crate::swarm::set_policy(&mut d.store.lock().unwrap(), p)?,
         "swarm.admit" => {

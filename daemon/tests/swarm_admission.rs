@@ -88,6 +88,33 @@ fn shared_pool_reservation_blocks_stale_capacity_across_categories() {
 }
 
 #[test]
+fn full_director_inbox_holds_new_admissions_but_keeps_terminal_reports() {
+    let d = Daemon::start(&[]);
+    let id = setup(&d, "Inbox pressure", 2);
+    let at = now();
+    let first = admit(&d, &id, "j0", "codex-a", "inbox-first", at, 1000000, 100)
+        .unwrap();
+    assert_eq!(first["status"], "admitted");
+    for n in 0..1000 {
+        d.call(
+            "swarm.report",
+            json!({"run_id":id,"job_id":"j0","attempt_id":first["attempt_id"],
+                "token":first["token"],"message_id":format!("progress-{n}"),
+                "type":"progress","revision":1,"payload":{"n":n}}),
+        );
+    }
+    let held = admit(&d, &id, "j1", "codex-a", "inbox-second", at, 1000000, 100)
+        .unwrap();
+    assert_eq!(held["status"], "blocked");
+    assert_eq!(held["reason"], "director_inbox_full");
+    d.call("swarm.report", json!({"run_id":id,"job_id":"j0",
+        "attempt_id":first["attempt_id"],"token":first["token"],
+        "message_id":"terminal-at-capacity","type":"result","revision":1,
+        "payload":{"artifact_ids":[]}}));
+    assert_eq!(d.call("swarm.jobs",json!({"id":id}))["jobs"][0]["status"], "submitted");
+}
+
+#[test]
 fn default_worker_ceiling_and_four_per_wave_are_admission_bounds() {
     let d = Daemon::start(&[]);
     let id = setup(&d, "Scale admission", 9);

@@ -31,7 +31,12 @@ fn unfinished_runtime_transitions_are_disabled_without_fixture_opt_in() {
     let d=Daemon::start(&[("OVERSEER_SWARM_FIXTURE_API","0")]);
     let run=d.call("swarm.create",json!({"category":"Safe default","objective":"Audit","allowed_targets":["system-codex"]}));
     let id=run["id"].as_str().unwrap();
-    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[{"id":"audit","title":"Audit","acceptance":"report","deps":[]}]}));
+    let plan=json!({"id":id,"generation":1,"revision":0,"jobs":[{"id":"audit","title":"Audit","acceptance":"report","deps":[]}]});
+    assert!(d.try_call("swarm.plan",plan).unwrap_err().contains("fixture-only"));
+    for method in ["swarm.messages","swarm.direct","swarm.claim","swarm.decide","swarm.revise"] {
+        assert!(d.try_call(method,json!({"run_id":id,"recipient":"director"})).unwrap_err().contains("fixture-only"),"{method}");
+    }
+    assert!(d.try_call("swarm.ack",json!({"run_id":id,"recipient":"director"})).unwrap_err().contains("fixture-only"));
     let error=d.try_call("swarm.attempt.register",json!({"run_id":id,"job_id":"audit","generation":1,"revision":1})).unwrap_err();
     assert!(error.contains("fixture-only"));
     let error=d.try_call("swarm.attempt.confirm_exit",json!({"run_id":id,"job_id":"audit","attempt_id":"fake","generation":1,"revision":1})).unwrap_err();
