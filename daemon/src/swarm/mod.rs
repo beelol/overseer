@@ -117,6 +117,32 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
     run["completion"] = completion::get(store, id)?;
     run["availability"] = availability::get(store, id)?;
     run["benefit"] = benefit::get_state(store, id, run["revision"].as_i64().unwrap_or(0))?;
+    if run["status"] == "stopping" {
+        let count: i64 = store.conn.query_row(
+            "SELECT COUNT(*) FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+             WHERE l.run_id=?1 AND (r.ended_ms IS NULL OR r.status='disconnected')",
+            params![id], |row| row.get(0))?;
+        let mut stmt = store.conn.prepare(
+            "SELECT l.job_id,l.attempt_id,l.overseer_run_id,r.status,
+                    COALESCE(s.last_outcome,'not_attempted'),COALESCE(s.attempts,0),s.last_attempt_ms
+             FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+             LEFT JOIN swarm_stop_signals s ON s.run_id=l.run_id AND s.overseer_run_id=r.id
+             WHERE l.run_id=?1 AND (r.ended_ms IS NULL OR r.status='disconnected')
+             ORDER BY l.created_ms,l.attempt_id LIMIT 100")?;
+        let exits = stmt.query_map(params![id], |row| Ok(json!({
+            "job_id":row.get::<_,String>(0)?,"attempt_id":row.get::<_,String>(1)?,
+            "overseer_run_id":row.get::<_,String>(2)?,"worker_status":row.get::<_,String>(3)?,
+            "last_signal_outcome":row.get::<_,String>(4)?,"signal_attempts":row.get::<_,i64>(5)?,
+            "last_signal_ms":row.get::<_,Option<i64>>(6)?
+        })))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        run["unconfirmed_exit_count"] = json!(count);
+        run["unconfirmed_exits_truncated"] = json!(count > exits.len() as i64);
+        run["unconfirmed_exits"] = json!(exits);
+    } else {
+        run["unconfirmed_exit_count"] = json!(0);
+        run["unconfirmed_exits_truncated"] = json!(false);
+        run["unconfirmed_exits"] = json!([]);
+    }
     Ok(run)
 }
 

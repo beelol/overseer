@@ -710,6 +710,10 @@ fn stop_retries_an_initially_unreachable_worker_after_daemon_restart() {
     assert_eq!(d.run(worker)["status"], "running");
     assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["status"],
         "cancel_requested");
+    let pending = d.call("swarm.get", json!({"id":id}));
+    assert_eq!(pending["unconfirmed_exit_count"], 1);
+    assert_eq!(pending["unconfirmed_exits"][0]["overseer_run_id"], worker);
+    assert_eq!(pending["unconfirmed_exits"][0]["last_signal_outcome"], "unconfirmed");
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     let first: (i64,String) = db.query_row(
         "SELECT attempts,last_outcome FROM swarm_stop_signals WHERE run_id=?1 AND overseer_run_id=?2",
@@ -723,7 +727,9 @@ fn stop_retries_an_initially_unreachable_worker_after_daemon_restart() {
         rusqlite::params![id,worker], |r| Ok((r.get(0)?,r.get(1)?))).unwrap();
     assert!(later.0 >= 2, "stop interrupt was not retried: {later:?}");
     assert_eq!(later.1, "requested");
-    assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopping");
+    let after = d.call("swarm.get", json!({"id":id}));
+    assert_eq!(after["status"], "stopping");
+    assert_eq!(after["unconfirmed_exit_count"], 0);
     assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["attempt_count"], 1);
 }
 
