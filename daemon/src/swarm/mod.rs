@@ -90,8 +90,12 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
     let revision = p["revision"]
         .as_i64()
         .ok_or_else(|| anyhow!("missing revision"))?;
-    let jobs: Vec<JobSpec> =
-        serde_json::from_value(p["jobs"].clone()).map_err(|e| anyhow!("invalid jobs: {e}"))?;
+    let (jobs, rejected): (Vec<JobSpec>, Vec<Value>) = if p["allow_partial"] == true {
+        plan::select_valid(&p["jobs"])?
+    } else {
+        (serde_json::from_value(p["jobs"].clone())
+            .map_err(|e| anyhow!("invalid jobs: {e}"))?, Vec::new())
+    };
     plan::validate(&jobs)?;
     let tx = store.conn.transaction()?;
     let current: (i64, i64, String) = tx
@@ -136,7 +140,7 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
         params![id, revision + 1, now],
     )?;
     tx.commit()?;
-    Ok(json!({"id":id,"generation":generation,"revision":revision+1,"job_count":jobs.len()}))
+    Ok(json!({"id":id,"generation":generation,"revision":revision+1,"job_count":jobs.len(),"rejected":rejected}))
 }
 
 pub fn jobs(store: &Store, p: &Value) -> Result<Value> {

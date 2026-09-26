@@ -103,6 +103,33 @@ fn plan_validates_dependencies_and_revision_before_dispatch() {
 }
 
 #[test]
+fn partial_plan_keeps_independent_valid_subgraphs() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Partial graph","objective":"Audit",
+        "allowed_targets":["system-codex"]}));
+    let id = run["id"].as_str().unwrap();
+    let planned = d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,
+        "allow_partial":true,"jobs":[
+            {"id":"root","title":"Root","acceptance":"evidence","deps":[]},
+            {"id":"child","title":"Child","acceptance":"evidence","deps":["root"]},
+            {"id":"independent","title":"Independent","acceptance":"evidence","deps":[]},
+            {"id":"missing","title":"Missing","acceptance":"evidence","deps":["unknown"]},
+            {"id":"depends-on-bad","title":"Dependent","acceptance":"evidence","deps":["missing"]},
+            {"id":"cycle-a","title":"Cycle A","acceptance":"evidence","deps":["cycle-b"]},
+            {"id":"cycle-b","title":"Cycle B","acceptance":"evidence","deps":["cycle-a"]},
+            {"id":"no-check","title":"No check","deps":[]},
+            {"id":"duplicate","title":"One","acceptance":"evidence","deps":[]},
+            {"id":"duplicate","title":"Two","acceptance":"evidence","deps":[]}
+        ]}));
+    assert_eq!(planned["job_count"], 3);
+    assert_eq!(planned["rejected"].as_array().unwrap().len(), 7);
+    let jobs = d.call("swarm.jobs",json!({"id":id,"limit":100}))["jobs"].as_array().unwrap().clone();
+    assert_eq!(jobs.len(), 3);
+    assert_eq!(jobs.iter().filter(|job| job["status"] == "ready").count(), 2);
+    assert_eq!(jobs.iter().filter(|job| job["status"] == "planned").count(), 1);
+}
+
+#[test]
 fn large_plan_pages_without_loading_every_job() {
     let d = Daemon::start(&[]);
     let made = d.call("swarm.create", json!({"category":"Catalog", "objective":"Audit modules", "allowed_targets":["system-codex"]}));

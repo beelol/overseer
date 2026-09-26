@@ -375,9 +375,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
-        "docs/verification/swarm/milestone-2.md"
+        "docs/verification/swarm/milestone-2.md",
+        "daemon/tests/swarm_state.rs",
+        "docs/verification/swarm/SWARM-48.md"
       ],
-      "blocker": "Plan validation and conflicting exclusive claims pass; independent valid subgraph retention and stalled planning remain unimplemented."
+      "blocker": "Strict validation, conflicting exclusive claims, and opt-in independent valid subgraph retention pass in fixtures; bounded failed planning/repair turns and visible stalled planning remain unimplemented."
     },
     "SWARM-49": {
       "status": "partial",
