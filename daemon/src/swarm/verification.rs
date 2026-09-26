@@ -3,12 +3,14 @@
 //! sandboxing remain prerequisites before this can be enabled outside fixtures.
 
 use super::{get, required};
-use crate::{git, store::Store};
+use crate::{git, paths, store::Store};
 use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom};
+use std::os::fd::AsRawFd;
 use std::os::unix::{fs::PermissionsExt, process::CommandExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -26,6 +28,7 @@ pub struct VerificationPlan {
     workspace: PathBuf,
     verifier: PathBuf,
     verifier_sha256: String,
+    _lease: File,
 }
 
 pub enum PreparedVerification {
@@ -58,6 +61,56 @@ fn configured_verifier() -> Result<(PathBuf, String)> {
 fn clean_at(workspace: &Path, commit: &str) -> Result<bool> {
     Ok(git::head(workspace).as_deref() == Some(commit)
         && git::git(workspace, &["status", "--porcelain=v1"])?.is_empty())
+}
+
+fn lease_file(run: &str, request_id: &str) -> Result<File> {
+    let dir = paths::data_dir().join("swarm-verifiers");
+    paths::ensure_private_dir(&dir)?;
+    let digest = format!(
+        "{:x}",
+        Sha256::digest(format!("{run}\0{request_id}").as_bytes())
+    );
+    let file = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(dir.join(digest))?;
+    Ok(file)
+}
+
+fn try_lock(file: &File) -> Result<bool> {
+    let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+    if result == 0 {
+        return Ok(true);
+    }
+    let error = std::io::Error::last_os_error();
+    if error.kind() == std::io::ErrorKind::WouldBlock {
+        Ok(false)
+    } else {
+        Err(error.into())
+    }
+}
+
+fn reconcile_abandoned(store: &mut Store, run: &str) -> Result<()> {
+    let mut statement = store.conn.prepare(
+        "SELECT request_id FROM swarm_verifications WHERE run_id=?1 AND status='running'",
+    )?;
+    let ids = statement
+        .query_map([run], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(statement);
+    for id in ids {
+        let lease = lease_file(run, &id)?;
+        if try_lock(&lease)? {
+            store.conn.execute(
+                "UPDATE swarm_verifications SET status='interrupted',
+                 stderr='verifier exited without a durable result; retry with a new request id',
+                 finished_ms=?3 WHERE run_id=?1 AND request_id=?2 AND status='running'",
+                params![run, id, crate::daemon::now()],
+            )?;
+        }
+    }
+    Ok(())
 }
 
 pub fn prepare(store: &mut Store, p: &Value) -> Result<PreparedVerification> {
@@ -93,6 +146,7 @@ pub fn prepare(store: &mut Store, p: &Value) -> Result<PreparedVerification> {
         bail!("integration workspace requires reconciliation");
     }
     let (verifier, verifier_sha256) = configured_verifier()?;
+    reconcile_abandoned(store, run)?;
     let existing: Option<(i64, i64, String, String, String, Option<i32>)> = store
         .conn
         .query_row(
@@ -139,6 +193,10 @@ pub fn prepare(store: &mut Store, p: &Value) -> Result<PreparedVerification> {
     if running {
         bail!("combined verification is already running or requires reconciliation");
     }
+    let lease = lease_file(run, request_id)?;
+    if !try_lock(&lease)? {
+        bail!("combined verification process is still running");
+    }
     store.conn.execute(
         "INSERT INTO swarm_verifications(run_id,request_id,generation,revision,commit_sha,verifier_sha256,status,created_ms)
          VALUES(?1,?2,?3,?4,?5,?6,'running',?7)",
@@ -153,6 +211,7 @@ pub fn prepare(store: &mut Store, p: &Value) -> Result<PreparedVerification> {
         workspace,
         verifier,
         verifier_sha256,
+        _lease: lease,
     }))
 }
 
@@ -182,15 +241,26 @@ pub fn run(plan: &VerificationPlan) -> VerificationOutcome {
 fn run_inner(plan: &VerificationPlan) -> Result<VerificationOutcome> {
     let mut stdout = tempfile::tempfile()?;
     let mut stderr = tempfile::tempfile()?;
-    let spawned = Command::new(&plan.verifier)
+    let lease_fd = plan._lease.as_raw_fd();
+    let mut command = Command::new(&plan.verifier);
+    command
         .current_dir(&plan.workspace)
         .env_clear()
         .env("PATH", "/usr/bin:/bin")
         .process_group(0)
         .stdin(Stdio::null())
         .stdout(stdout.try_clone()?)
-        .stderr(stderr.try_clone()?)
-        .spawn();
+        .stderr(stderr.try_clone()?);
+    unsafe {
+        command.pre_exec(move || {
+            let flags = libc::fcntl(lease_fd, libc::F_GETFD);
+            if flags < 0 || libc::fcntl(lease_fd, libc::F_SETFD, flags & !libc::FD_CLOEXEC) < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    let spawned = command.spawn();
     let mut child = match spawned {
         Ok(child) => child,
         Err(error) => {

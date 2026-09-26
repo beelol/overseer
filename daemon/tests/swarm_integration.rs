@@ -778,3 +778,90 @@ fn stop_remains_responsive_while_combined_checker_is_running() {
     let result = checker.join().unwrap();
     assert_eq!(result["result"]["status"], "interrupted", "{result}");
 }
+
+#[test]
+fn restart_waits_for_orphaned_verifier_then_retries_without_reusing_its_pass() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::time::{Duration, Instant};
+
+    let t = tmp();
+    let verifier = t.path().join("restart-check.py");
+    let entered = t.path().join("checker-entered");
+    let release = t.path().join("checker-release");
+    std::fs::write(&verifier, format!(
+        "#!/usr/bin/env python3\nimport pathlib, time\npathlib.Path({:?}).write_text('started')\nfor _ in range(250):\n    if pathlib.Path({:?}).exists():\n        raise SystemExit(0)\n    time.sleep(0.02)\nraise SystemExit(1)\n",
+        entered.to_string_lossy(), release.to_string_lossy()
+    )).unwrap();
+    std::fs::set_permissions(&verifier, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut d = Daemon::start(&[("OVERSEER_SWARM_VERIFIER_PATH", verifier.to_str().unwrap())]);
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Verifier restart fixture",
+        "objective":"Check a.txt", "allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    d.call(
+        "swarm.integrate",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"writer-patch","repo":checkout,
+        "base_revision":base}),
+    );
+
+    let socket = d.socket();
+    let old_run = run.to_string();
+    let pending = std::thread::spawn(move || {
+        let mut conn = UnixStream::connect(socket).unwrap();
+        writeln!(
+            conn,
+            "{}",
+            json!({"id":1,"method":"swarm.verify","params":{
+            "run_id":old_run,"generation":1,"revision":1,"request_id":"before-crash"}})
+        )
+        .unwrap();
+        let mut line = String::new();
+        let _ = BufReader::new(conn).read_line(&mut line);
+    });
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while !entered.exists() {
+        assert!(Instant::now() < deadline, "verifier never started");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    d.kill9();
+    pending.join().unwrap();
+    d.spawn();
+    let next = json!({"run_id":run,"generation":1,"revision":1,"request_id":"after-crash"});
+    let blocked = d.try_call("swarm.verify", next.clone()).unwrap_err();
+    assert!(blocked.contains("already running"), "{blocked}");
+    std::fs::write(&release, "go").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(4);
+    let passed = loop {
+        match d.try_call("swarm.verify", next.clone()) {
+            Ok(result) => break result,
+            Err(error) if error.contains("already running") && Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(error) => panic!("retry failed: {error}"),
+        }
+    };
+    assert_eq!(passed["status"], "passed", "{passed}");
+    let old = d.call(
+        "swarm.verify",
+        json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"before-crash"}),
+    );
+    assert_eq!(old["status"], "interrupted", "{old}");
+    assert_eq!(old["duplicate"], true);
+}
