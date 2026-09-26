@@ -10,4 +10,4 @@ The dependency clusters are:
 4. Product presentation and truthful outcomes: SWARM-23/37/55. The extension has no Swarm view, and final coverage does not yet classify negative results, environment failures and confirmed defects.
 5. End-to-end lifecycle and scenarios: SWARM-31/64. Adapter lifecycle tests exist outside Swarm; complete versioned S0–S5 traces have not been replayed.
 
-Each `blocker` field in `coverage.json` names the missing behavior. A partial criterion stays partial where fixture evidence exists; an unverified criterion remains unverified even if adjacent code has tests. No lack of live authorization was turned into a passing fixture claim.
+Each `blocker` field in `coverage.json` names the missing behavior for the 24 criteria and six scenarios. A partial criterion stays partial where fixture evidence exists; an unverified criterion remains unverified even if adjacent code has tests. No lack of live authorization was turned into a passing fixture claim.

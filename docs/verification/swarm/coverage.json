@@ -508,27 +508,33 @@
   "scenarios": {
     "S0": {
       "status": "unverified",
-      "evidence": []
+      "evidence": [],
+      "blocker": "No normal category + objective launch control or live director selection exists; policy defaults only have daemon fixture coverage."
     },
     "S1": {
       "status": "unverified",
-      "evidence": []
+      "evidence": [],
+      "blocker": "No versioned Atlas backend fixture, live worker route, scoped reproduction, directed overlap sequence or final evidence synthesis exists."
     },
     "S2": {
       "status": "unverified",
-      "evidence": []
+      "evidence": [],
+      "blocker": "No versioned payment/side-effect fixture or command journal can reconcile a lost acknowledgement without double application."
     },
     "S3": {
       "status": "unverified",
-      "evidence": []
+      "evidence": [],
+      "blocker": "No versioned 20-module migration fixture, isolated Swarm worker integration or combined-test gate exists."
     },
     "S4": {
       "status": "unverified",
-      "evidence": []
+      "evidence": [],
+      "blocker": "No versioned Dispatch incident bundle, permission-aware account replacement or live checkpoint handoff exists."
     },
     "S5": {
       "status": "unverified",
-      "evidence": []
+      "evidence": [],
+      "blocker": "Individual fault fixtures exist, but the complete ordered Atlas replay and all injected faults have not been executed."
     }
   }
 }
