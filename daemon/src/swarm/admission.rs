@@ -40,6 +40,32 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
     if current["revision"] != revision {
         bail!("stale plan revision");
     }
+    let previous: Option<(String,String)> = store.conn.query_row(
+        "SELECT request_sha256,attempt_id FROM swarm_admissions WHERE run_id=?1 AND request_id=?2",
+        params![run,request_id], |r|Ok((r.get(0)?,r.get(1)?)),
+    ).optional()?;
+    if let Some((old_hash, attempt_id)) = previous {
+        if old_hash != request_hash {
+            bail!("admission request id reused with different input");
+        }
+        return Ok(json!({"status":"already_admitted","attempt_id":attempt_id}));
+    }
+    let deadline = current["policy"]["effective"]["deadline_ms"]
+        .as_i64()
+        .unwrap_or(3_600_000);
+    let created = current["created_ms"].as_i64().unwrap_or(now);
+    if now >= created.saturating_add(deadline) {
+        if current["status"] != "stopping"
+            && current["status"] != "stopped"
+            && current["status"] != "completed"
+        {
+            super::stop(
+                store,
+                &json!({"run_id":run,"generation":generation,"revision":revision}),
+            )?;
+        }
+        return Ok(blocked("run_deadline"));
+    }
     let tx = store.conn.transaction()?;
     let replay: Option<(String, String)> = tx
         .query_row(

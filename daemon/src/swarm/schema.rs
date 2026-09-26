@@ -17,9 +17,10 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           updated_ms INTEGER NOT NULL
         );
-        CREATE UNIQUE INDEX IF NOT EXISTS swarm_active_category
+        DROP INDEX IF EXISTS swarm_active_category;
+        CREATE UNIQUE INDEX swarm_active_category
           ON swarm_runs(category_key)
-          WHERE status IN ('planning','running','paused','stalled','stopping');
+          WHERE status IN ('planning','running','paused','stalled','draining','stopping');
         CREATE TABLE IF NOT EXISTS swarm_jobs(
           run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
           id TEXT NOT NULL,

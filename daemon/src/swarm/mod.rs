@@ -1,6 +1,7 @@
 mod artifacts;
 mod admission;
 mod broker;
+mod control;
 mod director;
 mod plan;
 mod policy;
@@ -10,6 +11,7 @@ pub mod schema;
 pub use artifacts::{confirm_exit, decide, put};
 pub use admission::admit;
 pub use broker::{ack, direct, messages, register, report};
+pub use control::{off, pause, resume};
 pub use director::{claim_batch, complete_batch};
 pub use policy::preview;
 pub use settings::set_policy;
@@ -54,7 +56,7 @@ pub fn create(store: &mut Store, p: &Value) -> Result<Value> {
     }
     let key = category.to_lowercase();
     let occupied: bool = store.conn.query_row(
-        "SELECT 1 FROM swarm_runs WHERE category_key=?1 AND status IN ('planning','running','paused','stalled','stopping') LIMIT 1",
+        "SELECT 1 FROM swarm_runs WHERE category_key=?1 AND status IN ('planning','running','paused','stalled','draining','stopping') LIMIT 1",
         params![key], |_| Ok(()),
     ).optional()?.is_some();
     if occupied {

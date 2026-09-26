@@ -144,9 +144,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_control.rs",
+        "docs/verification/swarm/milestone-8.md"
       ],
-      "blocker": "Stop records queued cancellation and cancel-requested attempts; live interruption, Pause, Resume and Swarm off remain unimplemented."
+      "blocker": "Daemon Pause, Resume and Swarm off states, queued cancellation and late-result retention pass; live descendant interruption, draining to one agent and confirmed exits remain unimplemented."
     },
     "SWARM-21": {
       "status": "partial",
@@ -455,9 +457,12 @@
       "blocker": "Stop halts new attempt registration and director batch claims while preserving late evidence; live cancellation and permission-revocation races remain unimplemented."
     },
     "SWARM-62": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_control.rs",
+        "docs/verification/swarm/milestone-8.md"
+      ],
+      "blocker": "An admission at the snapshotted deadline triggers Stop and cancels queued work; periodic evaluation while idle, live checkpoint/interrupt and explicit extension remain unimplemented."
     },
     "SWARM-63": {
       "status": "unverified",
