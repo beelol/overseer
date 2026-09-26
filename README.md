@@ -5,12 +5,11 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **47 / 53** · **5** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-11, AC-13, AC-41, AC-50, AC-52, AC-53. The biggest gaps are owner actions, not
-code. Five criteria are partial, each with its proven part and the owner's step in
+criteria: **48 / 53** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-11, AC-13, AC-41, AC-50, AC-53. The biggest gaps are owner actions, not
+code. Four criteria are partial, each with its proven part and the owner's step in
 [Follow-ups](#follow-ups): a live ChatGPT re-sign-in (AC-11) and a live sign-in cycle of a
-disposable ChatGPT account while another works (AC-13); one live pull request (AC-50); a look at
-the Overseer-branded notification (AC-52); and fixed Claude accounts (AC-53,
+disposable ChatGPT account while another works (AC-13); one live pull request (AC-50); and fixed Claude accounts (AC-53,
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account. Linux (AC-41)
 is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
@@ -73,7 +72,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-49** Restore the open session — [evidence](docs/verification/AC-49.md)
 - [ ] **AC-50** Open a pull request from a run — ◐ partial: Open PR (run panel and Agents menu) explains a missing remote, a non-GitHub remote, an active run and a current-checkout task; signed out of GitHub in VS Code it explains and offers VS Code's own GitHub sign-in (no personal access token); signed in (mock GitHub API) it commits the worktree, pushes the branch with an in-memory header, creates the PR with a generated description, reuses an existing PR, records the URL, never merges, and stores no token / deferred: one live pull request on a repository the owner chooses, with the owner approving VS Code's GitHub sign-in — [evidence](docs/verification/AC-50.md)
 - [x] **AC-51** Worktree file hierarchy — [evidence](docs/verification/AC-51.md)
-- [ ] **AC-52** Native Overseer notifications (macOS) — ◐ partial: the bundled Overseer Notifier.app ships in the installed VSIX (signed, com.beelol.overseer.notifier, named Overseer, universal, transparent icon) and runs; the daemon posts through it (found next to its binary) with the Overseer-view link and falls back to osascript when it is denied, unanswered or missing, recording which path in delivered_via; Test Notification reports both; the link opens the Overseer view / deferred: the owner sees the real Overseer-branded banner, allows it once, finds Overseer in System Settings → Notifications, and clicks a banner into the Overseer view — [evidence](docs/verification/AC-52.md)
+- [x] **AC-52** Native Overseer notifications (macOS) — [evidence](docs/verification/AC-52.md)
 - [ ] **AC-53** Fixed Claude accounts — ◐ partial: the design for keeping each Claude account's credentials separate is written (docs/rfcs/claude-credentials.md: check per-folder Keychain entries first, otherwise Overseer-managed credentials); the account flows it builds on (Add Account → Anthropic → Sign In with its own CLAUDE_CONFIG_DIR, sign-out, expiry and Sign in again) pass with the synthetic account CLI / deferred: a live test with a second Claude account (the owner asked not to test Claude yet, and has one Claude account) — [evidence](docs/verification/AC-53.md)
 <!-- ac-list:end -->
 
@@ -205,7 +204,6 @@ the owner action or decision each one needs.
 - [ ] [AC-13](docs/verification/AC-13.md) (Credential isolation on macOS): Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: sign a throwaway Overseer ChatGPT account in, then Sign Out and Sign In it again while ChatGPT B runs a task (two browser logins); Overseer checks that B and A are unchanged.
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
 - [ ] [AC-50](docs/verification/AC-50.md) (Open a pull request from a run): Owner action: choose a GitHub repository you can push to, run a tiny task on a clone of it, press Open PR…, and approve VS Code's GitHub sign-in when asked; confirm the pull request appears on GitHub and nothing was merged.
-- [ ] [AC-52](docs/verification/AC-52.md) (Native Overseer notifications (macOS)): Owner action: reload VS Code with the new VSIX, run Overseer: Test Notification, allow Overseer when macOS asks, and confirm the banner shows Overseer (name and icon), that Overseer appears in System Settings → Notifications, and that clicking a banner opens the Overseer view.
 - [ ] [AC-53](docs/verification/AC-53.md) (Fixed Claude accounts): Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
