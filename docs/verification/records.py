@@ -849,6 +849,57 @@ def main():
     sync(out)
 
 
+
+# Gate K (added by the owner on 2026-09-26; docs/rfcs/orchestrator-ui.md#gate-k-layout). Not started.
+rec(67, "One agents list: the native side bar", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(68, "Provider logos in the side bar", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(69, "Search and filter in the side bar", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(70, "Quiet row actions", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(71, "Take an agent out", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(72, "Chat in the middle when there is nothing to review", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(73, "Changes bring the diff forward", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(74, "Follow or manual review", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(75, "One place for changes", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(76, "Review that stays clean at any width", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(77, "Chat that works beside a diff", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(78, "Quiet turn endings", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(79, "Grid and dashboard mode in the new layout", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(80, "Remembered place", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(81, "Gate J still holds", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+rec(82, "Gate K design review (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
+
 SHORT_BLOCKERS = {
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
@@ -876,6 +927,22 @@ SHORT_BLOCKERS = {
     64: "owner session after the rest of Gate J",
     65: "not started (added by the owner on 2026-09-26)",
     66: "owner design review after the Gate J build",
+    67: "not started (Gate K, added by the owner on 2026-09-26)",
+    68: "not started (Gate K, added by the owner on 2026-09-26)",
+    69: "not started (Gate K, added by the owner on 2026-09-26)",
+    70: "not started (Gate K, added by the owner on 2026-09-26)",
+    71: "not started (Gate K, added by the owner on 2026-09-26)",
+    72: "not started (Gate K, added by the owner on 2026-09-26)",
+    73: "not started (Gate K, added by the owner on 2026-09-26)",
+    74: "not started (Gate K, added by the owner on 2026-09-26)",
+    75: "not started (Gate K, added by the owner on 2026-09-26)",
+    76: "not started (Gate K, added by the owner on 2026-09-26)",
+    77: "not started (Gate K, added by the owner on 2026-09-26)",
+    78: "not started (Gate K, added by the owner on 2026-09-26)",
+    79: "not started (Gate K, added by the owner on 2026-09-26)",
+    80: "not started (Gate K, added by the owner on 2026-09-26)",
+    81: "not started (Gate K, added by the owner on 2026-09-26)",
+    82: "not started (Gate K, added by the owner on 2026-09-26)",
 }
 TOTAL = 53
 

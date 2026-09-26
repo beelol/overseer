@@ -1,6 +1,6 @@
 # Side RFC: daily-driver orchestrator UI
 
-Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-54 to AC-66 (Gate J in the
+Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-54 to AC-66 (Gate J) and AC-67 to AC-82 (Gate K) in the
 [main RFC](../overseer-rfc.md)).
 
 ## Why
@@ -176,6 +176,23 @@ What still sends people back to the native CLIs:
 - **Usage and limits (AC-62):** so you pick the right account.
 - **A tidy history (AC-63):** archive and search.
 - **The real test (AC-64):** an hour of real work without leaving Overseer, after the owner's design review (AC-66).
+
+## Gate K layout
+
+Owner direction (2026-09-26): one agents list in VS Code's own side bar, and an editor area that
+shows what matters for the selected agent.
+
+| Area | Content |
+| --- | --- |
+| Side bar (Overseer view container) | **Needs you** first, then agents by repository with native children nested; provider logos as tree icons; search; hover actions (stop, archive, pin to grid); Accounts below. Replaces the dashboard's agent rail (AC-67 to AC-71). |
+| Editor area, nothing to review | The chat, or the new-agent composer, alone in the middle (AC-72). |
+| Editor area, agent has changes | The editable review on the left (about two thirds) and the chat on the right (about one third). Closing the review puts the chat back in the middle (AC-73). |
+| Review | One scope picker (All changes, Staged, Unstaged, Untracked) beside the comparison base; follow or manual mode (AC-74, AC-75). The Workspace Dirty view goes away. |
+| Grid | Opens in the editor area and closes back to the previous arrangement (AC-79). |
+
+- Built with editor groups, which Overseer already manages. The secondary side bar was considered for the chat; extensions cannot reliably place views there, so it is not used.
+- The side bar is a native tree: it cannot show chips or custom layouts, which a list does not need. Rich surfaces (chat, composer, grid, review) stay in the editor area.
+- Dragging an agent out of the tree depends on what VS Code accepts as a drop; the fallback is **Open to the Side** and **Pin to Grid** (AC-71).
 
 ## Limits
 
