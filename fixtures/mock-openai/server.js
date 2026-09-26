@@ -81,7 +81,7 @@ const server = http.createServer((req, res) => {
     const p = plan(body);
     if (p.pace) await new Promise(r => setTimeout(r, Number(process.env.MOCK_STEP_DELAY_MS || 1500)));
     const id = `mock-${++counter}`;
-    if (logFile) fs.appendFileSync(logFile, JSON.stringify({ t: Date.now(), id, url: req.url, stream: !!body.stream, last: (body.messages || []).slice(-1)[0]?.role, plan: p.tool || (p.slow ? 'slow' : 'text') }) + '\n');
+    if (logFile) fs.appendFileSync(logFile, JSON.stringify({ t: Date.now(), id, url: req.url, stream: !!body.stream, last: (body.messages || []).slice(-1)[0]?.role, tools: (body.tools || []).map(tool => tool.function?.name).filter(Boolean), plan: p.tool || (p.slow ? 'slow' : 'text') }) + '\n');
     if (!body.stream) {
       res.writeHead(200, { 'content-type': 'application/json' });
       const message = p.tool ? { role: 'assistant', content: null, tool_calls: [{ id: `call_${counter}`, type: 'function', function: { name: p.tool, arguments: JSON.stringify(p.args) } }] }

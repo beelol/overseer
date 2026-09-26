@@ -138,6 +138,25 @@ pub fn parse_local_catalog(config: &Value, response: &Value, observed_ms: i64) -
 /// itself is free or trustworthy.
 pub fn auto_local_execution_guard(profile: &crate::store::Profile, project: &Path,
     model: &str, endpoint: &str) -> Result<()> {
+    validate_auto_local_config(profile, project, model, endpoint, false)
+}
+
+/// A process-scoped override for one selected local provider. OpenCode's
+/// `OPENCODE_CONFIG_CONTENT` is loaded after the project config, so this avoids
+/// editing task files when Auto chooses a different provider. Only the model
+/// and its small-model fallback change. The child launch boundary must call
+/// this again against its own workspace before a model turn.
+pub fn auto_local_inline_config(profile: &crate::store::Profile, project: &Path,
+    model: &str, endpoint: &str) -> Result<String> {
+    validate_auto_local_config(profile, project, model, endpoint, true)?;
+    Ok(serde_json::json!({"model":model,"small_model":model,
+        "autoupdate":false,"share":"disabled","plugin":[],
+        "permission":{"*":"deny","read":"allow","glob":"allow",
+            "grep":"allow","list":"allow"}}).to_string())
+}
+
+fn validate_auto_local_config(profile: &crate::store::Profile, project: &Path,
+    model: &str, endpoint: &str, allow_inline_model_override: bool) -> Result<()> {
     if profile.harness != "opencode" || profile.is_system {
         return Err(anyhow!("automatic local OpenCode requires an isolated profile"));
     }
@@ -197,10 +216,15 @@ pub fn auto_local_execution_guard(profile: &crate::store::Profile, project: &Pat
         || root.get("$schema").is_some_and(|value| value != "https://opencode.ai/config.json") {
         return Err(anyhow!("automatic local OpenCode config has unverified fields"));
     }
+    if allow_inline_model_override && config["$schema"] != "https://opencode.ai/config.json" {
+        return Err(anyhow!("automatic local OpenCode inline route requires a stable project config"));
+    }
     if config["autoupdate"] != false || config["share"] != "disabled" {
         return Err(anyhow!("automatic local OpenCode updates or sharing are not disabled"));
     }
-    if config["model"] != model || config["small_model"] != model {
+    let default_model = config["model"].as_str().filter(|default| *default == config["small_model"])
+        .ok_or_else(|| anyhow!("automatic local OpenCode default and small models disagree"))?;
+    if !allow_inline_model_override && default_model != model {
         return Err(anyhow!("automatic local OpenCode selected and small models disagree"));
     }
     let (selected_provider, selected_model) = model.split_once('/')
@@ -213,6 +237,7 @@ pub fn auto_local_execution_guard(profile: &crate::store::Profile, project: &Pat
         .filter(|map| !map.is_empty() && map.len() <= 128)
         .ok_or_else(|| anyhow!("automatic local OpenCode provider map is unavailable"))?;
     let mut selected_found = false;
+    let mut default_found = false;
     for (id, provider) in providers {
         if !identifier(id, false) { return Err(anyhow!("invalid local OpenCode provider")); }
         let object = provider.as_object().ok_or_else(|| anyhow!("invalid local OpenCode provider"))?;
@@ -238,8 +263,13 @@ pub fn auto_local_execution_guard(profile: &crate::store::Profile, project: &Pat
             }
             selected_found = true;
         }
+        if default_model.strip_prefix(id).is_some_and(|suffix| suffix.starts_with('/')
+            && models.contains_key(&suffix[1..])) {
+            default_found = true;
+        }
     }
     if !selected_found { return Err(anyhow!("selected OpenCode provider is unavailable")); }
+    if !default_found { return Err(anyhow!("configured OpenCode default is not a local provider model")); }
     Ok(())
 }
 
@@ -330,6 +360,84 @@ mod tests {
     }
 
     #[test]
+    fn installed_opencode_uses_process_scoped_alternate_local_model() {
+        let Some(program) = crate::adapters::resolve_program("opencode") else { return };
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        let home = dir.path().join("profile");
+        std::fs::create_dir_all(&project).unwrap();
+        std::fs::create_dir_all(home.join("data/opencode")).unwrap();
+        std::fs::create_dir_all(home.join("config")).unwrap();
+        let profile = crate::store::Profile { id:"p-local".into(), name:"Local".into(),
+            harness:"opencode".into(), home:Some(home.display().to_string()),
+            is_system:false, created_ms:0 };
+        let port_file = dir.path().join("mock-port");
+        let mock_log = dir.path().join("mock-log");
+        let server_file = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../fixtures/mock-openai/server.js");
+        let mut server = std::process::Command::new("node").arg(server_file)
+            .env("MOCK_PORT_FILE", &port_file).env("MOCK_LOG", &mock_log)
+            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+            .spawn().unwrap();
+        struct StopServer<'a>(&'a mut std::process::Child);
+        impl Drop for StopServer<'_> {
+            fn drop(&mut self) { let _ = self.0.kill(); let _ = self.0.wait(); }
+        }
+        let _server_guard = StopServer(&mut server);
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !port_file.exists() {
+            assert!(std::time::Instant::now() < deadline, "local mock did not start");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let port = std::fs::read_to_string(&port_file).unwrap();
+        let alternate = format!("http://127.0.0.1:{port}/v1");
+        let config = serde_json::json!({"$schema":"https://opencode.ai/config.json","provider":{
+            "local_a":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://127.0.0.1:1/v1"},
+                "models":{"fixture-a":{"name":"Fixture A","tool_call":true}}},
+            "local_b":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":alternate},
+                "models":{"fixture-b":{"name":"Fixture B","tool_call":true}}}
+        },"model":"local_a/fixture-a","small_model":"local_a/fixture-a",
+            "autoupdate":false,"share":"disabled"});
+        std::fs::write(project.join("opencode.json"), config.to_string()).unwrap();
+        let inline = auto_local_inline_config(&profile, &project, "local_b/fixture-b", &alternate).unwrap();
+        let mut env = crate::adapters::base_env(&program.display().to_string());
+        env.extend(crate::daemon::Daemon::profile_env(&profile));
+        env.insert("OPENCODE_CONFIG_CONTENT".into(), inline);
+        env.insert("OPENCODE_DISABLE_MODELS_FETCH".into(), "true".into());
+        env.insert("OPENCODE_DISABLE_DEFAULT_PLUGINS".into(), "true".into());
+        let mut child = std::process::Command::new(program)
+            .args(["run", "--format", "json", "-m", "local_b/fixture-b", "--", "write forbidden.txt"])
+            .current_dir(&project).env_clear().envs(env)
+            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+            .spawn().unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(45);
+        loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                assert!(status.success(), "OpenCode alternate local route failed");
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                let _ = child.kill(); let _ = child.wait();
+                panic!("OpenCode alternate local route timed out");
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let requests = std::fs::read_to_string(mock_log).unwrap();
+        assert!(requests.contains("/v1/chat/completions"), "alternate provider saw no model turn");
+        for request in requests.lines() {
+            let request: Value = serde_json::from_str(request).unwrap();
+            let tools = request["tools"].as_array().unwrap();
+            for forbidden in ["bash", "edit", "write", "apply_patch", "task", "webfetch", "websearch"] {
+                assert!(!tools.iter().any(|tool| tool == forbidden),
+                    "read-only route exposed {forbidden} to the model");
+            }
+        }
+        assert!(!project.join("forbidden.txt").exists());
+        let project_config: Value = serde_json::from_slice(&std::fs::read(project.join("opencode.json")).unwrap()).unwrap();
+        assert_eq!(project_config, config, "process-scoped override must not edit the project");
+    }
+
+    #[test]
     fn duplicate_provider_metadata_cannot_multiply_one_local_route() {
         let config = json!({"provider":{"local_a":{"npm":"@ai-sdk/openai-compatible",
             "options":{"baseURL":"http://127.0.0.1:47811/v1"},"models":{"fixture-a":{}}}}});
@@ -352,7 +460,7 @@ mod tests {
             harness:"opencode".into(), home:Some(home.display().to_string()),
             is_system:false, created_ms:0 };
         let endpoint = "http://127.0.0.1:47811/v1";
-        let config = serde_json::json!({"provider":{
+        let mut config = serde_json::json!({"provider":{
             "local_a":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":endpoint},
                 "models":{"fixture-a":{"name":"Fixture A","tool_call":true}}},
             "local_b":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://127.0.0.1:47812/v1"},
@@ -362,6 +470,24 @@ mod tests {
         let save = |value: &Value| std::fs::write(project.join("opencode.json"), value.to_string()).unwrap();
         save(&config);
         assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_ok());
+        assert!(auto_local_inline_config(&profile, &project,
+            "local_b/fixture-b", "http://127.0.0.1:47812/v1").is_err(),
+            "OpenCode mutates project config without its schema marker");
+        config["$schema"] = serde_json::json!("https://opencode.ai/config.json");
+        save(&config);
+        assert!(auto_local_execution_guard(&profile, &project,
+            "local_b/fixture-b", "http://127.0.0.1:47812/v1").is_err());
+        let inline = auto_local_inline_config(&profile, &project,
+            "local_b/fixture-b", "http://127.0.0.1:47812/v1").unwrap();
+        let inline: Value = serde_json::from_str(&inline).unwrap();
+        assert_eq!(inline["model"], "local_b/fixture-b");
+        assert_eq!(inline["small_model"], "local_b/fixture-b");
+        assert_eq!(inline["autoupdate"], false);
+        assert_eq!(inline["share"], "disabled");
+        assert_eq!(inline["plugin"], serde_json::json!([]));
+        assert_eq!(inline["permission"]["*"], "deny");
+        assert_eq!(inline["permission"]["read"], "allow");
+        assert_eq!(inline["permission"]["edit"], Value::Null);
         let generated = home.join("config/opencode");
         std::fs::create_dir_all(&generated).unwrap();
         std::fs::write(generated.join(".gitignore"), "node_modules\n").unwrap();
@@ -378,10 +504,14 @@ mod tests {
             "options":{"baseURL":"https://api.example.test/v1"},"models":{"paid":{}}});
         save(&remote);
         assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_err());
+        assert!(auto_local_inline_config(&profile, &project,
+            "local_b/fixture-b", "http://127.0.0.1:47812/v1").is_err());
         let mut plugin = config.clone();
         plugin["plugin"] = serde_json::json!(["some-plugin"]);
         save(&plugin);
         assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_err());
+        assert!(auto_local_inline_config(&profile, &project,
+            "local_b/fixture-b", "http://127.0.0.1:47812/v1").is_err());
         save(&config);
         std::fs::write(project.join("opencode.jsonc"), "{}").unwrap();
         assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_err());
@@ -391,6 +521,8 @@ mod tests {
         std::fs::remove_dir(project.join(".opencode")).unwrap();
         std::fs::write(home.join("data/opencode/auth.json"), "secret-auth-sentinel").unwrap();
         assert!(auto_local_execution_guard(&profile, &project, "local_a/fixture-a", endpoint).is_err());
+        assert!(auto_local_inline_config(&profile, &project,
+            "local_b/fixture-b", "http://127.0.0.1:47812/v1").is_err());
         std::fs::remove_file(home.join("data/opencode/auth.json")).unwrap();
         let mut system = profile.clone();
         system.is_system = true;
