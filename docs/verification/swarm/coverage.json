@@ -281,9 +281,12 @@
       "blocker": "Rejected results do not unlock dependents and contract revisions invalidate affected jobs; session reuse and integration remain unimplemented."
     },
     "SWARM-36": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "Admission is atomic per request but no cross-category round-robin queue selects among eligible backlogs."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_scheduler.rs",
+        "docs/verification/swarm/SWARM-36.md"
+      ],
+      "blocker": "A fixture-only central queue fairly admits a 100-job and two-job backlog through one durable admission transaction. It does not yet start directors/workers automatically, route per-job targets through Auto Mode, reserve an actual director process, or prove cross-category scope and handoff isolation in a live run."
     },
     "SWARM-37": {
       "status": "unverified",
