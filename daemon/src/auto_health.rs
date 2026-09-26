@@ -112,7 +112,8 @@ pub fn evaluate(route: &Route, observations: &[Observation], now_ms: i64) -> Hea
                 Some((0, Health::Healthy))
             }
             (Scope::Endpoint { provider, endpoint }, Signal::EndpointFailure)
-                if provider == &route.provider && endpoint == &route.endpoint =>
+                if endpoint == &route.endpoint && (provider == &route.provider
+                    || crate::auto_opencode::is_verified_loopback_endpoint(endpoint)) =>
             {
                 Some((1, Health::Unavailable))
             }
@@ -124,7 +125,8 @@ pub fn evaluate(route: &Route, observations: &[Observation], now_ms: i64) -> Hea
                 },
                 Signal::AuthenticationFailure | Signal::Throttled,
             ) if profile_id == &route.profile_id
-                && provider == &route.provider
+                && (provider == &route.provider
+                    || crate::auto_opencode::is_verified_loopback_endpoint(endpoint))
                 && endpoint == &route.endpoint =>
             {
                 Some((1, Health::Unavailable))
@@ -165,7 +167,7 @@ pub fn recent_local_observations(
     let since = now_ms.saturating_sub(RECENT_MS);
     let mut observations = Vec::new();
     let mut errors = store.conn.prepare(
-        "SELECT e.ts,e.payload,r.profile_id,r.harness FROM events e JOIN runs r ON r.id=e.run_id \
+        "SELECT e.ts,e.payload,r.profile_id,r.harness,r.model,r.launch FROM events e JOIN runs r ON r.id=e.run_id \
          WHERE e.kind='error' AND e.source='harness' AND e.ts>=?1 AND e.ts<=?2 \
          ORDER BY e.seq DESC LIMIT 100",
     )?;
@@ -175,12 +177,15 @@ pub fn recent_local_observations(
             row.get::<_, String>(1)?,
             row.get::<_, Option<String>>(2)?,
             row.get::<_, String>(3)?,
+            row.get::<_, Option<String>>(4)?,
+            row.get::<_, Option<String>>(5)?,
         ))
     })?;
     for item in rows {
-        let (at, payload, profile, harness) = item?;
+        let (at, payload, profile, harness, model, launch) = item?;
         let Some(profile) = profile else { continue };
-        let Some((provider, endpoint)) = fixed_harness_endpoint(&harness) else {
+        let Some((provider, endpoint)) = observed_route_endpoint(&harness,
+            model.as_deref(), launch.as_deref()) else {
             continue;
         };
         let Ok(value) = serde_json::from_str::<Value>(&payload) else {
@@ -194,14 +199,14 @@ pub fn recent_local_observations(
         };
         let scope = if matches!(signal, Signal::EndpointFailure) {
             Scope::Endpoint {
-                provider: provider.into(),
-                endpoint: endpoint.into(),
+                provider: provider.clone(),
+                endpoint: endpoint.clone(),
             }
         } else {
             Scope::AccountEndpoint {
                 profile_id: profile,
-                provider: provider.into(),
-                endpoint: endpoint.into(),
+                provider,
+                endpoint,
             }
         };
         observations.push(Observation {
@@ -245,11 +250,76 @@ fn fixed_harness_endpoint(harness: &str) -> Option<(&'static str, &'static str)>
     }
 }
 
+fn observed_route_endpoint(harness: &str, model: Option<&str>, launch: Option<&str>)
+    -> Option<(String, String)> {
+    if let Some((provider, endpoint)) = fixed_harness_endpoint(harness) {
+        return Some((provider.into(), endpoint.into()));
+    }
+    if harness != "opencode" { return None; }
+    let launch: Value = serde_json::from_str(launch?).ok()?;
+    if launch["auto_selected"] != true { return None; }
+    let endpoint = launch["auto_local_endpoint"].as_str()?;
+    if !crate::auto_opencode::is_verified_loopback_endpoint(endpoint) { return None; }
+    let (provider, _) = model?.split_once('/')?;
+    if provider.is_empty() || provider.len() > 120
+        || !provider.bytes().all(|byte| byte.is_ascii_alphanumeric()
+            || matches!(byte, b'-' | b'_' | b'.')) { return None; }
+    Some((provider.into(), endpoint.into()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::auto_select::{select, Allowance, CapabilityTier, Fit, Sandbox, WorkUnit};
     use std::collections::BTreeSet;
+
+    #[test]
+    fn managed_local_error_scopes_to_endpoint_and_blocks_shared_loopback_url() {
+        let launch = serde_json::json!({"auto_selected":true,
+            "auto_local_endpoint":"http://127.0.0.1:47811/v1"}).to_string();
+        assert_eq!(observed_route_endpoint("opencode", Some("local_a/gpt-oss-120b"), Some(&launch)),
+            Some(("local_a".into(), "http://127.0.0.1:47811/v1".into())));
+        assert!(observed_route_endpoint("opencode", Some("local_a/gpt-oss-120b"),
+            Some("{\"auto_selected\":false,\"auto_local_endpoint\":\"http://127.0.0.1:47811/v1\"}")).is_none());
+        assert!(observed_route_endpoint("opencode", Some("local_a/gpt-oss-120b"),
+            Some("{\"auto_selected\":true,\"auto_local_endpoint\":\"https://api.example.test\"}")).is_none());
+        let failure = obs(Scope::Endpoint {provider:"local_a".into(),
+            endpoint:"http://127.0.0.1:47811/v1".into()},
+            Signal::EndpointFailure, 100, 300);
+        let a = route("a", "opencode", "local_a", "http://127.0.0.1:47811/v1", "p");
+        let same_url = route("same-url", "opencode", "local_b", "http://127.0.0.1:47811/v1", "p");
+        let independent = route("independent", "opencode", "local_b", "http://127.0.0.1:47812/v1", "p");
+        assert_eq!(evaluate(&a, &[failure.clone()], 200), Health::Unavailable);
+        assert_eq!(evaluate(&same_url, &[failure.clone()], 200), Health::Unavailable);
+        assert_eq!(evaluate(&independent, &[failure], 200), Health::Unknown);
+        let throttled = obs(Scope::AccountEndpoint {profile_id:"p".into(),
+            provider:"local_a".into(), endpoint:"http://127.0.0.1:47811/v1".into()},
+            Signal::Throttled, 100, 300);
+        assert_eq!(evaluate(&same_url, &[throttled.clone()], 200), Health::Unavailable);
+        assert_eq!(evaluate(&independent, &[throttled], 200), Health::Unknown);
+    }
+
+    #[test]
+    fn persisted_managed_local_error_uses_its_selected_endpoint_not_the_harness_name() {
+        let store = crate::store::Store::open(std::path::Path::new(":memory:")).unwrap();
+        store.conn.execute_batch("INSERT INTO workspaces(id,path,repo_root,common_dir,kind,initial_dirty,created_ms) VALUES('w','/tmp','/tmp','/tmp','current','{}',0);
+            INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms) VALUES('t','t','p','/tmp','w',0);").unwrap();
+        let launch = serde_json::json!({"auto_selected":true,
+            "auto_local_endpoint":"http://127.0.0.1:47811/v1"}).to_string();
+        store.conn.execute("INSERT INTO runs(id,task_id,harness,profile_id,model,effort,workspace_id,status,created_ms,title,capabilities,launch)
+            VALUES('r','t','opencode','p','local_a/gpt-oss-120b','default','w','failed',1000,'r','{}',?1)",
+            [&launch]).unwrap();
+        store.conn.execute("INSERT INTO events(ts,task_id,run_id,kind,source,confidence,payload)
+            VALUES(1000,'t','r','error','harness','exact',?1)",
+            [serde_json::json!({"class":"service_unavailable","message":"secret-endpoint-error"}).to_string()]).unwrap();
+        let observations = recent_local_observations(&store, 1100).unwrap();
+        assert_eq!(observations.len(), 1);
+        let scoped = route("local", "opencode", "local_a", "http://127.0.0.1:47811/v1", "p");
+        let independent = route("other", "opencode", "local_b", "http://127.0.0.1:47812/v1", "p");
+        assert_eq!(evaluate(&scoped, &observations, 1100), Health::Unavailable);
+        assert_eq!(evaluate(&independent, &observations, 1100), Health::Unknown);
+        assert!(!format!("{observations:?}").contains("secret-endpoint-error"));
+    }
 
     #[test]
     fn public_feed_maps_only_codex_cli_and_api_to_advisory_health() {
@@ -342,6 +412,7 @@ mod tests {
             quota: Allowance::ObservedNonExhausted,
             fit: Fit::Unknown,
             health: Health::Unknown,
+            unresolved_quota_pool_identity: false,
         }
     }
 

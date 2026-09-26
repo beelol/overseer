@@ -1629,7 +1629,7 @@ fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_rout
     let repo = repo(&r.path().join("repo"));
     let local = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = local.local_addr().unwrap().port();
-    std::fs::write(repo.join("opencode.json"), json!({"provider":{
+    std::fs::write(repo.join("opencode.json"), json!({"$schema":"https://opencode.ai/config.json","provider":{
         "local_a":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":format!("http://127.0.0.1:{port}/v1")},
             "models":{"fixture-a":{"name":"Fixture A","tool_call":true}}},
         "local_b":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://127.0.0.1:1/v1"},
@@ -1666,8 +1666,8 @@ fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_rout
         "workspace_id":workspace_id}));
     assert_eq!(isolated_read["local_execution_config_verified"]["local_a/fixture-a"], true,
         "credential-free isolated local provider can be considered for a future Auto route: {isolated_read}");
-    assert_eq!(isolated_read["local_execution_config_verified"]["local_b/fixture-b"], false,
-        "the selected and secondary models must both point to this route before execution");
+    assert_eq!(isolated_read["local_execution_config_verified"]["local_b/fixture-b"], true,
+        "the process-scoped override can select a second verified local route");
     assert_eq!(isolated_read["endpoint_health"]["local_b"], "unavailable");
     let auth_file = Path::new(isolated["home"].as_str().unwrap()).join("data/opencode/auth.json");
     std::fs::create_dir_all(auth_file.parent().unwrap()).unwrap();
@@ -1798,6 +1798,92 @@ fn auto_selected_opencode_child_uses_guarded_alternate_local_endpoint() {
     assert!(credentialed.contains("contains credentials"), "{credentialed}");
     assert!(!credentialed.contains("secret-auth-sentinel"));
     assert_eq!(d.runs().len(), 2, "failed preflights must not create managed children");
+}
+
+#[test]
+fn auto_dispatch_selects_reachable_local_opencode_provider_after_another_fails() {
+    let Some(program) = std::env::var_os("PATH").and_then(|path| std::env::split_paths(&path)
+        .map(|dir| dir.join("opencode")).find(|candidate| candidate.is_file())) else { return };
+    struct MockServer(std::process::Child);
+    impl Drop for MockServer {
+        fn drop(&mut self) { let _ = self.0.kill(); let _ = self.0.wait(); }
+    }
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let port_file = r.path().join("mock-port");
+    let mock_log = r.path().join("mock-log.jsonl");
+    let _mock = MockServer(std::process::Command::new("node")
+        .arg(fixture("mock-openai/server.js"))
+        .env("MOCK_PORT_FILE", &port_file).env("MOCK_LOG", &mock_log)
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+        .spawn().unwrap());
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while !port_file.exists() {
+        assert!(std::time::Instant::now() < deadline, "local mock provider did not start");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let reachable = format!("http://127.0.0.1:{}/v1", std::fs::read_to_string(&port_file).unwrap());
+    let quota_mode = r.path().join("quota-mode.txt");
+    std::fs::write(&quota_mode, "available").unwrap();
+    std::fs::write(repo.join("opencode.json"), json!({
+        "$schema":"https://opencode.ai/config.json","provider":{
+            "local_a":{"npm":"@ai-sdk/openai-compatible",
+                "options":{"baseURL":"http://127.0.0.1:1/v1"},
+                "models":{"gpt-oss-120b":{"name":"Local A","tool_call":true,"reasoning":true}}},
+            "local_b":{"npm":"@ai-sdk/openai-compatible",
+                "options":{"baseURL":reachable},
+                "models":{"gpt-oss-120b":{"name":"Local B","tool_call":true,"reasoning":true}}}
+        },"model":"local_a/gpt-oss-120b","small_model":"local_a/gpt-oss-120b",
+        "autoupdate":false,"share":"disabled"}).to_string()).unwrap();
+    git(&repo, &["add", "opencode.json"]);
+    git(&repo, &["commit", "-q", "-m", "local route candidates"]);
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_OPENCODE_PATH", program.to_str().unwrap()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_QUOTA_MODE_FILE"),
+        ("FIXTURE_MODE", "managed-models"),
+        ("FIXTURE_QUOTA_MODE_FILE", quota_mode.to_str().unwrap())]);
+    let local = d.call("profile.create", json!({"name":"Local Auto","harness":"opencode"}));
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"parent checkpoint",
+        "approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"local-auto-route-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"sandbox":"read_only",
+        "allowed_profiles":[local["id"]],"preferred_harness":"opencode",
+        "prompt":"reply hello","title":"local summary"});
+    let selected = d.call("auto.dispatch", request.clone());
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    assert_eq!(selected["run"]["harness"], "opencode");
+    assert_eq!(selected["decision"]["selected"],
+        format!("{}/local_b/gpt-oss-120b/default", local["id"].as_str().unwrap()));
+    let excluded = selected["decision"]["exclusions"].as_array().unwrap();
+    assert!(excluded.iter().any(|item| item["reason"] == "route_unavailable"
+        && item["route_id"].as_str().unwrap().contains("local_a")), "{selected}");
+    let child_id = run_id(&selected);
+    assert_eq!(d.wait_done(&child_id, 60)["status"], "completed");
+    assert!(std::fs::read_to_string(&mock_log).unwrap().contains("/v1/chat/completions"));
+    let decision_event = d.events(&parent).into_iter()
+        .find(|event| event["kind"] == "auto_decision").unwrap();
+    assert_eq!(decision_event["payload"]["candidates"].as_array().unwrap().iter()
+        .find(|item| item["id"] == selected["decision"]["selected"]).unwrap()["quota"], "unknown");
+    assert_eq!(d.call("auto.decision.replay", json!({"event_seq":decision_event["seq"]}))["matches_recorded"], true);
+    assert_eq!(d.call("auto.dispatch", request)["run"]["id"], child_id);
+    let write_request = d.call("auto.dispatch", json!({"work_unit_id":"local-auto-write-2",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[local["id"]],"prompt":"write a file","title":"write"}));
+    assert_eq!(write_request["state"], "paused", "{write_request}");
+    assert!(write_request["decision"]["exclusions"].as_array().unwrap().iter()
+        .any(|item| item["reason"] == "sandbox_incompatible"));
+    std::fs::write(&quota_mode, "exhausted").unwrap();
+    let unresolved = d.call("auto.dispatch", json!({"work_unit_id":"local-auto-quota-3",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "sandbox":"read_only","allowed_profiles":["system-codex",local["id"]],
+        "prompt":"reply hello","title":"quota identity"}));
+    assert_eq!(unresolved["state"], "paused", "{unresolved}");
+    assert!(unresolved["decision"]["exclusions"].as_array().unwrap().iter()
+        .any(|item| item["reason"] == "unresolved_quota_pool_identity"
+            && item["route_id"].as_str().unwrap().contains("local_b")), "{unresolved}");
+    assert_eq!(d.runs().len(), 2, "neither rejected unit may create a child");
 }
 
 #[test]

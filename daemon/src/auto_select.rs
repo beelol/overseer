@@ -181,6 +181,11 @@ pub struct Route {
     pub quota: Allowance,
     pub fit: Fit,
     pub health: Health,
+    /// True only for this decision when an exhausted allowed account may be
+    /// the upstream of a credential-free local proxy. Unknown identity is a
+    /// conservative admission block, not a claim that this route is exhausted.
+    #[serde(default)]
+    pub unresolved_quota_pool_identity: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -224,6 +229,9 @@ fn excluded(work: &WorkUnit, route: &Route, exhausted_pools: &BTreeSet<&str>) ->
     }
     if route.health == Health::Unavailable {
         return Some("route_unavailable");
+    }
+    if route.unresolved_quota_pool_identity {
+        return Some("unresolved_quota_pool_identity");
     }
     if route.quota == Allowance::Exhausted || exhausted_pools.contains(route.pool_id.as_str()) {
         return Some("quota_exhausted");
@@ -350,6 +358,7 @@ mod tests {
             quota: Allowance::ObservedNonExhausted,
             fit: Fit::Unknown,
             health: Health::Healthy,
+            unresolved_quota_pool_identity: false,
         }
     }
 

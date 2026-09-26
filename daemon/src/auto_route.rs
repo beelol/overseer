@@ -7,7 +7,7 @@ use serde_json::Value;
 use std::collections::BTreeSet;
 
 use crate::auto_quota::QuotaSnapshot;
-use crate::auto_select::{self, CapabilityTier, Fit, Health, Route, Sandbox};
+use crate::auto_select::{self, Allowance, CapabilityTier, Fit, Health, Route, Sandbox};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DiscoveredModel {
@@ -68,6 +68,7 @@ pub fn codex_auto_routes(
             sandbox: Sandbox::WorkspaceWrite, recommended_default: *recommended,
             quota: auto_select::observed_allowance(quota, &model.model, now_ms),
             fit: Fit::Unknown, health: Health::Unknown,
+            unresolved_quota_pool_identity:false,
         });
     }
     routes
@@ -97,7 +98,35 @@ pub fn claude_auto_routes(
             sandbox:Sandbox::WorkspaceWrite, recommended_default,
             quota:auto_select::observed_allowance(quota, model, now_ms),
             fit:Fit::Unknown, health:Health::Unknown,
+            unresolved_quota_pool_identity:false,
         }).collect()
+}
+
+/// A versioned task-capability prior, not a claim that any configured proxy
+/// actually serves these weights or has free subscription allowance. Unknown
+/// local model identities remain manual until supported by stronger evidence.
+/// OpenAI documents gpt-oss-120b as an open-weight reasoning model with tool
+/// calling: https://developers.openai.com/api/docs/models/gpt-oss-120b
+pub fn opencode_local_routes(catalog: &crate::auto_opencode::LocalCatalog,
+    profile_id: &str, now_ms: i64) -> Vec<Route> {
+    if now_ms < catalog.observed_ms || now_ms >= catalog.expires_ms { return Vec::new(); }
+    catalog.models.iter().filter_map(|model| {
+        let model_id = model.model.strip_prefix(&format!("{}/", model.provider_id))?;
+        if model_id != "gpt-oss-120b" || !model.toolcall || !model.reasoning { return None; }
+        Some(Route {
+            id:format!("{profile_id}/{}/default", model.model), harness:"opencode".into(),
+            provider:model.provider_id.clone(), endpoint:model.endpoint.clone(),
+            profile_id:profile_id.into(), pool_id:format!("{profile_id}/{}", model.endpoint),
+            model:model.model.clone(), effort:"default".into(), tier:CapabilityTier::General,
+            tools:BTreeSet::new(), context_limit:model.context_limit,
+            // The guarded inline config exposes read-only agent tools. This
+            // is not evidence of an OS-level filesystem sandbox.
+            supports_approvals:false, sandbox:Sandbox::ReadOnly,
+            recommended_default:model.is_default, quota:Allowance::Unknown,
+            fit:Fit::Unknown, health:Health::Unknown,
+            unresolved_quota_pool_identity:false,
+        })
+    }).collect()
 }
 
 fn identifier(value: &Value) -> Result<String> {
@@ -270,6 +299,35 @@ mod tests {
         assert_eq!(routes[1].model, "opus");
         assert_eq!(routes[1].quota, crate::auto_select::Allowance::Exhausted);
         assert!(claude_auto_routes(&auth, Some(&quota), "system-claude", now + 60_000).is_empty());
+    }
+
+    #[test]
+    fn local_opencode_prior_preserves_unknown_allowance_and_excludes_unknown_models() {
+        let now = 1_800_000_000_000_i64;
+        let local = |provider: &str, model: &str, toolcall, reasoning| crate::auto_opencode::LocalModel {
+            provider_id:provider.into(), model:format!("{provider}/{model}"),
+            endpoint:format!("http://127.0.0.1:{}/v1", if provider == "a" { 47811 } else { 47812 }),
+            context_limit:Some(32_000), toolcall, reasoning,
+            variants:vec![], is_default:provider == "a",
+        };
+        let catalog = crate::auto_opencode::LocalCatalog { observed_ms:now,
+            expires_ms:now + 60_000, models:vec![
+                local("a", "gpt-oss-120b", true, true),
+                local("b", "gpt-oss-120b", true, true),
+                local("b", "unknown-model", true, true),
+                local("b", "gpt-oss-20b", true, true),
+                local("b", "gpt-oss-120b", false, true),
+            ] };
+        let routes = opencode_local_routes(&catalog, "p-local", now);
+        assert_eq!(routes.len(), 2);
+        assert_ne!(routes[0].endpoint, routes[1].endpoint);
+        assert_eq!(routes[0].quota, Allowance::Unknown);
+        assert_eq!(routes[0].fit, Fit::Unknown);
+        assert_eq!(routes[0].sandbox, Sandbox::ReadOnly);
+        assert!(!routes[0].supports_approvals);
+        assert_eq!(routes[0].tier, CapabilityTier::General);
+        assert_eq!(routes[0].effort, "default");
+        assert!(opencode_local_routes(&catalog, "p-local", now + 60_000).is_empty());
     }
 
     #[test]

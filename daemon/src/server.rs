@@ -313,7 +313,7 @@ where T: Send, F: Fn(&str, Duration) -> Result<T> + Sync {
 struct AutoProfileDiscovery {
     routes: Vec<crate::auto_select::Route>,
     evidence: Value,
-    generation: i64,
+    generation: Option<i64>,
 }
 
 fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
@@ -342,7 +342,7 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
                     "model_observed_ms":catalog.observed_ms,"tool_observed_ms":tool_catalog.observed_ms,
                     "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
                     "account_generation":generation}),
-                generation:generation.unwrap(),
+                generation,
             })
         }
         "claude" => {
@@ -366,8 +366,42 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
                     "auth_observed_ms":auth.observed_ms,
                     "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
                     "account_generation":generation}),
-                generation,
+                generation:Some(generation),
             })
+        }
+        "opencode" => {
+            let gate = d.profile_gate(profile_id);
+            let _guard = lock_gate_until(&gate, deadline)?;
+            if d.store.lock().unwrap().runs()?.iter().any(|run|
+                run.profile_id.as_deref() == Some(profile_id)
+                    && ACTIVE.contains(&run.status.as_str())) {
+                return Err(anyhow!("OpenCode profile has an active run"));
+            }
+            let workspace = d.workspace(workspace_id)?;
+            if workspace.removed_ms.is_some() { return Err(anyhow!("workspace was removed")); }
+            let project = std::path::Path::new(&workspace.path);
+            let program = crate::adapters::resolve_program("opencode")
+                .ok_or_else(|| anyhow!("OpenCode executable unavailable"))?;
+            let mut env = crate::adapters::base_env(&program.display().to_string());
+            env.extend(Daemon::profile_env(&profile));
+            let catalog = crate::auto_collect::opencode_local_catalog(&program, &env,
+                project, Duration::from_millis(remaining_metadata_ms(deadline)?),
+                crate::daemon::now())?;
+            let mut routes = crate::auto_route::opencode_local_routes(&catalog, profile_id,
+                crate::daemon::now());
+            routes.retain(|route| crate::auto_opencode::auto_local_inline_config(&profile,
+                project, &route.model, &route.endpoint).is_ok());
+            for route in &mut routes {
+                if crate::auto_opencode::probe_local_endpoint(&route.endpoint)
+                    != crate::auto_opencode::EndpointProbe::Reachable {
+                    route.health = crate::auto_select::Health::Unavailable;
+                }
+            }
+            Ok(AutoProfileDiscovery { evidence:json!({"profile_id":profile_id,
+                "source":"opencode/local-config-providers","observed_ms":catalog.observed_ms,
+                "capability_prior":"opencode-gpt-oss-120b-v1",
+                "allowance":"unknown","route_count":routes.len()}), routes,
+                generation:None })
         }
         _ => Err(anyhow!("unsupported automatic harness")),
     }
@@ -438,7 +472,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             for field in p.as_object().ok_or_else(|| anyhow!("automatic work request must be an object"))?.keys() {
                 if !matches!(field.as_str(), "work_unit_id" | "parent_run_id" | "prompt" | "title"
                     | "min_tier" | "required_tools" | "context_needed" | "requires_approvals"
-                    | "pinned_route" | "preferred_harness" | "allowed_profiles") {
+                    | "pinned_route" | "preferred_harness" | "allowed_profiles" | "sandbox") {
                     return Err(anyhow!("unsupported automatic work constraint: {field}"));
                 }
             }
@@ -455,7 +489,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             }
             let profile_id = parent.profile_id.as_deref().ok_or_else(|| anyhow!("parent has no account profile"))?;
             let profile = d.profile(profile_id)?;
-            if !matches!(profile.harness.as_str(), "codex" | "claude") {
+            if !matches!(profile.harness.as_str(), "codex" | "claude" | "opencode") {
                 return Err(anyhow!("automatic route discovery is not yet supported for this harness"));
             }
             let prompt = s(p, "prompt")?;
@@ -481,6 +515,16 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 None => false,
                 Some(value) => value.as_bool().ok_or_else(|| anyhow!("requires_approvals must be a boolean"))?,
             };
+            let sandbox = match p.get("sandbox") {
+                None => Sandbox::WorkspaceWrite,
+                Some(value) => {
+                    let requested: Sandbox = serde_json::from_value(value.clone())?;
+                    if !matches!(requested, Sandbox::ReadOnly | Sandbox::WorkspaceWrite) {
+                        return Err(anyhow!("automatic sandbox is unsupported"));
+                    }
+                    requested
+                }
+            };
             let pinned_route = match p.get("pinned_route") {
                 None => None,
                 Some(value) => Some(value.as_str().filter(|s| !s.is_empty() && s.len() <= 300)
@@ -499,7 +543,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         let id = value.as_str().filter(|id| !id.is_empty() && id.len() <= 120)
                             .ok_or_else(|| anyhow!("invalid allowed account profile"))?;
                         let candidate = d.profile(id)?;
-                        if !matches!(candidate.harness.as_str(), "codex" | "claude") {
+                        if !matches!(candidate.harness.as_str(), "codex" | "claude" | "opencode") {
                             return Err(anyhow!("automatic route discovery is not yet supported for this account profile"));
                         }
                         if !allowed.insert(id.to_string()) { return Err(anyhow!("duplicate allowed account profile")); }
@@ -517,6 +561,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "preferred_harness":preferred_harness});
             let mut requirements = requirements;
             if let Some(explicit) = &explicit_allowed_profiles { requirements["allowed_profiles"] = json!(explicit); }
+            if p.get("sandbox").is_some() { requirements["sandbox"] = json!(sandbox); }
             let requirements_hash = Sha256::digest(serde_json::to_vec(&requirements)?)
                 .iter().map(|byte| format!("{byte:02x}")).collect::<String>();
             let saved_work_unit = {
@@ -556,7 +601,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     match discovered {
                         Ok(discovered) => {
                             routes.extend(discovered.routes);
-                            account_generations.insert(candidate_id, discovered.generation);
+                            if let Some(generation) = discovered.generation {
+                                account_generations.insert(candidate_id, generation);
+                            }
                             evidence.push(discovered.evidence);
                         }
                         Err(_) => discovery_failures.push(json!({"profile_id":candidate_id,
@@ -598,11 +645,23 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 }
                 let health_now = crate::daemon::now();
                 for route in &mut routes {
-                    route.health = crate::auto_health::evaluate(route, &health_observations, health_now);
+                    if route.health != crate::auto_select::Health::Unavailable {
+                        route.health = crate::auto_health::evaluate(route, &health_observations, health_now);
+                    }
+                }
+                // A loopback OpenCode provider can forward to a paid account.
+                // Until its upstream is attested, an allowed account's proven
+                // exhaustion must not become apparent fresh capacity by
+                // changing harness. Keep the local route's allowance unknown.
+                if routes.iter().any(|route| route.harness != "opencode"
+                    && route.quota == crate::auto_select::Allowance::Exhausted) {
+                    for route in routes.iter_mut().filter(|route| route.harness == "opencode") {
+                        route.unresolved_quota_pool_identity = true;
+                    }
                 }
                 let work = WorkUnit { id:work_unit_id.into(), min_tier, required_tools:required_tools.clone(),
-                    context_needed, requires_approvals, min_sandbox:Sandbox::WorkspaceWrite,
-                    max_sandbox:Sandbox::WorkspaceWrite,
+                    context_needed, requires_approvals, min_sandbox:sandbox,
+                    max_sandbox:sandbox,
                     allowed_profiles:allowed_profiles.clone(),
                     pinned_route, preferred_harness };
                 let mut decision = crate::auto_select::select(&work, &routes);
@@ -619,6 +678,30 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     }
                     let route = routes.iter().find(|route| route.id == selected)
                         .ok_or_else(|| anyhow!("selected route disappeared"))?;
+                    if route.harness == "opencode" {
+                        let local_profile = d.profile(&route.profile_id)?;
+                        let parent_workspace = d.workspace(&parent.workspace_id)?;
+                        let valid = crate::auto_opencode::auto_local_inline_config(&local_profile,
+                            std::path::Path::new(&parent_workspace.path), &route.model,
+                            &route.endpoint).is_ok()
+                            && crate::auto_opencode::probe_local_endpoint(&route.endpoint)
+                                == crate::auto_opencode::EndpointProbe::Reachable;
+                        if valid { break; }
+                        pre_effect_failures.push(json!({"profile_id":route.profile_id,
+                            "route_id":route.id,"reason":"local_endpoint_or_config_rejected_before_child"}));
+                        let endpoint = route.endpoint.clone();
+                        for alternate in routes.iter_mut().filter(|candidate|
+                            candidate.harness == "opencode" && candidate.endpoint == endpoint) {
+                            alternate.health = crate::auto_select::Health::Unavailable;
+                        }
+                        decision = crate::auto_select::select(&work, &routes);
+                        if attempt == 2 && decision.selected.is_some() {
+                            attempt_limit_reached = true;
+                            decision.selected = None;
+                            decision.reason = "pre_effect_attempt_limit".into();
+                        }
+                        continue;
+                    }
                     if route.harness != "claude" { break; }
                     let rejected_profile = route.profile_id.clone();
                     let rejected_route = route.id.clone();
@@ -645,7 +728,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     decision.selected = None;
                     decision.reason = "collection_deadline_elapsed".into();
                 }
-                let trace = json!({"selector_version":"multi-harness-preflight-v2","decision":decision,
+                let trace = json!({"selector_version":"multi-harness-preflight-v3","decision":decision,
                     "selection_input":{"work":&work,"routes":&routes,
                         "attempt_limit_reached":attempt_limit_reached,
                         "deadline_exhausted":deadline_exhausted},
@@ -659,14 +742,18 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 if let Some(selected) = decision.selected.as_deref() {
                     let route = routes.iter().find(|route| route.id == selected)
                         .ok_or_else(|| anyhow!("selected route disappeared"))?;
-                    let generation = account_generations.get(&route.profile_id)
-                        .ok_or_else(|| anyhow!("selected account generation unavailable"))?;
+                    let generation = if route.harness == "opencode" { None } else {
+                        Some(account_generations.get(&route.profile_id)
+                            .ok_or_else(|| anyhow!("selected account generation unavailable"))?)
+                    };
                     let required = required_tools.iter().cloned().collect::<Vec<_>>();
                     let mut delegated = d.delegate_run(&json!({"work_unit_id":work_unit_id,
                         "parent_run_id":parent.id,"harness":route.harness,"profile_id":route.profile_id,
                         "model":route.model,"effort":route.effort,"prompt":prompt,"title":title,
                         "required_tools":required,"auto_selected":true,
-                        "requirements_hash":requirements_hash,"expected_account_generation":generation}))?;
+                        "requirements_hash":requirements_hash,"expected_account_generation":generation,
+                        "auto_local_endpoint":if route.harness == "opencode" {
+                            Some(route.endpoint.as_str()) } else { None }}))?;
                     if delegated.get("launch_error").is_some() {
                         delegated["state"] = json!("paused");
                         delegated["actions"] = json!(["refresh", "choose_manual_route"]);
@@ -701,7 +788,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "codex-cold-start-v1" => crate::auto_select::select_legacy_v1(&work, &routes),
                 "codex-cold-start-v2" | "multi-harness-cold-start-v1" =>
                     crate::auto_select::select_pre_status_v1(&work, &routes),
-                "multi-harness-preflight-v1" | "multi-harness-preflight-v2" => {
+                "multi-harness-preflight-v1" | "multi-harness-preflight-v2" | "multi-harness-preflight-v3" => {
                     let mut decision = if selector_version == "multi-harness-preflight-v1" {
                         crate::auto_select::select_pre_status_v1(&work, &routes)
                     } else { crate::auto_select::select(&work, &routes) };
@@ -819,7 +906,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let mut local_execution_config_verified = BTreeMap::new();
             let mut local_execution_config_reason = BTreeMap::new();
             for model in &catalog.models {
-                let eligibility = crate::auto_opencode::auto_local_execution_guard(&profile,
+                let eligibility = crate::auto_opencode::auto_local_inline_config(&profile,
                     std::path::Path::new(&workspace.path), &model.model, &model.endpoint);
                 local_execution_config_reason.insert(model.model.clone(), eligibility.as_ref().err()
                     .map(ToString::to_string));
