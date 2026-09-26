@@ -442,6 +442,72 @@ fn repeated_progress_dedupes_before_reaching_director() {
 }
 
 #[test]
+fn stop_is_not_starved_by_two_thousand_duplicate_progress_replays() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    let d = Daemon::start(&[]);
+    let (run, attempt, token) = planned(&d);
+    let report = json!({"run_id":run,"job_id":"routes","attempt_id":attempt,
+        "token":token,"message_id":"replayed-progress","type":"progress",
+        "revision":1,"payload":{"step":"checking routes"}});
+    assert_eq!(d.call("swarm.report", report.clone())["duplicate"], false);
+    let socket = d.socket();
+    let (started_tx, started_rx) = mpsc::channel();
+    let flood = std::thread::spawn(move || {
+        for index in 0..2000 {
+            let mut conn = UnixStream::connect(&socket).unwrap();
+            conn.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            writeln!(conn, "{}", json!({"id":index,"method":"swarm.report","params":report})).unwrap();
+            let mut line = String::new();
+            BufReader::new(conn).read_line(&mut line).unwrap();
+            let reply: serde_json::Value = serde_json::from_str(&line).unwrap();
+            assert_eq!(reply["result"]["duplicate"], true, "{reply}");
+            if index == 20 { started_tx.send(()).unwrap(); }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    });
+    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let begin = Instant::now();
+    let stopped = d.call("swarm.stop", json!({"run_id":run,"generation":1,"revision":1}));
+    assert!(begin.elapsed() < Duration::from_secs(2), "Stop was starved by duplicate traffic");
+    assert_eq!(stopped["status"], "stopping");
+    flood.join().unwrap();
+    let inbox = d.call("swarm.messages", json!({"run_id":run,"recipient":"director"}));
+    assert_eq!(inbox["messages"].as_array().unwrap().len(), 1, "{inbox}");
+    assert_eq!(inbox["messages"][0]["message_id"], "replayed-progress");
+}
+
+#[test]
+fn terminal_run_replays_a_saved_result_receipt_without_accepting_new_work() {
+    let mut d = Daemon::start(&[]);
+    let (run, attempt, token) = planned(&d);
+    let result = json!({"run_id":run,"job_id":"routes","attempt_id":attempt,
+        "token":token,"message_id":"final-result","type":"result","revision":1,
+        "payload":{"artifact_ids":[]}});
+    let first = d.call("swarm.report", result.clone());
+    assert_eq!(first["duplicate"], false);
+    // Simulate finalization after the broker committed the result but before its receipt arrived.
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap()
+        .execute("UPDATE swarm_runs SET status='completed' WHERE id=?1", [&run]).unwrap();
+    d.kill9();
+    d.spawn();
+    let replay = d.call("swarm.report", result.clone());
+    assert_eq!(replay["duplicate"], true);
+    assert_eq!(replay["seq"], first["seq"]);
+    let mut different = result.clone();
+    different["payload"] = json!({"artifact_ids":["different"]});
+    assert!(d.try_call("swarm.report", different).is_err());
+    let mut new_message = result;
+    new_message["message_id"] = json!("new-after-completion");
+    assert!(d.try_call("swarm.report", new_message).is_err());
+    let inbox = d.call("swarm.messages", json!({"run_id":run,"recipient":"director"}));
+    assert_eq!(inbox["messages"].as_array().unwrap().len(), 1);
+}
+
+#[test]
 fn full_inbox_rejects_routine_progress_but_keeps_terminal_result() {
     let d = Daemon::start(&[]);
     let (run_id, attempt_id, token) = planned(&d);

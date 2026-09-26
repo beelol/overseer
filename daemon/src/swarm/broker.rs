@@ -137,9 +137,6 @@ fn insert_message(
     let run = required(p, "run_id")?;
     let (id, kind, revision, payload) = validate_envelope(p)?;
     let current = get(store, run)?;
-    if current["status"] == "stopped" || current["status"] == "completed" {
-        bail!("swarm run is terminal");
-    }
     let existing: Option<(String,String,String,String,i64,String,String,i64,String)> = store.conn.query_row(
         "SELECT sender,recipient,job_id,attempt_id,revision,kind,payload,seq,phase FROM swarm_messages WHERE run_id=?1 AND message_id=?2",
         params![run,id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?)),
@@ -176,6 +173,9 @@ fn insert_message(
             bail!("message id reused with different content");
         }
         return Ok(json!({"message_id":id,"seq":seq,"phase":phase,"duplicate":true}));
+    }
+    if current["status"] == "stopped" || current["status"] == "completed" {
+        bail!("swarm run is terminal");
     }
     if recipient == "director" {
         let pending: i64=store.conn.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND recipient='director' AND phase='queued'",params![run],|r|r.get(0))?;
