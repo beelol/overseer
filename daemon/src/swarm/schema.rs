@@ -32,6 +32,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           reason TEXT,
           eligible_targets TEXT NOT NULL,
           purpose TEXT NOT NULL,
+          request_sha256 TEXT NOT NULL,
           observed_ms INTEGER NOT NULL,
           expires_ms INTEGER NOT NULL,
           wake_count INTEGER NOT NULL DEFAULT 0,
@@ -275,11 +276,28 @@ pub fn migrate(conn: &Connection) -> Result<()> {
             "ALTER TABLE swarm_runs ADD COLUMN no_progress_turns INTEGER NOT NULL DEFAULT 0;",
         )?;
     }
+    let has_availability_request_sha256 = conn
+        .prepare(
+            "SELECT 1 FROM pragma_table_info('swarm_availability') WHERE name='request_sha256'",
+        )?
+        .exists([])?;
+    if !has_availability_request_sha256 {
+        // Old draft observations have no assessment identity. Keep them blocked from
+        // being reinterpreted as recovery under changed requirements.
+        conn.execute_batch(
+            "ALTER TABLE swarm_availability ADD COLUMN request_sha256 TEXT NOT NULL DEFAULT '';
+             UPDATE swarm_availability SET state='blocked',reason='assessment_unknown',eligible_targets='[]';",
+        )?;
+    }
     let has_failed_planning_turns = conn
-        .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='failed_planning_turns'")?
+        .prepare(
+            "SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='failed_planning_turns'",
+        )?
         .exists([])?;
     if !has_failed_planning_turns {
-        conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN failed_planning_turns INTEGER NOT NULL DEFAULT 0;")?;
+        conn.execute_batch(
+            "ALTER TABLE swarm_runs ADD COLUMN failed_planning_turns INTEGER NOT NULL DEFAULT 0;",
+        )?;
     }
     let has_decision_snapshot = conn
         .prepare("SELECT 1 FROM pragma_table_info('swarm_director_turns') WHERE name='accepted_decision_id_at_claim'")?
@@ -288,7 +306,9 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         conn.execute_batch("ALTER TABLE swarm_director_turns ADD COLUMN accepted_decision_id_at_claim INTEGER NOT NULL DEFAULT 0;")?;
     }
     let has_reviewed_message_seq = conn
-        .prepare("SELECT 1 FROM pragma_table_info('swarm_decisions') WHERE name='reviewed_message_seq'")?
+        .prepare(
+            "SELECT 1 FROM pragma_table_info('swarm_decisions') WHERE name='reviewed_message_seq'",
+        )?
         .exists([])?;
     if !has_reviewed_message_seq {
         conn.execute_batch("ALTER TABLE swarm_decisions ADD COLUMN reviewed_message_seq INTEGER NOT NULL DEFAULT 0;")?;
@@ -306,4 +326,43 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         conn.execute_batch("ALTER TABLE swarm_jobs ADD COLUMN stop_reason TEXT;")?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn old_availability_rows_fail_closed_during_migration() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE swarm_availability(
+                run_id TEXT PRIMARY KEY,state TEXT NOT NULL,reason TEXT,
+                eligible_targets TEXT NOT NULL,purpose TEXT NOT NULL,
+                observed_ms INTEGER NOT NULL,expires_ms INTEGER NOT NULL,
+                wake_count INTEGER NOT NULL,updated_ms INTEGER NOT NULL);
+             INSERT INTO swarm_availability VALUES(
+                'old-run','eligible',NULL,'[\"route-a\"]','worker',1,2,0,1);",
+        )
+        .unwrap();
+        migrate(&conn).unwrap();
+        let row: (String, String, String, String) = conn
+            .query_row(
+                "SELECT state,reason,eligible_targets,request_sha256
+                 FROM swarm_availability WHERE run_id='old-run'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            row,
+            (
+                "blocked".into(),
+                "assessment_unknown".into(),
+                "[]".into(),
+                "".into()
+            )
+        );
+        migrate(&conn).unwrap();
+    }
 }

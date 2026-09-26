@@ -66,6 +66,22 @@ fn missing_target_blocks_durably_and_only_eligibility_change_wakes() {
     assert_eq!(unchanged["changed"], false);
     assert_eq!(unchanged["woken"], false);
     assert_eq!(unchanged["wake_count"], 0);
+    for (purpose, estimate) in [("finishing", 100), ("worker", 1)] {
+        let err = d
+            .try_call(
+                "swarm.availability.observe",
+                json!({"run_id":id,
+                "snapshot":snapshot(at+2000,true,100000),"now_ms":at+2000,
+                "required_capabilities":["code"],"estimate_milli":{"points":estimate},
+                "purpose":purpose}),
+            )
+            .unwrap_err();
+        assert!(err.contains("availability assessment changed"), "{err}");
+    }
+    assert_eq!(
+        d.call("swarm.get", json!({"id":id}))["availability"]["state"],
+        "blocked"
+    );
     let available = observe(&d, at + 2000, snapshot(at + 2000, true, 100000));
     assert_eq!(available["state"], "eligible");
     assert_eq!(available["woken"], true);

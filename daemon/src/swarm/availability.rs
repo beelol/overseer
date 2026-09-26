@@ -6,6 +6,7 @@ use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 pub fn get(store: &Store, run: &str) -> Result<Value> {
     let row: Option<(String, Option<String>, String, String, i64, i64, i64)> = store
@@ -73,6 +74,12 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
         "allocation_percent":effective["run_allocation_percent"],
         "finishing_reserve_percent":effective["finishing_reserve_percent"],
     });
+    let mut stable_request = request.clone();
+    stable_request.as_object_mut().unwrap().remove("now_ms");
+    let request_sha256 = format!(
+        "{:x}",
+        Sha256::digest(stable_request.to_string().as_bytes())
+    );
     let preview = policy::preview(&json!({"snapshot":p["snapshot"],"request":request}))?;
     let observed = p["snapshot"]["observed_ms"]
         .as_i64()
@@ -121,6 +128,20 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
         "eligible"
     };
     let old = get(store, run)?;
+    let prior_request_sha256: Option<String> = store
+        .conn
+        .query_row(
+            "SELECT request_sha256 FROM swarm_availability WHERE run_id=?1",
+            params![run],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if prior_request_sha256
+        .as_deref()
+        .is_some_and(|hash| hash != request_sha256)
+    {
+        bail!("availability assessment changed");
+    }
     if !old.is_null() && observed < old["observed_ms"].as_i64().unwrap_or(-1) {
         bail!("out-of-order availability observation");
     }
@@ -136,13 +157,13 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
     let wakes = old["wake_count"].as_i64().unwrap_or(0) + i64::from(woken);
     let tx = store.conn.transaction()?;
     tx.execute(
-        "INSERT INTO swarm_availability(run_id,state,reason,eligible_targets,purpose,observed_ms,expires_ms,wake_count,updated_ms)
-         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)
+        "INSERT INTO swarm_availability(run_id,state,reason,eligible_targets,purpose,request_sha256,observed_ms,expires_ms,wake_count,updated_ms)
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
          ON CONFLICT(run_id) DO UPDATE SET state=excluded.state,reason=excluded.reason,
          eligible_targets=excluded.eligible_targets,purpose=excluded.purpose,
          observed_ms=excluded.observed_ms,expires_ms=excluded.expires_ms,
          wake_count=excluded.wake_count,updated_ms=excluded.updated_ms",
-        params![run,state,reason,json!(eligible).to_string(),purpose,observed,expires,wakes,now],
+        params![run,state,reason,json!(eligible).to_string(),purpose,request_sha256,observed,expires,wakes,now],
     )?;
     if woken {
         let message_id = format!("availability-wake-{wakes}");
