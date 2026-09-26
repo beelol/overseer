@@ -572,6 +572,29 @@ fn full_inbox_rejects_routine_progress_but_keeps_terminal_result() {
 }
 
 #[test]
+fn terminal_inbox_bypass_is_bounded_per_attempt_and_replays_stay_idempotent() {
+    let d = Daemon::start(&[]);
+    let (run, attempt, token) = planned(&d);
+    let message = |n: usize| json!({"run_id":run,"job_id":"routes",
+        "attempt_id":attempt,"token":token,"message_id":format!("terminal-{n}"),
+        "type":match n % 3 { 0 => "result", 1 => "submit", _ => "blocker" },
+        "revision":1,"payload":{"n":n}});
+    let mut first = serde_json::Value::Null;
+    for n in 0..16 {
+        let receipt = d.call("swarm.report", message(n));
+        if n == 0 { first = receipt; }
+    }
+    assert_eq!(d.call("swarm.report", message(0))["seq"], first["seq"]);
+    let rejected = d.try_call("swarm.report", message(16)).unwrap_err();
+    assert!(rejected.contains("terminal report limit"), "{rejected}");
+    let inbox = d.call("swarm.messages", json!({"run_id":run,"recipient":"director"}));
+    assert_eq!(inbox["messages"].as_array().unwrap().len(), 16);
+    d.call("swarm.ack", json!({"run_id":run,"message_id":"terminal-0",
+        "recipient":"director","generation":1,"revision":1,"phase":"applied"}));
+    assert_eq!(d.call("swarm.report", message(16))["duplicate"], false);
+}
+
+#[test]
 fn stop_blocks_new_attempts_without_discarding_late_evidence() {
     let d = Daemon::start(&[]);
     let (run_id, attempt_id, token) = planned(&d);

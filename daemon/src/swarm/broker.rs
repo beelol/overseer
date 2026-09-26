@@ -6,6 +6,8 @@ use sha2::{Digest, Sha256};
 
 use super::{get, required};
 
+const MAX_TERMINAL_REPORTS_PER_ATTEMPT: i64 = 16;
+
 fn token_hash(token: &str) -> String {
     format!("{:x}", Sha256::digest(token.as_bytes()))
 }
@@ -178,6 +180,20 @@ fn insert_message(
         bail!("swarm run is terminal");
     }
     if recipient == "director" {
+        // In-flight terminal reports bypass a full director inbox, but an
+        // attempt cannot use fresh IDs to make the outstanding set unbounded.
+        // Applied reports free room for later corrections from that attempt.
+        if ["result", "submit", "blocker"].contains(&kind) {
+            let count: i64 = store.conn.query_row(
+                "SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND attempt_id=?2
+                    AND recipient='director' AND phase!='applied'
+                    AND kind IN ('result','submit','blocker')",
+                params![run, attempt], |r| r.get(0),
+            )?;
+            if count >= MAX_TERMINAL_REPORTS_PER_ATTEMPT {
+                bail!("terminal report limit reached for attempt");
+            }
+        }
         let pending: i64=store.conn.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND recipient='director' AND phase='queued'",params![run],|r|r.get(0))?;
         if pending >= 1000 && kind != "result" && kind != "submit" && kind != "blocker" {
             bail!("director inbox is full");
