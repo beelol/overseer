@@ -40,7 +40,7 @@ fn policy_uses_capability_allowed_pool_and_finishing_headroom() {
         0,
     );
     assert_eq!(result["defaults"]["max_workers"], 8);
-    assert_eq!(result["defaults"]["max_executing"], 9);
+    assert!(result["defaults"].get("max_executing").is_none());
     assert_eq!(result["targets"]["qualified"]["eligible"], true);
     assert_eq!(
         result["targets"]["qualified"]["windows"][0]["allocation_milli"],

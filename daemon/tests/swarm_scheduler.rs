@@ -24,7 +24,7 @@ fn make_run(d: &Daemon, category: &str, jobs: usize) -> String {
     let run = d.call(
         "swarm.create",
         json!({"category":category,"objective":"Audit backend",
-        "allowed_targets":["fixture"],"policy":{"max_executing":9}}),
+        "allowed_targets":["fixture"]}),
     );
     let id = run["id"].as_str().unwrap().to_string();
     let backlog = (0..jobs)

@@ -268,13 +268,7 @@ pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
         .ok_or_else(|| anyhow!("missing benefit estimate"))?;
     let policy_cap = current["policy"]["effective"]["max_workers"]
         .as_u64()
-        .unwrap_or(8)
-        .min(
-            current["policy"]["effective"]["max_executing"]
-                .as_u64()
-                .unwrap_or(9)
-                .saturating_sub(1),
-        );
+        .unwrap_or(8);
     let proposed_cap = object
         .get("max_workers")
         .and_then(Value::as_u64)

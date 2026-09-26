@@ -310,36 +310,12 @@ fn admit_inner(
     if workers >= effective["max_workers"].as_i64().unwrap_or(8) {
         return Ok(blocked("worker_limit"));
     }
-    let global_workers: i64 = tx.query_row(
-        "SELECT COUNT(*) FROM swarm_attempts WHERE status='registered'",
-        [],
-        |r| r.get(0),
-    )?;
-    let global_directors: i64 = tx.query_row(
-        "SELECT COUNT(*) FROM swarm_runs WHERE status IN ('running','paused','stalled','stopping')",
-        [],
-        |r| r.get(0),
-    )?;
-    let ordinary_agents: i64 = tx.query_row(
-        "SELECT COUNT(*) FROM runs r WHERE r.status IN ('queued','starting','running','waiting_for_user')
-         AND NOT EXISTS (
-           SELECT 1 FROM swarm_worker_launches l JOIN swarm_attempts a ON a.id=l.attempt_id
-           WHERE l.overseer_run_id=r.id AND a.status='registered'
-         )",
-        [],
-        |r| r.get(0),
-    )?;
     let new_director = if current["status"] == "planning" {
         1
     } else {
         0
     };
     if app_active + pending_slots + new_director >= app_limit {
-        return Ok(blocked("global_agent_limit"));
-    }
-    if global_workers + global_directors + ordinary_agents + new_director
-        >= effective["max_executing"].as_i64().unwrap_or(9)
-    {
         return Ok(blocked("global_agent_limit"));
     }
     let growth: Option<(i64, i64)> = tx

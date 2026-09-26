@@ -234,7 +234,7 @@ pub fn preview(p: &Value) -> Result<Value> {
     }
     Ok(json!({
         "snapshot_version":snapshot.version,
-        "defaults":{"max_workers":8,"max_executing":9,"growth_per_wave":4,
+        "defaults":{"max_workers":8,"growth_per_wave":4,
             "growth_interval_ms":5000,"deadline_ms":3600000,"run_allocation_percent":10,
             "minimum_finishing_reserve_percent":20},
         "applied_percentages":{"run_allocation_percent":request.allocation_percent,

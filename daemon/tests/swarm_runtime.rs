@@ -145,7 +145,7 @@ fn explicit_ceiling_runs_thirty_two_supervised_workers() {
     let checkout = repo(&temp.path().join("large-swarm-source"));
     let run = d.call("swarm.create", json!({"category":"Large local swarm",
         "objective":"Inspect 32 modules","allowed_targets":["fixture-local"],
-        "policy":{"max_workers":32,"max_executing":33,"deadline_ms":120000}}));
+        "policy":{"max_workers":32,"deadline_ms":120000}}));
     let id = run["id"].as_str().unwrap();
     let jobs: Vec<_> = (0..33).map(|n| json!({"id":format!("j{n}"),
         "title":format!("Inspect {n}"),"acceptance":"evidence","deps":[]})).collect();
@@ -416,8 +416,7 @@ fn admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart() {
     let run = d.call(
         "swarm.create",
         json!({"category":"Runtime bridge",
-        "objective":"Inspect backend", "allowed_targets":["fixture-local"],
-        "policy":{"max_executing":3}}),
+        "objective":"Inspect backend", "allowed_targets":["fixture-local"]}),
     );
     let id = run["id"].as_str().unwrap();
     d.call(

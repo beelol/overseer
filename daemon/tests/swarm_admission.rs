@@ -142,6 +142,7 @@ fn shared_pool_reservation_blocks_stale_capacity_across_categories() {
 #[test]
 fn ordinary_run_occupies_global_slot_until_confirmed_exit() {
     let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":2}));
     let temp = tmp();
     let checkout = repo(&temp.path().join("ordinary"));
     let ordinary = d.generic(&checkout, "worktree", "/bin/sleep", &["2"]);
@@ -150,7 +151,7 @@ fn ordinary_run_occupies_global_slot_until_confirmed_exit() {
     assert!(["starting", "running"].contains(&d.run(&ordinary_id)["status"].as_str().unwrap()));
     let swarm = d.call("swarm.create", json!({"category":"Shared global slots",
         "objective":"Audit", "allowed_targets":["codex-a"],
-        "policy":{"max_executing":2,"max_workers":1}}));
+        "policy":{"max_workers":1}}));
     let id = swarm["id"].as_str().unwrap();
     d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
         {"id":"j0","title":"Inspect","acceptance":"evidence","deps":[]}
@@ -310,11 +311,12 @@ fn lowering_app_limit_holds_new_workers_until_existing_work_drains() {
 #[test]
 fn ordinary_launches_take_priority_over_active_swarm_capacity() {
     let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":3}));
     let temp = tmp();
     let checkout = repo(&temp.path().join("ordinary-after-swarm"));
     let swarm = d.call("swarm.create", json!({"category":"Reverse shared slots",
         "objective":"Audit", "allowed_targets":["codex-a"],
-        "policy":{"max_executing":2,"max_workers":2}}));
+        "policy":{"max_workers":2}}));
     let id = swarm["id"].as_str().unwrap();
     d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
         {"id":"j0","title":"Inspect","acceptance":"evidence","deps":[]},
@@ -331,6 +333,7 @@ fn ordinary_launches_take_priority_over_active_swarm_capacity() {
 
     d.call("swarm.attempt.confirm_exit",json!({"run_id":id,"generation":1,
         "revision":1,"job_id":"j0","attempt_id":first["attempt_id"]}));
+    d.call("agents.limit.set",json!({"max_active":4}));
     let barrier = std::sync::Barrier::new(3);
     let launches = std::thread::scope(|scope| {
         let first = scope.spawn(|| {
@@ -544,7 +547,7 @@ fn review_backlog_holds_admissions_until_it_drains_below_four() {
     let run = d.call(
         "swarm.create",
         json!({"category":"Review pressure","objective":"Audit many checks",
-        "allowed_targets":["codex-a"],"policy":{"max_workers":32,"max_executing":33}}),
+        "allowed_targets":["codex-a"],"policy":{"max_workers":32}}),
     );
     let id = run["id"].as_str().unwrap();
     let jobs: Vec<_>=(0..10).map(|n|json!({"id":format!("j{n}"),"title":format!("J{n}"),"acceptance":"evidence","deps":[]})).collect();
@@ -618,7 +621,7 @@ fn already_admitted_results_can_overflow_review_threshold_without_loss() {
     d.call("agents.limit.set", json!({"max_active":33}));
     let run = d.call("swarm.create", json!({"category":"Review overflow",
         "objective":"Audit many checks","allowed_targets":["codex-a"],
-        "policy":{"max_workers":32,"max_executing":33}}));
+        "policy":{"max_workers":32}}));
     let id = run["id"].as_str().unwrap();
     let jobs: Vec<_> = (0..11).map(|n| json!({"id":format!("j{n}"),
         "title":format!("J{n}"),"acceptance":"evidence","deps":[]})).collect();
@@ -663,7 +666,7 @@ fn explicit_ceiling_admits_thirty_two_fixture_workers_without_hidden_eight_cap()
     let run = d.call(
         "swarm.create",
         json!({"category":"Large qualification","objective":"Inspect modules",
-        "allowed_targets":["codex-a"],"policy":{"max_workers":32,"max_executing":33}}),
+        "allowed_targets":["codex-a"],"policy":{"max_workers":32}}),
     );
     let id = run["id"].as_str().unwrap();
     let jobs: Vec<_>=(0..33).map(|n|json!({"id":format!("j{n}"),"title":format!("J{n}"),"acceptance":"evidence","deps":[]})).collect();
@@ -737,7 +740,7 @@ fn hundred_jobs_cycle_through_thirty_two_slots_and_accept_once() {
     d.call("agents.limit.set", json!({"max_active":33}));
     let run = d.call("swarm.create", json!({"category":"Hundred job qualification",
         "objective":"Audit one hundred independent paths","allowed_targets":["codex-a"],
-        "policy":{"max_workers":32,"max_executing":33}}));
+        "policy":{"max_workers":32}}));
     let id = run["id"].as_str().unwrap();
     let jobs: Vec<_> = (0..100).map(|n| json!({"id":format!("j{n:03}"),
         "title":format!("Inspect path {n}"),"acceptance":"evidence","deps":[]})).collect();
@@ -797,7 +800,7 @@ fn quota_headroom_explains_smaller_pool_than_worker_ceiling() {
     d.call("agents.limit.set", json!({"max_active":33}));
     let run=d.call("swarm.create",json!({"category":"Quota-constrained pool",
         "objective":"Inspect three paths","allowed_targets":["codex-a"],
-        "policy":{"max_workers":32,"max_executing":33}}));
+        "policy":{"max_workers":32}}));
     let id=run["id"].as_str().unwrap();
     let jobs:Vec<_>=(0..3).map(|n|json!({"id":format!("j{n}"),
         "title":format!("Inspect {n}"),"acceptance":"evidence","deps":[]})).collect();

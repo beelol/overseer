@@ -8,7 +8,6 @@ use std::collections::HashSet;
 fn defaults() -> Map<String, Value> {
     json!({
         "max_workers":8,
-        "max_executing":9,
         "growth_per_wave":4,
         "growth_interval_ms":5000,
         "deadline_ms":3600000,
@@ -85,8 +84,14 @@ fn saved(store: &Store, scope: &str, key: &str) -> Result<Option<(Value, Value)>
         )
         .optional()?;
     raw.map(|(policy, targets)| {
+        let mut policy: Value = serde_json::from_str(&policy)?;
+        // Existing fixture databases may contain the former per-Swarm total
+        // ceiling. The app setting supersedes it; retain all other settings.
+        if let Some(values) = policy.as_object_mut() {
+            values.remove("max_executing");
+        }
         Ok((
-            serde_json::from_str(&policy)?,
+            policy,
             serde_json::from_str(&targets)?,
         ))
     })

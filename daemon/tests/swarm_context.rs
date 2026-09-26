@@ -33,7 +33,7 @@ fn hundred_job_summary_and_scoped_large_artifact_context() {
     let run = d.call(
         "swarm.create",
         json!({"category":"Context fixture", "objective":"Audit backend",
-        "allowed_targets":["account-a","account-b"],"policy":{"max_executing":4}}),
+        "allowed_targets":["account-a","account-b"]}),
     );
     let id = run["id"].as_str().unwrap();
     let mut jobs = vec![
