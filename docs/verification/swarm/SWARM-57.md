@@ -1,6 +1,6 @@
 # SWARM-57 — destination artifact revocation
 
-Status: partial. Implementation revisions: `51f072f`, `9148e84`.
+Status: partial. Latest implementation evidence: `0183eef`.
 
 Input: a local backend fixture with an accepted contract artifact, an admitted dependent worker on `account-a`, a second dependent job, and an unrelated job. The director revokes `account-a` access to the artifact while the first dependent worker runs.
 
@@ -17,3 +17,5 @@ Reproduce: `cargo test --offline -p overseerd --test swarm_context revoked_artif
 The S4-shaped checkpoint fixture in `daemon/tests/swarm_checkpoint.rs` now revokes account B's grant while its replacement worker runs. Context retrieval fails, the worker is interrupted, and L2 is blocked. The joined S4 replay grants B access to a sanitized incident bundle before it resumes, though it does not revoke that grant in the same joined run.
 
 Remaining: this is a fixture-only API. It does not prove live cross-target artifact delivery or revocation, account/credential isolation, absence of raw secrets throughout broker/ledger/logs, or denial of peer attempts to bypass director/account restrictions. The combined Stop/revocation/result/acceptance race and simultaneous native races are still unverified. Do not check the RFC box yet.
+
+Completion-text regression (`0183eef`): `completion_requires_a_current_passed_combined_check` first failed because a secret-shaped value in the final summary appeared unchanged in `swarm.get`. The completion transition now runs the daemon's best-effort redactor on the summary and verification text before saving them. The test asserts both the returned completion and the SQLite row omit the supplied secret and bearer value while the combined-check gate still works. `cargo test -p overseerd --test swarm_integration --offline -- --test-threads=1` passed 16 tests; `git diff --check` passed. This checks two completion text fields in a local fixture; it does not prove universal secret detection or clean broker, artifact ID, log and live-harness paths. SWARM-57 remains partial.

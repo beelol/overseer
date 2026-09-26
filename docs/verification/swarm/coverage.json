@@ -562,9 +562,11 @@
         "daemon/src/swarm/context.rs",
         "docs/verification/swarm/SWARM-57.md",
         "daemon/tests/swarm_checkpoint.rs",
-        "docs/verification/swarm/S4.md"
+        "docs/verification/swarm/S4.md",
+        "daemon/tests/swarm_integration.rs",
+        "daemon/src/swarm/completion.rs"
       ],
-      "blocker": "Durable grants and revocation protect accepted dependent evidence and a same-job S4-shaped checkpoint; revocation interrupts an active replacement and denies further context. Live cross-target ACL/credential isolation, raw-secret audits, peer bypass resistance, joined S4 revocation and simultaneous native races remain unverified."
+      "blocker": "Durable grants and revocation protect accepted dependent evidence and a same-job S4-shaped checkpoint; revocation interrupts an active replacement and denies further context. Final completion summary and verification text are best-effort redacted before SQLite persistence and API display in a local fixture. Live cross-target ACL/credential isolation, complete raw-secret audits across broker/ledger/logs, peer bypass resistance, joined S4 revocation and simultaneous native races remain unverified."
     },
     "SWARM-58": {
       "status": "partial",
