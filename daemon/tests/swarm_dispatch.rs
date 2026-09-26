@@ -177,7 +177,7 @@ fn startup_does_not_launch_an_admitted_worker_from_an_expired_snapshot() {
 
 #[test]
 fn supervised_scripted_workers_report_evidence_that_unlocks_dependent_work() {
-    let d = Daemon::start(&[]);
+    let mut d = Daemon::start(&[]);
     let temp = tmp();
     let checkout = repo(&temp.path().join("worker-report-source"));
     let script = temp.path().join("report-worker.sh");
@@ -211,6 +211,7 @@ case "$reported" in *'"error"'*) exit 3;; esac
         "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
             "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
             "confidence":"exact","expires_ms":at+60000}]}]});
+    let mut checks = Vec::new();
     for (request_id, job_id) in [
         ("contract-launch", "contract"),
         ("endpoint-launch", "endpoint"),
@@ -262,10 +263,52 @@ case "$reported" in *'"error"'*) exit 3;; esac
             json!({"run_id":run_id,"generation":1,
             "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"progress"}),
         );
+        checks.push(json!({"job_id":job_id,"outcome":"passed","evidence":[artifact]}));
+        if job_id == "contract" {
+            assert!(d.try_call("swarm.complete",json!({"run_id":run_id,"generation":1,
+                "revision":1,"request_id":"finish-before-endpoint",
+                "summary":"Contract checked; endpoint pending","verification":"Endpoint still pending",
+                "checks":checks})).is_err());
+        }
     }
     let jobs = d.call("swarm.jobs", json!({"id":run_id}));
     assert_eq!(jobs["jobs"][0]["status"], "accepted");
     assert_eq!(jobs["jobs"][1]["status"], "accepted");
+    let final_request = json!({"run_id":run_id,"generation":1,"revision":1,
+        "request_id":"finish-verified-backend",
+        "summary":"Contract and endpoint checks are complete.",
+        "verification":"The scripted endpoint check used the accepted contract finding.",
+        "checks":checks});
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute("UPDATE swarm_artifacts SET content='tampered after review' WHERE run_id=?1 AND job_id='contract'",
+        rusqlite::params![run_id]).unwrap();
+    assert!(d
+        .try_call("swarm.complete", final_request.clone())
+        .unwrap_err()
+        .contains("integrity"));
+    assert_eq!(
+        d.call("swarm.get", json!({"id":run_id}))["status"],
+        "running"
+    );
+    db.execute("UPDATE swarm_artifacts SET content='scripted evidence' WHERE run_id=?1 AND job_id='contract'",
+        rusqlite::params![run_id]).unwrap();
+    let completed = d.call("swarm.complete", final_request.clone());
+    assert_eq!(completed["status"], "completed");
+    assert_eq!(
+        d.call("swarm.complete", final_request.clone())["duplicate"],
+        true
+    );
+    let mut changed = final_request;
+    changed["summary"] = json!("An unreviewed alternative summary");
+    assert!(d.try_call("swarm.complete", changed).is_err());
+    d.kill9();
+    d.spawn();
+    let recovered = d.call("swarm.get", json!({"id":run_id}));
+    assert_eq!(recovered["status"], "completed");
+    assert_eq!(
+        recovered["completion"]["checks"].as_array().unwrap().len(),
+        2
+    );
 }
 
 #[test]

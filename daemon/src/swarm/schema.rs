@@ -105,6 +105,16 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           UNIQUE(run_id,job_id,attempt_id,decision)
         );
+        CREATE TABLE IF NOT EXISTS swarm_completions(
+          run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id),
+          request_sha256 TEXT NOT NULL,
+          generation INTEGER NOT NULL,
+          revision INTEGER NOT NULL,
+          summary TEXT NOT NULL,
+          verification TEXT NOT NULL,
+          checks TEXT NOT NULL,
+          created_ms INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS swarm_director_turns(
           id TEXT PRIMARY KEY,
           run_id TEXT NOT NULL REFERENCES swarm_runs(id),

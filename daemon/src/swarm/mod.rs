@@ -1,6 +1,7 @@
 mod artifacts;
 mod admission;
 mod broker;
+mod completion;
 mod control;
 mod context;
 mod director;
@@ -15,6 +16,7 @@ pub mod schema;
 pub use artifacts::{confirm_exit, decide, put};
 pub use admission::admit;
 pub use broker::{ack, direct, messages, register, report};
+pub use completion::complete;
 pub use control::{expire_due, off, pause, resume};
 pub use context::{artifact_chunk, director_summary, worker_brief};
 pub use director::{claim_batch, complete_batch, recover};
@@ -87,11 +89,13 @@ pub fn create(store: &mut Store, p: &Value) -> Result<Value> {
 }
 
 pub fn get(store: &Store, id: &str) -> Result<Value> {
-    store
+    let mut run = store
         .conn
         .query_row("SELECT * FROM swarm_runs WHERE id=?1", params![id], row_run)
         .optional()?
-        .ok_or_else(|| anyhow!("unknown swarm run {id}"))
+        .ok_or_else(|| anyhow!("unknown swarm run {id}"))?;
+    run["completion"] = completion::get(store, id)?;
+    Ok(run)
 }
 
 pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {

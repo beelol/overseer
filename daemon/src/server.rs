@@ -305,6 +305,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             crate::swarm::decide(&mut d.store.lock().unwrap(), p)?
         }
+        "swarm.complete" => {
+            fixture_only()?;
+            crate::swarm::complete(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.attempt.confirm_exit" => {
             fixture_only()?;
             crate::swarm::confirm_exit(&mut d.store.lock().unwrap(), p)?
