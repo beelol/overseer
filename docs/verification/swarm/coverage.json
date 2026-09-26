@@ -264,9 +264,12 @@
       "blocker": "A fixture batch claims at most 20 messages/32 KiB and Stop halts future claims; no model turn, reservation, or semantic review runs."
     },
     "SWARM-34": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "No worker-brief/context request service or 100-job director summary exists; broker byte caps do not prove context relevance."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_context.rs",
+        "docs/verification/swarm/SWARM-34.md"
+      ],
+      "blocker": "A 100-job fixture proves bounded director pages, a bounded worker brief attached to scripted launch, same-target accepted-dependency references, and chunked retrieval. Live harness delivery, destination-specific context grants/revocation, token accounting, complete scope/resource/budget briefs, and on-demand director mediation remain unverified."
     },
     "SWARM-35": {
       "status": "partial",
