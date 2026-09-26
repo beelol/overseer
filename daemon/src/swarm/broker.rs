@@ -203,6 +203,7 @@ pub fn report(store: &mut Store, p: &Value) -> Result<Value> {
     if revision != attempt_revision {
         bail!("stale or incorrect attempt revision");
     }
+    let kind = required(p, "type")?;
     if ![
         "progress",
         "discovery",
@@ -212,9 +213,28 @@ pub fn report(store: &mut Store, p: &Value) -> Result<Value> {
         "claim",
         "submit",
     ]
-    .contains(&required(p, "type")?)
+    .contains(&kind)
     {
         bail!("worker cannot send this message type");
+    }
+    if kind == "result" && !p["payload"]["audit_outcome"].is_null() {
+        let outcome = p["payload"]["audit_outcome"]
+            .as_str().ok_or_else(|| anyhow!("invalid audit outcome"))?;
+        if !["negative", "environment_failure", "confirmed_defect"].contains(&outcome) {
+            bail!("invalid audit outcome");
+        }
+        let evidence = p["payload"]["artifact_ids"].as_array()
+            .ok_or_else(|| anyhow!("audit result requires artifact IDs"))?;
+        if evidence.is_empty() || evidence.len() > 100 || evidence.iter().any(|v| v.as_str().is_none_or(|s| s.is_empty() || s.len() > 128)) {
+            bail!("audit result requires bounded artifact IDs");
+        }
+        if outcome == "environment_failure" {
+            let resource = p["payload"]["unavailable_resource"].as_str()
+                .ok_or_else(|| anyhow!("environment failure requires unavailable resource"))?;
+            if resource.is_empty() || resource.len() > 80 {
+                bail!("invalid unavailable resource");
+            }
+        }
     }
     insert_message(store, p, attempt, "director", job, attempt)
 }

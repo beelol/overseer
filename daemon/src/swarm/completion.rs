@@ -157,6 +157,22 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
         ).optional()?;
         let (attempt, accepted_evidence) =
             decision.ok_or_else(|| anyhow!("accepted job lacks a review decision"))?;
+        let mut results = tx.prepare(
+            "SELECT payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND revision=?4 AND kind='result'",
+        )?;
+        let payloads = results
+            .query_map(params![run, job, attempt, job_revision], |r| {
+                r.get::<_, String>(0)
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(results);
+        if payloads.iter().any(|raw| {
+            serde_json::from_str::<Value>(raw)
+                .ok()
+                .is_some_and(|payload| payload["audit_outcome"] == "environment_failure")
+        }) {
+            bail!("environment failure cannot become a passed completion check");
+        }
         let attempt_revision: i64 = tx
             .query_row(
                 "SELECT revision FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3",

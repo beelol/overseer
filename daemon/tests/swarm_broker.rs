@@ -54,6 +54,227 @@ fn result_submission_is_durable_with_awaiting_review_state() {
 }
 
 #[test]
+fn audit_coverage_distinguishes_negative_environment_and_defect_results() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call(
+        "swarm.create",
+        json!({"category":"LedgerPay audit",
+        "objective":"Check signature, queue and duplicate entitlement behavior",
+        "allowed_targets":["fixture"]}),
+    );
+    let run_id = run["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run_id,"generation":1,"revision":0,"jobs":[
+            {"id":"negative","title":"Invalid signatures","acceptance":"Rejection trace","deps":[]},
+            {"id":"environment","title":"Queue retries","acceptance":"Queue trace","deps":[]},
+            {"id":"defect","title":"Duplicate grants","acceptance":"Reproducer","deps":[]}
+        ]}),
+    );
+    for (job, outcome, kind) in [
+        ("negative", "negative", "finding"),
+        ("environment", "environment_failure", "log"),
+        ("defect", "confirmed_defect", "reproduction"),
+    ] {
+        let attempt = d.call(
+            "swarm.attempt.register",
+            json!({"run_id":run_id,
+            "job_id":job,"generation":1,"revision":1}),
+        );
+        let artifact = format!("proof-{job}");
+        d.call(
+            "swarm.artifact.put",
+            json!({"run_id":run_id,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "artifact_id":artifact,"kind":kind,"content":format!("fixture evidence for {job}"),
+            "source_revision":1}),
+        );
+        let payload = if job == "environment" {
+            json!({"audit_outcome":outcome,"artifact_ids":[artifact],
+                "unavailable_resource":"queue"})
+        } else {
+            json!({"audit_outcome":outcome,"artifact_ids":[artifact]})
+        };
+        d.call(
+            "swarm.report",
+            json!({"run_id":run_id,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":format!("result-{job}"),"type":"result","revision":1,
+            "payload":payload}),
+        );
+        let decision = json!({"run_id":run_id,"generation":1,"revision":1,"job_id":job,
+            "decision":"accept","evidence":[artifact]});
+        if job == "environment" {
+            assert!(d
+                .try_call("swarm.decide", decision)
+                .unwrap_err()
+                .contains("environment"));
+        } else {
+            assert_eq!(d.call("swarm.decide", decision)["status"], "accepted");
+        }
+    }
+    let coverage = d.call("swarm.coverage", json!({"run_id":run_id}));
+    let rows = coverage["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 3);
+    assert_eq!(
+        rows.iter().find(|r| r["job_id"] == "negative").unwrap()["coverage_state"],
+        "checked_negative"
+    );
+    let blocked = rows.iter().find(|r| r["job_id"] == "environment").unwrap();
+    assert_eq!(blocked["coverage_state"], "environment_blocked");
+    assert_eq!(blocked["unavailable_resource"], "queue");
+    assert_ne!(blocked["job_status"], "accepted");
+    assert_eq!(
+        rows.iter().find(|r| r["job_id"] == "defect").unwrap()["coverage_state"],
+        "confirmed_application_defect"
+    );
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.coverage", json!({"run_id":run_id})), coverage);
+}
+
+#[test]
+fn reported_defect_needs_reproducer_evidence_before_confirmation() {
+    let d = Daemon::start(&[]);
+    let (run_id, attempt_id, token) = planned(&d);
+    d.call(
+        "swarm.artifact.put",
+        json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"token":token,"artifact_id":"claim",
+        "kind":"finding","content":"The worker suspects an authorization defect",
+        "source_revision":1}),
+    );
+    d.call(
+        "swarm.report",
+        json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"token":token,"message_id":"claim-result",
+        "type":"result","revision":1,"payload":{"audit_outcome":"confirmed_defect",
+            "artifact_ids":["claim"]}}),
+    );
+    let decision = json!({"run_id":run_id,"generation":1,"revision":1,
+        "job_id":"routes","decision":"accept","evidence":["claim"]});
+    assert!(d
+        .try_call("swarm.decide", decision)
+        .unwrap_err()
+        .contains("reproduction"));
+    assert_eq!(
+        d.call("swarm.coverage", json!({"run_id":run_id}))["rows"][0]["coverage_state"],
+        "defect_awaiting_review"
+    );
+    d.call(
+        "swarm.artifact.put",
+        json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"token":token,"artifact_id":"repro",
+        "kind":"reproduction","content":"Request returned 200 and changed another tenant row",
+        "source_revision":1}),
+    );
+    d.call(
+        "swarm.report",
+        json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"token":token,"message_id":"repro-result",
+        "type":"result","revision":1,"payload":{"audit_outcome":"confirmed_defect",
+            "artifact_ids":["claim","repro"]}}),
+    );
+    assert_eq!(
+        d.call(
+            "swarm.decide",
+            json!({"run_id":run_id,"generation":1,"revision":1,
+        "job_id":"routes","decision":"accept","evidence":["claim","repro"]})
+        )["status"],
+        "accepted"
+    );
+    assert_eq!(
+        d.call("swarm.coverage", json!({"run_id":run_id}))["rows"][0]["coverage_state"],
+        "confirmed_application_defect"
+    );
+}
+
+#[test]
+fn late_environment_failure_cannot_be_hidden_by_an_earlier_acceptance() {
+    let d = Daemon::start(&[]);
+    let (run_id, attempt_id, token) = planned(&d);
+    // This fixture registers an attempt directly, bypassing admission's running transition.
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite"))
+        .unwrap()
+        .execute(
+            "UPDATE swarm_runs SET status='running' WHERE id=?1",
+            rusqlite::params![run_id],
+        )
+        .unwrap();
+    d.call(
+        "swarm.artifact.put",
+        json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"token":token,"artifact_id":"checked",
+        "kind":"finding","content":"Routes checked with fixture database",
+        "source_revision":1}),
+    );
+    d.call(
+        "swarm.report",
+        json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"token":token,"message_id":"initial-result",
+        "type":"result","revision":1,"payload":{"audit_outcome":"negative",
+            "artifact_ids":["checked"]}}),
+    );
+    d.call(
+        "swarm.decide",
+        json!({"run_id":run_id,"generation":1,"revision":1,
+        "job_id":"routes","decision":"accept","evidence":["checked"]}),
+    );
+    d.call(
+        "swarm.attempt.confirm_exit",
+        json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"generation":1,"revision":1}),
+    );
+    d.call(
+        "swarm.report",
+        json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"token":token,"message_id":"late-queue-failure",
+        "type":"result","revision":1,"payload":{"audit_outcome":"environment_failure",
+            "artifact_ids":["checked"],"unavailable_resource":"queue"}}),
+    );
+    d.call(
+        "swarm.report",
+        json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"token":token,"message_id":"later-all-clear",
+        "type":"result","revision":1,"payload":{"audit_outcome":"negative",
+            "artifact_ids":["checked"]}}),
+    );
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    let batch = d.call(
+        "swarm.director.claim_batch",
+        json!({"run_id":run_id,
+        "generation":1,"revision":1,"now_ms":now+6000}),
+    );
+    assert_eq!(batch["status"], "claimed", "{batch}");
+    d.call(
+        "swarm.director.complete_batch",
+        json!({"run_id":run_id,"generation":1,
+        "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"no_progress"}),
+    );
+    assert_eq!(
+        d.call("swarm.get", json!({"id":run_id}))["status"],
+        "running"
+    );
+    assert_eq!(
+        d.call("swarm.coverage", json!({"run_id":run_id}))["rows"][0]["coverage_state"],
+        "environment_blocked"
+    );
+    let error = d
+        .try_call(
+            "swarm.complete",
+            json!({"run_id":run_id,"generation":1,
+        "revision":1,"request_id":"complete-after-queue-failure",
+        "summary":"Routes checked","verification":"Fixture route checks",
+        "checks":[{"job_id":"routes","outcome":"passed","evidence":["checked"]}]}),
+        )
+        .unwrap_err();
+    assert!(error.contains("environment failure"), "{error}");
+}
+
+#[test]
 fn report_is_durable_before_ack_and_replay_is_idempotent() {
     let mut d = Daemon::start(&[]);
     let (run_id, attempt_id, token) = planned(&d);

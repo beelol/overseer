@@ -97,13 +97,14 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
         .optional()?
         .ok_or_else(|| anyhow!("unknown job"))?;
     let mut attempt_id: Option<String> = None;
+    let mut has_reproduction = false;
     for artifact in evidence {
         let id = artifact.as_str().unwrap();
-        let found: Option<(String,i64,String,String)> = store.conn.query_row(
-            "SELECT attempt_id,source_revision,content,sha256 FROM swarm_artifacts WHERE run_id=?1 AND job_id=?2 AND id=?3",
-            params![run,job,id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
+        let found: Option<(String,i64,String,String,String)> = store.conn.query_row(
+            "SELECT attempt_id,source_revision,content,sha256,kind FROM swarm_artifacts WHERE run_id=?1 AND job_id=?2 AND id=?3",
+            params![run,job,id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
         ).optional()?;
-        let (attempt, source_rev, content, digest) =
+        let (attempt, source_rev, content, digest, kind) =
             found.ok_or_else(|| anyhow!("missing artifact evidence {id}"))?;
         if source_rev != job_revision {
             bail!("stale artifact source revision");
@@ -114,6 +115,7 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
         if attempt_id.as_deref().is_some_and(|a| a != attempt) {
             bail!("mixed attempt evidence requires separate review");
         }
+        has_reproduction |= kind == "reproduction";
         attempt_id = Some(attempt);
     }
     let attempt = attempt_id.ok_or_else(|| anyhow!("missing attempt"))?;
@@ -126,6 +128,18 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
+    if decision == "accept" && submitted.iter().any(|raw| {
+        serde_json::from_str::<Value>(raw).ok()
+            .is_some_and(|payload| payload["audit_outcome"] == "environment_failure")
+    }) {
+        bail!("environment failure cannot be accepted as a passed check");
+    }
+    if decision == "accept" && !has_reproduction && submitted.iter().any(|raw| {
+        serde_json::from_str::<Value>(raw).ok()
+            .is_some_and(|payload| payload["audit_outcome"] == "confirmed_defect")
+    }) {
+        bail!("confirmed defect requires reproduction artifact evidence");
+    }
     let linked = submitted.iter().any(|raw| {
         let payload: Value = serde_json::from_str(raw).unwrap_or(Value::Null);
         evidence.iter().all(|id| {

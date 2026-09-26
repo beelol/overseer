@@ -268,6 +268,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             crate::swarm::plan(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.jobs" => crate::swarm::jobs(&d.store.lock().unwrap(), p)?,
+        "swarm.coverage" => crate::swarm::coverage_report(&d.store.lock().unwrap(), p)?,
         "swarm.attempt.register" => {
             fixture_only()?;
             crate::swarm::register(&mut d.store.lock().unwrap(), p)?
