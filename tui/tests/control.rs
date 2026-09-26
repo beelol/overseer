@@ -284,3 +284,74 @@ fn t18_merge_back_from_the_terminal_asks_before_each_step() {
     assert!(std::fs::read_to_string(repo.join("README.md")).unwrap().contains("They refresh once."), "the change is on main in the source checkout");
     d.ctl("run.interrupt", json!({ "run_id": busy }));
 }
+
+#[test]
+fn t19_a_new_waiting_agent_rings_and_shows_in_the_window_title() {
+    let t = tempfile::tempdir().unwrap();
+    let d = claude_daemon("permission");
+    let repo = repo(&t.path().join("attention"));
+    let echo = d.sh(&repo, "Quiet agent", "echo quiet; while read l; do echo $l; done");
+    let mut tui = Tui::attach(&d, 140, 40);
+    tui.until_screen(10, "quiet");
+    assert!(!tui.app.bell);
+    assert_eq!(tui.app.window_title(), "Overseer · 1 active");
+    let asks = claude_task(&d, &repo, "Asks permission");
+    tui.until(20, |a| a.state.run(&asks).is_some_and(|r| r.needs_you()));
+    assert!(tui.app.bell, "a new waiting agent rings the bell");
+    assert_eq!(tui.app.window_title(), "Overseer · 1 needs you · 2 active");
+    let s = tui.screen();
+    assert!(s.contains("◆ Asks permission needs you — press w"), "{s}");
+    tui.key(KeyCode::Char('w'));
+    assert_eq!(tui.app.focus.as_deref(), Some(asks.as_str()));
+
+    // The real binary: a standalone bell and the title escape in its terminal output.
+    let bin = env!("CARGO_BIN_EXE_overseer-tui");
+    let helper = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/pty_run.py");
+    let dd = &d;
+    let script = std::thread::spawn({
+        let bin_dir = dd.bin.clone();
+        let home = dd.home.path().to_path_buf();
+        move || {
+            std::process::Command::new("python3").arg(helper).args(["30", "120", "6.0", "q", "--", bin, "--daemon"]).arg(bin_dir).arg("--home").arg(home).env("TERM", "xterm-256color").output().unwrap()
+        }
+    });
+    std::thread::sleep(std::time::Duration::from_millis(2500));
+    let second = claude_task(&d, &repo, "Also asks");
+    d.wait_status(&second, |s| s == "waiting_for_user", 20);
+    let out = script.join().unwrap();
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    assert!(text.contains("\u{1b}]0;Overseer · 2 need you · 3 active\u{7}"), "window title set");
+    let titles = text.matches("\u{1b}]0;").count();
+    let bells = text.matches('\u{7}').count();
+    assert!(bells > titles, "a bell beyond the title terminators ({bells} vs {titles})");
+    for r in [echo, asks, second] {
+        d.ctl("run.interrupt", json!({ "run_id": r }));
+    }
+}
+
+#[test]
+fn t20_cleanup_removes_a_finished_worktree_and_names_what_would_be_lost() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("cleanup"));
+    let run = d.sh(&repo, "Leaves a scratch file", "echo scratch > notes-draft.txt; echo done");
+    d.wait_status(&run, |s| s == "completed", 20);
+    let ws = workspace_of(&d, &run);
+    assert!(ws.exists());
+    let mut tui = Tui::attach(&d, 160, 40);
+    tui.until(10, |a| a.visible().len() == 1);
+    tui.key(KeyCode::Char('C'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(Confirm::Cleanup { .. })));
+    let s = tui.screen();
+    assert!(s.contains("Remove this worktree? overseer/leaves-a-scratch-file is kept, but 1 uncommitted file will be LOST: notes-draft.txt."), "{s}");
+    tui.snapshot("t20-cleanup");
+    tui.key(KeyCode::Char('n'));
+    assert!(ws.exists(), "n keeps it");
+    tui.key(KeyCode::Char('C'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(Confirm::Cleanup { .. })));
+    tui.key(KeyCode::Char('y'));
+    tui.until_screen(10, "Worktree removed; the branch is kept");
+    assert!(!ws.exists(), "the worktree is gone");
+    let branches = String::from_utf8_lossy(&std::process::Command::new("git").args(["branch", "--list", "overseer/*"]).current_dir(&repo).output().unwrap().stdout).to_string();
+    assert!(branches.contains("overseer/leaves-a-scratch-file"), "{branches}");
+}

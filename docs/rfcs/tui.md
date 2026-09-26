@@ -50,6 +50,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | w | Jump to the next agent waiting for you |
 | x | Interrupt the focused agent (asks y/n) |
 | M | Merge back: commit the worktree and merge the target in (y/n), then merge into the target (y/n) |
+| C | Remove a finished agent's worktree (its branch is kept; lists uncommitted files first) |
 | n | New agent (repository, harness, account, model, prompt) |
 | f | Filter: All → Active → Needs you |
 | / | Search agents by title, repository, harness, model, account or prompt (Esc clears) |
@@ -163,3 +164,13 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   and merges into the target branch in the source checkout, keeping the worktree and branch.
   **Verify:** `M` on a running agent explains; on a finished one, nothing reaches the target
   before the second yes, and after it the change is on the target branch.
+- [x] **T-19 — Attention from another window.** When an agent starts waiting for you, the TUI rings
+  the terminal bell (unless `--no-bell`) and says who, with `w` to jump there; the terminal's window
+  title always carries the counts ("Overseer · 1 needs you · 2 active"). **Verify:** a new waiting
+  agent sets the bell, the notice and the title through the app loop; the real binary in a
+  terminal writes the title escape and a bell.
+- [x] **T-20 — Clean up a finished worktree.** `C` on a finished agent removes its worktree after
+  y/n, keeps its branch, and names any uncommitted files that would be lost; running agents and
+  current-checkout tasks are refused with the reason (the daemon's own safety checks). **Verify:**
+  a finished agent with an untracked file: the prompt names it, `n` keeps the worktree, `y`
+  removes it, and the branch remains.

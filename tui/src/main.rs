@@ -24,6 +24,7 @@ OPTIONS:
                     bundled with the Overseer VS Code extension)
     --home DIR      Overseer data directory (sets OVERSEER_HOME; default: the same as VS Code)
     --no-mouse      Leave the mouse to the terminal (text selection) instead of clicking tiles
+    --no-bell       No terminal bell when an agent starts waiting for you
     -h, --help      Show this help
     -V, --version   Show the version
 
@@ -33,6 +34,7 @@ KEYS:
     i / enter       message the focused agent  z     zoom (full screen, scrollback)
     a / d           allow / deny a permission  w     next agent waiting for you
     x               interrupt                  n     new agent
+    C               remove a finished agent's worktree (branch kept)
     v               changes (files, diffs)     M     merge back (asks each step)
     /               search agents              A     accounts and sign-in
     e               in zoom: expand tool calls
@@ -49,6 +51,7 @@ enum Ev {
 fn main() -> Result<()> {
     let mut daemon_path: Option<PathBuf> = None;
     let mut mouse = true;
+    let mut bell = true;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -67,6 +70,7 @@ fn main() -> Result<()> {
                 }
             }
             "--no-mouse" => mouse = false,
+            "--no-bell" => bell = false,
             other => anyhow::bail!("unknown option {other} (see --help)"),
         }
     }
@@ -122,7 +126,19 @@ fn main() -> Result<()> {
 
     let result = (|| -> Result<()> {
         let mut last_second = Instant::now();
+        let mut title = String::new();
         loop {
+            // The window title carries the counts (visible from another tab or window).
+            let t = app.window_title();
+            if t != title {
+                let _ = execute!(std::io::stdout(), crossterm::terminal::SetTitle(&t));
+                title = t;
+            }
+            if std::mem::take(&mut app.bell) && bell {
+                use std::io::Write;
+                let _ = std::io::stdout().write_all(b"\x07");
+                let _ = std::io::stdout().flush();
+            }
             if app.dirty {
                 terminal.draw(|f| ui::draw(f, &mut app))?;
                 app.dirty = false;

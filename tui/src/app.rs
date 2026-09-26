@@ -93,6 +93,8 @@ pub enum Confirm {
     MergePrepare { run: String, text: String },
     /// Merge back, step 2: merge the agent's branch into the target in the source checkout.
     MergeComplete { run: String, text: String },
+    /// Remove a finished agent's worktree (its branch is kept).
+    Cleanup { run: String, text: String, discard: bool },
 }
 
 /// What a pending request was for.
@@ -118,6 +120,8 @@ enum Pending {
     MergeLanding { run: String, branch: String, target: String, repo: String },
     MergeFiles { run: String, text: String },
     MergeComplete,
+    CleanupPlan { run: String },
+    Cleanup,
 }
 
 /// The New Agent form.
@@ -240,6 +244,10 @@ pub struct App {
     pub exec: Option<Exec>,
     /// Zoom shows tool inputs and results under each tool call.
     pub expand_tools: bool,
+    /// Agents waiting for you at the last state (to notice new ones).
+    waiting: HashSet<String>,
+    /// Ring the terminal bell (an agent started waiting for you); the event loop clears it.
+    pub bell: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -286,6 +294,8 @@ impl App {
             account_sel: 0,
             exec: None,
             expand_tools: false,
+            waiting: HashSet::new(),
+            bell: false,
         }
     }
 
@@ -557,7 +567,20 @@ impl App {
                 match serde_json::from_value::<State>(v) {
                     Ok(state) => {
                         let cursor = state.cursor;
+                        let now_waiting: HashSet<String> = state.runs.iter().filter(|r| r.parent_run_id.is_none() && r.needs_you()).map(|r| r.id.clone()).collect();
+                        let first_load = self.state.runs.is_empty();
+                        let new: Vec<String> = now_waiting.difference(&self.waiting).cloned().collect();
+                        self.waiting = now_waiting;
                         self.state = state;
+                        if !first_load && !new.is_empty() {
+                            // Someone needs you: a bell, and a pointer to it unless it is already focused.
+                            self.bell = true;
+                            if new.iter().all(|id| Some(id.as_str()) != self.focus.as_deref()) {
+                                let name = self.state.run(&new[0]).map(|r| r.title.clone()).unwrap_or_default();
+                                let more = if new.len() > 1 { format!(" and {} more", new.len() - 1) } else { String::new() };
+                                self.say(format!("◆ {}{more} needs you — press w", short(&name, 40)), false);
+                            }
+                        }
                         for (root, feed) in self.feeds.iter_mut() {
                             Self::locate_feed(&self.state, root, feed);
                         }
@@ -730,6 +753,33 @@ impl App {
                 });
             }
             (Pending::MergePlan { run }, Ok(plan)) => self.on_merge_plan(run, plan),
+            (Pending::CleanupPlan { run }, Ok(plan)) => {
+                if plan["removable"] != true {
+                    self.say(format!("Not removing: {}", plan["reason"].as_str().unwrap_or("not removable")), true);
+                    return;
+                }
+                let d = &plan["dirty"];
+                let mut files: Vec<String> = Vec::new();
+                for key in ["staged", "unstaged", "conflicted"] {
+                    for f in d[key].as_array().into_iter().flatten() {
+                        files.push(f["path"].as_str().or(f.as_str()).unwrap_or_default().to_string());
+                    }
+                }
+                for f in d["untracked"].as_array().into_iter().flatten() {
+                    files.push(f.as_str().unwrap_or_default().to_string());
+                }
+                let branch = plan["workspace"]["branch"].as_str().unwrap_or("its branch").to_string();
+                let text = if files.is_empty() {
+                    format!("Remove this worktree? {branch} is kept; no uncommitted work.")
+                } else {
+                    format!("Remove this worktree? {branch} is kept, but {} uncommitted file{} will be LOST: {}.", files.len(), if files.len() == 1 { "" } else { "s" }, files.iter().take(6).cloned().collect::<Vec<_>>().join(", "))
+                };
+                self.mode = Mode::Confirm(Confirm::Cleanup { run, text, discard: !files.is_empty() });
+            }
+            (Pending::Cleanup, Ok(_)) => {
+                self.say("Worktree removed; the branch is kept", false);
+                self.request_state();
+            }
             (Pending::MergeResolved { run }, Ok(v)) => {
                 if v["state"] == "ready" {
                     self.merge_plan(&run);
@@ -779,6 +829,18 @@ impl App {
     }
 
     // ---------------------------------------------------------------- actions
+
+    /// The terminal window title: counts that matter when the TUI is in another tab.
+    pub fn window_title(&self) -> String {
+        let all = self.state.agents();
+        let needs = all.iter().filter(|r| r.needs_you()).count();
+        let active = all.iter().filter(|r| r.active()).count();
+        match (needs, active) {
+            (0, 0) => "Overseer".into(),
+            (0, a) => format!("Overseer · {a} active"),
+            (n, a) => format!("Overseer · {n} need{} you · {a} active", if n == 1 { "s" } else { "" }),
+        }
+    }
 
     /// Why the focused agent cannot take a message right now (None: it can).
     pub fn message_blocker(&self, run: &Run) -> Option<String> {
@@ -1080,6 +1142,11 @@ impl App {
                                 self.request("workspace.merge_prepare", json!({ "workspace_id": ws, "handoff": true }), Pending::MergePrepare { run });
                             }
                         }
+                        Confirm::Cleanup { run, discard, .. } => {
+                            if let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) {
+                                self.request("workspace.cleanup", json!({ "workspace_id": ws, "discard_dirty": discard }), Pending::Cleanup);
+                            }
+                        }
                         Confirm::MergeComplete { run, .. } => {
                             if let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) {
                                 self.request("workspace.merge_complete", json!({ "workspace_id": ws }), Pending::MergeComplete);
@@ -1137,6 +1204,16 @@ impl App {
             KeyCode::Char('n') => self.open_new_agent(),
             KeyCode::Char('v') => self.open_changes(),
             KeyCode::Char('A') => self.open_accounts(),
+            KeyCode::Char('C') => {
+                if let Some(run) = self.focused().cloned() {
+                    if run.active() {
+                        self.say("Cleaning up waits until the agent is done", false);
+                    } else {
+                        let ws = run.workspace_id.clone();
+                        self.request("workspace.cleanup_plan", json!({ "workspace_id": ws }), Pending::CleanupPlan { run: run.id.clone() });
+                    }
+                }
+            }
             KeyCode::Char('M') => {
                 if let Some(run) = self.focused().cloned() {
                     if run.active() {
