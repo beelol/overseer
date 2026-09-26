@@ -1,0 +1,9 @@
+{
+  "fixture": "atlas-tenant-isolation",
+  "version": 1,
+  "runtime": "Node.js 24, Express 5.2.1, PostgreSQL 16, in-process local object-store emulator",
+  "jobs": ["J1-projects", "J2-tasks", "J3-membership", "J4-attachments", "J5-exports", "J6-tokens", "J7-independent-reproduction"],
+  "seeded_findings": ["foreign-task-mutation", "foreign-attachment-download"],
+  "protected_paths": ["project-membership", "role-escalation", "export-workspace-binding", "read-only-and-revoked-tokens"],
+  "isolation": "one PostgreSQL schema per scripted worker; every schema has independent seed rows"
+}

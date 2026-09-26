@@ -1,0 +1,7 @@
+# Atlas v1 — tenant-isolation audit fixture
+
+This is the versioned local Express/TypeScript + PostgreSQL backend for Swarm S1. It has two deliberate defects: a task is looked up by ID before PATCH/DELETE without a project-membership check, and an attachment download is signed without checking its task's project. Projects, role changes, exports and token restrictions are protected paths. An in-process object-store emulator serves only the signed fixture object; there is no external object service or production data.
+
+Run `npm ci --ignore-scripts` once, then `./run-local.sh` with Docker and Node.js 24. The script creates a temporary PostgreSQL 16 container with a random localhost port and removes it on exit. `npm test` also works against a supplied `ATLAS_DATABASE_URL` for an already-running local database. Every scripted worker test gets a fresh PostgreSQL schema, including J7's independent reproduction. The test runner drops those schemas afterward.
+
+The passing acceptance test describes the **seeded backend's actual responses**, including the two vulnerabilities. It is not a security fix, a model-agent audit, or a full S1 pass. The Swarm director still needs to plan and route J1–J4, coordinate D1 and J4's overlap, accept checked paths, launch J7 within the four-worker ceiling, and synthesize a report with the stated evidence and fault variants. See `docs/rfcs/swarm-mode-scenarios.md`.
