@@ -52,6 +52,17 @@ fn control_socket_path(run: &str, generation: i64) -> PathBuf {
     paths::short_socket(&format!("c-{}-{generation}.sock", &run[..run.len().min(14)]))
 }
 
+/// A daemon-issued identity for a supervised, fixture-only Swarm worker.
+/// It is passed through the private launch file, never through the task prompt
+/// or user-visible launch metadata.
+pub(crate) struct SwarmWorkerIdentity {
+    pub run_id: String,
+    pub job_id: String,
+    pub attempt_id: String,
+    pub token: String,
+    pub revision: i64,
+}
+
 impl Daemon {
     pub fn open() -> Result<Arc<Self>> {
         paths::ensure_private_dir(&paths::data_dir())?;
@@ -294,11 +305,11 @@ impl Daemon {
         self.create_task_internal(p, None)
     }
 
-    pub(crate) fn create_task_for_swarm(self: &Arc<Self>, p: &Value, attempt_id: &str) -> Result<Value> {
-        self.create_task_internal(p, Some(attempt_id))
+    pub(crate) fn create_task_for_swarm(self: &Arc<Self>, p: &Value, identity: &SwarmWorkerIdentity) -> Result<Value> {
+        self.create_task_internal(p, Some(identity))
     }
 
-    fn create_task_internal(self: &Arc<Self>, p: &Value, swarm_attempt_id: Option<&str>) -> Result<Value> {
+    fn create_task_internal(self: &Arc<Self>, p: &Value, swarm_identity: Option<&SwarmWorkerIdentity>) -> Result<Value> {
         let repo_in = p["repo"].as_str().ok_or_else(|| anyhow!("repo is required"))?;
         let harness = p["harness"].as_str().unwrap_or("codex");
         if !["codex", "codex-app", "claude", "opencode", "generic"].contains(&harness) {
@@ -429,8 +440,8 @@ impl Daemon {
             // Task and run appear together: a state snapshot never shows a task without its run.
             let store = self.store.lock().unwrap();
             store.insert_task(&task)?;
-            if let Some(attempt_id) = swarm_attempt_id {
-                store.insert_run_for_swarm(&run, attempt_id)?;
+            if let Some(identity) = swarm_identity {
+                store.insert_run_for_swarm(&run, &identity.attempt_id)?;
             } else {
                 store.insert_run(&run)?;
             }
@@ -442,7 +453,7 @@ impl Daemon {
             store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![run.id, generic.to_string()])?;
         }
         self.emit(Some(&task.id), Some(&run.id), "task_created", "daemon", "exact", json!({"task": task, "workspace": ws, "run": run}))?;
-        let started = self.start_turn(&run.id, &prompt, false);
+        let started = self.start_turn_internal(&run.id, &prompt, false, swarm_identity);
         let run = self.run(&run.id)?;
         let task = self.task(&task.id)?;
         if let Err(e) = started {
@@ -453,6 +464,10 @@ impl Daemon {
 
     /// Start a work turn: fresh run-start snapshot, then launch (or stdin for live generic processes).
     pub fn start_turn(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool) -> Result<Turn> {
+        self.start_turn_internal(run_id, prompt, follow_up, None)
+    }
+
+    fn start_turn_internal(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, swarm_identity: Option<&SwarmWorkerIdentity>) -> Result<Turn> {
         let run = self.run(run_id)?;
         if run.parent_run_id.is_some() {
             bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
@@ -499,7 +514,7 @@ impl Daemon {
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
         }
-        let launch = adapters::launch(
+        let mut launch = adapters::launch(
             &run.harness,
             &LaunchReq {
                 cwd: Path::new(&ws.path),
@@ -512,6 +527,23 @@ impl Daemon {
                 extra_args: &extra_args,
             },
         )?;
+        if let Some(identity) = swarm_identity {
+            if run.harness != "generic" || std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() != Ok("1") {
+                bail!("scripted Swarm worker identity requires fixture-only generic harness");
+            }
+            for (key, value) in [
+                ("OVERSEER_SWARM_RUN_ID", identity.run_id.clone()),
+                ("OVERSEER_SWARM_JOB_ID", identity.job_id.clone()),
+                ("OVERSEER_SWARM_ATTEMPT_ID", identity.attempt_id.clone()),
+                ("OVERSEER_SWARM_TOKEN", identity.token.clone()),
+                ("OVERSEER_SWARM_REVISION", identity.revision.to_string()),
+                ("OVERSEER_HOME", paths::data_dir().display().to_string()),
+                ("OVERSEER_SOCKET", paths::socket_path().display().to_string()),
+                ("OVERSEER_BIN", self.exe.display().to_string()),
+            ] {
+                launch.env.insert(key.to_string(), value);
+            }
+        }
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(run_id))?;
         let app = json!({"prompt": prompt, "cwd": ws.path, "model": run.model, "resume": resume, "approval": generic_meta["approval"].as_str().unwrap_or("on-request")});
         self.spawn_process(&run, &ws, launch, json!({"generic": generic_meta, "app": app}))?;

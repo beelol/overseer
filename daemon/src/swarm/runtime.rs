@@ -2,7 +2,7 @@
 //! daemon-owned target and each live adapter proves directive/descendant control.
 
 use super::{broker, get, required};
-use crate::daemon::Daemon;
+use crate::daemon::{Daemon, SwarmWorkerIdentity};
 use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
@@ -41,9 +41,10 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
     }
     let digest = format!("{:x}", Sha256::digest(p.to_string().as_bytes()));
     let assigned_prompt;
+    let attempt_revision;
     {
         let store = d.store.lock().unwrap();
-        let attempt_revision = broker::check_attempt(&store, run, job, attempt, token)?;
+        attempt_revision = broker::check_attempt(&store, run, job, attempt, token)?;
         let current = get(&store, run)?;
         let prior: Option<(String,Option<String>)> = store.conn.query_row(
             "SELECT request_sha256,overseer_run_id FROM swarm_worker_launches WHERE attempt_id=?1 AND run_id=?2 AND job_id=?3",
@@ -90,7 +91,13 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
             "repo":repo,"harness":"generic","workspace_mode":"worktree",
             "program":program,"args":args,"prompt":assigned_prompt,"title":title,
         }),
-        attempt,
+        &SwarmWorkerIdentity {
+            run_id: run.to_string(),
+            job_id: job.to_string(),
+            attempt_id: attempt.to_string(),
+            token: token.to_string(),
+            revision: attempt_revision,
+        },
     )?;
     let overseer_run_id = task["run"]["id"]
         .as_str()

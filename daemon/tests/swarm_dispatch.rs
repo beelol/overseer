@@ -174,3 +174,163 @@ fn startup_does_not_launch_an_admitted_worker_from_an_expired_snapshot() {
         .unwrap();
     assert_eq!(attempts, 1);
 }
+
+#[test]
+fn supervised_scripted_workers_report_evidence_that_unlocks_dependent_work() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("worker-report-source"));
+    let script = temp.path().join("report-worker.sh");
+    std::fs::write(&script, r#"#!/bin/sh
+set -eu
+test -n "$OVERSEER_SWARM_RUN_ID"
+test -n "$OVERSEER_SWARM_JOB_ID"
+test -n "$OVERSEER_SWARM_ATTEMPT_ID"
+test -n "$OVERSEER_SWARM_TOKEN"
+test -n "$OVERSEER_SWARM_REVISION"
+artifact="proof-$OVERSEER_SWARM_ATTEMPT_ID"
+written=$("$OVERSEER_BIN" ctl swarm.artifact.put "{\"run_id\":\"$OVERSEER_SWARM_RUN_ID\",\"job_id\":\"$OVERSEER_SWARM_JOB_ID\",\"attempt_id\":\"$OVERSEER_SWARM_ATTEMPT_ID\",\"token\":\"$OVERSEER_SWARM_TOKEN\",\"artifact_id\":\"$artifact\",\"source_revision\":$OVERSEER_SWARM_REVISION,\"kind\":\"finding\",\"content\":\"scripted evidence\"}")
+case "$written" in *'"error"'*) exit 2;; esac
+reported=$("$OVERSEER_BIN" ctl swarm.report "{\"run_id\":\"$OVERSEER_SWARM_RUN_ID\",\"job_id\":\"$OVERSEER_SWARM_JOB_ID\",\"attempt_id\":\"$OVERSEER_SWARM_ATTEMPT_ID\",\"token\":\"$OVERSEER_SWARM_TOKEN\",\"message_id\":\"result-$OVERSEER_SWARM_ATTEMPT_ID\",\"type\":\"result\",\"revision\":$OVERSEER_SWARM_REVISION,\"payload\":{\"artifact_ids\":[\"$artifact\"]}}")
+case "$reported" in *'"error"'*) exit 3;; esac
+"#).unwrap();
+    let run = d.call(
+        "swarm.create",
+        json!({"category":"Fixture endpoint work",
+        "objective":"Set contract then verify endpoint","allowed_targets":["fixture"]}),
+    );
+    let run_id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run_id,"generation":1,"revision":0,"jobs":[
+        {"id":"contract","title":"Define endpoint contract","acceptance":"Contract evidence","deps":[]},
+        {"id":"endpoint","title":"Verify endpoint","acceptance":"Endpoint evidence","deps":["contract"]}
+    ]}));
+    let at = now();
+    let snapshot = json!({"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+        "targets":[{"id":"fixture","account_id":"fixture","pool_ids":["pool"],
+            "capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+            "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+60000}]}]});
+    for (request_id, job_id) in [
+        ("contract-launch", "contract"),
+        ("endpoint-launch", "endpoint"),
+    ] {
+        let dispatched = d.call(
+            "swarm.dispatch.next",
+            json!({"request_id":request_id,
+            "target_id":"fixture","repo":checkout,"program":"/bin/sh","args":[script],
+            "now_ms":at,"snapshot":snapshot,"required_capabilities":["code"],
+            "estimate_milli":{"points":100},"purpose":"worker"}),
+        );
+        assert_eq!(dispatched["job_id"], job_id, "{dispatched}");
+        let worker = dispatched["overseer_run_id"].as_str().unwrap();
+        let attempt = dispatched["attempt_id"].as_str().unwrap();
+        assert_eq!(d.wait_done(worker, 5)["status"], "completed");
+        let messages = d.call(
+            "swarm.messages",
+            json!({"run_id":run_id,"recipient":"director"}),
+        );
+        let artifact = format!("proof-{attempt}");
+        assert!(
+            messages["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|m| m["type"] == "result"
+                    && m["job_id"] == job_id
+                    && m["payload"]["artifact_ids"][0] == artifact),
+            "{messages}"
+        );
+        d.call(
+            "swarm.worker.reconcile",
+            json!({"run_id":run_id,"job_id":job_id,
+            "attempt_id":attempt,"generation":1,"revision":1}),
+        );
+        let batch = d.call(
+            "swarm.director.claim_batch",
+            json!({"run_id":run_id,
+            "generation":1,"revision":1,"now_ms":now()+6000}),
+        );
+        assert_eq!(batch["status"], "claimed", "{batch}");
+        d.call(
+            "swarm.decide",
+            json!({"run_id":run_id,"generation":1,"revision":1,
+            "job_id":job_id,"decision":"accept","evidence":[artifact]}),
+        );
+        d.call(
+            "swarm.director.complete_batch",
+            json!({"run_id":run_id,"generation":1,
+            "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"progress"}),
+        );
+    }
+    let jobs = d.call("swarm.jobs", json!({"id":run_id}));
+    assert_eq!(jobs["jobs"][0]["status"], "accepted");
+    assert_eq!(jobs["jobs"][1]["status"], "accepted");
+}
+
+#[test]
+fn supervised_scripted_worker_receives_and_applies_targeted_director_advisory() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("worker-advisory-source"));
+    let script = temp.path().join("receive-advisory.sh");
+    std::fs::write(&script, r#"#!/bin/sh
+set -eu
+count=0
+while [ "$count" -lt 100 ]; do
+    inbox=$("$OVERSEER_BIN" ctl swarm.messages "{\"run_id\":\"$OVERSEER_SWARM_RUN_ID\",\"recipient\":\"$OVERSEER_SWARM_ATTEMPT_ID\"}")
+    case "$inbox" in *'"message_id":"targeted-note"'*) break;; esac
+    count=$((count + 1))
+    sleep 0.05
+done
+test "$count" -lt 100
+delivered=$("$OVERSEER_BIN" ctl swarm.ack "{\"run_id\":\"$OVERSEER_SWARM_RUN_ID\",\"message_id\":\"targeted-note\",\"recipient\":\"$OVERSEER_SWARM_ATTEMPT_ID\",\"token\":\"$OVERSEER_SWARM_TOKEN\",\"revision\":$OVERSEER_SWARM_REVISION,\"phase\":\"delivered\"}")
+case "$delivered" in *'"error"'*) exit 2;; esac
+applied=$("$OVERSEER_BIN" ctl swarm.ack "{\"run_id\":\"$OVERSEER_SWARM_RUN_ID\",\"message_id\":\"targeted-note\",\"recipient\":\"$OVERSEER_SWARM_ATTEMPT_ID\",\"token\":\"$OVERSEER_SWARM_TOKEN\",\"revision\":$OVERSEER_SWARM_REVISION,\"phase\":\"applied\"}")
+case "$applied" in *'"error"'*) exit 3;; esac
+"#).unwrap();
+    let run = d.call(
+        "swarm.create",
+        json!({"category":"Fixture advisory",
+        "objective":"Inspect API routes","allowed_targets":["fixture"]}),
+    );
+    let run_id = run["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run_id,"generation":1,"revision":0,"jobs":[
+            {"id":"inspect","title":"Inspect routes","acceptance":"Finding","deps":[]}
+        ]}),
+    );
+    let at = now();
+    let dispatched = d.call(
+        "swarm.dispatch.next",
+        json!({"request_id":"advisory-worker",
+        "target_id":"fixture","repo":checkout,"program":"/bin/sh","args":[script],
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,
+            "expires_ms":at+60000,"targets":[{"id":"fixture","account_id":"fixture",
+                "pool_ids":["pool"],"capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}),
+    );
+    let worker = dispatched["overseer_run_id"].as_str().unwrap();
+    let attempt = dispatched["attempt_id"].as_str().unwrap();
+    let sent = d.call(
+        "swarm.direct",
+        json!({"run_id":run_id,"job_id":"inspect",
+        "attempt_id":attempt,"generation":1,"revision":1,"message_id":"targeted-note",
+        "type":"advisory","payload":{"question":"Check the retry handler"}}),
+    );
+    assert_eq!(sent["phase"], "queued");
+    assert_eq!(d.wait_done(worker, 8)["status"], "completed");
+    let messages = d.call(
+        "swarm.messages",
+        json!({"run_id":run_id,"recipient":attempt}),
+    );
+    assert_eq!(messages["messages"][0]["phase"], "applied");
+    assert_eq!(
+        messages["messages"][0]["payload"]["question"],
+        "Check the retry handler"
+    );
+}
