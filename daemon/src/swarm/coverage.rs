@@ -1,7 +1,7 @@
 use super::{get, required};
 use crate::store::Store;
 use anyhow::Result;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 
 pub fn report(store: &Store, p: &Value) -> Result<Value> {
@@ -56,8 +56,30 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
             None => (None, None, Value::Null),
         };
         let outcome = payload["audit_outcome"].as_str();
+        let reviewed: Option<(String, i64)> = store.conn.query_row(
+            "SELECT attempt_id,reviewed_message_seq FROM swarm_decisions
+             WHERE run_id=?1 AND job_id=?2 AND decision='accept' ORDER BY id DESC LIMIT 1",
+            params![run, job],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        ).optional()?;
+        let review_stale = if status == "accepted" {
+            if let Some((accepted_attempt, reviewed_seq)) = reviewed {
+                let late: i64 = store.conn.query_row(
+                    "SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND job_id=?2
+                     AND attempt_id=?3 AND revision=?4 AND kind IN ('result','submit') AND seq>?5",
+                    params![run, job, accepted_attempt, revision, reviewed_seq],
+                    |r| r.get(0),
+                )?;
+                late > 0
+            } else {
+                true
+            }
+        } else {
+            false
+        };
         let state = match outcome {
             Some("environment_failure") => "environment_blocked",
+            _ if review_stale => "review_stale",
             Some("negative") if status == "accepted" => "checked_negative",
             Some("negative") => "negative_awaiting_review",
             Some("confirmed_defect") if status == "accepted" => "confirmed_application_defect",

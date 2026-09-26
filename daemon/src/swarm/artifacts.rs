@@ -120,27 +120,27 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
     }
     let attempt = attempt_id.ok_or_else(|| anyhow!("missing attempt"))?;
     let mut stmt = store.conn.prepare(
-        "SELECT payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND kind IN ('result','submit') AND revision=?4"
+        "SELECT seq,payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND kind IN ('result','submit') AND revision=?4"
     )?;
     let submitted = stmt
         .query_map(params![run, job, attempt, job_revision], |r| {
-            r.get::<_, String>(0)
+            Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
-    if decision == "accept" && submitted.iter().any(|raw| {
+    if decision == "accept" && submitted.iter().any(|(_, raw)| {
         serde_json::from_str::<Value>(raw).ok()
             .is_some_and(|payload| payload["audit_outcome"] == "environment_failure")
     }) {
         bail!("environment failure cannot be accepted as a passed check");
     }
-    if decision == "accept" && !has_reproduction && submitted.iter().any(|raw| {
+    if decision == "accept" && !has_reproduction && submitted.iter().any(|(_, raw)| {
         serde_json::from_str::<Value>(raw).ok()
             .is_some_and(|payload| payload["audit_outcome"] == "confirmed_defect")
     }) {
         bail!("confirmed defect requires reproduction artifact evidence");
     }
-    let linked = submitted.iter().any(|raw| {
+    let linked = submitted.iter().any(|(_, raw)| {
         let payload: Value = serde_json::from_str(raw).unwrap_or(Value::Null);
         evidence.iter().all(|id| {
             payload["artifact_ids"]
@@ -189,9 +189,10 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
     }
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
+    let reviewed_message_seq = submitted.iter().map(|(seq, _)| *seq).max().unwrap_or(0);
     tx.execute(
-        "INSERT INTO swarm_decisions(run_id,job_id,attempt_id,revision,decision,evidence,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7)",
-        params![run,job,attempt,revision,decision,evidence_text,now],
+        "INSERT INTO swarm_decisions(run_id,job_id,attempt_id,revision,decision,evidence,reviewed_message_seq,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+        params![run,job,attempt,revision,decision,evidence_text,reviewed_message_seq,now],
     )?;
     let next = match decision {
         "accept" => "accepted",

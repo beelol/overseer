@@ -151,11 +151,11 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
             .map(|v| v.as_str().unwrap().to_owned())
             .collect();
         claimed.sort();
-        let decision: Option<(String, String)> = tx.query_row(
-            "SELECT attempt_id,evidence FROM swarm_decisions WHERE run_id=?1 AND job_id=?2 AND decision='accept' ORDER BY id DESC LIMIT 1",
-            params![run,job], |r| Ok((r.get(0)?,r.get(1)?)),
+        let decision: Option<(String, String, i64)> = tx.query_row(
+            "SELECT attempt_id,evidence,reviewed_message_seq FROM swarm_decisions WHERE run_id=?1 AND job_id=?2 AND decision='accept' ORDER BY id DESC LIMIT 1",
+            params![run,job], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
         ).optional()?;
-        let (attempt, accepted_evidence) =
+        let (attempt, accepted_evidence, reviewed_message_seq) =
             decision.ok_or_else(|| anyhow!("accepted job lacks a review decision"))?;
         let mut results = tx.prepare(
             "SELECT payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND revision=?4 AND kind='result'",
@@ -172,6 +172,15 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
                 .is_some_and(|payload| payload["audit_outcome"] == "environment_failure")
         }) {
             bail!("environment failure cannot become a passed completion check");
+        }
+        let late_results: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3
+             AND revision=?4 AND kind IN ('result','submit') AND seq>?5",
+            params![run, job, attempt, job_revision, reviewed_message_seq],
+            |r| r.get(0),
+        )?;
+        if late_results > 0 {
+            bail!("new result after review requires a fresh decision");
         }
         let attempt_revision: i64 = tx
             .query_row(

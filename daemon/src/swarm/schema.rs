@@ -102,6 +102,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           revision INTEGER NOT NULL,
           decision TEXT NOT NULL,
           evidence TEXT NOT NULL,
+          reviewed_message_seq INTEGER NOT NULL DEFAULT 0,
           created_ms INTEGER NOT NULL,
           UNIQUE(run_id,job_id,attempt_id,decision)
         );
@@ -249,6 +250,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         .exists([])?;
     if !has_decision_snapshot {
         conn.execute_batch("ALTER TABLE swarm_director_turns ADD COLUMN accepted_decision_id_at_claim INTEGER NOT NULL DEFAULT 0;")?;
+    }
+    let has_reviewed_message_seq = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_decisions') WHERE name='reviewed_message_seq'")?
+        .exists([])?;
+    if !has_reviewed_message_seq {
+        conn.execute_batch("ALTER TABLE swarm_decisions ADD COLUMN reviewed_message_seq INTEGER NOT NULL DEFAULT 0;")?;
     }
     Ok(())
 }

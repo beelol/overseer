@@ -275,6 +275,56 @@ fn late_environment_failure_cannot_be_hidden_by_an_earlier_acceptance() {
 }
 
 #[test]
+fn late_result_invalidates_the_accepted_review_before_completion() {
+    let mut d = Daemon::start(&[]);
+    let (run_id, attempt_id, token) = planned(&d);
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite"))
+        .unwrap()
+        .execute(
+            "UPDATE swarm_runs SET status='running' WHERE id=?1",
+            rusqlite::params![run_id],
+        )
+        .unwrap();
+    d.call("swarm.artifact.put", json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"token":token,"artifact_id":"checked",
+        "kind":"finding","content":"The route rejected cross-tenant access",
+        "source_revision":1}));
+    let original_result = json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"token":token,"message_id":"negative-result",
+        "type":"result","revision":1,"payload":{"audit_outcome":"negative",
+            "artifact_ids":["checked"]}});
+    d.call("swarm.report", original_result.clone());
+    d.call("swarm.decide", json!({"run_id":run_id,"generation":1,"revision":1,
+        "job_id":"routes","decision":"accept","evidence":["checked"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"generation":1,"revision":1}));
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.report", original_result)["duplicate"], true);
+    assert_eq!(d.call("swarm.coverage", json!({"run_id":run_id}))["rows"][0]["coverage_state"],
+        "checked_negative");
+    d.call("swarm.report", json!({"run_id":run_id,"job_id":"routes",
+        "attempt_id":attempt_id,"token":token,"message_id":"late-defect-result",
+        "type":"result","revision":1,"payload":{"audit_outcome":"confirmed_defect",
+            "artifact_ids":["checked"]}}));
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    let batch = d.call("swarm.director.claim_batch", json!({"run_id":run_id,
+        "generation":1,"revision":1,"now_ms":now+6000}));
+    d.call("swarm.director.complete_batch", json!({"run_id":run_id,"generation":1,
+        "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"no_progress"}));
+    assert_eq!(d.call("swarm.get", json!({"id":run_id}))["status"], "running");
+    assert_eq!(d.call("swarm.coverage", json!({"run_id":run_id}))["rows"][0]["coverage_state"],
+        "review_stale");
+    let error = d.try_call("swarm.complete", json!({"run_id":run_id,"generation":1,
+        "revision":1,"request_id":"complete-after-new-result",
+        "summary":"Routes checked","verification":"Fixture route checks",
+        "checks":[{"job_id":"routes","outcome":"passed","evidence":["checked"]}]}))
+        .unwrap_err();
+    assert!(error.contains("new result after review"), "{error}");
+}
+
+#[test]
 fn report_is_durable_before_ack_and_replay_is_idempotent() {
     let mut d = Daemon::start(&[]);
     let (run_id, attempt_id, token) = planned(&d);
