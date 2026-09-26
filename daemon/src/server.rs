@@ -248,12 +248,12 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "auto.dispatch" => {
             use crate::auto_select::{CapabilityTier, Sandbox, WorkUnit};
             use sha2::{Digest, Sha256};
-            use std::collections::BTreeSet;
+            use std::collections::{BTreeMap, BTreeSet};
 
             for field in p.as_object().ok_or_else(|| anyhow!("automatic work request must be an object"))?.keys() {
                 if !matches!(field.as_str(), "work_unit_id" | "parent_run_id" | "prompt" | "title"
                     | "min_tier" | "required_tools" | "context_needed" | "requires_approvals"
-                    | "pinned_route" | "preferred_harness") {
+                    | "pinned_route" | "preferred_harness" | "allowed_profiles") {
                     return Err(anyhow!("unsupported automatic work constraint: {field}"));
                 }
             }
@@ -270,7 +270,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             }
             let profile_id = parent.profile_id.as_deref().ok_or_else(|| anyhow!("parent has no account profile"))?;
             let profile = d.profile(profile_id)?;
-            if profile.harness != "codex" {
+            if !matches!(profile.harness.as_str(), "codex" | "claude") {
                 return Err(anyhow!("automatic route discovery is not yet supported for this harness"));
             }
             let prompt = s(p, "prompt")?;
@@ -306,11 +306,32 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 Some(value) => Some(value.as_str().filter(|s| !s.is_empty() && s.len() <= 40)
                     .ok_or_else(|| anyhow!("preferred_harness must be a harness name"))?.to_string()),
             };
+            let explicit_allowed_profiles = match p.get("allowed_profiles") {
+                None => None,
+                Some(Value::Array(values)) if !values.is_empty() && values.len() <= 8 => {
+                    let mut allowed = BTreeSet::new();
+                    for value in values {
+                        let id = value.as_str().filter(|id| !id.is_empty() && id.len() <= 120)
+                            .ok_or_else(|| anyhow!("invalid allowed account profile"))?;
+                        let candidate = d.profile(id)?;
+                        if !matches!(candidate.harness.as_str(), "codex" | "claude") {
+                            return Err(anyhow!("automatic route discovery is not yet supported for this account profile"));
+                        }
+                        if !allowed.insert(id.to_string()) { return Err(anyhow!("duplicate allowed account profile")); }
+                    }
+                    Some(allowed)
+                }
+                _ => return Err(anyhow!("allowed_profiles must be a bounded nonempty account list")),
+            };
+            let allowed_profiles = explicit_allowed_profiles.clone()
+                .unwrap_or_else(|| BTreeSet::from([profile_id.to_string()]));
             let requirements = json!({"work_unit_id":work_unit_id,"parent_run_id":parent.id,
                 "profile_id":profile_id,"prompt":prompt,"title":title,"min_tier":min_tier,
                 "required_tools":required_tools,"context_needed":context_needed,
                 "requires_approvals":requires_approvals,"pinned_route":pinned_route,
                 "preferred_harness":preferred_harness});
+            let mut requirements = requirements;
+            if let Some(explicit) = &explicit_allowed_profiles { requirements["allowed_profiles"] = json!(explicit); }
             let requirements_hash = Sha256::digest(serde_json::to_vec(&requirements)?)
                 .iter().map(|byte| format!("{byte:02x}")).collect::<String>();
             let saved_work_unit = {
@@ -327,54 +348,109 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     && launch["requirements_hash"] != requirements_hash {
                     return Err(anyhow!("work unit was already used for different automatic work"));
                 }
-                let route_id = format!("{profile_id}/{}/{}", child.model.as_deref().unwrap_or("unknown"), child.effort.as_deref().unwrap_or("unknown"));
-                json!({"state":"dispatched","work_unit_id":work_unit_id,"run":child,
+                let route_id = format!("{}/{}/{}", child.profile_id.as_deref().unwrap_or("unknown"),
+                    child.model.as_deref().unwrap_or("unknown"), child.effort.as_deref().unwrap_or("unknown"));
+                let replay_state = if child.status == "failed" { "paused" } else { "dispatched" };
+                json!({"state":replay_state,"work_unit_id":work_unit_id,"run":child,
                     "workspace":d.workspace(&child.workspace_id)?,"replayed":true,
                     "decision":{"work_unit_id":work_unit_id,"selected":route_id,"exclusions":[],"reason":"replayed_existing_work_unit"}})
             } else {
-                let models = dispatch(d, "auto.models.refresh", &json!({"profile_id":profile_id}))?;
-                let first_generation = d.store.lock().unwrap().auto_account_generation(profile_id)?;
-                let tools = dispatch(d, "auto.tools.inspect", &json!({"profile_id":profile_id,"workspace_id":parent.workspace_id}))?;
-                let generation = d.store.lock().unwrap().auto_account_generation(profile_id)?;
-                if generation.is_none() || generation != first_generation {
-                    return Err(anyhow!("account changed during automatic route discovery"));
+                let mut routes = Vec::new();
+                let mut evidence = Vec::new();
+                let mut discovery_failures = Vec::new();
+                let mut account_generations = BTreeMap::new();
+                for candidate_id in &allowed_profiles {
+                    let candidate = d.profile(candidate_id)?;
+                    let discovered = (|| -> Result<()> {
+                        match candidate.harness.as_str() {
+                            "codex" => {
+                                let models = dispatch(d, "auto.models.refresh", &json!({"profile_id":candidate_id}))?;
+                                let first_generation = d.store.lock().unwrap().auto_account_generation(candidate_id)?;
+                                let tools = dispatch(d, "auto.tools.inspect", &json!({"profile_id":candidate_id,"workspace_id":parent.workspace_id}))?;
+                                let generation = d.store.lock().unwrap().auto_account_generation(candidate_id)?;
+                                if generation.is_none() || generation != first_generation {
+                                    return Err(anyhow!("account changed during automatic route discovery"));
+                                }
+                                let catalog: crate::auto_route::ModelCatalog = serde_json::from_value(models["catalog"].clone())?;
+                                let tool_catalog: crate::auto_route::ToolCatalog = serde_json::from_value(tools["catalog"].clone())?;
+                                let observation = d.store.lock().unwrap().latest_auto_quota(candidate_id)?;
+                                let now_ms = crate::daemon::now();
+                                routes.extend(crate::auto_route::codex_auto_routes(&catalog, &tool_catalog,
+                                    observation.as_ref().map(|value| &value.snapshot), candidate_id, now_ms));
+                                account_generations.insert(candidate_id.clone(), generation.unwrap());
+                                evidence.push(json!({"profile_id":candidate_id,"source":"codex-app/model-and-tool-metadata",
+                                    "model_observed_ms":catalog.observed_ms,"tool_observed_ms":tool_catalog.observed_ms,
+                                    "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
+                                    "account_generation":generation}));
+                            }
+                            "claude" => {
+                                let gate = d.profile_gate(candidate_id);
+                                let _guard = gate.lock().unwrap();
+                                let program = crate::adapters::resolve_program("claude")
+                                    .ok_or_else(|| anyhow!("Claude executable unavailable"))?;
+                                let auth = crate::auto_collect::claude_auth_status(&program,
+                                    &crate::daemon::Daemon::profile_env(&candidate),
+                                    std::time::Duration::from_secs(5), crate::daemon::now())?;
+                                let store = d.store.lock().unwrap();
+                                store.record_auto_account_identity(candidate_id, &auth.fingerprint)?;
+                                let generation = store.auto_account_generation(candidate_id)?
+                                    .ok_or_else(|| anyhow!("Claude account generation unavailable"))?;
+                                let observation = store.latest_auto_quota(candidate_id)?;
+                                let now_ms = crate::daemon::now();
+                                routes.extend(crate::auto_route::claude_auto_routes(&auth,
+                                    observation.as_ref().map(|value| &value.snapshot), candidate_id, now_ms));
+                                account_generations.insert(candidate_id.clone(), generation);
+                                evidence.push(json!({"profile_id":candidate_id,"source":"claude/auth-status-and-native-quota",
+                                    "auth_observed_ms":auth.observed_ms,
+                                    "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
+                                    "account_generation":generation}));
+                            }
+                            _ => return Err(anyhow!("unsupported automatic harness")),
+                        }
+                        Ok(())
+                    })();
+                    if discovered.is_err() {
+                        discovery_failures.push(json!({"profile_id":candidate_id,"reason":"metadata_or_auth_unavailable"}));
+                    }
                 }
-                let catalog: crate::auto_route::ModelCatalog = serde_json::from_value(models["catalog"].clone())?;
-                let tool_catalog: crate::auto_route::ToolCatalog = serde_json::from_value(tools["catalog"].clone())?;
-                let observation = d.store.lock().unwrap().latest_auto_quota(profile_id)?;
-                let now_ms = crate::daemon::now();
-                let routes = crate::auto_route::codex_auto_routes(&catalog, &tool_catalog,
-                    observation.as_ref().map(|value| &value.snapshot), profile_id, now_ms);
+                if routes.len() > 128 { return Err(anyhow!("automatic candidate catalog exceeded its bound")); }
                 let work = WorkUnit { id:work_unit_id.into(), min_tier, required_tools:required_tools.clone(),
                     context_needed, requires_approvals, min_sandbox:Sandbox::WorkspaceWrite,
                     max_sandbox:Sandbox::WorkspaceWrite,
-                    allowed_profiles:BTreeSet::from([profile_id.to_string()]),
+                    allowed_profiles:allowed_profiles.clone(),
                     pinned_route, preferred_harness };
                 let decision = crate::auto_select::select(&work, &routes);
-                let trace = json!({"selector_version":"codex-cold-start-v2","decision":decision,
+                let trace = json!({"selector_version":"multi-harness-cold-start-v1","decision":decision,
                     "selection_input":{"work":&work,"routes":&routes},
                     "requirements":{"min_tier":min_tier,"required_tools":required_tools,
                         "context_needed":context_needed,"requires_approvals":requires_approvals},
-                    "evidence":{"model_observed_ms":catalog.observed_ms,"tool_observed_ms":tool_catalog.observed_ms,
-                        "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
-                        "account_generation":generation},
+                    "evidence":evidence,"discovery_failures":discovery_failures,
                     "candidates":routes.iter().map(|route| json!({"id":route.id,"quota":route.quota,
                         "fit":route.fit,"health":route.health})).collect::<Vec<_>>()});
                 d.emit(Some(&parent.task_id), Some(&parent.id), "auto_decision", "daemon", "exact", trace)?;
                 if let Some(selected) = decision.selected.as_deref() {
                     let route = routes.iter().find(|route| route.id == selected)
                         .ok_or_else(|| anyhow!("selected route disappeared"))?;
+                    let generation = account_generations.get(&route.profile_id)
+                        .ok_or_else(|| anyhow!("selected account generation unavailable"))?;
                     let required = required_tools.iter().cloned().collect::<Vec<_>>();
                     let mut delegated = d.delegate_run(&json!({"work_unit_id":work_unit_id,
                         "parent_run_id":parent.id,"harness":route.harness,"profile_id":route.profile_id,
                         "model":route.model,"effort":route.effort,"prompt":prompt,"title":title,
                         "required_tools":required,"auto_selected":true,
                         "requirements_hash":requirements_hash,"expected_account_generation":generation}))?;
-                    delegated["state"] = json!("dispatched");
+                    if delegated.get("launch_error").is_some() {
+                        delegated["state"] = json!("paused");
+                        delegated["actions"] = json!(["refresh", "choose_manual_route"]);
+                    } else {
+                        delegated["state"] = json!("dispatched");
+                    }
                     delegated["decision"] = json!(decision);
+                    delegated["discovery_failures"] = json!(discovery_failures);
                     delegated
                 } else {
                     json!({"state":"paused","work_unit_id":work_unit_id,"decision":decision,
+                        "discovery_failures":discovery_failures,
                         "actions":["refresh","choose_manual_route"]})
                 }
             }
@@ -394,7 +470,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             if routes.len() > 128 { return Err(anyhow!("automatic decision replay exceeded its candidate bound")); }
             let decision = match selector_version {
                 "codex-cold-start-v1" => crate::auto_select::select_legacy_v1(&work, &routes),
-                "codex-cold-start-v2" => crate::auto_select::select(&work, &routes),
+                "codex-cold-start-v2" | "multi-harness-cold-start-v1" => crate::auto_select::select(&work, &routes),
                 _ => return Err(anyhow!("unsupported automatic selector version")),
             };
             let matches_recorded = serde_json::to_value(&decision)? == payload["decision"];

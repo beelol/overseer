@@ -15,6 +15,19 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+if (process.argv.includes('auth') && process.argv.includes('status')) {
+  let email = 'fixture@example.test';
+  if (process.env.CLAUDE_FIXTURE_AUTH_COUNTER_FILE) {
+    const marker = process.env.CLAUDE_FIXTURE_AUTH_COUNTER_FILE;
+    const count = Number(fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8') : '0');
+    fs.writeFileSync(marker, String(count + 1));
+    if (count > 0) email = 'switched@example.test';
+  }
+  console.log(JSON.stringify({ loggedIn: true,
+    authMethod: process.env.CLAUDE_FIXTURE_AUTH_MODE === 'api-key' ? 'api-key' : 'claude.ai',
+    email, orgId: 'fixture-org', subscriptionType: 'fixture' }));
+  process.exit(0);
+}
 if (!process.argv.includes('-p')) { console.log('claude-fixture 0.0.0 (synthetic)'); process.exit(0); }
 const mode = process.env.CLAUDE_FIXTURE_MODE || process.env.FIXTURE_MODE || 'nested';
 const sid = 'fixture-session-1';

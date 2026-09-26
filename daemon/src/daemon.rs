@@ -708,6 +708,34 @@ impl Daemon {
                 }
             }
         }
+        if run.harness == "claude" && run.relation_source.as_deref() == Some("managed-delegation") {
+            let launch: Option<String> = self.store.lock().unwrap().conn.query_row(
+                "SELECT launch FROM runs WHERE id=?1", [run_id], |row| row.get(0))?;
+            let launch: Value = launch.as_deref().and_then(|text| serde_json::from_str(text).ok())
+                .unwrap_or(Value::Null);
+            if launch["auto_selected"] == true {
+                let profile_id = run.profile_id.as_deref().ok_or_else(|| anyhow!("automatic Claude profile unavailable"))?;
+                let expected = launch["expected_account_generation"].as_i64()
+                    .ok_or_else(|| anyhow!("automatic Claude account generation unavailable"))?;
+                let program = adapters::resolve_program("claude")
+                    .ok_or_else(|| anyhow!("Claude executable unavailable"))?;
+                let profile = self.profile(profile_id)?;
+                let auth = crate::auto_collect::claude_auth_status(&program, &Self::profile_env(&profile),
+                    std::time::Duration::from_secs(5), now())?;
+                let store = self.store.lock().unwrap();
+                store.record_auto_account_identity(profile_id, &auth.fingerprint)?;
+                if store.auto_account_generation(profile_id)? != Some(expected) {
+                    bail!("automatic Claude account changed before the model turn");
+                }
+                if let Some(model) = run.model.as_deref() {
+                    if let Some(observation) = store.latest_auto_quota(profile_id)? {
+                        if observation.snapshot.state_for(model, now()) == crate::auto_quota::QuotaState::Exhausted {
+                            bail!("automatic Claude allowance is exhausted");
+                        }
+                    }
+                }
+            }
+        }
         let snap = self.take_snapshot(&ws, "run-start")?;
         let n = self.store.lock().unwrap().turns(run_id)?.len() as i64 + 1;
         let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt.into(), snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };

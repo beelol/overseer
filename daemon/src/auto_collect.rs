@@ -2,6 +2,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream};
@@ -12,6 +13,78 @@ use std::time::{Duration, Instant};
 
 const MAX_FRAME: usize = 1024 * 1024;
 const MAX_FRAMES: usize = 100;
+
+#[derive(Clone, Debug)]
+pub struct ClaudeAuth {
+    pub fingerprint: String,
+    pub observed_ms: i64,
+}
+
+fn parse_claude_auth_status(value: &Value, observed_ms: i64) -> Result<ClaudeAuth> {
+    if value.get("loggedIn").and_then(Value::as_bool) != Some(true)
+        || value.get("authMethod").and_then(Value::as_str) != Some("claude.ai") {
+        return Err(anyhow!("Claude profile is not signed in with a Claude account"));
+    }
+    let email = value.get("email").and_then(Value::as_str).unwrap_or("");
+    let org = value.get("orgId").and_then(Value::as_str).unwrap_or("");
+    if (email.is_empty() && org.is_empty()) || email.len() > 256 || org.len() > 256 {
+        return Err(anyhow!("Claude account identity is unavailable"));
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"overseer:auto:claude-account:v1\0");
+    digest.update(email.to_ascii_lowercase().as_bytes());
+    digest.update(b"\0");
+    digest.update(org.as_bytes());
+    Ok(ClaudeAuth { fingerprint:format!("{:x}", digest.finalize()), observed_ms })
+}
+
+/// `claude auth status --json` is a local metadata read. The child has no API
+/// keys, no stdin or repository cwd, a 16 KiB output cap and one deadline.
+pub fn claude_auth_status(program: &Path, profile_env: &BTreeMap<String, String>,
+    timeout: Duration, observed_ms: i64) -> Result<ClaudeAuth> {
+    for key in profile_env.keys() {
+        if crate::adapters::forbidden_env(key) { return Err(anyhow!("unsafe Claude auth environment")); }
+    }
+    let mut env = crate::adapters::base_env(&program.display().to_string());
+    env.extend(profile_env.clone());
+    let mut child = Command::new(program).args(["auth", "status", "--json"])
+        .current_dir(crate::adapters::neutral_dir()).env_clear().envs(&env)
+        .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
+    let result = (|| -> Result<ClaudeAuth> {
+        let mut stdout = child.stdout.take().ok_or_else(|| anyhow!("Claude auth stdout unavailable"))?;
+        let deadline = Instant::now() + timeout;
+        let mut bytes = Vec::new();
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() { return Err(anyhow!("Claude auth metadata timed out")); }
+            let mut pollfd = libc::pollfd { fd:stdout.as_raw_fd(), events:libc::POLLIN | libc::POLLHUP, revents:0 };
+            let ready = unsafe { libc::poll(&mut pollfd, 1, remaining.as_millis().min(i32::MAX as u128) as i32) };
+            if ready == 0 { return Err(anyhow!("Claude auth metadata timed out")); }
+            if ready < 0 {
+                if std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted { continue; }
+                return Err(anyhow!("Claude auth metadata stream failed"));
+            }
+            let mut chunk = [0u8; 4096];
+            let count = stdout.read(&mut chunk)?;
+            if count == 0 { break; }
+            bytes.extend_from_slice(&chunk[..count]);
+            if bytes.len() > 16 * 1024 { return Err(anyhow!("Claude auth metadata exceeded its bound")); }
+        }
+        loop {
+            if let Some(status) = child.try_wait()? {
+                if !status.success() { return Err(anyhow!("Claude auth status command failed")); }
+                break;
+            }
+            if Instant::now() >= deadline { return Err(anyhow!("Claude auth metadata timed out")); }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let value: Value = serde_json::from_slice(&bytes).map_err(|_| anyhow!("invalid Claude auth status JSON"))?;
+        parse_claude_auth_status(&value, observed_ms)
+    })();
+    let _ = child.kill();
+    let _ = child.wait();
+    result
+}
 
 #[derive(Debug)]
 struct OpenCodeReadTimeout;
@@ -187,6 +260,35 @@ mod opencode_metadata_tests {
         server.join().unwrap();
         assert!(error.contains("timed out"), "{error}");
         assert!(!error.contains("secret-sentinel"));
+    }
+}
+
+#[cfg(test)]
+mod claude_auth_tests {
+    use super::*;
+
+    #[test]
+    fn authenticated_claude_account_is_fingerprinted_without_retaining_identity() {
+        let payload = json!({"loggedIn":true,"authMethod":"claude.ai",
+            "email":"private@example.test","orgId":"private-org","subscriptionType":"max"});
+        let auth = parse_claude_auth_status(&payload, 1000).unwrap();
+        assert_eq!(auth.fingerprint.len(), 64);
+        assert_eq!(auth.observed_ms, 1000);
+        assert!(!format!("{auth:?}").contains("private@example.test"));
+        assert!(!format!("{auth:?}").contains("private-org"));
+        assert_eq!(auth.fingerprint, parse_claude_auth_status(&payload, 2000).unwrap().fingerprint);
+        assert_ne!(auth.fingerprint, parse_claude_auth_status(&json!({"loggedIn":true,
+            "authMethod":"claude.ai","email":"other@example.test","orgId":"private-org"}), 2000)
+            .unwrap().fingerprint);
+    }
+
+    #[test]
+    fn claude_api_key_or_missing_identity_never_authorizes_auto() {
+        for payload in [json!({"loggedIn":true,"authMethod":"api-key","email":"a@example.test"}),
+            json!({"loggedIn":true,"authMethod":"claude.ai"}),
+            json!({"loggedIn":false,"authMethod":"claude.ai","email":"a@example.test"})] {
+            assert!(parse_claude_auth_status(&payload, 1000).is_err());
+        }
     }
 }
 

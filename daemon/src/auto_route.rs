@@ -73,6 +73,33 @@ pub fn codex_auto_routes(
     routes
 }
 
+/// Claude's installed CLI documents the moving `sonnet` and `opus` aliases
+/// and `medium`/`high` efforts. These versioned capability priors are not
+/// model-version identities or consumption estimates. Alias changes require
+/// later actual-model attribution before learning can pool observations.
+pub fn claude_auto_routes(
+    auth: &crate::auto_collect::ClaudeAuth,
+    quota: Option<&QuotaSnapshot>,
+    profile_id: &str,
+    now_ms: i64,
+) -> Vec<Route> {
+    if now_ms < auth.observed_ms || now_ms >= auth.observed_ms.saturating_add(60_000) {
+        return Vec::new();
+    }
+    [("sonnet", "medium", CapabilityTier::General, true),
+     ("opus", "high", CapabilityTier::Frontier, false)].into_iter()
+        .map(|(model, effort, tier, recommended_default)| Route {
+            id:format!("{profile_id}/{model}/{effort}"), harness:"claude".into(),
+            provider:"anthropic".into(), endpoint:"claude-code".into(),
+            profile_id:profile_id.into(), pool_id:profile_id.into(),
+            model:model.into(), effort:effort.into(), tier,
+            tools:BTreeSet::new(), context_limit:None, supports_approvals:true,
+            sandbox:Sandbox::WorkspaceWrite, recommended_default,
+            quota:auto_select::observed_allowance(quota, model, now_ms),
+            fit:Fit::Unknown, health:Health::Unknown,
+        }).collect()
+}
+
 fn identifier(value: &Value) -> Result<String> {
     let s = value
         .as_str()
@@ -226,6 +253,24 @@ pub fn parse_codex_tools(value: &Value, observed_ms: i64) -> Result<ToolCatalog>
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn claude_alias_routes_keep_family_quota_and_do_not_claim_tools_or_model_charges() {
+        let now = 1_800_000_000_000_i64;
+        let auth = crate::auto_collect::ClaudeAuth { fingerprint:"f".repeat(64), observed_ms:now };
+        let quota = crate::auto_quota::parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+            "rate_limit_info":{"status":"rejected","rateLimitType":"seven_day_opus",
+                "resetsAt":1800003600,"unifiedWindows":{"five_hour":{"utilization":0.3,"resetsAt":1800003600}}}}),
+            "system-claude", now).unwrap();
+        let routes = claude_auto_routes(&auth, Some(&quota), "system-claude", now);
+        assert_eq!(routes.len(), 2);
+        assert_eq!(routes[0].model, "sonnet");
+        assert_eq!(routes[0].quota, crate::auto_select::Allowance::ObservedNonExhausted);
+        assert!(routes[0].tools.is_empty());
+        assert_eq!(routes[1].model, "opus");
+        assert_eq!(routes[1].quota, crate::auto_select::Allowance::Exhausted);
+        assert!(claude_auto_routes(&auth, Some(&quota), "system-claude", now + 60_000).is_empty());
+    }
 
     #[test]
     fn codex_catalog_preserves_reported_models_and_efforts_without_cost_or_tier() {

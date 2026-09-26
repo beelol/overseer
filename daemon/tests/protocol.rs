@@ -1768,6 +1768,111 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
 }
 
 #[test]
+fn auto_dispatch_can_choose_an_explicitly_allowed_claude_child_and_reject_missing_browser_tools() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "prose")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"cross-claude-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"allowed_profiles":["system-claude"],
+        "preferred_harness":"claude","prompt":"summarize the bounded result","title":"summary"});
+    let child = d.call("auto.dispatch", request.clone());
+    assert_eq!(child["state"], "dispatched", "{child}");
+    assert_eq!(child["decision"]["selected"], "system-claude/sonnet/medium");
+    assert_eq!(child["run"]["harness"], "claude");
+    let child_id = run_id(&child);
+    assert_eq!(d.wait_done(&child_id, 15)["status"], "completed");
+    assert_eq!(d.call("run.result", json!({"run_id":child_id}))["state"], "ready");
+    assert!(!serde_json::to_string(&d.events(&parent)).unwrap().contains("fixture@example.test"));
+    assert!(!serde_json::to_string(&d.events(&child_id)).unwrap().contains("fixture@example.test"));
+    let decision_event = d.events(&parent).into_iter().find(|event| event["kind"] == "auto_decision").unwrap();
+    assert_eq!(d.call("auto.decision.replay", json!({"event_seq":decision_event["seq"]}))["matches_recorded"], true);
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("auto.dispatch", request)["run"]["id"], child_id);
+    let browser = d.call("auto.dispatch", json!({"work_unit_id":"cross-claude-browser-2",
+        "parent_run_id":parent,"min_tier":"general","required_tools":["browser/navigate"],
+        "allowed_profiles":["system-claude"],"prompt":"visit a page"}));
+    assert_eq!(browser["state"], "paused", "{browser}");
+    assert_eq!(browser["decision"]["exclusions"][0]["reason"], "missing_tool");
+    assert_eq!(d.runs().len(), 2, "tool-incompatible Claude route must not launch");
+}
+
+#[test]
+fn auto_claude_account_change_before_child_turn_pauses_without_a_model_call() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let counter = r.path().join("claude-auth-count");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_AUTH_COUNTER_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "prose"),
+        ("CLAUDE_FIXTURE_AUTH_COUNTER_FILE", counter.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let outcome = d.call("auto.dispatch", json!({"work_unit_id":"cross-claude-switch-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-claude"],"prompt":"safe bounded result"}));
+    assert_eq!(outcome["state"], "paused", "{outcome}");
+    assert_eq!(outcome["run"]["status"], "failed");
+    assert_eq!(std::fs::read_to_string(&counter).unwrap(), "2");
+    let child_id = run_id(&outcome);
+    assert!(!d.events(&child_id).iter().any(|event| event["kind"] == "turn_started"),
+        "a changed account must be caught before Claude starts a model turn");
+}
+
+#[test]
+fn auto_dispatch_from_claude_exhausted_frontier_pool_uses_allowed_codex_child() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "native-quota")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"claude",
+        "model":"opus","effort":"high","prompt":"identify difficult diagnosis","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let blocked = d.call("auto.quota.state", json!({"profile_id":"system-claude",
+        "harness":"claude","model":"opus"}));
+    assert_eq!(blocked["state"], "exhausted", "{blocked}");
+    let next = d.call("auto.dispatch", json!({"work_unit_id":"claude-to-codex-1",
+        "parent_run_id":parent,"min_tier":"frontier","required_tools":[],
+        "allowed_profiles":["system-claude","system-codex"],
+        "prompt":"finish the difficult diagnosis"}));
+    assert_eq!(next["state"], "dispatched", "{next}");
+    assert_eq!(next["decision"]["selected"], "system-codex/gpt-6-astra/high");
+    assert_eq!(next["run"]["harness"], "codex-app");
+    assert!(next["decision"]["exclusions"].as_array().unwrap().iter()
+        .any(|entry| entry["route_id"] == "system-claude/opus/high" && entry["reason"] == "quota_exhausted"));
+    assert_eq!(d.wait_done(&run_id(&next), 15)["status"], "completed");
+}
+
+#[test]
+fn auto_claude_api_key_auth_is_excluded_without_a_child() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_AUTH_MODE"),
+        ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_AUTH_MODE", "api-key")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let outcome = d.call("auto.dispatch", json!({"work_unit_id":"api-key-claude-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-claude"],"prompt":"use the subscription"}));
+    assert_eq!(outcome["state"], "paused", "{outcome}");
+    assert_eq!(outcome["discovery_failures"][0]["reason"], "metadata_or_auth_unavailable");
+    assert_eq!(d.runs().len(), 1);
+}
+
+#[test]
 fn auto_dispatch_rechecks_quota_and_account_generation_inside_the_selected_child() {
     for action in ["exhaust_quota", "switch_account"] {
         let r = tmp();
