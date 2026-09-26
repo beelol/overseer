@@ -38,7 +38,7 @@
         "daemon/tests/swarm_benefit.rs",
         "docs/verification/swarm/SWARM-05.md"
       ],
-      "blocker": "A fixture-only preview compares planning, context, worker, retry, integration and review estimates in elapsed time and native usage units, including finishing reserve. It is not connected to admission, does not persist estimates or actuals, and has no live calibration."
+      "blocker": "A fixture-only decision now persists cost estimates by revision and batch, gates second-worker admission, and preserves serial/parallel behavior over restart and refill. Actual elapsed/usage outcomes, validated independence, live calibrated estimates and shared Auto Mode quota input remain absent."
     },
     "SWARM-06": {
       "status": "partial",
