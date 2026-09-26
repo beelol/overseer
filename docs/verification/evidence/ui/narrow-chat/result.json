@@ -1,0 +1,372 @@
+{
+  "checks": [
+    {
+      "name": "the chat measured about 640, 480 and 360 px wide (360 is the floor)",
+      "ok": true,
+      "detail": [
+        [
+          640,
+          647
+        ],
+        [
+          480,
+          484
+        ],
+        [
+          360,
+          371
+        ],
+        [
+          640,
+          647
+        ],
+        [
+          480,
+          483
+        ],
+        [
+          360,
+          373
+        ]
+      ]
+    },
+    {
+      "name": "nothing in the chat overflows sideways at any width, in both themes",
+      "ok": true,
+      "detail": [
+        [
+          "Overseer Dark",
+          640,
+          false,
+          false,
+          []
+        ],
+        [
+          "Overseer Dark",
+          480,
+          false,
+          false,
+          []
+        ],
+        [
+          "Overseer Dark",
+          360,
+          false,
+          false,
+          []
+        ],
+        [
+          "Overseer Light",
+          640,
+          false,
+          false,
+          []
+        ],
+        [
+          "Overseer Light",
+          480,
+          false,
+          false,
+          []
+        ],
+        [
+          "Overseer Light",
+          360,
+          false,
+          false,
+          []
+        ]
+      ]
+    },
+    {
+      "name": "no text run over 80 characters outside code",
+      "ok": true,
+      "detail": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ]
+    },
+    {
+      "name": "the header keeps the agent's name fully readable",
+      "ok": true,
+      "detail": [
+        [
+          640,
+          true
+        ],
+        [
+          480,
+          true
+        ],
+        [
+          360,
+          true
+        ],
+        [
+          640,
+          true
+        ],
+        [
+          480,
+          true
+        ],
+        [
+          360,
+          true
+        ]
+      ]
+    },
+    {
+      "name": "tool steps stay folded; code blocks scroll sideways inside themselves; the composer fits",
+      "ok": true,
+      "detail": [
+        [
+          640,
+          [
+            false
+          ],
+          [
+            {
+              "scrolls": true,
+              "inside": true
+            }
+          ],
+          true
+        ],
+        [
+          480,
+          [
+            false
+          ],
+          [
+            {
+              "scrolls": true,
+              "inside": true
+            }
+          ],
+          true
+        ],
+        [
+          360,
+          [
+            false
+          ],
+          [
+            {
+              "scrolls": true,
+              "inside": true
+            }
+          ],
+          true
+        ],
+        [
+          640,
+          [
+            false
+          ],
+          [
+            {
+              "scrolls": true,
+              "inside": true
+            }
+          ],
+          true
+        ],
+        [
+          480,
+          [
+            false
+          ],
+          [
+            {
+              "scrolls": true,
+              "inside": true
+            }
+          ],
+          true
+        ],
+        [
+          360,
+          [
+            false
+          ],
+          [
+            {
+              "scrolls": true,
+              "inside": true
+            }
+          ],
+          true
+        ]
+      ]
+    }
+  ],
+  "audits": [
+    {
+      "theme": "Overseer Dark",
+      "target": 640,
+      "width": 647,
+      "audit": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 647
+      },
+      "nameVisible": true,
+      "name": "Refresh sessions once",
+      "steps": [
+        false
+      ],
+      "code": [
+        {
+          "scrolls": true,
+          "inside": true
+        }
+      ],
+      "composerFits": true,
+      "docOverflow": false,
+      "scrollOverflow": false
+    },
+    {
+      "theme": "Overseer Dark",
+      "target": 480,
+      "width": 484,
+      "audit": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 484
+      },
+      "nameVisible": true,
+      "name": "Refresh sessions once",
+      "steps": [
+        false
+      ],
+      "code": [
+        {
+          "scrolls": true,
+          "inside": true
+        }
+      ],
+      "composerFits": true,
+      "docOverflow": false,
+      "scrollOverflow": false
+    },
+    {
+      "theme": "Overseer Dark",
+      "target": 360,
+      "width": 371,
+      "audit": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 371
+      },
+      "nameVisible": true,
+      "name": "Refresh sessions once",
+      "steps": [
+        false
+      ],
+      "code": [
+        {
+          "scrolls": true,
+          "inside": true
+        }
+      ],
+      "composerFits": true,
+      "docOverflow": false,
+      "scrollOverflow": false
+    },
+    {
+      "theme": "Overseer Light",
+      "target": 640,
+      "width": 647,
+      "audit": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 647
+      },
+      "nameVisible": true,
+      "name": "Refresh sessions once",
+      "steps": [
+        false
+      ],
+      "code": [
+        {
+          "scrolls": true,
+          "inside": true
+        }
+      ],
+      "composerFits": true,
+      "docOverflow": false,
+      "scrollOverflow": false
+    },
+    {
+      "theme": "Overseer Light",
+      "target": 480,
+      "width": 483,
+      "audit": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 483
+      },
+      "nameVisible": true,
+      "name": "Refresh sessions once",
+      "steps": [
+        false
+      ],
+      "code": [
+        {
+          "scrolls": true,
+          "inside": true
+        }
+      ],
+      "composerFits": true,
+      "docOverflow": false,
+      "scrollOverflow": false
+    },
+    {
+      "theme": "Overseer Light",
+      "target": 360,
+      "width": 373,
+      "audit": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 373
+      },
+      "nameVisible": true,
+      "name": "Refresh sessions once",
+      "steps": [
+        false
+      ],
+      "code": [
+        {
+          "scrolls": true,
+          "inside": true
+        }
+      ],
+      "composerFits": true,
+      "docOverflow": false,
+      "scrollOverflow": false
+    }
+  ]
+}

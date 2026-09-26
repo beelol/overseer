@@ -15,6 +15,12 @@
 .chat-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scroll-behavior: auto; }
 .chat-column { max-width: calc(var(--ov-chat-column) + 2 * var(--ov-chat-gutter)); margin: 0 auto; padding: var(--ov-space-6) var(--ov-chat-gutter) var(--ov-space-4); }
 @media (max-width: 560px) { .chat-column { padding-left: var(--ov-chat-gutter-narrow); padding-right: var(--ov-chat-gutter-narrow); } }
+/* Beside a diff (AC-77): the name wins. Review and Files move into More; the title may wrap once. */
+@media (max-width: 480px) {
+  .chat-head #review, .chat-head #files-toggle { display: none; }
+  .chat-head { height: auto; min-height: 48px; padding-top: 6px; padding-bottom: 6px; }
+  .chat-head h1 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
+}
 .details-panel { margin: 0 0 var(--ov-space-4); padding: var(--ov-space-3) var(--ov-space-4); border-radius: var(--ov-radius-card); background: var(--ov-raised); border: 1px solid var(--ov-border); font-size: var(--ov-font-sm); }
 .details-panel dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px var(--ov-space-4); margin: 0; }
 .details-panel dt { color: var(--ov-muted); }

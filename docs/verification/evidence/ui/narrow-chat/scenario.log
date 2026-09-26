@@ -1,0 +1,13 @@
+[2026-09-26T20:01:53.047Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T20:02:06.633Z] screenshot docs/verification/evidence/ui/narrow-chat/01-chat-dark-640.png
+[2026-09-26T20:02:11.842Z] screenshot docs/verification/evidence/ui/narrow-chat/02-chat-dark-480.png
+[2026-09-26T20:02:17.080Z] screenshot docs/verification/evidence/ui/narrow-chat/03-chat-dark-360.png
+[2026-09-26T20:02:23.899Z] screenshot docs/verification/evidence/ui/narrow-chat/04-chat-light-640.png
+[2026-09-26T20:02:29.196Z] screenshot docs/verification/evidence/ui/narrow-chat/05-chat-light-480.png
+[2026-09-26T20:02:34.510Z] screenshot docs/verification/evidence/ui/narrow-chat/06-chat-light-360.png
+[2026-09-26T20:02:34.521Z] audits [{"theme":"Overseer Dark","target":640,"width":647,"overflow":[],"longRuns":0,"nameVisible":true,"steps":[false],"docOverflow":false},{"theme":"Overseer Dark","target":480,"width":484,"overflow":[],"longRuns":0,"nameVisible":true,"steps":[false],"docOverflow":false},{"theme":"Overseer Dark","target":360,"width":371,"overflow":[],"longRuns":0,"nameVisible":true,"steps":[false],"docOverflow":false},{"theme":"Overseer Light","target":640,"width":647,"overflow":[],"longRuns":0,"nameVisible":true,"steps":[false],"docOverflow":false},{"theme":"Overseer Light","target":480,"width":483,"overflow":[],"longRuns":0,"nameVisible":true,"steps":[false],"docOverflow":false},{"theme":"Overseer Light","target":360,"width":373,"overflow":[],"longRuns":0,"nameVisible":true,"steps":[false],"docOverflow":false}]
+[2026-09-26T20:02:34.522Z] PASS the chat measured about 640, 480 and 360 px wide (360 is the floor) [[640,647],[480,484],[360,371],[640,647],[480,483],[360,373]]
+[2026-09-26T20:02:34.522Z] PASS nothing in the chat overflows sideways at any width, in both themes [["Overseer Dark",640,false,false,[]],["Overseer Dark",480,false,false,[]],["Overseer Dark",360,false,false,[]],["Overseer Light",640,false,false,[]],["Overseer Light",480,false,false,[]],["Overseer Light",360,false,false,[]]]
+[2026-09-26T20:02:34.522Z] PASS no text run over 80 characters outside code [[],[],[],[],[],[]]
+[2026-09-26T20:02:34.522Z] PASS the header keeps the agent's name fully readable [[640,true],[480,true],[360,true],[640,true],[480,true],[360,true]]
+[2026-09-26T20:02:34.522Z] PASS tool steps stay folded; code blocks scroll sideways inside themselves; the composer fits [[640,[false],[{"scrolls":true,"inside":true}],true],[480,[false],[{"scrolls":true,"inside":true}],true],[360,[false],[{"scrolls":true,"inside":true}],true],[640,[false],[{"scrolls":true,"inside":true}],true],[480,[false],[{"scrolls":true,"inside":true}],true],[360,[false],[{"scrolls":true,"inside":true}],true]]
