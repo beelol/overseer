@@ -439,7 +439,7 @@
         "daemon/src/swarm/runtime.rs",
         "docs/verification/swarm/SWARM-51.md"
       ],
-      "blocker": "A disconnected supervised worker now stays unknown with its attempt and reservation held, but separate silence/reachability sampling, a 60-second threshold, live dead-process reconciliation and progress-spam deadlines remain unverified."
+      "blocker": "The daemon now samples bounded local worker reachability and preserves a durable 60-second suspect-to-unknown transition without treating output silence as death. A real prolonged transport outage/recovery, confirmed dead-process reconciliation, full progress-spam deadline checks and live harness qualification remain unverified."
     },
     "SWARM-52": {
       "status": "unverified",
