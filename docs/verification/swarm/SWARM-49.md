@@ -8,6 +8,8 @@ Expected: routine progress is capped and deduplicated before director inference;
 
 Actual: `swarm.admit` returns `director_inbox_full` for the second job, and the first job's terminal result changes it to `submitted`. The existing broker test also rejects a 1,001st routine message and accepts a terminal result at capacity. The focused test initially failed because the second admission succeeded; it passed after the admission gate was added. The workspace suite passed with 67 tests at revision `042b3e5`.
 
+Follow-up revision `a0ef330`: `stop_is_not_starved_by_two_thousand_duplicate_progress_replays` sends 2,000 duplicate progress envelopes over real local daemon socket connections while issuing Stop after the flood has begun. Every replay receives a duplicate receipt, the director inbox retains one event, and Stop returns `stopping` within the RFC's two-second bound. The full offline Rust suite passed 178 non-ignored tests. This measures the local fixture machine and does not qualify a live director model's context behavior.
+
 Evidence: `daemon/tests/swarm_admission.rs`, `daemon/tests/swarm_broker.rs`, `docs/verification/swarm/milestone-9.md`.
 
-Remaining: malformed permission cases, live director inference/context limits, and measured Stop responsiveness are unverified.
+Remaining: malformed permission cases and live director inference/context limits remain unverified. Stop responsiveness under this local duplicate flood is covered; broader load behavior is not.

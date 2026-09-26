@@ -379,7 +379,7 @@
         "docs/verification/swarm/milestone-15.md",
         "docs/verification/swarm/SWARM-42.md"
       ],
-      "blocker": "Stable-ID dedupe, restart replay, stale generation checks and late finished-attempt result isolation pass; live dispatch/accounting and broader delayed/reordered message traces remain untested."
+      "blocker": "Stable-ID dedupe, terminal exact-receipt replay after restart, stale generation checks and late finished-attempt result isolation pass; live dispatch/accounting and broader delayed/reordered message traces remain untested."
     },
     "SWARM-43": {
       "status": "partial",
@@ -451,7 +451,7 @@
         "docs/verification/swarm/milestone-9.md",
         "docs/verification/swarm/SWARM-49.md"
       ],
-      "blocker": "Payload and inbox bounds, dedupe, bounded director batches, admission hold at a full inbox, and terminal report persistence pass in fixtures; live inference/context controls, malformed permission cases and Stop latency remain unverified."
+      "blocker": "Payload and inbox bounds, dedupe of 2,000 local-socket replays, Stop under two seconds during that flood, bounded director batches, admission hold at a full inbox, and terminal report persistence pass in fixtures; live inference/context controls and malformed permission cases remain unverified."
     },
     "SWARM-50": {
       "status": "partial",
@@ -472,7 +472,7 @@
         "daemon/src/swarm/runtime.rs",
         "docs/verification/swarm/SWARM-51.md"
       ],
-      "blocker": "Local supervised fixtures now distinguish output silence, interrupted transport, disconnected/unconfirmed exit, progress spam, crash between job-timeout persistence and interrupt, and a worker ignoring the first signal. Confirmed exit keeps the reservation binding as uncertain. A 60-second wall-clock outage, late launch/review race, worker ignoring all escalation, shared usage settlement, and qualified live harness behavior remain unverified."
+      "blocker": "Local supervised fixtures now distinguish output silence, interrupted transport, disconnected/unconfirmed exit, prompt suspect retry, progress spam, crash between job-timeout persistence and interrupt, and a worker ignoring the first signal. Confirmed exit keeps the reservation binding as uncertain. A 60-second wall-clock outage, late launch/review race, worker ignoring all escalation, shared usage settlement, and qualified live harness behavior remain unverified."
     },
     "SWARM-52": {
       "status": "partial",
