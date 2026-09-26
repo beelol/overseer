@@ -73,6 +73,7 @@ fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
         "id": row.get::<_, String>("id")?,
         "category": row.get::<_, String>("category")?,
         "objective": row.get::<_, String>("objective")?,
+        "source_change_permission": row.get::<_, String>("source_change_permission")?,
         "status": row.get::<_, String>("status")?,
         "stop_reason": row.get::<_, Option<String>>("stop_reason")?,
         "stalled_from": row.get::<_, Option<String>>("stalled_from")?,
@@ -96,6 +97,13 @@ pub fn create(store: &mut Store, p: &Value) -> Result<Value> {
     {
         bail!("category or objective is empty or too long");
     }
+    let source_change_permission = p.get("source_change_permission")
+        .map(Value::as_str)
+        .unwrap_or(Some("none"))
+        .ok_or_else(|| anyhow!("invalid source change permission"))?;
+    if !["none", "isolated"].contains(&source_change_permission) {
+        bail!("invalid source change permission");
+    }
     let key = category.to_lowercase();
     let occupied: bool = store.conn.query_row(
         "SELECT 1 FROM swarm_runs WHERE category_key=?1 AND status IN ('planning','running','paused','stalled','draining','stopping') LIMIT 1",
@@ -108,8 +116,8 @@ pub fn create(store: &mut Store, p: &Value) -> Result<Value> {
     let id = format!("sw-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
     let now = crate::daemon::now();
     store.conn.execute(
-        "INSERT INTO swarm_runs(id,category,category_key,objective,status,generation,revision,allowed_targets,policy,created_ms,updated_ms) VALUES(?1,?2,?3,?4,'planning',1,0,?5,?6,?7,?7)",
-        params![id,category,key,objective,targets.to_string(),policy.to_string(),now],
+        "INSERT INTO swarm_runs(id,category,category_key,objective,source_change_permission,status,generation,revision,allowed_targets,policy,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,'planning',1,0,?6,?7,?8,?8)",
+        params![id,category,key,objective,source_change_permission,targets.to_string(),policy.to_string(),now],
     )?;
     get(store, &id)
 }

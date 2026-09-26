@@ -43,6 +43,60 @@ fn accepted_patch(d: &Daemon, run: &str, job: &str, artifact: &str, patch: &str)
 }
 
 #[test]
+fn audit_only_run_cannot_integrate_a_worker_patch() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("audit-source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "unauthorized change\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let before = fingerprint(&checkout);
+    assert!(d
+        .try_call(
+            "swarm.create",
+            json!({"category":"Invalid source permission",
+        "objective":"Audit", "allowed_targets":["system-codex"],
+        "source_change_permission":"current_checkout"})
+        )
+        .unwrap_err()
+        .contains("invalid source change permission"));
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Audit-only source guard",
+        "objective":"Audit a.txt without changing application code",
+        "allowed_targets":["system-codex"]}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+        "source_change_permission":"isolated",
+        "jobs":[{"id":"audit","title":"Inspect a.txt","acceptance":"finding","deps":[]}]}),
+    );
+    accepted_patch(&d, run, "audit", "unauthorized-patch", &patch);
+    d.kill9();
+    d.spawn();
+    let error = d
+        .try_call(
+            "swarm.integrate",
+            json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"audit","artifact_id":"unauthorized-patch",
+        "repo":checkout,"base_revision":base}),
+        )
+        .unwrap_err();
+    assert!(
+        error.contains("source changes are not permitted"),
+        "{error}"
+    );
+    assert_eq!(fingerprint(&checkout), before);
+    assert_eq!(
+        d.call("swarm.get", json!({"id":run}))["source_change_permission"],
+        "none"
+    );
+}
+
+#[test]
 fn accepted_patch_integrates_in_isolated_workspace_without_touching_checkout() {
     let d = Daemon::start(&[]);
     let t = tmp();
@@ -58,7 +112,7 @@ fn accepted_patch_integrates_in_isolated_workspace_without_touching_checkout() {
         "swarm.create",
         json!({
             "category":"Integration fixture","objective":"Change a.txt",
-            "allowed_targets":["system-codex"]
+            "allowed_targets":["system-codex"],"source_change_permission":"isolated"
         }),
     );
     let run = made["id"].as_str().unwrap();
@@ -99,7 +153,7 @@ fn source_commit_change_blocks_stale_patch_integration() {
         "swarm.create",
         json!({
             "category":"Stale integration fixture","objective":"Change a.txt",
-            "allowed_targets":["system-codex"]
+            "allowed_targets":["system-codex"],"source_change_permission":"isolated"
         }),
     );
     let run = made["id"].as_str().unwrap();
@@ -143,7 +197,7 @@ fn dependent_job_waits_for_accepted_patch_to_integrate() {
         "swarm.create",
         json!({
             "category":"Dependency integration fixture","objective":"Change contract",
-            "allowed_targets":["system-codex"]
+            "allowed_targets":["system-codex"],"source_change_permission":"isolated"
         }),
     );
     let run = made["id"].as_str().unwrap();
@@ -193,7 +247,7 @@ fn completion_rejects_an_accepted_but_unintegrated_patch() {
         "swarm.create",
         json!({
             "category":"Completion integration fixture","objective":"Change a.txt",
-            "allowed_targets":["system-codex"]
+            "allowed_targets":["system-codex"],"source_change_permission":"isolated"
         }),
     );
     let run = made["id"].as_str().unwrap();
@@ -244,7 +298,7 @@ fn conflicting_accepted_patches_preserve_first_commit_and_second_artifact() {
     let made = d.call(
         "swarm.create",
         json!({"category":"Conflict integration fixture",
-        "objective":"Change a.txt","allowed_targets":["system-codex"]}),
+        "objective":"Change a.txt","allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
     );
     let run = made["id"].as_str().unwrap();
     d.call(
@@ -306,7 +360,7 @@ fn active_repository_commit_hook_blocks_integration_without_running() {
     let made = d.call(
         "swarm.create",
         json!({"category":"Commit hook fixture",
-        "objective":"Change a.txt","allowed_targets":["system-codex"]}),
+        "objective":"Change a.txt","allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
     );
     let run = made["id"].as_str().unwrap();
     d.call(
@@ -354,7 +408,7 @@ fn interrupted_integration_recovers_without_a_second_commit() {
             "swarm.create",
             json!({
                 "category":"Recovery fixture", "objective":"Change a.txt",
-                "allowed_targets":["system-codex"]
+                "allowed_targets":["system-codex"],"source_change_permission":"isolated"
             }),
         );
         let run = made["id"].as_str().unwrap();
@@ -435,7 +489,7 @@ fn interrupted_integration_rejects_unexpected_workspace_edits() {
     let made = d.call(
         "swarm.create",
         json!({"category":"Tamper fixture",
-        "objective":"Change a.txt","allowed_targets":["system-codex"]}),
+        "objective":"Change a.txt","allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
     );
     let run = made["id"].as_str().unwrap();
     d.call(
@@ -509,7 +563,7 @@ fn individually_accepted_patches_cannot_complete_after_combined_check_fails() {
     let made = d.call(
         "swarm.create",
         json!({"category":"Combined verification fixture",
-        "objective":"Change two modules", "allowed_targets":["system-codex"]}),
+        "objective":"Change two modules", "allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
     );
     let run = made["id"].as_str().unwrap();
     d.call(
@@ -585,7 +639,7 @@ fn completion_requires_a_current_passed_combined_check() {
     let made = d.call(
         "swarm.create",
         json!({"category":"Passing combined check",
-        "objective":"Change a.txt", "allowed_targets":["system-codex"]}),
+        "objective":"Change a.txt", "allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
     );
     let run = made["id"].as_str().unwrap();
     d.call(
@@ -655,7 +709,7 @@ fn stop_remains_responsive_while_combined_checker_is_running() {
     let made = d.call(
         "swarm.create",
         json!({"category":"Responsive verification",
-        "objective":"Check a.txt", "allowed_targets":["system-codex"]}),
+        "objective":"Check a.txt", "allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
     );
     let run = made["id"].as_str().unwrap();
     d.call(

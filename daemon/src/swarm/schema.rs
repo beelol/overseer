@@ -9,6 +9,8 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           category TEXT NOT NULL,
           category_key TEXT NOT NULL,
           objective TEXT NOT NULL,
+          source_change_permission TEXT NOT NULL DEFAULT 'none'
+            CHECK(source_change_permission IN ('none','isolated')),
           status TEXT NOT NULL,
           stop_reason TEXT,
           stalled_from TEXT,
@@ -363,6 +365,16 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     if !has_stop_reason {
         conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN stop_reason TEXT;")?;
     }
+    let has_source_change_permission = conn
+        .prepare(
+            "SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='source_change_permission'",
+        )?
+        .exists([])?;
+    if !has_source_change_permission {
+        // An old run has no durable grant to change source, even if its objective
+        // happens to describe implementation work.
+        conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN source_change_permission TEXT NOT NULL DEFAULT 'none' CHECK(source_change_permission IN ('none','isolated'));")?;
+    }
     let has_stalled_from = conn
         .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='stalled_from'")?
         .exists([])?;
@@ -446,6 +458,28 @@ pub fn migrate(conn: &Connection) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_swarm_runs_do_not_inherit_source_change_permission() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE swarm_runs(
+                id TEXT PRIMARY KEY,category TEXT NOT NULL,category_key TEXT NOT NULL,
+                objective TEXT NOT NULL,status TEXT NOT NULL,generation INTEGER NOT NULL,
+                revision INTEGER NOT NULL,allowed_targets TEXT NOT NULL,policy TEXT NOT NULL,
+                created_ms INTEGER NOT NULL,updated_ms INTEGER NOT NULL);
+             INSERT INTO swarm_runs VALUES('old-run','Audit','audit','Inspect only',
+                'running',1,1,'[]','{}',1,1);",
+        )
+        .unwrap();
+        migrate(&conn).unwrap();
+        let permission: String = conn.query_row(
+            "SELECT source_change_permission FROM swarm_runs WHERE id='old-run'",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(permission, "none");
+        migrate(&conn).unwrap();
+    }
 
     #[test]
     fn old_availability_rows_fail_closed_during_migration() {

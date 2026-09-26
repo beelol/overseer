@@ -312,6 +312,7 @@ pub fn worker_brief(store: &Store, p: &Value) -> Result<Value> {
     }
     let deps: Value = serde_json::from_str(&deps)?;
     let mut result = json!({"run_id":run,"category":current["category"],"objective":current["objective"],
+        "source_change_permission":current["source_change_permission"],
         "plan_revision":job_revision,"target_id":target,"job":{"id":job,"title":title,
         "acceptance":acceptance,"deps":deps},"artifacts":[]});
     if result.to_string().len() > limit {

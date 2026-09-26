@@ -120,7 +120,7 @@ fn catalog_s3_twenty_four_patches_need_a_combined_cursor_check() {
         "swarm.create",
         json!({"category":"Catalog migration S3",
         "objective":"Migrate 24 endpoints to stable cursor pagination",
-        "allowed_targets":["system-codex"]}),
+        "allowed_targets":["system-codex"],"source_change_permission":"isolated"}),
     );
     let run = made["id"].as_str().unwrap();
     let mut jobs = vec![json!({"id":"contract","title":"Cursor contract",

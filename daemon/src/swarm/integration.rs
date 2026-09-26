@@ -123,6 +123,9 @@ pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
     if ["stopping", "stopped", "stalled"].contains(&current["status"].as_str().unwrap_or("")) {
         bail!("run cannot integrate in this state");
     }
+    if current["source_change_permission"] != "isolated" {
+        bail!("source changes are not permitted for this run");
+    }
     let root = git::toplevel(repo)?;
     if root != std::fs::canonicalize(repo)? {
         bail!("integration repo must be its root");
