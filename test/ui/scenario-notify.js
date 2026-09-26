@@ -79,6 +79,9 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}
   } finally {
+    // Unregister this test's temporary copy of the notifier from LaunchServices (it shares the
+    // real app's bundle id; stale copies confuse macOS about which app "Overseer" is).
+    try { const ext = fs.readdirSync(s.extensions).find(d => d.startsWith('beelol.overseer')); cp.spawnSync('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister', ['-u', path.join(s.extensions, ext, 'bin', 'Overseer Notifier.app')]); } catch {}
     s.writeLog();
     fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
     if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }
