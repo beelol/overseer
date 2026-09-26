@@ -16,4 +16,6 @@ Follow-up at `14faa93`: accepted patch artifacts apply in an Overseer-owned inte
 
 Follow-up at `fca22c0`: fixture interruptions after patch application and after Git commit recover in the integration worktree after daemon restart, without a duplicate commit or source checkout mutation. Unexpected workspace edits block recovery. The eight focused integration tests and the 168-test offline Rust suite passed.
 
-Remaining: no combined result/check or director conflict resolution was tested. The fixture does not simulate unsaved editor buffers, service-side writes, or all normal launch paths. Keep the RFC box unchecked.
+Follow-up at `089df35`: two reviewed patches each pass a fixture checker alone, but the checker fails on their combined integration tree; final completion remains blocked and both patches remain in the isolated worktree. A current passed check permits completion in a separate fixture. No source checkout mutation occurs.
+
+Remaining: no full S3 migration or director conflict resolution was tested. The fixture does not simulate unsaved editor buffers, service-side writes, or all normal launch paths. Keep the RFC box unchecked.

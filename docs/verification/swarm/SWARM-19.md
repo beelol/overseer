@@ -1,6 +1,6 @@
 # SWARM-19 — integration and combined verification
 
-Status: partial. Revisions: `14faa93`, `fca22c0`. Fixture version: local Git repositories with scripted Swarm review and exit APIs; no provider account or live service.
+Status: partial. Revisions: `14faa93`, `fca22c0`, `089df35`. Fixture version: local Git repositories with scripted Swarm review and exit APIs; no provider account or live service.
 
 Input: submit an accepted `patch` artifact from a worker, confirm its exit, and request integration against the pinned source commit. A second fixture gives two accepted workers conflicting edits to the same file. A third requests final completion before the accepted patch is integrated.
 
@@ -10,6 +10,8 @@ Actual: `swarm.integrate` creates an Overseer-owned worktree, applies the accept
 
 Follow-up at `fca22c0`: before applying a patch, integration records its artifact digest, prior commit and expected Git tree in SQLite. A fixture interruption after applying but before committing, and one after committing but before SQLite acknowledgement, were red against the earlier implementation. After daemon restart, replay either verifies the staged tree and makes one commit, or verifies the already-made commit's parent, tree and message and acknowledges that commit. A moved source HEAD does not prevent reconciliation of an already-recorded intent. An unexpected edit in the integration worktree blocks replay; no artifact is marked integrated. Two new integration tests bring the focused file to eight tests and the full offline Rust suite to 168 tests. The integration path remains fixture-only.
 
+Follow-up at `089df35`: two independent fixture patches each pass the same local checker alone. After the first patch integrates, the combined checker passes and binds that verdict to its commit. After the second integrates, the checker fails on the combined tree; the earlier pass cannot complete the run. A separate fixture shows completion rejected before a check and accepted after a pass on the current commit; changing the checker file invalidates the pass until restored. A two-second slow checker leaves Stop responsive and rejects an overlapping check. The first focused test was red for the absent `swarm.verify` method. Eleven focused integration tests and the 171-test offline Rust suite passed. The configured checker is a fixture-only executable selected by the test environment, with no worker-supplied command.
+
 Replay: `cargo test --offline -p overseerd --test swarm_integration -- --nocapture` and `cargo test --workspace --offline -q`.
 
 Evidence: `daemon/tests/swarm_integration.rs`, `daemon/src/swarm/integration.rs`, `daemon/src/swarm/artifacts.rs`, `daemon/src/swarm/completion.rs`, `daemon/src/swarm/schema.rs`.
@@ -18,4 +20,4 @@ Ruling: keep `swarm.integrate` fixture-only until live adapter authority and per
 
 Ruling: reject repositories with active Git commit hooks during unattended integration — this avoids running an unreviewed hook from the source repository; the cost is that such repositories need a supported, reviewed integration path before this feature works there.
 
-Remaining: no combined build/test check runs on the integrated tree. Patch conflicts have no director resolution flow. Hook detection has a race against external hook changes. Live adapter permissions, unsaved buffers and service-side writes remain unqualified. This criterion stays unchecked.
+Remaining: no versioned S3 backend migration or full combined build/test suite is replayed. A verifier attempt left `running` by daemon death requires reconciliation before another check; the fixture checker is not a qualified live execution sandbox. Patch conflicts have no director resolution flow. Hook detection has a race against external hook changes. Live adapter permissions, unsaved buffers and service-side writes remain unqualified. This criterion stays unchecked.
