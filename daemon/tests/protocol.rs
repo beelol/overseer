@@ -16,6 +16,24 @@ fn fixture(name: &str) -> String {
     repo_root().join("fixtures").join(name).display().to_string()
 }
 
+#[test]
+fn auto_disabled_preserves_manual_create_follow_up_and_interrupt() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let created = d.generic(&repo, "worktree", "/bin/sh", &["-c", "cat >> input.txt"]);
+    let run = run_id(&created);
+    d.wait_status(&run, |status| status == "running", 10);
+    d.call("run.follow_up", json!({"run_id":run,"prompt":"manual continuation"}));
+    assert_eq!(d.call("run.turns", json!({"run_id":run})).as_array().unwrap().len(), 2);
+    d.call("run.interrupt", json!({"run_id":run}));
+    assert_eq!(d.wait_done(&run, 15)["status"], "interrupted");
+    assert_eq!(std::fs::read_to_string(ws_path(&d, &created).join("input.txt")).unwrap(),
+        "manual continuation\n");
+    assert_eq!(d.runs().len(), 1, "manual routing must not create an Auto child");
+    assert!(!d.events(&run).iter().any(|event| event["kind"] == "auto_decision"));
+}
+
 // ---------------------------------------------------------------- AC-05 / AC-07
 
 #[test]
