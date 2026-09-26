@@ -1808,7 +1808,7 @@ fn auto_claude_account_change_before_child_turn_pauses_without_a_model_call() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let counter = r.path().join("claude-auth-count");
-    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
         ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
         ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_AUTH_COUNTER_FILE"),
         ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "prose"),
@@ -1816,15 +1816,23 @@ fn auto_claude_account_change_before_child_turn_pauses_without_a_model_call() {
     let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
         "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
-    let outcome = d.call("auto.dispatch", json!({"work_unit_id":"cross-claude-switch-1",
+    let request = json!({"work_unit_id":"cross-claude-switch-1",
         "parent_run_id":parent,"min_tier":"general","required_tools":[],
-        "allowed_profiles":["system-claude"],"prompt":"safe bounded result"}));
+        "allowed_profiles":["system-claude"],"prompt":"safe bounded result"});
+    let outcome = d.call("auto.dispatch", request.clone());
     assert_eq!(outcome["state"], "paused", "{outcome}");
     assert_eq!(outcome["run"]["status"], "failed");
     assert_eq!(std::fs::read_to_string(&counter).unwrap(), "2");
     let child_id = run_id(&outcome);
     assert!(!d.events(&child_id).iter().any(|event| event["kind"] == "turn_started"),
         "a changed account must be caught before Claude starts a model turn");
+    d.kill9();
+    d.spawn();
+    let replay = d.call("auto.dispatch", request);
+    assert_eq!(replay["state"], "paused");
+    assert_eq!(replay["run"]["id"], child_id);
+    assert!(replay["actions"].as_array().is_some_and(|actions| actions.contains(&json!("refresh"))));
+    assert_eq!(d.runs().len(), 2, "reconnecting must not create a second child");
 }
 
 #[test]

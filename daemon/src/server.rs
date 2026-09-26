@@ -351,9 +351,13 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let route_id = format!("{}/{}/{}", child.profile_id.as_deref().unwrap_or("unknown"),
                     child.model.as_deref().unwrap_or("unknown"), child.effort.as_deref().unwrap_or("unknown"));
                 let replay_state = if child.status == "failed" { "paused" } else { "dispatched" };
-                json!({"state":replay_state,"work_unit_id":work_unit_id,"run":child,
+                let mut replay = json!({"state":replay_state,"work_unit_id":work_unit_id,"run":child,
                     "workspace":d.workspace(&child.workspace_id)?,"replayed":true,
-                    "decision":{"work_unit_id":work_unit_id,"selected":route_id,"exclusions":[],"reason":"replayed_existing_work_unit"}})
+                    "decision":{"work_unit_id":work_unit_id,"selected":route_id,"exclusions":[],"reason":"replayed_existing_work_unit"}});
+                if replay_state == "paused" {
+                    replay["actions"] = json!(["refresh", "choose_manual_route"]);
+                }
+                replay
             } else {
                 let mut routes = Vec::new();
                 let mut evidence = Vec::new();
