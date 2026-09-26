@@ -1,0 +1,356 @@
+{
+  "base_commit": "19edf57ca4c30b0b4788b5416bb5d949a2cdff6c",
+  "rfc_sha256": {
+    "swarm-mode.md": "7e5d0d63d2a94e41e5764ac5dce374544f3e349b6afa58226330adfa55645dce",
+    "swarm-mode-scenarios.md": "c937732f9053bd16ab92cd6968ed5b30837e7e01947f90e1f46d614b2c58a9cc",
+    "swarm-mode-goal.md": "fb1bcf183e39e2edeb27b6d5f641eb8daf639bbaf271f5a4afbc15bcb01de08a"
+  },
+  "criteria": {
+    "SWARM-01": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-02": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-03": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-04": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-05": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-06": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-07": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-08": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-09": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-10": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-11": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-12": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-13": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-14": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-15": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-16": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-17": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-18": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-19": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-20": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-21": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-22": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-23": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-24": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-25": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-26": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-27": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-28": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-29": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-30": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-31": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-32": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-33": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-34": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-35": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-36": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-37": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-38": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-39": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-40": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-41": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-42": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-43": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-44": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-45": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-46": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-47": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-48": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-49": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-50": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-51": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-52": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-53": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-54": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-55": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-56": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-57": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-58": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-59": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-60": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-61": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-62": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-63": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    },
+    "SWARM-64": {
+      "status": "unverified",
+      "evidence": [],
+      "blocker": null
+    }
+  },
+  "scenarios": {
+    "S0": {
+      "status": "unverified",
+      "evidence": []
+    },
+    "S1": {
+      "status": "unverified",
+      "evidence": []
+    },
+    "S2": {
+      "status": "unverified",
+      "evidence": []
+    },
+    "S3": {
+      "status": "unverified",
+      "evidence": []
+    },
+    "S4": {
+      "status": "unverified",
+      "evidence": []
+    },
+    "S5": {
+      "status": "unverified",
+      "evidence": []
+    }
+  }
+}
