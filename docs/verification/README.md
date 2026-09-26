@@ -71,6 +71,6 @@ criteria on regressions. Keep README's verified count synchronized in the same u
 ## Audit notes (handoff)
 
 - Verified: 58 / 66 (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-11, AC-12, AC-13, AC-14, AC-15, AC-16, AC-17, AC-18, AC-19, AC-20, AC-21, AC-22, AC-23, AC-24, AC-25, AC-26, AC-27, AC-28, AC-29, AC-30, AC-31, AC-32, AC-33, AC-34, AC-35, AC-36, AC-37, AC-38, AC-39, AC-40, AC-42, AC-43, AC-44, AC-45, AC-46, AC-47, AC-48, AC-49, AC-50, AC-51, AC-52, AC-54, AC-55, AC-56, AC-57, AC-61, AC-63, AC-65).
-- Partial (box unchecked): 5 (AC-53, AC-58, AC-59, AC-60, AC-62).
+- Partial (box unchecked): 6 (AC-53, AC-58, AC-59, AC-60, AC-62, AC-66).
 - Not verified: AC-41, AC-53, AC-58, AC-59, AC-60, AC-62, AC-64, AC-66 — each record states the exact blocker and next action.
 - Every verified record was re-read against its evidence folder/test before checking; anything that relied only on fixtures where the criterion demands live evidence stays unchecked.

@@ -5,7 +5,7 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **58 / 66** · **5** partial (see [ledger](docs/verification/README.md)). Unverified:
+criteria: **58 / 66** · **6** partial (see [ledger](docs/verification/README.md)). Unverified:
 AC-41, AC-53, AC-58, AC-59, AC-60, AC-62, AC-64, AC-66. The biggest gaps are the daily-driver UI (Gate J, AC-54 to AC-66, added by the
 owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
@@ -84,7 +84,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-63** History that stays tidy — [evidence](docs/verification/AC-63.md)
 - [ ] **AC-64** Default-to-Overseer session (owner-confirmed) — owner session after the rest of Gate J — [evidence](docs/verification/AC-64.md)
 - [x] **AC-65** Provider logos — [evidence](docs/verification/AC-65.md)
-- [ ] **AC-66** Design review against references (owner-confirmed) — owner design review after the Gate J build — [evidence](docs/verification/AC-66.md)
+- [ ] **AC-66** Design review against references (owner-confirmed) — ◐ partial: the references are studied and what Overseer adopts is written down (docs/design/references.md, the RFC's "What Overseer adopts"); the review page shows every view before and after in both Overseer themes and a stock theme, plus the new views (chat, live chats, grid, dashboard mode, composer, Needs you, history, usage, themes and logos), with a Looks right / Needs work mark and a note per view saved for the owner / deferred: the owner's marks, the changes they ask for, and the owner's dated confirmation that the UI looks clean and polished — [evidence](docs/verification/AC-66.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -218,7 +218,7 @@ the owner action or decision each one needs.
 - [ ] [AC-60](docs/verification/AC-60.md) (Native-CLI parity for everyday use): Composer keyboard focus after the options menu (and the queue display). Next: keep focus in the prompt when the options menu closes, then rerun scenario-parity.js.
 - [ ] [AC-62](docs/verification/AC-62.md) (Usage and limits): Independent Codex comparison. Next: have the daemon include the raw token_count line it read in account.usage (no credentials), then compare it in the live scenario.
 - [ ] [AC-64](docs/verification/AC-64.md) (Default-to-Overseer session (owner-confirmed)): Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.
-- [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Owner action after the Gate J build: review the published before/after page, mark what is not right, and confirm once it is.
+- [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.

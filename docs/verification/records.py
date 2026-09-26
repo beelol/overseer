@@ -793,9 +793,17 @@ rec(62, "Usage and limits", "partial", commit="8bcac2f", date="2026-09-26",
 rec(64, "Default-to-Overseer session (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
     actual="Not started.", live="—", blocker="Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.")
-rec(66, "Design review against references (owner-confirmed)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Owner action after the Gate J build: review the published before/after page, mark what is not right, and confirm once it is.")
+rec(66, "Design review against references (owner-confirmed)", "partial", commit="5b41948", date="2026-09-26",
+    proven="the references are studied and what Overseer adopts is written down (docs/design/references.md, the RFC's \"What Overseer adopts\"); the review page shows every view before and after in both Overseer themes and a stock theme, plus the new views (chat, live chats, grid, dashboard mode, composer, Needs you, history, usage, themes and logos), with a Looks right / Needs work mark and a note per view saved for the owner",
+    deferred="the owner's marks, the changes they ask for, and the owner's dated confirmation that the UI looks clean and polished",
+    harness="—",
+    steps="""1. Study the RFC's references (web, read-only) and record what Overseer adopts ([references](../design/references.md), [RFC](../rfcs/orchestrator-ui.md#what-overseer-adopts-research-2026-09-26)).
+2. Publish the review page (a private claude.ai artifact, https://claude.ai/artifact/BX8zPJfgpAvtFvH5FEdXss) from the audit, scenario and live-session screenshots. Marks are stored in the page's own database (`marks/<view>`).""",
+    expected="The reference notes, the review page(s), the owner's marked items with their outcomes, and the owner's dated confirmation.",
+    actual="Reference notes and the review page exist. No marks yet (the owner reviews in the morning of 2026-09-26).",
+    evidence="[references](../design/references.md), [audit list](../design/audit.md), review page (private artifact linked above)",
+    live="—",
+    blocker="Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.")
 
 HEAD = """# AC-{n:02d} — {title}
 Status: {status}{partial}
