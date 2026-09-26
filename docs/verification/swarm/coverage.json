@@ -12,9 +12,13 @@
       "blocker": "Normal Auto/Manual \u00d7 Swarm launch paths and an opt-in UI are not wired; fixture planning cannot verify off-mode or one-agent fallback."
     },
     "SWARM-02": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "Saved allowlists are snapshotted, but live target discovery and permission-aware fallback or checkpoint transfer are absent."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_checkpoint.rs",
+        "daemon/tests/swarm_dispatch_incident.rs",
+        "docs/verification/swarm/SWARM-02.md"
+      ],
+      "blocker": "Fixture allowlists exclude a newly observed unselected account and require a destination-specific checkpoint grant before selected account B resumes. Live discovery/provider-context permissions, denied-only routing and ordinary fallback remain unverified."
     },
     "SWARM-03": {
       "status": "partial",
@@ -138,9 +142,14 @@
       "blocker": "Two fixture target routes now transition a failed supervised launch from ready to failed after the second attempt, retain the cap across revision, and block retry when an effect is unknown. Live routing and unchanged-state model-planning suppression remain unverified."
     },
     "SWARM-16": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "No live worker checkpoint transfer or external side-effect reconciliation exists; artifact persistence alone is insufficient."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_checkpoint.rs",
+        "daemon/tests/swarm_dispatch_incident.rs",
+        "docs/verification/swarm/SWARM-16.md",
+        "docs/verification/swarm/S4.md"
+      ],
+      "blocker": "A worker-authored checkpoint survives failure and daemon restart, is granted to another selected account and is revoked during replacement. Automatic recovery of accepted artifacts, a live account failure/harness handoff and joined side-effect reconciliation remain unverified."
     },
     "SWARM-17": {
       "status": "unverified",
@@ -542,9 +551,11 @@
       "evidence": [
         "daemon/tests/swarm_context.rs",
         "daemon/src/swarm/context.rs",
-        "docs/verification/swarm/SWARM-57.md"
+        "docs/verification/swarm/SWARM-57.md",
+        "daemon/tests/swarm_checkpoint.rs",
+        "docs/verification/swarm/S4.md"
       ],
-      "blocker": "Durable fixture destination grants transfer only accepted evidence to an admitted dependent target, survive restart, and yield to revocation. Revocation blocks context delivery and dependent admission, interrupts a linked worker, and retries after daemon crash while an unrelated worker remains active. Scripted Stop/revocation/result/acceptance orderings now pass. Live cross-target ACL/credential isolation, secret audits, peer bypass resistance, S4 bundle revocation replay and simultaneous native races remain unverified."
+      "blocker": "Durable grants and revocation protect accepted dependent evidence and a same-job S4-shaped checkpoint; revocation interrupts an active replacement and denies further context. Live cross-target ACL/credential isolation, raw-secret audits, peer bypass resistance, joined S4 revocation and simultaneous native races remain unverified."
     },
     "SWARM-58": {
       "status": "partial",
@@ -629,9 +640,11 @@
         "fixtures/swarm/ledgerpay-v1/test_session.py",
         "fixtures/swarm/dispatch-v1/",
         "daemon/tests/swarm_dispatch_incident.rs",
-        "docs/verification/swarm/S4.md"
+        "docs/verification/swarm/S4.md",
+        "daemon/tests/swarm_checkpoint.rs",
+        "docs/verification/swarm/SWARM-16.md"
       ],
-      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S4 links measured PostgreSQL pool starvation to three scoped findings, account-A worker failure, account-B attempt-2 checkpoint and a cautious completed report. Autonomous director/routing, real account outage and bundle permissions, complete fault/report traces, live communication and S0/S5 remain unverified."
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S4 links measured PostgreSQL pool starvation to three scoped findings, account-A worker failure, permission-gated durable account-B checkpoint and a cautious completed report; a focused replay covers restart and revocation. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0/S5 remain unverified."
     }
   },
   "scenarios": {
@@ -680,9 +693,10 @@
       "evidence": [
         "fixtures/swarm/dispatch-v1/",
         "daemon/tests/swarm_dispatch_incident.rs",
-        "docs/verification/swarm/S4.md"
+        "docs/verification/swarm/S4.md",
+        "daemon/tests/swarm_checkpoint.rs"
       ],
-      "blocker": "Versioned Go/PostgreSQL fixture and joined scripted three-worker replay now cover measured pool timeout, held transaction, queue redelivery, one failed L2 worker, attempt-2 checkpoint on another allowed target, cautious evidence-gated report, and no-qualified-target block after restart. Live Auto Mode outage routing, automatic checkpoint creation, cross-account bundle ACL/revocation and read-only harness enforcement remain unverified."
+      "blocker": "Versioned Go/PostgreSQL fixture and joined scripted three-worker replay cover measured pool timeout, held transaction, queue redelivery, failed L2 worker, permission-gated attempt-2 checkpoint on another allowed target, cautious evidence-gated report and no-qualified-target block after restart. A focused fixture covers grant/revocation across restart. Live Auto Mode outage routing, automatic checkpoint assembly, live cross-account ACL and read-only harness enforcement remain unverified."
     },
     "S5": {
       "status": "unverified",

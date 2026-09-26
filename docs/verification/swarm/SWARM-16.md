@@ -1,0 +1,7 @@
+# SWARM-16 — checkpoint recovery after worker failure
+
+Status: partial. Reproduce with `cargo test --offline -p overseerd --test swarm_checkpoint -q` and `./fixtures/swarm/dispatch-v1/run-swarm.sh`. See `daemon/tests/swarm_checkpoint.rs` and [S4](S4.md).
+
+A failed SQL worker stores a checkpoint artifact containing a sanitized trace, source reference and open question. Reconciliation confirms the worker failed and makes the same logical job ready. The artifact survives daemon restart. A replacement on a different selected account is blocked until the director grants that destination access; an unselected account and stale director generation cannot receive a grant. The replacement's worker brief lists the checkpoint and its context API returns the content. A second grant request is idempotent. Revocation during replacement stops delivery, interrupts the worker and blocks the job. The joined S4 Go/PostgreSQL replay uses this handoff on the second attempt while other scoped jobs continue.
+
+This transfers an artifact, not the original native session. The checkpoint is authored by the fixture worker, and the replay does not recover already accepted artifacts from a failed worker automatically. Side-effect reconciliation is exercised separately in `daemon/tests/swarm_effects.rs` and the S2 joined replay, not in this checkpoint handoff. Live provider/account outage routing and harness session recovery remain unverified. Keep the RFC box open.

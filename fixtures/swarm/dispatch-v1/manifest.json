@@ -10,6 +10,6 @@
   },
   "seeded_trace_id": "ship-trace-021",
   "seeded_fault": "retry wait holds the only pool connection while a shipment query times out",
-  "expected_handoff": "L2 account A fails after checkpoint; allowed account B receives source reference and question as attempt 2",
+  "expected_handoff": "L2 account A stores a checkpoint then fails; allowed account B is blocked until a destination grant, then reads the checkpoint as attempt 2",
   "expected_report": "timeline, plausible pool-starvation hypothesis, alternative causes, and unverified production assumptions"
 }

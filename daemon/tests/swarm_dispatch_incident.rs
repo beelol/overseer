@@ -155,6 +155,7 @@ fn shipment_incident_survives_sql_account_loss_with_two_attempts() {
     }
     let worker_note = json!({"traceId":bundle["request"]["traceId"],
         "source":"shipment.go:consumeWithRetry","question":"Does the retry hold the pool connection?"});
+    let checkpoint_content = json!({"note":worker_note,"sanitized_bundle":bundle}).to_string();
     d.call(
         "swarm.report",
         json!({"run_id":run,"job_id":"l1",
@@ -183,6 +184,13 @@ fn shipment_incident_survives_sql_account_loss_with_two_attempts() {
         "message_id":"s4-sql-checkpoint","type":"progress","revision":1,
         "payload":worker_note}),
     );
+    d.call(
+        "swarm.artifact.put",
+        json!({"run_id":run,"job_id":"l2",
+        "attempt_id":l2a["attempt_id"],"token":l2a["token"],
+        "artifact_id":"s4-checkpoint-bundle","source_revision":1,
+        "kind":"checkpoint","content":checkpoint_content}),
+    );
     let launched = d.call(
         "swarm.worker.launch",
         json!({"run_id":run,"job_id":"l2",
@@ -204,27 +212,39 @@ fn shipment_incident_survives_sql_account_loss_with_two_attempts() {
     let after = snapshot(at + 1000, false, true);
     let denied = admit(&d, run, "l2", "audit-a", &after, at + 1000, "s4-dead-a");
     assert_eq!(denied["status"], "blocked");
+    let no_bundle = admit(
+        &d,
+        run,
+        "l2",
+        "audit-b",
+        &after,
+        at + 1000,
+        "s4-l2b-before-grant",
+    );
+    assert_eq!(no_bundle["reason"], "checkpoint_permission_required");
+    let granted = d.call(
+        "swarm.context.grant",
+        json!({"run_id":run,
+        "generation":1,"revision":1,"artifact_id":"s4-checkpoint-bundle",
+        "target_id":"audit-b"}),
+    );
+    assert_eq!(granted["status"], "granted");
     let l2b = admit(&d, run, "l2", "audit-b", &after, at + 1000, "s4-l2b");
     assert_eq!(l2b["status"], "admitted", "{l2b}");
     assert_ne!(l2b["attempt_id"], l2a["attempt_id"]);
-    d.call(
-        "swarm.direct",
-        json!({"run_id":run,"generation":1,"revision":1,
-        "job_id":"l2","attempt_id":l2b["attempt_id"],"message_id":"s4-checkpoint-to-b",
-        "type":"checkpoint","payload":worker_note}),
+    let brief = d.call(
+        "swarm.worker.brief",
+        json!({"run_id":run,
+        "job_id":"l2","attempt_id":l2b["attempt_id"],"token":l2b["token"]}),
     );
+    assert_eq!(brief["artifacts"][0]["id"], "s4-checkpoint-bundle");
     let handoff = d.call(
-        "swarm.messages",
-        json!({"run_id":run,"recipient":l2b["attempt_id"]}),
+        "swarm.context.get",
+        json!({"run_id":run,
+        "job_id":"l2","attempt_id":l2b["attempt_id"],"token":l2b["token"],
+        "artifact_id":"s4-checkpoint-bundle"}),
     );
-    assert_eq!(
-        handoff["messages"][0]["payload"]["question"],
-        "Does the retry hold the pool connection?"
-    );
-    assert_eq!(
-        handoff["messages"][0]["payload"]["source"],
-        "shipment.go:consumeWithRetry"
-    );
+    assert_eq!(handoff["content"], checkpoint_content);
     for (job, attempt, evidence) in [
         ("l1", &l1, &bundle["request"]),
         ("l2", &l2b, &bundle["sql"]),

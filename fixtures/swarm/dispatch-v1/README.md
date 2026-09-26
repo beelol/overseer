@@ -17,13 +17,15 @@ cached `pgx` dependencies for offline runs.
 
 The joined replay scripts three scoped workers and a director. L1's pool-wait
 discovery is forwarded to L2 by trace ID. L2 preserves its note, source reference
-and question before account A fails; the daemon reconciles that worker, and a
-replacement on allowed account B consumes attempt 2 and receives a checkpoint.
+and question in a checkpoint artifact before account A fails. The daemon
+reconciles that worker, blocks B until the director grants access, then lets a
+replacement on allowed account B read the checkpoint on attempt 2.
 L1 and L3 remain active. Three accepted findings gate a final timeline that
 labels causality as plausible rather than proven. A separate no-database test
 blocks when only an unqualified cheap account and an unselected account remain,
 survives daemon restart, and records zero unchanged-state wakes.
 
-Routing snapshots, director decisions and checkpoint payloads are scripted.
+Routing snapshots and director decisions are scripted. A separate daemon
+fixture tests checkpoint revocation during the replacement attempt.
 The fixture does not prove live Auto Mode telemetry, live account handoff,
-credential isolation, sandboxed read-only execution, or revocation of the bundle.
+credential isolation or sandboxed read-only execution.

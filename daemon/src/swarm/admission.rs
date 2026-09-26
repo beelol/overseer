@@ -29,19 +29,24 @@ pub fn ordinary_slot_available(store: &Store) -> Result<bool> {
     if limits.is_empty() {
         return Ok(true);
     }
-    let cap = limits.into_iter().try_fold(i64::MAX, |cap, raw| -> Result<i64> {
-        let policy: Value = serde_json::from_str(&raw)?;
-        let max = policy["effective"]["max_executing"]
-            .as_i64()
-            .ok_or_else(|| anyhow!("active swarm has no global agent limit"))?;
-        Ok(cap.min(max))
-    })?;
+    let cap = limits
+        .into_iter()
+        .try_fold(i64::MAX, |cap, raw| -> Result<i64> {
+            let policy: Value = serde_json::from_str(&raw)?;
+            let max = policy["effective"]["max_executing"]
+                .as_i64()
+                .ok_or_else(|| anyhow!("active swarm has no global agent limit"))?;
+            Ok(cap.min(max))
+        })?;
     let workers: i64 = store.conn.query_row(
-        "SELECT COUNT(*) FROM swarm_attempts WHERE status='registered'", [], |r| r.get(0),
+        "SELECT COUNT(*) FROM swarm_attempts WHERE status='registered'",
+        [],
+        |r| r.get(0),
     )?;
     let directors: i64 = store.conn.query_row(
         "SELECT COUNT(*) FROM swarm_runs WHERE status IN ('running','paused','stalled','stopping')",
-        [], |r| r.get(0),
+        [],
+        |r| r.get(0),
     )?;
     let ordinary: i64 = store.conn.query_row(
         "SELECT COUNT(*) FROM runs r WHERE r.status IN ('queued','starting','running','waiting_for_user')
@@ -64,11 +69,19 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
     admit_inner(store, p, None)
 }
 
-pub(super) fn admit_scheduled(store: &mut Store, p: &Value, commit: ScheduledCommit<'_>) -> Result<Value> {
+pub(super) fn admit_scheduled(
+    store: &mut Store,
+    p: &Value,
+    commit: ScheduledCommit<'_>,
+) -> Result<Value> {
     admit_inner(store, p, Some(commit))
 }
 
-fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'_>>) -> Result<Value> {
+fn admit_inner(
+    store: &mut Store,
+    p: &Value,
+    scheduled: Option<ScheduledCommit<'_>>,
+) -> Result<Value> {
     let run = required(p, "run_id")?;
     let job = required(p, "job_id")?;
     let target = required(p, "target_id")?;
@@ -86,7 +99,9 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
         .as_i64()
         .ok_or_else(|| anyhow!("missing admission time"))?;
     let job_duration = match p.get("job_deadline_ms") {
-        Some(value) => value.as_i64().ok_or_else(|| anyhow!("invalid job deadline"))?,
+        Some(value) => value
+            .as_i64()
+            .ok_or_else(|| anyhow!("invalid job deadline"))?,
         None => 900_000,
     };
     if !(1..=86_400_000).contains(&job_duration) {
@@ -168,8 +183,10 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
     if current["status"] != "planning" && current["status"] != "running" {
         return Ok(blocked("run_not_admitting"));
     }
-    if tx.prepare("SELECT 1 FROM swarm_availability WHERE run_id=?1 AND state='blocked'")?
-        .exists(params![run])? {
+    if tx
+        .prepare("SELECT 1 FROM swarm_availability WHERE run_id=?1 AND state='blocked'")?
+        .exists(params![run])?
+    {
         return Ok(blocked("run_availability_blocked"));
     }
     let effective = &current["policy"]["effective"];
@@ -207,8 +224,28 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
     if super::context::revoked_dependency(&tx, run, job, target)? {
         return Ok(blocked("artifact_permission_revoked"));
     }
-    let job_deadline = old_job_deadline.unwrap_or_else(||
-        now.saturating_add(job_duration).min(created.saturating_add(deadline)));
+    // A failed worker's checkpoint is useful only if this destination can read
+    // it. Keep the job ready while the director grants access or chooses a
+    // different allowed target; never launch a replacement with missing context.
+    let checkpoint_needs_grant = tx
+        .prepare(
+            "SELECT 1 FROM swarm_artifacts a
+         JOIN swarm_attempts prior ON prior.id=a.attempt_id AND prior.status='finished'
+         JOIN swarm_admissions source ON source.run_id=a.run_id AND source.attempt_id=a.attempt_id
+         WHERE a.run_id=?1 AND a.job_id=?2 AND a.kind='checkpoint'
+           AND a.source_revision=?3 AND source.target_id<>?4
+           AND NOT EXISTS (SELECT 1 FROM swarm_artifact_grants g
+                           WHERE g.run_id=a.run_id AND g.artifact_id=a.id AND g.target_id=?4)
+         LIMIT 1",
+        )?
+        .exists(params![run, job, job_revision, target])?;
+    if checkpoint_needs_grant {
+        return Ok(blocked("checkpoint_permission_required"));
+    }
+    let job_deadline = old_job_deadline.unwrap_or_else(|| {
+        now.saturating_add(job_duration)
+            .min(created.saturating_add(deadline))
+    });
     if now >= job_deadline {
         return Ok(blocked("job_deadline"));
     }
@@ -217,11 +254,15 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
     }
     let planned_claims: String = tx.query_row(
         "SELECT resource_claims FROM swarm_jobs WHERE run_id=?1 AND id=?2",
-        params![run,job], |r| r.get(0),
+        params![run, job],
+        |r| r.get(0),
     )?;
     let planned_claims: Vec<super::plan::ResourceClaim> = serde_json::from_str(&planned_claims)?;
     for claim in planned_claims {
-        if let Some((_, mode)) = resource_claims.iter().find(|(resource, _)| resource == &claim.resource) {
+        if let Some((_, mode)) = resource_claims
+            .iter()
+            .find(|(resource, _)| resource == &claim.resource)
+        {
             if mode != &claim.mode {
                 bail!("admission cannot change a planned resource claim");
             }
@@ -389,7 +430,8 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
         let prior_cap: Option<i64> = tx.query_row(
             "SELECT MIN(allocation_milli) FROM swarm_allocations
              WHERE run_id=?1 AND pool_id=?2 AND unit=?3",
-            params![run,pool,unit], |r| r.get(0),
+            params![run, pool, unit],
+            |r| r.get(0),
         )?;
         let (allocation, reserve) = if let Some((old_unit, allocation, reserve)) = frozen {
             if old_unit != unit {
@@ -404,9 +446,11 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
                 / 100;
             let allocation = prior_cap.map_or(fresh_allocation, |cap| fresh_allocation.min(cap));
             let finish = p["finishing_estimate_milli"][unit].as_i64().unwrap_or(0);
-            let minimum_reserve = allocation
-                .saturating_mul(effective["finishing_reserve_percent"].as_i64().unwrap_or(20))
-                / 100;
+            let minimum_reserve = allocation.saturating_mul(
+                effective["finishing_reserve_percent"]
+                    .as_i64()
+                    .unwrap_or(20),
+            ) / 100;
             (allocation, minimum_reserve.max(finish))
         };
         let own_reserved: i64 = tx.query_row(
@@ -416,7 +460,8 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
                 WHERE run_id=?1 AND pool_id=?2 AND unit=?3
                   AND status IN ('active','uncertain')
                 GROUP BY attempt_id)",
-            params![run,pool,unit], |r|r.get(0),
+            params![run, pool, unit],
+            |r| r.get(0),
         )?;
         let available = if p["purpose"] == "finishing" {
             allocation.saturating_sub(own_reserved)
@@ -453,15 +498,28 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
             return Ok(blocked("benefit_no_affordable_plan"));
         }
         if workers >= cap {
-            return Ok(blocked(if decision == "serial" { "benefit_serial" } else { "benefit_batch_full" }));
+            return Ok(blocked(if decision == "serial" {
+                "benefit_serial"
+            } else {
+                "benefit_batch_full"
+            }));
         }
         let estimate: Value = serde_json::from_str(&estimate_json)?;
-        let worker = estimate[if decision == "parallel" { "parallel" } else { "serial" }]["workers"]
-            .as_array().and_then(|workers| workers.iter().find(|worker| worker["id"] == job))
+        let worker = estimate[if decision == "parallel" {
+            "parallel"
+        } else {
+            "serial"
+        }]["workers"]
+            .as_array()
+            .and_then(|workers| workers.iter().find(|worker| worker["id"] == job))
             .ok_or_else(|| anyhow!("committed benefit job estimate missing"))?;
-        benefit_assignment = Some((wave,
-            worker["elapsed_ms"].as_i64().ok_or_else(|| anyhow!("committed elapsed estimate missing"))?,
-            worker["usage_milli"].to_string()));
+        benefit_assignment = Some((
+            wave,
+            worker["elapsed_ms"]
+                .as_i64()
+                .ok_or_else(|| anyhow!("committed elapsed estimate missing"))?,
+            worker["usage_milli"].to_string(),
+        ));
     } else if workers > 0 {
         return Ok(blocked("benefit_unproven"));
     }
@@ -495,13 +553,17 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
         tx.execute("INSERT INTO swarm_scheduler_admissions(request_id,request_sha256,run_id,job_id,attempt_id,target_id,created_ms)
             VALUES(?1,?2,?3,?4,?5,?6,?7)",
             params![commit.request_id,commit.request_sha256,run,job,attempt_id,target,now])?;
-        tx.execute("INSERT INTO swarm_scheduler_cursor(id,last_category_key) VALUES(1,?1)
+        tx.execute(
+            "INSERT INTO swarm_scheduler_cursor(id,last_category_key) VALUES(1,?1)
             ON CONFLICT(id) DO UPDATE SET last_category_key=excluded.last_category_key",
-            params![commit.category_key])?;
+            params![commit.category_key],
+        )?;
     }
-    tx.execute("UPDATE swarm_jobs SET attempt_count=attempt_count+1,status='reserved',
+    tx.execute(
+        "UPDATE swarm_jobs SET attempt_count=attempt_count+1,status='reserved',
         deadline_at_ms=COALESCE(deadline_at_ms,?4),updated_ms=?3 WHERE run_id=?1 AND id=?2",
-        params![run,job,now,job_deadline])?;
+        params![run, job, now, job_deadline],
+    )?;
     tx.execute(
         "UPDATE swarm_runs SET status='running',updated_ms=?2 WHERE id=?1 AND status='planning'",
         params![run, now],
