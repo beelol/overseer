@@ -365,7 +365,7 @@
         "daemon/tests/swarm_state.rs",
         "docs/verification/swarm/SWARM-39.md"
       ],
-      "blocker": "Built-in defaults, saved precedence, approved-target inheritance, immutable run snapshots, percentage override arithmetic and the 100-job ready-window default pass in fixtures; actual S0 launch, one-time selection UI, immediate revocation and full scheduler enforcement remain unimplemented."
+      "blocker": "Built-in defaults, saved precedence, approved-target inheritance, immutable run snapshots, percentage override arithmetic, the 100-job ready window and configured nonterminal backlog cap pass in fixtures. Active-run limit change, actual S0 launch, one-time selection UI, immediate revocation and full scheduler enforcement remain unimplemented."
     },
     "SWARM-40": {
       "status": "partial",
