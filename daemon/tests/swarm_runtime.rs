@@ -77,6 +77,61 @@ fn job_deadline_interrupt_retries_after_daemon_crash() {
 }
 
 #[test]
+fn job_deadline_never_accepts_a_worker_that_ignores_interrupt() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("deadline-ignore-source"));
+    let run = d.call("swarm.create", json!({"category":"Ignored interrupt",
+        "objective":"Inspect backend","allowed_targets":["fixture-local"],
+        "policy":{"deadline_ms":15000}}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let at = now();
+    let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"inspect","target_id":"fixture-local","request_id":"deadline-ignore-worker",
+        "job_deadline_ms":1500,"now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    let launched = d.call("swarm.worker.launch", json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],"repo":checkout,
+        "program":"/usr/bin/python3","args":["-c",
+            "import signal,time;signal.signal(signal.SIGINT,signal.SIG_IGN);time.sleep(30)"],
+        "prompt":"Inspect","title":"Ignoring worker"}));
+    let worker = launched["overseer_run_id"].as_str().unwrap();
+    let db_probe = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let run_dir: String = db_probe.query_row("SELECT run_dir FROM runs WHERE id=?1",
+        [worker], |row| row.get(0)).unwrap();
+    let marker = std::path::Path::new(&run_dir).join("interrupt.requested");
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !marker.exists() {
+        assert!(std::time::Instant::now() < until, "job deadline did not request interrupt");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    std::thread::sleep(std::time::Duration::from_millis(600));
+    let job = &d.call("swarm.jobs", json!({"id":id}))["jobs"][0];
+    assert_eq!(job["status"], "cancel_requested");
+    assert_eq!(job["stop_reason"], "job_deadline");
+    assert_eq!(job["attempt_count"], 1);
+    assert_eq!(d.run(worker)["status"], "running");
+    let shim: serde_json::Value = serde_json::from_slice(&std::fs::read(
+        std::path::Path::new(&run_dir).join("shim.json")).unwrap()).unwrap();
+    signal(shim["child_pid"].as_i64().unwrap(), 9);
+    assert_ne!(d.wait_done(worker, 5)["status"], "completed");
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["status"] != "failed" {
+        assert!(std::time::Instant::now() < until, "confirmed exit did not fail the job");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
+#[test]
 fn job_deadline_interrupts_only_its_worker_despite_progress() {
     let d = Daemon::start(&[]);
     let temp = tmp();
