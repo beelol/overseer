@@ -93,12 +93,20 @@ pub fn preview(p: &Value) -> Result<Value> {
         }
     }
     let mut target_ids = HashSet::new();
+    let mut account_pools: HashMap<&str, (usize, HashSet<&str>)> = HashMap::new();
     for target in &snapshot.targets {
         if target.id.is_empty()
             || target.account_id.is_empty()
             || !target_ids.insert(target.id.as_str())
         {
             bail!("duplicate or missing target identity");
+        }
+        let declared: HashSet<&str> = target.pool_ids.iter().map(String::as_str).collect();
+        if let Some((count, common)) = account_pools.get_mut(target.account_id.as_str()) {
+            *count += 1;
+            common.retain(|pool| declared.contains(pool));
+        } else {
+            account_pools.insert(target.account_id.as_str(), (1, declared));
         }
     }
     let allowed: HashSet<&str> = request.allowed_targets.iter().map(String::as_str).collect();
@@ -124,6 +132,11 @@ pub fn preview(p: &Value) -> Result<Value> {
             .all(|cap| target.capabilities.iter().any(|c| c == cap))
         {
             reason = Some("missing_capability");
+        } else if account_pools
+            .get(target.account_id.as_str())
+            .is_some_and(|(count, common)| *count > 1 && common.is_empty())
+        {
+            reason = Some("account_pool_conflict");
         } else if target.pool_ids.is_empty() {
             reason = Some("unknown_quota_pool");
         } else {

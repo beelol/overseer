@@ -139,3 +139,18 @@ fn zero_upper_estimate_cannot_authorize_free_fanout() {
     let result=preview(&d,snapshot(Some(60000),true), &["qualified"],0,0);
     assert_eq!(result["targets"]["qualified"]["reason"],"uncalibrated_estimate");
 }
+
+#[test]
+fn one_account_without_a_common_verified_pool_cannot_double_its_allowance() {
+    let d=Daemon::start(&[]);
+    let mut conflicting=snapshot(Some(60000),true);
+    conflicting["targets"][1]["pool_ids"]=json!(["other-pool"]);
+    let result=preview(&d,conflicting,&["qualified","independent"],1000,0);
+    assert_eq!(result["targets"]["qualified"]["reason"],"account_pool_conflict");
+    assert_eq!(result["targets"]["independent"]["eligible"],true);
+    let mut overlapping=snapshot(Some(60000),true);
+    overlapping["targets"][1]["pool_ids"]=json!(["shared-pool","other-pool"]);
+    let result=preview(&d,overlapping,&["qualified"],1000,0);
+    assert_eq!(result["targets"]["qualified"]["eligible"],true);
+    assert_eq!(result["targets"]["qualified"]["windows"].as_array().unwrap().len(),2);
+}
