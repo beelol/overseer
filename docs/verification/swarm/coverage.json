@@ -331,7 +331,7 @@
         "daemon/tests/swarm_scenarios.rs",
         "docs/verification/swarm/S3.md"
       ],
-      "blocker": "S3 contract repair uses attempt 2 of the same logical job, redirects one stale module result and integrates 24 module patches. Applied revision acknowledgement, director conflict resolution, qualified session reuse and the complete S3 workflow remain unverified."
+      "blocker": "Dependency readiness now waits for accepted patch integration across review and plan revision paths. S3 contract repair uses attempt 2 of the same logical job, redirects one stale module result and integrates 24 module patches. Applied revision acknowledgement, director conflict resolution, qualified session reuse and the complete S3 workflow remain unverified."
     },
     "SWARM-36": {
       "status": "partial",
