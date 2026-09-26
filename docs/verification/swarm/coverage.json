@@ -79,7 +79,8 @@
         "daemon/tests/swarm_policy.rs",
         "docs/verification/swarm/milestone-4.md",
         "daemon/tests/swarm_admission.rs",
-        "docs/verification/swarm/milestone-7.md"
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/milestone-16.md"
       ],
       "blocker": "Fixture allocation freezes at first admission and preserves a finishing reserve; actual usage reconciliation and finishing-work draw are not implemented."
     },
@@ -288,9 +289,12 @@
         "daemon/tests/swarm_policy.rs",
         "docs/verification/swarm/milestone-4.md",
         "daemon/tests/swarm_settings.rs",
-        "docs/verification/swarm/milestone-6.md"
+        "docs/verification/swarm/milestone-6.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-16.md",
+        "docs/verification/swarm/SWARM-39.md"
       ],
-      "blocker": "Built-in defaults, saved precedence, approved-target inheritance and immutable run snapshots pass; actual S0 launch, one-time selection UI, immediate revocation and scheduler enforcement remain unimplemented."
+      "blocker": "Built-in defaults, saved precedence, approved-target inheritance, immutable run snapshots and percentage override arithmetic pass; actual S0 launch, one-time selection UI, immediate revocation and full scheduler enforcement remain unimplemented."
     },
     "SWARM-40": {
       "status": "partial",
