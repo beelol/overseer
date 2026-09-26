@@ -12,6 +12,8 @@ use std::process::{Command, Stdio};
 #[derive(Debug, Clone)]
 pub struct Daemon {
     pub binary: PathBuf,
+    /// Data directory to start it with (None: inherit `OVERSEER_HOME`, like `--home` sets).
+    pub home: Option<PathBuf>,
 }
 
 impl Daemon {
@@ -20,7 +22,7 @@ impl Daemon {
         candidates
             .iter()
             .find(|p| p.is_file())
-            .map(|p| Daemon { binary: p.clone() })
+            .map(|p| Daemon { binary: p.clone(), home: None })
             .ok_or_else(|| anyhow!("overseerd not found (looked in: {}). Pass --daemon PATH or set OVERSEERD.", candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ")))
     }
 
@@ -37,6 +39,9 @@ impl Daemon {
         use std::os::unix::process::CommandExt;
         let mut cmd = Command::new(&self.binary);
         cmd.arg("serve").stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+        if let Some(h) = &self.home {
+            cmd.env("OVERSEER_HOME", h);
+        }
         // New session: not in this terminal's process group, so Ctrl-C here never reaches it.
         unsafe {
             cmd.pre_exec(|| {

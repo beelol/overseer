@@ -13,12 +13,11 @@
 ┃                                                          ┃│                                                          ││                                                          │
 ┃                                                          ┃│                                                          ││                                                          │
 ┃                                                          ┃│                                                          ││                                                          │
-┃                                                          ┃│                                                          ││                                                          │
 ┃                                                          ┃│╭ keys ──────────────────────────────────────────────────╮││                                                          │
-┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰│                                                        │╯╰ completed ───────────────────────────────────────────────╯
-╭ 4 ✓ agent 09 ────────────────────────────── generic · 0s ╮╭│  ←↓↑→  h j k l     move between agents                 │╮╭ 6 ✓ agent 07 ────────────────────────────── generic · 0s ╮
-│ hi                                                       │││  1 – 9             focus agent n on this page          │││ hi                                                       │
-│                                                          │││  tab / shift+tab   next / previous agent               │││                                                          │
+┃                                                          ┃││                                                        │││                                                          │
+┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰│  ←↓↑→  h j k l     move between agents                 │╯╰ completed ───────────────────────────────────────────────╯
+╭ 4 ✓ agent 09 ────────────────────────────── generic · 0s ╮╭│  1 – 9             focus agent n on this page          │╮╭ 6 ✓ agent 07 ────────────────────────────── generic · 0s ╮
+│ hi                                                       │││  tab / shift+tab   next / previous agent               │││ hi                                                       │
 │                                                          │││  ] [   pgdn pgup   next / previous page                │││                                                          │
 │                                                          │││  i  enter          message the focused agent           │││                                                          │
 │                                                          │││  z                 zoom: full screen with scrollback   │││                                                          │
@@ -29,14 +28,15 @@
 │                                                          │││  x                 interrupt the focused agent         │││                                                          │
 │                                                          │││  n                 start a new agent                   │││                                                          │
 │                                                          │││  M                 merge back (asks before each step)  │││                                                          │
+│                                                          │││  C                 remove a finished agent's worktree  │││                                                          │
 │                                                          │││  f                 filter: all → active → needs you    │││                                                          │
 │                                                          │││  /                 search agents (esc clears)          │││                                                          │
 │                                                          │││  A                 accounts and sign-in                │││                                                          │
-│                                                          │││  r                 reload from the daemon              │││                                                          │
-╰ completed ───────────────────────────────────────────────╯╰│  q                 quit (agents keep running)          │╯╰ completed ───────────────────────────────────────────────╯
-╭ 7 ✓ agent 06 ────────────────────────────── generic · 0s ╮╭│                                                        │╮╭ 9 ✓ agent 04 ────────────────────────────── generic · 0s ╮
-│ hi                                                       ││╰──────────────────────────────────────── any key closes ╯││ hi                                                       │
-│                                                          ││                                                          ││                                                          │
+│                                                          │││  r                 reload (after X: start the daemon)  │││                                                          │
+╰ completed ───────────────────────────────────────────────╯╰│  X                 stop all agents and the daemon      │╯╰ completed ───────────────────────────────────────────────╯
+╭ 7 ✓ agent 06 ────────────────────────────── generic · 0s ╮╭│  q                 quit (agents keep running)          │╮╭ 9 ✓ agent 04 ────────────────────────────── generic · 0s ╮
+│ hi                                                       │││                                                        │││ hi                                                       │
+│                                                          ││╰──────────────────────────────────────── any key closes ╯││                                                          │
 │                                                          ││                                                          ││                                                          │
 │                                                          ││                                                          ││                                                          │
 │                                                          ││                                                          ││                                                          │

@@ -12,7 +12,7 @@
 ┃                                      ┃│                                      ││                                      │
 ┃                                      ┃│                                      ││                                      │
 ┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ───────────────────────────╯╰ completed ───────────────────────────╯
-╭ 4 ◆ Add a changelog en…  claude · 3s ╮╭ 5 ● Watch the build ─── generic · 3s ╮╭ 6 ● Refactor the paym…  generic · 4s ╮
+╭ 4 ◆ Add a changelog en…  claude · 2s ╮╭ 5 ● Watch the build ─── generic · 3s ╮╭ 6 ● Refactor the paym…  generic · 3s ╮
 │ › Add a changelog entry for the      ││ watching the build…                  ││ Reading                              │
 │   session refresh change             ││                                      ││ web-app/src/payments/providers/stripe│
 │ ✎ perm.txt                           ││                                      ││ /adapters/refund-reconciliation-worke│
@@ -25,8 +25,8 @@
 │                                      ││                                      ││                                      │
 ╰ ◆ Write perm.txt  a allow d deny ────╯╰──────────────────────────────────────╯╰──────────────────────────────────────╯
 ╭ 7 ■ Long soak test ──── generic · 0s ╮╭ 8 ✗ Migration dry-run ─ generic · 0s ╮╭ 9 ✓ Refresh sessions …  generic · 0s ╮
-│ soaking                              ││ error: relation users_v2 missing     ││ Sessions now refresh once.           │
-│ · interrupted: interrupted by user   ││ migration dry-run: 3 pending         ││ 2 tests passing                      │
+│ soaking                              ││ migration dry-run: 3 pending         ││ Sessions now refresh once.           │
+│ · interrupted: interrupted by user   ││ error: relation users_v2 missing     ││ 2 tests passing                      │
 │   (exit signal 2)                    ││ · failed: exit code 1                ││                                      │
 │                                      ││                                      ││                                      │
 │                                      ││                                      ││                                      │

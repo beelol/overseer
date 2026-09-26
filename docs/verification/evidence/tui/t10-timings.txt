@@ -1,3 +1,3 @@
-nine agents × 120 lines at 25 ms; 120 key presses during streaming
-key handling + full redraw: p50 6.46 ms, p95 7.77 ms, max 9.92 ms
-event → app lag: 477 events, p50 0 ms, p95 7 ms, max 684 ms
+nine agents × 120 lines at 25 ms; 115 key presses during streaming
+key handling + full redraw: p50 5.82 ms, p95 7.76 ms, max 11.03 ms
+event → app lag: 608 events, p50 0 ms, p95 6 ms, max 571 ms

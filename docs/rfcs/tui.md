@@ -51,6 +51,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | x | Interrupt the focused agent (asks y/n) |
 | M | Merge back: commit the worktree and merge the target in (y/n), then merge into the target (y/n) |
 | C | Remove a finished agent's worktree (its branch is kept; lists uncommitted files first) |
+| X | Stop all agents and the daemon (y/n); the TUI does not restart it until `r` |
 | n | New agent (repository, harness, account, model, prompt) |
 | f | Filter: All → Active → Needs you |
 | / | Search agents by title, repository, harness, model, account or prompt (Esc clears) |
@@ -174,3 +175,9 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   current-checkout tasks are refused with the reason (the daemon's own safety checks). **Verify:**
   a finished agent with an untracked file: the prompt names it, `n` keeps the worktree, `y`
   removes it, and the branch remains.
+- [x] **T-21 — Stop everything, start again.** `X` lists the running agents and, after y/n, stops
+  them and the daemon (VS Code's *Stop Agents and Daemon*). The TUI then does not start the daemon
+  again on its own (from this TUI or when another UI stopped it); it shows "stopped" until `r`,
+  which starts the daemon in the same data directory. Worktrees and history are kept.
+  **Verify:** two running agents: the prompt names them; after `y` the daemon exits and is not
+  respawned; `r` brings it back and both agents show as interrupted.

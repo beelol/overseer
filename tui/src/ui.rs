@@ -96,7 +96,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         let text = match c {
             Confirm::Interrupt(id) => format!(" Interrupt {}? y / n", short(&app.state.run(id).map(|r| r.title.clone()).unwrap_or_default(), 50)),
             Confirm::Quit => " Unsent drafts will be lost. Quit? y / n".to_string(),
-            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::Cleanup { text, .. } => format!(" {text} y / n"),
+            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } => format!(" {text} y / n"),
         };
         f.render_widget(Paragraph::new(Line::from(Span::styled(text, Style::new().fg(waiting()).add_modifier(Modifier::BOLD)))).wrap(Wrap { trim: false }), comp);
     }
@@ -141,7 +141,13 @@ fn header(f: &mut Frame, app: &App, area: Rect) {
         spans.push(Span::styled(format!("filter: {}", app.filter.label()), Style::new().fg(accent())));
     }
     let left = Line::from(spans);
-    let right = if app.connected { Line::from(Span::styled("● connected ", Style::new().fg(Color::Green))) } else { Line::from(Span::styled("○ reconnecting ", Style::new().fg(Color::Red))) };
+    let right = if app.connected {
+        Line::from(Span::styled("● connected ", Style::new().fg(Color::Green)))
+    } else if app.stopped {
+        Line::from(Span::styled("○ stopped · r starts ", Style::new().fg(MUTED)))
+    } else {
+        Line::from(Span::styled("○ reconnecting ", Style::new().fg(Color::Red)))
+    };
     f.render_widget(Paragraph::new(left), area);
     f.render_widget(Paragraph::new(right).alignment(Alignment::Right), area);
 }
@@ -421,7 +427,8 @@ fn help(f: &mut Frame, area: Rect) {
         ("f", "filter: all → active → needs you"),
         ("/", "search agents (esc clears)"),
         ("A", "accounts and sign-in"),
-        ("r", "reload from the daemon"),
+        ("r", "reload (after X: start the daemon)"),
+        ("X", "stop all agents and the daemon"),
         ("q", "quit (agents keep running)"),
     ];
     let w = 58.min(area.width.saturating_sub(4));

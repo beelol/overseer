@@ -355,3 +355,38 @@ fn t20_cleanup_removes_a_finished_worktree_and_names_what_would_be_lost() {
     let branches = String::from_utf8_lossy(&std::process::Command::new("git").args(["branch", "--list", "overseer/*"]).current_dir(&repo).output().unwrap().stdout).to_string();
     assert!(branches.contains("overseer/leaves-a-scratch-file"), "{branches}");
 }
+
+#[test]
+fn t21_stop_everything_and_start_the_daemon_again() {
+    let t = tempfile::tempdir().unwrap();
+    let mut d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("stop"));
+    let a = d.sh(&repo, "Long job one", "echo one; sleep 60");
+    let b = d.sh(&repo, "Long job two", "echo two; sleep 60");
+    for r in [&a, &b] {
+        d.wait_status(r, |s| s == "running", 10);
+    }
+    let mut tui = Tui::attach_spawning(&d, 160, 40);
+    tui.until(10, |app| app.visible().len() == 2);
+    tui.key(KeyCode::Char('X'));
+    let s = tui.screen();
+    assert!(s.contains("Stop 2 running agents (Long job two, Long job one) and the daemon? Worktrees and history are kept. y / n"), "{s}");
+    tui.snapshot("t21-stop-all");
+    tui.key(KeyCode::Char('y'));
+    tui.until(15, |app| app.stopped && !app.connected);
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !d.exited() && std::time::Instant::now() < end {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert!(d.exited(), "the daemon exited");
+    // Not started again behind the user's back.
+    tui.pump(2500);
+    assert!(std::os::unix::net::UnixStream::connect(&d.socket).is_err(), "no daemon was respawned");
+    assert!(tui.screen().contains("○ stopped · r starts"));
+    // r starts it again (in the same home); the agents were interrupted, not lost.
+    tui.key(KeyCode::Char('r'));
+    tui.until(20, |app| app.connected && !app.stopped);
+    tui.until(10, |app| [&a, &b].iter().all(|id| app.state.run(id).is_some_and(|r| r.status == "interrupted")));
+    let s = tui.screen();
+    assert!(s.contains("■ Long job one") && s.contains("■ Long job two") && s.contains("● connected"), "{s}");
+}

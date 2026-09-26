@@ -38,6 +38,8 @@ pub trait Requests: Send + Sync {
     fn set_cursor_if_unset(&self, cursor: i64);
     /// Subscribes to live events from the cursor (after `state` was loaded on a connection).
     fn subscribe(&self);
+    /// After "stop agents and daemon": do not start the daemon again until cleared.
+    fn set_stopped(&self, _stopped: bool) {}
 }
 
 pub struct Client {
@@ -57,6 +59,8 @@ struct Inner {
     /// Request ids the client itself made (hello, subscribe); their replies are not forwarded.
     internal: Mutex<HashSet<u64>>,
     generation: AtomicU64,
+    /// Stopped on purpose: keep trying to connect (another UI may start it) but never spawn.
+    stopped: AtomicBool,
 }
 
 impl Client {
@@ -74,6 +78,7 @@ impl Client {
             closed: AtomicBool::new(false),
             internal: Mutex::new(HashSet::new()),
             generation: AtomicU64::new(0),
+            stopped: AtomicBool::new(false),
         });
         let bg = inner.clone();
         std::thread::spawn(move || bg.connect_loop());
@@ -121,6 +126,9 @@ impl Requests for Client {
         let id = self.inner.send("events.subscribe", json!({ "after": after }));
         self.inner.internal.lock().unwrap().insert(id);
     }
+    fn set_stopped(&self, stopped: bool) {
+        self.inner.stopped.store(stopped, Ordering::SeqCst);
+    }
 }
 
 impl Inner {
@@ -152,7 +160,7 @@ impl Inner {
                 }
                 Err(_) => {
                     // Like VS Code: start the daemon (detached, it outlives this TUI) once per outage.
-                    if !spawned {
+                    if !spawned && !self.stopped.load(Ordering::SeqCst) {
                         if let Some(d) = &self.daemon {
                             let _ = d.spawn_serve();
                         }

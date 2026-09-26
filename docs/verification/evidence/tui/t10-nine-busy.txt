@@ -1,23 +1,23 @@
  ◆ Overseer  page 1/1 · 9 agents · ● 2 active                                                                                                                                               ● connected 
-┏ 1 ● chatty 9 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 4s ┓╭ 2 ● chatty 8 ──────────────────────────────────── generic · 4s ╮╭ 3 ✓ chatty 7 ───────────────────────────────────── generic · 4s ╮
-┃ agent 9 line 103: compiling module 103 of 120                   ┃│ agent 8 line 103: compiling module 103 of 120                  ││ agent 7 line 103: compiling module 103 of 120                   │
-┃ agent 9 line 104: compiling module 104 of 120                   ┃│ agent 8 line 104: compiling module 104 of 120                  ││ agent 7 line 104: compiling module 104 of 120                   │
-┃ agent 9 line 105: compiling module 105 of 120                   ┃│ agent 8 line 105: compiling module 105 of 120                  ││ agent 7 line 105: compiling module 105 of 120                   │
-┃ agent 9 line 106: compiling module 106 of 120                   ┃│ agent 8 line 106: compiling module 106 of 120                  ││ agent 7 line 106: compiling module 106 of 120                   │
-┃ agent 9 line 107: compiling module 107 of 120                   ┃│ agent 8 line 107: compiling module 107 of 120                  ││ agent 7 line 107: compiling module 107 of 120                   │
-┃ agent 9 line 108: compiling module 108 of 120                   ┃│ agent 8 line 108: compiling module 108 of 120                  ││ agent 7 line 108: compiling module 108 of 120                   │
-┃ agent 9 line 109: compiling module 109 of 120                   ┃│ agent 8 line 109: compiling module 109 of 120                  ││ agent 7 line 109: compiling module 109 of 120                   │
-┃ agent 9 line 110: compiling module 110 of 120                   ┃│ agent 8 line 110: compiling module 110 of 120                  ││ agent 7 line 110: compiling module 110 of 120                   │
-┃ agent 9 line 111: compiling module 111 of 120                   ┃│ agent 8 line 111: compiling module 111 of 120                  ││ agent 7 line 111: compiling module 111 of 120                   │
-┃ agent 9 line 112: compiling module 112 of 120                   ┃│ agent 8 line 112: compiling module 112 of 120                  ││ agent 7 line 112: compiling module 112 of 120                   │
-┃ agent 9 line 113: compiling module 113 of 120                   ┃│ agent 8 line 113: compiling module 113 of 120                  ││ agent 7 line 113: compiling module 113 of 120                   │
-┃ agent 9 line 114: compiling module 114 of 120                   ┃│ agent 8 line 114: compiling module 114 of 120                  ││ agent 7 line 114: compiling module 114 of 120                   │
-┃ agent 9 line 115: compiling module 115 of 120                   ┃│ agent 8 line 115: compiling module 115 of 120                  ││ agent 7 line 115: compiling module 115 of 120                   │
-┃ agent 9 line 116: compiling module 116 of 120                   ┃│ agent 8 line 116: compiling module 116 of 120                  ││ agent 7 line 116: compiling module 116 of 120                   │
-┃ agent 9 line 117: compiling module 117 of 120                   ┃│ agent 8 line 117: compiling module 117 of 120                  ││ agent 7 line 117: compiling module 117 of 120                   │
-┃ agent 9 line 118: compiling module 118 of 120                   ┃│ agent 8 line 118: compiling module 118 of 120                  ││ agent 7 line 118: compiling module 118 of 120                   │
-┃ agent 9 line 119: compiling module 119 of 120                   ┃│ agent 8 line 119: compiling module 119 of 120                  ││ agent 7 line 119: compiling module 119 of 120                   │
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰────────────────────────────────────────────────────────────────╯╰ completed ──────────────────────────────────────────────────────╯
+╭ 1 ● chatty 9 ───────────────────────────────────── generic · 4s ╮┏ 2 ● chatty 8 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 4s ┓╭ 3 ✓ chatty 7 ───────────────────────────────────── generic · 4s ╮
+│ agent 9 line 103: compiling module 103 of 120                   │┃ agent 8 line 103: compiling module 103 of 120                  ┃│ agent 7 line 103: compiling module 103 of 120                   │
+│ agent 9 line 104: compiling module 104 of 120                   │┃ agent 8 line 104: compiling module 104 of 120                  ┃│ agent 7 line 104: compiling module 104 of 120                   │
+│ agent 9 line 105: compiling module 105 of 120                   │┃ agent 8 line 105: compiling module 105 of 120                  ┃│ agent 7 line 105: compiling module 105 of 120                   │
+│ agent 9 line 106: compiling module 106 of 120                   │┃ agent 8 line 106: compiling module 106 of 120                  ┃│ agent 7 line 106: compiling module 106 of 120                   │
+│ agent 9 line 107: compiling module 107 of 120                   │┃ agent 8 line 107: compiling module 107 of 120                  ┃│ agent 7 line 107: compiling module 107 of 120                   │
+│ agent 9 line 108: compiling module 108 of 120                   │┃ agent 8 line 108: compiling module 108 of 120                  ┃│ agent 7 line 108: compiling module 108 of 120                   │
+│ agent 9 line 109: compiling module 109 of 120                   │┃ agent 8 line 109: compiling module 109 of 120                  ┃│ agent 7 line 109: compiling module 109 of 120                   │
+│ agent 9 line 110: compiling module 110 of 120                   │┃ agent 8 line 110: compiling module 110 of 120                  ┃│ agent 7 line 110: compiling module 110 of 120                   │
+│ agent 9 line 111: compiling module 111 of 120                   │┃ agent 8 line 111: compiling module 111 of 120                  ┃│ agent 7 line 111: compiling module 111 of 120                   │
+│ agent 9 line 112: compiling module 112 of 120                   │┃ agent 8 line 112: compiling module 112 of 120                  ┃│ agent 7 line 112: compiling module 112 of 120                   │
+│ agent 9 line 113: compiling module 113 of 120                   │┃ agent 8 line 113: compiling module 113 of 120                  ┃│ agent 7 line 113: compiling module 113 of 120                   │
+│ agent 9 line 114: compiling module 114 of 120                   │┃ agent 8 line 114: compiling module 114 of 120                  ┃│ agent 7 line 114: compiling module 114 of 120                   │
+│ agent 9 line 115: compiling module 115 of 120                   │┃ agent 8 line 115: compiling module 115 of 120                  ┃│ agent 7 line 115: compiling module 115 of 120                   │
+│ agent 9 line 116: compiling module 116 of 120                   │┃ agent 8 line 116: compiling module 116 of 120                  ┃│ agent 7 line 116: compiling module 116 of 120                   │
+│ agent 9 line 117: compiling module 117 of 120                   │┃ agent 8 line 117: compiling module 117 of 120                  ┃│ agent 7 line 117: compiling module 117 of 120                   │
+│ agent 9 line 118: compiling module 118 of 120                   │┃ agent 8 line 118: compiling module 118 of 120                  ┃│ agent 7 line 118: compiling module 118 of 120                   │
+│ agent 9 line 119: compiling module 119 of 120                   │┃ agent 8 line 119: compiling module 119 of 120                  ┃│ agent 7 line 119: compiling module 119 of 120                   │
+╰─────────────────────────────────────────────────────────────────╯┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ──────────────────────────────────────────────────────╯
 ╭ 4 ✓ chatty 6 ───────────────────────────────────── generic · 4s ╮╭ 5 ✓ chatty 5 ──────────────────────────────────── generic · 4s ╮╭ 6 ✓ chatty 4 ───────────────────────────────────── generic · 4s ╮
 │ agent 6 line 102: compiling module 102 of 120                   ││ agent 5 line 102: compiling module 102 of 120                  ││ agent 4 line 102: compiling module 102 of 120                   │
 │ agent 6 line 103: compiling module 103 of 120                   ││ agent 5 line 103: compiling module 103 of 120                  ││ agent 4 line 103: compiling module 103 of 120                   │

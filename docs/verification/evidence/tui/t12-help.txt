@@ -8,6 +8,7 @@ OPTIONS:
                     bundled with the Overseer VS Code extension)
     --home DIR      Overseer data directory (sets OVERSEER_HOME; default: the same as VS Code)
     --no-mouse      Leave the mouse to the terminal (text selection) instead of clicking tiles
+    --no-bell       No terminal bell when an agent starts waiting for you
     -h, --help      Show this help
     -V, --version   Show the version
 
@@ -17,6 +18,11 @@ KEYS:
     i / enter       message the focused agent  z     zoom (full screen, scrollback)
     a / d           allow / deny a permission  w     next agent waiting for you
     x               interrupt                  n     new agent
+    C               remove a finished agent's worktree (branch kept)
+    X               stop all agents and the daemon (r starts it again)
+    v               changes (files, diffs)     M     merge back (asks each step)
+    /               search agents              A     accounts and sign-in
+    e               in zoom: expand tool calls
     f               filter all/active/needs you ?     all keys
     q               quit (agents keep running)
 

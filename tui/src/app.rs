@@ -95,6 +95,8 @@ pub enum Confirm {
     MergeComplete { run: String, text: String },
     /// Remove a finished agent's worktree (its branch is kept).
     Cleanup { run: String, text: String, discard: bool },
+    /// Interrupt every agent and stop the daemon.
+    StopAll { text: String },
 }
 
 /// What a pending request was for.
@@ -122,6 +124,7 @@ enum Pending {
     MergeComplete,
     CleanupPlan { run: String },
     Cleanup,
+    StopAll,
 }
 
 /// The New Agent form.
@@ -248,6 +251,8 @@ pub struct App {
     waiting: HashSet<String>,
     /// Ring the terminal bell (an agent started waiting for you); the event loop clears it.
     pub bell: bool,
+    /// Agents and daemon were stopped on purpose; `r` starts the daemon again.
+    pub stopped: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -296,6 +301,7 @@ impl App {
             expand_tools: false,
             waiting: HashSet::new(),
             bell: false,
+            stopped: false,
         }
     }
 
@@ -474,6 +480,11 @@ impl App {
         match msg {
             Msg::Connected => {
                 self.connected = true;
+                if self.stopped {
+                    self.stopped = false;
+                    self.client.set_stopped(false);
+                    self.say("The daemon is running again", false);
+                }
                 self.connect_generation += 1;
                 self.state_inflight = false;
                 self.request_state();
@@ -484,7 +495,11 @@ impl App {
                 self.pending.clear();
                 self.state_inflight = false;
                 self.history_requested.retain(|r| self.feeds.get(r).is_some_and(|f| f.history_loaded));
-                self.say(format!("Reconnecting to overseerd ({why})…"), true);
+                if self.stopped {
+                    self.say("Agents and daemon stopped. Press r to start the daemon again.", false);
+                } else {
+                    self.say(format!("Reconnecting to overseerd ({why})…"), true);
+                }
             }
             Msg::Replayed => {}
             Msg::Event(ev) => self.on_event(ev),
@@ -543,6 +558,11 @@ impl App {
         }
         let run_id = ev["run_id"].as_str().unwrap_or_default().to_string();
         let kind = ev["kind"].as_str().unwrap_or_default().to_string();
+        if kind == "daemon_stopping" {
+            // Stopped from here or from VS Code: do not start it again behind the user's back.
+            self.stopped = true;
+            self.client.set_stopped(true);
+        }
         if !run_id.is_empty() {
             let root = self.state.root_of(&run_id);
             let child = if root != run_id { Some(self.state.run(&run_id).map(|r| r.title.clone()).unwrap_or_else(|| "sub-agent".into())) } else { None };
@@ -775,6 +795,11 @@ impl App {
                     format!("Remove this worktree? {branch} is kept, but {} uncommitted file{} will be LOST: {}.", files.len(), if files.len() == 1 { "" } else { "s" }, files.iter().take(6).cloned().collect::<Vec<_>>().join(", "))
                 };
                 self.mode = Mode::Confirm(Confirm::Cleanup { run, text, discard: !files.is_empty() });
+            }
+            (Pending::StopAll, Ok(v)) => {
+                let n = v["stopped"].as_array().map(|a| a.len()).unwrap_or(0);
+                let left = v["remaining"].as_array().map(|a| a.len()).unwrap_or(0);
+                self.say(format!("Stopped {n} agent{} and the daemon.{} Press r to start the daemon again.", if n == 1 { "" } else { "s" }, if left > 0 { format!(" {left} could not be stopped.") } else { String::new() }), left > 0);
             }
             (Pending::Cleanup, Ok(_)) => {
                 self.say("Worktree removed; the branch is kept", false);
@@ -1142,6 +1167,11 @@ impl App {
                                 self.request("workspace.merge_prepare", json!({ "workspace_id": ws, "handoff": true }), Pending::MergePrepare { run });
                             }
                         }
+                        Confirm::StopAll { .. } => {
+                            self.stopped = true;
+                            self.client.set_stopped(true);
+                            self.request("daemon.stop_all", json!({}), Pending::StopAll);
+                        }
                         Confirm::Cleanup { run, discard, .. } => {
                             if let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) {
                                 self.request("workspace.cleanup", json!({ "workspace_id": ws, "discard_dirty": discard }), Pending::Cleanup);
@@ -1238,7 +1268,20 @@ impl App {
                 self.settle_focus();
                 self.ensure_history();
             }
+            KeyCode::Char('r') if self.stopped => {
+                self.client.set_stopped(false);
+                self.say("Starting the daemon…", false);
+            }
             KeyCode::Char('r') => self.request_state(),
+            KeyCode::Char('X') => {
+                let active: Vec<String> = self.state.agents().iter().filter(|r| r.active()).map(|r| short(&r.title, 30)).collect();
+                let text = if active.is_empty() {
+                    "Stop the Overseer daemon? No agents are running; worktrees and history are kept.".to_string()
+                } else {
+                    format!("Stop {} running agent{} ({}) and the daemon? Worktrees and history are kept.", active.len(), if active.len() == 1 { "" } else { "s" }, active.join(", "))
+                };
+                self.mode = Mode::Confirm(Confirm::StopAll { text });
+            }
             // Zoom scrolling.
             KeyCode::Char('k') | KeyCode::Up if zoom => self.scroll(1),
             KeyCode::Char('j') | KeyCode::Down if zoom => self.scroll(-1),

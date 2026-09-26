@@ -62,6 +62,11 @@ impl Daemon {
         Daemon { home, bin, socket, child, env }
     }
 
+    /// Whether the daemon process started by this test has exited.
+    pub fn exited(&mut self) -> bool {
+        matches!(self.child.try_wait(), Ok(Some(_)))
+    }
+
     /// `overseerd ctl` (a separate client, like VS Code or a script).
     pub fn ctl(&self, method: &str, params: Value) -> Value {
         let out = Command::new(&self.bin).args(["ctl", method, &params.to_string()]).env("OVERSEER_HOME", self.home.path()).output().unwrap();
@@ -131,8 +136,18 @@ pub struct Tui {
 
 impl Tui {
     pub fn attach(d: &Daemon, w: u16, h: u16) -> Tui {
+        Tui::attach_with(d, w, h, false)
+    }
+
+    /// Like `attach`, but the TUI may start the daemon itself (always in the test's home).
+    pub fn attach_spawning(d: &Daemon, w: u16, h: u16) -> Tui {
+        Tui::attach_with(d, w, h, true)
+    }
+
+    fn attach_with(d: &Daemon, w: u16, h: u16, spawn: bool) -> Tui {
         let (tx, rx) = channel();
-        let client = Arc::new(Client::start(None, d.socket.clone(), tx));
+        let daemon = spawn.then(|| overseer_tui::locate::Daemon { binary: d.bin.clone(), home: Some(d.home.path().to_path_buf()) });
+        let client = Arc::new(Client::start(daemon, d.socket.clone(), tx));
         let app = App::new(client.clone() as Arc<dyn Requests>);
         let mut t = Tui { app, client, rx, term: Terminal::new(TestBackend::new(w, h)).unwrap() };
         t.until(10, |a| a.connected);

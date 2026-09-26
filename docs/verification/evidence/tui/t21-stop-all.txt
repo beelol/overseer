@@ -1,0 +1,40 @@
+ ◆ Overseer  page 1/1 · 2 agents · ● 2 active                                                                                                       ● connected 
+┏ 1 ● Long job two ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓╭ 2 ● Long job one ────────────────────────────────────────────── generic · 1s ╮
+┃ two                                                                          ┃│ one                                                                          │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰──────────────────────────────────────────────────────────────────────────────╯
+ Stop 2 running agents (Long job two, Long job one) and the daemon? Worktrees and history are kept. y / n                                                       
+                                                                                                                                                                
+ ←↑↓→ move   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                   
