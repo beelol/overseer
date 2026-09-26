@@ -245,7 +245,7 @@
         "docs/verification/swarm/SWARM-31.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "A scripted local launch remains separate from completion, replays to one run, and emits a once-only terminal event without accepting the job; native async receipts, silent/stale output, late append, descendants and usage reconciliation remain unverified."
+      "blocker": "A scripted local launch remains separate from completion, replays to one run, and emits a once-only terminal event automatically without accepting the job; native async receipts, silent/stale output, late append, descendants and usage reconciliation remain unverified."
     },
     "SWARM-32": {
       "status": "partial",
@@ -507,7 +507,7 @@
         "docs/verification/swarm/SWARM-62.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "A daemon timer checks deadlines without admission requests, records a deadline reason, cancels queued work and interrupts a linked scripted worker; live checkpoint/interrupt, visible unconfirmed exit and explicit extension remain unverified."
+      "blocker": "A daemon timer checks deadlines without admission requests, records a deadline reason, cancels queued work, interrupts a linked scripted worker and delivers its terminal event; live checkpoint/interrupt, visible unconfirmed exit and explicit extension remain unverified."
     },
     "SWARM-63": {
       "status": "unverified",

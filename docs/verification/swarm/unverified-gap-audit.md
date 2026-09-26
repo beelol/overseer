@@ -1,6 +1,6 @@
 # Unverified Swarm acceptance criteria — dependency audit
 
-Initially inspected at code revision `ffa08ba`; updated after terminal reconciliation and deadline interruption at `ae078e6`. This is a gap audit, not verification evidence. The 23 criteria still marked `unverified` in `coverage.json` each have a specific reason. None is checked in the RFC, and S0–S5 remain unverified.
+Initially inspected at code revision `ffa08ba`; updated after automatic terminal reconciliation at `c37ca47`. This is a gap audit, not verification evidence. The 23 criteria still marked `unverified` in `coverage.json` each have a specific reason. None is checked in the RFC, and S0–S5 remain unverified.
 
 The dependency clusters are:
 
