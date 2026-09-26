@@ -35,6 +35,8 @@ pub struct StoredThreadUsageObservation {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ThreadUsageEstimate {
     pub observed_ms: i64,
+    #[serde(default)]
+    pub plan_type: Option<String>,
     pub estimated_credits_micros: u64,
     pub groups: Vec<CreditGroup>,
 }
@@ -125,6 +127,7 @@ pub fn parse_codex_thread_usage(
     }
     Ok(Some(ThreadUsageEstimate {
         observed_ms,
+        plan_type: None,
         estimated_credits_micros: total,
         groups,
     }))

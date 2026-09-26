@@ -1852,6 +1852,37 @@ fn auto_codex_thread_credit_estimate_is_metadata_only_and_separate_from_quota() 
 }
 
 #[test]
+fn auto_thread_credit_read_loses_plan_attribution_when_the_account_plan_changes() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let plan_file = r.path().join("plan-type.txt");
+    std::fs::write(&plan_file, "pro").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_PLAN_TYPE_FILE"),
+        ("FIXTURE_MODE", "managed-delegation"),
+        ("FIXTURE_PLAN_TYPE_FILE", plan_file.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let child = run_id(&d.call("run.delegate", json!({"work_unit_id":"plan-scope-child-1",
+        "parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol",
+        "effort":"medium","prompt":"bounded work"})));
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    let original = d.call("auto.usage.thread.refresh", json!({"run_id":child}));
+    assert_eq!(original["observation"]["attribution"],
+        "same_account_generation_and_reported_plan", "{original}");
+    assert_eq!(original["observation"]["estimate"]["plan_type"], "pro");
+    std::fs::write(&plan_file, "plus").unwrap();
+    let changed = d.call("auto.usage.thread.refresh", json!({"run_id":child}));
+    assert_eq!(changed["observation"]["id"], original["observation"]["id"],
+        "a later read is a correction to the same cumulative sample");
+    assert_eq!(changed["observation"]["attribution"], "unverified_plan_scope", "{changed}");
+    assert_eq!(changed["observation"]["estimate"]["plan_type"], "plus");
+    assert_eq!(changed["observation"]["subscription_window_relation"], "unverified");
+    assert_eq!(d.runs().len(), 2, "metadata-only correction must not launch work");
+}
+
+#[test]
 fn auto_managed_child_has_an_isolated_parent_snapshot_and_returnable_result() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
@@ -1900,7 +1931,7 @@ fn auto_managed_child_has_an_isolated_parent_snapshot_and_returnable_result() {
     assert!(d.try_call("run.follow_up", json!({"run_id":child,"prompt":"repeat browser check"})).is_err(),
         "a settled work unit cannot produce a second, unreported child result");
     let usage = d.call("auto.usage.thread.refresh", json!({"run_id":child}));
-    assert_eq!(usage["observation"]["attribution"], "same_account_generation", "{usage}");
+    assert_eq!(usage["observation"]["attribution"], "same_account_generation_and_reported_plan", "{usage}");
     assert_eq!(usage["observation"]["subscription_window_relation"], "unverified");
     assert!(!serde_json::to_string(&d.events(&child)).unwrap().contains("account-A"), "raw account identity must not enter run history");
     d.call("run.follow_up", json!({"run_id":parent,"prompt":format!("Use {}", result["text"].as_str().unwrap())}));

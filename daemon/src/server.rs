@@ -1357,13 +1357,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             store.record_auto_account_identity(profile_id, &fingerprint)?;
             let event = store.insert_event(observed_ms, None, None, "quota", "codex-app/metadata-read", "reported", &json!({"profile_id":profile_id,"snapshot":snapshot}))?;
             store.insert_auto_quota(event.seq, profile_id, "codex-app/metadata-read", &snapshot)?;
-            let observation = if let Some(estimate) = estimate {
+            let observation = if let Some(mut estimate) = estimate {
                 let generation = store.auto_account_generation(profile_id)?.ok_or_else(|| anyhow!("account generation is unavailable"))?;
-                let attribution = if store.auto_run_account_matches(&run.id, profile_id, generation)? {
-                    "same_account_generation"
-                } else {
-                    "unverified_run_account"
-                };
+                estimate.plan_type = snapshot.reported_plan_type().map(str::to_string);
+                let attribution = store.auto_thread_usage_attribution(&run.id, profile_id,
+                    generation, estimate.plan_type.as_deref())?;
                 let id = store.insert_auto_thread_usage(&run.id, profile_id, generation, "codex-app/account-usage-read", &estimate)?;
                 Some(json!({"id":id,"run_id":run.id,"profile_id":profile_id,"read_account_generation":generation,"attribution":attribution,"subscription_window_relation":"unverified","source":"codex-app/account-usage-read","estimate":estimate}))
             } else { None };

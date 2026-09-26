@@ -56,6 +56,14 @@ pub enum QuotaBlockScope {
 }
 
 impl QuotaSnapshot {
+    /// Only a single, reported plan across every retained bucket can scope a
+    /// cumulative thread sample. Missing or conflicting plans remain unknown.
+    pub fn reported_plan_type(&self) -> Option<&str> {
+        let first = self.windows.first()?.plan_type.as_deref()?;
+        self.windows.iter().all(|window| window.plan_type.as_deref() == Some(first))
+            .then_some(first)
+    }
+
     /// A missing or malformed newer meter cannot clear an explicit quota
     /// rejection. Only a fresh reading of that same scoped window, its reset,
     /// or an explicit account-wide allow clears the corresponding block.

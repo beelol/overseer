@@ -40,11 +40,13 @@ rl.on('line', line => {
     const quotaMode = profileValue(process.env.FIXTURE_QUOTA_MODES_DIR,
       process.env.FIXTURE_QUOTA_MODE_FILE ? fs.readFileSync(process.env.FIXTURE_QUOTA_MODE_FILE, 'utf8').trim() : '');
     const quotaUsed = quotaMode === 'exhausted' ? 100 : 35;
+    const planType = process.env.FIXTURE_PLAN_TYPE_FILE
+      ? fs.readFileSync(process.env.FIXTURE_PLAN_TYPE_FILE, 'utf8').trim() : 'pro';
     mark('metadata_started');
     const reply = () => {
       mark('metadata_done');
       out({ id: m.id, result: { accountId, ordinaryUsageAllowed: true,
-        rateLimitsByLimitId: { codex: { limitId: 'codex', normalModelSlug: null,
+        rateLimitsByLimitId: { codex: { limitId: 'codex', planType, normalModelSlug: null,
           primary: quotaMode === 'unknown' ? null : { usedPercent: quotaUsed, windowDurationMins: 300, resetsAt: 1800003600 }, secondary: null,
           credits: { balance: 'secret-credit-sentinel' } } } } });
     };

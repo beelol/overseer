@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 13;
+pub const SCHEMA_VERSION: i64 = 14;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -269,7 +269,8 @@ impl Store {
             CREATE TABLE IF NOT EXISTS auto_run_account_evidence(
               run_id TEXT PRIMARY KEY REFERENCES runs(id), profile_id TEXT NOT NULL,
               first_generation INTEGER NOT NULL, last_generation INTEGER NOT NULL,
-              observed_turns INTEGER NOT NULL, consistent INTEGER NOT NULL);
+              observed_turns INTEGER NOT NULL, consistent INTEGER NOT NULL,
+              plan_type TEXT, plan_consistent INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS managed_work_units(
               work_unit_id TEXT PRIMARY KEY, parent_run_id TEXT NOT NULL REFERENCES runs(id),
               child_run_id TEXT NOT NULL UNIQUE REFERENCES runs(id),
@@ -289,6 +290,14 @@ impl Store {
         let has_effort: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='effort'")?.exists([])?;
         if !has_effort {
             self.conn.execute_batch("ALTER TABLE runs ADD COLUMN effort TEXT;")?;
+        }
+        let has_run_plan: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_run_account_evidence') WHERE name='plan_type'")?.exists([])?;
+        if !has_run_plan {
+            self.conn.execute_batch("ALTER TABLE auto_run_account_evidence ADD COLUMN plan_type TEXT;")?;
+        }
+        let has_plan_consistency: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_run_account_evidence') WHERE name='plan_consistent'")?.exists([])?;
+        if !has_plan_consistency {
+            self.conn.execute_batch("ALTER TABLE auto_run_account_evidence ADD COLUMN plan_consistent INTEGER NOT NULL DEFAULT 0;")?;
         }
         let has_result_notice: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('managed_work_units') WHERE name='result_event_seq'")?.exists([])?;
         if !has_result_notice {
@@ -966,12 +975,15 @@ impl Store {
     /// A same-process Codex app-server metadata reply observed before a turn.
     /// Every turn of the thread must be stamped before its cumulative usage can
     /// be tied to one account generation.
-    pub fn record_auto_run_account(&self, run_id: &str, profile_id: &str, generation: i64) -> Result<()> {
+    pub fn record_auto_run_account(&self, run_id: &str, profile_id: &str, generation: i64,
+        plan_type: Option<&str>) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO auto_run_account_evidence(run_id,profile_id,first_generation,last_generation,observed_turns,consistent) VALUES(?1,?2,?3,?3,1,1) \
+            "INSERT INTO auto_run_account_evidence(run_id,profile_id,first_generation,last_generation,observed_turns,consistent,plan_type,plan_consistent) \
+             VALUES(?1,?2,?3,?3,1,1,?4,CASE WHEN ?4 IS NULL THEN 0 ELSE 1 END) \
              ON CONFLICT(run_id) DO UPDATE SET last_generation=excluded.last_generation,observed_turns=observed_turns+1, \
-             consistent=CASE WHEN profile_id=excluded.profile_id AND first_generation=excluded.first_generation AND consistent=1 THEN 1 ELSE 0 END",
-            params![run_id, profile_id, generation],
+             consistent=CASE WHEN profile_id=excluded.profile_id AND first_generation=excluded.first_generation AND consistent=1 THEN 1 ELSE 0 END, \
+             plan_consistent=CASE WHEN plan_consistent=1 AND plan_type IS NOT NULL AND plan_type=excluded.plan_type THEN 1 ELSE 0 END",
+            params![run_id, profile_id, generation, plan_type],
         )?;
         Ok(())
     }
@@ -986,16 +998,35 @@ impl Store {
         Ok(consistent && profile == profile_id && first == generation && last == generation && observed_turns == actual_turns)
     }
 
+    pub fn auto_run_plan_matches(&self, run_id: &str, profile_id: &str, generation: i64,
+        plan_type: Option<&str>) -> Result<bool> {
+        let Some(plan_type) = plan_type else { return Ok(false); };
+        if !self.auto_run_account_matches(run_id, profile_id, generation)? { return Ok(false); }
+        let evidence: Option<(Option<String>, bool)> = self.conn.query_row(
+            "SELECT plan_type,plan_consistent FROM auto_run_account_evidence WHERE run_id=?1",
+            params![run_id], |row| Ok((row.get(0)?, row.get::<_, i64>(1)? != 0)),
+        ).optional()?;
+        Ok(evidence.is_some_and(|(first, consistent)| consistent && first.as_deref() == Some(plan_type)))
+    }
+
+    pub fn auto_thread_usage_attribution(&self, run_id: &str, profile_id: &str,
+        generation: i64, plan_type: Option<&str>) -> Result<&'static str> {
+        if !self.auto_run_account_matches(run_id, profile_id, generation)? {
+            Ok("unverified_run_account")
+        } else if !self.auto_run_plan_matches(run_id, profile_id, generation, plan_type)? {
+            Ok("unverified_plan_scope")
+        } else {
+            Ok("same_account_generation_and_reported_plan")
+        }
+    }
+
     pub fn insert_auto_thread_usage(
         &self, run_id: &str, profile_id: &str, generation: i64,
         source: &str, estimate: &crate::auto_consumption::ThreadUsageEstimate,
     ) -> Result<i64> {
         if !self.learning_persistent || self.learning_reset_pending()? { return Err(anyhow!("Auto learning storage unavailable")); }
-        let attribution = if self.auto_run_account_matches(run_id, profile_id, generation)? {
-            "same_account_generation"
-        } else {
-            "unverified_run_account"
-        };
+        let attribution = self.auto_thread_usage_attribution(run_id, profile_id,
+            generation, estimate.plan_type.as_deref())?;
         // This is cumulative thread metadata, not a new charge on every read.
         // Keep one latest sample per run/account generation, including later
         // provider corrections, so refreshes cannot inflate learned draw.
@@ -1487,10 +1518,10 @@ mod schema_migration_tests {
             estimated_credits_micros:1_000, input_tokens:None, output_tokens:None,
             cached_input_tokens:None, net_new_input_tokens:None, total_tokens:None };
         let now = crate::daemon::now();
-        let first = ThreadUsageEstimate { observed_ms:now,
+        let first = ThreadUsageEstimate { observed_ms:now, plan_type:None,
             estimated_credits_micros:1_000, groups:vec![group.clone()] };
         let first_id = store.insert_auto_thread_usage("run", "profile", 1, "codex-app/account-usage-read", &first).unwrap();
-        let corrected = ThreadUsageEstimate { observed_ms:now + 1,
+        let corrected = ThreadUsageEstimate { observed_ms:now + 1, plan_type:None,
             estimated_credits_micros:2_000,
             groups:vec![CreditGroup { estimated_credits_micros:2_000, ..group }] };
         let corrected_id = store.insert_auto_thread_usage("run", "profile", 1,
@@ -1508,7 +1539,7 @@ mod schema_migration_tests {
         let dir = tempfile::tempdir().unwrap();
         let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
         let now = crate::daemon::now();
-        let estimate = ThreadUsageEstimate { observed_ms:now,
+        let estimate = ThreadUsageEstimate { observed_ms:now, plan_type:None,
             estimated_credits_micros:0, groups:Vec::new() };
         let encoded = serde_json::to_string(&estimate).unwrap();
         store.learning_conn.execute(
@@ -1519,11 +1550,11 @@ mod schema_migration_tests {
                'profile',1,'unverified_run_account',?1+x,'fixture',?2 FROM n",
             params![now, encoded],
         ).unwrap();
-        let corrected = ThreadUsageEstimate { observed_ms:now+6_000,
+        let corrected = ThreadUsageEstimate { observed_ms:now+6_000, plan_type:None,
             estimated_credits_micros:0, groups:Vec::new() };
         store.insert_auto_thread_usage("target", "profile", 1,
             "codex-app/account-usage-read", &corrected).unwrap();
-        let fresh = ThreadUsageEstimate { observed_ms:now+6_001,
+        let fresh = ThreadUsageEstimate { observed_ms:now+6_001, plan_type:None,
             estimated_credits_micros:0, groups:Vec::new() };
         store.insert_auto_thread_usage("fresh", "profile", 1,
             "codex-app/account-usage-read", &fresh).unwrap();
@@ -1633,6 +1664,24 @@ mod schema_migration_tests {
         assert_eq!(store.auto_launch_resources("browser-1").unwrap(),
             Some(("overseer/browser-1".into(), "/tmp/browser-1".into(),
                 "snapshot-1".into(), "commit-1".into())));
+    }
+
+    #[test]
+    fn prior_run_account_evidence_gains_unknown_plan_without_losing_account_history() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE auto_run_account_evidence(
+            run_id TEXT PRIMARY KEY, profile_id TEXT NOT NULL,
+            first_generation INTEGER NOT NULL, last_generation INTEGER NOT NULL,
+            observed_turns INTEGER NOT NULL, consistent INTEGER NOT NULL);
+            INSERT INTO auto_run_account_evidence VALUES('run-1','profile-1',2,2,1,1);").unwrap();
+        let store = Store { conn, learning_conn: Connection::open_in_memory().unwrap(), learning_persistent: true };
+        store.migrate().unwrap();
+        store.migrate().unwrap();
+        let row: (i64, Option<String>, i64) = store.conn.query_row(
+            "SELECT first_generation,plan_type,plan_consistent FROM auto_run_account_evidence WHERE run_id='run-1'",
+            [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        ).unwrap();
+        assert_eq!(row, (2, None, 0), "old account evidence must not become proven plan evidence");
     }
 
     #[test]

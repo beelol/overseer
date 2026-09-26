@@ -1585,13 +1585,14 @@ impl Daemon {
                             let profile_id = run.profile_id.as_deref().ok_or_else(|| anyhow!("run account profile unavailable"))?;
                             store.record_auto_account_identity(profile_id, &fingerprint)?;
                             let generation = store.auto_account_generation(profile_id)?.ok_or_else(|| anyhow!("account generation unavailable"))?;
-                            store.record_auto_run_account(&run.id, profile_id, generation)?;
+                            let quota = crate::auto_quota::parse_codex_rate_limits(&result, profile_id, now()).ok();
+                            store.record_auto_run_account(&run.id, profile_id, generation,
+                                quota.as_ref().and_then(|snapshot| snapshot.reported_plan_type()))?;
                             if app["auto_selected"] == true {
                                 if app["expected_account_generation"].as_i64() != Some(generation) {
                                     return Ok(false);
                                 }
                                 if let Some(model) = run.model.as_deref() {
-                                    let quota = crate::auto_quota::parse_codex_rate_limits(&result, profile_id, now()).ok();
                                     if matches!(quota.as_ref().map(|snapshot| snapshot.state_for(model, now())),
                                         Some(crate::auto_quota::QuotaState::Exhausted)) {
                                         return Ok(false);
