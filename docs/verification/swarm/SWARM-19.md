@@ -22,4 +22,6 @@ Ruling: reject repositories with active Git commit hooks during unattended integ
 
 Follow-up with `catalog-v1`: an explicit Node.js 24 fixture replays 24 TypeScript resource modules, a contract repair and 26 isolated integration commits. The combined backend acceptance check fails after four migrated modules and passes after all 24; the source checkout remains unchanged. Run `cargo test --offline -p overseerd --test swarm_scenarios -- --ignored`; see [S3](S3.md). This is a local scripted replay, not an automated live integration path.
 
+At `d48c33a`, the same S3 run also admitted the 24 module attempts in bounded batches, held new admission at eight pending reviews, applied two director inbox batches, and reached `completed` only after 25 accepted job checks and a passing combined check on the final integration commit. The join reduces the gap between independent fixture proofs; the live integration path, conflict resolution and verifier recovery remain open.
+
 Remaining: a verifier attempt left `running` by daemon death requires reconciliation before another check; the fixture checker is not a qualified live execution sandbox. Patch conflicts have no director resolution flow. Hook detection has a race against external hook changes. Live adapter permissions, unsaved buffers and service-side writes remain unqualified. This criterion stays unchecked.

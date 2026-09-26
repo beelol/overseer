@@ -601,7 +601,7 @@
         "docs/verification/swarm/S3.md",
         "docs/verification/swarm/SWARM-64.md"
       ],
-      "blocker": "S3 now has a versioned backend, partial 26-commit integration replay and a separate four-to-eight-worker admission/review replay; S0–S2/S4–S5 and the complete S3 director, fault and artifact trace remain unverified."
+      "blocker": "S3 now has a versioned backend and one scripted run joining four-to-eight-worker admission, review pressure, 26 isolated integration commits and evidence-gated completion. S0–S2/S4–S5 and the complete S3 autonomous director, fault and user-facing artifact trace remain unverified."
     }
   },
   "scenarios": {
@@ -630,7 +630,7 @@
         "daemon/tests/swarm_scenarios.rs",
         "docs/verification/swarm/S3.md"
       ],
-      "blocker": "The versioned 24-module fixture replays contract repair, stale-result rejection and 26 isolated integration commits; a separate daemon test exercises scripted four-to-eight admission and review backpressure. Autonomous director adaptation, a joined live run, conflict repair, scope narrowing and qualified harness paths remain unverified."
+      "blocker": "One scripted run of the versioned 24-module fixture joins contract repair, stale-result rejection, four-to-eight admission, review backpressure, 26 isolated integration commits and evidence-gated completion. Autonomous director adaptation, a live run, conflict repair, scope narrowing and qualified harness paths remain unverified."
     },
     "S4": {
       "status": "unverified",
