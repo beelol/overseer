@@ -1756,10 +1756,13 @@ fn auto_codex_thread_credit_estimate_is_metadata_only_and_separate_from_quota() 
     assert!(observed["observation"]["read_account_generation"].as_i64().unwrap() > 0);
     assert!(!observed.to_string().contains("private-credit-sentinel"));
     assert!(!observed.to_string().contains("secret-prompt-sentinel"));
+    let repeated = d.call("auto.usage.thread.refresh", json!({"run_id":run}));
+    assert_eq!(repeated["observation"]["id"], observed["observation"]["id"],
+        "re-reading one unchanged cumulative thread estimate must not create a second sample");
     let rows = d.call("auto.usage.thread.list", json!({"limit":10}));
     assert_eq!(rows["observations"].as_array().unwrap().len(), 1);
     assert_eq!(d.runs().len(), 1, "metadata read must not start an agent run");
-    assert_eq!(std::fs::read_to_string(&trace).unwrap().lines().filter(|line| *line == "thread_usage_read").count(), 1);
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().lines().filter(|line| *line == "thread_usage_read").count(), 2);
     assert!(std::fs::read_to_string(&trace).unwrap().lines().any(|line| line == "turn_effort:medium"));
     let export = r.path().join("usage-export.json");
     d.call("auto.usage.export", json!({"path":export}));

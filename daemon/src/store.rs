@@ -978,14 +978,40 @@ impl Store {
         } else {
             "unverified_run_account"
         };
-        self.learning_conn.execute(
-            "INSERT INTO auto_thread_usage_observations(run_id,profile_id,read_account_generation,attribution,observed_ms,source,estimate) VALUES(?1,?2,?3,?4,?5,?6,?7)",
-            params![run_id, profile_id, generation, attribution, estimate.observed_ms, source, serde_json::to_string(estimate)?],
-        )?;
-        let id = self.learning_conn.last_insert_rowid();
+        // This is cumulative thread metadata, not a new charge on every read.
+        // Keep one latest sample per run/account generation, including later
+        // provider corrections, so refreshes cannot inflate learned draw.
+        let encoded = serde_json::to_string(estimate)?;
+        let tx = self.learning_conn.unchecked_transaction()?;
+        let existing: Option<i64> = tx.query_row(
+            "SELECT id FROM auto_thread_usage_observations
+             WHERE run_id=?1 AND profile_id=?2 AND read_account_generation=?3
+             ORDER BY id DESC LIMIT 1",
+            params![run_id, profile_id, generation], |row| row.get(0),
+        ).optional()?;
+        let id = if let Some(id) = existing {
+            tx.execute(
+                "UPDATE auto_thread_usage_observations
+                 SET attribution=?2,observed_ms=?3,source=?4,estimate=?5 WHERE id=?1",
+                params![id, attribution, estimate.observed_ms, source, encoded],
+            )?;
+            tx.execute(
+                "DELETE FROM auto_thread_usage_observations
+                 WHERE run_id=?1 AND profile_id=?2 AND read_account_generation=?3 AND id<>?4",
+                params![run_id, profile_id, generation, id],
+            )?;
+            id
+        } else {
+            tx.execute(
+                "INSERT INTO auto_thread_usage_observations(run_id,profile_id,read_account_generation,attribution,observed_ms,source,estimate) VALUES(?1,?2,?3,?4,?5,?6,?7)",
+                params![run_id, profile_id, generation, attribution, estimate.observed_ms, source, encoded],
+            )?;
+            tx.last_insert_rowid()
+        };
         const THIRTY_DAYS_MS: i64 = 30 * 86_400_000;
-        self.learning_conn.execute("DELETE FROM auto_thread_usage_observations WHERE observed_ms < ?1", params![crate::daemon::now().saturating_sub(THIRTY_DAYS_MS)])?;
-        self.learning_conn.execute("DELETE FROM auto_thread_usage_observations WHERE id NOT IN (SELECT id FROM auto_thread_usage_observations ORDER BY id DESC LIMIT 5000)", [])?;
+        tx.execute("DELETE FROM auto_thread_usage_observations WHERE observed_ms < ?1", params![crate::daemon::now().saturating_sub(THIRTY_DAYS_MS)])?;
+        tx.execute("DELETE FROM auto_thread_usage_observations WHERE id NOT IN (SELECT id FROM auto_thread_usage_observations ORDER BY observed_ms DESC,id DESC LIMIT 5000)", [])?;
+        tx.commit()?;
         Ok(id)
     }
 
@@ -1432,6 +1458,63 @@ mod schema_migration_tests {
         let reopened = Store::open(&path).unwrap();
         assert!(reopened.auto_measurements(10).unwrap().is_empty());
         assert!(reopened.auto_daily_aggregates(10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn later_thread_credit_correction_replaces_the_run_sample() {
+        use crate::auto_consumption::{CreditGroup, ThreadUsageEstimate};
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
+        let group = CreditGroup { model:Some("gpt-6-sol".into()), effort:Some("medium".into()),
+            estimated_credits_micros:1_000, input_tokens:None, output_tokens:None,
+            cached_input_tokens:None, net_new_input_tokens:None, total_tokens:None };
+        let now = crate::daemon::now();
+        let first = ThreadUsageEstimate { observed_ms:now,
+            estimated_credits_micros:1_000, groups:vec![group.clone()] };
+        let first_id = store.insert_auto_thread_usage("run", "profile", 1, "codex-app/account-usage-read", &first).unwrap();
+        let corrected = ThreadUsageEstimate { observed_ms:now + 1,
+            estimated_credits_micros:2_000,
+            groups:vec![CreditGroup { estimated_credits_micros:2_000, ..group }] };
+        let corrected_id = store.insert_auto_thread_usage("run", "profile", 1,
+            "codex-app/account-usage-read", &corrected).unwrap();
+        assert_eq!(first_id, corrected_id, "one run and account generation has one cumulative sample");
+        let rows = store.auto_thread_usage_observations(10).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].estimate.estimated_credits_micros, 2_000);
+        assert_eq!(rows[0].estimate.observed_ms, now + 1);
+    }
+
+    #[test]
+    fn corrected_thread_credit_sample_survives_the_next_row_cap_insert() {
+        use crate::auto_consumption::ThreadUsageEstimate;
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
+        let now = crate::daemon::now();
+        let estimate = ThreadUsageEstimate { observed_ms:now,
+            estimated_credits_micros:0, groups:Vec::new() };
+        let encoded = serde_json::to_string(&estimate).unwrap();
+        store.learning_conn.execute(
+            "WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<5000)
+             INSERT INTO auto_thread_usage_observations
+             (run_id,profile_id,read_account_generation,attribution,observed_ms,source,estimate)
+             SELECT CASE WHEN x=1 THEN 'target' ELSE 'other-'||x END,
+               'profile',1,'unverified_run_account',?1+x,'fixture',?2 FROM n",
+            params![now, encoded],
+        ).unwrap();
+        let corrected = ThreadUsageEstimate { observed_ms:now+6_000,
+            estimated_credits_micros:0, groups:Vec::new() };
+        store.insert_auto_thread_usage("target", "profile", 1,
+            "codex-app/account-usage-read", &corrected).unwrap();
+        let fresh = ThreadUsageEstimate { observed_ms:now+6_001,
+            estimated_credits_micros:0, groups:Vec::new() };
+        store.insert_auto_thread_usage("fresh", "profile", 1,
+            "codex-app/account-usage-read", &fresh).unwrap();
+        let count: i64 = store.learning_conn.query_row(
+            "SELECT COUNT(*) FROM auto_thread_usage_observations", [], |row| row.get(0)).unwrap();
+        let target: i64 = store.learning_conn.query_row(
+            "SELECT COUNT(*) FROM auto_thread_usage_observations WHERE run_id='target'", [], |row| row.get(0)).unwrap();
+        assert_eq!(count, 5_000);
+        assert_eq!(target, 1, "a freshly corrected sample cannot be evicted as the oldest ID");
     }
 
     #[test]
