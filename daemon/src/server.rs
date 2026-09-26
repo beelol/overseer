@@ -323,6 +323,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             crate::swarm::schedule_next(&mut d.store.lock().unwrap(), p)?
         }
+        "swarm.dispatch.next" => {
+            fixture_only()?;
+            crate::swarm::dispatch_next(d, p)?
+        }
         "swarm.worker.launch" => {
             fixture_only()?;
             crate::swarm::launch_worker(d, p)?

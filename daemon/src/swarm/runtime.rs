@@ -11,6 +11,10 @@ use std::sync::Arc;
 
 pub fn launch_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let _serial = d.swarm_launch_lock.lock().unwrap();
+    launch_worker_locked(d,p)
+}
+
+pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
     let job = required(p, "job_id")?;
     let attempt = required(p, "attempt_id")?;

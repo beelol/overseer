@@ -181,6 +181,13 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           target_id TEXT NOT NULL,
           created_ms INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS swarm_dispatch_intents(
+          request_id TEXT PRIMARY KEY,
+          request_sha256 TEXT NOT NULL,
+          request_json TEXT NOT NULL,
+          failure_injected INTEGER NOT NULL DEFAULT 0 CHECK(failure_injected IN (0,1)),
+          created_ms INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS swarm_review_gate(
           run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id),
           held INTEGER NOT NULL CHECK(held IN (0,1))
