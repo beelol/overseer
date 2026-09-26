@@ -169,9 +169,10 @@
         "daemon/tests/swarm_control.rs",
         "docs/verification/swarm/milestone-8.md",
         "docs/verification/swarm/SWARM-61.md",
-        "daemon/tests/swarm_runtime.rs"
+        "daemon/tests/swarm_runtime.rs",
+        "docs/verification/swarm/SWARM-20.md"
       ],
-      "blocker": "Stop now interrupts a linked scripted local worker and blocks pending launch replay; live Pause checkpoints, native descendants, unconfirmed-exit retry, and full off-mode drain remain unverified."
+      "blocker": "Stop interrupts linked scripted local workers, blocks pending launch replay, and retries a simulated failed first signal after daemon restart while exit remains unconfirmed. Live Pause checkpoints, native descendants, visible reservation/exit state in the UI, and full off-mode drain remain unverified."
     },
     "SWARM-21": {
       "status": "partial",
@@ -555,7 +556,7 @@
         "daemon/tests/swarm_context.rs",
         "daemon/src/swarm/schema.rs"
       ],
-      "blocker": "Pending local launch replay is rejected after Stop, a linked scripted worker is interrupted, and rejected/superseded work does not requeue after cancellation. A crash fixture persists revocation, retries the dependent-worker interrupt after restart, and leaves an unrelated worker running. Four scripted Stop/revocation/result/acceptance orderings persist a shared sequence, preserve late results, and block new launches; simultaneous native races, native descendants, initially unreachable-process retry, and explicit user resume remain unverified."
+      "blocker": "Pending local launch replay is rejected after Stop, a linked scripted worker is interrupted, and rejected/superseded work does not requeue after cancellation. A crash fixture persists revocation, retries the dependent-worker interrupt after restart, and leaves an unrelated worker running. Four scripted Stop/revocation/result/acceptance orderings persist a shared sequence, preserve late results, and block new launches. A simulated failed Stop signal is retried after daemon restart. Simultaneous native races, native descendants, qualified live paths, and explicit user resume remain unverified."
     },
     "SWARM-62": {
       "status": "partial",
