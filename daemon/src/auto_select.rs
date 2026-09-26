@@ -252,16 +252,23 @@ fn excluded(work: &WorkUnit, route: &Route, exhausted_pools: &BTreeSet<&str>) ->
 /// Deterministic eligibility comes before ranking. Unknown allowance remains
 /// eligible only as a disclosed cold-start possibility, never as free capacity.
 pub fn select(work: &WorkUnit, routes: &[Route]) -> Decision {
-    select_with_pool_blocks(work, routes, true)
+    select_with_pool_blocks(work, routes, true, false)
 }
 
 /// Replay only: decisions recorded before shared-pool block propagation keep
 /// their original selector semantics rather than changing under a new build.
 pub fn select_legacy_v1(work: &WorkUnit, routes: &[Route]) -> Decision {
-    select_with_pool_blocks(work, routes, false)
+    select_with_pool_blocks(work, routes, false, true)
 }
 
-fn select_with_pool_blocks(work: &WorkUnit, routes: &[Route], propagate_pool_blocks: bool) -> Decision {
+/// Replay decisions written before public-status collection changed the
+/// ranking of unknown versus degraded health. Pool blocks already existed.
+pub fn select_pre_status_v1(work: &WorkUnit, routes: &[Route]) -> Decision {
+    select_with_pool_blocks(work, routes, true, true)
+}
+
+fn select_with_pool_blocks(work: &WorkUnit, routes: &[Route], propagate_pool_blocks: bool,
+    legacy_health_order: bool) -> Decision {
     let mut exclusions = Vec::new();
     let mut eligible = Vec::new();
     let exhausted_pools: BTreeSet<&str> = routes.iter()
@@ -280,11 +287,12 @@ fn select_with_pool_blocks(work: &WorkUnit, routes: &[Route], propagate_pool_blo
     eligible.sort_by_key(|route| {
         (
             route.tier,
-            match route.health {
-                Health::Healthy => 0,
-                Health::Degraded => 1,
-                Health::Unknown => 2,
-                Health::Unavailable => 3,
+            if legacy_health_order {
+                match route.health { Health::Healthy => 0, Health::Degraded => 1,
+                    Health::Unknown => 2, Health::Unavailable => 3 }
+            } else {
+                match route.health { Health::Healthy => 0, Health::Unknown => 1,
+                    Health::Degraded => 2, Health::Unavailable => 3 }
             },
             match route.quota {
                 Allowance::ObservedNonExhausted | Allowance::NotApplicable => 0,
@@ -343,6 +351,20 @@ mod tests {
             fit: Fit::Unknown,
             health: Health::Healthy,
         }
+    }
+
+    #[test]
+    fn legacy_replay_keeps_the_health_order_recorded_before_public_feeds() {
+        let mut degraded = route("a", "codex-app", "pool-a", CapabilityTier::General,
+            "medium", &[]);
+        let mut unknown = route("b", "claude", "pool-b", CapabilityTier::General,
+            "medium", &[]);
+        degraded.health = Health::Degraded;
+        unknown.health = Health::Unknown;
+        let work = unit(CapabilityTier::General, &[]);
+        assert_eq!(select_legacy_v1(&work, &[degraded.clone(), unknown.clone()]).selected.as_deref(), Some("a"));
+        assert_eq!(select_pre_status_v1(&work, &[degraded.clone(), unknown.clone()]).selected.as_deref(), Some("a"));
+        assert_eq!(select(&work, &[degraded, unknown]).selected.as_deref(), Some("b"));
     }
 
     fn unit(tier: CapabilityTier, tools: &[&str]) -> WorkUnit {

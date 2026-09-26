@@ -565,13 +565,40 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 }
                 if routes.len() > 128 { return Err(anyhow!("automatic candidate catalog exceeded its bound")); }
                 let health_now = crate::daemon::now();
-                match crate::auto_health::recent_local_observations(&d.store.lock().unwrap(), health_now) {
-                    Ok(observations) => {
-                        for route in &mut routes {
-                            route.health = crate::auto_health::evaluate(route, &observations, health_now);
+                let mut health_observations = match crate::auto_health::recent_local_observations(
+                    &d.store.lock().unwrap(), health_now) {
+                    Ok(observations) => observations,
+                    Err(_) => {
+                        discovery_failures.push(json!({"reason":"local_health_evidence_unavailable"}));
+                        Vec::new()
+                    }
+                };
+                let public_providers = routes.iter().map(|route| route.provider.clone())
+                    .filter(|provider| matches!(provider.as_str(), "openai" | "anthropic"))
+                    .collect::<Vec<_>>();
+                let public_budget = Duration::from_millis(750)
+                    .min(decision_deadline.saturating_duration_since(Instant::now()));
+                if !public_providers.is_empty() && public_budget >= Duration::from_millis(20) {
+                    for (provider, reading) in collect_unique_bounded(&public_providers,
+                        public_budget, |id, timeout| {
+                            let data = crate::auto_collect::public_status_json(
+                                std::path::Path::new("/usr/bin/curl"), id, timeout)?;
+                            crate::auto_health::parse_public_status(&data, id, crate::daemon::now())
+                        }) {
+                        match reading {
+                            Ok(observation) => {
+                                evidence.push(json!({"provider":provider,"source":"official-status-summary",
+                                    "observed_ms":observation.observed_ms,"advisory":true}));
+                                health_observations.push(observation);
+                            }
+                            Err(_) => discovery_failures.push(json!({"provider":provider,
+                                "reason":"public_status_unavailable"})),
                         }
                     }
-                    Err(_) => discovery_failures.push(json!({"reason":"local_health_evidence_unavailable"})),
+                }
+                let health_now = crate::daemon::now();
+                for route in &mut routes {
+                    route.health = crate::auto_health::evaluate(route, &health_observations, health_now);
                 }
                 let work = WorkUnit { id:work_unit_id.into(), min_tier, required_tools:required_tools.clone(),
                     context_needed, requires_approvals, min_sandbox:Sandbox::WorkspaceWrite,
@@ -618,7 +645,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     decision.selected = None;
                     decision.reason = "collection_deadline_elapsed".into();
                 }
-                let trace = json!({"selector_version":"multi-harness-preflight-v1","decision":decision,
+                let trace = json!({"selector_version":"multi-harness-preflight-v2","decision":decision,
                     "selection_input":{"work":&work,"routes":&routes,
                         "attempt_limit_reached":attempt_limit_reached,
                         "deadline_exhausted":deadline_exhausted},
@@ -672,9 +699,12 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             if routes.len() > 128 { return Err(anyhow!("automatic decision replay exceeded its candidate bound")); }
             let decision = match selector_version {
                 "codex-cold-start-v1" => crate::auto_select::select_legacy_v1(&work, &routes),
-                "codex-cold-start-v2" | "multi-harness-cold-start-v1" => crate::auto_select::select(&work, &routes),
-                "multi-harness-preflight-v1" => {
-                    let mut decision = crate::auto_select::select(&work, &routes);
+                "codex-cold-start-v2" | "multi-harness-cold-start-v1" =>
+                    crate::auto_select::select_pre_status_v1(&work, &routes),
+                "multi-harness-preflight-v1" | "multi-harness-preflight-v2" => {
+                    let mut decision = if selector_version == "multi-harness-preflight-v1" {
+                        crate::auto_select::select_pre_status_v1(&work, &routes)
+                    } else { crate::auto_select::select(&work, &routes) };
                     if input["attempt_limit_reached"] == true {
                         decision.selected = None;
                         decision.reason = "pre_effect_attempt_limit".into();

@@ -1,7 +1,7 @@
 //! Scoped, expiring service evidence for automatic route selection.
 
 use crate::auto_select::{Health, Route};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use rusqlite::params;
 use serde_json::Value;
 
@@ -38,6 +38,37 @@ pub struct Observation {
     pub signal: Signal,
     pub observed_ms: i64,
     pub expires_ms: i64,
+}
+
+/// Normalize only the public component that corresponds to a supported
+/// harness route. Status pages are advisory and never authorize an account.
+pub fn parse_public_status(value: &Value, provider: &str, observed_ms: i64) -> Result<Observation> {
+    let (required, endpoint): (&[&str], &str) = match provider {
+        "openai" => (&["CLI", "Codex API"], "codex"),
+        "anthropic" => (&["Claude Code"], "claude-code"),
+        _ => return Err(anyhow!("unsupported public status provider")),
+    };
+    let components = value.get("components").and_then(Value::as_array)
+        .filter(|items| items.len() <= 128)
+        .ok_or_else(|| anyhow!("public status components unavailable"))?;
+    let mut found = std::collections::BTreeSet::new();
+    let mut incident = false;
+    for component in components {
+        let Some(name) = component.get("name").and_then(Value::as_str) else { continue };
+        if !required.contains(&name) { continue; }
+        if !found.insert(name) { return Err(anyhow!("duplicate public status component")); }
+        match component.get("status").and_then(Value::as_str) {
+            Some("operational") => {}
+            Some("degraded_performance" | "partial_outage" | "major_outage" | "under_maintenance") => incident = true,
+            _ => return Err(anyhow!("unsupported public status component state")),
+        }
+    }
+    if found.len() != required.len() {
+        return Err(anyhow!("required public status component unavailable"));
+    }
+    Ok(Observation { scope: Scope::Endpoint {provider:provider.into(), endpoint:endpoint.into()},
+        signal:if incident {Signal::PublicIncident} else {Signal::PublicHealthy},
+        observed_ms, expires_ms:observed_ms.saturating_add(60_000) })
 }
 
 /// Direct, scope-matched observations may exclude a route. Public status is
@@ -115,14 +146,10 @@ pub fn evaluate(route: &Route, observations: &[Observation], now_ms: i64) -> Hea
             }
         }
     }
-    let incident_at =
-        provider_status.and_then(|(at, signal)| (signal == Signal::PublicIncident).then_some(at));
+    let public_incident = provider_status.is_some_and(|(_, signal)| signal == Signal::PublicIncident);
     match direct {
-        Some((at, _, Health::Healthy)) if incident_at.is_some_and(|incident| incident > at) => {
-            Health::Degraded
-        }
         Some((_, _, health)) => health,
-        None if incident_at.is_some() => Health::Degraded,
+        None if public_incident => Health::Degraded,
         None => Health::Unknown,
     }
 }
@@ -223,6 +250,78 @@ mod tests {
     use super::*;
     use crate::auto_select::{select, Allowance, CapabilityTier, Fit, Sandbox, WorkUnit};
     use std::collections::BTreeSet;
+
+    #[test]
+    fn public_feed_maps_only_codex_cli_and_api_to_advisory_health() {
+        let at = 1_800_000_000_000;
+        let feed = serde_json::json!({"components":[
+            {"name":"Images","status":"major_outage"},
+            {"name":"CLI","status":"operational"},
+            {"name":"Codex API","status":"degraded_performance"}
+        ]});
+        let signal = parse_public_status(&feed, "openai", at).unwrap();
+        let codex = route("codex", "codex-app", "openai", "codex", "acct-a");
+        assert_eq!(evaluate(&codex, &[signal], at), Health::Degraded);
+        let mut recovered = feed;
+        recovered["components"][2]["status"] = serde_json::json!("operational");
+        let green = parse_public_status(&recovered, "openai", at).unwrap();
+        let mut exhausted = codex;
+        exhausted.quota = Allowance::Exhausted;
+        exhausted.health = evaluate(&exhausted, &[green], at);
+        assert!(select(&work(), &[exhausted]).selected.is_none(),
+            "public green cannot clear an exhausted account");
+    }
+
+    #[test]
+    fn public_feed_requires_the_relevant_component_and_rejects_drift() {
+        let at = 1_800_000_000_000;
+        let unrelated = serde_json::json!({"components":[
+            {"name":"Claude API (api.anthropic.com)","status":"operational"}
+        ]});
+        assert!(parse_public_status(&unrelated, "anthropic", at).is_err());
+        let incident = serde_json::json!({"components":[
+            {"name":"Claude API (api.anthropic.com)","status":"operational"},
+            {"name":"Claude Code","status":"major_outage"}
+        ]});
+        let observation = parse_public_status(&incident, "anthropic", at).unwrap();
+        let claude = route("claude", "claude", "anthropic", "claude-code", "acct-a");
+        assert_eq!(evaluate(&claude, &[observation], at), Health::Degraded);
+        let mut duplicate = incident.clone();
+        duplicate["components"].as_array_mut().unwrap().push(
+            serde_json::json!({"name":"Claude Code","status":"operational"}));
+        assert!(parse_public_status(&duplicate, "anthropic", at).is_err());
+        let mut unknown = incident;
+        unknown["components"][1]["status"] = serde_json::json!("new_status");
+        assert!(parse_public_status(&unknown, "anthropic", at).is_err());
+        unknown["components"][1]["status"] = serde_json::json!("under_maintenance");
+        let maintenance = parse_public_status(&unknown, "anthropic", at).unwrap();
+        assert_eq!(evaluate(&claude, &[maintenance], at), Health::Degraded);
+    }
+
+    #[test]
+    fn public_incident_softly_prefers_an_independent_unknown_route() {
+        let at = 1_800_000_000_000;
+        let mut affected = route("a", "codex-app", "openai", "codex", "acct-a");
+        let independent = route("b", "claude", "anthropic", "claude-code", "acct-b");
+        affected.health = evaluate(&affected,
+            &[obs(Scope::Endpoint {provider:"openai".into(), endpoint:"codex".into()},
+                Signal::PublicIncident, at, at + 60_000)], at);
+        let decision = select(&work(), &[affected, independent]);
+        assert_eq!(decision.selected.as_deref(), Some("b"));
+        assert!(decision.exclusions.is_empty(), "public incidents must not hard-exclude a route");
+    }
+
+    #[test]
+    fn a_recent_direct_success_outweighs_a_later_public_page_refresh() {
+        let route = route("codex", "codex-app", "openai", "codex", "acct-a");
+        let observations = [
+            obs(Scope::Route("codex".into()), Signal::RouteSuccess, 150, 250),
+            obs(Scope::Endpoint {provider:"openai".into(), endpoint:"codex".into()},
+                Signal::PublicIncident, 200, 260),
+        ];
+        assert_eq!(evaluate(&route, &observations, 210), Health::Healthy,
+            "a status fetch time is not proof the incident began after the successful turn");
+    }
 
     fn route(id: &str, harness: &str, provider: &str, endpoint: &str, profile: &str) -> Route {
         Route {

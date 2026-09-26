@@ -223,6 +223,60 @@ pub fn opencode_local_catalog(
     result
 }
 
+/// Public, credential-free status metadata. URLs are fixed in product code;
+/// the response is bounded and later reduced to an advisory component state.
+pub fn public_status_json(program: &Path, provider: &str, timeout: Duration) -> Result<Value> {
+    let url = match provider {
+        "openai" => "https://status.openai.com/api/v2/summary.json",
+        "anthropic" => "https://status.claude.com/api/v2/summary.json",
+        _ => return Err(anyhow!("unsupported public status provider")),
+    };
+    if timeout < Duration::from_millis(20) || timeout > Duration::from_secs(2) {
+        return Err(anyhow!("public status deadline is out of bounds"));
+    }
+    let max_time = format!("{:.3}", timeout.as_secs_f64());
+    let mut child = Command::new(program)
+        .args(["-q", "--fail", "--silent", "--show-error", "--max-time", &max_time,
+            "--connect-timeout", &max_time, "--max-filesize", "131072", "--noproxy", "*",
+            "--proto", "=https", url])
+        .current_dir(crate::adapters::neutral_dir()).env_clear()
+        .env("PATH", "/usr/bin:/bin:/usr/local/bin").env("HOME", "/var/empty")
+        .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
+    let result = (|| -> Result<Value> {
+        let deadline = Instant::now() + timeout;
+        let mut stdout = child.stdout.take().ok_or_else(|| anyhow!("public status output unavailable"))?;
+        let mut bytes = Vec::new();
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() { return Err(anyhow!("public status read timed out")); }
+            let mut pollfd = libc::pollfd {fd:stdout.as_raw_fd(), events:libc::POLLIN | libc::POLLHUP, revents:0};
+            let ready = unsafe { libc::poll(&mut pollfd, 1, remaining.as_millis().min(i32::MAX as u128) as i32) };
+            if ready == 0 { return Err(anyhow!("public status read timed out")); }
+            if ready < 0 {
+                if std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted { continue; }
+                return Err(anyhow!("public status stream failed"));
+            }
+            let mut chunk = [0u8; 4096];
+            let count = stdout.read(&mut chunk)?;
+            if count == 0 { break; }
+            bytes.extend_from_slice(&chunk[..count]);
+            if bytes.len() > 128 * 1024 { return Err(anyhow!("public status response exceeded its bound")); }
+        }
+        loop {
+            if let Some(status) = child.try_wait()? {
+                if !status.success() { return Err(anyhow!("public status request failed")); }
+                break;
+            }
+            if Instant::now() >= deadline { return Err(anyhow!("public status read timed out")); }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        serde_json::from_slice(&bytes).map_err(|_| anyhow!("invalid public status JSON"))
+    })();
+    let _ = child.kill();
+    let _ = child.wait();
+    result
+}
+
 #[cfg(test)]
 mod opencode_metadata_tests {
     use super::*;
@@ -289,6 +343,25 @@ mod claude_auth_tests {
             json!({"loggedIn":false,"authMethod":"claude.ai","email":"a@example.test"})] {
             assert!(parse_claude_auth_status(&payload, 1000).is_err());
         }
+    }
+}
+
+#[cfg(test)]
+mod public_status_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn public_status_read_uses_a_fixed_url_and_bounded_structured_output() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("fixture-curl");
+        std::fs::write(&program, "#!/bin/sh\ncase \"$*\" in *https://status.claude.com/api/v2/summary.json*) printf '%s' '{\"components\":[{\"name\":\"Claude Code\",\"status\":\"operational\"}]}' ;; *) exit 2 ;; esac\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let value = public_status_json(&program, "anthropic", Duration::from_secs(1)).unwrap();
+        assert_eq!(value["components"][0]["name"], "Claude Code");
+        assert!(public_status_json(&program, "unknown", Duration::from_secs(1)).is_err());
+        std::fs::write(&program, "#!/bin/sh\nhead -c 140000 /dev/zero\n").unwrap();
+        assert!(public_status_json(&program, "anthropic", Duration::from_secs(1)).is_err());
     }
 }
 
