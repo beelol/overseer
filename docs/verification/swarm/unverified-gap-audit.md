@@ -1,6 +1,6 @@
 # Unverified Swarm acceptance criteria — dependency audit
 
-Inspected at code revision `ffa08ba`. This is a gap audit, not verification evidence. The 24 criteria still marked `unverified` in `coverage.json` now each have a specific reason. None is checked in the RFC, and S0–S5 remain unverified.
+Initially inspected at code revision `ffa08ba`; updated after the local runtime bridge at `6152228`. This is a gap audit, not verification evidence. The 23 criteria still marked `unverified` in `coverage.json` each have a specific reason. None is checked in the RFC, and S0–S5 remain unverified.
 
 The dependency clusters are:
 
@@ -8,6 +8,6 @@ The dependency clusters are:
 2. Shared workspace and side effects: SWARM-18/52/57/58. Swarm assignments do not yet select isolated worktrees or enforce read-only source/service permissions, destination ACLs, or side-effect reconciliation.
 3. Director context and multi-category scheduling: SWARM-34/36. A bounded message batch is implemented, but not a bounded worker brief/context request path or fair central admission queue.
 4. Product presentation and truthful outcomes: SWARM-23/37/55. The extension has no Swarm view, and final coverage does not yet classify negative results, environment failures and confirmed defects.
-5. End-to-end lifecycle and scenarios: SWARM-31/64. Adapter lifecycle tests exist outside Swarm; complete versioned S0–S5 traces have not been replayed.
+5. End-to-end scenarios: SWARM-64. A scripted Swarm worker now has partial SWARM-31 evidence, but complete versioned S0–S5 traces and live harness lifecycle qualification have not been replayed.
 
-Each `blocker` field in `coverage.json` names the missing behavior for the 24 criteria and six scenarios. A partial criterion stays partial where fixture evidence exists; an unverified criterion remains unverified even if adjacent code has tests. No lack of live authorization was turned into a passing fixture claim.
+Each `blocker` field in `coverage.json` names the missing behavior for the 23 criteria and six scenarios. A partial criterion stays partial where fixture evidence exists; an unverified criterion remains unverified even if adjacent code has tests. No lack of live authorization was turned into a passing fixture claim.

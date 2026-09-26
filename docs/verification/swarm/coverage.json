@@ -50,18 +50,20 @@
       "evidence": [
         "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-7.md",
-        "docs/verification/swarm/SWARM-08.md"
+        "docs/verification/swarm/SWARM-08.md",
+        "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Fixture admission counts director, worker and existing ordinary-run slots and enforces per-run/global ceilings; reverse ordinary-launch gating, lower-maximum draining, actual reviewer/descendant control and live activation remain unimplemented."
+      "blocker": "Fixture admission counts existing ordinary runs and counts a linked scripted worker only once alongside its Swarm attempt; reverse ordinary-launch gating, lower-maximum draining, reviewer/native-descendant control and live activation remain unimplemented."
     },
     "SWARM-08": {
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-7.md",
-        "docs/verification/swarm/SWARM-08.md"
+        "docs/verification/swarm/SWARM-08.md",
+        "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Concurrent fixture swarm admissions share an atomic reservation transaction and count active ordinary runs toward the global slot ceiling; ordinary task.create does not yet reserve a slot/account window atomically, so reverse races remain possible."
+      "blocker": "Fixture swarm admissions share an atomic reservation transaction and count ordinary active runs while avoiding double-counting linked Swarm workers; ordinary task.create still lacks a shared atomic slot/account reservation, so reverse races remain possible."
     },
     "SWARM-09": {
       "status": "partial",
@@ -151,9 +153,11 @@
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
         "daemon/tests/swarm_control.rs",
-        "docs/verification/swarm/milestone-8.md"
+        "docs/verification/swarm/milestone-8.md",
+        "docs/verification/swarm/SWARM-61.md",
+        "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Daemon Pause, Resume and Swarm off states, queued cancellation and late-result retention pass; live descendant interruption, draining to one agent and confirmed exits remain unimplemented."
+      "blocker": "Stop now interrupts a linked scripted local worker and blocks pending launch replay; live Pause checkpoints, native descendants, unconfirmed-exit retry, and full off-mode drain remain unverified."
     },
     "SWARM-21": {
       "status": "partial",
@@ -172,9 +176,11 @@
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
-        "docs/verification/swarm/milestone-10.md"
+        "docs/verification/swarm/milestone-10.md",
+        "docs/verification/swarm/SWARM-22.md",
+        "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Pre-launch state, broker replay and an additive database migration survive restart; launch/reservation reconciliation and VS Code restart cases are not implemented."
+      "blocker": "A linked scripted worker survives daemon restart and launch replay returns one run with its attempt reserved; exact spawn-record crash windows, result receipt replay, VS Code restart and live harness recovery remain unverified."
     },
     "SWARM-23": {
       "status": "unverified",
@@ -234,9 +240,12 @@
       "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result and prior Pause state, and requeues an unapplied batch after confirmed replacement with generation fencing; live process liveness, replacement availability and actual director execution are unverified."
     },
     "SWARM-31": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "Existing adapter lifecycle tests are not wired to Swarm attempts, descendants, accounting and asynchronous launch receipts."
+      "status": "partial",
+      "evidence": [
+        "docs/verification/swarm/SWARM-31.md",
+        "daemon/tests/swarm_runtime.rs"
+      ],
+      "blocker": "A scripted local launch remains separate from completion, replays to one run and requires terminal process state; native async receipts, silent/stale output, late append, descendants and usage reconciliation remain unverified."
     },
     "SWARM-32": {
       "status": "partial",
@@ -482,9 +491,11 @@
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
         "daemon/tests/swarm_director.rs",
-        "docs/verification/swarm/milestone-5.md"
+        "docs/verification/swarm/milestone-5.md",
+        "docs/verification/swarm/SWARM-61.md",
+        "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Stop halts new attempt registration and director batch claims while preserving late evidence; live cancellation and permission-revocation races remain unimplemented."
+      "blocker": "Pending local launch replay is rejected after Stop and a linked scripted worker is interrupted; permission revocation, result/acceptance races, native descendants and unreachable-process retry remain unverified."
     },
     "SWARM-62": {
       "status": "partial",

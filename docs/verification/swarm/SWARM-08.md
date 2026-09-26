@@ -8,6 +8,8 @@ Expected: the ordinary process occupies a global execution slot. Swarm admission
 
 Actual: the red test admitted the Swarm worker while the ordinary process was active. After the fix, admission reports `global_agent_limit`; after the ordinary run exits, it reports `admitted`. `cargo test --workspace --offline` passed 78 tests. The test runs no paid model.
 
+Follow-up at `6152228`: a fixture-launched Swarm worker now appears in Overseer's ordinary `runs` table as well as `swarm_attempts`. Admission excludes that linked ordinary row while the attempt is registered, avoiding a double count; with a three-agent total limit, a second worker can enter alongside the director and first worker. Its test first failed with `global_agent_limit`, then passed. The workspace suite passed 81 tests.
+
 Evidence: `daemon/tests/swarm_admission.rs` (`ordinary_run_occupies_global_slot_until_confirmed_exit`), `daemon/src/swarm/admission.rs`.
 
 Remaining: this is one-directional. An ordinary `task.create` after Swarm admission is not checked against the same slot ledger, and no ordinary run yet reserves an account quota window. Shared account identity, reverse launch races and descendant enforcement therefore remain unverified; neither SWARM-07 nor SWARM-08 is checked.
