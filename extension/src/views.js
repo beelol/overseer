@@ -28,7 +28,8 @@ class Model {
     catch (error) { this.error = error.message; }
     this.emitter.fire();
   }
-  scheduleRefresh() { clearTimeout(this.timer); this.timer = setTimeout(() => this.refresh(), 120); }
+  // Coalesces bursts without starving: a steady stream of events still refreshes every 120 ms.
+  scheduleRefresh() { if (!this.timer) this.timer = setTimeout(() => { this.timer = undefined; this.refresh(); }, 120); }
   run(id) { return this.state.runs.find(r => r.id === id); }
   task(id) { return this.state.tasks.find(t => t.id === id); }
   workspace(id) { return this.state.workspaces.find(w => w.id === id); }
@@ -230,10 +231,12 @@ class AccountsProvider {
         else if (st.logged_in) detail = [st.identity?.plan, (st.identity?.account_fingerprint || st.identity?.fingerprint || '').slice(0, 8)].filter(Boolean).join(' · ') || 'signed in';
         else detail = 'signed out';
       }
-      item.description = `${detail}${a.kind === 'follows-app' ? ' · desktop' : ''}`;
+      const usage = this.model.accountUsage?.get(a.id);
+      const near = usage?.reported ? (usage.windows || []).filter(w => w.used >= 0.8).sort((x, y) => y.used - x.used)[0] : undefined;
+      item.description = `${detail}${a.kind === 'follows-app' ? ' · desktop' : ''}${near ? ` · ${Math.round(near.used * 100)}% of ${near.label}` : ''}`;
       item.iconPath = st?.logged_in ? this.logo(a.provider, 'account') : new vscode.ThemeIcon('circle-slash');
       item.accessibilityInformation = { label: `${a.name}, ${st?.logged_in ? 'signed in' : 'not signed in'}${detail && st?.logged_in ? ', ' + detail : ''}${a.kind === 'follows-app' ? ', follows the desktop app' : ''}` };
-      item.tooltip = new vscode.MarkdownString(`**${a.name}** — ${node.provider.label}\n\n${a.kind === 'follows-app' ? `Follows ${a.follows}. It changes when that app switches accounts; Overseer never signs it out.` : `Fixed account with its own credential folder: \`${p.home || ''}\`. The desktop app switching accounts does not change it.`}\n\nUsable by: ${(a.harnesses || []).join(', ')}${a.last_used_ms ? `\n\nLast used ${new Date(a.last_used_ms).toLocaleString()}` : ''}${st ? '\n\n```\n' + (st.detail || '') + '\n```' : ''}`);
+      item.tooltip = new vscode.MarkdownString(`**${a.name}** — ${node.provider.label}\n\n${a.kind === 'follows-app' ? `Follows ${a.follows}. It changes when that app switches accounts; Overseer never signs it out.` : `Fixed account with its own credential folder: \`${p.home || ''}\`. The desktop app switching accounts does not change it.`}\n\nUsable by: ${(a.harnesses || []).join(', ')}${a.last_used_ms ? `\n\nLast used ${new Date(a.last_used_ms).toLocaleString()}` : ''}\n\n${usage?.reported ? `Usage (${usage.source}): ${(usage.windows || []).map(w => `${w.label} ${Math.round(w.used * 100)}%${w.resets_at_ms ? `, resets ${new Date(w.resets_at_ms).toLocaleString()}` : ''}`).join('; ')}` : 'Usage: not reported by this harness yet'}${st ? '\n\n```\n' + (st.detail || '') + '\n```' : ''}`);
       // The sign-in state picks the menu: Sign In for a signed-out account, Sign Out only for a signed-in one.
       item.contextValue = `${a.kind === 'follows-app' ? 'profile-system' : 'profile-isolated'}-${st?.logged_in ? 'signedin' : 'signedout'}`;
       return { item, profile: p, account: a };

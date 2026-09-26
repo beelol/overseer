@@ -158,14 +158,14 @@ function fold(row) {
   const position = row.element.classList.contains('collapsed') !== closed ? anchor() : undefined;
   if (position?.id === row.entry.id && closed) position.offset = 0;
   row.element.classList.toggle('collapsed', closed);
-  row.toggle.textContent = closed ? '▸' : '▾'; row.toggle.setAttribute('aria-expanded', String(!closed));
+  row.toggle.setAttribute('aria-expanded', String(!closed));
   if (closed) release(row); else ensure(row);
   restoreAnchor(position);
 }
 function makeRow(entry) {
   const element = node('article', 'diff-file'); element.dataset.id = entry.id;
   const header = node('header', 'file-header'); header.tabIndex = -1;
-  const toggle = node('button', 'fold', '▾'); toggle.setAttribute('aria-label', 'Collapse or expand ' + entry.path); toggle.title = 'Collapse or expand'; toggle.setAttribute('aria-expanded', 'true');
+  const toggle = node('button', 'fold'); toggle.setAttribute('aria-label', 'Collapse or expand ' + entry.path); toggle.title = 'Collapse or expand'; toggle.setAttribute('aria-expanded', 'true');
   const title = node('a', 'file-path', entry.path); title.setAttribute('role', 'link');
   const status = node('span', 'status'); const unsaved = node('span', 'unsaved');
   const stats = node('span', 'stats', '…');

@@ -59,6 +59,15 @@
   };
   ui.duration = ms => { if (!ms && ms !== 0) return ''; const s = Math.round(ms / 1000); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`; };
 
+  /** Usage as the harness reported it: "5 hours 12% · week 46%", or "" when not reported. */
+  ui.usageText = u => (u && u.reported && u.windows?.length ? u.windows.map(w => `${w.label} ${Math.round(w.used * 100)}%`).join(' · ') : '');
+  ui.usageDetail = u => {
+    if (!u || !u.reported) return 'Usage: not reported by this harness';
+    const at = ms => (ms ? new Date(ms).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '');
+    return ['Usage (' + (u.source || 'reported') + ')', ...u.windows.map(w => `${w.label}: ${Math.round(w.used * 100)}% used${w.resets_at_ms ? ', resets ' + at(w.resets_at_ms) : ''}`), u.observed_ms ? `As of ${at(u.observed_ms)}` : ''].filter(Boolean).join('\n');
+  };
+  ui.nearLimit = (u, at = 0.9) => (u && u.reported ? (u.windows || []).filter(w => w.used >= at).sort((a, b) => b.used - a.used)[0] : undefined);
+
   /** Popup menu anchored to an element. items: {label, icon?, logo?, hint?, checked?, danger?, disabled?, run()} | 'sep' | {head}. */
   let openMenu;
   ui.closeMenu = () => { if (openMenu) { openMenu.el.remove(); openMenu.anchor?.setAttribute('aria-expanded', 'false'); const a = openMenu.anchor; openMenu = undefined; a?.focus?.(); } };

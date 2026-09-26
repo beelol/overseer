@@ -23,7 +23,7 @@
 
   function show(id) {
     if (!id || id === runId) return;
-    runId = id; cache.clear(); focusPath = undefined; document.body.dataset.filesReady = '';
+    runId = id; cache.clear(); focusPath = undefined; document.body.dataset.filesReady = ''; box.dataset.run = id;
     const run = runs.find(r => r.id === id);
     const ws = run && workspaces.find(w => w.id === run.workspace_id);
     title.textContent = ws ? (ws.kind === 'current' ? 'Current checkout' : ui.basename(ws.branch || ws.path)) : '';

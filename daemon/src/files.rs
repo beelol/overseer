@@ -13,6 +13,32 @@ use std::path::{Component, Path};
 pub const MAX_ENTRIES: usize = 5000;
 
 impl Daemon {
+    /// Files for @-mentions (AC-60): tracked and untracked (not ignored) files in a run's worktree or
+    /// a repository, best matches first (file-name matches before path matches, shorter paths first).
+    pub fn repo_files(&self, workspace_id: Option<&str>, repo: Option<&str>, query: &str, limit: usize) -> Result<Value> {
+        let root = match (workspace_id, repo) {
+            (Some(id), _) => std::path::PathBuf::from(self.workspace(id)?.path),
+            (None, Some(r)) => git::toplevel(Path::new(r))?,
+            _ => bail!("give a workspace_id or a repo"),
+        };
+        let listing = git::git(&root, &["ls-files", "--cached", "--others", "--exclude-standard", "-z"])?;
+        let q = query.to_lowercase();
+        let mut hits: Vec<(u8, usize, &str)> = listing
+            .split('\0')
+            .filter(|f| !f.is_empty())
+            .filter_map(|f| {
+                let lower = f.to_lowercase();
+                let name = lower.rsplit('/').next().unwrap_or(&lower);
+                let rank = if q.is_empty() { 2 } else if name.starts_with(&q) { 0 } else if name.contains(&q) { 1 } else if lower.contains(&q) { 2 } else { return None };
+                Some((rank, f.len(), f))
+            })
+            .collect();
+        hits.sort();
+        hits.dedup_by(|a, b| a.2 == b.2);
+        let files: Vec<&str> = hits.iter().take(limit.clamp(1, 200)).map(|h| h.2).collect();
+        Ok(json!({"root": root.display().to_string(), "files": files}))
+    }
+
     /// Changes since the task started, with line counts, for the chat's changes bar (AC-55).
     pub fn workspace_changes(&self, workspace_id: &str) -> Result<Value> {
         let ws = self.workspace(workspace_id)?;

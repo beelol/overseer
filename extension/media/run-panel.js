@@ -20,6 +20,7 @@
     else if (m.type === 'notice') chat.notice(m.message);
     else if (m.type === 'raw') chat.raw(m.raw);
     else if (m.type === 'changes') chat.changes(m.changes);
+    else if (m.type === 'mentionFiles') chat.mentionFiles(m);
   });
   vscode.postMessage({ type: 'ready' });
 })();

@@ -54,7 +54,7 @@ const PROMPT = 'Use the Bash tool to run exactly this command in the foreground:
     await delay(6000);
     const notices = s.ctl('events.list', { after: 0, limit: 5000 }).events.filter(e => e.kind === 'background_notice');
     const logLine = daemonLog().split('\n').find(l => l.includes('background notice ('));
-    check('notification posted after the last window closed', notices.length === 1 && /osascript \(ok\)/.test(notices[0]?.payload.delivered_via || ''), { notice: notices[0]?.payload, logLine, afterMs: Date.now() - t0 });
+    check('notification posted after the last window closed', notices.length === 1 && /(overseer-notifier|osascript) \(ok\)/.test(notices[0]?.payload.delivered_via || ''), { notice: notices[0]?.payload, logLine, afterMs: Date.now() - t0 });
     check('notification names the running agent and how to stop it', notices[0] && /claude: tick loop/.test(notices[0].payload.body) && /Stop Agents and Daemon/.test(notices[0].payload.body), notices[0]?.payload.body);
     const shot = path.join(s.evidence, '02-macos-notification.png');
     const cap = cp.spawnSync('/usr/sbin/screencapture', ['-x', shot], { encoding: 'utf8' });

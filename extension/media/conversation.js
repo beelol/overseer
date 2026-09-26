@@ -418,7 +418,7 @@
       if (input === undefined && output === undefined && cost === undefined) { if (p.rate_limits) t.limits = p.rate_limits; return; }
       const parts = [];
       if (input !== undefined || output !== undefined) parts.push(`${ui.compact((input || 0) + (output || 0))} tokens`);
-      if (cost !== undefined) parts.push(`$${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}`);
+      if (cost) parts.push(`$${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}`);
       t.usage.textContent = parts.join(' · ');
       t.usage.title = [input !== undefined && `${input.toLocaleString()} in`, output !== undefined && `${output.toLocaleString()} out`, cached !== undefined && `${cached.toLocaleString()} cached`, cost !== undefined && `$${cost.toFixed(4)}`].filter(Boolean).join(' · ');
       t.foot.hidden = false;

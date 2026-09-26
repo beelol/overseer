@@ -40,7 +40,7 @@
       this.rawEl = el('pre', 'code raw-out'); this.rawEl.id = 'rawout'; this.rawEl.hidden = true;
       col.append(this.details, this.convEl, this.logEl, this.rawEl);
       this.scroll.append(col);
-      this.jump = el('button', 'jump'); this.jump.type = 'button'; this.jump.hidden = true; this.jump.append(ui.icon('arrow-down', 'sm'), el('span', null, 'Latest'));
+      this.jump = el('button', 'jump'); this.jump.type = 'button'; this.jump.hidden = true; this.jump.id = 'jump'; this.jump.append(ui.icon('arrow-down', 'sm'), el('span', null, 'Latest'));
       this.jump.setAttribute('aria-label', 'Jump to the latest message');
 
       const bottom = el('div', 'chat-bottom'); const inner = el('div', 'chat-bottom-inner');
@@ -51,10 +51,14 @@
       this.prompt = el('textarea'); this.prompt.id = 'prompt'; this.prompt.rows = 1; this.prompt.setAttribute('aria-label', 'Message to this agent');
       const row = el('div', 'composer-row'); this.chips = el('div', 'chips');
       this.sendBtn = ui.iconButton('arrow-up', 'Send', { cls: 'primary send', shortcut: 'Enter' }); this.sendBtn.id = 'send';
+      const tools = el('div', 'composer-tools'); this.tray = el('div', 'composer-tray'); this.tray.hidden = true;
       row.append(this.chips, this.sendBtn);
-      composer.append(this.prompt, row);
+      composer.append(tools, this.prompt, row);
+      this.queuedEl = el('div', 'queued'); this.queuedEl.hidden = true; this.queuedEl.id = 'queued';
+      this.tools = window.OverseerPromptTools.create(this.prompt, tools, this.tray, { post: m => this.post(m), harness: () => this.msg?.run.harness, target: () => this.msg?.workspace ? { workspace_id: this.msg.workspace.id } : null,
+        notice: t => this.notice(t), onChange: () => {} });
       this.why = el('div', 'composer-note'); this.why.id = 'send-why';
-      inner.append(this.permBar, this.changesBar, this.noticeEl, composer, this.why);
+      inner.append(this.permBar, this.changesBar, this.queuedEl, this.noticeEl, this.tray, composer, this.why);
       bottom.append(inner);
       this.root.replaceChildren(head, this.scroll, this.jump, bottom);
 
@@ -63,10 +67,10 @@
       this.changesBar.addEventListener('click', () => this.post({ type: 'openReview' }));
       this.filesBtn.addEventListener('click', () => this.opts.onFiles && this.opts.onFiles(this.filesBtn));
       this.moreBtn.addEventListener('click', () => this.menu());
-      this.sendBtn.addEventListener('click', () => this.send());
+      this.sendBtn.addEventListener('click', e => this.send(e.altKey ? 'interrupt' : 'queue'));
       this.jump.addEventListener('click', () => { this.stick = true; this.toBottom(); });
       this.prompt.addEventListener('keydown', e => {
-        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); this.send(); }
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); this.send(e.altKey ? 'interrupt' : 'queue'); }
         else if (e.key === '.' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (!this.stopBtn.hidden) this.post({ type: 'interrupt' }); }
       });
       this.prompt.addEventListener('input', () => { this.grow(); if (this.runId) this.drafts.set(this.runId, this.prompt.value); this.opts.onState && this.opts.onState(); });
@@ -122,11 +126,16 @@
       this.reviewBtn.hidden = child;
       this.why.textContent = '';
       const busy = msg.active && run.harness !== 'generic';
-      const canSend = !child && msg.followUpSupported && !busy && msg.trusted;
-      this.sendBtn.disabled = !canSend; this.prompt.disabled = !canSend && !busy;
+      this.busy = busy;
+      const canSend = !child && msg.followUpSupported && msg.trusted;
+      this.sendBtn.disabled = !canSend; this.prompt.disabled = !canSend;
       this.prompt.placeholder = child ? 'Sub-agents are steered through their parent' : !msg.trusted ? 'Trust this workspace to talk to agents'
-        : !msg.followUpSupported ? `${ui.HARNESS[run.harness] || run.harness} does not take follow-ups` : busy ? 'Working… Stop it to steer, or wait to reply' : 'Reply…';
-      this.sendBtn.title = canSend ? 'Send (Enter)' : this.prompt.placeholder;
+        : !msg.followUpSupported ? `${ui.HARNESS[run.harness] || run.harness} does not take follow-ups` : busy ? 'Message for when it finishes · ⌥⏎ stops and sends' : 'Reply…  (@ to mention a file)';
+      this.sendBtn.replaceChildren(ui.icon(busy ? 'history' : 'arrow-up'));
+      this.sendBtn.title = !canSend ? this.prompt.placeholder : busy ? 'Send when this turn ends (Enter) · stop and send now (⌥Enter)' : 'Send (Enter)';
+      this.sendBtn.setAttribute('aria-label', busy ? 'Queue message' : 'Send');
+      this.tools.refresh();
+      this.renderQueued(msg.queued);
       this.worktree = worktree; this.child = child;
       this.renderDetails();
       this.renderPermBar();
@@ -178,18 +187,30 @@
       items.push({ id: 'raw', label: 'Raw output', icon: 'output', run: () => this.post({ type: 'raw' }) });
       items.push({ id: 'details-toggle', label: this.details.hidden ? 'Details' : 'Hide details', icon: 'info', run: () => { this.details.hidden = !this.details.hidden; if (!this.details.hidden) this.scroll.scrollTop = 0; } });
       items.push({ label: 'Copy run ID', icon: 'copy', run: () => ui.copy(this.post, m.run.id) });
+      if (!this.child && !m.active && m.taskId) items.push({ id: 'archive', label: m.archived ? 'Restore from archive' : 'Archive', icon: m.archived ? 'discard' : 'archive', run: () => this.post({ type: 'archive', taskId: m.taskId, archived: !m.archived }) });
       if (this.opts.mode === 'dashboard') items.push({ label: 'Open in its own tab', icon: 'link-external', run: () => this.post({ type: 'openPanel' }) });
       if (!this.child && this.worktree) { items.push('sep'); items.push({ id: 'cleanup', label: 'Remove worktree…', icon: 'trash', danger: true, disabled: m.active, why: m.active ? 'Stop the agent first' : '', run: () => this.post({ type: 'cleanup' }) }); }
       ui.menu(this.moreBtn, items, { align: 'end', label: 'More actions' });
     }
 
-    send() {
+    send(how) {
       const text = this.prompt.value.trim();
       if (!text || this.sendBtn.disabled) return;
-      this.post({ type: 'followUp', text: this.prompt.value });
+      const { prompt, options } = this.tools.take();
+      if (this.busy) this.post({ type: 'steer', text: prompt, options, how });
+      else this.post({ type: 'followUp', text: prompt, options });
       this.prompt.value = ''; this.drafts.delete(this.runId); this.grow(); this.stick = true;
       this.opts.onState && this.opts.onState();
     }
+
+    renderQueued(q) {
+      this.queuedEl.hidden = !q;
+      if (!q) { this.queuedEl.replaceChildren(); return; }
+      const cancel = el('button', 'link', 'Cancel'); cancel.type = 'button'; cancel.addEventListener('click', () => this.post({ type: 'steer', how: 'cancel' }));
+      const text = el('span', 'queued-text', ui.firstLine(q.text, 80)); text.title = q.text;
+      this.queuedEl.replaceChildren(ui.icon(q.how === 'interrupt' ? 'debug-stop' : 'history', 'sm'), el('span', 'muted', q.how === 'interrupt' ? 'Stopping, then sending' : 'Queued'), text, cancel);
+    }
+    mentionFiles(m) { this.tools.files(m); }
 
     show(v) {
       this.view = v; const conv = v === 'conv';

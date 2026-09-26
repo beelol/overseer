@@ -84,8 +84,10 @@
     const m = el('span', 'meta');
     const p = r.profile_id && byId(state.profiles, r.profile_id);
     const time = el('span', 'meta-time', ui.ago(r.ended_ms || r.created_ms));
-    time.title = [ui.HARNESS[r.harness] || r.harness, p?.name, r.model, new Date(r.ended_ms || r.created_ms).toLocaleString()].filter(Boolean).join(' · ');
-    m.append(time);
+    time.title = new Date(r.ended_ms || r.created_ms).toLocaleString();
+    const mark = el('span', 'meta-mark'); mark.append(ui.harnessMark(r.harness, 12));
+    mark.title = [ui.HARNESS[r.harness] || r.harness, p?.name, r.model].filter(Boolean).join(' · ');
+    m.append(mark, time);
     return m;
   }
   function renderRail() {
@@ -117,7 +119,12 @@
       for (const t of list) {
         const r = runOf(t);
         const kids = r ? state.runs.filter(x => x.parent_run_id === r.id) : [];
-        const open = addRow(frag, { id: 'task:' + t.id, level: 2, cls: 'run', label: t.title, run: r?.id, task: t.id, status: r?.status || 'unknown', attention: r?.attention?.kind, meta: r && runMeta(r), twisty: kids.length ? true : undefined,
+        const meta = r && runMeta(r);
+        if (meta && r && !ACTIVE.has(r.status)) {
+          const arch = ui.iconButton(showArchived ? 'discard' : 'archive', showArchived ? 'Restore' : 'Archive', { cls: 'sm row-archive' }); arch.dataset.task = t.id; arch.tabIndex = -1;
+          meta.prepend(arch);
+        }
+        const open = addRow(frag, { id: 'task:' + t.id, level: 2, cls: 'run', label: t.title, run: r?.id, task: t.id, status: r?.status || 'unknown', attention: r?.attention?.kind, meta, twisty: kids.length ? true : undefined,
           title: [t.title, ui.firstLine(t.prompt, 200), r && ui.statusText(r.status)].filter(Boolean).join('\n') });
         if (open) {
           const walk = (parent, level) => { for (const c of state.runs.filter(x => x.parent_run_id === parent.id)) {
@@ -173,6 +180,7 @@
   }
   list.addEventListener('click', e => {
     const add = e.target.closest('.repo-add'); if (add) { e.stopPropagation(); setMode('composer', { repo: add.dataset.repo }); return; }
+    const arch = e.target.closest('.row-archive'); if (arch) { e.stopPropagation(); post({ type: 'archive', taskId: arch.dataset.task, archived: !showArchived }); return; }
     const row = e.target.closest('.row'); if (!row) return;
     focusRow(row);
     if (e.target.closest('.twisty') || !row.dataset.run) toggle(row); else selectRun(row.dataset.run);
@@ -185,6 +193,7 @@
     else if (e.key === 'ArrowRight') { if (!toggle(row, true)) focusRow(all[i + 1]); }
     else if (e.key === 'ArrowLeft') { if (!toggle(row, false)) { const lv = Number(row.dataset.level); focusRow(all.slice(0, i).reverse().find(r => Number(r.dataset.level) < lv)); } }
     else if (e.key === 'Enter' || e.key === ' ') { if (row.dataset.run) selectRun(row.dataset.run, { focusChat: e.key === 'Enter' && e.metaKey }); else toggle(row); }
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && row.dataset.task && !e.metaKey) { const r = byId(state.runs, row.dataset.run); if (r && !ACTIVE.has(r.status)) post({ type: 'archive', taskId: row.dataset.task, archived: !showArchived }); }
     else if (e.key === 'Home') focusRow(all[0]);
     else if (e.key === 'End') focusRow(all[all.length - 1]);
     else return;
@@ -194,7 +203,7 @@
   searchInput.addEventListener('input', () => {
     query = searchInput.value.trim(); persist();
     clearTimeout(searchTimer); searchHits = null; renderRail();
-    if (query.length >= 2) searchTimer = setTimeout(() => post({ type: 'search', q: query }), 150);
+    if (query.length >= 2) searchTimer = setTimeout(() => post({ type: 'search', q: query }), 60);
   });
   searchInput.addEventListener('keydown', e => { if (e.key === 'ArrowDown') { focusRow(rowsList()[0]); e.preventDefault(); } else if (e.key === 'Escape') { searchInput.value = ''; query = ''; searchHits = null; renderRail(); } });
   newBtn.addEventListener('click', () => setMode(mode === 'composer' && selected ? 'chat' : 'composer'));
@@ -204,13 +213,13 @@
     { label: 'Clean up archived worktrees…', icon: 'trash', run: () => post({ type: 'cleanupArchived' }) },
     'sep',
     { label: 'Open dashboard in a new window', icon: 'empty-window', run: () => post({ type: 'dashboardWindow' }) },
-    { label: 'Exit dashboard', icon: 'screen-normal', run: () => post({ type: 'exitDashboard' }) },
+    document.body.dataset.dashboard ? { label: 'Exit dashboard', icon: 'screen-normal', hint: '⌥⌘O', run: () => post({ type: 'exitDashboard' }) } : { label: 'Dashboard mode', icon: 'screen-full', hint: '⌥⌘O', run: () => post({ type: 'command', command: 'overseer.openDashboard' }) },
     'sep',
     { label: 'Test notification', icon: 'bell', run: () => post({ type: 'command', command: 'overseer.testNotification' }) },
     { label: 'Stop all agents…', icon: 'debug-stop', danger: true, run: () => post({ type: 'command', command: 'overseer.stopAll' }) },
   ], { label: 'Dashboard' }));
   acctBtn.addEventListener('click', () => {
-    const items = (state.accounts || []).map(a => ({ label: a.name, logo: ui.providerMark(a.provider, 14), hint: a.signedIn ? (a.plan || 'signed in') : 'sign in', title: a.signedIn ? `${a.name} · signed in${a.plan ? ' · ' + a.plan : ''}${a.fingerprint ? ' · ' + a.fingerprint : ''}` : `Sign in ${a.name}`,
+    const items = (state.accounts || []).map(a => ({ label: a.name, logo: ui.providerMark(a.provider, 14), hint: a.signedIn ? (ui.usageText(a.usage) || a.plan || 'signed in') : 'sign in', title: a.signedIn ? `${a.name} · signed in${a.plan ? ' · ' + a.plan : ''}${a.fingerprint ? ' · ' + a.fingerprint : ''}\n${ui.usageDetail(a.usage)}` : `Sign in ${a.name}`,
       run: () => post({ type: 'command', command: a.signedIn ? 'overseer.refreshAccounts' : 'overseer.signIn', args: a.signedIn ? undefined : { profile: { id: a.id, name: a.name } } }) }));
     ui.menu(acctBtn, [{ head: 'Accounts' }, ...items, 'sep', { label: 'Add account…', icon: 'person-add', run: () => post({ type: 'command', command: 'overseer.addProfile' }) },
       { label: 'Manage accounts', icon: 'settings-gear', run: () => post({ type: 'command', command: 'overseer.accounts.focus' }) }], { label: 'Accounts' });
@@ -261,7 +270,10 @@
       case 'raw': chat.raw(m.raw); break;
       case 'changes': if (m.runId === selected) chat.changes(m.changes); break;
       case 'composerData': composer.data(m.data); break;
+      case 'mentionFiles': if (m.scope === 'composer') composer.mentionFiles(m); else chat.mentionFiles(m); break;
       case 'searchHits': if (m.q === query) { searchHits = new Set(m.taskIds); renderRail(); } break;
+      case 'measure': post({ type: 'measured', id: m.id, w: window.innerWidth, h: window.innerHeight }); break;
+      case 'dashboard': document.body.dataset.dashboard = m.on ? '1' : ''; break;
       case 'focus': if (m.target === 'search') searchInput.focus(); else if (m.target === 'composer') setMode('composer'); else if (m.target === 'chat') chat.prompt.focus(); break;
     }
   });
@@ -271,6 +283,8 @@
     if (e.key === 'Escape' && mode === 'grid' && !e.target.closest('input, textarea')) { setMode(selected ? 'chat' : 'composer'); e.preventDefault(); }
   });
 
+  // Read-only view of the dashboard's state for UI tests.
+  window.__overseer = { state: () => state, mode: () => mode, selected: () => selected };
   setMode(mode === 'chat' && !selected ? 'composer' : mode, { quiet: true });
   if (selected && mode === 'chat') post({ type: 'select', runId: selected, restore: true });
   setFiles(filesOpen, true);

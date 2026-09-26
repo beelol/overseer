@@ -21,8 +21,11 @@ body { overflow: hidden; background: var(--ov-bg); }
 .rail .row.run .title { color: var(--ov-text); }
 .rail .row.run.child { min-height: 26px; }
 .rail .row.run.child .title { color: var(--ov-muted); font-size: var(--ov-font-sm); }
-.rail .row .meta-mark { display: inline-flex; color: var(--ov-muted); }
+.rail .row .meta-mark { display: inline-flex; color: var(--ov-muted); opacity: .8; }
 .rail .row .meta-time { min-width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
+.rail .row .row-archive { display: none; }
+.rail .row:hover .row-archive, .rail .row:focus .row-archive, .rail .row:focus-within .row-archive { display: inline-flex; }
+.rail .row:hover .meta-time, .rail .row:focus .meta-time { display: none; }
 .rail .row[aria-selected="true"] .meta { color: var(--ov-text); }
 .rail .why-chip { font-size: var(--ov-font-xs); padding: 1px 6px; border-radius: var(--ov-radius-pill); background: var(--ov-raised-2); color: var(--ov-text); }
 .rail .row.needs-row .status { color: var(--ov-waiting); }

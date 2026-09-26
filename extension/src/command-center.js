@@ -62,14 +62,15 @@ class CommandCenter {
     if (!m || typeof m !== 'object') return;
     const post = x => this.panel?.webview.postMessage(x);
     switch (m.type) {
-      case 'ready': await this.push(); return;
+      case 'ready': await this.push(); if (this.inDashboard) post({ type: 'dashboard', on: true }); return;
+      case 'measured': { const done = this.measuring?.get(m.id); if (done) { this.measuring.delete(m.id); done({ w: Number(m.w), h: Number(m.h) }); } return; }
       case 'select': if (typeof m.runId === 'string') { await this.showChat(m.runId); if (!m.restore) await this.handlers.select(m.runId); } return;
       case 'mode': this.mode = m.mode; if (m.mode !== 'chat') { /* keep the chat feed; it is cheap */ } return;
       case 'focusComposer': post({ type: 'mode', mode: 'composer' }); return;
       case 'gridSubscribe': {
         const ids = (m.runIds || []).filter(id => this.model.run(id));
         // Metadata first: the tile needs its root run id before history arrives.
-        for (const id of ids) { const msg = runMessage(this.model, id); if (msg) post({ type: 'run', channel: 'grid', ...msg }); }
+        for (const id of ids) { const msg = runMessage(this.model, id, this.handlers.steering); if (msg) post({ type: 'run', channel: 'grid', ...msg }); }
         await this.gridFeed.set(ids, { limit: 400 });
         return;
       }
@@ -92,7 +93,9 @@ class CommandCenter {
         await this.handlers.select(runId, { follow: vscode.workspace.getConfiguration('overseer').get('followNewRuns', true), fromDashboard: true });
         return;
       }
+      case 'mentionFiles': await handleRunMessage(this.handlers, this.chatRun, { ...m, scope: m.scope || 'composer' }, x => post(x)); return;
       case 'pin': await this.handlers.setPinned(m.runId, !!m.on); await this.push(); return;
+      case 'archive': await this.client.request('task.archive', { task_id: String(m.taskId), archived: m.archived !== false }); await this.model.refresh(); return;
       case 'search': post({ type: 'searchHits', q: m.q, taskIds: await this.handlers.search(String(m.q || '')) }); return;
       case 'command': await vscode.commands.executeCommand(String(m.command), ...(m.args !== undefined ? [m.args] : [])); return;
       case 'openExternal': { const url = String(m.url || ''); if (/^https?:\/\//i.test(url)) await vscode.env.openExternal(vscode.Uri.parse(url)); return; }
@@ -111,7 +114,7 @@ class CommandCenter {
   async showChat(runId) {
     if (!this.panel || !this.model.run(runId)) return;
     this.chatRun = runId;
-    const msg = runMessage(this.model, runId);
+    const msg = runMessage(this.model, runId, this.handlers.steering);
     this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg });
     await this.chatFeed.set([runId]);
     this.pushChanges(true);
@@ -153,11 +156,23 @@ class CommandCenter {
     const state = { tasks, runs, workspaces, profiles, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), pinned: this.handlers.pinned(),
       gridMax: Math.max(1, Math.min(9, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
     await this.panel.webview.postMessage({ type: 'state', state, selected: this.handlers.selected() });
-    if (this.chatRun) { const msg = runMessage(this.model, this.chatRun); if (msg) { this.chatFeed.refreshDescendants(); this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg }); } }
-    for (const id of this.gridFeed?.roots.keys() || []) { const msg = runMessage(this.model, id); if (msg) this.panel.webview.postMessage({ type: 'run', channel: 'grid', ...msg }); }
+    if (this.chatRun) { const msg = runMessage(this.model, this.chatRun, this.handlers.steering); if (msg) { this.chatFeed.refreshDescendants(); this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg }); } }
+    for (const id of this.gridFeed?.roots.keys() || []) { const msg = runMessage(this.model, id, this.handlers.steering); if (msg) this.panel.webview.postMessage({ type: 'run', channel: 'grid', ...msg }); }
   }
 
   selected(runId) { this.panel?.webview.postMessage({ type: 'selected', runId }); }
+  setDashboard(on) { this.inDashboard = on; this.panel?.webview.postMessage({ type: 'dashboard', on }); }
+
+  /** The dashboard webview's size (dashboard mode uses it to see which parts were open). */
+  measure() {
+    if (!this.panel) return Promise.resolve(undefined);
+    const id = Math.random().toString(36).slice(2);
+    return new Promise(resolve => {
+      const timer = setTimeout(() => { this.measuring?.delete(id); resolve(undefined); }, 1500);
+      (this.measuring ||= new Map()).set(id, size => { clearTimeout(timer); resolve(size); });
+      this.panel.webview.postMessage({ type: 'measure', id });
+    });
+  }
   setMode(mode) { this.panel?.webview.postMessage({ type: 'mode', mode }); }
   focus(target) { this.panel?.webview.postMessage({ type: 'focus', target }); }
 

@@ -124,7 +124,7 @@
       "properties": {
         "overseer.grid.maxTiles": { "type": "integer", "minimum": 1, "maximum": 9, "default": 6, "markdownDescription": "Most agents shown at once in the agent grid (1–9)." },
         "overseer.dashboard.openOnStartup": { "type": "boolean", "default": false, "markdownDescription": "Open the Overseer dashboard when VS Code starts." },
-        "overseer.history.autoArchiveDays": { "type": "integer", "minimum": 0, "default": 14, "markdownDescription": "Archive finished agents automatically after this many days (0 turns it off). Archived agents stay searchable and can be restored." },
+        "overseer.history.autoArchiveDays": { "type": "number", "minimum": 0, "default": 14, "markdownDescription": "Archive finished agents automatically after this many days (0 turns it off). Archived agents stay searchable and can be restored." },
         "overseer.showCodexAppServer": { "type": "boolean", "default": false, "markdownDescription": "Offer the Codex app-server harness in the new-agent composer (the New Task form always lists it)." },
         "overseer.github.apiUrl": { "type": "string", "default": "https://api.github.com", "description": "GitHub API base URL used by Open Pull Request (GitHub Enterprise: https://HOST/api/v3). Pull requests use the GitHub account VS Code is signed in to." },
         "overseer.daemonPath": { "type": "string", "default": "", "markdownDescription": "Path to the `overseerd` binary. Empty uses the binary bundled with the extension.", "scope": "machine" },

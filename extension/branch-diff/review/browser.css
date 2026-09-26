@@ -23,7 +23,13 @@ button:focus-visible, a:focus-visible, summary:focus-visible, #resize:focus-visi
 #resize { cursor: col-resize; border-right: 1px solid var(--vscode-panel-border); touch-action: none; }
 #resize:hover, #resize:focus { background: var(--vscode-focusBorder); }
 .folder { padding-left: 10px; }
-.folder summary { cursor: pointer; padding: 5px 3px; white-space: nowrap; }
+.folder summary { cursor: pointer; padding: 5px 3px; white-space: nowrap; list-style: none; border-radius: 2px; }
+.folder summary::-webkit-details-marker { display: none; }
+/* A thin chevron like the workbench tree's, instead of the browser's filled triangle. */
+.folder summary::before { content: ""; display: inline-block; width: 5px; height: 5px; margin: 0 9px 2px 4px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; opacity: .7; transform: rotate(-45deg); transition: transform 120ms ease; }
+.folder[open] > summary::before { transform: rotate(45deg); }
+.folder summary:hover { background: var(--vscode-list-hoverBackground); }
+@media (prefers-reduced-motion: reduce) { .folder summary::before { transition: none; } }
 .folder-children { border-left: 1px solid var(--vscode-tree-indentGuidesStroke); padding-left: 4px; }
 .file { display: flex; align-items: center; gap: 8px; text-align: left; width: 100%; border: 0; border-radius: 2px; padding: 5px 7px; background: transparent; }
 .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -40,7 +46,10 @@ button:focus-visible, a:focus-visible, summary:focus-visible, #resize:focus-visi
 .file-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--vscode-editor-font-family); color: var(--vscode-textLink-foreground); text-decoration: none; }
 .file-path[href]:hover, .file-path[href]:focus-visible { color: var(--vscode-textLink-activeForeground); text-decoration: underline; }
 .file-path[aria-disabled="true"] { color: inherit; cursor: default; }
-.fold { border: 0; background: transparent; width: 22px; padding: 0; }
+.fold { border: 0; background: transparent; width: 22px; padding: 0; color: inherit; }
+.fold::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-bottom: 2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; opacity: .7; transform: rotate(45deg); transition: transform 120ms ease; }
+.fold[aria-expanded="false"]::before { transform: rotate(-45deg); }
+@media (prefers-reduced-motion: reduce) { .fold::before { transition: none; } }
 .unsaved { color: var(--vscode-descriptionForeground); font-size: 11px; }
 .stats { display: flex; gap: 8px; font-size: 11px; white-space: nowrap; }
 .open-native { font-size: 11px; white-space: nowrap; }

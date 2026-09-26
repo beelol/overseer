@@ -31,10 +31,12 @@ const MODEL = process.env.CODEX_MODEL || 'gpt-5.6-luna';
       await cdp.click(pt.x, pt.y);
       await delay(1500);
     };
-    const panel = runId => cdp.webview(`document.body.dataset.runId === ${JSON.stringify(runId)} && !!document.getElementById('merge')`, 30000);
+    const panel = runId => cdp.webview(`document.body.dataset.runId === ${JSON.stringify(runId)} && !!document.getElementById('more')`, 30000);
+    // Merge back lives in the chat's … menu.
+    const openMenu = async p => { if (!(await p.eval(`!!document.getElementById('merge')`))) { const m = await s.webviewPoint(p, '#more'); await cdp.click(m.x, m.y); await delay(300); } };
     const clickMerge = async runId => {
       const p = await panel(runId);
-      await p.waitFor(`!document.getElementById('merge').disabled`, 20000);
+      for (let i = 0; i < 40; i++) { await openMenu(p); if (await p.eval(`!document.getElementById('merge').disabled`)) break; await p.eval(`document.getElementById('more').click()`); await delay(500); }
       const pt = await s.webviewPoint(p, '#merge');
       await cdp.click(pt.x, pt.y);
       await delay(800);
@@ -111,8 +113,11 @@ const MODEL = process.env.CODEX_MODEL || 'gpt-5.6-luna';
     const busy = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'sleep 60'], prompt: '', title: 'merge busy' });
     await selectRun('merge busy');
     const bp = await panel(busy.run.id);
-    const state = await bp.waitFor(`(() => { const b = document.getElementById('merge'); return b.disabled && { disabled: b.disabled, title: b.title }; })()`, 20000);
-    check('while the run is active Merge back is disabled with an explanation', state.disabled && /Wait for the run to finish/.test(state.title), state);
+    await bp.waitFor(`!document.getElementById('interrupt').hidden`, 20000);
+    await openMenu(bp);
+    const state = await bp.waitFor(`(() => { const b = document.getElementById('merge'); return b && b.disabled && { disabled: b.disabled, title: b.title }; })()`, 20000);
+    await cdp.key('Escape');
+    check('while the run is active Merge back is disabled with an explanation', state.disabled && /Wait for the agent to finish/.test(state.title), state);
     s.ctl('run.interrupt', { run_id: busy.run.id });
     await s.screenshot('busy-disabled');
   } catch (error) {

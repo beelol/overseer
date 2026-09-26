@@ -156,7 +156,7 @@ impl Daemon {
              Then reply with one short line saying what you kept.",
             files.join(", ")
         );
-        match self.start_turn(run_id, &prompt, true) {
+        match self.start_turn(run_id, &prompt, true, &crate::daemon::TurnOpts::default()) {
             Ok(turn) => json!({"sent": true, "run_id": run_id, "turn": turn}),
             Err(e) => json!({"sent": false, "why": e.to_string()}),
         }

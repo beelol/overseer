@@ -87,7 +87,7 @@ class Cdp {
 
   async key(key, { meta = false, shift = false, ctrl = false, alt = false } = {}) {
     const modifiers = (alt ? 1 : 0) | (ctrl ? 2 : 0) | (meta ? 4 : 0) | (shift ? 8 : 0);
-    const codes = { Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], Tab: [9, 'Tab'], ArrowDown: [40, 'ArrowDown'], ArrowUp: [38, 'ArrowUp'], Backspace: [8, 'Backspace'], PageDown: [34, 'PageDown'], End: [35, 'End'], Home: [36, 'Home'], F10: [121, 'F10'], ContextMenu: [93, 'ContextMenu'] };
+    const codes = { Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], Tab: [9, 'Tab'], ArrowDown: [40, 'ArrowDown'], ArrowUp: [38, 'ArrowUp'], Backspace: [8, 'Backspace'], PageDown: [34, 'PageDown'], End: [35, 'End'], Home: [36, 'Home'], F10: [121, 'F10'], ContextMenu: [93, 'ContextMenu'], '.': [190, 'Period', '.'], ArrowRight: [39, 'ArrowRight'], ArrowLeft: [37, 'ArrowLeft'], Delete: [46, 'Delete'] };
     const [keyCode, code, text] = codes[key] || [key.toUpperCase().charCodeAt(0), 'Key' + key.toUpperCase()];
     const base = { modifiers, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode, key: codes[key] ? key : (shift ? key.toUpperCase() : key), code };
     await this.call('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...base }, this.workbench);

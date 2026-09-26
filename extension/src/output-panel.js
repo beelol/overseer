@@ -19,7 +19,7 @@ class OutputPanels {
   }
 
   pushRun(runId, entry) {
-    const msg = runMessage(this.model, runId);
+    const msg = runMessage(this.model, runId, this.steering);
     if (!msg) return;
     entry.feed.refreshDescendants();
     entry.panel.title = msg.run.title.slice(0, 40) || 'Agent';

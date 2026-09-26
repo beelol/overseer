@@ -41,10 +41,11 @@ function snapshotTree(dir) {
 }
 
 class Session {
-  constructor(name) {
+  /** ownerDaemon: use the owner's own daemon and data (no OVERSEER_HOME) — live sessions only. */
+  constructor(name, { ownerDaemon = false } = {}) {
     this.name = name;
     this.root = fs.realpathSync(fs.mkdtempSync('/tmp/ovs-ui-'));
-    this.home = path.join(this.root, 'overseer-home');
+    this.home = ownerDaemon ? null : path.join(this.root, 'overseer-home');
     this.profile = path.join(this.root, 'profile');
     this.extensions = path.join(this.root, 'extensions');
     this.evidence = path.join(repoRoot, 'docs/verification/evidence/ui', name);
@@ -52,6 +53,12 @@ class Session {
     fs.mkdirSync(this.evidence, { recursive: true });
     this.log = [];
     this.shot = 0;
+  }
+
+  baseEnv() {
+    const env = { ...process.env };
+    if (this.home) env.OVERSEER_HOME = this.home; else delete env.OVERSEER_HOME;
+    return env;
   }
 
   note(msg, data) {
@@ -66,7 +73,7 @@ class Session {
       'git.autofetch': false, 'git.openRepositoryInParentFolders': 'always', 'workbench.startupEditor': 'none',
       'security.workspace.trust.enabled': false, 'files.autoSave': 'off', 'update.mode': 'none',
       'workbench.tips.enabled': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
-      'editor.minimap.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden', ...extra,
+      'editor.minimap.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden', 'window.dialogStyle': 'custom', ...extra,
     }, null, 2));
   }
 
@@ -80,8 +87,8 @@ class Session {
   launch(folder, env = {}) {
     fs.rmSync(path.join(this.profile, 'DevToolsActivePort'), { force: true });
     this.child = cp.spawn(CODE, ['--remote-debugging-port=0', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
-      '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', ...(env.OVERSEER_TEST_TRUST ? [] : ['--disable-workspace-trust']), folder],
-    { env: { ...process.env, OVERSEER_HOME: this.home, ...env }, stdio: ['ignore', fs.openSync(path.join(this.root, 'code-' + Date.now() + '.log'), 'a'), fs.openSync(path.join(this.root, 'code-err-' + Date.now() + '.log'), 'a')], detached: false });
+      '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', ...(env.OVERSEER_TEST_TRUST ? [] : ['--disable-workspace-trust']), ...(folder ? [folder] : [])],
+    { env: { ...this.baseEnv(), ...env }, stdio: ['ignore', fs.openSync(path.join(this.root, 'code-' + Date.now() + '.log'), 'a'), fs.openSync(path.join(this.root, 'code-err-' + Date.now() + '.log'), 'a')], detached: false });
   }
 
   async connect() {
@@ -99,7 +106,7 @@ class Session {
 
   ctl(method, params = {}) {
     const bin = path.join(this.extensions, fs.readdirSync(this.extensions).find(d => d.startsWith('beelol.overseer')), 'bin', `overseerd-${process.platform}-${process.arch}`);
-    const out = cp.execFileSync(bin, ['ctl', method, JSON.stringify(params)], { env: { ...process.env, OVERSEER_HOME: this.home }, encoding: 'utf8' });
+    const out = cp.execFileSync(bin, ['ctl', method, JSON.stringify(params)], { env: this.baseEnv(), encoding: 'utf8' });
     const msg = JSON.parse(out.split('\n')[0]);
     if (msg.error) throw new Error(msg.error.message);
     return msg.result;

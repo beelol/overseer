@@ -11,6 +11,7 @@ const { CommandCenter, COLUMNS } = require('./command-center');
 const { NewTaskPanel } = require('./new-task');
 const { PullRequests } = require('./pull-request');
 const { TaskLauncher } = require('./task-launcher');
+const { Steering } = require('./run-actions');
 const { Dashboard } = require('./dashboard-mode');
 
 let client;
@@ -36,6 +37,8 @@ async function activate(context) {
   const review = new Review(context, client, model, say);
   let selectedRun;
   const launcher = new TaskLauncher(context, client, model, () => refreshAccounts());
+  const steering = new Steering(client, model);
+  outputs.steering = steering;
   // Needs you (AC-61): waiting for a decision, failed, or finished with changes not yet reviewed.
   const reviewed = new Map(Object.entries(context.workspaceState.get('overseer.reviewed', {})));
   const markReviewed = runId => { if (!runId) return; reviewed.set(runId, Date.now()); context.workspaceState.update('overseer.reviewed', Object.fromEntries([...reviewed].slice(-800))); };
@@ -49,12 +52,14 @@ async function activate(context) {
   function attention() {
     const archived = new Set(archivedTasks());
     const out = [];
+    // Only the 40 most recently finished runs are checked for unreviewed changes (large histories stay fast).
+    const recent = new Set((model.state.runs || []).filter(r => !r.parent_run_id && r.status === 'completed').sort((a, b) => (b.ended_ms || b.created_ms) - (a.ended_ms || a.created_ms)).slice(0, 40).map(r => r.id));
     for (const r of (model.state.runs || []).filter(r => !r.parent_run_id)) {
       if (archived.has(r.task_id)) continue;
       const seen = reviewed.get(r.id) || 0;
       if (r.status === 'waiting_for_user') out.push({ run_id: r.id, rank: 0, label: r.attention?.kind === 'permission' ? 'Approve' : 'Reply', detail: r.attention?.kind === 'permission' ? `Wants to use ${r.attention.tool}` : 'Waiting for your reply' });
       else if (['failed', 'disconnected'].includes(r.status) && seen < (r.ended_ms || r.created_ms)) out.push({ run_id: r.id, rank: 1, label: 'Failed', detail: r.exit_reason || 'The agent failed' });
-      else if (r.status === 'completed' && seen < (r.ended_ms || r.created_ms) && Date.now() - (r.ended_ms || r.created_ms) < 7 * 86400000) {
+      else if (r.status === 'completed' && recent.has(r.id) && seen < (r.ended_ms || r.created_ms) && Date.now() - (r.ended_ms || r.created_ms) < 7 * 86400000) {
         if (!changedRuns.has(r.id)) checkChanged(r);
         const n = changedRuns.get(r.id);
         if (n) out.push({ run_id: r.id, rank: 2, label: 'Review', detail: `${n} file${n === 1 ? '' : 's'} changed` });
@@ -66,7 +71,7 @@ async function activate(context) {
   const setPinned = (runId, on) => context.workspaceState.update('overseer.pinned', [...new Set([...pinned().filter(id => id !== runId), ...(on ? [runId] : [])])]);
   const search = async q => { try { return (await client.request('search', { query: q, limit: 200 })).task_ids || []; } catch { return []; } };
   // With the dashboard open, the chat stays inside it and reviews go to the column on its right.
-  const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, { preserveFocus: true, ...opts }), selected: () => selectedRun, client, model, launcher, attention, pinned, setPinned, archived: archivedTasks, search });
+  const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, { preserveFocus: true, ...opts }), selected: () => selectedRun, client, model, launcher, attention, pinned, setPinned, archived: archivedTasks, search, steering });
   review.reviewColumn = () => center.active ? COLUMNS.review : undefined;
   outputs.column = () => center.active ? COLUMNS.conversation : undefined;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
@@ -91,11 +96,18 @@ async function activate(context) {
     vscode.commands.executeCommand('setContext', 'overseer.connected', client.connected);
   };
   model.onDidChange(updateStatus);
+  model.onDidChange(() => { autoArchive().catch(() => {}); });
   client.on('connected', () => { model.refresh(); updateStatus(); });
   client.on('disconnected', () => { model.error = 'daemon connection lost; reconnecting'; model.emitter.fire(); updateStatus(); });
   client.on('stopped', () => { model.error = 'agents and daemon stopped (Overseer: Start Daemon to restart)'; model.emitter.fire(); updateStatus(); });
+  // Accounts created, removed or signed out elsewhere (overseerd ctl, another window) show up here too.
+  let accountsTimer;
+  const accountsSoon = () => { clearTimeout(accountsTimer); accountsTimer = setTimeout(() => refreshAccounts().catch(() => {}), 400); };
+  let accountsSeen = Date.now();
+  context.subscriptions.push(vscode.window.onDidChangeWindowState(w => { if (w.focused && Date.now() - accountsSeen > 30000) { accountsSeen = Date.now(); accountsSoon(); } }));
   client.on('event', event => {
     model.scheduleRefresh();
+    if (event.kind === 'profile') accountsSoon();
     if (selectedRun && ['file_activity', 'status', 'turn_done', 'workspace_removed'].includes(event.kind)) setTimeout(() => dirty.refresh(), 300);
     if (event.kind === 'permission') {
       if (center.panel?.visible) return; // the dashboard's Needs you shows it
@@ -315,6 +327,55 @@ async function activate(context) {
     else if (choice) await stopAll();
   }
 
+  /** Archives finished tasks older than overseer.history.autoArchiveDays (AC-63); never deletes anything. */
+  let lastAutoArchive = 0;
+  async function autoArchive() {
+    const days = vscode.workspace.getConfiguration('overseer').get('history.autoArchiveDays', 14);
+    if (!days || Date.now() - lastAutoArchive < 3600000 || !client.connected) return;
+    lastAutoArchive = Date.now();
+    const cutoff = Date.now() - days * 86400000;
+    for (const t of model.state.tasks || []) {
+      if (t.archived_ms) continue;
+      const runs = (model.state.runs || []).filter(r => r.task_id === t.id);
+      if (!runs.length || runs.some(r => ACTIVE.has(r.status))) continue;
+      const last = Math.max(...runs.map(r => r.ended_ms || r.created_ms));
+      if (last < cutoff) await client.request('task.archive', { task_id: t.id, archived: true }).catch(error => say('auto-archive: ' + error.message));
+    }
+  }
+
+  /** Removes the worktrees of archived tasks; branches are kept; uncommitted work needs its own confirmation. */
+  async function cleanupArchived() {
+    requireTrust();
+    await model.refresh();
+    const archived = new Set(archivedTasks());
+    const plans = [];
+    for (const t of (model.state.tasks || []).filter(t => archived.has(t.id))) {
+      const ws = model.workspace(t.workspace_id);
+      if (!ws || ws.kind !== 'worktree' || ws.removed_ms) continue;
+      const plan = await client.request('workspace.cleanup_plan', { workspace_id: ws.id }).catch(e => { say('cleanup plan: ' + e.message); return undefined; });
+      if (!plan || !plan.removable) continue;
+      const d = plan.dirty || {};
+      const dirty = [...(d.staged || []), ...(d.unstaged || []), ...(d.untracked || []), ...(d.conflicted || [])].length;
+      plans.push({ task: t, ws, dirty });
+    }
+    if (!plans.length) { vscode.window.showInformationMessage('No archived worktrees to clean up.', { modal: true }); return; }
+    const clean = plans.filter(p => !p.dirty), dirty = plans.filter(p => p.dirty);
+    const detail = `Branches are kept, so committed work stays in Git.\n\n${clean.length ? `Clean (${clean.length}):\n${clean.slice(0, 15).map(p => '• ' + p.task.title).join('\n')}` : ''}${dirty.length ? `\n\nWith uncommitted work (${dirty.length}), kept unless you choose to discard it:\n${dirty.slice(0, 15).map(p => `• ${p.task.title} (${p.dirty} file${p.dirty === 1 ? '' : 's'})`).join('\n')}` : ''}`;
+    const actions = [...(clean.length ? [`Remove ${clean.length} Clean`] : []), ...(dirty.length ? ['Remove All, Discarding Uncommitted Work'] : [])];
+    const choice = await vscode.window.showWarningMessage(`Clean up worktrees of ${plans.length} archived agent${plans.length === 1 ? '' : 's'}?`, { modal: true, detail }, ...actions);
+    if (!choice) return;
+    let targets = clean;
+    if (choice.startsWith('Remove All')) {
+      const sure = await vscode.window.showWarningMessage(`Discard uncommitted work in ${dirty.length} worktree${dirty.length === 1 ? '' : 's'}?`, { modal: true, detail: 'This cannot be undone. Branches and committed work are kept.' }, 'Discard and Remove');
+      if (sure !== 'Discard and Remove') return;
+      targets = plans;
+    }
+    let removed = 0;
+    for (const p of targets) { try { await client.request('workspace.cleanup', { workspace_id: p.ws.id, discard_dirty: p.dirty > 0 }); removed++; } catch (error) { say('cleanup: ' + error.message); } }
+    await model.refresh();
+    vscode.window.setStatusBarMessage(`$(trash) Removed ${removed} worktree${removed === 1 ? '' : 's'}; branches kept`, 4000);
+  }
+
   /** Allow or deny the pending permission of the selected agent, or of the first agent waiting. */
   async function answerPermission(allow) {
     requireTrust();
@@ -330,6 +391,7 @@ async function activate(context) {
     try { const list = await client.request('account.list'); model.accounts = list.accounts; model.providers = list.providers; } catch (e) { say('account.list: ' + e.message); }
     await Promise.all(model.state.profiles.map(async p => {
       try { model.profileStatus.set(p.id, await client.request('profile.status', { id: p.id })); } catch (e) { say(e.message); }
+      try { (model.accountUsage ||= new Map()).set(p.id, await client.request('account.usage', { id: p.id })); } catch { /* older daemon */ }
     }));
     accounts.emitter.fire();
   }
@@ -446,12 +508,13 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.nextNeedsYou', guard(async () => {
       const list = attention();
       if (!list.length) { vscode.window.setStatusBarMessage('$(check) Nothing needs you', 2500); return; }
-      const i = list.findIndex(a => a.run_id === selectedRun);
-      const next = list[(i + 1) % list.length];
+      // The most urgent item that is not already open (approvals first, then failures, then reviews).
+      const next = list.find(a => a.run_id !== selectedRun) || list[0];
       await center.open({ layout: !center.active }); await selectRun(next.run_id); center.focus('chat');
     })),
     vscode.commands.registerCommand('overseer.allowPermission', guard(async () => answerPermission(true))),
     vscode.commands.registerCommand('overseer.denyPermission', guard(async () => answerPermission(false))),
+    vscode.commands.registerCommand('overseer.cleanupArchived', guard(cleanupArchived)),
     vscode.commands.registerCommand('overseer.stopSelected', guard(async () => { requireTrust(); const r = selectedRun && model.run(selectedRun); if (r && ACTIVE.has(r.status)) await client.request('run.interrupt', { run_id: model.rootRun(r).id }); })),
     vscode.commands.registerCommand('overseer.mergeBack', guard(mergeBack)),
     vscode.commands.registerCommand('overseer.openPullRequest', guard(arg => pullRequests.open(runArg(arg)))),

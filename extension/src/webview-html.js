@@ -6,7 +6,7 @@ const { randomBytes } = require('crypto');
 
 const SHARED_CSS = ['vendor/codicons/codicon.css', 'tokens.css', 'base.css'];
 const SHARED_JS = ['ui.js', 'logos.js'];
-const CHAT_JS = ['vendor/marked.umd.js', 'vendor/purify.min.js', 'vendor/highlight.min.js', 'markdown.js', 'conversation.js', 'chat.js'];
+const CHAT_JS = ['vendor/marked.umd.js', 'vendor/purify.min.js', 'vendor/highlight.min.js', 'markdown.js', 'conversation.js', 'prompt-tools.js', 'chat.js'];
 
 function page(webview, extensionUri, { title, css = [], js = [], body = '', bodyAttrs = '', chat = false }) {
   const media = vscode.Uri.joinPath(extensionUri, 'media');

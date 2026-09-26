@@ -12,6 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+if (process.argv.includes('auth') && process.argv.includes('status')) { console.log(JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', email: 'fixture@example.invalid', subscriptionType: 'max' })); process.exit(0); }
 if (!process.argv.includes('-p')) { console.log('claude-fixture 0.0.0 (synthetic)'); process.exit(0); }
 // CLAUDE_FIXTURE_MODE_FILE lets one test session give each task its own mode (read at start).
 const modeFile = process.env.CLAUDE_FIXTURE_MODE_FILE;
@@ -29,7 +30,7 @@ const next = pred => new Promise(resolve => { const check = () => { const i = li
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
-  await next(m => m.type === 'user');
+  const first = await next(m => m.type === 'user');
   out({ type: 'system', subtype: 'init', session_id: sid, model: 'fixture', cwd: process.cwd(), tools: ['Agent', 'Write'] });
   if (mode === 'nested') {
     // Grandchild traffic arrives before the child's Agent tool_use is reported (delayed parent).
@@ -140,6 +141,30 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     }
     out({ type: 'result', subtype: 'success', is_error: false, result: 'Sessions refresh once.', session_id: sid, num_turns: 1, duration_ms: 48210, total_cost_usd: 0.0412,
       usage: { input_tokens: 18423, output_tokens: 1204, cache_read_input_tokens: 9321 } });
+  } else if (mode === 'slow') {
+    // Busy for a few seconds (steering tests); honours an interrupt; each turn echoes its prompt.
+    const content = first.message.content;
+    const text = Array.isArray(content) ? content.filter(c => c.type === 'text').map(c => c.text).join('\n') : content;
+    assistant([{ type: 'text', text: 'working on: ' + text }]);
+    const stop = next(m => m.type === 'control_request' && m.request?.subtype === 'interrupt').then(() => 'interrupt');
+    const done = sleep(Number(process.env.FIXTURE_SLOW_MS || 5000)).then(() => 'done');
+    if ((await Promise.race([stop, done])) === 'interrupt') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+    assistant([{ type: 'text', text: 'finished: ' + text }]);
+    result(false, 'finished');
+  } else if (mode === 'limits' || mode === 'limits-low') {
+    // Claude's rate_limit_event (shape as streamed by Claude Code 2.1.x): near or far from the 5-hour limit.
+    const used = mode === 'limits' ? 0.95 : 0.12;
+    const reset = Math.floor(Date.now() / 1000) + 3600;
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed', resetsAt: reset, rateLimitType: 'five_hour', unifiedWindows: { five_hour: { utilization: used, resetsAt: reset }, seven_day: { utilization: 0.4, resetsAt: reset + 86400 * 3 } } }, uuid: 'fixture', session_id: sid });
+    assistant([{ type: 'text', text: 'done' }]);
+    result(false, 'done');
+  } else if (mode === 'echo') {
+    // Reports what Overseer sent: arguments (effort, permission mode, model, resume) and the content kinds.
+    const content = first.message.content;
+    const kinds = Array.isArray(content) ? content.map(c => c.type + (c.source ? ':' + c.source.media_type + ':' + c.source.data.length : '')) : ['text'];
+    const text = Array.isArray(content) ? content.filter(c => c.type === 'text').map(c => c.text).join('\n') : content;
+    assistant([{ type: 'text', text: 'ECHO ' + JSON.stringify({ argv: process.argv.slice(2), kinds, text }) }]);
+    result(false, 'echoed');
   } else if (mode === 'ratelimit') {
     out({ type: 'assistant', session_id: sid, error: 'rate_limit', message: { role: 'assistant', content: [{ type: 'text', text: 'API Error: Request rejected (429) · rate limited' }] } });
     result(true, 'API Error: Request rejected (429) · rate limited');

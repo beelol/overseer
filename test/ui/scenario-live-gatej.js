@@ -1,0 +1,211 @@
+// LIVE scenario for Gate J (AC-55, AC-60, AC-62) on the OWNER'S daemon: tiny prompts, one attempt
+// per step, no retries. Claude Code (existing login, haiku) and Codex (ChatGPT A, gpt-5.6-luna),
+// plus one tiny Codex turn on ChatGPT B for usage. From the dashboard chat composer: a pasted image
+// and an @-mentioned worktree file reach the agent (its reply names the color and the file's first
+// line); per-turn model / effort / permission mode reach the harness (argv read from the run's
+// launch record, never its environment); a message sent while the agent works is queued; ⌥Enter
+// stops the agent and sends; a finished run continues after the daemon restarts. Then usage per
+// account is compared with the harness's own output, and the chats are captured in both Overseer
+// themes at 900 and 1600 px. Refuses to start if any run is active on the owner's daemon.
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const cp = require('child_process');
+const { Session, makeRepo, latestVsix, delay } = require('./harness');
+
+const RED_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR42mP4z8DAgAEYRqEAAKXxAf9L4zNXAAAAAElFTkSuQmCC';
+const DATA = path.join(os.homedir(), 'Library/Application Support/Overseer');
+const ACTIVE = ['queued', 'starting', 'running', 'waiting_for_user'];
+const CHATGPT_A = process.env.CHATGPT_A || 'p-f262c1bc4958';
+const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
+
+(async () => {
+  const s = new Session('live-gatej', { ownerDaemon: true });
+  const result = { checks: [], runs: {}, usage: {} };
+  const check = (name, ok, detail) => { result.checks.push({ name, ok: !!ok, detail }); s.note(`${ok ? 'PASS' : 'FAIL'} ${name}`, detail); };
+  let cdp;
+  try {
+    // Safety: the owner's daemon must be idle before anything is installed or restarted.
+    const ownerBin = path.join(os.homedir(), '.vscode/extensions', fs.readdirSync(path.join(os.homedir(), '.vscode/extensions')).find(d => d.startsWith('beelol.overseer')), 'bin', `overseerd-${process.platform}-${process.arch}`);
+    const ownerCtl = (m, p = {}) => JSON.parse(cp.execFileSync(ownerBin, ['ctl', m, JSON.stringify(p)], { env: s.baseEnv(), encoding: 'utf8' }).split('\n')[0]);
+    let before;
+    try { before = ownerCtl('state').result; } catch { before = null; }
+    if (before) {
+      const busy = before.runs.filter(r => ACTIVE.includes(r.status));
+      const clients = ownerCtl('daemon.clients').result.vscode;
+      s.note('owner daemon before', { runs: before.runs.length, active: busy.length, vscodeClients: clients, pid: before.daemon.pid });
+      if (busy.length || clients) throw new Error(`owner daemon busy (active runs ${busy.length}, VS Code windows ${clients}); not touching it`);
+      ownerCtl('daemon.shutdown'); await delay(1500);
+      s.note('stopped the idle owner daemon so the new build starts');
+    }
+
+    const repo = makeRepo(path.join(s.root, 'live-gatej'), { dirty: false });
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'window.dialogStyle': 'custom' });
+    s.install(latestVsix());
+    s.launch(repo, {});
+    cdp = await s.connect();
+    await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
+    const run = id => s.ctl('state').runs.find(r => r.id === id);
+    const waitDone = async (id, ms = 180000) => { for (let t = 0; t < ms; t += 1000) { const r = run(id); if (!ACTIVE.includes(r.status)) return r; await delay(1000); } return run(id); };
+    const turns = id => s.ctl('run.turns', { run_id: id });
+    const replies = id => s.ctl('events.list', { run_id: id, limit: 5000 }).events.filter(e => e.kind === 'output' && e.payload?.role === 'assistant').map(e => e.payload.text || '');
+    const argvOf = (id, proc) => { try { const l = JSON.parse(fs.readFileSync(path.join(DATA, 'runs', id, proc, 'launch.json'), 'utf8')); return l.args || l.argv || null; } catch { return null; } };
+    const procs = id => { try { return fs.readdirSync(path.join(DATA, 'runs', id)).filter(p => /^p\d+$/.test(p)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))); } catch { return []; } };
+    const flag = (argv, f) => { const i = (argv || []).indexOf(f); return i >= 0 ? argv[i + 1] : undefined; };
+
+    await cdp.command('Overseer: Open Overseer View');
+    const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail')`, 30000);
+    const select = async id => {
+      await dash.waitFor(`!!document.querySelector('.rail-list .row[data-run=${JSON.stringify(id)}]')`, 30000);
+      await dash.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(id)}]').click()`);
+      await dash.waitFor(`document.body.dataset.mode === 'chat' && !document.getElementById('send').disabled`, 60000);
+    };
+    const focusPrompt = async () => { const at = await s.webviewPoint(dash, '#prompt'); await cdp.click(at.x, at.y); await delay(200); };
+    const pickOpt = async label => {
+      await dash.eval(`document.querySelector('.chat .composer-tools [data-action="tune"]').click()`); await delay(300);
+      const ok = await dash.eval(`(() => { const b = [...document.querySelectorAll('.menu .menu-item')].find(b => b.querySelector('.menu-label')?.textContent === ${JSON.stringify(label)}); if (!b) return false; b.click(); return true; })()`);
+      await delay(250); return ok;
+    };
+    const composeRich = async (text, mention) => {
+      await dash.eval(`(() => { const b = Uint8Array.from(atob(${JSON.stringify(RED_PNG)}), c => c.charCodeAt(0)); const f = new File([b], 'swatch.png', { type: 'image/png' });
+        const dt = new DataTransfer(); dt.items.add(f); document.getElementById('prompt').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`);
+      await dash.waitFor(`!!document.querySelector('.composer-tray .attach-chip img')`, 5000);
+      await focusPrompt();
+      await cdp.type(text + ' @' + mention); await delay(300);
+      await dash.eval(`document.getElementById('prompt').dispatchEvent(new Event('input'))`);
+      await dash.waitFor(`!document.querySelector('.mention-pop').hidden && [...document.querySelectorAll('.mention-item')].some(i => i.title === 'README.md')`, 10000);
+      await cdp.key('Enter'); await delay(200);
+      await cdp.type(' Answer in one short line.'); await delay(200);
+    };
+    const send = async (text, opts = {}) => { await focusPrompt(); await cdp.type(text); await delay(150); await cdp.key('Enter', opts); await delay(400); };
+    const shots = async label => {
+      for (const theme of ['Overseer Dark', 'Overseer Light']) {
+        const cur = JSON.parse(fs.readFileSync(path.join(s.profile, 'User/settings.json'), 'utf8')); cur['workbench.colorTheme'] = theme;
+        fs.writeFileSync(path.join(s.profile, 'User/settings.json'), JSON.stringify(cur, null, 2)); await delay(1500);
+        for (const w of [1600, 900]) { await cdp.call('Emulation.setDeviceMetricsOverride', { width: w, height: 1000, deviceScaleFactor: 0, mobile: false }, cdp.workbench); await delay(1500); await s.screenshot(`${label}-${theme.split(' ')[1].toLowerCase()}-${w}`); }
+      }
+      await cdp.call('Emulation.clearDeviceMetricsOverride', {}, cdp.workbench).catch(() => {});
+      const cur = JSON.parse(fs.readFileSync(path.join(s.profile, 'User/settings.json'), 'utf8')); cur['workbench.colorTheme'] = 'Overseer Dark';
+      fs.writeFileSync(path.join(s.profile, 'User/settings.json'), JSON.stringify(cur, null, 2)); await delay(1200);
+    };
+
+    const SPECS = [
+      { key: 'claude', harness: 'claude', profile: 'system-claude', model: 'haiku', effort: 'low', mode: 'Plan only', modeFlag: ['--permission-mode', 'plan'], effortFlag: '--effort', stopPrompt: 'Write a numbered list of 60 short facts about lighthouses.' },
+      { key: 'codex', harness: 'codex', profile: CHATGPT_A, model: 'gpt-5.6-luna', effort: 'low', mode: 'Read only', modeFlag: ['-s', 'read-only'], effortFlag: '-c', stopPrompt: 'Write a numbered list of 60 short facts about lighthouses.' },
+    ].filter(x => !process.env.ONLY || process.env.ONLY.split(',').includes(x.key));
+
+    for (const spec of SPECS) {
+      const r = {};
+      result.runs[spec.key] = r;
+      const t = s.ctl('task.create', { repo, harness: spec.harness, profile_id: spec.profile, model: spec.model, prompt: 'Reply with exactly: ready', title: `Live ${spec.key}` });
+      r.id = t.run.id;
+      const first = await waitDone(r.id);
+      r.first = { status: first.status, reply: replies(r.id).pop() };
+      await select(r.id);
+
+      // Image + @-mention + options for the next turn.
+      await composeRich('What color is the attached image, and what is the first line of', 'README');
+      r.optsPicked = [await pickOpt(spec.effort), await pickOpt(spec.mode)];
+      r.tray = await dash.eval(`document.querySelector('.composer-tray')?.textContent`);
+      await s.screenshot(`${spec.key}-composer-tools`);
+      await cdp.key('Enter');
+      await delay(1500);
+      const second = await waitDone(r.id);
+      const p = procs(r.id); const argv = argvOf(r.id, p[p.length - 1]);
+      r.rich = { status: second.status, reply: replies(r.id).pop(), argv: argv && argv.filter(a => !/^\//.test(a) || a.length < 200).slice(0, 40) };
+      const effortOk = spec.harness === 'claude' ? flag(argv, '--effort') === 'low' : (argv || []).some(a => /model_reasoning_effort="?low"?/.test(a));
+      // Codex follow-ups resume the session, where the sandbox is a config value instead of -s.
+      const modeOk = (argv || []).some((a, i) => (a === spec.modeFlag[0] && argv[i + 1] === spec.modeFlag[1]) || (spec.harness === 'codex' && a === 'sandbox_mode="read-only"'));
+      const imageOk = spec.harness === 'claude' ? true : (argv || []).includes('-i');
+      check(`${spec.key}: a pasted image and an @-mentioned file reach the agent (reply names red and "# fixture")`, /red/i.test(r.rich.reply || '') && /fixture/i.test(r.rich.reply || '') && imageOk, { reply: r.rich.reply, tray: r.tray });
+      check(`${spec.key}: per-turn model, effort and permission mode reach the harness`, flag(argv, spec.harness === 'claude' ? '--model' : '-m') === spec.model && effortOk && modeOk, { argv: r.rich.argv, picked: r.optsPicked });
+
+      // Queue: a message sent while the agent works is sent when the turn ends.
+      await send(spec.stopPrompt.replace('60', '12'));
+      await dash.waitFor(`!document.getElementById('interrupt').hidden`, 30000).catch(() => {});
+      await send('Reply with exactly: queued ok');
+      r.queuedShown = await dash.eval(`!document.getElementById('queued').hidden && document.getElementById('queued').textContent`);
+      for (let i = 0; i < 180; i++) { const ts = turns(r.id); if (ts.length >= 4 && !ACTIVE.includes(run(r.id).status)) break; await delay(1000); }
+      const q = turns(r.id);
+      r.queue = q.map(x => [x.n, x.prompt.slice(0, 40), x.status]);
+      check(`${spec.key}: a message sent while the agent works is queued, then sent when the turn ends`, /Queued/.test(r.queuedShown || '') && q.length >= 4 && q[3].prompt === 'Reply with exactly: queued ok' && /queued ok/i.test(replies(r.id).pop() || ''), { queued: r.queuedShown, turns: r.queue });
+
+      // ⌥Enter: stop the agent and send now.
+      await send(spec.stopPrompt);
+      await dash.waitFor(`!document.getElementById('interrupt').hidden`, 30000).catch(() => {});
+      await delay(2500);
+      await send('Stop. Reply with exactly: stopped ok', { alt: true });
+      for (let i = 0; i < 180; i++) { const ts = turns(r.id); if (ts.length >= 6 && !ACTIVE.includes(run(r.id).status)) break; await delay(1000); }
+      const st = turns(r.id);
+      r.stop = st.map(x => [x.n, x.prompt.slice(0, 40), x.status]);
+      check(`${spec.key}: ⌥Enter stops the agent and sends the message right away`, st.length >= 6 && st[4].status === 'interrupted' && st[5].prompt === 'Stop. Reply with exactly: stopped ok' && /stopped ok/i.test(replies(r.id).pop() || ''), r.stop);
+      await s.screenshot(`${spec.key}-steered`);
+    }
+
+    // Continue finished runs after the daemon restarts.
+    s.ctl('daemon.shutdown'); await delay(2000);
+    await cdp.command('Overseer: Start Daemon');
+    await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'reconnected');
+    await delay(2000);
+    for (const spec of SPECS) {
+      const r = result.runs[spec.key];
+      const nativeBefore = run(r.id).native_id;
+      await select(r.id);
+      await send('Reply with exactly: resumed ok');
+      await delay(1500);
+      const done = await waitDone(r.id);
+      r.resumed = { status: done.status, reply: replies(r.id).pop(), sameSession: run(r.id).native_id === nativeBefore };
+      check(`${spec.key}: a finished run continues its session after the daemon restarts`, done.status === 'completed' && /resumed ok/i.test(r.resumed.reply || '') && r.resumed.sameSession, r.resumed);
+    }
+
+    // One tiny turn on ChatGPT B, so both ChatGPT accounts report usage.
+    if (!process.env.ONLY || process.env.ONLY.includes('codex')) {
+      const b = s.ctl('task.create', { repo, harness: 'codex', profile_id: CHATGPT_B, model: 'gpt-5.6-luna', prompt: 'Reply with exactly: ok', title: 'Live ChatGPT B' });
+      result.runs.chatgptB = { id: b.run.id, status: (await waitDone(b.run.id)).status };
+    }
+
+    // Usage: what the daemon reports per account vs the harness's own output.
+    await cdp.command('Overseer: Refresh Account Status'); await delay(3000);
+    for (const id of ['system-claude', CHATGPT_A, CHATGPT_B, 'system-opencode']) result.usage[id] = s.ctl('account.usage', { id });
+    s.note('account.usage', result.usage);
+    // Claude: the last rate_limit_event in the run's raw output.
+    const raw = { claude: null, codex: null };
+    if (result.runs.claude) {
+      for (const p of procs(result.runs.claude.id).reverse()) {
+        const dir = path.join(DATA, 'runs', result.runs.claude.id, p);
+        for (const f of fs.readdirSync(dir).filter(f => f.startsWith('output-')).sort().reverse()) {
+          const line = fs.readFileSync(path.join(dir, f), 'utf8').split('\n').reverse().find(l => l.includes('"rate_limit_event"'));
+          if (line && !raw.claude) raw.claude = line.slice(line.indexOf('{'));
+        }
+        if (raw.claude) break;
+      }
+    }
+    result.raw = raw;
+    s.note('raw claude rate_limit_event', raw.claude);
+    const cu = result.usage['system-claude'];
+    check('Claude usage matches its own rate_limit_event (or says not reported)', cu && (cu.reported ? !!raw.claude : !raw.claude), { usage: cu, raw: raw.claude && raw.claude.slice(0, 400) });
+    for (const id of [CHATGPT_A, CHATGPT_B]) {
+      const u = result.usage[id];
+      check(`Codex ${id === CHATGPT_A ? 'ChatGPT A' : 'ChatGPT B'} usage comes from its session log (or says not reported)`, u && (u.reported ? (u.windows || []).length > 0 && /session/.test(u.source || '') : true), u);
+    }
+    check('OpenCode says not reported', result.usage['system-opencode']?.reported === false, result.usage['system-opencode']);
+    await dash.eval(`document.querySelector('.rail-accounts').click()`); await delay(500);
+    await s.screenshot('accounts-usage');
+    await cdp.key('Escape');
+
+    // AC-55: live chats in both themes at 1600 and 900 px.
+    for (const spec of SPECS) { await select(result.runs[spec.key].id); await delay(1200); await shots(`chat-${spec.key}`); }
+  } catch (error) {
+    s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
+    try { await s.screenshot('error'); } catch {}
+  } finally {
+    // Leave nothing running: interrupt anything this scenario started that is still active.
+    try { for (const r of Object.values(result.runs)) if (r.id && ACTIVE.includes(s.ctl('state').runs.find(x => x.id === r.id)?.status)) s.ctl('run.interrupt', { run_id: r.id }); } catch {}
+    s.writeLog();
+    fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
+    if (!process.env.KEEP_OPEN) { await s.quit(); try { s.ctl('daemon.shutdown'); } catch {} }
+    const failed = result.error || result.checks.some(c => !c.ok);
+    console.log(failed ? 'SCENARIO FAILED' : 'SCENARIO PASSED', s.root);
+    process.exit(failed ? 1 : 0);
+  }
+})();

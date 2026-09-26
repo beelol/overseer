@@ -31,8 +31,16 @@ const { Session, makeRepo, latestVsix, delay, git, repoRoot } = require('./harne
     const pt = await cdp.waitFor(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
       const i = rows.findIndex(r => r.textContent.includes('PR demo change')); const r = rows[i + 1]; if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 20000);
     await cdp.click(pt.x, pt.y); await delay(1500);
-    const panel = await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(t.run.id)} && !!document.getElementById('pr')`, 30000);
-    const clickPr = async () => { await panel.waitFor(`!document.getElementById('pr').disabled`, 10000); const p = await s.webviewPoint(panel, '#pr'); await cdp.click(p.x, p.y); await delay(1200); };
+    const panel = await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(t.run.id)} && !!document.getElementById('more')`, 30000);
+    // Open pull request lives in the chat's … menu.
+    const clickPr = async () => {
+      for (let i = 0; i < 20; i++) {
+        if (!(await panel.eval(`!!document.getElementById('pr')`))) { const m = await s.webviewPoint(panel, '#more'); await cdp.click(m.x, m.y); await delay(300); }
+        if (await panel.eval(`!document.getElementById('pr').disabled`)) break;
+        await panel.eval(`document.getElementById('more').click()`); await delay(500);
+      }
+      const p = await s.webviewPoint(panel, '#pr'); await cdp.click(p.x, p.y); await delay(1200);
+    };
     // Open PR answers with dialogs, not toasts (VS Code's Do Not Disturb hides toasts). Read one, then close it.
     const dialogText = pattern => cdp.waitFor(`(() => { const d = document.querySelector('.monaco-dialog-box'); return d && ${pattern}.test(d.innerText) ? d.innerText : null; })()`, 20000).catch(() => null);
     const closeDialog = async () => {
