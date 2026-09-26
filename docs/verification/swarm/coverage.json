@@ -486,7 +486,7 @@
         "docs/verification/swarm/milestone-7.md",
         "docs/verification/swarm/SWARM-56.md"
       ],
-      "blocker": "Local fixtures enforce review pressure and launch 32 live supervised workers with explicit ceilings, but in-flight submissions over the threshold, live account usage, director/reviewer operation at scale and versioned qualification remain unverified."
+      "blocker": "Local fixtures enforce review pressure, preserve ten already-admitted results across the eight-result threshold and daemon restart, and launch 32 live supervised workers with explicit ceilings. Live account usage, director/reviewer operation at scale and versioned qualification remain unverified."
     },
     "SWARM-57": {
       "status": "unverified",
