@@ -107,6 +107,8 @@ Expired observations become unknown and trigger one bounded refresh. A reset tim
 
 No paid synthetic request is allowed just to probe a service unless the user enables a separate bounded probe policy. The actual requested task may be the first request under unknown health. A local network outage is surfaced as connectivity failure and stops repeated remote fallback attempts; an eligible local route can still be considered.
 
+The current health collector treats an explicit local kernel `ENETDOWN` / “network is down” error from an attempted harness request as a short-lived host-offline signal. A destination-specific unreachable error, 429, 503, or public status failure does not imply a host-wide outage. Verified loopback routes remain eligible under the host-offline signal.
+
 ## Measuring model and reasoning consumption
 
 Remaining account allowance and the expected cost of a proposed work unit are separate inputs. Prefer provider-reported per-model/effort allowance rates or charges if they exist for that account/plan. Otherwise collect actual turn tokens (including cache/reasoning where exposed), elapsed time, model/effort, harness/version, context size, and before/after account-window observations from ordinary authorized work. Public API dollar prices are not subscription multipliers.
@@ -212,7 +214,7 @@ These are implementation requirements, not claims about this documentation revis
 - [ ] **AUTO-AC-06 — Claude structured acquisition.** Collect supported native events/status data or explicit unknown without a hidden inference probe. **Verify:** Live available-account observation during an authorized tiny task plus versioned fixtures; test pre-response absence, missing windows, original cache age, and preservation of existing status-line settings.
 - [x] **AUTO-AC-07 — OpenCode provider separation.** Each supported provider route has its own evidence and authentication eligibility. **Verify:** real OpenCode with two controlled local endpoints; failing one leaves the other eligible; stats-only data stays quota-unknown; unsupported cloud login is excluded.
 - [x] **AUTO-AC-08 — Parser honesty.** Deterministic collectors fail safely on format drift. **Verify:** fixtures for ANSI text, used/remaining inversion, localization, malformed/negative/out-of-range values, reset time zones, and missing units; unknown replaces invented balances.
-- [ ] **AUTO-AC-09 — Scoped health.** Public incidents, route errors, authentication, throttling, and local connectivity remain distinct. **Verify:** decision fixtures for green feed plus exhausted account, unrelated incident, broad incident plus route success, matching endpoint failure, 429 without quota proof, and offline host with local alternative.
+- [x] **AUTO-AC-09 — Scoped health.** Public incidents, route errors, authentication, throttling, and local connectivity remain distinct. **Verify:** decision fixtures for green feed plus exhausted account, unrelated incident, broad incident plus route success, matching endpoint failure, 429 without quota proof, and offline host with local alternative.
 - [ ] **AUTO-AC-10 — Freshness and reset.** Expiry/reset schedules a bounded refresh instead of assuming health/capacity. **Verify:** fake clock tests at expiry/reset, cached source timestamps, clock skew, out-of-order updates, and collector timeout.
 
 ### Decisions and resource bounds

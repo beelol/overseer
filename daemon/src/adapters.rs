@@ -360,6 +360,10 @@ pub fn classify_error(message: &str) -> &'static str {
         "rate_limit"
     } else if m.contains("503 service unavailable") || m.contains("http status 503") {
         "service_unavailable"
+    } else if m.contains("enetdown") || m.contains("network is down") {
+        // A kernel network-down error is host-scoped. A destination-specific
+        // unreachable error is not enough to declare every remote route down.
+        "host_offline"
     } else if m.contains("authenticat") || m.contains("401") || m.contains("unauthorized") || m.contains("not logged in") || m.contains("log in") || m.contains("login") || m.contains("oauth") || m.contains("token expired") {
         "auth"
     } else {
@@ -852,6 +856,8 @@ mod tests {
         assert_eq!(classify_error("Failed to authenticate: OAuth session expired and could not be refreshed"), "auth");
         assert_eq!(classify_error("stream error: 429 Too Many Requests"), "rate_limit");
         assert_eq!(classify_error("HTTP 503 Service Unavailable"), "service_unavailable");
+        assert_eq!(classify_error("connect ENETDOWN: Network is down"), "host_offline");
+        assert_eq!(classify_error("connect ENETUNREACH: Network is unreachable"), "other");
         assert_eq!(classify_error("You've hit your usage limit. Upgrade to Pro"), "quota");
         assert_eq!(classify_error("file not found"), "other");
         // Real message formats found in the pinned codex 0.155 binary (strings probe).

@@ -158,7 +158,8 @@ pub fn evaluate(route: &Route, observations: &[Observation], now_ms: i64) -> Hea
 
 /// Read only bounded, normalized local run outcomes. Message text is not used
 /// to infer allowance or persisted in this health view. Public status and
-/// connectivity need separate collectors before they can enter this path.
+/// A direct kernel network-down error is the only host-wide connectivity
+/// signal accepted here; destination-specific failures stay endpoint-scoped.
 pub fn recent_local_observations(
     store: &crate::store::Store,
     now_ms: i64,
@@ -195,9 +196,12 @@ pub fn recent_local_observations(
             Some("rate_limit") => Signal::Throttled,
             Some("auth") => Signal::AuthenticationFailure,
             Some("service_unavailable") => Signal::EndpointFailure,
+            Some("host_offline") => Signal::HostOffline,
             _ => continue,
         };
-        let scope = if matches!(signal, Signal::EndpointFailure) {
+        let scope = if matches!(signal, Signal::HostOffline) {
+            Scope::Host
+        } else if matches!(signal, Signal::EndpointFailure) {
             Scope::Endpoint {
                 provider: provider.clone(),
                 endpoint: endpoint.clone(),
@@ -319,6 +323,33 @@ mod tests {
         assert_eq!(evaluate(&scoped, &observations, 1100), Health::Unavailable);
         assert_eq!(evaluate(&independent, &observations, 1100), Health::Unknown);
         assert!(!format!("{observations:?}").contains("secret-endpoint-error"));
+    }
+
+    #[test]
+    fn persisted_kernel_network_down_stops_remote_routes_but_keeps_loopback_eligible() {
+        let store = crate::store::Store::open(std::path::Path::new(":memory:")).unwrap();
+        store.conn.execute_batch("INSERT INTO workspaces(id,path,repo_root,common_dir,kind,initial_dirty,created_ms) VALUES('w','/tmp','/tmp','/tmp','current','{}',0);
+            INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms) VALUES('t','t','p','/tmp','w',0);
+            INSERT INTO runs(id,task_id,harness,profile_id,model,effort,workspace_id,status,created_ms,title,capabilities)
+                VALUES('r','t','codex-app','acct-a','general','medium','w','failed',1000,'r','{}');").unwrap();
+        store.conn.execute("INSERT INTO events(ts,task_id,run_id,kind,source,confidence,payload)
+            VALUES(1000,'t','r','error','harness','exact',?1)",
+            [serde_json::json!({"class":"host_offline","message":"private-network-sentinel"}).to_string()]).unwrap();
+        let observations = recent_local_observations(&store, 1100).unwrap();
+        assert_eq!(observations.len(), 1);
+        let mut codex = route("codex", "codex-app", "openai", "codex", "acct-a");
+        let mut claude = route("claude", "claude", "anthropic", "claude-code", "acct-b");
+        let mut local = route("local", "opencode", "local", "http://127.0.0.1:47811/v1", "local");
+        codex.health = evaluate(&codex, &observations, 1100);
+        claude.health = evaluate(&claude, &observations, 1100);
+        local.health = evaluate(&local, &observations, 1100);
+        assert_eq!(codex.health, Health::Unavailable);
+        assert_eq!(claude.health, Health::Unavailable);
+        assert_eq!(local.health, Health::Unknown);
+        assert_eq!(select(&work(), &[codex, claude, local]).selected.as_deref(), Some("local"));
+        assert!(!format!("{observations:?}").contains("private-network-sentinel"));
+        assert_eq!(evaluate(&route("later", "claude", "anthropic", "claude-code", "acct-b"),
+            &observations, 61_000), Health::Unknown, "host signal must expire");
     }
 
     #[test]
@@ -575,6 +606,12 @@ mod tests {
             Health::Unknown
         );
         assert_eq!(evaluate(&throttled, &[signal], 160), Health::Unknown);
+        let auth = obs(Scope::AccountEndpoint {profile_id:"acct-a".into(),
+            provider:"openai".into(), endpoint:"codex".into()},
+            Signal::AuthenticationFailure, 120, 180);
+        assert_eq!(evaluate(&throttled, &[auth.clone()], 130), Health::Unavailable);
+        assert_eq!(evaluate(&independent, &[auth], 130), Health::Unknown,
+            "one account's expired login must not become a provider outage");
     }
 
     #[test]
