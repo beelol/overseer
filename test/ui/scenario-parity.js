@@ -29,8 +29,8 @@ const RED_PNG = 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAKklEQVR4nGO4Iyd
     const t = s.ctl('task.create', { repo, harness: 'claude', profile_id: 'system-claude', title: 'Parity demo', prompt: 'first turn' });
     for (let i = 0; i < 30 && run(t.run.id).status !== 'completed'; i++) await delay(300);
     await cdp.command('Overseer: Open Overseer View');
-    const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list .row[data-run]')`, 30000);
-    await dash.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(t.run.id)}]').click()`);
+    await s.selectRun(t.run.id);
+    const dash = await s.editorView();
     await dash.waitFor(`document.getElementById('title')?.textContent === 'Parity demo' && !document.getElementById('send').disabled`, 20000);
 
     // Paste an image into the composer.

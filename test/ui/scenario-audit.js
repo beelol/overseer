@@ -5,7 +5,8 @@
 // icon-only controls without a name or tooltip.
 //
 //   AUDIT_UI=baseline  today's UI (before Gate J); views found by their old selectors
-//   AUDIT_UI=new       the Gate J UI; views carry data-audit-view
+//   AUDIT_UI=new       the Gate J UI; views carry data-audit-view (needs a Gate J VSIX)
+//   AUDIT_UI=gatek     the Gate K layout (default): agents in the side bar, review left and chat right
 //   AUDIT_VSIX=path    VSIX to install (default: the latest build)
 const fs = require('fs');
 const path = require('path');
@@ -13,13 +14,13 @@ const cp = require('child_process');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 const { auditExpression } = require('./audit');
 
-const UI = process.env.AUDIT_UI || 'new';
+const UI = process.env.AUDIT_UI || 'gatek';
 const THEMES = UI === 'baseline' ? ['Default Dark Modern', 'Default Light Modern'] : ['Overseer Dark', 'Overseer Light', 'Default Dark Modern'];
 const WIDTHS = [1280, 900];
 const HEIGHT = 860;
 
 (async () => {
-  const s = new Session(UI === 'baseline' ? 'audit-baseline' : 'audit');
+  const s = new Session({ baseline: 'audit-baseline', new: 'audit', gatek: 'audit-gatek' }[UI]);
   const result = { ui: UI, checks: [], views: {} };
   const check = (name, ok, detail) => { result.checks.push({ name, ok: !!ok, detail }); s.note(`${ok ? 'PASS' : 'FAIL'} ${name}`, detail); };
   const fx = name => path.join(repoRoot, 'fixtures/fake-harness', name);
@@ -81,6 +82,19 @@ const HEIGHT = 860;
       views.files = { frame: center, opts: { root: '#files-section' } };
       views.chat = { frame: await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(id)} && !!document.querySelector('#conv .turn')`, 30000), opts: { root: 'body' } };
       views.review = { frame: await cdp.webview(`document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(runs.showcase.workspace.path)}) && document.querySelectorAll('.diff-file').length > 0`, 30000), opts: { root: 'body' } };
+    } else if (UI === 'gatek') {
+      // Gate K: the showcase agent has changes, so the review opens left and the chat right.
+      await s.selectRun(runs.showcase.run.id, { settle: 3000 });
+      const dash = await s.editorView(`!!document.querySelector('[data-audit-view="chat"] .msg')`);
+      await dash.eval(`document.getElementById('files-toggle').click()`);
+      await dash.waitFor(`document.body.dataset.filesReady === '1'`, 20000);
+      const tagged = await cdp.evalWorkbench(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || '')); if (!pane) return false; pane.dataset.audit = 'agents'; return true; })()`);
+      views.dashboard = { frame: dash, opts: { root: 'body' } };
+      views.agents = tagged ? { frame: null, opts: { root: '[data-audit="agents"]' } } : undefined;
+      views.chat = { frame: dash, opts: { root: '[data-audit-view="chat"]' } };
+      views.files = { frame: dash, opts: { root: '[data-audit-view="files"]' } };
+      views.review = { frame: await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(runs.showcase.run.id)}`, 30000), opts: { root: 'body' } };
+      if (!views.agents) delete views.agents;
     } else {
       await cdp.command('Overseer: Open Dashboard');
       const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('[data-audit-view="agents"]')`, 30000);
@@ -109,8 +123,10 @@ const HEIGHT = 860;
 
     // Grid (new UI only).
     if (UI !== 'baseline') {
-      const dash = views.dashboard.frame;
-      await dash.eval(`document.querySelector('[data-action="grid"]').click()`);
+      let dash = views.dashboard.frame;
+      const toggleGrid = () => UI === 'gatek' ? cdp.command('Overseer: Toggle Agent Grid') : dash.eval(`document.querySelector('[data-action="grid"]').click()`);
+      await toggleGrid();
+      if (UI === 'gatek') dash = await cdp.webview(`!!document.querySelector('[data-audit-view="grid"] .tile')`, 20000);
       await dash.waitFor(`!!document.querySelector('[data-audit-view="grid"] .tile')`, 20000);
       for (const theme of THEMES) {
         await setTheme(theme);
@@ -120,16 +136,17 @@ const HEIGHT = 860;
           record('grid', `${theme}@${w}`, await audit(dash, { root: '[data-audit-view="grid"]' }));
         }
       }
-      await dash.eval(`document.querySelector('[data-action="grid"]').click()`);
-      await delay(800);
+      await toggleGrid();
+      await delay(1500);
     }
 
     // New agent: the New Task form (baseline) or the composer shown with no agent selected (new).
     if (UI === 'baseline') await cdp.command('Overseer: New Task');
+    else if (UI === 'gatek') await cdp.command('Overseer: New Agent');
     else await views.dashboard.frame.eval(`document.querySelector('[data-action="new-agent"]').click()`);
     const composer = UI === 'baseline'
       ? await cdp.webview(`document.body.dataset.ready === '1' && document.querySelectorAll('#harnesses .tile').length >= 3`, 30000)
-      : views.dashboard.frame;
+      : UI === 'gatek' ? await cdp.webview(`!!document.querySelector('[data-audit-view="composer"]')`, 20000) : views.dashboard.frame;
     if (UI !== 'baseline') await composer.waitFor(`!!document.querySelector('[data-audit-view="composer"]')`, 20000);
     for (const theme of THEMES) {
       await setTheme(theme);
@@ -171,6 +188,15 @@ const HEIGHT = 860;
         check(`${view}: every icon-only control has a name and a tooltip`, v.unnamed.length === 0, v.unnamed);
         const b = base[view === 'dashboard' || view === 'grid' ? null : view];
         if (b) check(`${view}: at least 40% less visible text than today's UI (${b.chars} → ${v.chars})`, v.chars <= b.chars * 0.6, { before: b.chars, after: v.chars, reduction: Math.round((1 - v.chars / b.chars) * 100) + '%' });
+      }
+      if (UI === 'gatek') {
+        // AC-81: the text budget re-measured against Gate J; AC-67's agents budget is Gate J's 238.
+        const gatej = JSON.parse(fs.readFileSync(path.join(repoRoot, 'docs/verification/evidence/ui/audit/result.json'), 'utf8')).summary;
+        result.gatej = gatej;
+        const rows = Object.entries(summary).map(([view, v]) => ({ view, gatej: gatej[view]?.chars, gatek: v.chars }));
+        s.note('text: Gate J → Gate K', rows);
+        check('agents: the side bar stays within the Gate J agents budget (238 characters)', (summary.agents?.chars ?? Infinity) <= 238, summary.agents?.chars);
+        for (const r of rows.filter(r => r.gatej != null && r.view !== 'agents' && r.view !== 'dashboard')) check(`${r.view}: no more visible text than Gate J (${r.gatej} → ${r.gatek})`, r.gatek <= r.gatej, r);
       }
     }
   } catch (error) {

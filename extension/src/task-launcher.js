@@ -90,7 +90,7 @@ class TaskLauncher {
       approval_policy: harness === 'codex-app' ? (f.approval || 'on-request') : undefined, unsaved: unsaved.map(d => path.relative(repo, d.uri.fsPath)),
       effort: f.options?.effort, permission_mode: f.options?.permission_mode, images: f.options?.images });
     if (created.launch_error) throw new Error(`Could not start ${harness}: ${created.launch_error}`);
-    await this.saveDefaults({ repo, harness, account: f.account, model: f.model || '', mode: f.mode === 'current' ? 'current' : 'worktree' });
+    await this.saveDefaults({ repo, harness, account: f.account, model: f.model || '', mode: f.mode === 'current' ? 'current' : 'worktree', ...(f.approval ? { approval: f.approval } : {}) });
     await this.model.refresh();
     return created.run.id;
   }

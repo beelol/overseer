@@ -143,7 +143,8 @@
     task.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); go(); } });
     start.addEventListener('click', go);
 
-    function save() { post({ type: 'composerDefaults', defaults: { repo: form.repo, harness: form.harness, account: form.account, model: form.model, mode: form.mode, approval: form.approval } }); render(); }
+    // Choices become the defaults only when an agent starts with them (the launcher saves them then).
+    function save() { render(); }
     function go() {
       if (!validate() || starting) return;
       starting = true; start.disabled = true; note.className = 'composer-note'; note.replaceChildren(el('span', 'mini-dot'), el('span', null, 'Starting…'));

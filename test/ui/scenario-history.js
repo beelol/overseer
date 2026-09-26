@@ -1,7 +1,7 @@
 // Packaged-UI scenario for AC-63 (history that stays tidy), fixture runs only: 300 finished runs;
-// the agents rail shows active and recent ones; search finds runs by title and by text that only
+// the side bar's agents list (Gate K) shows active and recent ones; search finds runs by title and by text that only
 // appears in an agent's output, answering in under 200 ms; finished runs are archived and restored
-// from the rail (keyboard); bulk cleanup of archived worktrees removes only clean ones unless the
+// from the side bar (keyboard); bulk cleanup of archived worktrees removes only clean ones unless the
 // user confirms discarding uncommitted work (branches are always kept); automatic archiving after
 // the chosen age hides old finished runs.
 const fs = require('fs');
@@ -31,41 +31,46 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     for (let i = 0; i < 120 && s.ctl('state').runs.some(r => ['queued', 'starting', 'running'].includes(r.status)); i++) await delay(500);
     s.note('created 300 runs', { ms: Date.now() - t0 });
 
-    await cdp.command('Overseer: Open Overseer View');
-    const dash = await cdp.webview(`document.body.dataset.ready === '1' && document.querySelectorAll('.rail-list .row[data-run]').length >= 300`, 60000);
-    // Search: time from the keystroke to the rail showing the match.
-    const timeSearch = async (q, expectTitle) => dash.eval(`new Promise(resolve => {
-      const input = document.querySelector('.rail-head input[type=search]');
-      const t0 = performance.now();
-      input.value = ${JSON.stringify(q)}; input.dispatchEvent(new Event('input'));
-      (function poll() {
-        const titles = [...document.querySelectorAll('.rail-list .row[data-run] .title')].map(e => e.textContent);
-        if (titles.length && titles.every(t => t === ${JSON.stringify(expectTitle)})) return resolve({ ms: Math.round(performance.now() - t0), titles });
-        if (performance.now() - t0 > 5000) return resolve({ ms: -1, titles });
-        requestAnimationFrame(poll);
-      })();
-    })`);
+    // Gate K: the agents list is the Overseer side bar; search goes through its Search action.
+    await cdp.command('View: Show Overseer'); await delay(2500);
+    const labels = () => s.agentRows().then(rows => rows.filter(r => r.level === 2).map(r => r.label));
+    const timeSearch = async (q, expectTitle) => {
+      await cdp.command('Overseer: Search Agents'); await cdp.waitQuickTitle('Search agents');
+      await cdp.key('a', { meta: true }); await cdp.key('Backspace');
+      await cdp.call('Input.insertText', { text: q }, cdp.workbench);
+      const t0 = Date.now(); let titles = [];
+      for (let i = 0; i < 400; i++) { titles = await labels(); if (titles.length && titles.every(t => t === expectTitle)) break; await delay(5); }
+      const ms = Date.now() - t0;
+      await cdp.key('Enter'); await delay(200);
+      return { ms: titles.every(t => t === expectTitle) ? ms : -1, titles: titles.slice(0, 5) };
+    };
+    const shownAtStart = (await labels()).length;
     const byTitle = await timeSearch('History task 123', 'History task 123');
     const byOutput = await timeSearch('needle-237', 'History task 237');
     await s.screenshot('search');
-    check('with 300 runs, search answers in under 200 ms, by title and by text only in the agent output', byTitle.ms >= 0 && byTitle.ms < 200 && byOutput.ms >= 0 && byOutput.ms < 200, { byTitle, byOutput });
-    await dash.eval(`(() => { const i = document.querySelector('.rail-head input[type=search]'); i.value = ''; i.dispatchEvent(new Event('input')); return true; })()`);
-    await delay(500);
+    check('with 300 runs, search answers in under 200 ms, by title and by text only in the agent output', byTitle.ms >= 0 && byTitle.ms < 200 && byOutput.ms >= 0 && byOutput.ms < 200, { shownAtStart, byTitle, byOutput });
+    await cdp.command('Overseer: Clear Search'); await delay(1200);
 
-    // Archive and restore from the rail with the keyboard (Delete on a finished run's row).
+    // Archive and restore from the side bar with the keyboard (Delete / ⌘⌫ on a finished agent's row).
+    // The tree draws only the rows in view, so the old agent is found by search first.
     const target = tasks[5];
-    const rowFocus = `(() => { const r = document.querySelector('.rail-list .row[data-task=${JSON.stringify(target.task.id)}]'); r.tabIndex = 0; r.focus(); return !!r; })()`;
-    await dash.eval(rowFocus);
-    await cdp.key('Delete'); await delay(1200);
+    const filterTo = async q => { await cdp.command('Overseer: Search Agents'); await cdp.waitQuickTitle('Search agents'); await cdp.key('a', { meta: true }); await cdp.key('Backspace'); await cdp.call('Input.insertText', { text: q }, cdp.workbench); await delay(400); await cdp.key('Enter'); await delay(600); };
+    await filterTo('History task 005');
+    await s.clickAgentRow('History task 005', { settle: 1500 });
+    await cdp.key('Backspace', { meta: true }); await delay(1500);
     const archived = s.ctl('state').tasks.find(t => t.id === target.task.id).archived_ms;
-    const hidden = await dash.eval(`!document.querySelector('.rail-list .row[data-task=${JSON.stringify(target.task.id)}]')`);
-    await dash.eval(`document.querySelector('[data-action="rail-more"]').click()`); await delay(300);
-    await dash.eval(`[...document.querySelectorAll('.menu-item')].find(b => /Show archived/.test(b.textContent)).click()`); await delay(800);
-    const inArchive = await dash.eval(`[...document.querySelectorAll('.rail-list .row[data-task] .title')].map(e => e.textContent)`);
-    await dash.eval(rowFocus);
-    await cdp.key('Delete'); await delay(1200);
+    const hidden = !(await labels()).includes('History task 005');
+    await cdp.command('Overseer: Clear Search'); await delay(800);
+    await cdp.command('Overseer: Show Archived Agents'); await delay(1500);
+    await filterTo('History task 005');
+    const inArchive = await labels();
+    await s.screenshot('archived');
+    await s.clickAgentRow('History task 005', { settle: 1500 });
+    await cdp.key('Backspace', { meta: true }); await delay(1500);
     const restored = !s.ctl('state').tasks.find(t => t.id === target.task.id).archived_ms;
-    check('a finished run is archived from the rail (hidden, still listed under Show archived) and restored', !!archived && hidden && inArchive.includes('History task 005') && restored, { archived, hidden, inArchive: inArchive.slice(0, 5), restored });
+    await cdp.command('Overseer: Clear Search'); await delay(800);
+    await cdp.command('Overseer: Show Active Agents'); await delay(1000);
+    check('a finished agent is archived from the side bar by keyboard (hidden, listed under Show Archived) and restored', !!archived && hidden && inArchive.includes('History task 005') && restored, { archived, hidden, inArchive: inArchive.slice(0, 5), restored });
 
     // Bulk cleanup of archived worktrees: clean ones only, unless discarding is confirmed.
     const [a, b, c] = [tasks[10], tasks[11], tasks[12]];
@@ -100,9 +105,10 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     cdp = await s.connect(); s.cdp = cdp;
     let archivedCount = 0;
     for (let i = 0; i < 40; i++) { archivedCount = s.ctl('state').tasks.filter(t => t.archived_ms).length; if (archivedCount >= 300) break; await delay(500); }
-    const dash2 = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail')`, 30000);
-    const shown = await dash2.eval(`document.querySelectorAll('.rail-list .row[data-run]').length`);
-    check('finished runs older than overseer.history.autoArchiveDays are archived automatically; the rail shows active and recent runs only', archivedCount >= 300 && shown === 0, { archivedCount, shown });
+    await s.openOverseerView(); await delay(2000);
+    const shown = (await s.agentRows()).filter(r => r.level === 2).length;
+    await s.screenshot('auto-archived');
+    check('finished runs older than overseer.history.autoArchiveDays are archived automatically; the side bar shows active and recent agents only', archivedCount >= 300 && shown === 0, { archivedCount, shown });
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

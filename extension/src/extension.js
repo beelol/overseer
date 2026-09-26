@@ -597,7 +597,8 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.clearAgentSearch', guard(async () => setAgentFilter(undefined))),
     vscode.commands.registerCommand('overseer.showArchived', guard(async () => { agents.showArchived = true; setAgentFilter(undefined); vscode.commands.executeCommand('setContext', 'overseer.showArchived', true); })),
     vscode.commands.registerCommand('overseer.hideArchived', guard(async () => { agents.showArchived = false; agents.refresh(); vscode.commands.executeCommand('setContext', 'overseer.showArchived', false); })),
-    vscode.commands.registerCommand('overseer.archiveAgent', guard(async arg => { const task = agentTask(arg); if (task) { await client.request('task.archive', { task_id: task.id, archived: true }); await model.refresh(); } })),
+    // Delete on an archived row (Show Archived) restores it, as it did in the Gate J rail.
+    vscode.commands.registerCommand('overseer.archiveAgent', guard(async arg => { const task = agentTask(arg); if (task) { await client.request('task.archive', { task_id: task.id, archived: !task.archived_ms }); await model.refresh(); } })),
     vscode.commands.registerCommand('overseer.restoreAgent', guard(async arg => { const task = agentTask(arg); if (task) { await client.request('task.archive', { task_id: task.id, archived: false }); await model.refresh(); } })),
     vscode.commands.registerCommand('overseer.pinAgent', guard(async arg => { const id = runArg(arg); if (id) { await setPinned(id, true); agents.refresh(); center.push(); } })),
     vscode.commands.registerCommand('overseer.unpinAgent', guard(async arg => { const id = runArg(arg); if (id) { await setPinned(id, false); agents.refresh(); center.push(); } })),

@@ -53,11 +53,11 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
     const procs = id => { try { return fs.readdirSync(path.join(DATA, 'runs', id)).filter(p => /^p\d+$/.test(p)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))); } catch { return []; } };
     const flag = (argv, f) => { const i = (argv || []).indexOf(f); return i >= 0 ? argv[i + 1] : undefined; };
 
-    await cdp.command('Overseer: Open Overseer View');
-    const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail')`, 30000);
+    // Gate K: agents are selected in the side bar; the chat is the editor view.
+    let dash;
     const select = async id => {
-      await dash.waitFor(`!!document.querySelector('.rail-list .row[data-run=${JSON.stringify(id)}]')`, 30000);
-      await dash.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(id)}]').click()`);
+      await s.selectRun(id, { settle: 2000 });
+      dash = await s.editorView(`document.body.dataset.runId === ${JSON.stringify(id)} || document.body.dataset.mode === 'chat'`, 30000);
       await dash.waitFor(`document.body.dataset.mode === 'chat' && !document.getElementById('send').disabled`, 60000);
     };
     const shots = async label => {
@@ -166,9 +166,8 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
       check(`Codex ${id === CHATGPT_A ? 'ChatGPT A' : 'ChatGPT B'} usage comes from its session log (or says not reported)`, u && (u.reported ? (u.windows || []).length > 0 && /session/.test(u.source || '') : true), u);
     }
     check('OpenCode says not reported', result.usage['system-opencode']?.reported === false, result.usage['system-opencode']);
-    await dash.eval(`document.querySelector('.rail-accounts').click()`); await delay(500);
+    await s.openOverseerView(); await delay(800);
     await s.screenshot('accounts-usage');
-    await cdp.key('Escape');
 
     // AC-55: live chats in both themes at 1600 and 900 px.
     for (const spec of SPECS) { await select(result.runs[spec.key].id); await delay(1200); await shots(`chat-${spec.key}`); }

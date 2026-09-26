@@ -39,9 +39,12 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
     await waitFor(long.run.id, /running/);
 
     await cdp.command('Overseer: Open Overseer View');
-    const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list .row')`, 30000);
-    const needs = () => dash.eval(`[...document.querySelectorAll('.rail-list .row.needs-row')].map(r => ({ run: r.dataset.run, why: r.querySelector('.why-chip')?.textContent }))`);
-    const badge = () => dash.eval(`document.querySelector('.rail-list .row.section.needs .badge')?.textContent`);
+    const dash = await s.editorView();
+    await s.openOverseerView(); await delay(800);
+    // Gate K: Needs you is the first section of the side bar's agents list.
+    const needs = () => cdp.evalWorkbench(`(() => { const rows = [...document.querySelectorAll('.part.sidebar .monaco-list-row')].filter(r => r.offsetParent); const i = rows.findIndex(r => r.querySelector('.label-name')?.textContent.trim() === 'Needs you'); if (i < 0) return [];
+      const out = []; for (const r of rows.slice(i + 1)) { if (r.getAttribute('aria-level') === '1') break; out.push({ title: r.querySelector('.label-name')?.textContent.trim(), why: r.querySelector('.label-description')?.textContent.trim() }); } return out; })()`);
+    const badge = () => cdp.evalWorkbench(`[...document.querySelectorAll('.part.sidebar .monaco-list-row')].find(r => r.querySelector('.label-name')?.textContent.trim() === 'Needs you')?.querySelector('.label-description')?.textContent.trim()`);
     const status = () => cdp.evalWorkbench(`[...document.querySelectorAll('.statusbar-item')].map(e => e.getAttribute('aria-label') || e.textContent).find(t => /Overseer/.test(t)) || ''`);
     let list = []; for (let i = 0; i < 20; i++) { list = await needs(); if (list.length >= 4) break; await delay(500); }
     const st = await status();
@@ -50,7 +53,7 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
       list.length === 4 && list.filter(x => x.why === 'Approve').length === 2 && list.some(x => x.why === 'Failed') && list.some(x => x.why === 'Review') && (await badge()) === '4' && /4/.test(st),
       { list, badge: await badge(), status: st });
 
-    const selected = () => dash.eval(`document.querySelector('.rail-list .row[aria-selected="true"]')?.dataset.run`);
+    const selected = () => dash.eval(`window.__overseer.selected()`);
     const key = async (k, o = {}) => { await cdp.focusWorkbench(); await cdp.key(k, o); await delay(900); };
     // Next waiting agent, allow.
     await key('j', { meta: true, alt: true });

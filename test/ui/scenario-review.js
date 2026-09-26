@@ -30,21 +30,18 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     const wsA = taskA.workspace.path, wsB = taskB.workspace.path;
     s.note('workspaces', { wsA, wsB });
 
-    const icon = await cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.activitybar .action-item a, .activitybar .action-label')].find(a => /^Overseer/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const b = a.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000);
-    await cdp.click(icon.x, icon.y);
-    const selectRun = async title => {
-      const pt = await cdp.waitFor(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-        const i = rows.findIndex(r => r.textContent.includes(${JSON.stringify(title)})); const r = rows[i + 1]; if (!r || !/opencode|generic/.test(r.textContent)) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 20000, 'run row ' + title);
-      await cdp.click(pt.x, pt.y);
-      await delay(1500);
-    };
+    // Gate K: agents are selected in the Overseer side bar.
+    const selectRun = title => s.selectAgent(title, { settle: 1500 });
     const reviewFor = async ws => cdp.webview(`document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(ws)})`, 30000);
 
     // AC-25/30: select A, turn Follow on; then B does not inherit Follow and shows B's worktree.
+    // Both already have changes, so selecting them is "an existing run" (a first edit while its chat
+    // is shown would bring the review forward in follow mode, AC-73/74).
+    for (const t of [taskA, taskB]) for (let i = 0; i < 60 && !(s.ctl('workspace.changes', { workspace_id: t.workspace.id }).files > 0); i++) await delay(250);
     await selectRun('A seq');
     let reviewA = await reviewFor(wsA);
     check('selecting run A opens A worktree review (outside the open folder)', await reviewA.eval(`document.getElementById('workspace-note').textContent`), wsA);
-    check('selecting an existing run does not turn Follow on', !(await reviewA.eval(`(document.getElementById('follow').dataset.state !== 'off')`)));
+    check('selecting an existing run does not turn Follow on', !(await reviewA.eval(`(document.getElementById('follow').dataset.state !== 'off')`)), await reviewA.eval(`document.getElementById('follow').dataset.state`));
     const box = await s.webviewPoint(reviewA, '#follow');
     await cdp.click(box.x, box.y);
     await reviewA.waitFor(`document.getElementById('follow-state').textContent.startsWith('Following')`, 20000);
@@ -107,7 +104,11 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     const revBefore = await reviewB.eval(`[...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'b.txt')?.dataset.revision`);
     const tAtomic = await timeUntil('atomic replace', () => { fs.writeFileSync(path.join(wsB, '.b.tmp'), 'atomically replaced\n'); fs.renameSync(path.join(wsB, '.b.tmp'), path.join(wsB, 'b.txt')); }, reviewB,
       async () => (await reviewB.eval(`[...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'b.txt')?.dataset.revision`)) !== revBefore && await reviewB.eval(`[...document.querySelectorAll('.view-line')].some(l => /atomically/.test(l.textContent))`));
-    const tStage = await timeUntil('staging (dirty view)', () => git(wsB, 'add', 'x1.txt'), cdp, () => cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row')].some(r => /Staged \\(HEAD → index\\) \\(1\\)/.test(r.textContent))`));
+    // Staging shows in the review's Staged scope (AC-75 replaced the Workspace Dirty view).
+    const setScope = async (frame, v) => { await frame.eval(`(() => { const e = document.getElementById('scope'); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('change')); return true; })()`); await frame.waitFor(`document.body.dataset.scope === ${JSON.stringify(v)}`, 10000); };
+    await setScope(reviewB, 'staged'); await delay(800);
+    const tStage = await timeUntil('staging (review Staged scope)', () => git(wsB, 'add', 'x1.txt'), reviewB, () => listed(reviewB, 'x1.txt'));
+    await setScope(reviewB, 'all'); await reviewB.waitFor(`[...document.querySelectorAll('.diff-file .file-path')].some(e => e.textContent === 'x1.txt') && document.querySelectorAll('.diff-file').length > 1`, 10000);
     const tRename = await timeUntil('rename', () => git(wsB, 'mv', 'x1.txt', 'x2.txt'), reviewB, async () => await listed(reviewB, 'x2.txt') && await listed(reviewB, 'x1.txt', false));
     const tDelete = await timeUntil('delete', () => fs.rmSync(path.join(wsB, 'c.txt')), reviewB, () => reviewB.eval(`[...document.querySelectorAll('.diff-file')].some(e => e.querySelector('.file-path').textContent === 'c.txt' && /D/.test(e.querySelector('.status').textContent))`));
     const tBranch = await timeUntil('branch change', () => { git(wsB, 'switch', '-q', '-c', 'review-branch'); fs.writeFileSync(path.join(wsB, 'after-switch.txt'), 'x\n'); }, reviewB, () => listed(reviewB, 'after-switch.txt'));
@@ -140,7 +141,7 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     const symAfter = await reviewB.eval(`(() => { const e = [...document.querySelectorAll('.diff-file')].find(e => e.querySelector('.file-path').textContent === 'escape.txt'); return { typed: [...e.querySelectorAll('.view-line')].some(l => /HACK/.test(l.textContent)), save: e.querySelector('.save-file').disabled }; })()`);
     check('symlink escaping the workspace cannot be edited in the review', !symAfter.typed && symAfter.save, symAfter);
     check('symlink target outside workspace untouched', fs.readFileSync(outside, 'utf8') === 'outside the workspace\n');
-    // Merge conflict: listed truthfully in the dirty view.
+    // Merge conflict: marked Conflicted in the review's file list.
     fs.writeFileSync(path.join(wsB, 'conflict.txt'), 'base\n');
     git(wsB, 'add', '-A'); git(wsB, 'commit', '-q', '-m', 'scenario checkpoint');
     git(wsB, 'branch', 'other');
@@ -148,7 +149,7 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     git(wsB, 'switch', '-q', 'other'); fs.writeFileSync(path.join(wsB, 'conflict.txt'), 'theirs\n'); git(wsB, 'commit', '-q', '-m', 'theirs', 'conflict.txt');
     git(wsB, 'switch', '-q', 'review-branch');
     s.note('merge', cp.spawnSync('git', ['merge', 'other'], { cwd: wsB, encoding: 'utf8' }).stdout.trim());
-    const conflictShown = await cdp.waitFor(`[...document.querySelectorAll('.monaco-list-row')].some(r => r.textContent.includes('Conflicted (1)'))`, 8000).catch(() => false);
+    const conflictShown = await reviewB.waitFor(`[...document.querySelectorAll('#tree .file.conflicted')].some(b => /conflict\\.txt/.test(b.getAttribute('aria-label') || '') && /conflicted/.test(b.getAttribute('aria-label')))`, 8000).then(() => true, () => false);
     const conflictListed = await reviewB.waitFor(`[...document.querySelectorAll('.diff-file .file-path')].some(e => e.textContent === 'conflict.txt')`, 8000).catch(() => false);
     check('merge conflict shown as Conflicted and listed in the review', conflictShown && conflictListed, { conflictShown, conflictListed });
     await s.screenshot('conflict');
@@ -210,8 +211,9 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     const diskHasAgent = fs.readFileSync(path.join(repoA, 'a.txt'), 'utf8').includes('AGENT-EXTERNAL-WRITE');
     check('same-line external write does not overwrite the unsaved draft; both versions exist', draftKept && diskHasAgent, { draftKept, diskHasAgent });
     await cdp.evalWorkbench('0');
-    const draftListed = await cdp.waitFor(`[...document.querySelectorAll('.monaco-list-row')].some(r => /Unsaved drafts \\(1\\)/.test(r.textContent))`, 8000).catch(() => false);
-    check('unsaved draft labeled in Workspace Dirty', draftListed);
+    const draftListed = await reviewC.waitFor(`[...document.querySelectorAll('#tree .file')].some(b => /^a\\.txt, .*unsaved/.test(b.getAttribute('aria-label') || '') && !!b.querySelector('.marker.codicon-circle-filled'))`, 8000).then(() => true, () => false);
+    await s.screenshot('unsaved-marker');
+    check('unsaved draft marked in the review file list (AC-75 replaced Workspace Dirty)', draftListed);
     // Reload the window; the draft must survive.
     await cdp.command('Developer: Reload Window');
     await delay(6000);
@@ -221,12 +223,13 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     const recovered = await cdp2.waitFor(`[...document.querySelectorAll('.tab')].some(t => /a\\.txt/.test(t.getAttribute('aria-label') || '') && t.classList.contains('dirty'))`, 20000).catch(() => false);
     check('pending draft recovered after reload', recovered);
     await s.screenshot('after-reload');
-    const tab = await cdp2.waitFor(`(() => { const t = [...document.querySelectorAll('.tab')].find(t => /Review: C current/.test(t.getAttribute('aria-label') || t.textContent)); if (!t) return null; const b = t.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000).catch(() => undefined);
+    const tab = await cdp2.waitFor(`(() => { const t = [...document.querySelectorAll('.tab')].find(t => /Review.*C current/.test(t.getAttribute('aria-label') || t.textContent)); if (!t) return null; const b = t.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000).catch(() => undefined);
     if (tab) await cdp2.click(tab.x, tab.y);
     const reviewAfter = tab && await cdp2.webview(`document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(repoA)}) && document.querySelectorAll('.diff-file').length > 0`, 30000).catch(() => undefined);
     check('review restored after reload', !!reviewAfter, tab ? 'tab restored' : 'no tab');
-    const dirtyRestored = await cdp2.waitFor(`[...document.querySelectorAll('.monaco-list-row')].some(r => /Current checkout/.test(r.textContent))`, 10000).catch(() => false);
-    check('selected run and Workspace Dirty restored after reload', dirtyRestored);
+    const chatRestored = await cdp2.webview(`document.getElementById('title')?.textContent === 'C current'`, 20000).then(() => true, () => false);
+    const markerRestored = !!reviewAfter && await reviewAfter.waitFor(`[...document.querySelectorAll('#tree .file')].some(b => /^a\\.txt, .*unsaved/.test(b.getAttribute('aria-label') || ''))`, 10000).then(() => true, () => false);
+    check('selected agent and the unsaved marker restored after reload', chatRestored && markerRestored, { chatRestored, markerRestored });
     await s.screenshot('review-after-reload');
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message));

@@ -158,6 +158,38 @@ class Session {
     await delay(settle);
   }
 
+  /** Visible rows of the side bar's Agents view, in order: label, description, level, expanded, selected, focused. */
+  agentRows() {
+    return this.cdp.evalWorkbench(`(() => {
+      const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || ''));
+      if (!pane) return [];
+      return [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).map(r => ({ label: r.querySelector('.label-name')?.textContent.trim(), description: r.querySelector('.label-description')?.textContent.trim() || '',
+        level: Number(r.getAttribute('aria-level')), expanded: r.getAttribute('aria-expanded'), selected: r.classList.contains('selected'), focused: r.classList.contains('focused'), aria: r.getAttribute('aria-label') }));
+    })()`);
+  }
+
+  /** Clicks a side-bar Agents row by label (the last match, so agents win over their Needs-you rows); twisty clicks the expander. */
+  async clickAgentRow(label, { twisty = false, settle = 700 } = {}) {
+    const pt = await this.cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(label)}).pop(); if (!r) return null;
+      const t = r.querySelector('.monaco-tl-twistie'); const b = (${twisty} && t ? t : r).getBoundingClientRect(); return ${twisty} ? { x: b.left + b.width / 2, y: b.top + b.height / 2 } : { x: b.left + 80, y: b.top + b.height / 2 }; })()`, 20000, 'row ' + label);
+    await this.cdp.click(pt.x, pt.y);
+    await delay(settle);
+  }
+
+  /** Selects an agent by run id (its task's title) in the side bar. */
+  async selectRun(runId, opts) {
+    const st = this.ctl('state');
+    const run = st.runs.find(r => r.id === runId);
+    const task = run && st.tasks.find(t => t.id === run.task_id);
+    if (!task) throw new Error('unknown run ' + runId);
+    return this.selectAgent(task.title, opts);
+  }
+
+  /** The Overseer editor view (chat, composer or grid) once it is ready. */
+  editorView(extra = 'true', ms = 30000) {
+    return this.cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.view-chat') && (${extra})`, ms);
+  }
+
   /** Absolute page coordinates of an element inside a webview frame. */
   async webviewPoint(frame, selector) {
     const inner = await frame.eval(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 40), y: r.top + Math.min(r.height / 2, 12), w: innerWidth, h: innerHeight }; })()`);

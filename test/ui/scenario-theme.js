@@ -52,7 +52,7 @@ function lint() {
 
     // Keyboard-only task creation in the New Task form.
     await cdp.command('Overseer: Open Overseer View');
-    await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list')`, 30000);
+    await s.editorView();
     await cdp.command('Overseer: New Task');
     const form = await cdp.webview(`document.body.dataset.ready === '1' && !!document.getElementById('harnesses')`, 30000);
     await form.waitFor(`document.querySelectorAll('#harnesses .tile').length >= 4 && document.querySelectorAll('#repos .tile').length >= 2`, 20000);
@@ -98,9 +98,9 @@ function lint() {
       const bodyClass = await f.eval(`document.body.className`);
       await s.screenshot(`new-task-${slug}`);
       // Overseer view + review + conversation for the nested run.
-      const center = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list')`, 30000);
       const rootOf = h => s.ctl('state').runs.find(r => !r.parent_run_id && r.harness === h)?.id;
-      await center.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(rootOf('generic'))}]')?.click()`);
+      await s.selectRun(rootOf('generic'));
+      const center = await s.editorView();
       await delay(2500);
       // The conversation is part of the dashboard.
       const conv = center;
@@ -108,7 +108,7 @@ function lint() {
       const review = await cdp.webview(`!!document.getElementById('diffs') && document.querySelectorAll('.diff-file').length > 0`, 20000).catch(() => null);
       const audits = { form: formAudit, center: await center.eval(AUDIT), conversation: await conv.eval(AUDIT), review: review ? await review.eval(AUDIT) : null };
       await s.screenshot(`views-${slug}`);
-      await center.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(rootOf('claude'))}]')?.click()`);
+      await s.selectRun(rootOf('claude'));
       await delay(2000);
       await s.screenshot(`conversation-${slug}`);
       if (theme === THEMES[0]) {

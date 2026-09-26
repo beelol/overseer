@@ -29,7 +29,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     s.ctl('account.create', { provider: 'openai', name: 'ChatGPT Signed Out' });
     await cdp.command('Overseer: Open Overseer View');
-    let dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail')`, 30000);
+    let dash = await s.editorView();
     await dash.waitFor(`document.body.dataset.mode === 'composer' && !!document.querySelector('.view-composer:not([hidden]) #task')`, 20000);
     check('with no agent selected the middle of the dashboard is the new-agent composer', true);
     await dash.waitFor(`!document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);
@@ -69,13 +69,13 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     check('Claude agent started keyboard-only from the composer; it becomes selected and streams in place', /Claude Code/.test(claudeChip) && c.run && c.shown, { claudeChip, run: c.run?.id, shown: c.shown });
     await s.screenshot('claude-started');
     // Codex.
-    await dash.eval(`document.querySelector('[data-action="new-agent"]').click()`);
+    await cdp.command('Overseer: New Agent'); await delay(800);
     await dash.waitFor(`document.body.dataset.mode === 'composer'`, 5000);
     await pickAgent('codex (existing login)');
     const x = await start('Say hello from Codex', 'codex');
     check('Codex agent started keyboard-only', x.run && x.shown, { run: x.run?.id, shown: x.shown });
     // Generic program.
-    await dash.eval(`document.querySelector('[data-action="new-agent"]').click()`);
+    await cdp.command('Overseer: New Agent'); await delay(800);
     await dash.waitFor(`document.body.dataset.mode === 'composer'`, 5000);
     await pickAgent('Run a program');
     { const at = await s.webviewPoint(dash, '#program'); await cdp.click(at.x, at.y); await cdp.type('/bin/echo'); await delay(200); }
@@ -84,7 +84,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     check('generic program started keyboard-only', g.run && g.shown, { run: g.run?.id, shown: g.shown, note: g.note, chip: g.chip, program: g.program });
 
     // Problems inline with their fix.
-    await dash.eval(`document.querySelector('[data-action="new-agent"]').click()`);
+    await cdp.command('Overseer: New Agent'); await delay(800);
     await dash.waitFor(`document.body.dataset.mode === 'composer'`, 5000);
     await pickAgent('ChatGPT Signed Out');
     const signedOut = { note: await note(), fix: await dash.eval(`document.querySelector('.view-composer .composer-note .fix')?.textContent`), disabled: await dash.eval(`document.getElementById('start').disabled`) };
@@ -99,8 +99,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // Defaults remembered across a reload: the last agent (codex? generic?) — the last successful start was generic.
     await cdp.command('Developer: Reload Window'); await delay(6000);
     cdp = await s.connect(); s.cdp = cdp;
-    dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail')`, 30000);
-    await dash.eval(`document.querySelector('[data-action="new-agent"]').click()`);
+    dash = await s.editorView();
+    await cdp.command('Overseer: New Agent'); await delay(800);
     await dash.waitFor(`document.body.dataset.mode === 'composer' && !document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);
     const remembered = { agent: await chip('agent'), repo: await chip('repo') };
     check('defaults remembered across reloads (last agent and repository)', /Program/.test(remembered.agent) && /composer-repo/.test(remembered.repo), remembered);
@@ -118,8 +118,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     cdp = await s.connect(); s.cdp = cdp;
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer/.test(e.textContent))`, 60000, 'status bar');
     await cdp.command('Overseer: Open Overseer View');
-    dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail')`, 30000);
-    await dash.eval(`document.querySelector('[data-action="new-agent"]').click()`);
+    dash = await s.editorView();
+    await cdp.command('Overseer: New Agent'); await delay(800);
     const untrusted = await dash.waitFor(`(() => { const n = document.querySelector('.view-composer .composer-note'); return n && /Trust this workspace/.test(n.textContent) && { note: n.textContent, fix: n.querySelector('.fix')?.textContent, disabled: document.getElementById('start').disabled }; })()`, 20000).catch(() => null);
     check('an untrusted workspace is explained inline with its fix (Trust) and nothing can start', untrusted && untrusted.fix === 'Trust' && untrusted.disabled, untrusted);
     await s.screenshot('untrusted');

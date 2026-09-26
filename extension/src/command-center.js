@@ -147,7 +147,10 @@ class CommandCenter {
     const uri = vscode.Uri.joinPath(vscode.Uri.file(ws.path), ...rel.split('/'));
     try { await vscode.workspace.fs.stat(uri); }
     catch { vscode.window.showInformationMessage(`${rel} was deleted in this worktree; open the review to see its change.`); return; }
-    await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: vscode.ViewColumn.Beside, preview: false });
+    // Gate K: files open where code lives — the review's group left of the chat — never a third column.
+    const chat = this.panel?.viewColumn;
+    const other = vscode.window.tabGroups.all.map(g => g.viewColumn).find(c => c !== chat);
+    await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: other ?? vscode.ViewColumn.Beside, preview: false });
   }
 
   async push() {

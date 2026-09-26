@@ -92,7 +92,7 @@ class Arrangement {
     if (!tab || tab.group.viewColumn !== vscode.ViewColumn.Two) return;
     const active = vscode.window.activeTextEditor;
     this.center.panel?.reveal(vscode.ViewColumn.Two, false);
-    for (let i = 0; i < 25 && !this.center.panel?.active; i++) await new Promise(r => setTimeout(r, 20));
+    for (let i = 0; i < 75 && !this.center.panel?.active; i++) await new Promise(r => setTimeout(r, 20));
     await vscode.commands.executeCommand('workbench.action.keepEditor');
     // Hand focus back to where it was (the side bar or the review).
     if (active) await vscode.window.showTextDocument(active.document, { viewColumn: active.viewColumn, preserveFocus: false }).then(undefined, () => {});
