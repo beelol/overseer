@@ -30,8 +30,15 @@ rl.on('line', line => {
       out({ id: m.id, error: { code: -32601, message: 'unsupported metadata method' } });
       return;
     }
-    const accountId = process.env.FIXTURE_ACCOUNT_ID_FILE ? fs.readFileSync(process.env.FIXTURE_ACCOUNT_ID_FILE, 'utf8').trim() : 'private-account-id';
-    const quotaMode = process.env.FIXTURE_QUOTA_MODE_FILE ? fs.readFileSync(process.env.FIXTURE_QUOTA_MODE_FILE, 'utf8').trim() : '';
+    const profileKey = process.env.CODEX_HOME ? path.basename(path.dirname(process.env.CODEX_HOME)) : '';
+    const profileValue = (directory, fallback) => {
+      const file = directory && profileKey ? path.join(directory, profileKey) : '';
+      return file && fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim() : fallback;
+    };
+    const accountId = profileValue(process.env.FIXTURE_ACCOUNT_IDS_DIR,
+      process.env.FIXTURE_ACCOUNT_ID_FILE ? fs.readFileSync(process.env.FIXTURE_ACCOUNT_ID_FILE, 'utf8').trim() : 'private-account-id');
+    const quotaMode = profileValue(process.env.FIXTURE_QUOTA_MODES_DIR,
+      process.env.FIXTURE_QUOTA_MODE_FILE ? fs.readFileSync(process.env.FIXTURE_QUOTA_MODE_FILE, 'utf8').trim() : '');
     const quotaUsed = quotaMode === 'exhausted' ? 100 : 35;
     mark('metadata_started');
     const reply = () => {

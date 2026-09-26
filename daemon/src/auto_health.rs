@@ -410,6 +410,7 @@ mod tests {
             sandbox: Sandbox::WorkspaceWrite,
             recommended_default: true,
             quota: Allowance::ObservedNonExhausted,
+            quota_blocks: Vec::new(),
             fit: Fit::Unknown,
             health: Health::Unknown,
             unresolved_quota_pool_identity: false,

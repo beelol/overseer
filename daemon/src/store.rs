@@ -758,6 +758,17 @@ impl Store {
         ).optional()?)
     }
 
+    /// The fingerprint is already provider-domain-separated and one-way. Use
+    /// it as a shared quota-pool key across profiles signed into one account;
+    /// a profile ID by itself is not an account identity.
+    pub fn auto_account_pool_id(&self, profile_id: &str) -> Result<Option<String>> {
+        let fingerprint: Option<String> = self.conn.query_row(
+            "SELECT fingerprint FROM auto_account_identity WHERE profile_id=?1",
+            params![profile_id], |row| row.get(0),
+        ).optional()?;
+        Ok(fingerprint.map(|value| format!("account/{value}")))
+    }
+
     /// A same-process Codex app-server metadata reply observed before a turn.
     /// Every turn of the thread must be stamped before its cumulative usage can
     /// be tied to one account generation.

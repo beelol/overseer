@@ -45,6 +45,14 @@ pub enum QuotaState {
     Unknown,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(tag = "scope", content = "value", rename_all = "snake_case")]
+pub enum QuotaBlockScope {
+    Account,
+    Model(String),
+    ModelFamily(String),
+}
+
 impl QuotaSnapshot {
     /// A missing or malformed newer meter cannot clear an explicit quota
     /// rejection. Only a fresh reading of that same scoped window, its reset,
@@ -80,6 +88,25 @@ impl QuotaSnapshot {
 
     pub fn allowance_unknown(&self, model: &str) -> bool {
         self.applicable_to(model).is_empty()
+    }
+
+    /// Report the scope of each active authoritative block. An account-wide
+    /// denial supersedes narrower windows; model and family limits must not
+    /// exclude sibling models in the same account pool.
+    pub fn blocking_scopes(&self, model: &str, now_ms: i64) -> Vec<QuotaBlockScope> {
+        if self.state_for(model, now_ms) != QuotaState::Exhausted { return Vec::new(); }
+        if self.ordinary_usage_allowed == Some(false) { return vec![QuotaBlockScope::Account]; }
+        let mut scopes: Vec<_> = self.applicable_to(model).into_iter()
+            .filter(|window| window.used_percent >= 100.0
+                && window.reset_ms.is_none_or(|reset| reset > now_ms))
+            .map(|window| match (&window.model, &window.model_family) {
+                (Some(model), _) => QuotaBlockScope::Model(model.clone()),
+                (None, Some(family)) => QuotaBlockScope::ModelFamily(family.clone()),
+                (None, None) => QuotaBlockScope::Account,
+            }).collect();
+        scopes.sort();
+        scopes.dedup();
+        scopes
     }
 
     pub fn state_for(&self, model: &str, now_ms: i64) -> QuotaState {

@@ -1,6 +1,6 @@
 //! Provider-neutral eligibility and task-aware selection for Auto Mode.
 
-use crate::auto_quota::{QuotaSnapshot, QuotaState};
+use crate::auto_quota::{QuotaBlockScope, QuotaSnapshot, QuotaState};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -179,6 +179,8 @@ pub struct Route {
     pub sandbox: Sandbox,
     pub recommended_default: bool,
     pub quota: Allowance,
+    #[serde(default)]
+    pub quota_blocks: Vec<QuotaBlockScope>,
     pub fit: Fit,
     pub health: Health,
     /// True only for this decision when an exhausted allowed account may be
@@ -216,7 +218,14 @@ pub struct Decision {
     pub reason: String,
 }
 
-fn excluded(work: &WorkUnit, route: &Route, exhausted_pools: &BTreeSet<&str>) -> Option<&'static str> {
+#[derive(Default)]
+struct PoolBlocks<'a> {
+    accounts: BTreeSet<&'a str>,
+    models: BTreeSet<(&'a str, &'a str)>,
+    families: BTreeSet<(&'a str, &'a str)>,
+}
+
+fn excluded(work: &WorkUnit, route: &Route, blocks: &PoolBlocks<'_>) -> Option<&'static str> {
     if work
         .pinned_route
         .as_deref()
@@ -233,7 +242,9 @@ fn excluded(work: &WorkUnit, route: &Route, exhausted_pools: &BTreeSet<&str>) ->
     if route.unresolved_quota_pool_identity {
         return Some("unresolved_quota_pool_identity");
     }
-    if route.quota == Allowance::Exhausted || exhausted_pools.contains(route.pool_id.as_str()) {
+    if route.quota == Allowance::Exhausted || blocks.accounts.contains(route.pool_id.as_str())
+        || blocks.models.contains(&(route.pool_id.as_str(), route.model.as_str()))
+        || route.model.split('-').any(|part| blocks.families.contains(&(route.pool_id.as_str(), part))) {
         return Some("quota_exhausted");
     }
     if route.fit == Fit::Unaffordable {
@@ -260,30 +271,47 @@ fn excluded(work: &WorkUnit, route: &Route, exhausted_pools: &BTreeSet<&str>) ->
 /// Deterministic eligibility comes before ranking. Unknown allowance remains
 /// eligible only as a disclosed cold-start possibility, never as free capacity.
 pub fn select(work: &WorkUnit, routes: &[Route]) -> Decision {
-    select_with_pool_blocks(work, routes, true, false)
+    select_with_pool_blocks(work, routes, true, false, true)
 }
 
 /// Replay only: decisions recorded before shared-pool block propagation keep
 /// their original selector semantics rather than changing under a new build.
 pub fn select_legacy_v1(work: &WorkUnit, routes: &[Route]) -> Decision {
-    select_with_pool_blocks(work, routes, false, true)
+    select_with_pool_blocks(work, routes, false, true, false)
 }
 
 /// Replay decisions written before public-status collection changed the
 /// ranking of unknown versus degraded health. Pool blocks already existed.
 pub fn select_pre_status_v1(work: &WorkUnit, routes: &[Route]) -> Decision {
-    select_with_pool_blocks(work, routes, true, true)
+    select_with_pool_blocks(work, routes, true, true, false)
+}
+
+/// Replay decisions written before quota-pool propagation used model scopes.
+pub fn select_pre_scoped_pool_v1(work: &WorkUnit, routes: &[Route]) -> Decision {
+    select_with_pool_blocks(work, routes, true, false, false)
 }
 
 fn select_with_pool_blocks(work: &WorkUnit, routes: &[Route], propagate_pool_blocks: bool,
-    legacy_health_order: bool) -> Decision {
+    legacy_health_order: bool, scoped_blocks: bool) -> Decision {
     let mut exclusions = Vec::new();
     let mut eligible = Vec::new();
-    let exhausted_pools: BTreeSet<&str> = routes.iter()
-        .filter(|route| propagate_pool_blocks && route.quota == Allowance::Exhausted && !route.pool_id.is_empty())
-        .map(|route| route.pool_id.as_str()).collect();
+    let mut blocks = PoolBlocks::default();
+    for route in routes.iter().filter(|route| propagate_pool_blocks
+        && route.quota == Allowance::Exhausted && !route.pool_id.is_empty()) {
+        if !scoped_blocks || route.quota_blocks.is_empty() {
+            blocks.accounts.insert(route.pool_id.as_str());
+            continue;
+        }
+        for scope in &route.quota_blocks {
+            match scope {
+                QuotaBlockScope::Account => { blocks.accounts.insert(route.pool_id.as_str()); }
+                QuotaBlockScope::Model(model) => { blocks.models.insert((route.pool_id.as_str(), model)); }
+                QuotaBlockScope::ModelFamily(family) => { blocks.families.insert((route.pool_id.as_str(), family)); }
+            }
+        }
+    }
     for route in routes {
-        if let Some(reason) = excluded(work, route, &exhausted_pools) {
+        if let Some(reason) = excluded(work, route, &blocks) {
             exclusions.push(Exclusion {
                 route_id: route.id.clone(),
                 reason: reason.into(),
@@ -356,6 +384,7 @@ mod tests {
             sandbox: Sandbox::WorkspaceWrite,
             recommended_default: tier == CapabilityTier::General,
             quota: Allowance::ObservedNonExhausted,
+            quota_blocks: Vec::new(),
             fit: Fit::Unknown,
             health: Health::Healthy,
             unresolved_quota_pool_identity: false,
@@ -531,6 +560,52 @@ mod tests {
         assert_eq!(select_legacy_v1(&unit(CapabilityTier::General, &["browser"]),
             &[exhausted, alternate, independent]).selected.as_deref(),
             Some("codex-app"));
+    }
+
+    #[test]
+    fn model_scoped_exhaustion_blocks_that_model_across_harnesses_but_leaves_sibling_eligible() {
+        use crate::auto_quota::parse_codex_rate_limits;
+        use serde_json::json;
+        let now = 1_800_000_000_000_i64;
+        let snapshot = parse_codex_rate_limits(&json!({"rateLimitsByLimitId":{
+            "astra":{"limitId":"astra","normalModelSlug":"gpt-6-astra",
+                "primary":{"usedPercent":100,"resetsAt":1800003600}}
+        }}), "pool-a", now).unwrap();
+        let mut blocked = route("astra-cli", "codex", "pool-a", CapabilityTier::General,
+            "medium", &[]);
+        blocked.model = "gpt-6-astra".into();
+        blocked.quota = observed_allowance(Some(&snapshot), &blocked.model, now);
+        blocked.quota_blocks = snapshot.blocking_scopes(&blocked.model, now);
+        let mut stale = route("astra-app", "codex-app", "pool-a", CapabilityTier::General,
+            "medium", &[]);
+        stale.model = blocked.model.clone();
+        let mut sibling = route("sol-app", "codex-app", "pool-a", CapabilityTier::General,
+            "medium", &[]);
+        sibling.model = "gpt-6-sol".into();
+        let routes = [blocked, stale, sibling];
+        let result = select(&unit(CapabilityTier::General, &[]), &routes);
+        assert_eq!(result.selected.as_deref(), Some("sol-app"), "{result:?}");
+        assert_eq!(result.exclusions.iter().filter(|e| e.reason == "quota_exhausted").count(), 2);
+        assert!(select_pre_scoped_pool_v1(&unit(CapabilityTier::General, &[]), &routes)
+            .selected.is_none(), "older traces keep account-wide pool propagation");
+    }
+
+    #[test]
+    fn family_scoped_exhaustion_keeps_another_family_in_the_account_eligible() {
+        let mut opus = route("opus-cli", "claude", "pool-a", CapabilityTier::General,
+            "high", &[]);
+        opus.model = "opus".into();
+        opus.quota = Allowance::Exhausted;
+        opus.quota_blocks = vec![QuotaBlockScope::ModelFamily("opus".into())];
+        let mut stale_opus = route("opus-other", "claude", "pool-a", CapabilityTier::General,
+            "high", &[]);
+        stale_opus.model = "opus".into();
+        let mut sonnet = route("sonnet", "claude", "pool-a", CapabilityTier::General,
+            "medium", &[]);
+        sonnet.model = "sonnet".into();
+        let result = select(&unit(CapabilityTier::General, &[]), &[opus, stale_opus, sonnet]);
+        assert_eq!(result.selected.as_deref(), Some("sonnet"), "{result:?}");
+        assert_eq!(result.exclusions.iter().filter(|entry| entry.reason == "quota_exhausted").count(), 2);
     }
 
     #[test]

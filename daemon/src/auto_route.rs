@@ -67,6 +67,7 @@ pub fn codex_auto_routes(
             tools: tools.tools.clone(), context_limit: None, supports_approvals: true,
             sandbox: Sandbox::WorkspaceWrite, recommended_default: *recommended,
             quota: auto_select::observed_allowance(quota, &model.model, now_ms),
+            quota_blocks: quota.map(|value| value.blocking_scopes(&model.model, now_ms)).unwrap_or_default(),
             fit: Fit::Unknown, health: Health::Unknown,
             unresolved_quota_pool_identity:false,
         });
@@ -97,6 +98,7 @@ pub fn claude_auto_routes(
             tools:BTreeSet::new(), context_limit:None, supports_approvals:true,
             sandbox:Sandbox::WorkspaceWrite, recommended_default,
             quota:auto_select::observed_allowance(quota, model, now_ms),
+            quota_blocks:quota.map(|value| value.blocking_scopes(model, now_ms)).unwrap_or_default(),
             fit:Fit::Unknown, health:Health::Unknown,
             unresolved_quota_pool_identity:false,
         }).collect()
@@ -123,6 +125,7 @@ pub fn opencode_local_routes(catalog: &crate::auto_opencode::LocalCatalog,
             // is not evidence of an OS-level filesystem sandbox.
             supports_approvals:false, sandbox:Sandbox::ReadOnly,
             recommended_default:model.is_default, quota:Allowance::Unknown,
+            quota_blocks:Vec::new(),
             fit:Fit::Unknown, health:Health::Unknown,
             unresolved_quota_pool_identity:false,
         })

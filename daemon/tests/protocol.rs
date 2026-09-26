@@ -2362,6 +2362,52 @@ fn auto_dispatch_from_claude_exhausted_frontier_pool_uses_allowed_codex_child() 
 }
 
 #[test]
+fn auto_dispatch_blocks_two_profiles_on_one_codex_account_but_uses_an_independent_account() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let account_dir = r.path().join("account-ids");
+    let quota_dir = r.path().join("quota-modes");
+    std::fs::create_dir_all(&account_dir).unwrap();
+    std::fs::create_dir_all(&quota_dir).unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_ACCOUNT_IDS_DIR,FIXTURE_QUOTA_MODES_DIR"),
+        ("FIXTURE_MODE", "managed-models"),
+        ("FIXTURE_ACCOUNT_IDS_DIR", account_dir.to_str().unwrap()),
+        ("FIXTURE_QUOTA_MODES_DIR", quota_dir.to_str().unwrap())]);
+    let profiles: Vec<_> = ["Exhausted", "Stale alternate", "Independent"].into_iter()
+        .map(|name| d.call("profile.create", json!({"name":name,"harness":"codex"}))).collect();
+    for (index, profile) in profiles.iter().enumerate() {
+        let id = profile["id"].as_str().unwrap();
+        std::fs::write(account_dir.join(id), if index < 2 { "private-shared-identity-007" } else { "private-independent-identity-008" }).unwrap();
+        std::fs::write(quota_dir.join(id), ["exhausted", "available", "unknown"][index]).unwrap();
+    }
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let allowed: Vec<_> = profiles.iter().map(|profile| profile["id"].as_str().unwrap()).collect();
+    let outcome = d.call("auto.dispatch", json!({"work_unit_id":"shared-account-pool-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":allowed,"prompt":"summarize the result"}));
+    let independent = profiles[2]["id"].as_str().unwrap();
+    assert_eq!(outcome["state"], "dispatched", "{outcome}");
+    assert_eq!(outcome["run"]["profile_id"], independent, "{outcome}");
+    for profile in &profiles[..2] {
+        let id = profile["id"].as_str().unwrap();
+        assert!(outcome["decision"]["exclusions"].as_array().unwrap().iter().any(|entry|
+            entry["route_id"].as_str().unwrap().starts_with(&format!("{id}/"))
+                && entry["reason"] == "quota_exhausted"), "{outcome}");
+    }
+    let event = d.events(&parent).into_iter().find(|item| item["kind"] == "auto_decision").unwrap();
+    let routes = event["payload"]["selection_input"]["routes"].as_array().unwrap();
+    let pool_for = |id: &str| routes.iter().find(|route| route["profile_id"] == id).unwrap()["pool_id"].clone();
+    assert_eq!(pool_for(profiles[0]["id"].as_str().unwrap()), pool_for(profiles[1]["id"].as_str().unwrap()));
+    assert_ne!(pool_for(profiles[0]["id"].as_str().unwrap()), pool_for(independent));
+    assert!(!event["payload"].to_string().contains("private-shared-identity-007"));
+    assert!(!event["payload"].to_string().contains("private-independent-identity-008"));
+    assert_eq!(d.wait_done(&run_id(&outcome), 15)["status"], "completed");
+}
+
+#[test]
 fn auto_recent_429_excludes_only_its_route_without_inventing_quota_exhaustion() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

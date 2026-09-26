@@ -474,11 +474,15 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
             let catalog: crate::auto_route::ModelCatalog = serde_json::from_value(models["catalog"].clone())?;
             let tool_catalog: crate::auto_route::ToolCatalog = serde_json::from_value(tools["catalog"].clone())?;
             let observation = store.latest_auto_quota(profile_id)?;
+            let pool_id = store.auto_account_pool_id(profile_id)?
+                .ok_or_else(|| anyhow!("Codex account pool identity unavailable"))?;
             drop(store);
             let now_ms = crate::daemon::now();
+            let mut routes = crate::auto_route::codex_auto_routes(&catalog, &tool_catalog,
+                observation.as_ref().map(|value| &value.snapshot), profile_id, now_ms);
+            for route in &mut routes { route.pool_id = pool_id.clone(); }
             Ok(AutoProfileDiscovery {
-                routes:crate::auto_route::codex_auto_routes(&catalog, &tool_catalog,
-                    observation.as_ref().map(|value| &value.snapshot), profile_id, now_ms),
+                routes,
                 evidence:json!({"profile_id":profile_id,"source":"codex-app/model-and-tool-metadata",
                     "model_observed_ms":catalog.observed_ms,"tool_observed_ms":tool_catalog.observed_ms,
                     "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
@@ -509,10 +513,14 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
                 return Err(anyhow!("Claude account changed during shared discovery"));
             }
             let observation = store.latest_auto_quota(profile_id)?;
+            let pool_id = store.auto_account_pool_id(profile_id)?
+                .ok_or_else(|| anyhow!("Claude account pool identity unavailable"))?;
             let now_ms = crate::daemon::now();
+            let mut routes = crate::auto_route::claude_auto_routes(&read.auth,
+                observation.as_ref().map(|value| &value.snapshot), profile_id, now_ms);
+            for route in &mut routes { route.pool_id = pool_id.clone(); }
             Ok(AutoProfileDiscovery {
-                routes:crate::auto_route::claude_auto_routes(&read.auth,
-                    observation.as_ref().map(|value| &value.snapshot), profile_id, now_ms),
+                routes,
                 evidence:json!({"profile_id":profile_id,"source":"claude/auth-status-and-native-quota",
                     "auth_observed_ms":read.auth.observed_ms,
                     "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
@@ -926,7 +934,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     decision.selected = None;
                     decision.reason = "collection_deadline_elapsed".into();
                 }
-                let trace = json!({"selector_version":"multi-harness-preflight-v3","decision":decision,
+                let trace = json!({"selector_version":"multi-harness-preflight-v4","decision":decision,
                     "selection_input":{"work":&work,"routes":&routes,
                         "attempt_limit_reached":attempt_limit_reached,
                         "deadline_exhausted":deadline_exhausted},
@@ -1033,10 +1041,12 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "codex-cold-start-v1" => crate::auto_select::select_legacy_v1(&work, &routes),
                 "codex-cold-start-v2" | "multi-harness-cold-start-v1" =>
                     crate::auto_select::select_pre_status_v1(&work, &routes),
-                "multi-harness-preflight-v1" | "multi-harness-preflight-v2" | "multi-harness-preflight-v3" => {
+                "multi-harness-preflight-v1" | "multi-harness-preflight-v2" | "multi-harness-preflight-v3" | "multi-harness-preflight-v4" => {
                     let mut decision = if selector_version == "multi-harness-preflight-v1" {
                         crate::auto_select::select_pre_status_v1(&work, &routes)
-                    } else { crate::auto_select::select(&work, &routes) };
+                    } else if selector_version == "multi-harness-preflight-v4" {
+                        crate::auto_select::select(&work, &routes)
+                    } else { crate::auto_select::select_pre_scoped_pool_v1(&work, &routes) };
                     if input["attempt_limit_reached"] == true {
                         decision.selected = None;
                         decision.reason = "pre_effect_attempt_limit".into();
