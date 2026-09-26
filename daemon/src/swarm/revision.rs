@@ -153,8 +153,14 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
             old.get(dep)
                 .is_some_and(|o| o.status == "accepted" && !affected.contains(dep))
         });
+        let unsafe_effects: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+            params![id,job.id], |r| r.get(0),
+        )?;
         let state = if !live.is_empty() {
             "cancel_requested"
+        } else if unsafe_effects > 0 {
+            "blocked"
         } else if previous.attempts >= 2 {
             "failed"
         } else if deps_satisfied {

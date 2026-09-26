@@ -219,6 +219,23 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           unreachable_since_ms INTEGER,
           last_sample_ms INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS swarm_effects(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id),
+          effect_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          attempt_id TEXT NOT NULL REFERENCES swarm_attempts(id),
+          revision INTEGER NOT NULL,
+          operation_sha256 TEXT NOT NULL,
+          outcome TEXT NOT NULL CHECK(outcome IN ('unknown','applied')),
+          proof_artifact_id TEXT,
+          created_ms INTEGER NOT NULL,
+          updated_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,effect_id),
+          FOREIGN KEY(run_id,job_id) REFERENCES swarm_jobs(run_id,id)
+        );
+        CREATE INDEX IF NOT EXISTS swarm_effects_job ON swarm_effects(run_id,job_id,outcome);
+        CREATE UNIQUE INDEX IF NOT EXISTS swarm_effects_operation
+          ON swarm_effects(run_id,operation_sha256);
         "#,
     )?;
     let has_stop_reason = conn

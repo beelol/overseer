@@ -170,6 +170,13 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
     if job_status != "ready" {
         return Ok(blocked("job_not_ready"));
     }
+    let unsafe_effects: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+        params![run,job], |r| r.get(0),
+    )?;
+    if unsafe_effects > 0 {
+        return Ok(blocked("side_effect_unreconciled"));
+    }
     if attempts >= effective["max_attempts"].as_i64().unwrap_or(2).min(2) {
         return Ok(blocked("attempt_limit"));
     }

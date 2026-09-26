@@ -166,6 +166,15 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
     if ["cancelled", "cancel_requested", "superseded", "failed"].contains(&state.as_str()) {
         bail!("job cannot be decided in this state");
     }
+    if decision == "accept" {
+        let uncertain: i64 = store.conn.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome='unknown'",
+            params![run,job], |r| r.get(0),
+        )?;
+        if uncertain > 0 {
+            bail!("unreconciled side effect blocks acceptance");
+        }
+    }
     let evidence_text = Value::Array(evidence.to_vec()).to_string();
     let old: Option<String> = store.conn.query_row(
         "SELECT evidence FROM swarm_decisions WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND decision=?4",
@@ -327,7 +336,13 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
         )?;
         tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
     } else if job_status == "rejected" {
-        let next = if count < 2 && job_deadline.is_none_or(|deadline| now < deadline) {
+        let unsafe_effects: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+            params![run,job], |r| r.get(0),
+        )?;
+        let next = if unsafe_effects > 0 {
+            "blocked"
+        } else if count < 2 && job_deadline.is_none_or(|deadline| now < deadline) {
             "ready"
         } else {
             "failed"
@@ -338,6 +353,10 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
         )?;
         tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
     } else if job_status == "cancel_requested" && job_revision > attempt_revision {
+        let unsafe_effects: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+            params![run,job], |r| r.get(0),
+        )?;
         let deps_raw: String = tx.query_row(
             "SELECT deps FROM swarm_jobs WHERE run_id=?1 AND id=?2",
             params![run, job],
@@ -359,7 +378,9 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
                 }
             }
         }
-        let next = if count >= 2 {
+        let next = if unsafe_effects > 0 {
+            "blocked"
+        } else if count >= 2 {
             "failed"
         } else if ready {
             "ready"

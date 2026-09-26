@@ -59,6 +59,13 @@ pub fn register(store: &mut Store, p: &Value) -> Result<Value> {
     if status != "ready" {
         bail!("job is not ready");
     }
+    let unsafe_effects: i64 = store.conn.query_row(
+        "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+        params![run,job], |r| r.get(0),
+    )?;
+    if unsafe_effects > 0 {
+        bail!("unreconciled side effect blocks replacement attempt");
+    }
     let existing: i64 = store.conn.query_row(
         "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND job_id=?2",
         params![run, job],

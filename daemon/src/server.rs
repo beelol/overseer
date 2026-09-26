@@ -346,6 +346,18 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             crate::swarm::launch_worker(d, p)?
         }
+        "swarm.effect.begin" => {
+            fixture_only()?;
+            let begun = crate::swarm::begin_effect(&mut d.store.lock().unwrap(), p)?;
+            if p["fixture_drop_ack_after_commit"] == true {
+                return Err(anyhow!("injected effect acknowledgement loss after commit"));
+            }
+            begun
+        }
+        "swarm.effect.reconcile" => {
+            fixture_only()?;
+            crate::swarm::reconcile_effect(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.worker.brief" => {
             fixture_only()?;
             crate::swarm::worker_brief(&d.store.lock().unwrap(), p)?
