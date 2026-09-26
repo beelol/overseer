@@ -178,9 +178,10 @@
         "docs/verification/swarm/milestone-1.md",
         "docs/verification/swarm/milestone-10.md",
         "docs/verification/swarm/SWARM-22.md",
-        "daemon/tests/swarm_runtime.rs"
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_dispatch.rs"
       ],
-      "blocker": "A linked scripted worker survives daemon restart, launch replay returns one run, and terminal reconciliation emits one neutral director event; exact spawn-record crash windows, result receipt replay, VS Code restart and live harness recovery remain unverified."
+      "blocker": "A fixture dispatch replays admission after a crash before launch, reissues only an unlinked token, returns a linked worker after a second restart, and Stop prevents delayed launch. Automatic pending-intent drain, exact spawn-record crash windows, result receipt replay, VS Code restart and live harness recovery remain unverified."
     },
     "SWARM-23": {
       "status": "unverified",
@@ -210,9 +211,10 @@
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_dispatch.rs"
       ],
-      "blocker": "Category and job identity persist; director decomposition, review and synthesis are not implemented."
+      "blocker": "Category and job identity persist; fixture dispatch selects a ready job and launches it without a per-worker job choice. A live director still cannot decompose, route, review and synthesize the objective or complete it by checks."
     },
     "SWARM-28": {
       "status": "unverified",
