@@ -517,6 +517,11 @@ impl Daemon {
         if run.parent_run_id.is_some() {
             bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
         }
+        if swarm_identity.is_none() && self.store.lock().unwrap().conn.prepare(
+            "SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1 LIMIT 1"
+        )?.exists([run_id])? {
+            bail!("Swarm worker runs cannot receive ordinary follow-ups; continue through the Swarm director");
+        }
         let ws = self.workspace(&run.workspace_id)?;
         if ws.removed_ms.is_some() {
             bail!("workspace was removed");

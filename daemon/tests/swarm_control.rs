@@ -78,6 +78,8 @@ fn daemon_stop_all_preserves_unconfirmed_swarm_worker_after_control_loss() {
     assert_eq!(attempts, 1);
     signal(shim["child_pid"].as_i64().unwrap(), 9);
     d.wait_done(worker, 5);
+    let err = d.try_call("run.follow_up", json!({"run_id":worker,"prompt":"continue"})).unwrap_err();
+    assert!(err.contains("Swarm worker"), "unexpected follow-up result: {err}");
 }
 
 #[test]
