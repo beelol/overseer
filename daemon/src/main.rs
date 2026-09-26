@@ -1,4 +1,11 @@
 mod accounts;
+mod auto_telemetry;
+mod auto_quota;
+mod auto_route;
+mod auto_opencode;
+mod auto_collect;
+mod auto_consumption;
+mod auto_select;
 mod adapters;
 mod background;
 mod daemon;

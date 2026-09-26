@@ -26,12 +26,45 @@ fn short_id() -> String {
     uuid::Uuid::new_v4().simple().to_string()[..12].to_string()
 }
 
+fn codex_thread_request(app: &Value) -> Value {
+    match app["resume"].as_str() {
+        Some(thread) => json!({"id": "ovs-thread", "method": "thread/resume", "params": {
+            "threadId": thread, "cwd": app["cwd"], "approvalPolicy": app["approval"], "sandbox": "workspace-write"}}),
+        None => {
+            let mut params = json!({"cwd": app["cwd"], "approvalPolicy": app["approval"], "sandbox": "workspace-write"});
+            if let Some(model) = app["model"].as_str() {
+                params["model"] = json!(model);
+            }
+            json!({"id": "ovs-thread", "method": "thread/start", "params": params})
+        }
+    }
+}
+
+fn codex_child_next_request(app: &Value) -> Value {
+    if app["required_tools"].as_array().is_some_and(|tools| !tools.is_empty()) {
+        json!({"id":"ovs-auto-tools","method":"mcpServerStatus/list",
+            "params":{"detail":"toolsAndAuthOnly"}})
+    } else {
+        codex_thread_request(app)
+    }
+}
+
+pub(crate) fn valid_required_tool(name: &str) -> bool {
+    let Some((server, tool)) = name.split_once('/') else { return false };
+    [server, tool].iter().all(|part| !part.is_empty() && part.len() <= 120
+        && part.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')))
+}
+
 pub struct Daemon {
     pub store: Mutex<Store>,
+    profile_gates: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
+    workspace_gates: Mutex<BTreeMap<String, Arc<Mutex<()>>>>,
+    work_unit_gates: Mutex<BTreeMap<String, std::sync::Weak<Mutex<()>>>>,
     pub events: broadcast::Sender<Event>,
     tails: Mutex<HashSet<String>>,
     exe: PathBuf,
     pub started_ms: i64,
+    pub learning_paused: std::sync::atomic::AtomicBool,
     /// Connected VS Code windows (connections that said hello as `client: "vscode"`).
     pub ui_clients: std::sync::atomic::AtomicUsize,
     /// Bumped on every UI connect/disconnect so a pending background notice can tell a reload
@@ -59,7 +92,7 @@ impl Daemon {
         let store = Store::open(&paths::db_path())?;
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), exe, started_ms: now(),
+        let daemon = Arc::new(Self { store: Mutex::new(store), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(false),
             ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0) });
         daemon.ensure_system_profiles()?;
         Ok(daemon)
@@ -147,6 +180,30 @@ impl Daemon {
             }
         }
         env
+    }
+
+    /// Serializes metadata probes with launches and follow-ups for one account profile.
+    pub fn profile_gate(&self, id: &str) -> Arc<Mutex<()>> {
+        self.profile_gates.lock().unwrap().entry(id.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(()))).clone()
+    }
+
+    /// Concurrent clients deciding the same unit share one decision/launch.
+    /// Weak entries allow completed unit locks to be discarded on later calls.
+    pub fn work_unit_gate(&self, id: &str) -> Arc<Mutex<()>> {
+        let mut gates = self.work_unit_gates.lock().unwrap();
+        gates.retain(|_, gate| gate.strong_count() > 0);
+        if let Some(gate) = gates.get(id).and_then(std::sync::Weak::upgrade) {
+            return gate;
+        }
+        let gate = Arc::new(Mutex::new(()));
+        gates.insert(id.to_string(), Arc::downgrade(&gate));
+        gate
+    }
+
+    fn workspace_gate(&self, id: &str) -> Arc<Mutex<()>> {
+        self.workspace_gates.lock().unwrap().entry(id.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(()))).clone()
     }
 
     pub fn profile(&self, id: &str) -> Result<Profile> {
@@ -295,6 +352,12 @@ impl Daemon {
         if !["codex", "codex-app", "claude", "opencode", "generic"].contains(&harness) {
             bail!("unknown harness {harness}");
         }
+        let effort = match p.get("effort") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(value)) if !value.is_empty() => Some(value.clone()),
+            _ => bail!("effort must be a nonempty string"),
+        };
+        adapters::validate_effort(harness, effort.as_deref())?;
         let prompt = p["prompt"].as_str().unwrap_or_default().to_string();
         if prompt.is_empty() && harness != "generic" {
             bail!("prompt is required");
@@ -403,6 +466,7 @@ impl Daemon {
             harness_version: version,
             profile_id: profile.as_ref().map(|p| p.id.clone()),
             model: p["model"].as_str().filter(|s| !s.is_empty()).map(str::to_string),
+            effort,
             workspace_id: ws.id.clone(),
             native_id: None,
             status: "queued".into(),
@@ -438,10 +502,194 @@ impl Daemon {
         Ok(json!({"task": task, "run": run, "workspace": ws}))
     }
 
+    /// Execute a bounded work unit in a separately supervised workspace made
+    /// from a settled parent's exact snapshot. Route selection happens before
+    /// this execution boundary; this method never guesses a model or account.
+    pub fn delegate_run(self: &Arc<Self>, p: &Value) -> Result<Value> {
+        let work_unit_id = p["work_unit_id"].as_str().filter(|s| !s.is_empty() && s.len() <= 120
+            && s.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_')))
+            .ok_or_else(|| anyhow!("work_unit_id must be a stable 1-120 character identifier"))?;
+        let parent_id = p["parent_run_id"].as_str().ok_or_else(|| anyhow!("parent_run_id is required"))?;
+        let initial = self.run(parent_id)?;
+        let parent_workspace_gate = self.workspace_gate(&initial.workspace_id);
+        let parent_guard = parent_workspace_gate.lock().unwrap();
+        let harness = p["harness"].as_str().ok_or_else(|| anyhow!("delegation harness is required"))?;
+        if !["codex", "codex-app", "claude", "opencode"].contains(&harness) {
+            bail!("delegation requires a supported account-based harness");
+        }
+        let prompt = p["prompt"].as_str().filter(|s| !s.is_empty() && s.len() <= 32_768)
+            .ok_or_else(|| anyhow!("delegation prompt must be 1-32768 bytes"))?;
+        let title = p["title"].as_str().unwrap_or("delegated work").trim();
+        if title.is_empty() || title.len() > 80 {
+            bail!("delegation title must be 1-80 bytes");
+        }
+        let model = p["model"].as_str().filter(|s| !s.is_empty() && s.len() <= 120
+            && s.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'/')))
+            .ok_or_else(|| anyhow!("delegation requires a valid model identifier"))?.to_string();
+        let effort = p["effort"].as_str().ok_or_else(|| anyhow!("delegation requires a reasoning effort"))?.to_string();
+        adapters::validate_effort(harness, Some(&effort))?;
+        let required_tools = match p.get("required_tools") {
+            None | Some(Value::Null) => Vec::new(),
+            Some(Value::Array(values)) if values.len() <= 16 => {
+                let mut tools = Vec::new();
+                for value in values {
+                    let tool = value.as_str().filter(|tool| valid_required_tool(tool))
+                        .ok_or_else(|| anyhow!("invalid required tool identity"))?;
+                    if tools.contains(&tool.to_string()) { bail!("duplicate required tool"); }
+                    tools.push(tool.to_string());
+                }
+                tools.sort();
+                tools
+            }
+            _ => bail!("required_tools must be a bounded list"),
+        };
+        if !required_tools.is_empty() && harness != "codex-app" {
+            bail!("required-tool preflight is not supported for this harness");
+        }
+        let profile_id = p["profile_id"].as_str().map(str::to_string)
+            .unwrap_or_else(|| format!("system-{}", profile_harness(harness)));
+        let request = json!({"parent_run_id":parent_id,"harness":harness,"profile_id":profile_id,
+            "model":model,"effort":effort,"prompt":prompt,"title":title,"required_tools":required_tools});
+        let mut request = request;
+        if p["auto_selected"] == true {
+            let requirements_hash = p["requirements_hash"].as_str().filter(|value| value.len() == 64
+                && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+                .ok_or_else(|| anyhow!("automatic delegation requires a requirements hash"))?;
+            let expected_generation = p["expected_account_generation"].as_i64().filter(|generation| *generation > 0)
+                .ok_or_else(|| anyhow!("automatic delegation requires an account generation"))?;
+            request["auto_selected"] = json!(true);
+            request["requirements_hash"] = json!(requirements_hash);
+            request["expected_account_generation"] = json!(expected_generation);
+        }
+        let request_hash = {
+            use sha2::{Digest, Sha256};
+            Sha256::digest(serde_json::to_vec(&request)?).iter().map(|byte| format!("{byte:02x}")).collect::<String>()
+        };
+        let saved_work_unit = { self.store.lock().unwrap().managed_work_unit(work_unit_id)? };
+        if let Some((saved_parent, child_id, saved_hash)) = saved_work_unit {
+            if saved_parent != parent_id || saved_hash != request_hash {
+                bail!("work_unit_id was already used for different delegated work");
+            }
+            let child = self.run(&child_id)?;
+            let workspace = self.workspace(&child.workspace_id)?;
+            return Ok(json!({"work_unit_id":work_unit_id,"run":child,"workspace":workspace,"replayed":true}));
+        }
+        let parent = self.run(parent_id)?;
+        if parent.parent_run_id.is_some() || parent.status != "completed" {
+            bail!("delegation requires a completed top-level parent checkpoint");
+        }
+        let parent_ws = self.workspace(&parent.workspace_id)?;
+        if parent_ws.removed_ms.is_some() || self.active_writer(&parent_ws.path)?.is_some() {
+            bail!("parent workspace is unavailable or has an active writer");
+        }
+        let profile = self.profile(&profile_id)?;
+        if profile.harness != profile_harness(harness) {
+            bail!("delegation profile belongs to another harness");
+        }
+        let parent_approval = {
+            let store = self.store.lock().unwrap();
+            let launch: Option<String> = store.conn.query_row(
+                "SELECT launch FROM runs WHERE id=?1", [&parent.id], |row| row.get(0))?;
+            let launch: Value = launch.as_deref().and_then(|value| serde_json::from_str(value).ok())
+                .unwrap_or(Value::Null);
+            let generic = launch.get("generic").unwrap_or(&launch);
+            generic["approval"].as_str()
+                .ok_or_else(|| anyhow!("parent approval policy is unavailable"))?.to_string()
+        };
+        let snapshot = self.take_snapshot(&parent_ws, "managed-delegation")?;
+        let repo = Path::new(&parent_ws.repo_root);
+        let repo_name = repo.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "repo".into());
+        let hash = &fingerprint(&parent_ws.common_dir)[..8];
+        let worktrees = paths::worktrees_dir().join(format!("{repo_name}-{hash}"));
+        let (path, branch) = git::worktree_add(repo, &worktrees, &format!("delegate-{}-{title}", parent.id), &snapshot.commit_sha)?;
+        let ws = Workspace {
+            id: format!("w-{}", short_id()), path: path.display().to_string(),
+            repo_root: parent_ws.repo_root.clone(), common_dir: parent_ws.common_dir.clone(),
+            kind: "worktree".into(), branch: Some(branch), owner_run_id: None,
+            initial_dirty: json!({"clean":true,"parent_snapshot":snapshot.id}),
+            created_ms: now(), removed_ms: None,
+        };
+        let run = Run {
+            id: format!("r-{}", short_id()), task_id: parent.task_id.clone(),
+            parent_run_id: Some(parent.id.clone()), harness: harness.into(),
+            harness_version: adapters::resolve_program(harness).and_then(|program| adapters::version_of(&program)),
+            profile_id: Some(profile.id.clone()), model: Some(model), effort: Some(effort),
+            workspace_id: ws.id.clone(), native_id: None, status: "queued".into(),
+            exit_reason: None, created_ms: now(), ended_ms: None, title: title.into(),
+            relation_source: Some("managed-delegation".into()),
+            relation_confidence: Some("exact (Overseer-created work unit)".into()),
+            capabilities: adapters::capabilities(harness), process_generation: 0, attention: None,
+        };
+        let saved = (|| -> Result<()> {
+            let store = self.store.lock().unwrap();
+            store.conn.execute_batch("SAVEPOINT managed_child_create")?;
+            let writes = (|| -> Result<()> {
+                store.insert_workspace(&ws)?;
+                store.insert_run(&run)?;
+                store.insert_managed_work_unit(work_unit_id, &parent.id, &run.id, &request_hash)?;
+                store.set_workspace_owner(&ws.id, Some(&run.id))?;
+                store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1",
+                    rusqlite::params![run.id, json!({"approval":parent_approval,"extra_args":[],"required_tools":required_tools,
+                        "auto_selected":p["auto_selected"] == true,"expected_account_generation":p["expected_account_generation"],
+                        "requirements_hash":p["requirements_hash"]}).to_string()])?;
+                Ok(())
+            })();
+            match writes {
+                Ok(()) => store.conn.execute_batch("RELEASE managed_child_create")?,
+                Err(error) => {
+                    let _ = store.conn.execute_batch("ROLLBACK TO managed_child_create; RELEASE managed_child_create");
+                    return Err(error);
+                }
+            }
+            Ok(())
+        })();
+        if let Err(error) = saved {
+            let _ = git::worktree_remove(repo, &path);
+            return Err(error);
+        }
+        drop(parent_guard);
+        self.emit(Some(&run.task_id), Some(&run.id), "managed_child_created", "daemon", "exact",
+            json!({"parent_run_id":parent.id,"run":run,"workspace":ws,"snapshot_id":snapshot.id}))?;
+        if let Err(error) = self.start_turn(&run.id, prompt, false) {
+            self.mark_ended(&run, "failed", &format!("delegated launch failed: {error}"))?;
+            return Ok(json!({"work_unit_id":work_unit_id,"run":self.run(&run.id)?,"workspace":ws,"launch_error":error.to_string()}));
+        }
+        Ok(json!({"work_unit_id":work_unit_id,"run":self.run(&run.id)?,"workspace":ws,"snapshot_id":snapshot.id}))
+    }
+
+    /// A stable result handle for a settled managed child. The event sequence
+    /// lets the eventual coordinator deduplicate delivery across reconnects.
+    pub fn delegated_result(&self, run_id: &str) -> Result<Value> {
+        let run = self.run(run_id)?;
+        if run.relation_source.as_deref() != Some("managed-delegation") {
+            bail!("run is not an Overseer-managed child");
+        }
+        if ACTIVE.contains(&run.status.as_str()) {
+            return Ok(json!({"state":"pending","run_id":run.id,"parent_run_id":run.parent_run_id}));
+        }
+        if run.status != "completed" {
+            return Ok(json!({"state":"not_completed","run_id":run.id,"parent_run_id":run.parent_run_id,"status":run.status,"reason":run.exit_reason}));
+        }
+        let events = self.store.lock().unwrap().events_after(0, Some(run_id), 5000)?;
+        let output = events.iter().rev().find(|event| event.kind == "output" && event.payload["role"] == "assistant"
+            && event.payload["text"].as_str().is_some());
+        let Some(output) = output else {
+            return Ok(json!({"state":"completed_without_text","run_id":run.id,"parent_run_id":run.parent_run_id}));
+        };
+        let text: String = output.payload["text"].as_str().unwrap().chars().take(8192).collect();
+        Ok(json!({"state":"ready","run_id":run.id,"parent_run_id":run.parent_run_id,
+            "event_seq":output.seq,"text":text,"workspace_id":run.workspace_id}))
+    }
+
     /// Start a work turn: fresh run-start snapshot, then launch (or stdin for live generic processes).
     pub fn start_turn(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool) -> Result<Turn> {
+        let initial = self.run(run_id)?;
+        let profile_gate = initial.profile_id.as_deref().map(|id| self.profile_gate(id));
+        let _profile_guard = profile_gate.as_ref().map(|gate| gate.lock().unwrap());
+        let workspace_gate = self.workspace_gate(&initial.workspace_id);
+        let _workspace_guard = workspace_gate.lock().unwrap();
         let run = self.run(run_id)?;
-        if run.parent_run_id.is_some() {
+        if run.parent_run_id.is_some() && run.relation_source.as_deref() != Some("managed-delegation") {
             bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
         }
         let ws = self.workspace(&run.workspace_id)?;
@@ -492,6 +740,7 @@ impl Daemon {
                 cwd: Path::new(&ws.path),
                 prompt,
                 model: run.model.as_deref(),
+                effort: run.effort.as_deref(),
                 profile_env,
                 resume_session: resume.as_deref(),
                 program_override: generic_meta["program"].as_str(),
@@ -500,7 +749,9 @@ impl Daemon {
             },
         )?;
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(run_id))?;
-        let app = json!({"prompt": prompt, "cwd": ws.path, "model": run.model, "resume": resume, "approval": generic_meta["approval"].as_str().unwrap_or("on-request")});
+        let app = json!({"prompt": prompt, "cwd": ws.path, "model": run.model, "effort": run.effort, "resume": resume, "approval": generic_meta["approval"].as_str().unwrap_or("on-request"),
+            "required_tools":generic_meta["required_tools"], "auto_selected":generic_meta["auto_selected"],
+            "expected_account_generation":generic_meta["expected_account_generation"]});
         self.spawn_process(&run, &ws, launch, json!({"generic": generic_meta, "app": app}))?;
         Ok(turn)
     }
@@ -520,6 +771,9 @@ impl Daemon {
             control_socket: control.display().to_string(),
         };
         std::fs::write(run_dir.join("launch.json"), serde_json::to_vec_pretty(&file)?)?;
+        if run.relation_source.as_deref() == Some("managed-delegation") && run.harness == "codex-app" {
+            std::fs::write(run_dir.join("auto-account-deadline"), now().saturating_add(5_000).to_string())?;
+        }
         {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(run_dir.join("launch.json"), std::fs::Permissions::from_mode(0o600))?;
@@ -549,7 +803,43 @@ impl Daemon {
         }
         self.emit(Some(&run.task_id), Some(&run.id), "status", "daemon", "exact", json!({"status": "starting", "generation": generation, "program": launch.program}))?;
         self.spawn_tail(&run.id);
+        if run.relation_source.as_deref() == Some("managed-delegation") && run.harness == "codex-app" {
+            self.watch_managed_codex_handshake(run.id.clone(), generation, run_dir);
+        }
         Ok(())
+    }
+
+    /// Metadata calls must not leave an unstarted managed child holding its
+    /// workspace indefinitely. The deadline lives beside the supervisor so a
+    /// daemon restart cannot reset it or launch another child.
+    fn watch_managed_codex_handshake(self: &Arc<Self>, run_id: String, generation: i64, dir: PathBuf) {
+        let daemon = self.clone();
+        tokio::spawn(async move {
+            let deadline = std::fs::read_to_string(dir.join("auto-account-deadline"))
+                .ok().and_then(|value| value.parse::<i64>().ok())
+                .unwrap_or_else(|| now().saturating_add(5_000));
+            let remaining = deadline.saturating_sub(now()).max(0) as u64;
+            tokio::time::sleep(std::time::Duration::from_millis(remaining)).await;
+            let stalled = daemon.run(&run_id).ok().is_some_and(|run| {
+                run.process_generation == generation && run.native_id.is_none() && ACTIVE.contains(&run.status.as_str())
+            });
+            if !stalled { return; }
+            let _ = std::fs::write(dir.join("auto-account-timeout"), b"deadline exceeded\n");
+            if let Ok(run) = daemon.run(&run_id) {
+                let _ = daemon.emit(Some(&run.task_id), Some(&run.id), "auto_account_timeout", "daemon", "exact",
+                    json!({"reason":"managed Codex metadata handshake timed out before model launch"}));
+            }
+            if let Some(sock) = daemon.run(&run_id).ok().and_then(|run| daemon.control_socket(&run).ok()) {
+                let _ = shim::control(&sock, &json!({"op":"signal","sig":libc::SIGTERM}));
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                let still_stalled = daemon.run(&run_id).ok().is_some_and(|run| {
+                    run.process_generation == generation && run.native_id.is_none() && ACTIVE.contains(&run.status.as_str())
+                });
+                if still_stalled {
+                    let _ = shim::control(&sock, &json!({"op":"signal","sig":libc::SIGKILL}));
+                }
+            }
+        });
     }
 
     pub(crate) fn control_socket(&self, run: &Run) -> Result<PathBuf> {
@@ -569,11 +859,20 @@ impl Daemon {
 
     pub fn interrupt(self: &Arc<Self>, run_id: &str) -> Result<Value> {
         let run = self.run(run_id)?;
-        if run.parent_run_id.is_some() {
+        if run.parent_run_id.is_some() && run.relation_source.as_deref() != Some("managed-delegation") {
             bail!("native children are interrupted through their parent run");
         }
         if !ACTIVE.contains(&run.status.as_str()) {
             bail!("run is not active (status {})", run.status);
+        }
+        let mut child_interrupt_errors = Vec::new();
+        if run.parent_run_id.is_none() {
+            let children = self.store.lock().unwrap().children(run_id)?;
+            for child in children.into_iter().filter(|child| child.relation_source.as_deref() == Some("managed-delegation") && ACTIVE.contains(&child.status.as_str())) {
+                if let Err(error) = self.interrupt(&child.id) {
+                    child_interrupt_errors.push(json!({"run_id":child.id,"error":error.to_string()}));
+                }
+            }
         }
         let (dir, _, _) = self.store.lock().unwrap().run_process(run_id)?.ok_or_else(|| anyhow!("run has no process"))?;
         std::fs::write(Path::new(&dir).join("interrupt.requested"), now().to_string())?;
@@ -620,7 +919,11 @@ impl Daemon {
                 }
             }
         });
-        Ok(json!({"ok": true}))
+        if !child_interrupt_errors.is_empty() {
+            self.emit(Some(&run.task_id), Some(&run.id), "managed_child_interrupt_failed", "daemon", "exact",
+                json!({"children":child_interrupt_errors}))?;
+        }
+        Ok(json!({"ok": true,"child_interrupt_errors":child_interrupt_errors}))
     }
 
     pub fn answer_permission(&self, run_id: &str, request_id: &str, allow: bool, message: &str) -> Result<Value> {
@@ -894,6 +1197,7 @@ impl Daemon {
                             harness_version: run.harness_version.clone(),
                             profile_id: run.profile_id.clone(),
                             model: None,
+                            effort: None,
                             workspace_id: run.workspace_id.clone(),
                             native_id: Some(native_id.clone()),
                             status: status.clone().unwrap_or_else(|| "running".into()),
@@ -945,7 +1249,27 @@ impl Daemon {
                     ev("output", "harness", "exact", json!({"role": "assistant", "text": t}), Some(&child.id))?;
                 }
             }
-            Norm::Usage(u) => ev("usage", "harness", "exact", u, None)?,
+            Norm::Usage(u) => {
+                let event = store.insert_event(now(), task, rid, "usage", "harness", "exact", &redact_value(u))?;
+                if run.harness == "codex-app" {
+                    if let Some(limits) = event.payload.get("rate_limits") {
+                        let pool_id = run.profile_id.as_deref().unwrap_or("system-codex");
+                        let payload = json!({"rateLimits": limits});
+                        if let Ok(snapshot) = crate::auto_quota::parse_codex_rate_limits(&payload, pool_id, event.ts) {
+                            let _ = store.insert_auto_quota(event.seq, pool_id, "codex-app/native-update", &snapshot);
+                        }
+                    }
+                }
+                if let Some(measurement) = crate::auto_telemetry::from_usage_with_effort(
+                    event.ts, &run.task_id, &run.id, &run.harness,
+                    run.profile_id.as_deref(), run.model.as_deref(), run.effort.as_deref(), &event.payload,
+                ) {
+                    // Learning is best effort. The durable execution event remains authoritative.
+                    let recorded = store.insert_auto_measurement(event.seq, &measurement);
+                    self.learning_paused.store(recorded.is_err(), std::sync::atomic::Ordering::Relaxed);
+                }
+                out.push(event);
+            }
             Norm::Permission { request_id, tool, input } => {
                 let attention = json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input});
                 store.set_run_attention(&run.id, Some(&attention))?;
@@ -996,7 +1320,22 @@ impl Daemon {
                 }
             }
             Norm::RpcResult { id, result, error } => {
+                let meta: Value = store.conn.query_row("SELECT launch FROM runs WHERE id=?1", [&run.id], |r| r.get::<_, Option<String>>(0))?.and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null);
+                let app = &meta["app"];
                 if let Some(err) = error {
+                    if id == "ovs-auto-quota" {
+                        ev("auto_account_unknown", "harness", "exact", json!({"reason":"account quota metadata unavailable"}), None)?;
+                        state.sends.push(format!("{}\n", codex_child_next_request(app)));
+                        return Ok(());
+                    }
+                    if id == "ovs-auto-tools" {
+                        let msg = "required tool verification unavailable";
+                        state.last_error = Some(("capability".into(), msg.into()));
+                        ev("error", "daemon", "exact", json!({"class":"capability","message":msg}), None)?;
+                        state.turn_done = Some(false);
+                        state.close_stdin = true;
+                        return Ok(());
+                    }
                     let msg = err["message"].as_str().map(str::to_string).unwrap_or_else(|| err.to_string());
                     state.last_error = Some((classify(&msg), msg.clone()));
                     ev("error", "harness", "exact", json!({"class": classify(&msg), "message": msg, "request": id}), None)?;
@@ -1004,21 +1343,82 @@ impl Daemon {
                     state.close_stdin = true;
                     return Ok(());
                 }
-                let meta: Value = store.conn.query_row("SELECT launch FROM runs WHERE id=?1", [&run.id], |r| r.get::<_, Option<String>>(0))?.and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null);
-                let app = &meta["app"];
                 match id.as_str() {
                     "ovs-init" => {
-                        let msg = match app["resume"].as_str() {
-                            Some(thread) => json!({"id": "ovs-thread", "method": "thread/resume", "params": {"threadId": thread, "cwd": app["cwd"], "approvalPolicy": app["approval"], "sandbox": "workspace-write"}}),
-                            None => {
-                                let mut params = json!({"cwd": app["cwd"], "approvalPolicy": app["approval"], "sandbox": "workspace-write"});
-                                if let Some(m) = app["model"].as_str() {
-                                    params["model"] = json!(m);
-                                }
-                                json!({"id": "ovs-thread", "method": "thread/start", "params": params})
-                            }
-                        };
+                        let msg = if run.relation_source.as_deref() == Some("managed-delegation") && run.harness == "codex-app" {
+                            json!({"id":"ovs-account","method":"account/read","params":{"refreshToken":false}})
+                        } else { codex_thread_request(app) };
                         state.sends.push(format!("{msg}\n"));
+                    }
+                    "ovs-account" => {
+                        if result["requiresOpenaiAuth"] != true || result["account"]["type"] != "chatgpt" {
+                            ev("error", "harness", "exact", json!({"class":"authentication","message":"managed Codex delegation requires ChatGPT account login"}), None)?;
+                            state.turn_done = Some(false);
+                            state.close_stdin = true;
+                            return Ok(());
+                        }
+                        state.sends.push(format!("{}\n", json!({"id":"ovs-auto-quota","method":"account/rateLimits/read","params":{}})));
+                    }
+                    "ovs-auto-quota" => {
+                        let recorded = (|| -> Result<bool> {
+                            let fingerprint = crate::auto_quota::account_fingerprint(&result)?;
+                            let profile_id = run.profile_id.as_deref().ok_or_else(|| anyhow!("run account profile unavailable"))?;
+                            store.record_auto_account_identity(profile_id, &fingerprint)?;
+                            let generation = store.auto_account_generation(profile_id)?.ok_or_else(|| anyhow!("account generation unavailable"))?;
+                            store.record_auto_run_account(&run.id, profile_id, generation)?;
+                            if app["auto_selected"] == true {
+                                if app["expected_account_generation"].as_i64() != Some(generation) {
+                                    return Ok(false);
+                                }
+                                if let Some(model) = run.model.as_deref() {
+                                    let quota = crate::auto_quota::parse_codex_rate_limits(&result, profile_id, now()).ok();
+                                    if matches!(quota.as_ref().map(|snapshot| snapshot.state_for(model, now())),
+                                        Some(crate::auto_quota::QuotaState::Exhausted)) {
+                                        return Ok(false);
+                                    }
+                                }
+                            }
+                            Ok(true)
+                        })();
+                        match recorded {
+                            Ok(false) => {
+                                let msg = "automatic child account changed or allowance is exhausted";
+                                state.last_error = Some(("quota_or_account".into(), msg.into()));
+                                ev("error", "daemon", "exact", json!({"class":"quota_or_account","message":msg}), None)?;
+                                state.turn_done = Some(false);
+                                state.close_stdin = true;
+                                return Ok(());
+                            }
+                            Err(_) if app["auto_selected"] == true => {
+                                let msg = "automatic child account evidence unavailable";
+                                state.last_error = Some(("account".into(), msg.into()));
+                                ev("error", "daemon", "exact", json!({"class":"account","message":msg}), None)?;
+                                state.turn_done = Some(false);
+                                state.close_stdin = true;
+                                return Ok(());
+                            }
+                            Err(_) => {
+                                self.learning_paused.store(true, std::sync::atomic::Ordering::Relaxed);
+                                ev("auto_account_unknown", "daemon", "exact", json!({"reason":"run account evidence unavailable"}), None)?;
+                            }
+                            Ok(true) => {}
+                        }
+                        state.sends.push(format!("{}\n", codex_child_next_request(app)));
+                    }
+                    "ovs-auto-tools" => {
+                        let expected = app["required_tools"].as_array().cloned().unwrap_or_default();
+                        let observed = crate::auto_route::parse_codex_tools(&result, now());
+                        let allowed = observed.ok().is_some_and(|catalog| expected.iter().all(|tool| tool.as_str()
+                            .is_some_and(|name| catalog.tools.contains(name))));
+                        if !allowed {
+                            let msg = "required tool unavailable in managed child";
+                            state.last_error = Some(("capability".into(), msg.into()));
+                            ev("error", "daemon", "exact", json!({"class":"capability","message":msg}), None)?;
+                            state.turn_done = Some(false);
+                            state.close_stdin = true;
+                            return Ok(());
+                        }
+                        state.sends.push(format!("{}\n", codex_thread_request(app)));
                     }
                     "ovs-thread" => {
                         let thread = result["thread"]["id"].as_str().unwrap_or_default().to_string();
@@ -1026,7 +1426,14 @@ impl Daemon {
                             store.set_run_native(&run.id, &thread)?;
                             ev("session", "harness", "exact", json!({"native_id": thread}), None)?;
                         }
-                        let turn = json!({"id": "ovs-turn", "method": "turn/start", "params": {"threadId": thread, "input": [{"type": "text", "text": app["prompt"], "text_elements": []}]}});
+                        let mut params = json!({"threadId": thread, "input": [{"type": "text", "text": app["prompt"], "text_elements": []}]});
+                        if let Some(model) = app["model"].as_str() {
+                            params["model"] = json!(model);
+                        }
+                        if let Some(effort) = app["effort"].as_str() {
+                            params["effort"] = json!(effort);
+                        }
+                        let turn = json!({"id": "ovs-turn", "method": "turn/start", "params": params});
                         state.sends.push(format!("{turn}\n"));
                     }
                     _ => {}
@@ -1089,6 +1496,8 @@ impl Daemon {
             ("failed", format!("could not start harness: {err}"))
         } else if interrupted {
             ("interrupted", format!("interrupted by user (exit {})", describe_exit(exit)))
+        } else if dir.join("auto-account-timeout").exists() {
+            ("failed", "managed Codex account metadata handshake timed out".to_string())
         } else if let Some(sig) = exit.signal {
             ("failed", format!("killed by signal {sig} (not requested by Overseer)"))
         } else if exit.code == Some(0) {
@@ -1118,6 +1527,11 @@ impl Daemon {
             let mut stack = vec![run.id.clone()];
             while let Some(parent) = stack.pop() {
                 for child in store.children(&parent)? {
+                    // A managed child has its own supervisor and isolated workspace.
+                    // The parent's process exit is not evidence that it stopped.
+                    if child.relation_source.as_deref() == Some("managed-delegation") {
+                        continue;
+                    }
                     stack.push(child.id.clone());
                     if ACTIVE.contains(&child.status.as_str()) {
                         let why = "parent process ended before the child's final status was reported";
@@ -1143,7 +1557,7 @@ impl Daemon {
     pub fn reconcile(self: &Arc<Self>) -> Result<Value> {
         let runs = self.store.lock().unwrap().runs()?;
         let mut report = Vec::new();
-        for run in runs.iter().filter(|r| r.parent_run_id.is_none() && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {
+        for run in runs.iter().filter(|r| (r.parent_run_id.is_none() || r.relation_source.as_deref() == Some("managed-delegation")) && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {
             let process = self.store.lock().unwrap().run_process(&run.id)?;
             let Some((dir, _, _)) = process else {
                 if ACTIVE.contains(&run.status.as_str()) {
@@ -1162,6 +1576,9 @@ impl Daemon {
                 }
                 self.emit(Some(&run.task_id), Some(&run.id), "reattached", "daemon", "exact", json!({"note": "daemon restarted; supervisor still running"}))?;
                 self.spawn_tail(&run.id);
+                if run.relation_source.as_deref() == Some("managed-delegation") && run.harness == "codex-app" && run.native_id.is_none() {
+                    self.watch_managed_codex_handshake(run.id.clone(), run.process_generation, dir.clone());
+                }
                 report.push(json!({"run": run.id, "result": "reattached"}));
             } else if run.status != "disconnected" {
                 let child_alive = std::fs::read(dir.join("shim.json")).ok().and_then(|b| serde_json::from_slice::<ShimInfo>(&b).ok()).map(|i| pid_alive(i.child_pid)).unwrap_or(false);
@@ -1300,7 +1717,7 @@ impl Daemon {
         let store = self.store.lock().unwrap();
         let runs = store.runs()?;
         let mut turns = serde_json::Map::new();
-        for r in runs.iter().filter(|r| r.parent_run_id.is_none()) {
+        for r in runs.iter().filter(|r| r.parent_run_id.is_none() || r.relation_source.as_deref() == Some("managed-delegation")) {
             turns.insert(r.id.clone(), serde_json::to_value(store.turns(&r.id)?)?);
         }
         Ok(json!({"cursor": store.max_seq()?, "tasks": store.tasks()?, "runs": runs, "workspaces": store.workspaces()?, "profiles": store.profiles()?, "turns": turns,
@@ -1385,6 +1802,11 @@ fn find_in_tree(store: &Store, root: &str, native: &str) -> Result<Option<Run>> 
             continue;
         }
         for child in store.children(&id)? {
+            // Harness-native IDs are scoped to one supervisor. An independent
+            // managed child may report the same native ID in another process.
+            if child.relation_source.as_deref() == Some("managed-delegation") {
+                continue;
+            }
             if child.native_id.as_deref() == Some(native) {
                 return Ok(Some(child));
             }

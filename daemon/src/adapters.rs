@@ -48,6 +48,7 @@ pub struct LaunchReq<'a> {
     pub cwd: &'a Path,
     pub prompt: &'a str,
     pub model: Option<&'a str>,
+    pub effort: Option<&'a str>,
     pub profile_env: BTreeMap<String, String>,
     pub resume_session: Option<&'a str>,
     pub program_override: Option<&'a str>,
@@ -208,7 +209,19 @@ pub fn capabilities(harness: &str) -> Value {
     }
 }
 
+pub fn validate_effort(harness: &str, effort: Option<&str>) -> Result<()> {
+    let Some(value) = effort else { return Ok(()); };
+    if harness == "generic" {
+        bail!("generic harness does not expose a reasoning effort");
+    }
+    if value.is_empty() || value.len() > 32 || !value.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_') {
+        bail!("effort must be a short lowercase variant name");
+    }
+    Ok(())
+}
+
 pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
+    validate_effort(harness, req.effort)?;
     let program = match req.program_override {
         Some(p) => PathBuf::from(p),
         None => resolve_program(harness).ok_or_else(|| anyhow::anyhow!("{harness} executable not found"))?,
@@ -222,6 +235,7 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
         env.insert(k.clone(), v.clone());
     }
     let model = req.model.filter(|m| !m.is_empty());
+    let effort = req.effort;
     for a in req.extra_args {
         let lower = a.to_ascii_lowercase();
         if lower.contains("api-key") || lower.contains("api_key") || lower.contains("access-token") {
@@ -244,6 +258,9 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             if let Some(m) = model {
                 args.extend(["-m".into(), m.into()]);
             }
+            if let Some(level) = effort {
+                args.extend(["-c".into(), format!("model_reasoning_effort=\"{level}\"")]);
+            }
             args.push("--".into());
             args.push(req.prompt.to_string());
             (args, None, true)
@@ -261,6 +278,9 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             if let Some(m) = model {
                 args.extend(["--model".into(), m.into()]);
             }
+            if let Some(level) = effort {
+                args.extend(["--effort".into(), level.into()]);
+            }
             if let Some(session) = req.resume_session {
                 args.extend(["--resume".into(), session.into()]);
             }
@@ -271,6 +291,9 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             let mut args = vec!["run".to_string(), "--format".into(), "json".into()];
             if let Some(m) = model {
                 args.extend(["-m".into(), m.into()]);
+            }
+            if let Some(level) = effort {
+                args.extend(["--variant".into(), level.into()]);
             }
             if let Some(session) = req.resume_session {
                 args.extend(["--session".into(), session.into()]);
@@ -849,5 +872,25 @@ mod tests {
         assert!(!env.contains_key("OPENAI_API_KEY"));
         assert!(!env.contains_key("CLAUDECODE"));
         assert!(env["PATH"].starts_with("/x:"));
+    }
+
+    #[test]
+    fn selected_effort_reaches_supported_cli_launches_as_one_argument() {
+        for (harness, expected) in [
+            ("codex", "model_reasoning_effort=\"medium\""),
+            ("claude", "--effort"),
+            ("opencode", "--variant"),
+        ] {
+            let launch = launch(harness, &LaunchReq {
+                cwd: Path::new("/tmp"), prompt: "work", model: Some("fixture-model"),
+                effort: Some("medium"), profile_env: BTreeMap::new(),
+                resume_session: None, program_override: Some("/bin/true"),
+                args_override: None, extra_args: &[],
+            }).unwrap();
+            assert!(launch.args.iter().any(|arg| arg == expected), "{harness}: {:?}", launch.args);
+            assert!(!launch.args.iter().any(|arg| arg.contains(";")));
+        }
+        assert!(validate_effort("codex", Some("medium;touch /tmp/x")).is_err());
+        assert!(validate_effort("generic", Some("medium")).is_err());
     }
 }

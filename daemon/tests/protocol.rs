@@ -1400,3 +1400,776 @@ fn ac50_pr_plan_targets_the_branch_name_in_a_fresh_clone() {
     assert_eq!(prep["files"][0]["path"], "a.txt", "{prep}");
     assert_eq!(prep["commits"].as_array().map(Vec::len), Some(1), "only the run's commit, compared against main: {prep}");
 }
+
+#[test]
+fn auto_usage_is_local_bounded_and_clear_does_not_erase_run_history() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let replay = r.path().join("auto-usage.jsonl");
+    std::fs::write(&replay, concat!(
+        "{\"type\":\"thread.started\",\"thread_id\":\"auto-usage-thread\"}\n",
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":42,\"output_tokens\":7,\"prompt\":\"secret-prompt-sentinel\"}}\n"
+    )).unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"),
+        ("REPLAY_FILE", replay.to_str().unwrap()), ("REPLAY_DELAY_MS", "10")]);
+    let created = d.call("task.create", json!({"repo": repo, "harness": "codex", "model":"gpt-6-sol", "effort":"medium", "prompt": "x", "title": "usage"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let result = d.call("auto.usage.list", json!({"limit": 10}));
+    let rows = result["measurements"].as_array().unwrap();
+    assert_eq!(rows.len(), 1, "{result}");
+    assert_eq!(rows[0]["input_tokens"], 42);
+    assert_eq!(rows[0]["output_tokens"], 7);
+    assert_eq!(rows[0]["effort"], "medium");
+    assert!(!result.to_string().contains("secret-prompt-sentinel"));
+    let summary = d.call("auto.usage.summary", json!({"limit": 10}));
+    assert_eq!(summary["aggregates"].as_array().unwrap().len(), 1);
+    assert_eq!(summary["aggregates"][0]["samples"], 1);
+    assert_eq!(summary["aggregates"][0]["input_tokens"], 42);
+    assert_eq!(summary["aggregates"][0]["effort"], "medium");
+    assert!(!summary.to_string().contains("secret-prompt-sentinel"));
+    let export_path = r.path().join("auto-usage-export.json");
+    let exported = d.call("auto.usage.export", json!({"path": export_path}));
+    assert_eq!(exported["count"], 1);
+    let exported_text = std::fs::read_to_string(&export_path).unwrap();
+    assert!(exported_text.contains("\"input_tokens\": 42"));
+    assert!(exported_text.contains("\"aggregates\""));
+    assert!(!exported_text.contains("secret-prompt-sentinel"));
+    assert_eq!(d.call("auto.usage.clear", json!({}))["deleted"], 1);
+    assert!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().is_empty());
+    assert!(d.call("auto.usage.summary", json!({}))["aggregates"].as_array().unwrap().is_empty());
+    assert_eq!(d.run(&run)["status"], "completed");
+    assert!(d.events(&run).iter().any(|e| e["kind"] == "usage"));
+}
+
+#[test]
+fn auto_telemetry_failure_pauses_learning_without_restarting_or_replaying_work() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let replay = r.path().join("auto-usage-failure.jsonl");
+    std::fs::write(&replay, concat!(
+        "{\"type\":\"thread.started\",\"thread_id\":\"auto-usage-thread\"}\n",
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":42}}\n"
+    )).unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"),
+        ("REPLAY_FILE", replay.to_str().unwrap()), ("REPLAY_DELAY_MS", "10")]);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER auto_fail BEFORE INSERT ON auto_measurements BEGIN SELECT RAISE(FAIL, 'telemetry failure'); END;").unwrap();
+    let first = d.call("task.create", json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "first"}));
+    let first_run = run_id(&first);
+    assert_eq!(d.wait_done(&first_run, 15)["status"], "completed");
+    let paused = d.call("auto.usage.list", json!({}));
+    assert_eq!(paused["learning_paused"], true);
+    assert!(paused["measurements"].as_array().unwrap().is_empty());
+    db.execute_batch("DROP TRIGGER auto_fail;").unwrap();
+    let second = d.call("task.create", json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "second"}));
+    let second_run = run_id(&second);
+    assert_eq!(d.wait_done(&second_run, 15)["status"], "completed");
+    let recovered = d.call("auto.usage.list", json!({}));
+    assert_eq!(recovered["learning_paused"], false);
+    assert_eq!(recovered["measurements"].as_array().unwrap().len(), 1);
+    assert_eq!(d.events(&first_run).iter().filter(|e| e["kind"] == "usage").count(), 1);
+    assert_eq!(d.events(&second_run).iter().filter(|e| e["kind"] == "usage").count(), 1);
+}
+
+
+#[test]
+fn auto_aggregate_failure_rolls_back_learning_without_replaying_the_task() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let replay = r.path().join("aggregate-failure.jsonl");
+    std::fs::write(&replay, concat!(
+        "{\"type\":\"thread.started\",\"thread_id\":\"aggregate-fixture\"}\n",
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":42}}\n"
+    )).unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"),
+        ("REPLAY_FILE", replay.to_str().unwrap()), ("REPLAY_DELAY_MS", "10")]);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER aggregate_fail BEFORE INSERT ON auto_daily_aggregates BEGIN SELECT RAISE(FAIL, 'aggregate failure'); END;").unwrap();
+    let first = d.call("task.create", json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "aggregate first"}));
+    let first_run = run_id(&first);
+    assert_eq!(d.wait_done(&first_run, 15)["status"], "completed");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], true);
+    assert!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().is_empty());
+    assert!(d.call("auto.usage.summary", json!({}))["aggregates"].as_array().unwrap().is_empty());
+    db.execute_batch("DROP TRIGGER aggregate_fail;").unwrap();
+    let second = d.call("task.create", json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "aggregate second"}));
+    let second_run = run_id(&second);
+    assert_eq!(d.wait_done(&second_run, 15)["status"], "completed");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], false);
+    assert_eq!(d.call("auto.usage.summary", json!({}))["aggregates"][0]["samples"], 1);
+    for run in [first_run, second_run] {
+        assert_eq!(d.events(&run).iter().filter(|e| e["kind"] == "usage").count(), 1);
+    }
+}
+
+#[test]
+fn auto_codex_thread_credit_estimate_is_metadata_only_and_separate_from_quota() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("usage-read-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "metadata-usage"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"requested work","title":"credit fixture"}));
+    let run = run_id(&created);
+    assert_eq!(created["run"]["effort"], "medium");
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let observed = d.call("auto.usage.thread.refresh", json!({"run_id":run}));
+    assert_eq!(observed["state"], "estimated", "{observed}");
+    assert_eq!(observed["observation"]["estimate"]["estimated_credits_micros"], 2_500_000);
+    assert_eq!(observed["observation"]["estimate"]["groups"][0]["effort"], "medium");
+    assert_eq!(observed["observation"]["attribution"], "unverified_run_account");
+    assert!(observed["observation"]["read_account_generation"].as_i64().unwrap() > 0);
+    assert!(!observed.to_string().contains("private-credit-sentinel"));
+    assert!(!observed.to_string().contains("secret-prompt-sentinel"));
+    let rows = d.call("auto.usage.thread.list", json!({"limit":10}));
+    assert_eq!(rows["observations"].as_array().unwrap().len(), 1);
+    assert_eq!(d.runs().len(), 1, "metadata read must not start an agent run");
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().lines().filter(|line| *line == "thread_usage_read").count(), 1);
+    assert!(std::fs::read_to_string(&trace).unwrap().lines().any(|line| line == "turn_effort:medium"));
+    let export = r.path().join("usage-export.json");
+    d.call("auto.usage.export", json!({"path":export}));
+    let exported = std::fs::read_to_string(&export).unwrap();
+    assert!(exported.contains("estimated_credits_micros"));
+    assert!(!exported.contains("private-credit-sentinel"));
+    assert!(!exported.contains("secret-prompt-sentinel"));
+    d.call("auto.usage.clear", json!({}));
+    assert!(d.call("auto.usage.thread.list", json!({}))["observations"].as_array().unwrap().is_empty());
+    assert_eq!(d.runs().len(), 1);
+    assert!(d.try_call("task.create", json!({"repo":repo,"harness":"codex-app","model":"gpt-6-sol","effort":"medium;bad","prompt":"x"})).is_err());
+    assert_eq!(d.runs().len(), 1, "invalid effort must fail before creating a run");
+}
+
+#[test]
+fn auto_managed_child_has_an_isolated_parent_snapshot_and_returnable_result() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("managed-trace.txt");
+    let account_file = r.path().join("account-id.txt");
+    std::fs::write(&account_file, "account-A").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_ACCOUNT_ID_FILE"),
+        ("FIXTURE_MODE", "managed-delegation"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
+        ("FIXTURE_ACCOUNT_ID_FILE", account_file.to_str().unwrap())]);
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app","model":"gpt-6-astra","effort":"high","prompt":"seed context","title":"parent","approval_policy":"never"}));
+    let parent = run_id(&created);
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"browser-unit-1","parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check","title":"browser check"});
+    let delegated = d.call("run.delegate", request.clone());
+    let child = delegated["run"]["id"].as_str().unwrap().to_string();
+    let repeated = d.call("run.delegate", request.clone());
+    assert_eq!(repeated["run"]["id"], child, "a repeated work unit must not launch a second child");
+    assert_eq!(repeated["replayed"], true);
+    let mut changed = request;
+    changed["model"] = json!("gpt-6-astra");
+    assert!(d.try_call("run.delegate", changed).is_err(), "a reused key cannot silently change its route");
+    assert_eq!(d.runs().len(), 2);
+    assert_eq!(delegated["run"]["parent_run_id"], parent);
+    assert_eq!(delegated["run"]["model"], "gpt-6-sol");
+    assert_eq!(delegated["run"]["effort"], "medium");
+    assert_ne!(delegated["workspace"]["path"], created["workspace"]["path"]);
+    let child_path = delegated["workspace"]["path"].as_str().unwrap();
+    assert_eq!(std::fs::read_to_string(Path::new(child_path).join("parent-context.txt")).unwrap(), "from parent\n");
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert!(Path::new(child_path).join("browser-report.txt").exists());
+    assert!(!Path::new(created["workspace"]["path"].as_str().unwrap()).join("browser-report.txt").exists());
+    let result = d.call("run.result", json!({"run_id":child}));
+    assert_eq!(result["state"], "ready", "{result}");
+    assert_eq!(result["text"], "browser result: parent context found");
+    assert_eq!(result["parent_run_id"], parent);
+    assert_eq!(d.call("run.result", json!({"run_id":child}))["event_seq"], result["event_seq"]);
+    let usage = d.call("auto.usage.thread.refresh", json!({"run_id":child}));
+    assert_eq!(usage["observation"]["attribution"], "same_account_generation", "{usage}");
+    assert_eq!(usage["observation"]["subscription_window_relation"], "unverified");
+    assert!(!serde_json::to_string(&d.events(&child)).unwrap().contains("account-A"), "raw account identity must not enter run history");
+    d.call("run.follow_up", json!({"run_id":parent,"prompt":format!("Use {}", result["text"].as_str().unwrap())}));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    assert!(d.events(&parent).iter().any(|e| e["kind"] == "output" && e["payload"]["text"] == "continued with browser result"));
+    let trace = std::fs::read_to_string(trace).unwrap();
+    assert!(trace.contains("turn_model:gpt-6-sol"));
+    assert!(trace.contains("turn_effort:medium"));
+    let approvals = trace.lines().filter(|line| line.starts_with("thread_approval:")).collect::<Vec<_>>();
+    assert!(approvals.len() >= 2 && approvals.iter().all(|approval| *approval == "thread_approval:never"),
+        "the managed child must inherit the parent's approval ceiling: {approvals:?}");
+    assert_eq!(d.runs().len(), 2);
+    std::fs::write(&account_file, "account-B").unwrap();
+    let switched = d.call("auto.usage.thread.refresh", json!({"run_id":child}));
+    assert_eq!(switched["observation"]["attribution"], "unverified_run_account");
+    assert_eq!(d.call("auto.usage.thread.list", json!({}))["observations"].as_array().unwrap().len(), 1,
+        "an account switch must remove the old account's estimate");
+    d.call("auto.usage.clear", json!({}));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let account_evidence: i64 = db.query_row("SELECT COUNT(*) FROM auto_run_account_evidence", [], |row| row.get(0)).unwrap();
+    assert_eq!(account_evidence, 0, "clearing learning must remove retained account-attribution evidence");
+    assert_eq!(d.runs().len(), 2, "clearing learning must preserve execution history");
+}
+
+#[test]
+fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_routes() {
+    let Some(program) = std::env::var_os("PATH").and_then(|path| std::env::split_paths(&path)
+        .map(|dir| dir.join("opencode")).find(|candidate| candidate.is_file())) else { return };
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let local = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = local.local_addr().unwrap().port();
+    std::fs::write(repo.join("opencode.json"), json!({"provider":{
+        "local_a":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":format!("http://127.0.0.1:{port}/v1")},
+            "models":{"fixture-a":{"name":"Fixture A","tool_call":true}}},
+        "local_b":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://127.0.0.1:1/v1"},
+            "models":{"fixture-b":{"name":"Fixture B","tool_call":true}}}
+    },"model":"local_a/fixture-a","small_model":"local_a/fixture-a","autoupdate":false,"share":"disabled"}).to_string()).unwrap();
+    let config_home = r.path().join("config");
+    let data_home = r.path().join("data");
+    let cache_home = r.path().join("cache");
+    for path in [&config_home,&data_home,&cache_home] { std::fs::create_dir(path).unwrap(); }
+    let d = Daemon::start(&[("OVERSEER_OPENCODE_PATH",program.to_str().unwrap()),
+        ("XDG_CONFIG_HOME",config_home.to_str().unwrap()),
+        ("XDG_DATA_HOME",data_home.to_str().unwrap()),
+        ("XDG_CACHE_HOME",cache_home.to_str().unwrap())]);
+    let created = d.call("task.create", json!({"repo":repo,"workspace_mode":"current",
+        "harness":"generic","program":"/bin/true","prompt":"metadata workspace"}));
+    let workspace_id = created["workspace"]["id"].as_str().unwrap();
+    let inspected = d.call("auto.opencode.local.inspect",
+        json!({"profile_id":"system-opencode","workspace_id":workspace_id}));
+    let models = inspected["catalog"]["models"].as_array().unwrap();
+    assert_eq!(models.len(), 2, "{inspected}");
+    assert_eq!(models[0]["model"], "local_a/fixture-a");
+    assert_eq!(models[1]["model"], "local_b/fixture-b");
+    assert_eq!(inspected["endpoint_health"]["local_a"], "reachable");
+    assert_eq!(inspected["endpoint_health"]["local_b"], "unavailable");
+    assert_eq!(inspected["allowance"], "unknown",
+        "a loopback address alone does not prove the server is free local inference rather than a cloud proxy");
+    assert!(!inspected.to_string().contains("openai/"));
+}
+
+#[test]
+fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_pauses_on_exhaustion() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("auto-dispatch-trace.txt");
+    let quota = r.path().join("quota-mode.txt");
+    std::fs::write(&quota, "available").unwrap();
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_QUOTA_MODE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
+        ("FIXTURE_QUOTA_MODE_FILE", quota.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    for (unit, extra) in [
+        ("bad-context", json!({"context_needed":"unknown"})),
+        ("bad-approvals", json!({"requires_approvals":"yes"})),
+        ("bad-pin", json!({"pinned_route":17})),
+        ("unsupported-profile", json!({"profile_id":"another-account"})),
+        ("unsupported-pool", json!({"allowed_profiles":["another-account"]})),
+        ("unsupported-model", json!({"model":"gpt-6-astra"})),
+    ] {
+        let mut invalid = json!({"work_unit_id":unit,"parent_run_id":parent,
+            "min_tier":"general","required_tools":[],"prompt":"browser check"});
+        invalid.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        assert!(d.try_call("auto.dispatch", invalid).is_err(), "{unit} must not discard a constraint");
+    }
+    assert_eq!(d.runs().len(), 1, "invalid constraints must fail before launching a child");
+    let browser_request = json!({"work_unit_id":"auto-browser-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":["browser/navigate"],"prompt":"browser check","title":"browser check"});
+    let browser = d.call("auto.dispatch", browser_request.clone());
+    assert_eq!(browser["state"], "dispatched", "{browser}");
+    assert_eq!(browser["decision"]["selected"], "system-codex/gpt-6-sol/medium");
+    let decision_event = d.events(&parent).into_iter()
+        .find(|event| event["kind"] == "auto_decision").unwrap();
+    let replay = d.call("auto.decision.replay", json!({"event_seq":decision_event["seq"]}));
+    assert_eq!(replay["matches_recorded"], true, "{replay}");
+    assert_eq!(replay["decision"]["selected"], browser["decision"]["selected"]);
+    assert!(!decision_event["payload"].to_string().contains("browser check"),
+        "the decision trace must not store the work prompt or title");
+    let browser_id = run_id(&browser);
+    assert_eq!(d.wait_done(&browser_id, 15)["status"], "completed");
+    assert_eq!(d.call("run.result", json!({"run_id":browser_id}))["state"], "ready");
+    d.kill9();
+    d.spawn();
+    let repeated = d.call("auto.dispatch", browser_request);
+    assert_eq!(repeated["run"]["id"], browser_id);
+    assert_eq!(repeated["replayed"], true);
+    let diagnosis = d.call("auto.dispatch", json!({"work_unit_id":"auto-diagnosis-2","parent_run_id":parent,
+        "min_tier":"frontier","required_tools":[],"prompt":"diagnose the result","title":"diagnosis"}));
+    assert_eq!(diagnosis["decision"]["selected"], "system-codex/gpt-6-astra/high");
+    let diagnosis_id = run_id(&diagnosis);
+    assert_eq!(d.wait_done(&diagnosis_id, 15)["status"], "completed");
+    std::fs::write(&quota, "exhausted").unwrap();
+    let paused = d.call("auto.dispatch", json!({"work_unit_id":"auto-paused-3","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"prompt":"next work","title":"next"}));
+    assert_eq!(paused["state"], "paused", "{paused}");
+    assert!(paused["decision"]["selected"].is_null());
+    assert_eq!(d.runs().len(), 3, "exhaustion must not start another child");
+    let trace = std::fs::read_to_string(trace).unwrap();
+    assert_eq!(trace.matches("turn_model:gpt-6-sol").count(), 1);
+    assert_eq!(trace.matches("turn_model:gpt-6-astra").count(), 2);
+}
+
+#[test]
+fn auto_dispatch_rechecks_quota_and_account_generation_inside_the_selected_child() {
+    for action in ["exhaust_quota", "switch_account"] {
+        let r = tmp();
+        let repo = repo(&r.path().join("repo"));
+        let trace = r.path().join("dispatch-race-trace.txt");
+        let quota = r.path().join("quota-mode.txt");
+        let account = r.path().join("account-id.txt");
+        std::fs::write(&quota, "available").unwrap();
+        std::fs::write(&account, "account-A").unwrap();
+        let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+            ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_QUOTA_MODE_FILE,FIXTURE_ACCOUNT_ID_FILE,FIXTURE_TOOL_READ_ACTION"),
+            ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
+            ("FIXTURE_QUOTA_MODE_FILE", quota.to_str().unwrap()),
+            ("FIXTURE_ACCOUNT_ID_FILE", account.to_str().unwrap()), ("FIXTURE_TOOL_READ_ACTION", action)]);
+        let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+            "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+        assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+        let dispatched = d.call("auto.dispatch", json!({"work_unit_id":"race-unit","parent_run_id":parent,
+            "min_tier":"general","required_tools":["browser/navigate"],"prompt":"browser check"}));
+        assert_eq!(dispatched["decision"]["selected"], "system-codex/gpt-6-sol/medium", "{action}: {dispatched}");
+        let child = run_id(&dispatched);
+        assert_eq!(d.wait_done(&child, 15)["status"], "failed", "{action}");
+        let trace = std::fs::read_to_string(trace).unwrap();
+        assert_eq!(trace.matches("turn_model:gpt-6-sol").count(), 0,
+            "{action} must stop before the selected model turn");
+        let history = serde_json::to_string(&d.events(&child)).unwrap();
+        assert!(!history.contains("account-A") && !history.contains("account-B"));
+        assert_eq!(d.runs().len(), 2);
+    }
+}
+
+#[test]
+fn auto_dispatch_concurrent_clients_share_one_selection_and_one_child() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::sync::{Arc, Barrier};
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_MODEL_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_MODEL_DELAY_MS", "300")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let params = json!({"work_unit_id":"same-auto-unit","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"prompt":"browser check"});
+    let barrier = Arc::new(Barrier::new(3));
+    let socket = d.socket();
+    let handles = (0..2).map(|_| {
+        let barrier = barrier.clone();
+        let socket = socket.clone();
+        let params = params.clone();
+        std::thread::spawn(move || -> Result<serde_json::Value, String> {
+            barrier.wait();
+            let mut conn = UnixStream::connect(socket).map_err(|error| error.to_string())?;
+            conn.set_read_timeout(Some(Duration::from_secs(15))).map_err(|error| error.to_string())?;
+            conn.write_all(format!("{}\n", json!({"id":1,"method":"auto.dispatch","params":params})).as_bytes())
+                .map_err(|error| error.to_string())?;
+            let mut line = String::new();
+            BufReader::new(conn).read_line(&mut line).map_err(|error| error.to_string())?;
+            let reply: serde_json::Value = serde_json::from_str(&line).map_err(|error| error.to_string())?;
+            if let Some(error) = reply.get("error") { return Err(error.to_string()); }
+            Ok(reply["result"].clone())
+        })
+    }).collect::<Vec<_>>();
+    barrier.wait();
+    let results = handles.into_iter().map(|handle| handle.join().unwrap().unwrap()).collect::<Vec<_>>();
+    assert_eq!(results[0]["run"]["id"], results[1]["run"]["id"]);
+    let child = run_id(&results[0]);
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    let decisions = d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count();
+    assert_eq!(decisions, 1, "concurrent requests should reuse one recorded selection");
+    assert_eq!(d.runs().len(), 2);
+}
+
+#[test]
+fn auto_managed_child_checks_required_tools_before_starting_a_turn() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("required-tools-trace.txt");
+    let mode = r.path().join("tool-mode.txt");
+    std::fs::write(&mode, "available").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_TOOL_MODE_FILE"),
+        ("FIXTURE_MODE", "managed-delegation"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
+        ("FIXTURE_TOOL_MODE_FILE", mode.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let allowed_result = d.call("run.delegate", json!({"work_unit_id":"tool-allowed","parent_run_id":parent,
+        "harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check",
+        "required_tools":["browser/navigate"]}));
+    let allowed = run_id(&allowed_result);
+    assert_eq!(d.wait_done(&allowed, 15)["status"], "completed");
+    assert_eq!(d.call("run.result", json!({"run_id":allowed}))["state"], "ready");
+    std::fs::write(&mode, "missing").unwrap();
+    let denied = run_id(&d.call("run.delegate", json!({"work_unit_id":"tool-denied","parent_run_id":parent,
+        "harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check",
+        "required_tools":["browser/navigate"]})));
+    assert_eq!(d.wait_done(&denied, 15)["status"], "failed");
+    for (mode_name, unit) in [("logged-out", "tool-logged-out"), ("error", "tool-metadata-error")] {
+        std::fs::write(&mode, mode_name).unwrap();
+        let run = run_id(&d.call("run.delegate", json!({"work_unit_id":unit,"parent_run_id":parent,
+            "harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check",
+            "required_tools":["browser/navigate"]})));
+        assert_eq!(d.wait_done(&run, 15)["status"], "failed", "{mode_name}");
+        assert!(!serde_json::to_string(&d.events(&run)).unwrap().contains("private-tool-error-sentinel"));
+    }
+    let trace = std::fs::read_to_string(trace).unwrap();
+    assert_eq!(trace.matches("tool_preflight:available").count(), 1);
+    assert_eq!(trace.matches("tool_preflight:missing").count(), 1);
+    assert_eq!(trace.matches("tool_preflight:logged-out").count(), 1);
+    assert_eq!(trace.matches("tool_preflight:error").count(), 1);
+    assert!(trace.contains(&format!("tool_cwd:{}", allowed_result["workspace"]["path"].as_str().unwrap())),
+        "the child must inspect tools in its own workspace");
+    assert_eq!(trace.matches("turn_model:gpt-6-sol").count(), 1,
+        "the denied child must stop before its model turn");
+    assert!(d.try_call("run.delegate", json!({"work_unit_id":"invalid-tool","parent_run_id":parent,
+        "harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check",
+        "required_tools":["browser/navigate;unsafe"]})).is_err());
+    assert_eq!(d.runs().len(), 5, "invalid tool names must fail before creating a run");
+}
+
+#[test]
+fn auto_managed_child_unknown_quota_metadata_still_runs_without_account_attribution() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "managed-no-quota")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let child = run_id(&d.call("run.delegate", json!({"work_unit_id":"unknown-quota-unit","parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check"})));
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert_eq!(d.call("run.result", json!({"run_id":child}))["state"], "ready");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let evidence: i64 = db.query_row("SELECT COUNT(*) FROM auto_run_account_evidence WHERE run_id=?1", [&child], |row| row.get(0)).unwrap();
+    assert_eq!(evidence, 0, "unsupported metadata cannot become inferred account evidence");
+}
+
+#[test]
+fn auto_managed_child_rejects_api_key_login_before_turn() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let auth_file = r.path().join("auth-kind.txt");
+    let trace = r.path().join("key-trace.txt");
+    std::fs::write(&auth_file, "key").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_AUTH_FILE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-delegation"), ("FIXTURE_AUTH_FILE", auth_file.to_str().unwrap()),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let child = run_id(&d.call("run.delegate", json!({"work_unit_id":"key-login-unit","parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check"})));
+    assert_eq!(d.wait_done(&child, 15)["status"], "failed");
+    let trace = std::fs::read_to_string(trace).unwrap();
+    assert_eq!(trace.lines().filter(|line| *line == "thread_started").count(), 1,
+        "the child must not start a model thread under API-key auth");
+}
+
+#[test]
+fn auto_managed_child_silent_account_metadata_times_out_without_a_model_turn() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("silent-metadata-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-silent-metadata"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let child = run_id(&d.call("run.delegate", json!({"work_unit_id":"silent-account-unit","parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check"})));
+    let done = d.wait_done(&child, 12);
+    assert_eq!(done["status"], "failed", "{done}");
+    assert!(done["exit_reason"].as_str().unwrap().contains("metadata handshake timed out"));
+    let trace = std::fs::read_to_string(trace).unwrap();
+    assert_eq!(trace.lines().filter(|line| *line == "thread_started").count(), 1);
+    assert_eq!(trace.lines().filter(|line| *line == "metadata_silent").count(), 1);
+}
+
+#[test]
+fn auto_managed_child_metadata_deadline_survives_daemon_restart() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-silent-metadata")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let child = run_id(&d.call("run.delegate", json!({"work_unit_id":"restart-silent-unit","parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check"})));
+    d.kill9();
+    std::thread::sleep(Duration::from_secs(6));
+    d.spawn();
+    let done = d.wait_done(&child, 5);
+    assert_eq!(done["status"], "failed", "{done}");
+    assert!(done["exit_reason"].as_str().unwrap().contains("metadata handshake timed out"));
+    assert_eq!(done["process_generation"], 1, "reconciliation must not relaunch the child");
+}
+
+#[test]
+fn auto_managed_child_reattaches_after_daemon_restart_without_relaunch() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "managed-delay")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"seed context","title":"parent"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"browser-restart-unit","parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check"});
+    let child = run_id(&d.call("run.delegate", request.clone()));
+    d.wait_status(&child, |status| status == "running", 10);
+    d.kill9();
+    d.spawn();
+    let repeated = d.call("run.delegate", request);
+    assert_eq!(repeated["run"]["id"], child);
+    assert_eq!(repeated["replayed"], true);
+    assert_eq!(d.runs().len(), 2);
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert_eq!(d.run(&child)["process_generation"], 1);
+    assert_eq!(d.call("run.result", json!({"run_id":child}))["text"], "browser result: parent context found");
+    assert_eq!(d.events(&child).iter().filter(|event| event["kind"] == "output" && event["payload"]["role"] == "assistant").count(), 1);
+}
+
+#[test]
+fn auto_parent_interrupt_propagates_to_active_managed_child() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "managed-delay")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"seed context","title":"parent"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let child = run_id(&d.call("run.delegate", json!({"work_unit_id":"browser-cancel-unit","parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check"})));
+    d.wait_status(&child, |status| status == "running", 10);
+    d.call("run.follow_up", json!({"run_id":parent,"prompt":"hold parent"}));
+    d.wait_status(&parent, |status| status == "running", 10);
+    d.call("run.interrupt", json!({"run_id":parent}));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "interrupted");
+    assert_eq!(d.wait_done(&child, 15)["status"], "interrupted");
+    assert_ne!(d.call("run.result", json!({"run_id":child}))["state"], "ready");
+}
+
+#[test]
+fn auto_managed_child_launch_failure_releases_its_workspace() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "managed-delegation")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"seed context","title":"parent"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let delegated = d.call("run.delegate", json!({"work_unit_id":"failed-launch-unit","parent_run_id":parent,"harness":"claude","model":"claude-sonnet","effort":"medium","prompt":"browser check"}));
+    let child = delegated["run"]["id"].as_str().unwrap();
+    assert_eq!(d.wait_done(child, 15)["status"], "failed");
+    assert_eq!(d.call("run.result", json!({"run_id":child}))["state"], "not_completed");
+    let workspace_id = delegated["workspace"]["id"].as_str().unwrap();
+    let state = d.call("state", json!({}));
+    let workspace = state["workspaces"].as_array().unwrap().iter().find(|w| w["id"] == workspace_id).unwrap();
+    assert!(workspace["owner_run_id"].is_null());
+    assert_eq!(d.runs().len(), 2);
+}
+
+#[test]
+fn auto_codex_null_thread_usage_stays_unavailable_without_token_based_guess() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "metadata-usage-null")]);
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"requested work","title":"null credit fixture"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let observed = d.call("auto.usage.thread.refresh", json!({"run_id":run}));
+    assert_eq!(observed["state"], "unavailable", "{observed}");
+    assert!(d.call("auto.usage.thread.list", json!({}))["observations"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn auto_failed_thread_usage_read_invalidates_stale_account_capacity() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let auth_file = r.path().join("auth-state.txt");
+    std::fs::write(&auth_file, "chatgpt").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_AUTH_FILE"),
+        ("FIXTURE_MODE", "metadata-usage"), ("FIXTURE_AUTH_FILE", auth_file.to_str().unwrap())]);
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"requested work","title":"account changed"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    d.call("auto.quota.refresh", json!({"profile_id":"system-codex"}));
+    assert_eq!(d.call("auto.quota.list", json!({}))["observations"].as_array().unwrap().len(), 1);
+    std::fs::write(&auth_file, "key").unwrap();
+    assert!(d.try_call("auto.usage.thread.refresh", json!({"run_id":run})).is_err());
+    assert!(d.call("auto.quota.list", json!({}))["observations"].as_array().unwrap().is_empty());
+    assert!(d.call("auto.usage.thread.list", json!({}))["observations"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn auto_codex_native_allowance_update_is_scoped_and_not_usage() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "quota")]);
+    let created = d.call("task.create", json!({"repo": repo, "harness": "codex-app", "prompt": "x", "title": "quota"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let result = d.call("auto.quota.list", json!({"limit": 10}));
+    let rows = result["observations"].as_array().unwrap();
+    assert_eq!(rows.len(), 1, "{result}");
+    assert_eq!(rows[0]["pool_id"], "system-codex");
+    assert_eq!(rows[0]["snapshot"]["windows"].as_array().unwrap().len(), 2);
+    assert_eq!(rows[0]["snapshot"]["windows"][1]["used_percent"], 100.0);
+    for harness in ["codex", "codex-app"] {
+        let state = d.call("auto.quota.state", json!({"profile_id":"system-codex","harness":harness,"model":"gpt-6-sol"}));
+        assert_eq!(state["state"], "exhausted", "{state}");
+        assert_eq!(state["pool_id"], "system-codex");
+    }
+    let other = d.call("auto.quota.state", json!({"profile_id":"system-claude","harness":"claude","model":"claude-sonnet"}));
+    assert_eq!(other["state"], "unknown");
+    assert!(!result.to_string().contains("secret-credit-sentinel"));
+    assert!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().is_empty());
+}
+
+
+#[test]
+fn auto_codex_metadata_refresh_reads_account_quota_without_a_model_turn() {
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "metadata")]);
+    let result = d.call("auto.quota.refresh", json!({"profile_id":"system-codex"}));
+    assert_eq!(result["state"], "observed_non_exhausted", "{result}");
+    assert_eq!(result["pool_id"], "system-codex");
+    assert_eq!(result["snapshot"]["windows"].as_array().unwrap().len(), 1);
+    assert!(!result.to_string().contains("private-account-id"));
+    assert!(!result.to_string().contains("private@example.invalid"));
+    assert!(!result.to_string().contains("secret-credit-sentinel"));
+    assert!(d.runs().is_empty(), "metadata refresh must not create a task run");
+}
+
+#[test]
+fn auto_codex_metadata_refresh_refuses_api_key_auth() {
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "metadata-key")]);
+    assert!(d.try_call("auto.quota.refresh", json!({"profile_id":"system-codex"})).is_err());
+    assert!(d.call("auto.quota.list", json!({}))["observations"].as_array().unwrap().is_empty());
+}
+
+
+#[test]
+fn auto_codex_metadata_account_switch_invalidates_prior_quota_without_exposing_identity() {
+    let r = tmp();
+    let account_file = r.path().join("account-id.txt");
+    std::fs::write(&account_file, "first-private-account").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_ACCOUNT_ID_FILE"),
+        ("FIXTURE_MODE", "metadata"), ("FIXTURE_ACCOUNT_ID_FILE", account_file.to_str().unwrap())]);
+    d.call("auto.quota.refresh", json!({"profile_id":"system-codex"}));
+    d.call("auto.quota.refresh", json!({"profile_id":"system-codex"}));
+    assert_eq!(d.call("auto.quota.list", json!({}))["observations"].as_array().unwrap().len(), 2);
+    std::fs::write(&account_file, "second-private-account").unwrap();
+    let changed = d.call("auto.quota.refresh", json!({"profile_id":"system-codex"}));
+    let rows = d.call("auto.quota.list", json!({}));
+    assert_eq!(rows["observations"].as_array().unwrap().len(), 1);
+    assert!(!changed.to_string().contains("second-private-account"));
+    assert!(!rows.to_string().contains("first-private-account"));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let fingerprint: String = db.query_row("SELECT fingerprint FROM auto_account_identity WHERE profile_id='system-codex'", [], |row| row.get(0)).unwrap();
+    assert_eq!(fingerprint.len(), 64);
+    assert!(!fingerprint.contains("private-account"));
+}
+
+
+#[test]
+fn auto_codex_model_catalog_is_paginated_allowlisted_and_account_scoped() {
+    let r = tmp();
+    let account_file = r.path().join("account-id.txt");
+    std::fs::write(&account_file, "first-private-account").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_ACCOUNT_ID_FILE"),
+        ("FIXTURE_MODE", "metadata-models"), ("FIXTURE_ACCOUNT_ID_FILE", account_file.to_str().unwrap())]);
+    let refreshed = d.call("auto.models.refresh", json!({"profile_id":"system-codex"}));
+    let models = refreshed["catalog"]["models"].as_array().unwrap();
+    assert_eq!(models.len(), 2, "{refreshed}");
+    assert_eq!(models[1]["model"], "gpt-6-sol");
+    assert_eq!(models[1]["efforts"], json!(["low", "medium"]));
+    assert!(!refreshed.to_string().contains("secret-model-sentinel"));
+    assert!(!refreshed.to_string().contains("first-private-account"));
+    assert!(d.runs().is_empty(), "catalog read must not create a model turn");
+    let cached = d.call("auto.models.list", json!({"profile_id":"system-codex"}));
+    assert_eq!(cached["catalog"]["models"].as_array().unwrap().len(), 2);
+    assert!(!cached.to_string().contains("secret-model-sentinel"));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let stored: String = db.query_row("SELECT catalog FROM auto_model_catalogs WHERE profile_id='system-codex'", [], |row| row.get(0)).unwrap();
+    assert!(!stored.contains("secret-model-sentinel"));
+    std::fs::write(&account_file, "second-private-account").unwrap();
+    d.call("auto.quota.refresh", json!({"profile_id":"system-codex"}));
+    assert!(d.call("auto.models.list", json!({"profile_id":"system-codex"}))["catalog"].is_null());
+}
+
+#[test]
+fn auto_codex_tool_inventory_is_project_scoped_bounded_and_content_free() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("tool-inventory-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "metadata-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let workspace = ws_id(&sh(&d, &repo, "worktree", "true"));
+    let inspected = d.call("auto.tools.inspect", json!({"profile_id":"system-codex","workspace_id":workspace}));
+    assert_eq!(inspected["catalog"]["tools"], json!(["browser/navigate","browser/snapshot"]), "{inspected}");
+    assert_eq!(inspected["source"], "codex-app/mcpServerStatus-list");
+    assert!(!inspected.to_string().contains("secret-tool-sentinel"));
+    let trace = std::fs::read_to_string(trace).unwrap();
+    assert_eq!(trace.lines().filter(|line| *line == "tool_read").count(), 2);
+    assert!(trace.contains(&format!("tool_cwd:{}", d.call("state", json!({}))["workspaces"].as_array().unwrap()
+        .iter().find(|item| item["id"] == workspace).unwrap()["path"].as_str().unwrap())));
+    assert_eq!(d.runs().len(), 1, "tool inventory may not start a model run");
+}
+
+#[test]
+fn auto_failed_account_read_does_not_leave_fresh_model_or_allowance_evidence() {
+    let r = tmp();
+    let auth_file = r.path().join("auth-state.txt");
+    std::fs::write(&auth_file, "chatgpt").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_AUTH_FILE"),
+        ("FIXTURE_MODE", "metadata-models"), ("FIXTURE_AUTH_FILE", auth_file.to_str().unwrap())]);
+    d.call("auto.models.refresh", json!({"profile_id":"system-codex"}));
+    assert_eq!(d.call("auto.models.list", json!({"profile_id":"system-codex"}))["fresh"], true);
+    assert_eq!(d.call("auto.quota.list", json!({}))["observations"].as_array().unwrap().len(), 1);
+    std::fs::write(&auth_file, "key").unwrap();
+    assert!(d.try_call("auto.models.refresh", json!({"profile_id":"system-codex"})).is_err());
+    let catalog = d.call("auto.models.list", json!({"profile_id":"system-codex"}));
+    assert_eq!(catalog["fresh"], false, "{catalog}");
+    assert!(catalog["catalog"].is_null(), "{catalog}");
+    assert!(d.call("auto.quota.list", json!({}))["observations"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn auto_codex_metadata_read_and_new_run_do_not_overlap_same_profile() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("metadata-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "metadata-delay"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    std::thread::scope(|scope| {
+        let refresh = scope.spawn(|| d.call("auto.quota.refresh", json!({"profile_id":"system-codex"})));
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !std::fs::read_to_string(&trace).unwrap_or_default().contains("metadata_started") {
+            assert!(std::time::Instant::now() < deadline, "metadata probe did not start");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"x","title":"after metadata"}));
+        assert!(created["run"]["id"].is_string());
+        refresh.join().unwrap();
+    });
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let lines = std::fs::read_to_string(&trace).unwrap_or_default();
+        if lines.contains("thread_started") {
+            assert!(lines.find("metadata_done").unwrap() < lines.find("thread_started").unwrap(), "{lines}");
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline, "run did not launch after metadata probe");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
