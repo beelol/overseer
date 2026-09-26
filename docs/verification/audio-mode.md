@@ -1,0 +1,20 @@
+# Audio Mode verification (draft PR #5)
+
+The source pack is `daemon/assets/reactor`: twelve original synthesized MP3 files, 34,224 bytes in total, each under 0.5 seconds. The separate Machines voice lab and its private Commander WAVs are outside this repository. The daemon only stores the path to a user-selected private pack and plays it in place.
+
+| Requirement | Evidence | State |
+|---|---|---|
+| Off until explicitly enabled; setting survives restart | `audio_mode_is_off_until_enabled_and_survives_restart` | Verified |
+| Off mode starts no player or cache | `disabled_audio_never_materializes_a_player_asset` | Verified |
+| Root start and completion sound once while VS Code is closed | `live_root_events_play_once_without_or_with_multiple_ui_clients` | Verified with fixture |
+| A second UI client does not duplicate playback | Same two-client protocol test | Verified with fixture |
+| Permission event and waiting status share one attention cue | `live_permission_and_waiting_status_share_one_attention_cue` | Verified with fixture |
+| Auth failure needs attention once | `authentication_failure_makes_one_attention_cue` | Verified with fixture |
+| Simultaneous needs coalesce, including interleaved starts | `simultaneous_attention_is_coalesced_even_when_starts_interleave` | Verified in classifier; live multi-agent timing remains |
+| Attention remains queueable after routine bursts; memory stays bounded | `attention_can_queue_when_routine_cues_fill_their_lane`, `attention_history_stays_bounded_during_long_daemon_uptime` | Verified in queue tests |
+| Missing local cache does not interrupt agents | `missing_local_cache_does_not_interrupt_agents` | Verified |
+| System speech and private Commander import | `system_and_private_commander_tracks_are_selectable_without_bundling_voice_files`, `installed_system_voice_can_be_selected`; isolated macOS playback smoke for both | Verified locally |
+| Visible count for multiple needs | Existing VS Code status bar counts `attention()` entries in `extension/src/extension.js` | Needs live UI check |
+| Auto Mode, Swarm, and TUI changes | Current PRs #2, #3, and #4 still use the daemon; they remain in flight | Recheck and test when their event contracts settle |
+
+The daemon tests use a disposable log sink instead of starting a player. A separate isolated macOS smoke test exercised `afplay` for Reactor and Commander, and `say` with an installed voice. The extension's `npm test` command currently references a missing `extension/test/run.js`; `npm run check` verifies its JavaScript syntax.

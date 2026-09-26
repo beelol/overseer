@@ -1,11 +1,12 @@
-//! Opt-in, daemon-owned Reactor cues. No audio work occurs while disabled.
+//! Opt-in, daemon-owned audio cues. No playback occurs while disabled.
 use crate::daemon::Daemon;
 use crate::paths;
 use crate::store::Event;
 use anyhow::{anyhow, Result};
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
@@ -28,40 +29,150 @@ const KEYS: &[&str] = &[
 const DEFAULT_KEYS: &[&str] = &["agent_started", "agent_complete", "agent_needs_attention"];
 const MANIFEST: &str = include_str!("../assets/reactor/manifest.json");
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Track {
+    Reactor,
+    System,
+    Commander,
+}
+
+impl Track {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Reactor => "reactor",
+            Self::System => "system",
+            Self::Commander => "commander",
+        }
+    }
+
+    fn parse(name: &str) -> Result<Self> {
+        match name {
+            "reactor" => Ok(Self::Reactor),
+            "system" => Ok(Self::System),
+            "commander" => Ok(Self::Commander),
+            _ => Err(anyhow!("unknown audio track")),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct Selection {
+    track: Track,
+    voice: String,
+    commander_dir: Option<PathBuf>,
+}
+
 struct Cue {
     key: &'static str,
     preview: bool,
+    selection: Selection,
 }
 
 struct Runtime {
     enabled: AtomicBool,
-    queue: mpsc::Sender<Cue>,
+    routine: mpsc::Sender<Cue>,
+    urgent: mpsc::Sender<Cue>,
 }
+
+impl Runtime {
+    fn enqueue(&self, key: &'static str, preview: bool, selection: Selection) -> bool {
+        let lane = if key == "agent_needs_attention" {
+            &self.urgent
+        } else {
+            &self.routine
+        };
+        lane.try_send(Cue {
+            key,
+            preview,
+            selection,
+        })
+        .is_ok()
+    }
+}
+
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 
-fn available() -> bool {
-    cfg!(target_os = "macos") && std::path::Path::new("/usr/bin/afplay").exists()
+fn test_sink() -> bool {
+    std::env::var_os("OVERSEER_TEST_AUDIO_LOG").is_some()
+}
+
+fn reactor_available() -> bool {
+    test_sink() || (cfg!(target_os = "macos") && Path::new("/usr/bin/afplay").exists())
+}
+
+fn system_available() -> bool {
+    test_sink() || (cfg!(target_os = "macos") && Path::new("/usr/bin/say").exists())
+}
+
+fn meta(conn: &rusqlite::Connection, key: &str) -> Result<Option<String>> {
+    Ok(conn
+        .query_row("SELECT value FROM meta WHERE key=?1", [key], |r| r.get(0))
+        .optional()?)
 }
 
 fn stored_enabled(d: &Arc<Daemon>) -> Result<bool> {
     let store = d.store.lock().unwrap();
-    let value: Option<String> = store
-        .conn
-        .query_row(
-            "SELECT value FROM meta WHERE key='audio.reactor.enabled'",
-            [],
-            |r| r.get(0),
-        )
-        .optional()?;
-    Ok(value.as_deref() == Some("1"))
+    Ok(meta(&store.conn, "audio.reactor.enabled")?.as_deref() == Some("1"))
 }
 
-use rusqlite::OptionalExtension;
+fn selection(d: &Arc<Daemon>) -> Result<Selection> {
+    let store = d.store.lock().unwrap();
+    let track =
+        Track::parse(&meta(&store.conn, "audio.track")?.unwrap_or_else(|| "reactor".into()))?;
+    let voice = meta(&store.conn, "audio.system_voice")?.unwrap_or_default();
+    let commander_dir = meta(&store.conn, "audio.commander_dir")?.map(PathBuf::from);
+    Ok(Selection {
+        track,
+        voice,
+        commander_dir,
+    })
+}
+
+fn commander_file(dir: &Path, key: &str) -> PathBuf {
+    dir.join(key).join("transmission/commander.wav")
+}
+
+fn valid_commander_pack(dir: &Path) -> Result<()> {
+    use std::io::Read;
+    for key in DEFAULT_KEYS {
+        let path = commander_file(dir, key);
+        let meta = std::fs::metadata(&path)?;
+        if !meta.is_file() || !(16..=10_000_000).contains(&meta.len()) {
+            return Err(anyhow!(
+                "private Commander pack needs three valid WAV files"
+            ));
+        }
+        let mut header = [0u8; 12];
+        std::fs::File::open(path)?.read_exact(&mut header)?;
+        if &header[..4] != b"RIFF" || &header[8..] != b"WAVE" {
+            return Err(anyhow!("private Commander pack contains a non-WAV file"));
+        }
+    }
+    Ok(())
+}
+
+fn playback_available(selected: &Selection) -> bool {
+    match selected.track {
+        Track::Reactor => reactor_available(),
+        Track::System => system_available(),
+        Track::Commander => {
+            reactor_available()
+                && selected
+                    .commander_dir
+                    .as_deref()
+                    .is_some_and(|dir| valid_commander_pack(dir).is_ok())
+        }
+    }
+}
 
 pub fn get(d: &Arc<Daemon>) -> Result<Value> {
+    let selected = selection(d)?;
     Ok(json!({
         "enabled": stored_enabled(d)?,
-        "available": available(),
+        "available": playback_available(&selected),
+        "track": selected.track.name(),
+        "voice": selected.voice,
+        "commander_imported": selected.commander_dir.as_deref().is_some_and(|dir| valid_commander_pack(dir).is_ok()),
         "pack": "reactor",
         "keys": KEYS,
         "default_keys": DEFAULT_KEYS,
@@ -70,23 +181,111 @@ pub fn get(d: &Arc<Daemon>) -> Result<Value> {
 }
 
 pub fn set(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
-    let enabled = p["enabled"]
-        .as_bool()
-        .ok_or_else(|| anyhow!("enabled must be a boolean"))?;
-    if enabled && !available() {
-        return Err(anyhow!("Reactor audio requires macOS afplay"));
+    if p.get("enabled").is_none() && p.get("track").is_none() && p.get("voice").is_none() {
+        return Err(anyhow!("provide enabled, track, or voice"));
     }
-    d.store.lock().unwrap().conn.execute(
-        "INSERT INTO meta(key,value) VALUES('audio.reactor.enabled',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-        params![if enabled { "1" } else { "0" }],
-    )?;
+    let enabled = match p.get("enabled") {
+        Some(value) => value
+            .as_bool()
+            .ok_or_else(|| anyhow!("enabled must be a boolean"))?,
+        None => stored_enabled(d)?,
+    };
+    let mut selected = selection(d)?;
+    if let Some(value) = p.get("track") {
+        selected.track = Track::parse(
+            value
+                .as_str()
+                .ok_or_else(|| anyhow!("track must be a string"))?,
+        )?;
+    }
+    if let Some(value) = p.get("voice") {
+        selected.voice = value
+            .as_str()
+            .ok_or_else(|| anyhow!("voice must be a string"))?
+            .to_string();
+        if !selected.voice.is_empty()
+            && !test_sink()
+            && !installed_voices()?
+                .iter()
+                .any(|(name, _)| name == &selected.voice)
+        {
+            return Err(anyhow!("system voice is not installed"));
+        }
+    }
+    if selected.track == Track::Commander && !playback_available(&selected) {
+        return Err(anyhow!("import the private Commander pack first"));
+    }
+    if enabled && !playback_available(&selected) {
+        return Err(anyhow!("selected audio track is unavailable on this Mac"));
+    }
+    {
+        let store = d.store.lock().unwrap();
+        let transaction = store.conn.unchecked_transaction()?;
+        for (key, value) in [
+            ("audio.reactor.enabled", if enabled { "1" } else { "0" }),
+            ("audio.track", selected.track.name()),
+            ("audio.system_voice", selected.voice.as_str()),
+        ] {
+            transaction.execute("INSERT INTO meta(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![key, value])?;
+        }
+        transaction.commit()?;
+    }
     if let Some(runtime) = RUNTIME.get() {
         runtime.enabled.store(enabled, Ordering::Relaxed);
     }
-    Ok(json!({"enabled": enabled, "available": available(), "pack": "reactor"}))
+    get(d)
 }
 
-pub fn preview(p: &Value) -> Result<Value> {
+pub fn import_commander(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
+    let path = p["path"]
+        .as_str()
+        .ok_or_else(|| anyhow!("path must be a string"))?;
+    let directory = std::fs::canonicalize(path)?;
+    valid_commander_pack(&directory)?;
+    d.store.lock().unwrap().conn.execute(
+        "INSERT INTO meta(key,value) VALUES('audio.commander_dir',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        [directory.to_string_lossy().as_ref()],
+    )?;
+    Ok(json!({"imported": true}))
+}
+
+fn installed_voices() -> Result<Vec<(String, String)>> {
+    if !Path::new("/usr/bin/say").exists() {
+        return Err(anyhow!("macOS system speech is unavailable"));
+    }
+    let output = std::process::Command::new("/usr/bin/say")
+        .args(["-v", "?"])
+        .output()?;
+    if !output.status.success() {
+        return Err(anyhow!("could not list system voices"));
+    }
+    let mut voices = Vec::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let fields: Vec<&str> = line
+            .split('#')
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .collect();
+        if fields.len() < 2 {
+            continue;
+        }
+        voices.push((
+            fields[..fields.len() - 1].join(" "),
+            fields[fields.len() - 1].to_string(),
+        ));
+    }
+    Ok(voices)
+}
+
+pub fn voices() -> Result<Value> {
+    Ok(json!(installed_voices()?
+        .into_iter()
+        .map(|(name, locale)| json!({"name":name,"locale":locale}))
+        .collect::<Vec<_>>()))
+}
+
+pub fn preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let key = p["key"]
         .as_str()
         .ok_or_else(|| anyhow!("key must be a string"))?;
@@ -94,18 +293,43 @@ pub fn preview(p: &Value) -> Result<Value> {
         .iter()
         .copied()
         .find(|candidate| *candidate == key)
-        .ok_or_else(|| anyhow!("unknown Reactor cue"))?;
-    if !available() {
-        return Err(anyhow!("Reactor audio requires macOS afplay"));
+        .ok_or_else(|| anyhow!("unknown audio cue"))?;
+    let config = selection(d)?;
+    if config.track != Track::Reactor && !DEFAULT_KEYS.contains(&selected) {
+        return Err(anyhow!("this track has only the three core cues"));
     }
-    enqueue(selected, true);
+    if !playback_available(&config) {
+        return Err(anyhow!("selected audio track is unavailable"));
+    }
+    if !enqueue(selected, true, config) {
+        return Err(anyhow!("audio is busy; try the preview again"));
+    }
     Ok(json!({"queued": true, "key": selected}))
 }
 
-fn enqueue(key: &'static str, preview: bool) {
-    if let Some(runtime) = RUNTIME.get() {
-        // Bounded queue prevents a burst of agent events from growing memory or noise.
-        let _ = runtime.queue.try_send(Cue { key, preview });
+fn enqueue(key: &'static str, preview: bool, selection: Selection) -> bool {
+    // Both lanes are bounded; attention cannot be displaced by routine bursts.
+    RUNTIME
+        .get()
+        .is_some_and(|runtime| runtime.enqueue(key, preview, selection))
+}
+
+#[derive(Default)]
+struct BurstGate {
+    last_by_key: HashMap<&'static str, Instant>,
+}
+
+impl BurstGate {
+    fn allow(&mut self, key: &'static str, now: Instant) -> bool {
+        if self
+            .last_by_key
+            .get(key)
+            .is_some_and(|last| now.duration_since(*last) < Duration::from_millis(800))
+        {
+            return false;
+        }
+        self.last_by_key.insert(key, now);
+        true
     }
 }
 
@@ -114,13 +338,21 @@ fn enqueue(key: &'static str, preview: bool) {
 pub fn start(d: Arc<Daemon>) -> Result<()> {
     let enabled = stored_enabled(&d)?;
     let mut events = d.events.subscribe();
-    let (tx, mut rx) = mpsc::channel::<Cue>(4);
+    let (routine_tx, mut routine_rx) = mpsc::channel::<Cue>(4);
+    let (urgent_tx, mut urgent_rx) = mpsc::channel::<Cue>(2);
     let _ = RUNTIME.set(Runtime {
         enabled: AtomicBool::new(enabled),
-        queue: tx,
+        routine: routine_tx,
+        urgent: urgent_tx,
     });
     tokio::spawn(async move {
-        while let Some(cue) = rx.recv().await {
+        loop {
+            let cue = tokio::select! {
+                biased;
+                Some(cue) = urgent_rx.recv() => cue,
+                Some(cue) = routine_rx.recv() => cue,
+                else => break,
+            };
             if !cue.preview
                 && !RUNTIME
                     .get()
@@ -128,7 +360,7 @@ pub fn start(d: Arc<Daemon>) -> Result<()> {
             {
                 continue;
             }
-            match tokio::task::spawn_blocking(move || play(cue.key)).await {
+            match tokio::task::spawn_blocking(move || play(cue.key, &cue.selection)).await {
                 Ok(Ok(())) => {}
                 Ok(Err(e)) => crate::log(&format!("audio playback failed: {e}")),
                 Err(e) => crate::log(&format!("audio worker ended: {e}")),
@@ -137,7 +369,7 @@ pub fn start(d: Arc<Daemon>) -> Result<()> {
     });
     tokio::spawn(async move {
         let mut attention = HashSet::<String>::new();
-        let mut last: Option<(&'static str, Instant)> = None;
+        let mut burst = BurstGate::default();
         loop {
             let event = match events.recv().await {
                 Ok(event) => event,
@@ -165,18 +397,36 @@ pub fn start(d: Arc<Daemon>) -> Result<()> {
             let Some(key) = classify(&event, &mut attention) else {
                 continue;
             };
-            // Swarms can emit many identical transitions together. One cue conveys
-            // the batch without playing a noisy series of overlapping sounds.
-            if last.is_some_and(|(previous, at)| {
-                previous == key && at.elapsed() < Duration::from_millis(800)
-            }) {
+            // Keep simultaneous attention quiet even when start or completion
+            // events from other agents arrive between blocker events.
+            if !burst.allow(key, Instant::now()) {
                 continue;
             }
-            last = Some((key, Instant::now()));
-            enqueue(key, false);
+            match selection(&d) {
+                Ok(config) => {
+                    let _ = enqueue(key, false, config);
+                }
+                Err(e) => crate::log(&format!("audio selection failed: {e}")),
+            }
         }
     });
     Ok(())
+}
+
+const MAX_ATTENTION_HISTORY: usize = 1024;
+
+fn remember_attention(attention: &mut HashSet<String>, run_id: &str) -> bool {
+    if attention.contains(run_id) {
+        return false;
+    }
+    if attention.len() >= MAX_ATTENTION_HISTORY {
+        // Terminal failures can remain in the log indefinitely; keep only a fixed
+        // number of recent dedupe identities in this long-lived process.
+        if let Some(evicted) = attention.iter().next().cloned() {
+            attention.remove(&evicted);
+        }
+    }
+    attention.insert(run_id.to_owned())
 }
 
 fn classify(event: &Event, attention: &mut HashSet<String>) -> Option<&'static str> {
@@ -188,7 +438,7 @@ fn classify(event: &Event, attention: &mut HashSet<String>) -> Option<&'static s
         return None;
     }
     match event.payload["status"].as_str()? {
-        "waiting_for_user" | "failed" | "disconnected" if attention.insert(run_id.clone()) => {
+        "waiting_for_user" | "failed" | "disconnected" if remember_attention(attention, run_id) => {
             Some("agent_needs_attention")
         }
         "completed" => {
@@ -221,8 +471,67 @@ fn bytes(key: &str) -> &'static [u8] {
     }
 }
 
-fn play(key: &str) -> Result<()> {
-    if !available() {
+fn play(key: &str, selected: &Selection) -> Result<()> {
+    if let Some(path) = std::env::var_os("OVERSEER_TEST_AUDIO_LOG") {
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?;
+        writeln!(file, "{}:{key}", selected.track.name())?;
+        return Ok(());
+    }
+    match selected.track {
+        Track::Reactor => play_reactor(key),
+        Track::System => play_system(key, &selected.voice),
+        Track::Commander => {
+            let dir = selected
+                .commander_dir
+                .as_deref()
+                .ok_or_else(|| anyhow!("private Commander pack is not imported"))?;
+            play_file(&commander_file(dir, key))
+        }
+    }
+}
+
+fn play_file(path: &Path) -> Result<()> {
+    let status = std::process::Command::new("/usr/bin/afplay")
+        .arg(path)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()?;
+    if !status.success() {
+        return Err(anyhow!("afplay exited with {status}"));
+    }
+    Ok(())
+}
+
+fn play_system(key: &str, voice: &str) -> Result<()> {
+    let phrase = match key {
+        "agent_started" => "Agent started.",
+        "agent_complete" => "Agent complete.",
+        "agent_needs_attention" => "An agent needs your attention.",
+        _ => return Err(anyhow!("system speech has no phrase for {key}")),
+    };
+    let mut command = std::process::Command::new("/usr/bin/say");
+    if !voice.is_empty() {
+        command.arg("-v").arg(voice);
+    }
+    let status = command
+        .arg(phrase)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()?;
+    if !status.success() {
+        return Err(anyhow!("system speech exited with {status}"));
+    }
+    Ok(())
+}
+
+fn play_reactor(key: &str) -> Result<()> {
+    if !reactor_available() {
         return Ok(());
     }
     let dir = paths::data_dir().join("audio/reactor-v1");
@@ -241,16 +550,7 @@ fn play(key: &str) -> Result<()> {
         file.write_all(bytes(key))?;
         std::fs::rename(tmp, &path)?;
     }
-    let status = std::process::Command::new("/usr/bin/afplay")
-        .arg(&path)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()?;
-    if !status.success() {
-        crate::log(&format!("afplay exited with {status}"));
-    }
-    Ok(())
+    play_file(&path)
 }
 
 #[cfg(test)]
@@ -342,6 +642,47 @@ mod tests {
             ),
             None
         );
+    }
+    #[test]
+    fn attention_can_queue_when_routine_cues_fill_their_lane() {
+        let (routine, _routine_rx) = mpsc::channel(4);
+        let (urgent, _urgent_rx) = mpsc::channel(2);
+        let runtime = Runtime {
+            enabled: AtomicBool::new(true),
+            routine,
+            urgent,
+        };
+        let selection = Selection {
+            track: Track::Reactor,
+            voice: String::new(),
+            commander_dir: None,
+        };
+        for _ in 0..4 {
+            assert!(runtime.enqueue("agent_started", false, selection.clone()));
+        }
+        assert!(runtime.enqueue("agent_needs_attention", false, selection));
+    }
+    #[test]
+    fn simultaneous_attention_is_coalesced_even_when_starts_interleave() {
+        let start = Instant::now();
+        let mut gate = BurstGate::default();
+        assert!(gate.allow("agent_needs_attention", start));
+        assert!(gate.allow("agent_started", start + Duration::from_millis(100)));
+        assert!(!gate.allow("agent_needs_attention", start + Duration::from_millis(200)));
+        assert!(gate.allow("agent_needs_attention", start + Duration::from_millis(900)));
+    }
+    #[test]
+    fn attention_history_stays_bounded_during_long_daemon_uptime() {
+        let mut attention = HashSet::new();
+        for i in 0..1100 {
+            let mut item = event("status", json!({"status":"failed"}));
+            item.run_id = Some(format!("failed-{i}"));
+            assert_eq!(
+                classify(&item, &mut attention),
+                Some("agent_needs_attention")
+            );
+        }
+        assert!(attention.len() <= 1024);
     }
     #[test]
     fn pack_has_twelve_short_original_cues() {

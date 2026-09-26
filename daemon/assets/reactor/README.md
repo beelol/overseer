@@ -1,9 +1,15 @@
-# Reactor cue pack
+# Overseer audio tracks
 
-These twelve original synthesized MP3 cues ship inside `overseerd` (34,224 bytes total). They were created in the separate Machines voice lab with oscillators; no game recording, voice clone, or generated speech is included. Every cue is shorter than 0.5 seconds.
+The daemon bundles twelve original Reactor synth MP3 cues (34,224 bytes total). Every cue is shorter than 0.5 seconds. No game recordings, cloned speech, or model are bundled.
 
-Audio Mode is off by default. One explicit enable persists in the daemon's local database. The daemon then plays only `agent_started`, `agent_complete`, and `agent_needs_attention` for top-level runs, including a failed or disconnected root that cannot proceed. It selects cues from its own durable event stream, so VS Code can be closed. Repeated attention states and dense batches are coalesced. The other nine keys are included for preview and for future stable lifecycle events; they do not add automatic notifications now.
+Audio Mode is off by default and needs one explicit enable. Its global track and enabled state persist in the daemon's local database. Only `agent_started`, `agent_complete`, and `agent_needs_attention` play automatically for top-level runs. Failed or disconnected roots use the attention cue because they cannot proceed. The other nine Reactor keys are previewable and silent by default. Child, Swarm, and detailed voice lines reuse broad keys; they do not create extra automatic sounds.
 
-The key is the reusable sound identity. Detailed voice lines, child-agent labels, Auto Mode choices, and Swarm roles should map to one of these broad keys rather than create new sounds for every phrase. `manifest.json` lists the meanings and durations. The private Commander voice recordings remain in the separate lab.
+The selectable tracks are:
 
-Playback uses the macOS system `afplay` executable when a cue is needed. A tiny owner-only copy is written to Overseer's local data directory on first playback. No network connection or resident audio model is required. A bounded four-cue queue and one transient player process keep memory usage low. Other platforms report playback unavailable.
+- **Reactor signals**: Play the bundled MP3 through macOS `afplay`. On first use, the selected asset is copied to a tiny owner-only local cache.
+- **System voice**: Use macOS `say` on the device for “Agent started,” “Agent complete,” and “An agent needs your attention.” The user may choose an installed voice. No speech file or model is downloaded.
+- **Private Commander**: Import a local folder containing the three core `transmission/commander.wav` clips. The daemon reads these in place with `afplay`; it never copies them into the repository, extension, cache, bucket, or network.
+
+The Rust daemon classifies durable lifecycle events and owns the setting, playback queue, deduplication, and burst coalescing. VS Code only changes settings and requests previews. Closing VS Code or opening a second client does not create another player. The queue holds at most four routine cues and two urgent cues, one transient player process runs at a time, and attention deduplication history is bounded. Missing private files or playback errors are logged without interrupting agents. On other platforms the selected macOS audio track reports unavailable.
+
+`manifest.json` lists the Reactor keys, meanings, provenance, and durations. The private voice-to-synth mapping remains in the separate Machines voice lab.

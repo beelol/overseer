@@ -216,7 +216,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "state" => d.state()?,
         "audio.get" => crate::audio::get(d)?,
         "audio.set" => crate::audio::set(d, p)?,
-        "audio.preview" => crate::audio::preview(p)?,
+        "audio.preview" => crate::audio::preview(d, p)?,
+        "audio.import_commander" => crate::audio::import_commander(d, p)?,
+        "audio.voices" => crate::audio::voices()?,
         "harness.list" => {
             let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "generic"]
                 .iter()
