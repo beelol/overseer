@@ -391,7 +391,7 @@
         "daemon/tests/swarm_state.rs",
         "docs/verification/swarm/SWARM-48.md"
       ],
-      "blocker": "Strict validation, conflicting exclusive claims, and opt-in independent valid subgraph retention pass in fixtures; bounded failed planning/repair turns and visible stalled planning remain unimplemented."
+      "blocker": "Fixture plan validation, exclusive claims, independent subgraphs, and a durable two-turn no-progress stall pass. Live director progress verification, bounded failed planning/repair turns, and live recovery remain unimplemented."
     },
     "SWARM-49": {
       "status": "partial",
