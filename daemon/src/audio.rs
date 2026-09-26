@@ -188,12 +188,14 @@ fn classify(event: &Event, attention: &mut HashSet<String>) -> Option<&'static s
         return None;
     }
     match event.payload["status"].as_str()? {
-        "waiting_for_user" if attention.insert(run_id.clone()) => Some("agent_needs_attention"),
+        "waiting_for_user" | "failed" | "disconnected" if attention.insert(run_id.clone()) => {
+            Some("agent_needs_attention")
+        }
         "completed" => {
             attention.remove(run_id);
             Some("agent_complete")
         }
-        "running" | "starting" | "queued" | "failed" | "interrupted" | "disconnected" => {
+        "running" | "starting" | "queued" | "interrupted" => {
             attention.remove(run_id);
             None
         }
@@ -324,6 +326,21 @@ mod tests {
                 &mut attention
             ),
             Some("agent_complete")
+        );
+        assert_eq!(
+            classify(&event("status", json!({"status":"failed"})), &mut attention),
+            Some("agent_needs_attention")
+        );
+        assert_eq!(
+            classify(&event("status", json!({"status":"failed"})), &mut attention),
+            None
+        );
+        assert_eq!(
+            classify(
+                &event("status", json!({"status":"disconnected"})),
+                &mut attention
+            ),
+            None
         );
     }
     #[test]
