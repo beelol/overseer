@@ -19,3 +19,10 @@ from all four jobs before scripted completion. This does not qualify a live harn
 The missing-Redis case is classified as an environment failure. The lost-ack case probes
 the durable database state and reports `unknown_do_not_retry` when an update committed
 but the receipt did not. Neither case counts as a passing retry-safety check.
+
+`session.py` keeps one fixture schema and queue across separate processes for the
+daemon-restart test. `init` creates two queued `evt-42` deliveries; `deliver` consumes
+one and loses its acknowledgement after committing the grant; `outcome` independently
+reads the database and remaining queue; `cleanup` removes both. The local test proves
+that a blind second `deliver` increments the counter again, while the joined Swarm
+test keeps the second delivery queued after its durable effect journal rejects replay.

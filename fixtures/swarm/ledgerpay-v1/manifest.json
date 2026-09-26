@@ -6,5 +6,6 @@
   "seeded_finding": "two deliveries cross receipt barrier, grant counter 0 to 2",
   "protected_variant": "receipt insert and entitlement update share one transaction; grant counter 0 to 1",
   "other_variants": ["stale activation after cancellation", "lost acknowledgement after update", "missing Redis queue"],
+  "persistent_effect_session": "two queued evt-42 deliveries; one unreceipted grant survives process restart, while a blind second delivery increments the counter again",
   "isolation": "one PostgreSQL schema and Redis list per test"
 }

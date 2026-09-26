@@ -31,6 +31,52 @@ fn probe(job: &str) -> Value {
     result["evidence"].clone()
 }
 
+fn session_command(action: &str, namespace: Option<&str>) -> Value {
+    let fixture = repo_root().join("fixtures/swarm/ledgerpay-v1");
+    let mut command = Command::new(fixture.join(".venv/bin/python"));
+    command.arg("session.py").arg(action).current_dir(&fixture);
+    if let Some(namespace) = namespace {
+        command.arg(namespace);
+    }
+    let output = command.output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+struct EffectSession {
+    namespace: String,
+}
+
+impl EffectSession {
+    fn new() -> Self {
+        let initialized = session_command("init", None);
+        assert_eq!(initialized["queued"], json!(["evt-42", "evt-42"]));
+        Self {
+            namespace: initialized["namespace"].as_str().unwrap().to_string(),
+        }
+    }
+
+    fn call(&self, action: &str) -> Value {
+        session_command(action, Some(&self.namespace))
+    }
+}
+
+impl Drop for EffectSession {
+    fn drop(&mut self) {
+        let fixture = repo_root().join("fixtures/swarm/ledgerpay-v1");
+        let _ = Command::new(fixture.join(".venv/bin/python"))
+            .arg("session.py")
+            .arg("cleanup")
+            .arg(&self.namespace)
+            .current_dir(&fixture)
+            .output();
+    }
+}
+
 fn benefit(d: &Daemon, run: &str, jobs: &[&str]) {
     let workers: Vec<Value> = jobs
         .iter()
@@ -342,4 +388,157 @@ fn ledgerpay_s2_missing_redis_remains_blocked_coverage() {
         )
         .unwrap_err()
         .contains("requires every planned job to be accepted"));
+}
+
+#[test]
+#[ignore = "requires disposable LedgerPay PostgreSQL/Redis fixture and local socket permission"]
+fn ledgerpay_s2_lost_ack_probes_real_db_after_daemon_restart() {
+    assert!(std::env::var("LEDGERPAY_DATABASE_URL").is_ok());
+    assert!(std::env::var("LEDGERPAY_REDIS_URL").is_ok());
+    let fixture = EffectSession::new();
+    let mut d = Daemon::start(&[]);
+    let created = d.call(
+        "swarm.create",
+        json!({"category":"LedgerPay effect reconciliation",
+        "objective":"Audit duplicate evt-42 application after a lost acknowledgement",
+        "allowed_targets":["local-audit"]}),
+    );
+    let run = created["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,"jobs":[
+            {"id":"k2","title":"Queue delivery","acceptance":"one applied grant",
+                "deps":[],"resource_claims":[{"resource":"ledgerpay-sub-1","mode":"write"}]},
+            {"id":"k1","title":"Signature ingress","acceptance":"invalid signature denied",
+                "deps":[]}
+        ]}),
+    );
+    let k2 = d.call(
+        "swarm.attempt.register",
+        json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"k2"}),
+    );
+    let operation = format!("fixture:ledgerpay:{}:evt-42:grant", fixture.namespace);
+    let intent = json!({"run_id":run,"job_id":"k2","attempt_id":k2["id"],
+        "token":k2["token"],"effect_id":"evt-42-grant","operation_id":operation,
+        "revision":1,"fixture_drop_ack_after_commit":true});
+    assert!(d
+        .try_call("swarm.effect.begin", intent.clone())
+        .unwrap_err()
+        .contains("injected"));
+    assert_eq!(fixture.call("deliver")["status"], "ack_lost");
+    d.kill9();
+    d.spawn();
+    let mut replay = intent;
+    replay
+        .as_object_mut()
+        .unwrap()
+        .remove("fixture_drop_ack_after_commit");
+    let recovered = d.call("swarm.effect.begin", replay.clone());
+    assert_eq!(recovered["outcome"], "unknown");
+    assert_eq!(recovered["may_execute"], false);
+    assert_eq!(recovered["duplicate"], true);
+
+    let observed = fixture.call("outcome");
+    assert_eq!(observed["event_id"], "evt-42");
+    assert_eq!(observed["grant_count"], 1);
+    assert_eq!(observed["receipt"], false);
+    assert_eq!(observed["queued"], json!(["evt-42"]));
+    assert_eq!(observed["status"], "unknown_do_not_retry");
+
+    d.call(
+        "swarm.artifact.put",
+        json!({"run_id":run,"job_id":"k2",
+        "attempt_id":k2["id"],"token":k2["token"],
+        "artifact_id":"k2-lost-ack","source_revision":1,"kind":"finding",
+        "content":"delivery acknowledgement lost after evt-42 grant"}),
+    );
+    d.call(
+        "swarm.report",
+        json!({"run_id":run,"job_id":"k2",
+        "attempt_id":k2["id"],"token":k2["token"],
+        "message_id":"k2-lost-ack-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["k2-lost-ack"]}}),
+    );
+    assert!(d
+        .try_call(
+            "swarm.decide",
+            json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"k2","decision":"accept",
+        "evidence":["k2-lost-ack"]})
+        )
+        .unwrap_err()
+        .contains("unreconciled side effect"));
+
+    let k1 = d.call(
+        "swarm.attempt.register",
+        json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"k1"}),
+    );
+    let ingress = probe("k1");
+    assert_eq!(ingress["invalidSignatureStatus"], 401);
+    d.call(
+        "swarm.artifact.put",
+        json!({"run_id":run,"job_id":"k1",
+        "attempt_id":k1["id"],"token":k1["token"],
+        "artifact_id":"k1-signature","source_revision":1,"kind":"finding",
+        "content":ingress.to_string()}),
+    );
+    d.call(
+        "swarm.report",
+        json!({"run_id":run,"job_id":"k1",
+        "attempt_id":k1["id"],"token":k1["token"],
+        "message_id":"k1-signature-result","type":"result","revision":1,
+        "payload":{"audit_outcome":"negative","artifact_ids":["k1-signature"]}}),
+    );
+    assert_eq!(
+        d.call(
+            "swarm.decide",
+            json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"k1","decision":"accept",
+        "evidence":["k1-signature"]})
+        )["status"],
+        "accepted"
+    );
+    d.call(
+        "swarm.attempt.confirm_exit",
+        json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"k1","attempt_id":k1["id"]}),
+    );
+
+    d.call(
+        "swarm.artifact.put",
+        json!({"run_id":run,"job_id":"k2",
+        "attempt_id":k2["id"],"token":k2["token"],
+        "artifact_id":"k2-db-outcome","source_revision":1,"kind":"effect_probe",
+        "content":observed.to_string()}),
+    );
+    assert!(d
+        .try_call(
+            "swarm.effect.reconcile",
+            json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"k2","effect_id":"evt-42-grant",
+        "outcome":"applied","proof_artifact_id":"k2-db-outcome"})
+        )
+        .unwrap_err()
+        .contains("not submitted"));
+    d.call(
+        "swarm.report",
+        json!({"run_id":run,"job_id":"k2",
+        "attempt_id":k2["id"],"token":k2["token"],
+        "message_id":"k2-db-outcome-report","type":"discovery","revision":1,
+        "payload":{"artifact_ids":["k2-db-outcome"]}}),
+    );
+    let reconciled = d.call(
+        "swarm.effect.reconcile",
+        json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"k2","effect_id":"evt-42-grant",
+        "outcome":"applied","proof_artifact_id":"k2-db-outcome"}),
+    );
+    assert_eq!(reconciled["outcome"], "applied");
+    assert_eq!(reconciled["may_execute"], false);
+    assert_eq!(d.call("swarm.effect.begin", replay)["may_execute"], false);
+    let after = fixture.call("outcome");
+    assert_eq!(after["grant_count"], 1);
+    assert_eq!(after["queued"], json!(["evt-42"]));
 }

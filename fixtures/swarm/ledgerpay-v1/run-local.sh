@@ -29,4 +29,4 @@ fi
 cd "$fixture_dir"
 LEDGERPAY_DATABASE_URL="postgres://postgres:ledgerpay-test@127.0.0.1:$pg_port/ledgerpay" \
 LEDGERPAY_REDIS_URL="redis://127.0.0.1:$redis_port/0" \
-  .venv/bin/python -m unittest -v test_backend.py test_probe.py
+  .venv/bin/python -m unittest -v test_backend.py test_probe.py test_session.py

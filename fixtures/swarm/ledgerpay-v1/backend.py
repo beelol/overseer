@@ -94,7 +94,9 @@ class LedgerPay:
                                  (subscription_id,)).fetchone()[0]
         if receipt is not None:
             return {"event_id": event_id, "applied": False, "reason": "duplicate"}
-        if version <= current:
+        # Version guards exclude older events; equal-version redelivery still relies
+        # on the receipt, which is the seeded gap under audit.
+        if version < current:
             return {"event_id": event_id, "applied": False, "reason": "stale_version"}
         if barrier is not None:
             barrier.wait(timeout=10)
