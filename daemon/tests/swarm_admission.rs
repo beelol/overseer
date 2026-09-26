@@ -115,6 +115,47 @@ fn full_director_inbox_holds_new_admissions_but_keeps_terminal_reports() {
 }
 
 #[test]
+fn mutable_resource_conflict_is_rejected_before_reserving_an_attempt() {
+    let d=Daemon::start(&[]);
+    let first=setup(&d,"DB writer A",1);
+    let second=setup(&d,"DB writer B",1);
+    let at=now();
+    let request=|run:&str,request_id:&str,mode:&str|json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j0","target_id":"codex-a","request_id":request_id,
+        "snapshot":snapshot(at,1000000),"now_ms":at,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker",
+        "resource_claims":[{"resource":"db:shared-test","mode":mode}]
+    });
+    let admitted=d.call("swarm.admit",request(&first,"writer-a","write"));
+    assert_eq!(admitted["status"],"admitted");
+    let mut invalid=request(&second,"invalid-claims","write");
+    invalid["resource_claims"]=json!([
+        {"resource":"db:shared-test","mode":"write"},
+        {"resource":"db:shared-test","mode":"read"}
+    ]);
+    assert!(d.try_call("swarm.admit",invalid).unwrap_err().contains("duplicate resource"));
+    let held=d.call("swarm.admit",request(&second,"writer-b","write"));
+    assert_eq!(held["reason"],"resource_conflict");
+    assert_eq!(d.call("swarm.jobs",json!({"id":second}))["jobs"][0]["status"],"ready");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let attempts:i64=db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1",[&second],|r|r.get(0)).unwrap();
+    assert_eq!(attempts,0);
+    assert_eq!(d.call("swarm.admit",request(&second,"reader-b","read"))["reason"],"resource_conflict");
+    d.call("swarm.artifact.put",json!({"run_id":first,"job_id":"j0",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "artifact_id":"writer-a-result","source_revision":1,"kind":"finding","content":"checked"}));
+    d.call("swarm.report",json!({"run_id":first,"job_id":"j0",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "message_id":"writer-a-done","type":"result","revision":1,
+        "payload":{"artifact_ids":["writer-a-result"]}}));
+    d.call("swarm.decide",json!({"run_id":first,"generation":1,"revision":1,
+        "job_id":"j0","decision":"reject","evidence":["writer-a-result"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":first,"generation":1,
+        "revision":1,"job_id":"j0","attempt_id":admitted["attempt_id"]}));
+    assert_eq!(d.call("swarm.admit",request(&second,"writer-b","write"))["status"],"admitted");
+}
+
+#[test]
 fn default_worker_ceiling_and_four_per_wave_are_admission_bounds() {
     let d = Daemon::start(&[]);
     let id = setup(&d, "Scale admission", 9);

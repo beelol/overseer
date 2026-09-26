@@ -6,6 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 
 fn hash(raw: &str) -> String {
     format!("{:x}", Sha256::digest(raw.as_bytes()))
@@ -32,6 +33,31 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
     let now = p["now_ms"]
         .as_i64()
         .ok_or_else(|| anyhow!("missing admission time"))?;
+    let mut resource_claims = Vec::new();
+    let mut seen_resources = HashSet::new();
+    if let Some(value) = p.get("resource_claims") {
+        let claims = value
+            .as_array()
+            .ok_or_else(|| anyhow!("resource_claims must be an array"))?;
+        if claims.len() > 32 {
+            bail!("too many resource claims");
+        }
+        for claim in claims {
+            let resource = required(claim, "resource")?.trim();
+            let mode = required(claim, "mode")?;
+            if resource.is_empty()
+                || resource.len() > 512
+                || resource.chars().any(char::is_control)
+                || !seen_resources.insert(resource)
+            {
+                bail!("invalid or duplicate resource claim");
+            }
+            if mode != "read" && mode != "write" {
+                bail!("resource claim mode must be read or write");
+            }
+            resource_claims.push((resource.to_string(), mode.to_string()));
+        }
+    }
     let request_hash = hash(&p.to_string());
     let current = get(store, run)?;
     if current["generation"] != generation {
@@ -118,6 +144,29 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
     }
     if attempts >= effective["max_attempts"].as_i64().unwrap_or(2).min(2) {
         return Ok(blocked("attempt_limit"));
+    }
+    for (resource, mode) in &resource_claims {
+        let mut stmt = tx.prepare(
+            "SELECT run_id,job_id,mode FROM swarm_claims WHERE resource=?1 AND status='active'",
+        )?;
+        let owners = stmt
+            .query_map(params![resource], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        for (owner_run, owner_job, owner_mode) in owners {
+            if owner_run == run && owner_job == job {
+                if owner_mode != *mode {
+                    return Ok(blocked("resource_conflict"));
+                }
+            } else if mode == "write" || owner_mode == "write" {
+                return Ok(blocked("resource_conflict"));
+            }
+        }
     }
     let queued_inbox: i64 = tx.query_row(
         "SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND recipient='director' AND phase='queued'",
@@ -268,6 +317,15 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
     let token = uuid::Uuid::new_v4().simple().to_string();
     tx.execute("INSERT INTO swarm_attempts(id,run_id,job_id,revision,token_sha256,status,created_ms) VALUES(?1,?2,?3,?4,?5,'registered',?6)",
         params![attempt_id,run,job,job_revision,hash(&token),now])?;
+    for (resource, mode) in &resource_claims {
+        tx.execute(
+            "INSERT INTO swarm_claims(resource,run_id,job_id,mode,status,revision,created_ms,updated_ms)
+             VALUES(?1,?2,?3,?4,'active',?5,?6,?6)
+             ON CONFLICT(resource,run_id,job_id) DO UPDATE SET
+             mode=excluded.mode,status='active',revision=excluded.revision,updated_ms=excluded.updated_ms",
+            params![resource, run, job, mode, job_revision, now],
+        )?;
+    }
     for (pool, window_id, unit, allocation, reserve, estimate) in &chosen {
         tx.execute("INSERT OR IGNORE INTO swarm_allocations(run_id,pool_id,window_id,unit,allocation_milli,reserve_milli,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7)",
             params![run,pool,window_id,unit,allocation,reserve,now])?;
