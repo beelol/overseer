@@ -85,6 +85,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     header(f, app, head);
     match app.mode {
         Mode::Zoom { .. } => zoom(f, app, body),
+        Mode::Changes => changes(f, app, body),
         _ if app.state.runs.is_empty() || app.visible().is_empty() => empty(f, app, body),
         _ if area.width < 100 || area.height < 30 => compact_layout(f, app, body),
         _ => grid(f, app, body),
@@ -146,8 +147,9 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
         Mode::Zoom { .. } => &[("j/k", "scroll"), ("g/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
+        Mode::Changes => &[("j/k", "file"), ("J/K", "scroll diff"), ("c", "comparison"), ("r", "refresh"), ("v/esc", "back")],
         _ if area.width < 110 => &[("i", "message"), ("z", "zoom"), ("a/d", "answer"), ("n", "new"), ("?", "keys"), ("q", "quit")],
-        _ => &[("←↑↓→", "move"), ("i", "message"), ("z", "zoom"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
+        _ => &[("←↑↓→", "move"), ("i", "message"), ("z", "zoom"), ("v", "changes"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
     };
     let mut spans = vec![Span::raw(" ")];
     for (k, v) in keys {
@@ -291,6 +293,81 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     f.render_widget(Paragraph::new(lines), Rect { x: inner.x + 1, width: inner.width.saturating_sub(1), ..inner });
 }
 
+/// Changes view: the focused agent's changed files and the selected file's diff.
+fn changes(f: &mut Frame, app: &mut App, area: Rect) {
+    let c = app.changes.clone();
+    let run = app.state.run(&c.run).cloned().unwrap_or_default();
+    let label = c.options.get(c.option).map(|o| o.0.as_str()).unwrap_or("…");
+    let total: (u64, u64) = c.files.iter().fold((0, 0), |a, f| (a.0 + f.2, a.1 + f.3));
+    let title = Line::from(vec![
+        Span::styled(" changes ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)),
+        Span::styled("· ", Style::new().fg(MUTED)),
+        Span::styled(fit(&run.title, 50), Style::new().add_modifier(Modifier::BOLD)),
+        Span::styled(" · ", Style::new().fg(MUTED)),
+        Span::styled(label.to_string(), Style::new().fg(accent())),
+        Span::styled(format!(" · {} file{} ", c.files.len(), if c.files.len() == 1 { "" } else { "s" }), Style::new().fg(MUTED)),
+        Span::styled(format!("+{} ", total.0), Style::new().fg(Color::Green)),
+        Span::styled(format!("−{} ", total.1), Style::new().fg(Color::Red)),
+    ]);
+    let block = Block::bordered().border_type(BorderType::Thick).border_style(Style::new().fg(accent())).title(title);
+    let inner = block.inner(area);
+    f.render_widget(Clear, area);
+    f.render_widget(block, area);
+    if c.loading && c.files.is_empty() {
+        f.render_widget(Paragraph::new(Span::styled(" loading…", Style::new().fg(MUTED))), inner);
+        return;
+    }
+    if let Some(e) = &c.error {
+        f.render_widget(Paragraph::new(Span::styled(format!(" {e}"), Style::new().fg(Color::Red))), inner);
+        return;
+    }
+    if c.files.is_empty() {
+        f.render_widget(Paragraph::new(Span::styled(format!(" No changes since {}.", label.to_lowercase()), Style::new().fg(MUTED))), inner);
+        return;
+    }
+    let list_w = (inner.width / 3).clamp(24, 48);
+    let [list, sep, diff] = Layout::horizontal([Constraint::Length(list_w), Constraint::Length(1), Constraint::Min(10)]).areas(inner);
+    let mut lines = Vec::new();
+    for (i, (st, path, a, d)) in c.files.iter().enumerate() {
+        let sel = i == c.file;
+        let color = match st.as_str() { "A" | "?" => Color::Green, "D" => Color::Red, "R" => Color::Cyan, _ => Color::Yellow };
+        let counts = format!(" +{a} −{d}");
+        let room = (list_w as usize).saturating_sub(counts.width() + 5);
+        let name = fit_path(path, room);
+        let style = if sel { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new() };
+        lines.push(Line::from(vec![
+            Span::styled(if sel { "› " } else { "  " }, Style::new().fg(accent())),
+            Span::styled(format!("{st} "), Style::new().fg(color).add_modifier(Modifier::BOLD)),
+            Span::styled(name, style),
+            Span::styled(counts, Style::new().fg(MUTED)),
+        ]));
+    }
+    let skip = c.file.saturating_sub(list.height as usize / 2).min(c.files.len().saturating_sub(list.height as usize));
+    f.render_widget(Paragraph::new(lines.into_iter().skip(skip).collect::<Vec<_>>()), list);
+    f.render_widget(Paragraph::new(vec![Line::from(Span::styled("│", Style::new().fg(MUTED))); sep.height as usize]), sep);
+    let w = diff.width.saturating_sub(1) as usize;
+    let body: Vec<Line> = c.diff.iter().skip(c.scroll).take(diff.height as usize).map(|l| {
+        let style = if l.starts_with('+') { Style::new().fg(Color::Green) } else if l.starts_with('-') { Style::new().fg(Color::Red) } else if l.starts_with("@@") { Style::new().fg(accent()) } else { Style::new() };
+        Line::from(Span::styled(fit(&l.replace('\t', "    "), w), style))
+    }).collect();
+    f.render_widget(Paragraph::new(body), Rect { x: diff.x + 1, width: diff.width.saturating_sub(1), ..diff });
+}
+
+/// Fits a path by dropping leading directories: `…/providers/stripe/refund.ts`.
+fn fit_path(path: &str, max: usize) -> String {
+    if path.width() <= max {
+        return path.to_string();
+    }
+    let parts: Vec<&str> = path.split('/').collect();
+    for start in 1..parts.len() {
+        let candidate = format!("…/{}", parts[start..].join("/"));
+        if candidate.width() <= max {
+            return candidate;
+        }
+    }
+    fit(parts.last().copied().unwrap_or(path), max)
+}
+
 fn composer_height(app: &App, width: u16) -> u16 {
     let draft = app.focus.as_deref().and_then(|f| app.drafts.get(f)).map(String::as_str).unwrap_or("");
     let w = width.saturating_sub(4).max(10) as usize;
@@ -322,6 +399,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("] [   pgdn pgup", "next / previous page"),
         ("i  enter", "message the focused agent"),
         ("z", "zoom: full screen with scrollback"),
+        ("v", "changes: files and diffs"),
         ("a / d", "allow / deny its permission request"),
         ("w", "next agent waiting for you"),
         ("x", "interrupt the focused agent"),

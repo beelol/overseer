@@ -196,3 +196,31 @@ fn t08_start_agents_from_the_new_agent_form() {
     d.ctl("run.interrupt", json!({ "run_id": run }));
     d.ctl("run.interrupt", json!({ "run_id": new }));
 }
+
+#[test]
+fn t14_changes_view_lists_files_and_diffs_like_the_review() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("changes"));
+    let run = d.sh(&repo, "Edits two files", "printf 'more docs\\n' >> README.md; mkdir -p src/deep/nested; printf 'fn main() {}\\n' > src/deep/nested/new.rs; echo edited; sleep 30");
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.until_screen(15, "edited");
+    tui.key(KeyCode::Char('v'));
+    assert_eq!(tui.app.mode, Mode::Changes);
+    tui.until(10, |a| a.changes.files.len() == 2 && !a.changes.loading);
+    let s = tui.screen();
+    assert!(s.contains("changes · Edits two files · Latest run · 2 files +2 −0"), "{s}");
+    assert!(s.contains("M README.md +1 −0") && s.contains("A src/deep/nested/new.rs +1 −0"), "{s}");
+    assert!(s.contains("+more docs"), "diff of the first file:\n{s}");
+    tui.snapshot("t14-changes");
+    tui.key(KeyCode::Char('j'));
+    let s = tui.screen();
+    assert!(s.contains("+fn main() {}") && !s.contains("+more docs"), "{s}");
+    // Another comparison, like the review's comparison picker.
+    tui.key(KeyCode::Char('c'));
+    tui.until(10, |a| !a.changes.loading && a.changes.option == 1 && !a.changes.files.is_empty());
+    assert!(tui.screen().contains("Since task start"), "{}", tui.screen());
+    tui.key(KeyCode::Esc);
+    assert_eq!(tui.app.mode, Mode::Grid);
+    d.ctl("run.interrupt", json!({ "run_id": run }));
+}

@@ -44,6 +44,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | ] / [ , PgDn / PgUp | Next / previous page |
 | i, Enter | Compose a message to the focused agent (Enter sends, Esc closes, Alt-Enter new line) |
 | z | Zoom: focused agent full screen with scrollback (j/k, PgUp/PgDn, g/G; z or Esc returns) |
+| v | Changes: the focused agent's changed files and their diffs (j/k file, J/K scroll, c comparison) |
 | a / d | Allow / deny the focused agent's pending permission |
 | w | Jump to the next agent waiting for you |
 | x | Interrupt the focused agent (asks y/n) |
@@ -54,7 +55,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 
 ## Acceptance criteria
 
-All thirteen are verified on the draft pull request; the evidence for each is listed in
+T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Verified criteria are checked here; the evidence for each is listed in
 [evidence/tui](../verification/evidence/tui/README.md).
 
 - [x] **T-01 — Same daemon, one source of truth.** `overseer-tui` connects to the same
@@ -128,3 +129,10 @@ All thirteen are verified on the draft pull request; the evidence for each is li
   login with haiku, and Codex with gpt-5.6-luna) show up and stream in the TUI, and a follow-up
   typed in the TUI reaches the live Claude agent. **Verify:** snapshots from the live session
   and the daemon's records of the typed follow-up.
+- [x] **T-14 — Changes view.** `v` shows what the focused agent changed, like the VS Code review:
+  its changed files with status and line counts, the selected file's diff (added and removed lines
+  colored), and the same comparisons as the review (latest run, earlier turns, task start, fork,
+  target branch) cycled with `c`. Nothing is written: files and trees come from the daemon
+  (`comparison.options`, `workspace.diff`) and the diff from read-only Git. **Verify:** an agent
+  that edits one file and adds another shows both with `+/−` counts, each file's diff, and a
+  second comparison.

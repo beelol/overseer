@@ -56,6 +56,8 @@ pub enum Mode {
     Compose,
     Confirm(Confirm),
     NewAgent,
+    /// What the focused agent changed: files and their diff against a comparison base.
+    Changes,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,6 +78,8 @@ enum Pending {
     Accounts,
     ProfileStatus(String),
     Create,
+    Comparisons { run: String },
+    Diff { run: String },
 }
 
 /// The New Agent form.
@@ -121,6 +125,37 @@ impl NewAgentForm {
     }
 }
 
+/// The Changes view (`v`): what an agent changed, like the review in VS Code.
+#[derive(Debug, Clone, Default)]
+pub struct ChangesView {
+    pub run: String,
+    /// Available comparisons: (label, base commit).
+    pub options: Vec<(String, String)>,
+    pub option: usize,
+    /// Changed files: (status letter, path, added lines, removed lines).
+    pub files: Vec<(String, String, u64, u64)>,
+    pub file: usize,
+    /// Diff of the selected file (unified, without color codes).
+    pub diff: Vec<String>,
+    pub scroll: usize,
+    /// Tree object of the worktree as captured by the daemon (includes untracked files).
+    pub tree: Option<String>,
+    pub root: String,
+    pub error: Option<String>,
+    pub loading: bool,
+}
+
+/// Lines of diff shown for one file at most.
+const DIFF_LINES: usize = 4000;
+
+fn git_out(dir: &str, args: &[&str]) -> Result<String, String> {
+    let out = std::process::Command::new("git").arg("-C").arg(dir).args(args).output().map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+}
+
 pub struct App {
     client: Arc<dyn Requests>,
     pub state: State,
@@ -158,6 +193,7 @@ pub struct App {
     zoom_return: bool,
     /// Typing a new repository path in the New Agent form.
     editing_repo: bool,
+    pub changes: ChangesView,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -198,6 +234,7 @@ impl App {
             stats: Stats::default(),
             zoom_return: false,
             editing_repo: false,
+            changes: ChangesView::default(),
         }
     }
 
@@ -534,6 +571,55 @@ impl App {
                 self.say("Started", false);
                 self.request_state();
             }
+            (Pending::Comparisons { run }, Ok(v)) => {
+                if self.changes.run != run {
+                    return;
+                }
+                let opts: Vec<(String, String)> = v["options"].as_array().cloned().unwrap_or_default().iter()
+                    .filter(|o| o["available"].as_bool().unwrap_or(false) && o["base"].is_string())
+                    .map(|o| (o["label"].as_str().unwrap_or("comparison").to_string(), o["base"].as_str().unwrap_or_default().to_string()))
+                    .collect();
+                if opts.is_empty() {
+                    self.changes.loading = false;
+                    self.changes.error = Some("No comparison is available for this agent yet.".into());
+                    return;
+                }
+                self.changes.options = opts;
+                self.changes.option = 0;
+                self.load_diff();
+            }
+            (Pending::Diff { run }, Ok(v)) => {
+                if self.changes.run != run {
+                    return;
+                }
+                self.changes.loading = false;
+                self.changes.root = v["root"].as_str().unwrap_or_default().to_string();
+                self.changes.tree = v["current_tree"].as_str().map(str::to_string);
+                let base = v["base"].as_str().unwrap_or_default().to_string();
+                let mut counts: HashMap<String, (u64, u64)> = HashMap::new();
+                if let Some(tree) = &self.changes.tree {
+                    if let Ok(num) = git_out(&self.changes.root, &["diff", "--numstat", "-M", &base, tree]) {
+                        for l in num.lines() {
+                            let mut it = l.split('\t');
+                            let (a, d, path) = (it.next().unwrap_or("0"), it.next().unwrap_or("0"), it.next_back().unwrap_or_default());
+                            counts.insert(path.to_string(), (a.parse().unwrap_or(0), d.parse().unwrap_or(0)));
+                        }
+                    }
+                }
+                let keep = self.changes.files.get(self.changes.file).map(|f| f.1.clone());
+                self.changes.files = v["changes"].as_array().cloned().unwrap_or_default().iter().map(|c| {
+                    let path = c["path"].as_str().unwrap_or_default().to_string();
+                    let (a, d) = counts.get(&path).copied().unwrap_or((0, 0));
+                    (c["status"].as_str().unwrap_or("M").to_string(), path, a, d)
+                }).collect();
+                self.changes.file = keep.and_then(|k| self.changes.files.iter().position(|f| f.1 == k)).unwrap_or(0);
+                self.changes.error = None;
+                self.load_file_diff();
+            }
+            (Pending::Comparisons { .. } | Pending::Diff { .. }, Err(e)) => {
+                self.changes.loading = false;
+                self.changes.error = Some(e);
+            }
             (Pending::Create, Err(e)) => {
                 self.form.busy = false;
                 self.form.error = Some(e);
@@ -665,6 +751,65 @@ impl App {
         self.request("task.create", params, Pending::Create);
     }
 
+    fn open_changes(&mut self) {
+        let Some(run) = self.focused().cloned() else { return };
+        self.changes = ChangesView { run: run.id.clone(), loading: true, ..Default::default() };
+        self.mode = Mode::Changes;
+        self.request("comparison.options", json!({ "run_id": run.id }), Pending::Comparisons { run: run.id.clone() });
+    }
+
+    fn load_diff(&mut self) {
+        let run = self.changes.run.clone();
+        let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) else { return };
+        let Some((_, base)) = self.changes.options.get(self.changes.option).cloned() else { return };
+        self.changes.loading = true;
+        self.request("workspace.diff", json!({ "workspace_id": ws, "base": base, "status": false }), Pending::Diff { run });
+    }
+
+    /// The selected file's unified diff (read-only `git diff` between the base and the captured tree).
+    fn load_file_diff(&mut self) {
+        let c = &mut self.changes;
+        c.scroll = 0;
+        c.diff.clear();
+        let (Some((_, base)), Some(tree), Some(file)) = (c.options.get(c.option), c.tree.as_ref(), c.files.get(c.file)) else { return };
+        let mut args = vec!["diff", "--no-color", "-M", base.as_str(), tree.as_str(), "--"];
+        let old = file.1.clone();
+        args.push(&old);
+        match git_out(&c.root, &args) {
+            Ok(text) => {
+                c.diff = text.lines().skip_while(|l| !l.starts_with("@@") && !l.starts_with("Binary")).take(DIFF_LINES).map(str::to_string).collect();
+                if c.diff.is_empty() {
+                    c.diff.push("(no textual change)".into());
+                }
+            }
+            Err(e) => c.error = Some(e),
+        }
+    }
+
+    fn changes_key(&mut self, k: KeyEvent) {
+        let n = self.changes.files.len();
+        match k.code {
+            KeyCode::Esc | KeyCode::Char('v') | KeyCode::Char('q') => self.mode = Mode::Grid,
+            KeyCode::Down | KeyCode::Char('j') if n > 0 => {
+                self.changes.file = (self.changes.file + 1) % n;
+                self.load_file_diff();
+            }
+            KeyCode::Up | KeyCode::Char('k') if n > 0 => {
+                self.changes.file = (self.changes.file + n - 1) % n;
+                self.load_file_diff();
+            }
+            KeyCode::Char('J') | KeyCode::PageDown => self.changes.scroll = (self.changes.scroll + (self.size.1 as usize).saturating_sub(6)).min(self.changes.diff.len().saturating_sub(1)),
+            KeyCode::Char('K') | KeyCode::PageUp => self.changes.scroll = self.changes.scroll.saturating_sub((self.size.1 as usize).saturating_sub(6)),
+            KeyCode::Char('c') if !self.changes.options.is_empty() => {
+                self.changes.option = (self.changes.option + 1) % self.changes.options.len();
+                self.changes.files.clear();
+                self.load_diff();
+            }
+            KeyCode::Char('r') => self.load_diff(),
+            _ => {}
+        }
+    }
+
     // ---------------------------------------------------------------- input
 
     pub fn handle_mouse(&mut self, m: MouseEvent) {
@@ -710,6 +855,7 @@ impl App {
             },
             Mode::Compose => self.compose_key(k),
             Mode::NewAgent => self.form_key(k),
+            Mode::Changes => self.changes_key(k),
             Mode::Grid | Mode::Zoom { .. } => self.nav_key(k),
         }
     }
@@ -751,6 +897,7 @@ impl App {
                 }
             }
             KeyCode::Char('n') => self.open_new_agent(),
+            KeyCode::Char('v') => self.open_changes(),
             KeyCode::Char('f') => {
                 self.filter = self.filter.next();
                 self.page = 0;
