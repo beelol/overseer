@@ -30,8 +30,8 @@
       "name": "the first file edit brings the review forward within 500 ms: review on the left (about two thirds) on the changed file, chat on the right",
       "ok": true,
       "detail": {
-        "lag": 376,
-        "waitedMs": 16,
+        "lag": 488,
+        "waitedMs": 130,
         "layout": [
           {
             "share": 0.66,
@@ -42,9 +42,9 @@
           },
           {
             "share": 0.34,
-            "active": "Overseer, preview, Editor Group 2",
+            "active": "Overseer, Editor Group 2",
             "tabs": [
-              "Overseer, preview, Editor Group 2"
+              "Overseer, Editor Group 2"
             ]
           }
         ],
@@ -68,9 +68,9 @@
       "detail": [
         {
           "share": 1,
-          "active": "Overseer, preview, Editor Group 2",
+          "active": "Overseer, Editor Group 2",
           "tabs": [
-            "Overseer, preview, Editor Group 2"
+            "Overseer, Editor Group 2"
           ]
         }
       ]
@@ -81,9 +81,9 @@
       "detail": [
         {
           "share": 1,
-          "active": "Overseer, preview, Editor Group 2",
+          "active": "Overseer, Editor Group 2",
           "tabs": [
-            "Overseer, preview, Editor Group 2"
+            "Overseer, Editor Group 2"
           ]
         }
       ]
@@ -101,9 +101,9 @@
         },
         {
           "share": 0.34,
-          "active": "Overseer, preview, Editor Group 2",
+          "active": "Overseer, Editor Group 2",
           "tabs": [
-            "Overseer, preview, Editor Group 2"
+            "Overseer, Editor Group 2"
           ]
         }
       ]

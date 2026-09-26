@@ -5,6 +5,7 @@
       "ok": true,
       "detail": {
         "sidebar": true,
+        "sidebarTitle": "Explorer",
         "panel": true,
         "auxiliary": false,
         "groups": 2,
@@ -21,28 +22,28 @@
       }
     },
     {
-      "name": "dashboard mode hides side bar, panel and secondary side bar; the dashboard works in a window without a folder",
+      "name": "dashboard mode hides the panel and secondary side bar and keeps the side bar on the Overseer agents list (Gate K, AC-79); it works in a window without a folder",
       "ok": true,
       "detail": {
         "during": {
-          "sidebar": false,
+          "sidebar": true,
+          "sidebarTitle": "Overseer",
           "panel": false,
           "auxiliary": false,
-          "groups": 2,
+          "groups": 1,
           "sizes": [
             {
-              "w": 708,
-              "h": 731
-            },
-            {
-              "w": 434,
+              "w": 842,
               "h": 731
             }
           ]
         },
         "agents": [
           "Dashboard demo",
-          "Dashboard demo"
+          "Dashboard demo",
+          "codex (existing login)",
+          "claude (existing login)",
+          "opencode (existing login)"
         ]
       }
     },
@@ -50,17 +51,14 @@
       "name": "the dashboard survives a window reload (still in dashboard mode)",
       "ok": true,
       "detail": {
-        "sidebar": false,
+        "sidebar": true,
+        "sidebarTitle": "Overseer",
         "panel": false,
         "auxiliary": false,
-        "groups": 2,
+        "groups": 1,
         "sizes": [
           {
-            "w": 708,
-            "h": 731
-          },
-          {
-            "w": 434,
+            "w": 842,
             "h": 731
           }
         ]
@@ -72,6 +70,7 @@
       "detail": {
         "before": {
           "sidebar": true,
+          "sidebarTitle": "Explorer",
           "panel": true,
           "auxiliary": false,
           "groups": 2,
@@ -88,6 +87,7 @@
         },
         "after": {
           "sidebar": true,
+          "sidebarTitle": "Explorer",
           "panel": true,
           "auxiliary": false,
           "groups": 2,

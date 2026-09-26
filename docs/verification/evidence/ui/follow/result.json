@@ -10,7 +10,6 @@
           "c.txt"
         ],
         "seen": [
-          "Following: a.txt:20 (agent tool input (tool-input))",
           "Following agent edits (agent tool input (tool-input))",
           "Following: a.txt:240 (agent tool input (tool-input))",
           "Following agent edits (agent tool input (tool-input))",
@@ -22,14 +21,15 @@
           "state": "following",
           "pressed": "true",
           "name": "Following the agent",
-          "text": "Following: c.txt:200 (agent tool input (tool-input))",
-          "top": 356,
-          "active": "a.txtM"
+          "text": "Following agent edits (agent tool input (tool-input))",
+          "top": 466,
+          "view": "b.txt@-7",
+          "active": "b.txtM"
         }
       }
     },
     {
-      "name": "one icon switches to manual; while the agent keeps editing, the scroll position does not move",
+      "name": "one icon switches to manual; while the agent keeps editing, the view does not move (same file at the top, same position)",
       "ok": true,
       "detail": {
         "icon": {
@@ -37,12 +37,13 @@
           "pressed": "false",
           "name": "Follow the agent",
           "text": "",
-          "top": 356,
-          "active": "a.txtM"
+          "top": 466,
+          "view": "b.txt@-7",
+          "active": "b.txtM"
         },
         "editsDuring": 3,
-        "scroll": [
-          356
+        "view": [
+          "b.txt@-7"
         ]
       }
     },

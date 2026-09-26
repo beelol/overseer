@@ -4,10 +4,10 @@
       "name": "your prompt is a bubble on the right; the agent reply is plain text in a centered column of about 720 px",
       "ok": true,
       "detail": {
-        "columnWidth": 550,
-        "available": 550,
+        "columnWidth": 422,
+        "available": 422,
         "centered": true,
-        "userRight": 24,
+        "userRight": 16,
         "userBubble": true,
         "agentPlain": true,
         "h2": "Done: sessions refresh once",
@@ -17,7 +17,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-MZvthG/overseer-home/worktrees/chat-repo-97eb28ed/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-zp6d7c/overseer-home/worktrees/chat-repo-7ea0490b/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -31,10 +31,10 @@
       "name": "the reply renders as Markdown: heading, list, table, highlighted code with its language, link with its URL, long path shortened with the full path as tooltip",
       "ok": true,
       "detail": {
-        "columnWidth": 550,
-        "available": 550,
+        "columnWidth": 422,
+        "available": 422,
         "centered": true,
-        "userRight": 24,
+        "userRight": 16,
         "userBubble": true,
         "agentPlain": true,
         "h2": "Done: sessions refresh once",
@@ -44,7 +44,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-MZvthG/overseer-home/worktrees/chat-repo-97eb28ed/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-zp6d7c/overseer-home/worktrees/chat-repo-7ea0490b/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -58,10 +58,10 @@
       "name": "consecutive tool calls fold into one line; edits are chips; the turn ends with a quiet footer; the composer stays pinned",
       "ok": true,
       "detail": {
-        "columnWidth": 550,
-        "available": 550,
+        "columnWidth": 422,
+        "available": 422,
         "centered": true,
-        "userRight": 24,
+        "userRight": 16,
         "userBubble": true,
         "agentPlain": true,
         "h2": "Done: sessions refresh once",
@@ -71,7 +71,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-MZvthG/overseer-home/worktrees/chat-repo-97eb28ed/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-zp6d7c/overseer-home/worktrees/chat-repo-7ea0490b/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -112,13 +112,15 @@
       }
     },
     {
-      "name": "a 2,000-event conversation scrolls with p95 frame time under 16 ms (refresh-rate frames, no dropped frames)",
+      "name": "a 2,000-event conversation scrolls with p95 frame time under 16 ms (frame work p95 < 16 ms, no dropped frames at the display refresh rate)",
       "ok": true,
       "detail": {
         "frames": 235,
-        "p95": 9.6,
-        "median": 8.3,
-        "max": 10
+        "p95": 17.5,
+        "median": 16.7,
+        "max": 18,
+        "workP95": 0.3,
+        "workMax": 0.4
       }
     },
     {
@@ -126,7 +128,7 @@
       "ok": true,
       "detail": {
         "found": 20,
-        "perAppendMs": 2.7
+        "perAppendMs": 3
       }
     }
   ]

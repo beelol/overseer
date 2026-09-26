@@ -64,7 +64,7 @@
     {
       "name": "clicking a file edit opens that hunk in the run's worktree review",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-WixnPM/overseer-home/worktrees/conv-demo-8f022f76/app-tree"
+      "detail": "/private/tmp/ovs-ui-6jnu0r/overseer-home/worktrees/conv-demo-cab6a5fe/app-tree"
     },
     {
       "name": "Claude Write tool call shown before its permission request",
@@ -79,20 +79,20 @@
       "detail": {
         "pres": [
           "allowed\n",
-          "File created successfully at: /private/tmp/ovs-ui-WixnPM/overseer-home/worktrees/conv-demo-8f022f76/claude-write/perm.txt"
+          "File created successfully at: /private/tmp/ovs-ui-6jnu0r/overseer-home/worktrees/conv-demo-cab6a5fe/claude-write/perm.txt"
         ],
         "labels": [
           "Content",
           "Result"
         ],
-        "title": "/private/tmp/ovs-ui-WixnPM/overseer-home/worktrees/conv-demo-8f022f76/claude-write/perm.txt (Write)",
+        "title": "/private/tmp/ovs-ui-6jnu0r/overseer-home/worktrees/conv-demo-cab6a5fe/claude-write/perm.txt (Write)",
         "status": "completed"
       }
     },
     {
       "name": "Claude file edit opens the Claude worktree review (not the codex-app one)",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-WixnPM/overseer-home/worktrees/conv-demo-8f022f76/claude-write"
+      "detail": "/private/tmp/ovs-ui-6jnu0r/overseer-home/worktrees/conv-demo-cab6a5fe/claude-write"
     },
     {
       "name": "Event log (… menu) lists the raw events; conversation returns",
@@ -104,7 +104,7 @@
       "ok": true,
       "detail": {
         "last": "burst line 5999",
-        "ms": 5,
+        "ms": 11,
         "events": 5002,
         "banner": "Older history was trimmed. Raw output keeps everything.",
         "msgs": 5000
@@ -115,8 +115,8 @@
       "ok": true,
       "detail": {
         "n": 97,
-        "p95": 3,
-        "max": 18,
+        "p95": 2,
+        "max": 73,
         "msgs": 5064
       }
     }

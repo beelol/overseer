@@ -71,6 +71,33 @@
       }
     },
     {
+      "name": "Needs-you rows carry the provider mark too (Claude logo, program codicon) with the reason as text",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Add a changelog entry",
+          "logo": "claudecode-dark",
+          "codicon": "",
+          "description": "Approve",
+          "badge": "!"
+        },
+        {
+          "label": "Migration dry-run",
+          "logo": "",
+          "codicon": "terminal",
+          "description": "Failed",
+          "badge": "✕"
+        },
+        {
+          "label": "Refresh sessions once",
+          "logo": "claudecode-dark",
+          "codicon": "",
+          "description": "Review",
+          "badge": "✓"
+        }
+      ]
+    },
+    {
       "name": "status badges: ✓ done, ! needs you, ✕ failed, ● working",
       "ok": true,
       "detail": [
