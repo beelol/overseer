@@ -9,7 +9,7 @@
     "SWARM-01": {
       "status": "unverified",
       "evidence": [],
-      "blocker": "Normal Auto/Manual × Swarm launch paths and an opt-in UI are not wired; fixture planning cannot verify off-mode or one-agent fallback."
+      "blocker": "Normal Auto/Manual \u00d7 Swarm launch paths and an opt-in UI are not wired; fixture planning cannot verify off-mode or one-agent fallback."
     },
     "SWARM-02": {
       "status": "unverified",
@@ -520,9 +520,12 @@
         "daemon/tests/swarm_atlas.rs",
         "fixtures/swarm/atlas-v1/probe.test.mjs",
         "daemon/src/swarm/coverage.rs",
-        "docs/verification/swarm/SWARM-55.md"
+        "docs/verification/swarm/SWARM-55.md",
+        "daemon/tests/swarm_ledgerpay.rs",
+        "fixtures/swarm/ledgerpay-v1/",
+        "docs/verification/swarm/S2.md"
       ],
-      "blocker": "Fixture results retain distinct negative, environment-failure and defect states; the versioned S1 backend now proves a missing export queue stays blocked through Swarm coverage and completion. Defect acceptance requires reproduction evidence and later results invalidate prior review. A complete endpoint/permission coverage matrix, S2 backend replay, autonomous director decisions and live harness paths remain unverified."
+      "blocker": "Versioned Atlas and LedgerPay backends now demonstrate missing PostgreSQL/Redis queues as environment-blocked in joined Swarm replays; negative signatures/stale events and a duplicate-grant defect remain distinct. Autonomous director decisions, a complete endpoint/permission matrix, independent reproduction enforcement and live harness paths remain unverified."
     },
     "SWARM-56": {
       "status": "partial",
@@ -548,9 +551,12 @@
       "evidence": [
         "daemon/tests/swarm_effects.rs",
         "daemon/src/swarm/effects.rs",
-        "docs/verification/swarm/SWARM-58.md"
+        "docs/verification/swarm/SWARM-58.md",
+        "daemon/tests/swarm_ledgerpay.rs",
+        "fixtures/swarm/ledgerpay-v1/",
+        "docs/verification/swarm/S2.md"
       ],
-      "blocker": "A fixture-only durable intent journal blocks duplicate execution and replacement after a lost acknowledgement, including revision and restart; Stop and revision preserve a conflicting resource claim. Actual tool calls are not intercepted, the external outcome probe is not independently qualified, safe claim release after quarantine is missing, and live S2 reconciliation remains unverified."
+      "blocker": "The durable fixture intent journal blocks repeat execution after a lost acknowledgement and restart. LedgerPay now probes a real local PostgreSQL grant after an update/receipt gap and reports unknown_do_not_retry, but that probe is not linked to the daemon journal across restart; native tool interception, authoritative outcome adapters and live paths remain unverified."
     },
     "SWARM-59": {
       "status": "partial",
@@ -611,9 +617,12 @@
         "fixtures/swarm/atlas-v1/",
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S1.md",
-        "docs/verification/swarm/SWARM-64.md"
+        "docs/verification/swarm/SWARM-64.md",
+        "fixtures/swarm/ledgerpay-v1/",
+        "daemon/tests/swarm_ledgerpay.rs",
+        "docs/verification/swarm/S2.md"
       ],
-      "blocker": "S3 and S1 have versioned backends and joined scripted runs. S1 covers seven isolated database probes, D1/overlap messages, slot refill, J7 reproduction and evidence-gated completion; separate fault replays cover missing artifact, stale J4 output, contradictory J7 with scripted retractions, and unavailable J5 export queue. Autonomous decisions, remaining S1/S3 fault and report traces, live communication and S0/S2/S4/S5 remain unverified."
+      "blocker": "S1/S2/S3 have versioned local backends and joined scripted runs. S2 covers signed ingress, K2-to-director-to-K3 discovery, three-worker admission with K4 refill, duplicate 0-to-2 versus protected 0-to-1, stale cancellation order, lost-ack probe and missing-Redis blocked coverage. Autonomous decisions, complete fault/report traces, live communication and S0/S4/S5 remain unverified."
     }
   },
   "scenarios": {
@@ -634,12 +643,17 @@
       "blocker": "Versioned Express/PostgreSQL probes feed a joined scripted Swarm run with four initial workers, D1/overlap coordination, slot refill, J7 reproduction and seven accepted checks. Separate fault runs reject missing/stale evidence, hold contradictory J7 with scripted retractions, and classify a missing export queue as blocked coverage. Profile/director choices, detailed report, source-text injection, contradiction resolution, and live communication remain open."
     },
     "S2": {
-      "status": "unverified",
+      "status": "partial",
       "evidence": [
         "daemon/tests/swarm_effects.rs",
-        "docs/verification/swarm/SWARM-58.md"
+        "docs/verification/swarm/SWARM-58.md",
+        "fixtures/swarm/ledgerpay-v1/manifest.json",
+        "fixtures/swarm/ledgerpay-v1/test_backend.py",
+        "fixtures/swarm/ledgerpay-v1/test_probe.py",
+        "daemon/tests/swarm_ledgerpay.rs",
+        "docs/verification/swarm/S2.md"
       ],
-      "blocker": "The local evt-42 fixture proves one side-effect application across lost acknowledgement and restart, but the versioned S2 payment fixture, signed webhook, queue barrier, protected variant, independent outcome probe and full director trace are missing."
+      "blocker": "Versioned FastAPI/PostgreSQL/Redis backend and joined scripted Swarm run now prove signed ingress, K1-K3 initial admission, K4 refill, K2-to-director-to-K3 discovery, duplicate and protected delivery results, stale-event denial, lost-ack state probe, and missing-Redis blocked coverage. Director/routing decisions and final prose are scripted; the real outcome probe is not journal-linked across restart; full report, fault trace and live communication remain unverified."
     },
     "S3": {
       "status": "partial",
