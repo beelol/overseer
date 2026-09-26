@@ -500,7 +500,7 @@
         "daemon/src/swarm/effects.rs",
         "docs/verification/swarm/SWARM-58.md"
       ],
-      "blocker": "A fixture-only durable intent journal blocks duplicate execution and replacement after a lost acknowledgement, including revision and restart. Actual tool calls are not intercepted, the external outcome probe is not independently qualified, and live S2 reconciliation remains unverified."
+      "blocker": "A fixture-only durable intent journal blocks duplicate execution and replacement after a lost acknowledgement, including revision and restart; Stop and revision preserve a conflicting resource claim. Actual tool calls are not intercepted, the external outcome probe is not independently qualified, safe claim release after quarantine is missing, and live S2 reconciliation remains unverified."
     },
     "SWARM-59": {
       "status": "unverified",
