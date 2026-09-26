@@ -392,9 +392,10 @@
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-2.md"
+        "docs/verification/swarm/milestone-2.md",
+        "docs/verification/swarm/SWARM-47.md"
       ],
-      "blocker": "Evidence is required for a review decision and a typed confirmed-defect result requires a reproduction artifact; contradictory evidence handling, independent reproduction and live director review remain unimplemented."
+      "blocker": "A later contradictory result invalidates the prior review and prevents final completion, but S1 cross-worker contradictions, independent reproduction, explicit unresolved synthesis and live director review remain unimplemented."
     },
     "SWARM-48": {
       "status": "partial",
@@ -471,7 +472,7 @@
         "daemon/src/swarm/coverage.rs",
         "docs/verification/swarm/SWARM-55.md"
       ],
-      "blocker": "Fixture result messages retain distinct negative, environment-failure and defect states; environment failures cannot be passed or hidden by later same-attempt messages, and defect acceptance requires reproduction artifact evidence. Versioned S1/S2 backend replays, independent reproduction, a complete coverage matrix and live director/harness paths remain unverified."
+      "blocker": "Fixture result messages retain distinct negative, environment-failure and defect states; environment failures cannot be passed or hidden, defect acceptance requires reproduction evidence, and later results invalidate prior review. Versioned S1/S2 backend replays, independent reproduction, a complete coverage matrix and live director/harness paths remain unverified."
     },
     "SWARM-56": {
       "status": "partial",
