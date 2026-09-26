@@ -56,7 +56,9 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     const target = tasks[5];
     const filterTo = async q => { await cdp.command('Overseer: Search Agents'); await cdp.waitQuickTitle('Search agents'); await cdp.key('a', { meta: true }); await cdp.key('Backspace'); await cdp.call('Input.insertText', { text: q }, cdp.workbench); await delay(400); await cdp.key('Enter'); await delay(600); };
     await filterTo('History task 005');
+    // Clicking an agent opens its chat (focus goes there); keyboard focus returns to the list for ⌘⌫.
     await s.clickAgentRow('History task 005', { settle: 1500 });
+    await cdp.command('Focus on Agents View'); await delay(400);
     await cdp.key('Backspace', { meta: true }); await delay(1500);
     const archived = s.ctl('state').tasks.find(t => t.id === target.task.id).archived_ms;
     const hidden = !(await labels()).includes('History task 005');
@@ -65,7 +67,9 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     await filterTo('History task 005');
     const inArchive = await labels();
     await s.screenshot('archived');
+    // Clicking an agent opens its chat (focus goes there); keyboard focus returns to the list for ⌘⌫.
     await s.clickAgentRow('History task 005', { settle: 1500 });
+    await cdp.command('Focus on Agents View'); await delay(400);
     await cdp.key('Backspace', { meta: true }); await delay(1500);
     const restored = !s.ctl('state').tasks.find(t => t.id === target.task.id).archived_ms;
     await cdp.command('Overseer: Clear Search'); await delay(800);

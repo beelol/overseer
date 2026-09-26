@@ -187,7 +187,9 @@ async function activate(context) {
     // refresh the rows first, then the message.
     agents.refresh();
     // The match count sits beside the view title (not the debounced tree message).
-    agentsView.description = filter ? `${filter.taskIds.size} match${filter.taskIds.size === 1 ? '' : 'es'} for “${filter.query}”` : undefined;
+    // Matches in the list shown (active agents, or archived ones under Show Archived).
+    const shown = filter ? [...filter.taskIds].filter(id => { const t = model.task(id); return t && !!t.archived_ms === !!agents.showArchived; }).length : 0;
+    agentsView.description = filter ? `${shown} match${shown === 1 ? '' : 'es'} for “${filter.query}”` : undefined;
     vscode.commands.executeCommand('setContext', 'overseer.agentsFiltered', !!filter);
     // Keep the selected agent in view (and selected) when the list changes shape.
     if (selectedRun && (!filter || filter.taskIds.has(model.run(selectedRun)?.task_id))) setTimeout(() => revealInTree(selectedRun), 150);

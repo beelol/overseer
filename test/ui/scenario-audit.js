@@ -90,7 +90,13 @@ const HEIGHT = 860;
       await dash.waitFor(`document.body.dataset.filesReady === '1'`, 20000);
       const tagged = await cdp.evalWorkbench(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || '')); if (!pane) return false; pane.dataset.audit = 'agents'; return true; })()`);
       views.dashboard = { frame: dash, opts: { root: 'body' } };
-      views.agents = tagged ? { frame: null, opts: { root: '[data-audit="agents"]' } } : undefined;
+      views.agents = tagged ? { frame: null, opts: { root: '[data-audit="agents"]', nativeHover: true } } : undefined;
+      // VS Code's managed hover really shows the name of a title action (checked once by pointer).
+      const act = await cdp.evalWorkbench(`(() => { const a = document.querySelector('[data-audit="agents"] .pane-header .action-label[aria-label^="Search Agents"]'); if (!a) return null; const r = a.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+      if (act) { await cdp.move(act.x, act.y); await delay(300); await cdp.move(act.x + 1, act.y); }
+      const hoverText = act && await cdp.waitFor(`[...document.querySelectorAll('.workbench-hover, .monaco-hover')].filter(h => h.offsetParent).map(h => h.innerText).find(t => /Search Agents/.test(t))`, 4000).catch(() => '');
+      if (act) await cdp.move(act.x + 300, act.y + 300);
+      check('agents: side-bar title actions show their name in VS Code\'s hover', !!hoverText, hoverText);
       views.chat = { frame: dash, opts: { root: '[data-audit-view="chat"]' } };
       views.files = { frame: dash, opts: { root: '[data-audit-view="files"]' } };
       views.review = { frame: await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(runs.showcase.run.id)}`, 30000), opts: { root: 'body' } };

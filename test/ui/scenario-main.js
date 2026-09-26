@@ -161,8 +161,9 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     for (let i = 0; i < 40; i++) { if (s.ctl('state').runs.filter(r => r.task_id === deleg.task.id).length >= 3 && s.ctl('state').runs.find(r => r.id === deleg.run.id).status === 'completed') break; await delay(500); }
     const icon = await cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.activitybar .action-item a, .activitybar .action-label')].find(a => /^Overseer/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const b = a.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000);
     await cdp.click(icon.x, icon.y);
-    const childRow = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && /grandchild hi/.test(r.textContent)); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2, text: r.textContent }; })()`, 20000, 'grandchild row');
-    check('three-level native tree visible in the UI', /native child/.test(childRow.text), childRow.text);
+    const childRow = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && /grandchild hi/.test(r.textContent)); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2, text: r.textContent, level: Number(r.getAttribute('aria-level')) }; })()`, 20000, 'grandchild row');
+    // Gate K side bar: repository (1) → task (2) → native child (3) → grandchild (4).
+    check('three-level native tree visible in the UI', childRow.level >= 4, { text: childRow.text, level: childRow.level });
     await cdp.click(childRow.x, childRow.y);
     const childOut = await cdp.webview(`document.getElementById('title')?.textContent.includes('grandchild hi')`, 20000);
     const ctl = await childOut.eval(`({ stopHidden: document.getElementById('interrupt').hidden, send: document.getElementById('send').disabled, why: document.getElementById('prompt').placeholder, sendWhy: document.getElementById('send').title, worktree: document.getElementById('details').textContent })`);

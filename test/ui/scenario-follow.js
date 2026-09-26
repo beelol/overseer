@@ -34,7 +34,9 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     // The first edit brings the review forward, following.
     const review = await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(task.run.id)}`, 60000);
     const follow = () => review.eval(`({ state: document.getElementById('follow').dataset.state, pressed: document.getElementById('follow').getAttribute('aria-pressed'), name: document.getElementById('follow').getAttribute('aria-label'),
-      text: document.getElementById('follow-state').textContent, top: Math.round(document.getElementById('diffs').scrollTop), active: document.querySelector('#tree .file.active, #tree .file[aria-selected="true"]')?.textContent.trim() || '' })`);
+      text: document.getElementById('follow-state').textContent, top: Math.round(document.getElementById('diffs').scrollTop),
+      // What the user sees: the file at the top of the review and where its header sits (content added above shifts scrollTop, not the view).
+      view: (() => { const d = document.getElementById('diffs'), t = d.getBoundingClientRect().top; const f = [...d.querySelectorAll('.diff-file')].find(e => e.getBoundingClientRect().bottom > t + 1); return f ? f.querySelector('.file-path')?.textContent + '@' + Math.round(f.getBoundingClientRect().top - t) : ''; })(), active: document.querySelector('#tree .file.active, #tree .file[aria-selected="true"]')?.textContent.trim() || '' })`);
     await review.waitFor(`document.getElementById('follow').dataset.state === 'following'`, 30000);
     const seen = [];
     for (let i = 0; i < 90 && new Set(seen.map(t => (t.match(/Following: (\w\.txt)/) || [])[1]).filter(Boolean)).size < 3; i++) {
@@ -51,19 +53,21 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     const m0 = await follow();
     const edits0 = s.ctl('events.list', { run_id: task.run.id, limit: 2000 }).events.filter(e => e.kind === 'file_activity').length;
     const samples = [];
-    for (let i = 0; i < 24; i++) { const f = await follow(); samples.push(f.top); await delay(250); }
+    for (let i = 0; i < 24; i++) { const f = await follow(); samples.push(f.view); await delay(250); }
     const edits1 = s.ctl('events.list', { run_id: task.run.id, limit: 2000 }).events.filter(e => e.kind === 'file_activity').length;
     await s.screenshot('manual');
-    check('one icon switches to manual; while the agent keeps editing, the scroll position does not move',
-      m0.state === 'off' && m0.pressed === 'false' && /Follow the agent/.test(m0.name) && edits1 > edits0 && samples.every(t => t === m0.top), { icon: m0, editsDuring: edits1 - edits0, scroll: [...new Set(samples)] });
+    check('one icon switches to manual; while the agent keeps editing, the view does not move (same file at the top, same position)',
+      m0.state === 'off' && m0.pressed === 'false' && /Follow the agent/.test(m0.name) && edits1 > edits0 && samples.every(v => v === m0.view), { icon: m0, editsDuring: edits1 - edits0, view: [...new Set(samples)] });
 
     // Remembered per agent: another agent has its own mode; coming back, this one is still manual.
     await switchTo('Other agent');
     const otherReview = await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(other.run.id)}`, 30000);
+    await otherReview.waitFor(`!!document.getElementById('follow').dataset.state`, 10000).catch(() => {});
     const otherState = await otherReview.eval(`document.getElementById('follow').dataset.state`);
     await switchTo('Three files');
     const back = await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(task.run.id)}`, 30000);
     await delay(800);
+    await back.waitFor(`!!document.getElementById('follow').dataset.state`, 10000).catch(() => {});
     const backState = await back.eval(`document.getElementById('follow').dataset.state`);
     check('the mode is remembered per agent (the other agent keeps its own; this one is still manual)', otherState === 'off' && backState === 'off', { otherState, backState });
     // And following again is one click.

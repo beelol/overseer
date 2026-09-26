@@ -50,7 +50,6 @@ const STATUS_BADGE = {
   queued: ['○', 'charts.yellow'], starting: ['○', 'charts.blue'], running: ['●', 'charts.blue'], waiting_for_user: ['!', 'charts.orange'],
   completed: ['✓', 'charts.green'], failed: ['✕', 'charts.red'], interrupted: ['■', 'descriptionForeground'], disconnected: ['✕', 'charts.red'], unknown: ['?', 'charts.purple'],
 };
-const NEEDS_ICON = { Approve: ['shield', 'charts.orange'], Reply: ['comment-discussion', 'charts.orange'], Failed: ['error', 'charts.red'], Review: ['diff', 'charts.blue'] };
 
 function ago(ms) {
   if (!ms) return '';
@@ -125,7 +124,8 @@ class AgentsProvider {
     if (ix.visible.has(key)) return ix.visible.get(key);
     const archived = t => !!t.archived_ms;
     const list = this.model.state.tasks.filter(t => ix.roots.has(t.id))
-      .filter(t => (this.filter ? this.filter.taskIds.has(t.id) : this.showArchived ? archived(t) : !archived(t)))
+      // Search looks within the list shown: active agents, or archived ones under Show Archived.
+      .filter(t => (!this.filter || this.filter.taskIds.has(t.id)) && (this.showArchived ? archived(t) : !archived(t)))
       .map(t => ({ t, at: this.lastActivity(t) })).sort((a, b) => b.at - a.at).map(x => x.t);
     ix.visible.set(key, list);
     return list;
@@ -174,8 +174,9 @@ class AgentsProvider {
     if (!run) return undefined;
     const item = new vscode.TreeItem(task?.title || run.title);
     item.id = 'needs:' + run.id;
-    const [icon, color] = NEEDS_ICON[a.label] || ['bell', 'charts.orange'];
-    item.iconPath = new vscode.ThemeIcon(icon, new vscode.ThemeColor(color));
+    // The provider's mark (AC-68), the reason as text, and the same status badge as the agent's row.
+    item.iconPath = this.logo(run.harness);
+    item.resourceUri = vscode.Uri.from({ scheme: 'overseer-agent', path: '/' + run.id });
     item.description = a.label;
     item.tooltip = `${task?.title || run.title}\n${a.detail}`;
     item.accessibilityInformation = { label: `${task?.title || run.title}, ${a.label}: ${a.detail}` };

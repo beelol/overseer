@@ -59,11 +59,11 @@ class Arrangement {
   /** The review on the left, the chat on the right. */
   async split(runId, { follow } = {}) {
     await this.closeReviews(runId);
-    if (this.current !== 'split') { await vscode.commands.executeCommand('vscode.setEditorLayout', SPLIT); this.chatShare = SPLIT.groups[1].size; }
-    // Review first, then move the chat: VS Code closes a group the moment it is empty.
+    // Review first (in the chat's group when the chat is alone), then move the chat right: a moved
+    // editor keeps its pinned tab, while reveal() into another column would reopen it as a preview.
     await this.review.open(runId, { viewColumn: vscode.ViewColumn.One, preserveFocus: true, follow });
-    await this.center.open({ column: vscode.ViewColumn.Two, preserveFocus: true });
-    await this.keepChat();
+    await this.moveChatRight();
+    if (this.current !== 'split') { await vscode.commands.executeCommand('vscode.setEditorLayout', SPLIT); this.chatShare = SPLIT.groups[1].size; }
     await this.fitChat();
     this.current = 'split';
     this.persist();
@@ -82,21 +82,18 @@ class Arrangement {
     this.chatShare = share;
   }
 
-  /** A moved editor becomes a preview tab, which the next opened file would replace; keep the chat. */
-  async keepChat() {
+  /** Puts the chat in the second column (moving its tab, so it stays pinned) and focuses the review. */
+  async moveChatRight() {
     const chatTab = () => vscode.window.tabGroups.all.flatMap(g => g.tabs).find(t => t.input?.viewType?.endsWith('overseer.center'));
-    // reveal() moves the panel asynchronously; wait until it sits in the chat's column.
-    for (let i = 0; i < 25 && chatTab()?.group.viewColumn !== vscode.ViewColumn.Two; i++) await new Promise(r => setTimeout(r, 20));
-    const tab = chatTab();
-    // (The tab API does not report preview for webview tabs, so keep it whenever it moved.)
-    if (!tab || tab.group.viewColumn !== vscode.ViewColumn.Two) return;
-    const active = vscode.window.activeTextEditor;
-    this.center.panel?.reveal(vscode.ViewColumn.Two, false);
-    for (let i = 0; i < 75 && !this.center.panel?.active; i++) await new Promise(r => setTimeout(r, 20));
-    await vscode.commands.executeCommand('workbench.action.keepEditor');
-    // Hand focus back to where it was (the side bar or the review).
-    if (active) await vscode.window.showTextDocument(active.document, { viewColumn: active.viewColumn, preserveFocus: false }).then(undefined, () => {});
-    else await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
+    const panel = this.center.panel;
+    if (!panel) { await this.center.open({ column: vscode.ViewColumn.Two, preserveFocus: true }); return; }
+    if (chatTab()?.group.viewColumn !== vscode.ViewColumn.Two) {
+      panel.reveal(chatTab()?.group.viewColumn ?? vscode.ViewColumn.One, false);
+      for (let i = 0; i < 50 && !(panel.active && vscode.window.tabGroups.activeTabGroup.activeTab?.input?.viewType?.endsWith('overseer.center')); i++) await new Promise(r => setTimeout(r, 10));
+      await vscode.commands.executeCommand('workbench.action.moveEditorToRightGroup');
+    }
+    // Focus goes to the review's group; a text editor left open there stays behind the review.
+    await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
   }
 
   /** The grid takes the editor area; leaving it returns to the arrangement before (AC-79). */

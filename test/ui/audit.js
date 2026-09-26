@@ -6,7 +6,9 @@
 //
 // Text inside Monaco diff editors (code) is not counted. "Visible" follows checkVisibility(): text in closed <details>, [hidden] or display:none parts is
 // not counted; text scrolled out of view is (it is part of the view).
-function auditExpression({ root = 'body', exclude = [] } = {}) {
+// nativeHover: VS Code's own workbench actions (.action-label) show their name in VS Code's managed
+// hover instead of a title attribute; there the accessible name is the tooltip text.
+function auditExpression({ root = 'body', exclude = [], nativeHover = false } = {}) {
   return `(() => {
   const root = document.querySelector(${JSON.stringify(root)});
   if (!root) return { missing: ${JSON.stringify(root)} };
@@ -53,7 +55,7 @@ function auditExpression({ root = 'body', exclude = [] } = {}) {
     const iconOnly = text.length <= 2;
     if (!iconOnly) continue;
     const name = b.getAttribute('aria-label') || b.getAttribute('aria-labelledby');
-    const tip = b.getAttribute('title') || b.closest('[title]')?.getAttribute('title') || b.getAttribute('data-tooltip');
+    const tip = b.getAttribute('title') || b.closest('[title]')?.getAttribute('title') || b.getAttribute('data-tooltip') || (${nativeHover} && b.matches('.action-label') && name);
     if (!name || !tip) unnamed.push({ html: b.outerHTML.slice(0, 100), name: !!name, tip: !!tip });
   }
   return { chars, longRuns: longRuns.slice(0, 20), overflow, unnamed, sample: words.join(' | ').slice(0, 400), width: W };

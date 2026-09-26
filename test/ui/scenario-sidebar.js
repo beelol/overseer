@@ -82,6 +82,10 @@ const BUDGET = 238;
     check('rows carry provider logos (Claude Code) and codicons for programs; status shows as a row badge',
       find('Refresh sessions once')?.logo.startsWith('claudecode') && find('child task')?.logo.startsWith('claudecode') && find('Watch the build')?.codicon === 'terminal',
       { showcase: find('Refresh sessions once'), watch: find('Watch the build') });
+    const needsRows = rows.slice(needsIdx + 1, webIdx).filter(r => r.level === 2);
+    check('Needs-you rows carry the provider mark too (Claude logo, program codicon) with the reason as text',
+      needsRows.length >= 2 && needsRows.find(r => r.label === 'Add a changelog entry')?.logo.startsWith('claudecode') && needsRows.find(r => r.label === 'Migration dry-run')?.codicon === 'terminal' && needsRows.every(r => r.description),
+      needsRows.map(r => ({ label: r.label, logo: r.logo, codicon: r.codicon, description: r.description, badge: r.badge })));
     const badgeOf = label => find(label)?.badge;
     check('status badges: ✓ done, ! needs you, ✕ failed, ● working', badgeOf('Refresh sessions once') === '✓' && badgeOf('Add a changelog entry') === '!' && badgeOf('Migration dry-run') === '✕' && badgeOf('Watch the build') === '●',
       ['Refresh sessions once', 'Add a changelog entry', 'Migration dry-run', 'Watch the build'].map(l => [l, badgeOf(l)]));
