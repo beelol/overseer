@@ -2,7 +2,7 @@
 //! form. Terminal default colors for text (works on dark and light terminals) plus a purple
 //! accent and status colors; truecolor when the terminal says so, 256 colors otherwise.
 
-use crate::app::{short, App, Confirm, Mode, NewAgentForm, PAGE};
+use crate::app::{shape, short, App, Confirm, Mode, NewAgentForm, PAGE};
 use crate::feed::{compact, Feed, Item, Kind, ToolStatus};
 use crate::model::Run;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
@@ -168,10 +168,11 @@ fn empty(f: &mut Frame, app: &App, area: Rect) {
 
 fn grid(f: &mut Frame, app: &mut App, area: Rect) {
     let agents: Vec<Run> = app.page_agents().into_iter().cloned().collect();
-    let rows = Layout::vertical([Constraint::Ratio(1, 3); 3]).split(area);
+    let (nr, nc) = shape(agents.len());
+    let rows = Layout::vertical(vec![Constraint::Ratio(1, nr as u32); nr]).split(area);
     for (slot, run) in agents.iter().enumerate().take(PAGE) {
-        let cols = Layout::horizontal([Constraint::Ratio(1, 3); 3]).split(rows[slot / 3]);
-        tile(f, app, run, slot + 1, cols[slot % 3], false);
+        let cols = Layout::horizontal(vec![Constraint::Ratio(1, nc as u32); nc]).split(rows[slot / nc]);
+        tile(f, app, run, slot + 1, cols[slot % nc], false);
     }
 }
 
@@ -208,8 +209,10 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     let (glyph, color) = status_mark(&run.status);
     let border = if focused { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new().fg(MUTED) };
     let account = run.profile_id.as_deref().and_then(|p| app.state.profile(p)).map(|p| p.name.replace(" (existing login)", "")).unwrap_or_default();
-    let mut meta = vec![run.harness.replace("codex-app", "codex")];
-    if !account.is_empty() {
+    let harness = run.harness.replace("codex-app", "codex");
+    let mut meta = vec![harness.clone()];
+    // The desktop login is implied; name other accounts.
+    if !account.is_empty() && account != harness {
         meta.push(account);
     }
     if let Some(m) = run.model.as_deref().filter(|m| !m.is_empty()) {
@@ -303,7 +306,7 @@ fn composer(f: &mut Frame, app: &App, area: Rect) {
     if let Some(last) = lines.last_mut() {
         last.spans.push(Span::styled("▌", Style::new().fg(accent())));
     }
-    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }).block(block), area);
+    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }).block(block.padding(ratatui::widgets::Padding::horizontal(1))), area);
 }
 
 fn help(f: &mut Frame, area: Rect) {

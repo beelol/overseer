@@ -1,0 +1,40 @@
+ ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                   ● connected 
+┏ 2 ✓ Two thousand lines ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓
+┃ row 1964                                                                                                                                 ┃
+┃ row 1965                                                                                                                                 ┃
+┃ row 1966                                                                                                                                 ┃
+┃ row 1967                                                                                                                                 ┃
+┃ row 1968                                                                                                                                 ┃
+┃ row 1969                                                                                                                                 ┃
+┃ row 1970                                                                                                                                 ┃
+┃ row 1971                                                                                                                                 ┃
+┃ row 1972                                                                                                                                 ┃
+┃ row 1973                                                                                                                                 ┃
+┃ row 1974                                                                                                                                 ┃
+┃ row 1975                                                                                                                                 ┃
+┃ row 1976                                                                                                                                 ┃
+┃ row 1977                                                                                                                                 ┃
+┃ row 1978                                                                                                                                 ┃
+┃ row 1979                                                                                                                                 ┃
+┃ row 1980                                                                                                                                 ┃
+┃ row 1981                                                                                                                                 ┃
+┃ row 1982                                                                                                                                 ┃
+┃ row 1983                                                                                                                                 ┃
+┃ row 1984                                                                                                                                 ┃
+┃ row 1985                                                                                                                                 ┃
+┃ row 1986                                                                                                                                 ┃
+┃ row 1987                                                                                                                                 ┃
+┃ row 1988                                                                                                                                 ┃
+┃ row 1989                                                                                                                                 ┃
+┃ row 1990                                                                                                                                 ┃
+┃ row 1991                                                                                                                                 ┃
+┃ row 1992                                                                                                                                 ┃
+┃ row 1993                                                                                                                                 ┃
+┃ row 1994                                                                                                                                 ┃
+┃ row 1995                                                                                                                                 ┃
+┃ row 1996                                                                                                                                 ┃
+┃ row 1997                                                                                                                                 ┃
+┃ row 1998                                                                                                                                 ┃
+┃ row 1999                                                                                                                                 ┃
+┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ j/k scroll   g/G top/bottom   i message   a/d allow/deny   x interrupt   z grid   ? help                                                   

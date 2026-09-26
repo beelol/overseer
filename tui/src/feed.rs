@@ -304,7 +304,7 @@ pub fn tool_target(name: &str, summary: &str, root: Option<&str>) -> (String, Op
     }
     if body.starts_with('{') {
         if let Ok(v) = serde_json::from_str::<Value>(&body) {
-            for key in ["file_path", "notebook_path", "path", "command", "pattern", "url", "query", "description", "prompt"] {
+            for key in ["file_path", "notebook_path", "command", "pattern", "path", "url", "query", "description", "prompt"] {
                 if let Some(s) = v[key].as_str() {
                     let s = if key.ends_with("path") { short_path(s, root) } else { first_line(s) };
                     let extra = if key == "pattern" { v["path"].as_str().map(|p| format!(" in {}", short_path(p, root))).unwrap_or_default() } else { String::new() };

@@ -1,0 +1,54 @@
+ ◆ Overseer  page 1/2 · 12 agents                                                                                                                                       ● connected 
+┏ 1 ✓ agent 12 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓╭ 2 ✓ agent 11 ────────────────────────────── generic · 0s ╮╭ 3 ✓ agent 10 ────────────────────────────── generic · 0s ╮
+┃ hi                                                       ┃│ hi                                                       ││ hi                                                       │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┃                                                          ┃│                                                          ││                                                          │
+┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ───────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────╯
+╭ 4 ✓ agent 09 ────────────────────────────── generic · 0s ╮╭╭ keys ──────────────────────────────────────────────────╮╮╭ 6 ✓ agent 07 ────────────────────────────── generic · 0s ╮
+│ hi                                                       │││                                                        │││ hi                                                       │
+│                                                          │││  ←↓↑→  h j k l     move between agents                 │││                                                          │
+│                                                          │││  1 – 9             focus agent n on this page          │││                                                          │
+│                                                          │││  tab / shift+tab   next / previous agent               │││                                                          │
+│                                                          │││  ] [   pgdn pgup   next / previous page                │││                                                          │
+│                                                          │││  i  enter          message the focused agent           │││                                                          │
+│                                                          │││  z                 zoom: full screen with scrollback   │││                                                          │
+│                                                          │││  a / d             allow / deny its permission request │││                                                          │
+│                                                          │││  w                 next agent waiting for you          │││                                                          │
+│                                                          │││  x                 interrupt the focused agent         │││                                                          │
+│                                                          │││  n                 start a new agent                   │││                                                          │
+│                                                          │││  f                 filter: all → active → needs you    │││                                                          │
+│                                                          │││  r                 reload from the daemon              │││                                                          │
+│                                                          │││  q                 quit (agents keep running)          │││                                                          │
+│                                                          │││                                                        │││                                                          │
+│                                                          ││╰──────────────────────────────────────── any key closes ╯││                                                          │
+╰ completed ───────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────╯
+╭ 7 ✓ agent 06 ────────────────────────────── generic · 0s ╮╭ 8 ✓ agent 05 ────────────────────────────── generic · 0s ╮╭ 9 ✓ agent 04 ────────────────────────────── generic · 0s ╮
+│ hi                                                       ││ hi                                                       ││ hi                                                       │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+│                                                          ││                                                          ││                                                          │
+╰ completed ───────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────╯
+ ←↑↓→ move   i message   z zoom   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                                   

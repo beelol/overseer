@@ -1,0 +1,48 @@
+ ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                       ● connected 
+╭ 1 ✓ Ticker ───────────────────────── generic · 2s ╮┏ 2 ● Latency probe ━━━━━━━━━━━━━━━━━━━ generic · 5s ┓                                                     
+│ tick 47                                           │┃ got p3                                             ┃                                                     
+│ tick 48                                           │┃ › p4                                               ┃                                                     
+│ tick 49                                           │┃ got p4                                             ┃                                                     
+│ tick 50                                           │┃ › p5                                               ┃                                                     
+│ tick 51                                           │┃ got p5                                             ┃                                                     
+│ tick 52                                           │┃ › p6                                               ┃                                                     
+│ tick 53                                           │┃ got p6                                             ┃                                                     
+│ tick 54                                           │┃ › p7                                               ┃                                                     
+│ tick 55                                           │┃ got p7                                             ┃                                                     
+│ tick 56                                           │┃ › p8                                               ┃                                                     
+│ tick 57                                           │┃ got p8                                             ┃                                                     
+│ tick 58                                           │┃ › p9                                               ┃                                                     
+│ tick 59                                           │┃ got p9                                             ┃                                                     
+╰ completed ────────────────────────────────────────╯┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                                                     
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+                                                                                                                                                                
+ Reconnecting to overseerd (the daemon closed the connection)…                                                                                                  

@@ -164,6 +164,8 @@ pub struct App {
 pub struct Stats {
     pub draws: u64,
     pub events: u64,
+    /// Milliseconds from each event's daemon timestamp to the app handling it (bounded).
+    pub lag_ms: Vec<i64>,
 }
 
 impl App {
@@ -272,26 +274,38 @@ impl App {
         };
         let n = self.visible().len();
         let (page, slot) = (i / PAGE, i % PAGE);
-        let (row, col) = ((slot / 3) as i32, (slot % 3) as i32);
+        let on_page = |p: usize| n.saturating_sub(p * PAGE).min(PAGE);
+        let (_, cols) = shape(on_page(page));
+        let (row, col) = ((slot / cols) as i32, (slot % cols) as i32);
         let target = if dx != 0 {
             let c = col + dx;
             if c < 0 {
                 // Past the left edge: the previous page's same row, rightmost column.
-                if page == 0 { None } else { Some((page - 1) * PAGE + (row as usize) * 3 + 2) }
-            } else if c > 2 {
-                Some((page + 1) * PAGE + (row as usize) * 3)
+                if page == 0 {
+                    None
+                } else {
+                    let (_, pc) = shape(on_page(page - 1));
+                    Some((page - 1) * PAGE + (row as usize) * pc + pc - 1)
+                }
+            } else if c >= cols as i32 {
+                // Past the right edge: the next page's same row (or its last agent).
+                if on_page(page + 1) == 0 {
+                    None
+                } else {
+                    let (nr, nc) = shape(on_page(page + 1));
+                    Some(((page + 1) * PAGE + (row as usize).min(nr - 1) * nc).min(n - 1))
+                }
             } else {
-                Some(page * PAGE + (row * 3 + c) as usize)
+                Some(page * PAGE + (row * cols as i32 + c) as usize)
             }
         } else {
             let r = row + dy;
-            if (0..3).contains(&r) { Some(page * PAGE + (r * 3 + col) as usize) } else { None }
+            let t = page * PAGE + (r.max(0) as usize) * cols + col as usize;
+            if r >= 0 && t < page * PAGE + on_page(page) { Some(t) } else { None }
         };
         if let Some(t) = target {
             if t < n {
                 self.focus_index(t);
-            } else if dx > 0 && t >= n && (page + 1) * PAGE < n {
-                self.focus_index(n - 1);
             }
         }
     }
@@ -384,6 +398,12 @@ impl App {
 
     fn on_event(&mut self, ev: Value) {
         self.stats.events += 1;
+        if let Some(ts) = ev["ts"].as_i64() {
+            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+            if self.stats.lag_ms.len() < 100_000 {
+                self.stats.lag_ms.push(now - ts);
+            }
+        }
         let run_id = ev["run_id"].as_str().unwrap_or_default().to_string();
         let kind = ev["kind"].as_str().unwrap_or_default().to_string();
         if !run_id.is_empty() {
@@ -800,7 +820,7 @@ impl App {
                 let cut = d.rfind(char::is_whitespace).map(|i| i + 1).unwrap_or(0);
                 d.truncate(cut);
             }
-            KeyCode::Char(c) => self.drafts.entry(id).or_default().push(c),
+            KeyCode::Char(c) if !c.is_control() => self.drafts.entry(id).or_default().push(c),
             _ => {}
         }
     }
@@ -877,8 +897,8 @@ impl App {
                     s.pop();
                 }
             }
-            KeyCode::Char(c) => {
-                if self.form.field == 0 && c == '/' || self.form.field == 0 && c == '~' {
+            KeyCode::Char(c) if !c.is_control() => {
+                if self.form.field == 0 && (c == '/' || c == '~') {
                     // Typing a path adds it as a repository.
                     self.form.repos.insert(0, c.to_string());
                     self.form.repo = 0;
@@ -901,6 +921,18 @@ impl App {
         if self.form.field != 0 {
             self.editing_repo = false;
         }
+    }
+}
+
+/// Grid shape (rows, columns) for `n` agents on a page: 1, 1×2, 1×3, 2×2, 2×3, 3×3.
+pub fn shape(n: usize) -> (usize, usize) {
+    match n {
+        0 | 1 => (1, 1),
+        2 => (1, 2),
+        3 => (1, 3),
+        4 => (2, 2),
+        5 | 6 => (2, 3),
+        _ => (3, 3),
     }
 }
 
