@@ -617,10 +617,10 @@ rec(53, "Fixed Claude accounts", "partial", date="2026-09-25",
     blocker="Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.")
 
 # Gate J (added by the owner on 2026-09-26; docs/rfcs/orchestrator-ui.md). Not started.
-rec(54, "Clean, compact presentation", "not started", date="—", commit="—",
+rec(54, "Clean, calm presentation with less text", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
     actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
-rec(55, "Chat-style conversation", "not started", date="—", commit="—",
+rec(55, "A chat that feels great", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
     actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
 rec(56, "Overseer themes, light and dark", "not started", date="—", commit="—",
@@ -649,7 +649,13 @@ rec(63, "History that stays tidy", "not started", date="—", commit="—",
     actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
 rec(64, "Default-to-Overseer session (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
-    actual="Not started.", live="—", blocker="Owner action after the rest of Gate J: work for an hour using only Overseer for Claude Code and Codex; log friction.")
+    actual="Not started.", live="—", blocker="Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.")
+rec(65, "Provider logos", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).")
+rec(66, "Design review against references (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
+    actual="Not started.", live="—", blocker="Owner action after the Gate J build: review the published before/after page, mark what is not right, and confirm once it is.")
 
 HEAD = """# AC-{n:02d} — {title}
 Status: {status}{partial}
@@ -720,6 +726,8 @@ SHORT_BLOCKERS = {
     62: "not started (added by the owner on 2026-09-26)",
     63: "not started (added by the owner on 2026-09-26)",
     64: "owner session after the rest of Gate J",
+    65: "not started (added by the owner on 2026-09-26)",
+    66: "owner design review after the Gate J build",
 }
 TOTAL = 53
 

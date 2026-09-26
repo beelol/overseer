@@ -1,6 +1,6 @@
 # Side RFC: daily-driver orchestrator UI
 
-Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-54 to AC-64 (Gate J in the
+Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-54 to AC-66 (Gate J in the
 [main RFC](../overseer-rfc.md)).
 
 ## Why
@@ -13,6 +13,33 @@ instead of Claude Code or Codex directly. Today the views read like a debug cons
 - VS Code's default chrome makes the whole thing feel heavy.
 
 The goal of Gate J is an orchestrator that is comfortable to live in all day.
+
+## Principles
+
+The owner's bar: ultra clear, easy to approach, and polished. In practice:
+
+1. **Less text.** No sentence where a word works, and no word where an icon, a status dot or the layout already says it. Every icon-only control has a tooltip and an accessible name. Explanations live in tooltips, empty states and a details disclosure, not inline.
+2. **Details on demand.** IDs, paths, capabilities and raw payloads are one hover or one click away, never on screen by default. Rare actions go into an overflow or ⌘K action menu instead of a row of buttons.
+3. **Quiet until it needs you.** Neutral surfaces; color only for status and attention (running, waiting for you, failed, changed). The accent purple marks the one thing to do next.
+4. **Generous padding, tight text.** Room around content, short lines and a steady vertical rhythm, rather than dense text with thin margins.
+5. **One scale.** Spacing, type, radii, elevation and motion come from one token set used by every view.
+6. **Keep the current icon style.** Codicons everywhere (the owner likes them), except real provider logos (AC-65).
+7. **The chat is the product.** It should feel as good as the best chat apps.
+
+## References to study (AC-66)
+
+Study these and record what Overseer adopts from each, never their assets:
+
+| Product | What to learn |
+| --- | --- |
+| Linear | Restraint, density done right, subtle borders, keyboard-first, a purple accent used sparingly |
+| Raycast | Crisp list rows (icon + short label + quiet accessory), the ⌘K action panel instead of button rows |
+| Claude.ai and ChatGPT | Chat column width, turn spacing, composer design, Markdown and code-block styling |
+| Cursor and Zed (agent panel) | Tool calls as compact chips, inline diffs with accept/reject, Zed's tiled panes for the grid |
+| Warp | Output as blocks; terminal-grid feel |
+| Vercel / Geist | Typography, neutral grays, spacing scale |
+| Codex app, Claude Code desktop, Conductor | Multi-agent lists, status at a glance, how runs are started |
+| Apple HIG, GitHub Primer | Accessibility, contrast, focus states |
 
 ## Layout
 
@@ -30,6 +57,10 @@ The Overseer dashboard (AC-57) has three columns and one alternative mode.
 - The dashboard can open in its own window with no folder.
 
 ## Visual rules (AC-54)
+
+**Text budget.** The audit counts visible text per view against today's UI and expects at least
+40% less with no function lost. Typical moves: status words become dots; labels on common actions
+become icons with tooltips; explanatory lines become empty states or tooltips; repeated headers disappear.
 
 **Long values are never printed raw.**
 - Paths: `~` for the home folder and a middle ellipsis (`~/…/worktrees/demo/fix-login`).
@@ -53,6 +84,17 @@ The Overseer dashboard (AC-57) has three columns and one alternative mode.
 
 ## Chat (AC-55)
 
+**Spacing:**
+- one centered column of about 72 characters, with 24 px side gutters and 16 px between turns;
+- 12 px padding inside bubbles and cards, and line height 1.5;
+- code blocks run full column width with 12 px padding.
+
+**Feel:**
+- streaming without layout jumps;
+- consecutive tool calls folded into one line ("3 edits, 2 commands");
+- the composer keeps focus after sending;
+- subtle motion only.
+
 - **Your messages:** right-aligned bubbles.
 - **Agent replies:** Markdown rendered with syntax-highlighted code blocks (with copy), streaming.
 - **Tool calls:** one-line chips (`Edited hello.md +1 −0`, `Ran npm test ✓ 3 s`) that expand to their inputs and results.
@@ -68,6 +110,14 @@ The Overseer dashboard (AC-57) has three columns and one alternative mode.
 - Each tile shows name, account, status, the last few conversation items, a one-line composer and inline Allow/Deny.
 - A tile can be pinned, so a finished agent stays on the grid.
 - Enter or a click opens the tile in the normal chat and review. Arrow keys move between tiles.
+
+## Provider logos (AC-65)
+
+Accounts, harness choices, agent rows, grid tiles and the composer show real provider logos:
+Claude/Anthropic, OpenAI/Codex, OpenCode, and GitHub for pull requests.
+- **Source:** only a license that allows bundling, for example Simple Icons (CC0) or LobeHub Icons (MIT), used as each brand's guidelines allow. Each logo is recorded in a third-party notices file shipped in the VSIX.
+- **Theme:** monochrome variants in dark, light and high contrast, where color would clash.
+- **No licensed logo:** a neutral codicon instead, with the gap recorded.
 
 ## Themes (AC-56)
 
@@ -99,7 +149,7 @@ What still sends people back to the native CLIs:
 - **Attention (AC-61):** one "Needs you" list and full keyboard control.
 - **Usage and limits (AC-62):** so you pick the right account.
 - **A tidy history (AC-63):** archive and search.
-- **The real test (AC-64):** an hour of real work without leaving Overseer.
+- **The real test (AC-64):** an hour of real work without leaving Overseer, after the owner's design review (AC-66).
 
 ## Limits
 
