@@ -15,6 +15,6 @@ The source pack is `daemon/assets/reactor`: twelve original synthesized MP3 file
 | Missing local cache does not interrupt agents | `missing_local_cache_does_not_interrupt_agents` | Verified |
 | System speech and private Commander import | `system_and_private_commander_tracks_are_selectable_without_bundling_voice_files`, `installed_system_voice_can_be_selected`; isolated macOS playback smoke for both | Verified locally |
 | Visible count for multiple needs | Existing VS Code status bar counts `attention()` entries in `extension/src/extension.js` | Needs live UI check |
-| Auto Mode, Swarm, and TUI changes | Current PRs #2, #3, and #4 still use the daemon; they remain in flight | Recheck and test when their event contracts settle |
+| Auto Mode, Swarm, and TUI changes | A non-checkout merge check at the current heads merges #2 and #3 cleanly. #4 has a README conflict from its older base; its daemon server changes auto-merge. All three remain in flight. | Recheck and run live integration when their event contracts settle |
 
 The daemon tests use a disposable log sink instead of starting a player. A separate isolated macOS smoke test exercised `afplay` for Reactor and Commander, and `say` with an installed voice. The extension's `npm test` command currently references a missing `extension/test/run.js`; `npm run check` verifies its JavaScript syntax.
