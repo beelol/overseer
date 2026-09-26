@@ -2497,6 +2497,57 @@ fn auto_dispatch_concurrent_clients_share_one_selection_and_one_child() {
 }
 
 #[test]
+fn auto_distinct_concurrent_units_share_one_profile_metadata_read() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::sync::{Arc, Barrier};
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("shared-metadata-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_MODEL_DELAY_MS,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_MODEL_DELAY_MS", "750"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    std::fs::write(&trace, "").unwrap();
+    let barrier = Arc::new(Barrier::new(3));
+    let socket = d.socket();
+    let handles = (0..2).map(|n| {
+        let barrier = barrier.clone();
+        let socket = socket.clone();
+        let params = json!({"work_unit_id":format!("shared-profile-{n}"),
+            "parent_run_id":parent,"min_tier":"general","required_tools":["absent/tool"],
+            "prompt":"check unavailable tool"});
+        std::thread::spawn(move || -> Result<serde_json::Value, String> {
+            barrier.wait();
+            let mut conn = UnixStream::connect(socket).map_err(|error| error.to_string())?;
+            conn.set_read_timeout(Some(Duration::from_secs(15))).map_err(|error| error.to_string())?;
+            conn.write_all(format!("{}\n", json!({"id":1,"method":"auto.dispatch","params":params})).as_bytes())
+                .map_err(|error| error.to_string())?;
+            let mut line = String::new();
+            BufReader::new(conn).read_line(&mut line).map_err(|error| error.to_string())?;
+            let reply: serde_json::Value = serde_json::from_str(&line).map_err(|error| error.to_string())?;
+            if let Some(error) = reply.get("error") { return Err(error.to_string()); }
+            Ok(reply["result"].clone())
+        })
+    }).collect::<Vec<_>>();
+    barrier.wait();
+    let results = handles.into_iter().map(|handle| handle.join().unwrap().unwrap()).collect::<Vec<_>>();
+    assert!(results.iter().all(|result| result["state"] == "paused"), "{results:?}");
+    assert_eq!(d.runs().len(), 1, "neither request should start a child");
+    let reads = std::fs::read_to_string(&trace).unwrap().matches("model_read").count();
+    assert_eq!(reads, 2, "one paginated model catalog should serve both decisions");
+    let later = d.call("auto.dispatch", json!({"work_unit_id":"shared-profile-later",
+        "parent_run_id":parent,"min_tier":"general","required_tools":["absent/tool"],
+        "prompt":"check unavailable tool again"}));
+    assert_eq!(later["state"], "paused");
+    let reads = std::fs::read_to_string(&trace).unwrap().matches("model_read").count();
+    assert_eq!(reads, 4, "a later decision must collect fresh profile evidence");
+}
+
+#[test]
 fn auto_managed_child_checks_required_tools_before_starting_a_turn() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

@@ -310,10 +310,63 @@ where T: Send, F: Fn(&str, Duration) -> Result<T> + Sync {
     results
 }
 
+#[derive(Clone)]
 struct AutoProfileDiscovery {
     routes: Vec<crate::auto_select::Route>,
     evidence: Value,
     generation: Option<i64>,
+}
+
+struct AutoDiscoveryFlight {
+    result: Mutex<Option<std::result::Result<AutoProfileDiscovery, String>>>,
+    ready: Condvar,
+}
+
+static AUTO_DISCOVERY_FLIGHTS: OnceLock<Mutex<std::collections::BTreeMap<
+    (usize, String, String), Arc<AutoDiscoveryFlight>>>> = OnceLock::new();
+
+/// Concurrent work units in one daemon/workspace share an in-flight profile
+/// read, including its source timestamps and account generation. A completed
+/// read is removed immediately; later decisions must collect fresh evidence.
+fn discover_auto_profile_shared(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
+    budget: Duration) -> Result<AutoProfileDiscovery> {
+    let deadline = Instant::now() + budget;
+    let key = (Arc::as_ptr(d) as usize, profile_id.to_string(), workspace_id.to_string());
+    let flights = AUTO_DISCOVERY_FLIGHTS.get_or_init(|| Mutex::new(std::collections::BTreeMap::new()));
+    let (flight, owner) = {
+        let mut active = flights.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        match active.get(&key) {
+            Some(existing) => (existing.clone(), false),
+            None => {
+                let new = Arc::new(AutoDiscoveryFlight { result:Mutex::new(None), ready:Condvar::new() });
+                active.insert(key.clone(), new.clone());
+                (new, true)
+            }
+        }
+    };
+    if owner {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(||
+            discover_auto_profile(d, profile_id, workspace_id, budget)))
+            .unwrap_or_else(|_| Err(anyhow!("automatic profile collector stopped unexpectedly")))
+            .map_err(|error| error.to_string());
+        *flight.result.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(result.clone());
+        flight.ready.notify_all();
+        flights.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).remove(&key);
+        return result.map_err(|message| anyhow!(message));
+    }
+    let mut shared = flight.result.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    loop {
+        if let Some(result) = shared.as_ref() {
+            return result.clone().map_err(|message| anyhow!(message));
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining < Duration::from_millis(20) {
+            return Err(anyhow!("shared automatic profile collection deadline elapsed"));
+        }
+        let (next, _) = flight.ready.wait_timeout(shared, remaining)
+            .map_err(|_| anyhow!("automatic profile collector gate is poisoned"))?;
+        shared = next;
+    }
 }
 
 fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
@@ -607,7 +660,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let candidate_ids = allowed_profiles.iter().cloned().collect::<Vec<_>>();
                 for (candidate_id, discovered) in collect_unique_bounded(&candidate_ids,
                     Duration::from_secs(8).min(decision_deadline.saturating_duration_since(Instant::now())), |id, budget|
-                        discover_auto_profile(d, id, &parent.workspace_id, budget)) {
+                        discover_auto_profile_shared(d, id, &parent.workspace_id, budget)) {
                     match discovered {
                         Ok(discovered) => {
                             routes.extend(discovered.routes);
