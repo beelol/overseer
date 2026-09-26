@@ -8,6 +8,7 @@ use crate::shim;
 use crate::store::Run;
 use anyhow::Result;
 use serde_json::{json, Value};
+use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -61,6 +62,13 @@ impl Daemon {
     /// session happened since.
     fn background_notice_once(&self) -> Result<Option<Value>> {
         let mut ids: Vec<String> = self.active_roots()?.into_iter().map(|r| r.id).collect();
+        {
+            let store = self.store.lock().unwrap();
+            let mut stmt = store.conn.prepare("SELECT id FROM swarm_runs WHERE status IN
+                ('planning','running','paused','stalled','draining','stopping')")?;
+            ids.extend(stmt.query_map([], |row| row.get::<_, String>(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?.into_iter().map(|id| format!("swarm:{id}")));
+        }
         ids.sort();
         if !ids.is_empty() && self.ui_session.lock().unwrap().1.as_ref() == Some(&ids) {
             crate::log("last VS Code window closed again; these agents were already announced, no notice");
@@ -76,19 +84,65 @@ impl Daemon {
     /// Posts the "agents still running" notification if anything is active. Returns what was sent.
     pub fn background_notice(&self) -> Result<Option<Value>> {
         let runs = self.active_roots()?;
-        if runs.is_empty() {
+        let (mut swarms, linked) = {
+            let store = self.store.lock().unwrap();
+            let mut active = store.conn.prepare(
+                "SELECT id,category,status FROM swarm_runs WHERE status IN
+                 ('planning','running','paused','stalled','draining','stopping')",
+            )?;
+            let rows = active.query_map([], |row| Ok((row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?, row.get::<_, String>(2)?)))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            let swarms: BTreeMap<String, (String, String, Vec<String>)> = rows.into_iter()
+                .map(|(id, category, status)| (id, (category, status, Vec::new()))).collect();
+            let mut stmt = store.conn.prepare(
+                "SELECT l.overseer_run_id,s.id,s.category,s.status FROM swarm_worker_launches l
+                 JOIN swarm_runs s ON s.id=l.run_id WHERE l.overseer_run_id IS NOT NULL",
+            )?;
+            let rows = stmt.query_map([], |row| Ok((row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?)))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            let linked: HashMap<String, (String, String, String)> = rows.into_iter()
+                .map(|(worker, id, category, status)| (worker, (id, category, status))).collect();
+            (swarms, linked)
+        };
+        if runs.is_empty() && swarms.is_empty() {
             crate::log("last VS Code window closed; no active agents, no notice");
             return Ok(None);
         }
-        let names: Vec<String> = runs.iter().map(|r| format!("{}: {}", r.harness, r.title.chars().take(40).collect::<String>())).collect();
-        let title = format!("Overseer: {} agent{} still running", runs.len(), if runs.len() == 1 { "" } else { "s" });
-        let body = format!(
-            "{}. They keep running with VS Code closed. Reopen VS Code to watch them, or run \u{201c}Overseer: Stop Agents and Daemon\u{201d}.",
-            names.join("; ")
-        );
+        let mut ordinary = Vec::new();
+        for run in &runs {
+            if let Some((id, category, status)) = linked.get(&run.id) {
+                let entry = swarms.entry(id.clone()).or_insert_with(||
+                    (category.clone(), status.clone(), Vec::new()));
+                entry.2.push(run.id.clone());
+            } else {
+                ordinary.push(run);
+            }
+        }
+        let mut names: Vec<String> = swarms.values().map(|(category, _, workers)| format!(
+            "Swarm {} ({} active worker{})", category.chars().take(40).collect::<String>(),
+            workers.len(), if workers.len() == 1 { "" } else { "s" }
+        )).collect();
+        names.extend(ordinary.iter().map(|r| format!("{}: {}", r.harness, r.title.chars().take(40).collect::<String>())));
+        let title = match (swarms.len(), ordinary.len()) {
+            (0, n) => format!("Overseer: {n} agent{} still running", if n == 1 { "" } else { "s" }),
+            (n, 0) => format!("Overseer: {n} swarm{} still active", if n == 1 { "" } else { "s" }),
+            (s, a) => format!("Overseer: {s} swarm{} and {a} agent{} still active",
+                if s == 1 { "" } else { "s" }, if a == 1 { "" } else { "s" }),
+        };
+        let body = if swarms.is_empty() {
+            format!("{}. They keep running with VS Code closed. Reopen VS Code to watch them, or run \u{201c}Overseer: Stop Agents and Daemon\u{201d}.", names.join("; "))
+        } else {
+            format!("{}. Overseer keeps this work active with VS Code closed. Reopen VS Code to watch it, or run \u{201c}Overseer: Stop Agents and Daemon\u{201d}.", names.join("; "))
+        };
         let via = notify(&title, &body);
         crate::log(&format!("background notice ({via}): {title} — {body}"));
-        let payload = json!({"title": title, "body": body, "runs": runs.iter().map(|r| json!({"id": r.id, "harness": r.harness, "title": r.title, "status": r.status})).collect::<Vec<_>>(), "delivered_via": via});
+        let payload = json!({"title": title, "body": body,
+            "swarms": swarms.into_iter().map(|(id, (category, status, worker_run_ids))| json!({
+                "id":id,"category":category,"status":status,"active_workers":worker_run_ids.len(),
+                "worker_run_ids":worker_run_ids})).collect::<Vec<_>>(),
+            "runs": runs.iter().map(|r| json!({"id": r.id, "harness": r.harness, "title": r.title, "status": r.status})).collect::<Vec<_>>(), "delivered_via": via});
         self.emit(None, None, "background_notice", "daemon", "exact", payload.clone())?;
         Ok(Some(payload))
     }
@@ -96,6 +150,34 @@ impl Daemon {
     /// Interrupts every active run, waits for their processes, forces stragglers, and reports.
     /// The caller exits the daemon afterwards.
     pub fn stop_all(self: &Arc<Self>) -> Result<Value> {
+        // Commit the Swarm control transition before interrupting processes. A category
+        // may have queued work but no Overseer run yet, so active_roots alone misses it.
+        // Keep the launch lock through this transition so an admitted worker cannot
+        // start between the snapshot and Stop.
+        let swarms = {
+            let _serial = self.swarm_launch_lock.lock().unwrap();
+            let rows = {
+                let store = self.store.lock().unwrap();
+                let mut stmt = store.conn.prepare(
+                    "SELECT id,generation,revision FROM swarm_runs
+                     WHERE status IN ('planning','running','paused','stalled','draining','stopping')
+                     ORDER BY id",
+                )?;
+                let rows = stmt.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?)))?
+                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                rows
+            };
+            for (id, generation, revision) in &rows {
+                crate::swarm::stop(&mut self.store.lock().unwrap(),
+                    &json!({"run_id":id,"generation":generation,"revision":revision}))?;
+            }
+            rows.into_iter().map(|(id, _, _)| id).collect::<Vec<_>>()
+        };
+        for run in &swarms {
+            if let Err(error) = crate::swarm::interrupt_workers(self, run) {
+                crate::log(&format!("stop_all: swarm interrupt {run} failed: {error}"));
+            }
+        }
         let runs = self.active_roots()?;
         let mut interrupted = Vec::new();
         for run in &runs {
@@ -104,7 +186,19 @@ impl Daemon {
                 Err(e) => crate::log(&format!("stop_all: interrupt {} failed: {e}", run.id)),
             }
         }
-        let alive = |run: &Run| self.control_socket(run).ok().map(|s| shim::control(&s, &json!({"op": "ping"})).is_ok()).unwrap_or(false);
+        let alive = |run: &Run| {
+            if self.control_socket(run).ok().is_some_and(|s| shim::control(&s, &json!({"op": "ping"})).is_ok()) {
+                return true;
+            }
+            let dir = self.store.lock().unwrap().run_process(&run.id).ok().flatten()
+                .map(|(dir, _, _)| std::path::PathBuf::from(dir));
+            let Some(dir) = dir else { return false };
+            if dir.join("exit.json").exists() { return false }
+            std::fs::read(dir.join("shim.json")).ok()
+                .and_then(|bytes| serde_json::from_slice::<shim::ShimInfo>(&bytes).ok())
+                .is_some_and(|info| crate::daemon::pid_alive(info.shim_pid)
+                    || crate::daemon::pid_alive(info.child_pid))
+        };
         let wait = |secs: u64| {
             let end = Instant::now() + Duration::from_secs(secs);
             while Instant::now() < end && runs.iter().any(|r| alive(r)) {
@@ -130,14 +224,15 @@ impl Daemon {
         }
         let remaining: Vec<String> = runs.iter().filter(|r| alive(r)).map(|r| r.id.clone()).collect();
         for run in &runs {
-            // Anything that never got a process (queued) or whose tail has not finalized yet.
+            // A recorded process is reconciled from its exit record on restart. A
+            // missing or unreachable control socket is not proof that it exited.
             let store = self.store.lock().unwrap();
             let status = store.run(&run.id).ok().flatten().map(|r| r.status).unwrap_or_default();
-            if ACTIVE.contains(&status.as_str()) {
+            if ACTIVE.contains(&status.as_str()) && store.run_process(&run.id)?.is_none() {
                 store.conn.execute("UPDATE runs SET status='interrupted', exit_reason=COALESCE(exit_reason, 'stopped with the daemon'), ended_ms=COALESCE(ended_ms, ?2) WHERE id=?1", rusqlite::params![run.id, now()])?;
             }
         }
-        let result = json!({"stopped": runs.iter().map(|r| r.id.clone()).collect::<Vec<_>>(), "interrupted": interrupted, "forced": forced, "remaining": remaining});
+        let result = json!({"stopped": runs.iter().map(|r| r.id.clone()).collect::<Vec<_>>(), "swarms": swarms, "interrupted": interrupted, "forced": forced, "remaining": remaining});
         self.emit(None, None, "daemon_stopping", "user", "exact", result.clone())?;
         crate::log(&format!("stop_all: {result}"));
         Ok(result)

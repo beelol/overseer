@@ -7,6 +7,8 @@ use anyhow::{anyhow, bail, Context, Result};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::process::Stdio;
+use std::io::Write;
 
 const SNAPSHOT_IDENTITY: [(&str, &str); 4] = [
     ("GIT_AUTHOR_NAME", "Overseer Snapshot"),
@@ -35,6 +37,30 @@ pub fn git_env(cwd: &Path, args: &[&str], env: &[(&str, &str)]) -> Result<Vec<u8
 
 pub fn git(cwd: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&git_env(cwd, args, &[])?).trim_end_matches('\n').to_string())
+}
+
+/// Run Git with bytes on stdin, used for an already-reviewed patch without a disk copy.
+pub fn git_stdin(cwd: &Path, args: &[&str], input: &[u8]) -> Result<String> {
+    git_stdin_env(cwd, args, input, &[])
+}
+
+pub fn git_stdin_env(cwd: &Path, args: &[&str], input: &[u8], env: &[(&str, &str)]) -> Result<String> {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(cwd).args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR"] {
+        cmd.env_remove(var);
+    }
+    cmd.env("GIT_OPTIONAL_LOCKS", "0").env("GIT_TERMINAL_PROMPT", "0");
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    let mut child = cmd.spawn().with_context(|| format!("running git {}", args.join(" ")))?;
+    child.stdin.take().ok_or_else(|| anyhow!("git stdin unavailable"))?.write_all(input)?;
+    let out = child.wait_with_output()?;
+    if !out.status.success() {
+        bail!("git {} failed: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim_end_matches('\n').to_string())
 }
 
 pub fn toplevel(path: &Path) -> Result<PathBuf> {

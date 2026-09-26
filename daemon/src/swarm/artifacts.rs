@@ -1,0 +1,486 @@
+use super::{broker, get, required};
+use crate::store::Store;
+use anyhow::{anyhow, bail, Result};
+use rusqlite::{params, OptionalExtension, Transaction};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+
+pub fn put(store: &mut Store, p: &Value) -> Result<Value> {
+    let run = required(p, "run_id")?;
+    let job = required(p, "job_id")?;
+    let attempt = required(p, "attempt_id")?;
+    let token = required(p, "token")?;
+    let id = required(p, "artifact_id")?;
+    let kind = required(p, "kind")?;
+    let content = required(p, "content")?;
+    let revision = p["source_revision"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing source revision"))?;
+    if id.is_empty()
+        || id.len() > 128
+        || kind.is_empty()
+        || kind.len() > 80
+        || content.len() > 256 * 1024
+    {
+        bail!("invalid or oversized artifact");
+    }
+    let attempt_revision = broker::check_attempt(store, run, job, attempt, token)?;
+    if revision != attempt_revision {
+        bail!("artifact source revision does not match attempt");
+    }
+    let safe = crate::redact::redact(content);
+    let digest = format!("{:x}", Sha256::digest(safe.as_bytes()));
+    let old: Option<(String, String, String, i64, String, String)> = store.conn.query_row(
+        "SELECT job_id,attempt_id,kind,source_revision,content,sha256 FROM swarm_artifacts WHERE run_id=?1 AND id=?2",
+        params![run,id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?)),
+    ).optional()?;
+    if let Some((old_job, old_attempt, old_kind, old_rev, old_content, old_digest)) = old {
+        if format!("{:x}", Sha256::digest(old_content.as_bytes())) != old_digest {
+            bail!("artifact integrity check failed");
+        }
+        if (
+            old_job.as_str(),
+            old_attempt.as_str(),
+            old_kind.as_str(),
+            old_rev,
+            old_digest.as_str(),
+        ) != (job, attempt, kind, revision, digest.as_str())
+        {
+            bail!("artifact id reused with different content or provenance");
+        }
+        return Ok(json!({"id":id,"sha256":digest,"duplicate":true}));
+    }
+    store.conn.execute(
+        "INSERT INTO swarm_artifacts(id,run_id,job_id,attempt_id,source_revision,kind,content,sha256,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+        params![id,run,job,attempt,revision,kind,safe,digest,crate::daemon::now()],
+    )?;
+    Ok(json!({"id":id,"sha256":digest,"duplicate":false}))
+}
+
+pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
+    let run = required(p, "run_id")?;
+    let job = required(p, "job_id")?;
+    let decision = required(p, "decision")?;
+    let generation = p["generation"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing generation"))?;
+    let revision = p["revision"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing revision"))?;
+    if !["accept", "reject", "unresolved"].contains(&decision) {
+        bail!("invalid decision");
+    }
+    let current = get(store, run)?;
+    if current["generation"] != generation {
+        bail!("stale director generation");
+    }
+    if current["revision"] != revision {
+        bail!("stale plan revision");
+    }
+    if current["status"] == "stopping" || current["status"] == "stopped" || current["status"] == "stalled" {
+        bail!("run cannot accept director decisions in this state");
+    }
+    let evidence = p["evidence"]
+        .as_array()
+        .ok_or_else(|| anyhow!("evidence must be an array"))?;
+    if evidence.is_empty() || evidence.len() > 100 || evidence.iter().any(|v| v.as_str().is_none())
+    {
+        bail!("decision requires artifact evidence");
+    }
+    let job_revision: i64 = store
+        .conn
+        .query_row(
+            "SELECT plan_revision FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            params![run, job],
+            |r| r.get(0),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("unknown job"))?;
+    let mut attempt_id: Option<String> = None;
+    let mut has_reproduction = false;
+    for artifact in evidence {
+        let id = artifact.as_str().unwrap();
+        let found: Option<(String,i64,String,String,String)> = store.conn.query_row(
+            "SELECT attempt_id,source_revision,content,sha256,kind FROM swarm_artifacts WHERE run_id=?1 AND job_id=?2 AND id=?3",
+            params![run,job,id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+        ).optional()?;
+        let (attempt, source_rev, content, digest, kind) =
+            found.ok_or_else(|| anyhow!("missing artifact evidence {id}"))?;
+        if source_rev != job_revision {
+            bail!("stale artifact source revision");
+        }
+        if format!("{:x}", Sha256::digest(content.as_bytes())) != digest {
+            bail!("artifact integrity check failed");
+        }
+        if attempt_id.as_deref().is_some_and(|a| a != attempt) {
+            bail!("mixed attempt evidence requires separate review");
+        }
+        has_reproduction |= kind == "reproduction";
+        attempt_id = Some(attempt);
+    }
+    let attempt = attempt_id.ok_or_else(|| anyhow!("missing attempt"))?;
+    let mut stmt = store.conn.prepare(
+        "SELECT seq,payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND kind IN ('result','submit') AND revision=?4"
+    )?;
+    let submitted = stmt
+        .query_map(params![run, job, attempt, job_revision], |r| {
+            Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    if decision == "accept" && submitted.iter().any(|(_, raw)| {
+        serde_json::from_str::<Value>(raw).ok()
+            .is_some_and(|payload| payload["audit_outcome"] == "environment_failure")
+    }) {
+        bail!("environment failure cannot be accepted as a passed check");
+    }
+    if decision == "accept" && !has_reproduction && submitted.iter().any(|(_, raw)| {
+        serde_json::from_str::<Value>(raw).ok()
+            .is_some_and(|payload| payload["audit_outcome"] == "confirmed_defect")
+    }) {
+        bail!("confirmed defect requires reproduction artifact evidence");
+    }
+    let linked = submitted.iter().any(|(_, raw)| {
+        let payload: Value = serde_json::from_str(raw).unwrap_or(Value::Null);
+        evidence.iter().all(|id| {
+            payload["artifact_ids"]
+                .as_array()
+                .is_some_and(|arr| arr.contains(id))
+        })
+    });
+    if !linked {
+        bail!("artifact evidence was not submitted by this attempt");
+    }
+    let (state, deadline_at): (String, Option<i64>) = store
+        .conn
+        .query_row(
+            "SELECT status,deadline_at_ms FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            params![run, job],
+            |r| Ok((r.get(0)?,r.get(1)?)),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("unknown job"))?;
+    if deadline_at.is_some_and(|deadline| crate::daemon::now() >= deadline) {
+        bail!("job deadline expired before decision");
+    }
+    if ["cancelled", "cancel_requested", "superseded", "failed"].contains(&state.as_str()) {
+        bail!("job cannot be decided in this state");
+    }
+    if decision == "accept" {
+        let uncertain: i64 = store.conn.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome='unknown'",
+            params![run,job], |r| r.get(0),
+        )?;
+        if uncertain > 0 {
+            bail!("unreconciled side effect blocks acceptance");
+        }
+    }
+    let evidence_text = Value::Array(evidence.to_vec()).to_string();
+    let old: Option<String> = store.conn.query_row(
+        "SELECT evidence FROM swarm_decisions WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND decision=?4",
+        params![run,job,attempt,decision], |r| r.get(0),
+    ).optional()?;
+    if let Some(old_evidence) = old {
+        if old_evidence != evidence_text {
+            bail!("decision replay changes evidence");
+        }
+        return Ok(json!({"job_id":job,"decision":decision,"duplicate":true}));
+    }
+    let other_decision: Option<String> = store.conn.query_row(
+        "SELECT decision FROM swarm_decisions WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 LIMIT 1",
+        params![run,job,attempt], |r| r.get(0),
+    ).optional()?;
+    if other_decision.is_some() {
+        bail!("attempt already has a different review decision");
+    }
+    if state == "accepted" {
+        bail!("job already accepted");
+    }
+    if state != "reserved" && state != "submitted" {
+        bail!("job is not awaiting review");
+    }
+    let now = crate::daemon::now();
+    let tx = store.conn.transaction()?;
+    let reviewed_message_seq = submitted.iter().map(|(seq, _)| *seq).max().unwrap_or(0);
+    tx.execute(
+        "INSERT INTO swarm_decisions(run_id,job_id,attempt_id,revision,decision,evidence,reviewed_message_seq,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+        params![run,job,attempt,revision,decision,evidence_text,reviewed_message_seq,now],
+    )?;
+    let next = match decision {
+        "accept" => "accepted",
+        "reject" => "rejected",
+        _ => "blocked",
+    };
+    tx.execute(
+        "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
+        params![run, job, next, now],
+    )?;
+    if next == "accepted" {
+        release_and_unlock(&tx, run, job, now)?;
+        super::record_operation(&tx, run, "accept")?;
+    }
+    super::finalize_control_if_idle(&tx,run,now)?;
+    tx.commit()?;
+    Ok(json!({"job_id":job,"decision":decision,"status":next,"duplicate":false}))
+}
+
+pub(super) fn pending_patch_integration(conn: &rusqlite::Connection, run: &str, job: &str) -> Result<bool> {
+    let revision: i64 = conn.query_row(
+        "SELECT plan_revision FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+        params![run,job], |r| r.get(0),
+    )?;
+    let mut stmt = conn.prepare(
+        "SELECT evidence FROM swarm_decisions WHERE run_id=?1 AND job_id=?2
+         AND revision=?3 AND decision='accept'",
+    )?;
+    let reviewed = stmt.query_map(params![run,job,revision], |r| r.get::<_,String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    for raw in reviewed {
+        for id in serde_json::from_str::<Vec<String>>(&raw)? {
+            let pending: bool = conn.prepare(
+                "SELECT 1 FROM swarm_artifacts a
+                 WHERE a.run_id=?1 AND a.job_id=?2 AND a.id=?3 AND a.kind='patch'
+                 AND NOT EXISTS (SELECT 1 FROM swarm_integrated_artifacts i
+                                 WHERE i.run_id=a.run_id AND i.artifact_id=a.id)"
+            )?.exists(params![run,job,id])?;
+            if pending { return Ok(true); }
+        }
+    }
+    Ok(false)
+}
+
+pub(super) fn release_and_unlock(tx: &Transaction<'_>, run: &str, job: &str, now: i64) -> Result<()> {
+    let active: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND job_id=?2 AND status='registered'",
+        params![run, job],
+        |r| r.get(0),
+    )?;
+    if active > 0 {
+        return Ok(());
+    }
+    if pending_patch_integration(tx,run,job)? {
+        return Ok(());
+    }
+    tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'", params![run,job,now])?;
+    let mut stmt =
+        tx.prepare("SELECT id,deps FROM swarm_jobs WHERE run_id=?1 AND status='planned'")?;
+    let planned = stmt
+        .query_map(params![run], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    for (id, raw_deps) in planned {
+        let deps: Vec<String> = serde_json::from_str(&raw_deps)?;
+        if deps.is_empty() {
+            continue;
+        }
+        let mut ready = true;
+        for dep in deps {
+            let (state,active): (String,i64) = tx.query_row(
+                "SELECT j.status,(SELECT COUNT(*) FROM swarm_attempts a WHERE a.run_id=j.run_id AND a.job_id=j.id AND a.status='registered') FROM swarm_jobs j WHERE j.run_id=?1 AND j.id=?2",
+                params![run,dep], |r| Ok((r.get(0)?,r.get(1)?)),
+            )?;
+            if state != "accepted" || active > 0 {
+                ready = false;
+                break;
+            }
+        }
+        if ready {
+            tx.execute(
+                "UPDATE swarm_jobs SET status='ready',updated_ms=?3 WHERE run_id=?1 AND id=?2",
+                params![run, id, now],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
+    let run = required(p, "run_id")?;
+    let job = required(p, "job_id")?;
+    let attempt = required(p, "attempt_id")?;
+    let generation = p["generation"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing generation"))?;
+    let revision = p["revision"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing revision"))?;
+    let current = get(store, run)?;
+    if current["generation"] != generation {
+        bail!("stale director generation");
+    }
+    if current["revision"] != revision {
+        bail!("stale plan revision");
+    }
+    let (attempt_status, attempt_revision): (String, i64) = store
+        .conn
+        .query_row(
+            "SELECT status,revision FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3",
+            params![attempt, run, job],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("unknown attempt"))?;
+    if attempt_status == "finished" {
+        return Ok(json!({"attempt_id":attempt,"status":"finished","duplicate":true}));
+    }
+    if attempt_status != "registered" {
+        bail!("attempt cannot finish in this state");
+    }
+    let linked: Option<(Option<String>,Option<String>,Option<i64>)> = store.conn.query_row(
+        "SELECT l.overseer_run_id,r.status,r.ended_ms FROM swarm_worker_launches l
+         LEFT JOIN runs r ON r.id=l.overseer_run_id WHERE l.attempt_id=?1 AND l.run_id=?2",
+        params![attempt,run], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
+    ).optional()?;
+    let linked_status = linked.as_ref().and_then(|(_, status, _)| status.clone());
+    if let Some((linked_run,status,ended)) = linked {
+        if linked_run.is_none()
+            || status.as_deref().is_none_or(|s| crate::daemon::ACTIVE.contains(&s) || s == "disconnected")
+            || ended.is_none() {
+            bail!("linked worker exit is not confirmed");
+        }
+    }
+    let now = crate::daemon::now();
+    let tx = store.conn.transaction()?;
+    tx.execute(
+        "UPDATE swarm_attempts SET status='finished' WHERE id=?1",
+        params![attempt],
+    )?;
+    // A confirmed process exit is not a usage measurement. Keep its upper reservation
+    // binding until the shared account authority reconciles native consumption.
+    tx.execute(
+        "UPDATE swarm_reservations SET status='uncertain'
+         WHERE attempt_id=?1 AND run_id=?2 AND status='active'",
+        params![attempt,run],
+    )?;
+    let (job_status, count, job_revision, job_stop_reason, job_deadline): (String, i64, i64, Option<String>, Option<i64>) = tx.query_row(
+        "SELECT status,attempt_count,plan_revision,stop_reason,deadline_at_ms FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+        params![run, job],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+    )?;
+    if job_status == "accepted" {
+        release_and_unlock(&tx, run, job, now)?;
+    } else if current["status"] == "stopping" {
+        let unsafe_effects: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+            params![run,job], |r| r.get(0),
+        )?;
+        tx.execute(
+            "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
+            params![run, job, if unsafe_effects > 0 { "blocked" } else { "cancelled" }, now],
+        )?;
+        if unsafe_effects == 0 {
+            tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        }
+    } else if job_status == "cancel_requested" && job_stop_reason.as_deref() == Some("job_deadline") {
+        let unsafe_effects: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+            params![run,job], |r| r.get(0),
+        )?;
+        tx.execute(
+            "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
+            params![run,job,if unsafe_effects > 0 { "blocked" } else { "failed" },now],
+        )?;
+        if unsafe_effects == 0 {
+            tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        }
+    } else if linked_status.as_deref() == Some("failed") && ["reserved", "launching", "running"].contains(&job_status.as_str()) {
+        let unsafe_effects: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+            params![run,job], |r| r.get(0),
+        )?;
+        let next = if unsafe_effects > 0 {
+            "blocked"
+        } else if count < 2 && job_deadline.is_none_or(|deadline| now < deadline) {
+            "ready"
+        } else {
+            "failed"
+        };
+        tx.execute(
+            "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
+            params![run,job,next,now],
+        )?;
+        if unsafe_effects == 0 {
+            tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        }
+    } else if job_status == "rejected" {
+        let unsafe_effects: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+            params![run,job], |r| r.get(0),
+        )?;
+        let next = if unsafe_effects > 0 {
+            "blocked"
+        } else if count < 2 && job_deadline.is_none_or(|deadline| now < deadline) {
+            "ready"
+        } else {
+            "failed"
+        };
+        tx.execute(
+            "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
+            params![run, job, next, now],
+        )?;
+        if unsafe_effects == 0 {
+            tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        }
+    } else if job_status == "cancel_requested" && job_revision > attempt_revision {
+        let unsafe_effects: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+            params![run,job], |r| r.get(0),
+        )?;
+        let deps_raw: String = tx.query_row(
+            "SELECT deps FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            params![run, job],
+            |r| r.get(0),
+        )?;
+        let deps: Vec<String> = serde_json::from_str(&deps_raw)?;
+        let mut ready = deps.is_empty();
+        if !deps.is_empty() {
+            ready = true;
+            for dep in deps {
+                let dep_status: String = tx.query_row(
+                    "SELECT status FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+                    params![run, dep],
+                    |r| r.get(0),
+                )?;
+                if dep_status != "accepted" {
+                    ready = false;
+                    break;
+                }
+            }
+        }
+        let next = if unsafe_effects > 0 {
+            "blocked"
+        } else if count >= 2 {
+            "failed"
+        } else if ready {
+            "ready"
+        } else {
+            "planned"
+        };
+        tx.execute(
+            "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
+            params![run, job, next, now],
+        )?;
+        if unsafe_effects == 0 {
+            tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        }
+    }
+    let elapsed: Option<i64> = tx.query_row(
+        "SELECT MAX(0,r.ended_ms-r.created_ms) FROM swarm_worker_launches l
+         JOIN runs r ON r.id=l.overseer_run_id
+         WHERE l.attempt_id=?1 AND l.run_id=?2 AND r.ended_ms IS NOT NULL",
+        params![attempt,run], |r| r.get(0),
+    ).optional()?;
+    if let Some(actual_elapsed_ms) = elapsed {
+        tx.execute(
+            "UPDATE swarm_benefit_attempt_outcomes
+             SET actual_elapsed_ms=?2,actual_source='supervised_run_wall',observed_ms=?3
+             WHERE attempt_id=?1 AND actual_elapsed_ms IS NULL",
+            params![attempt,actual_elapsed_ms,now],
+        )?;
+    }
+    super::finalize_control_if_idle(&tx,run,now)?;
+    tx.commit()?;
+    Ok(json!({"attempt_id":attempt,"status":"finished","duplicate":false}))
+}

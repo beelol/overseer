@@ -18,6 +18,50 @@ use tokio::sync::broadcast;
 pub const ACTIVE: &[&str] = &["queued", "starting", "running", "waiting_for_user"];
 const RAW_SEGMENTS_KEPT: u64 = 4;
 
+#[derive(Debug)]
+pub struct AgentLimitError {
+    pub active: i64,
+    pub limit: i64,
+    pub running_agents: Vec<Value>,
+}
+
+impl std::fmt::Display for AgentLimitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "agent limit reached: {} of {} slots active", self.active, self.limit)
+    }
+}
+
+impl std::error::Error for AgentLimitError {}
+
+struct AgentSlotReservation<'a> {
+    daemon: &'a Daemon,
+    pending: bool,
+}
+
+impl AgentSlotReservation<'_> {
+    fn insert_task_and_run(&mut self, task: &Task, run: &Run) -> Result<()> {
+        let mut pending = self.daemon.pending_agent_slots.lock().unwrap();
+        self.daemon.store.lock().unwrap().insert_task_and_run(task, run, None)?;
+        *pending -= 1;
+        self.pending = false;
+        Ok(())
+    }
+
+    fn release_after_start(&mut self) {
+        let mut pending = self.daemon.pending_agent_slots.lock().unwrap();
+        *pending -= 1;
+        self.pending = false;
+    }
+}
+
+impl Drop for AgentSlotReservation<'_> {
+    fn drop(&mut self) {
+        if self.pending {
+            *self.daemon.pending_agent_slots.lock().unwrap() -= 1;
+        }
+    }
+}
+
 pub fn now() -> i64 {
     shim::now_ms() as i64
 }
@@ -63,8 +107,13 @@ impl TurnOpts {
 
 pub struct Daemon {
     pub store: Mutex<Store>,
+    /// Manual starts reserve capacity before workspace preparation. Admission
+    /// reads this under the same lock, closing the gap before the queued row.
+    pub(crate) pending_agent_slots: Mutex<i64>,
     pub events: broadcast::Sender<Event>,
     tails: Mutex<HashSet<String>>,
+    pub(crate) swarm_launch_lock: Mutex<()>,
+    pub(crate) swarm_integration_lock: Mutex<()>,
     exe: PathBuf,
     pub started_ms: i64,
     /// Connected VS Code windows (connections that said hello as `client: "vscode"`).
@@ -77,7 +126,7 @@ pub struct Daemon {
     pub ui_session: Mutex<(Option<std::time::Instant>, Option<Vec<String>>)>,
 }
 
-fn pid_alive(pid: u32) -> bool {
+pub(crate) fn pid_alive(pid: u32) -> bool {
     if pid == 0 {
         return false;
     }
@@ -89,7 +138,30 @@ fn control_socket_path(run: &str, generation: i64) -> PathBuf {
     paths::short_socket(&format!("c-{}-{generation}.sock", &run[..run.len().min(14)]))
 }
 
+/// A daemon-issued identity for a supervised, fixture-only Swarm worker.
+/// It is passed through the private launch file, never through the task prompt
+/// or user-visible launch metadata.
+pub(crate) struct SwarmWorkerIdentity {
+    pub run_id: String,
+    pub job_id: String,
+    pub attempt_id: String,
+    pub token: String,
+    pub revision: i64,
+}
+
 impl Daemon {
+    fn reserve_agent_slot(&self) -> Result<AgentSlotReservation<'_>> {
+        let mut pending = self.pending_agent_slots.lock().unwrap();
+        let store = self.store.lock().unwrap();
+        let active = store.active_agent_count()? + *pending;
+        let limit = store.agent_limit()?;
+        if active >= limit {
+            return Err(AgentLimitError { active, limit, running_agents: store.active_agents()? }.into());
+        }
+        *pending += 1;
+        Ok(AgentSlotReservation { daemon: self, pending: true })
+    }
+
     pub fn open() -> Result<Arc<Self>> {
         paths::ensure_private_dir(&paths::data_dir())?;
         paths::ensure_private_dir(&paths::runtime_dir())?;
@@ -97,7 +169,7 @@ impl Daemon {
         let store = Store::open(&paths::db_path())?;
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), exe, started_ms: now(),
+        let daemon = Arc::new(Self { store: Mutex::new(store), pending_agent_slots: Mutex::new(0), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), exe, started_ms: now(),
             ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)) });
         daemon.ensure_system_profiles()?;
         Ok(daemon)
@@ -328,6 +400,14 @@ impl Daemon {
     }
 
     pub fn create_task(self: &Arc<Self>, p: &Value) -> Result<Value> {
+        self.create_task_internal(p, None)
+    }
+
+    pub(crate) fn create_task_for_swarm(self: &Arc<Self>, p: &Value, identity: &SwarmWorkerIdentity) -> Result<Value> {
+        self.create_task_internal(p, Some(identity))
+    }
+
+    fn create_task_internal(self: &Arc<Self>, p: &Value, swarm_identity: Option<&SwarmWorkerIdentity>) -> Result<Value> {
         let repo_in = p["repo"].as_str().ok_or_else(|| anyhow!("repo is required"))?;
         let harness = p["harness"].as_str().unwrap_or("codex");
         if !["codex", "codex-app", "claude", "opencode", "generic"].contains(&harness) {
@@ -337,6 +417,11 @@ impl Daemon {
         if prompt.is_empty() && harness != "generic" {
             bail!("prompt is required");
         }
+        let mut slot = if swarm_identity.is_none() {
+            Some(self.reserve_agent_slot()?)
+        } else {
+            None
+        };
         let title = p["title"].as_str().map(str::to_string).unwrap_or_else(|| prompt.chars().take(60).collect());
         let mode = p["workspace_mode"].as_str().unwrap_or("worktree");
         let repo = git::toplevel(Path::new(repo_in)).context("repository not found")?;
@@ -457,10 +542,13 @@ impl Daemon {
         };
         {
             // Task and run appear together: a state snapshot never shows a task without its run.
-            let store = self.store.lock().unwrap();
-            store.insert_task(&task)?;
-            store.insert_run(&run)?;
-            store.set_workspace_owner(&ws.id, Some(&run.id))?;
+            if let Some(reservation) = &mut slot {
+                reservation.insert_task_and_run(&task, &run)?;
+            } else {
+                self.store.lock().unwrap().insert_task_and_run(
+                    &task, &run, swarm_identity.map(|identity| identity.attempt_id.as_str())
+                )?;
+            }
         }
         let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "extra_args": p["extra_args"].clone()});
         let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };
@@ -469,20 +557,40 @@ impl Daemon {
             store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![run.id, generic.to_string()])?;
         }
         self.emit(Some(&task.id), Some(&run.id), "task_created", "daemon", "exact", json!({"task": task, "workspace": ws, "run": run}))?;
-        let started = self.start_turn(&run.id, &prompt, false, &opts);
-        let run = self.run(&run.id)?;
-        let task = self.task(&task.id)?;
+        let started = self.start_turn_internal(&run.id, &prompt, false, &opts, swarm_identity);
         if let Err(e) = started {
+            let current = self.run(&run.id)?;
+            // If no supervisor was recorded, a rejected initial turn must not
+            // consume an active slot forever. A process with a recorded run
+            // directory is left to normal exit/recovery reconciliation.
+            if current.status == "queued"
+                && self.store.lock().unwrap().run_process(&run.id)?.is_none()
+            {
+                self.mark_ended(&current, "failed", &format!("launch failed: {}", redact(&e.to_string())))?;
+            }
+            let run = self.run(&run.id)?;
+            let task = self.task(&task.id)?;
             return Ok(json!({"task": task, "run": run, "workspace": ws, "launch_error": e.to_string()}));
         }
+        let run = self.run(&run.id)?;
+        let task = self.task(&task.id)?;
         Ok(json!({"task": task, "run": run, "workspace": ws}))
     }
 
     /// Start a work turn: fresh run-start snapshot, then launch (or stdin for live generic processes).
     pub fn start_turn(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts) -> Result<Turn> {
+        self.start_turn_internal(run_id, prompt, follow_up, opts, None)
+    }
+
+    fn start_turn_internal(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts, swarm_identity: Option<&SwarmWorkerIdentity>) -> Result<Turn> {
         let mut run = self.run(run_id)?;
         if run.parent_run_id.is_some() {
             bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
+        }
+        if swarm_identity.is_none() && self.store.lock().unwrap().conn.prepare(
+            "SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1 LIMIT 1"
+        )?.exists([run_id])? {
+            bail!("Swarm worker runs cannot receive ordinary follow-ups; continue through the Swarm director");
         }
         let ws = self.workspace(&run.workspace_id)?;
         if ws.removed_ms.is_some() {
@@ -500,6 +608,11 @@ impl Daemon {
                 }
             }
         }
+        let mut resume_slot = if follow_up && !ACTIVE.contains(&run.status.as_str()) {
+            Some(self.reserve_agent_slot()?)
+        } else {
+            None
+        };
         let launch_meta: Value = {
             let store = self.store.lock().unwrap();
             store.conn.query_row("SELECT launch FROM runs WHERE id=?1", [run_id], |r| r.get::<_, Option<String>>(0))?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null)
@@ -557,7 +670,7 @@ impl Daemon {
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
         }
-        let launch = adapters::launch(
+        let mut launch = adapters::launch(
             &run.harness,
             &LaunchReq {
                 cwd: Path::new(&ws.path),
@@ -573,9 +686,29 @@ impl Daemon {
                 images: &images,
             },
         )?;
+        if let Some(identity) = swarm_identity {
+            if run.harness != "generic" || std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() != Ok("1") {
+                bail!("scripted Swarm worker identity requires fixture-only generic harness");
+            }
+            for (key, value) in [
+                ("OVERSEER_SWARM_RUN_ID", identity.run_id.clone()),
+                ("OVERSEER_SWARM_JOB_ID", identity.job_id.clone()),
+                ("OVERSEER_SWARM_ATTEMPT_ID", identity.attempt_id.clone()),
+                ("OVERSEER_SWARM_TOKEN", identity.token.clone()),
+                ("OVERSEER_SWARM_REVISION", identity.revision.to_string()),
+                ("OVERSEER_HOME", paths::data_dir().display().to_string()),
+                ("OVERSEER_SOCKET", paths::socket_path().display().to_string()),
+                ("OVERSEER_BIN", self.exe.display().to_string()),
+            ] {
+                launch.env.insert(key.to_string(), value);
+            }
+        }
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(run_id))?;
         let app = json!({"prompt": prompt, "cwd": ws.path, "model": run.model, "resume": resume, "approval": generic_meta["approval"].as_str().unwrap_or("on-request")});
         self.spawn_process(&run, &ws, launch, json!({"generic": generic_meta, "app": app}))?;
+        if let Some(reservation) = &mut resume_slot {
+            reservation.release_after_start();
+        }
         Ok(turn)
     }
 

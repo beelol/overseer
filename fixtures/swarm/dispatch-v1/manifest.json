@@ -1,0 +1,15 @@
+{
+  "fixture": "shipment-incident-audit",
+  "version": 1,
+  "runtime": "Go 1.23, PostgreSQL 16",
+  "isolation": "one disposable PostgreSQL schema per invocation",
+  "jobs": {
+    "l1": "request traces and pool wait",
+    "l2": "SQL retry and held transaction",
+    "l3": "queue redelivery path"
+  },
+  "seeded_trace_id": "ship-trace-021",
+  "seeded_fault": "retry wait holds the only pool connection while a shipment query times out",
+  "expected_handoff": "L2 account A stores a checkpoint then fails; allowed account B is blocked until a destination grant, then reads the checkpoint as attempt 2",
+  "expected_report": "timeline, plausible pool-starvation hypothesis, alternative causes, and unverified production assumptions"
+}

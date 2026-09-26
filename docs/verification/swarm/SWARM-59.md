@@ -1,0 +1,17 @@
+# SWARM-59 — durable eligibility block and wake
+
+Status: partial. Revision: `c0c47c6`. Support level: fixture-only observation of the agreed Auto Mode snapshot shape; no live telemetry feed or user-facing control.
+
+Input: four local replays cover (1) an allowed target missing at category start, daemon restart, repeat observation and later recovery; (2) loss of the only allowed target after the first of two jobs is admitted; (3) insufficient finishing capacity followed by increased headroom; and (4) an otherwise healthy recovery after the original 15-second run deadline. Each observation declares the required capability, native-unit estimate and purpose. The first replay also tries to turn the block into eligibility by changing only the purpose or estimate. A migration fixture supplies a legacy eligible observation without an assessment identity. The mid-run worker submits a discovery and artifact while availability is blocked.
+
+Expected: preserve a specific blocked reason and existing artifacts, stop new admissions and unchanged-state director turns, wake once on an eligible state change, and never wake beyond the original deadline. Active worker reports remain durable.
+
+Observed: the missing target persists as `availability.state=blocked`, `reason=allowed_target_missing` across daemon restart. The repeated observation leaves `wake_count=0` and an empty director batch returns `blocked`. Changing the assessment purpose or estimate is rejected without a wake; a later eligible snapshot for the original assessment records one wake event in the director inbox. The migration marks a legacy eligible row `blocked` with `assessment_unknown`, so the row cannot authorize new work. During mid-run target loss, direct admission and round-robin scheduling hold new work while the first worker's artifact and discovery remain available to the director; restored eligibility admits the next job. Exhausted finishing capacity records `finishing_reserve` and wakes when headroom increases. A recovery observed after the original deadline causes a deadline Stop and no wake. The four focused tests and full offline Rust suite pass (143 tests: 10 unit, 48 protocol, 85 Swarm).
+
+Commands: `cargo test --offline -p overseerd --test swarm_availability -- --nocapture`; `cargo test --workspace --offline -q`.
+
+Evidence: `daemon/tests/swarm_availability.rs`, `daemon/src/swarm/availability.rs`, `daemon/src/swarm/admission.rs`, `daemon/src/swarm/scheduler.rs`, `daemon/src/swarm/director.rs`.
+
+Remaining: the observation route is fixture-only; Auto Mode does not yet publish live eligibility changes. This is a persisted availability substate, while the top-level run remains `planning`/`running`; a normal status UI is absent. User-triggered target changes and interruption of affected live workers are not implemented. A changed assessment, including a migrated legacy assessment with unknown identity, needs an explicit transition or fresh run; the current fixture route fails closed. A live director loop has not been qualified for no repeated model calls. The RFC criterion stays unchecked.
+
+Dispatch S4 follow-up: `daemon/tests/swarm_dispatch_incident.rs` starts a two-job incident run, retains L1's pool-wait artifact, then removes all qualified selected accounts from the fixture snapshot. The availability block persists across daemon restart; repeating the same observation produces no wake, the director remains blocked, and an unselected target cannot resume L2. This is an incident-shaped regression, not a live Auto Mode feed. See [S4](S4.md).

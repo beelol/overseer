@@ -1,0 +1,17 @@
+# SWARM-30 — director replacement
+
+Status: partial. Revision: `0fc1446`, follow-ups `3d7bc31` and `e89bc7d`.
+
+Input: a fixture-admitted worker with a reserved quota window reports a discovery. The director claims it, and the daemon restarts before the batch is applied. The worker sends a late terminal result while director termination is uncertain. The fixture then reports confirmed director death.
+
+Expected: uncertainty holds new coordination and keeps usage reserved; confirmation advances the director generation, requeues unapplied messages, keeps worker results, and rejects old director commands.
+
+Actual: the run enters `stalled` on unknown termination. Claiming another director batch and sending an old directive fail; the worker result remains durable and its reservation stays active. Confirmed death increments generation from 1 to 2. The replacement claims both the original discovery and the late result, while the original completion token/directive is rejected. The focused test first failed because recovery did not exist, then passed after the transition was added. The workspace suite passed with 68 tests at revision `0fc1446`.
+
+Follow-up: Pause and Resume cannot bypass an uncertain director stall. A separate crash-and-restart fixture starts paused, receives repeated unknown-termination reports, then confirms death; replacement restores `paused` rather than silently resuming admission. The previous implementation returned `planning` in the red test. An additive schema migration persists the pre-stall state; the workspace suite passed 76 tests after the fix.
+
+Evidence: `daemon/tests/swarm_director.rs`, `daemon/tests/swarm_state.rs`, `docs/verification/swarm/milestone-11.md`.
+
+Remaining: the fixture supplies termination evidence; no live process identity/liveness proof, replacement target selection, model turn, or unavailable-replacement recovery is implemented. This is not proof that a real director can be safely killed or resumed.
+
+The versioned Atlas [S5](S5.md) replay now combines confirmed director death with a committed dispatch intent before worker acknowledgement. Generation 2 retains and launches one J2 worker after daemon restart; generation-1 claims, revision and directive fail, and the replacement accepts its database-backed finding. This adds a joined backend trace but does not establish live director death detection or replacement model behavior.

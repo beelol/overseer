@@ -1,12 +1,12 @@
 //! Durable state in SQLite. The daemon is the only writer.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 5;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -121,6 +121,62 @@ fn json_col(row: &Row, idx: &str) -> rusqlite::Result<Value> {
 }
 
 impl Store {
+    pub fn agent_limit(&self) -> Result<i64> {
+        let value: Option<String> = self.conn.query_row(
+            "SELECT value FROM meta WHERE key='agents.max_active'", [], |row| row.get(0)
+        ).optional()?;
+        Ok(value.and_then(|v| v.parse().ok()).unwrap_or(9))
+    }
+
+    pub fn set_agent_limit(&self, limit: i64) -> Result<()> {
+        if !(1..=256).contains(&limit) {
+            bail!("agents.max_active must be between 1 and 256");
+        }
+        self.conn.execute(
+            "INSERT INTO meta(key,value) VALUES('agents.max_active',?1) \
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value", [limit.to_string()]
+        )?;
+        Ok(())
+    }
+
+    /// App slots: one per active top-level run, one per registered Swarm attempt
+    /// without an active run, and one per active director. Native children are
+    /// already represented by their parent run and never consume another slot.
+    pub fn active_agent_count(&self) -> Result<i64> {
+        Ok(self.conn.query_row(
+            "SELECT
+              (SELECT COUNT(*) FROM runs r WHERE r.parent_run_id IS NULL
+               AND r.status IN ('queued','starting','running','waiting_for_user')
+               AND NOT EXISTS (SELECT 1 FROM swarm_worker_launches l
+                 JOIN swarm_attempts a ON a.id=l.attempt_id
+                 WHERE l.overseer_run_id=r.id AND a.status='registered'))
+              + (SELECT COUNT(*) FROM swarm_attempts WHERE status='registered')
+              + (SELECT COUNT(*) FROM swarm_runs
+                 WHERE status IN ('running','paused','stalled','stopping'))",
+            [], |row| row.get(0)
+        )?)
+    }
+
+    pub fn active_agents(&self) -> Result<Vec<Value>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT r.id,r.title,r.status,'run' FROM runs r
+             WHERE r.parent_run_id IS NULL
+             AND r.status IN ('queued','starting','running','waiting_for_user')
+             AND NOT EXISTS (SELECT 1 FROM swarm_worker_launches l
+               JOIN swarm_attempts a ON a.id=l.attempt_id
+               WHERE l.overseer_run_id=r.id AND a.status='registered')
+             UNION ALL SELECT id,job_id,status,'swarm_worker' FROM swarm_attempts
+               WHERE status='registered'
+             UNION ALL SELECT id,category,status,'swarm_director' FROM swarm_runs
+               WHERE status IN ('running','paused','stalled','stopping')"
+        )?;
+        let agents = stmt.query_map([], |row| {
+            Ok(serde_json::json!({"id":row.get::<_,String>(0)?,
+                "title":row.get::<_,String>(1)?,"status":row.get::<_,String>(2)?,
+                "kind":row.get::<_,String>(3)?}))
+        })?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(agents)
+    }
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
@@ -130,6 +186,15 @@ impl Store {
         let store = Self { conn };
         store.migrate()?;
         Ok(store)
+    }
+
+    /// An additional daemon-owned connection for operations that run slow external
+    /// tools between short SQLite writes. The database was migrated at startup.
+    pub fn connect_existing(path: &Path) -> Result<Self> {
+        let conn = Connection::open(path)?;
+        conn.pragma_update(None, "foreign_keys", "ON")?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
+        Ok(Self { conn })
     }
 
     fn migrate(&self) -> Result<()> {
@@ -167,6 +232,17 @@ impl Store {
             CREATE INDEX IF NOT EXISTS events_run ON events(run_id, seq);
             "#,
         )?;
+        let old_version: Option<String> = self.conn.query_row(
+            "SELECT value FROM meta WHERE key='schema_version'",
+            [],
+            |row| row.get(0),
+        ).optional()?;
+        if let Some(version) = old_version {
+            let version: i64 = version.parse()?;
+            if version > SCHEMA_VERSION {
+                bail!("database schema version {version} is newer than this daemon supports");
+            }
+        }
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;
         if !has_pending {
             self.conn.execute_batch("ALTER TABLE runs ADD COLUMN pending_parent_native TEXT;")?;
@@ -175,7 +251,9 @@ impl Store {
         if !has_archived {
             self.conn.execute_batch("ALTER TABLE tasks ADD COLUMN archived_ms INTEGER;")?;
         }
-        self.conn.execute("INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', ?1)", params![SCHEMA_VERSION.to_string()])?;
+        crate::swarm::schema::migrate(&self.conn)?;
+        self.conn.execute("INSERT INTO meta(key, value) VALUES('schema_version', ?1)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
     }
 
@@ -230,8 +308,8 @@ impl Store {
     }
 
     // ---- tasks
-    pub fn insert_task(&self, t: &Task) -> Result<()> {
-        self.conn.execute(
+    fn insert_task_row(conn: &Connection, t: &Task) -> Result<()> {
+        conn.execute(
             "INSERT INTO tasks(id,title,prompt,repo_root,target_ref,workspace_id,start_snapshot,fork_commit,fork_provenance,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
             params![t.id, t.title, t.prompt, t.repo_root, t.target_ref, t.workspace_id, t.start_snapshot, t.fork_commit, t.fork_provenance, t.created_ms],
         )?;
@@ -294,12 +372,34 @@ impl Store {
 
     // ---- runs
     pub fn insert_run(&self, r: &Run) -> Result<()> {
-        self.conn.execute(
+        Self::insert_run_row(&self.conn, r)
+    }
+
+    fn insert_run_row(conn: &Connection, r: &Run) -> Result<()> {
+        conn.execute(
             "INSERT INTO runs(id,task_id,parent_run_id,harness,harness_version,profile_id,model,workspace_id,native_id,status,exit_reason,created_ms,ended_ms,title,relation_source,relation_confidence,capabilities,process_generation)
              VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",
             params![r.id, r.task_id, r.parent_run_id, r.harness, r.harness_version, r.profile_id, r.model, r.workspace_id, r.native_id,
                 r.status, r.exit_reason, r.created_ms, r.ended_ms, r.title, r.relation_source, r.relation_confidence, r.capabilities.to_string(), r.process_generation],
         )?;
+        Ok(())
+    }
+
+    pub fn insert_task_and_run(&self, t: &Task, r: &Run, attempt_id: Option<&str>) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        Self::insert_task_row(&tx, t)?;
+        Self::insert_run_row(&tx, r)?;
+        if let Some(attempt_id) = attempt_id {
+            let linked = tx.execute(
+                "UPDATE swarm_worker_launches SET overseer_run_id=?2 WHERE attempt_id=?1 AND overseer_run_id IS NULL",
+                params![attempt_id, r.id],
+            )?;
+            if linked != 1 {
+                anyhow::bail!("swarm launch intent is missing or already linked");
+            }
+        }
+        tx.execute("UPDATE workspaces SET owner_run_id=?2 WHERE id=?1",params![r.workspace_id,r.id])?;
+        tx.commit()?;
         Ok(())
     }
 
@@ -563,5 +663,41 @@ impl Store {
         )?;
         self.conn.execute("DELETE FROM events WHERE run_id=?1 AND seq<=?2 AND kind<>'retention'", params![run, cutoff])?;
         Ok(Some(cutoff))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn failed_swarm_link_rolls_back_task() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
+        let workspace = Workspace {
+            id: "w-test".into(), path: "/tmp/test".into(), repo_root: "/tmp/test".into(),
+            common_dir: "/tmp/test/.git".into(), kind: "worktree".into(), branch: None,
+            owner_run_id: None, initial_dirty: json!({"clean":true}), created_ms: 1,
+            removed_ms: None,
+        };
+        store.insert_workspace(&workspace).unwrap();
+        let task = Task {
+            id: "t-test".into(), title: "Test".into(), prompt: "Check".into(),
+            repo_root: workspace.repo_root.clone(), target_ref: None,
+            workspace_id: workspace.id.clone(), start_snapshot: None,
+            fork_commit: None, fork_provenance: None, created_ms: 1, archived_ms: None,
+        };
+        let run = Run {
+            id: "r-test".into(), task_id: task.id.clone(), parent_run_id: None,
+            harness: "generic".into(), harness_version: None, profile_id: None, model: None,
+            workspace_id: workspace.id.clone(), native_id: None, status: "queued".into(),
+            exit_reason: None, created_ms: 1, ended_ms: None, title: task.title.clone(),
+            relation_source: None, relation_confidence: None, capabilities: json!({}),
+            process_generation: 0, attention: None,
+        };
+        assert!(store.insert_task_and_run(&task, &run, Some("missing-attempt")).is_err());
+        assert!(store.task(&task.id).unwrap().is_none());
+        assert!(store.run(&run.id).unwrap().is_none());
     }
 }

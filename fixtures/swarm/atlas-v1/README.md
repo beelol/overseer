@@ -1,0 +1,17 @@
+# Atlas v1 — tenant-isolation audit fixture
+
+This is the versioned local Express/TypeScript + PostgreSQL backend for Swarm S1. It has two deliberate defects: a task is looked up by ID before PATCH/DELETE without a project-membership check, and an attachment download is signed without checking its task's project. Projects, role changes, exports and token restrictions are protected paths. An in-process object-store emulator serves only the signed fixture object; there is no external object service or production data.
+
+Run `npm ci --ignore-scripts` once, then `./run-local.sh` with Docker and Node.js 24. The script creates a temporary PostgreSQL 16 container with a random localhost port and removes it on exit. `npm test` also works against a supplied `ATLAS_DATABASE_URL` for an already-running local database. Every scripted worker test gets a fresh PostgreSQL schema, including J7's independent reproduction. The test runner drops those schemas afterward.
+
+`node probe.mjs j2` emits the database-backed evidence for one job as JSON; omit the job ID for all seven probes. `./run-swarm.sh` runs the opt-in Rust S1 replay against the same disposable PostgreSQL fixture. That replay commits synthetic benefit decisions, admits J1–J4 across two synthetic account pools, records D1 and targeted acknowledgements, refills J1's freed slot with J5, adds an independent J7 reproduction, and completes an evidence-gated run. Its director choices and target snapshot are scripted.
+
+`node probe.mjs j7 task-guarded` uses the manifest's guarded J7 variant. It denies the foreign task mutation and leaves Bob's row unchanged, contradicting J2's seeded result. The joined fault replay holds the task claim for environment review and sends retraction messages to prior recipients; another replay refuses stale J4 output after an assignment change and a J2 result whose referenced artifact has been removed.
+
+`node probe.mjs j5 export-queue-missing` removes J5's local PostgreSQL queue table. The authorized export returns 503; the Swarm fault replay records `exports_queue` as unavailable, leaves J5 blocked in the coverage readout, and refuses a passed decision or completed run.
+
+The opt-in S5 lost-receipt replay in `daemon/tests/swarm_atlas.rs` uses a real J2 probe. It discards the first result reply after persistence, restarts the daemon, replays the same message ID, and verifies one admission, artifact, result, acceptance and completed check. The remaining S5 faults are tracked in `docs/verification/swarm/S5.md`.
+
+The S5 director-death replay uses `swarm-j2-worker.mjs` as a supervised fixture worker. It injects a failure after durable dispatch admission but before launch acknowledgement, advances the director generation on confirmed death, then restarts the daemon. Startup recovers one worker, which probes the disposable J2 database and submits its own artifact and result. A private temporary file supplies that worker with the disposable database URL; the daemon's ordinary worker environment stays restricted.
+
+The passing acceptance and joined replay tests describe the **seeded backend's actual responses**, including the two vulnerabilities. They are not a security fix, a model-agent audit, or a full S1 pass. Autonomous director choices, live harness communication, the stated report detail, source-text injection, and full fault recovery remain open. See `docs/rfcs/swarm-mode-scenarios.md`.

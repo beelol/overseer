@@ -1,0 +1,270 @@
+mod common;
+
+use common::*;
+use serde_json::json;
+
+#[test]
+fn background_notice_names_queued_swarm_without_a_worker_process() {
+    let d = Daemon::start(&[("OVERSEER_NOTIFY_COMMAND", "/usr/bin/true")]);
+    let run = d.call("swarm.create", json!({"category":"Queued backend audit",
+        "objective":"Inspect backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"pending","title":"Pending","acceptance":"evidence","deps":[]}
+    ]}));
+    let notice = d.call("daemon.background_notice", json!({}))["notice"].clone();
+    assert_eq!(notice["title"], "Overseer: 1 swarm still active");
+    assert_eq!(notice["swarms"][0]["id"], id);
+    assert_eq!(notice["swarms"][0]["active_workers"], 0);
+    assert!(notice["body"].as_str().unwrap().contains("Queued backend audit"));
+}
+
+#[test]
+fn daemon_stop_all_cancels_swarm_without_a_supervised_worker() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Global stop","objective":"Audit backend",
+        "allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"queued","title":"Queued audit","acceptance":"evidence","deps":[]}
+    ]}));
+
+    let stopped = d.call("daemon.stop_all", json!({}));
+    assert_eq!(stopped["swarms"], json!([id]));
+    assert!(d.child.as_mut().unwrap().wait().unwrap().success());
+    d.child = None;
+    d.spawn();
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopped");
+    assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["status"], "cancelled");
+    assert!(d.try_call("swarm.attempt.register", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"queued"})).is_err());
+}
+
+#[test]
+fn daemon_stop_all_preserves_unconfirmed_swarm_worker_after_control_loss() {
+    let mut d = Daemon::start(&[("OVERSEER_NOTIFY_COMMAND", "/usr/bin/true")]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("global-stop-source"));
+    let run = d.call("swarm.create", json!({"category":"Global active stop",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"active","title":"Inspect","acceptance":"evidence","deps":[]},
+        {"id":"queued","title":"Queued","acceptance":"evidence","deps":[]}
+    ]}));
+    let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"active","target_id":"fixture-local","request_id":"global-stop-worker",
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    let launched = d.call("swarm.worker.launch", json!({"run_id":id,"job_id":"active",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],"repo":checkout,
+        "program":"/bin/sleep","args":["30"],"prompt":"Inspect","title":"Global stop worker"}));
+    let worker = launched["overseer_run_id"].as_str().unwrap();
+    d.wait_status(worker, |status| status == "running", 10);
+    let notice = d.call("daemon.background_notice", json!({}))["notice"].clone();
+    assert_eq!(notice["title"], "Overseer: 1 swarm still active");
+    assert_eq!(notice["swarms"][0]["id"], id);
+    assert_eq!(notice["swarms"][0]["active_workers"], 1);
+    assert!(notice["body"].as_str().unwrap().contains("Global active stop"));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let run_dir: String = db.query_row("SELECT run_dir FROM runs WHERE id=?1", [worker],
+        |row| row.get(0)).unwrap();
+    let launch: serde_json::Value = serde_json::from_slice(&std::fs::read(
+        std::path::Path::new(&run_dir).join("launch.json")).unwrap()).unwrap();
+    std::fs::remove_file(launch["control_socket"].as_str().unwrap()).unwrap();
+    let shim: serde_json::Value = serde_json::from_slice(&std::fs::read(
+        std::path::Path::new(&run_dir).join("shim.json")).unwrap()).unwrap();
+
+    let stopped = d.call("daemon.stop_all", json!({}));
+    assert_eq!(stopped["swarms"], json!([id]));
+    assert_eq!(stopped["remaining"], json!([worker]));
+    let ended: Option<i64> = db.query_row("SELECT ended_ms FROM runs WHERE id=?1", [worker],
+        |row| row.get(0)).unwrap();
+    assert_eq!(ended, None, "unreachable control socket is not a confirmed process exit");
+    assert!(pid_alive(shim["child_pid"].as_i64().unwrap()));
+    assert!(d.child.as_mut().unwrap().wait().unwrap().success());
+    d.child = None;
+    d.spawn();
+    assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][1]["status"], "cancelled");
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["unconfirmed_exit_count"], 1);
+    assert_eq!(d.run(worker)["status"], "running");
+    let attempts: i64 = db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND job_id='active'",
+        [id], |row| row.get(0)).unwrap();
+    assert_eq!(attempts, 1);
+    signal(shim["child_pid"].as_i64().unwrap(), 9);
+    d.wait_done(worker, 5);
+    let err = d.try_call("run.follow_up", json!({"run_id":worker,"prompt":"continue"})).unwrap_err();
+    assert!(err.contains("Swarm worker"), "unexpected follow-up result: {err}");
+}
+
+#[test]
+fn pause_resume_and_off_keep_active_evidence_but_stop_new_delegation() {
+    let d = Daemon::start(&[]);
+    let run = d.call(
+        "swarm.create",
+        json!({"category":"Controls","objective":"Audit","allowed_targets":["system-codex"]}),
+    );
+    let id = run["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":id,"generation":1,"revision":0,"jobs":[
+            {"id":"active","title":"Active","acceptance":"evidence","deps":[]},
+            {"id":"queued","title":"Queued","acceptance":"evidence","deps":[]}
+        ]}),
+    );
+    let attempt = d.call(
+        "swarm.attempt.register",
+        json!({"run_id":id,"generation":1,"revision":1,"job_id":"active"}),
+    );
+    let aid = attempt["id"].as_str().unwrap();
+    let token = attempt["token"].as_str().unwrap();
+    assert_eq!(
+        d.call(
+            "swarm.pause",
+            json!({"run_id":id,"generation":1,"revision":1})
+        )["status"],
+        "paused"
+    );
+    assert!(d
+        .try_call(
+            "swarm.attempt.register",
+            json!({"run_id":id,"generation":1,"revision":1,"job_id":"queued"})
+        )
+        .is_err());
+    let pending = d.call("swarm.messages", json!({"run_id":id,"recipient":aid}));
+    assert!(pending["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|m| m["type"] == "checkpoint"));
+    assert_eq!(
+        d.call(
+            "swarm.resume",
+            json!({"run_id":id,"generation":1,"revision":1})
+        )["status"],
+        "running"
+    );
+    assert_eq!(
+        d.call(
+            "swarm.off",
+            json!({"run_id":id,"generation":1,"revision":1})
+        )["status"],
+        "draining"
+    );
+    let jobs = d.call("swarm.jobs", json!({"id":id}));
+    assert_eq!(
+        jobs["jobs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|j| j["id"] == "queued")
+            .unwrap()["status"],
+        "cancelled"
+    );
+    assert_eq!(
+        jobs["jobs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|j| j["id"] == "active")
+            .unwrap()["status"],
+        "reserved"
+    );
+    d.call(
+        "swarm.artifact.put",
+        json!({"run_id":id,"job_id":"active","attempt_id":aid,"token":token,
+            "artifact_id":"drained-evidence","source_revision":1,
+            "kind":"finding","content":"inspected active job"}),
+    );
+    d.call(
+        "swarm.report",
+        json!({"run_id":id,"job_id":"active","attempt_id":aid,"token":token,
+        "message_id":"late-after-off","type":"result","revision":1,
+        "payload":{"artifact_ids":["drained-evidence"]}}),
+    );
+    assert_eq!(
+        d.call("swarm.jobs", json!({"id":id}))["jobs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|j| j["id"] == "active")
+            .unwrap()["status"],
+        "submitted"
+    );
+    assert!(d
+        .try_call(
+            "swarm.attempt.register",
+            json!({"run_id":id,"generation":1,"revision":1,"job_id":"queued"})
+        )
+        .is_err());
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"active","attempt_id":aid}));
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["status"],"draining");
+    assert_eq!(d.call("swarm.decide",json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"active","decision":"accept","evidence":["drained-evidence"]}))["status"],"accepted");
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["status"],"stopped");
+}
+
+#[test]
+fn deadline_on_admission_stops_queued_work_without_claiming_completion() {
+    let d = Daemon::start(&[]);
+    let run=d.call("swarm.create",json!({"category":"Deadline","objective":"Audit","allowed_targets":["target"],"policy":{"deadline_ms":60000}}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[{"id":"j","title":"J","acceptance":"evidence","deps":[]}]}));
+    let at = run["created_ms"].as_i64().unwrap() + 60000;
+    let snapshot = json!({"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+        "targets":[{"id":"target","account_id":"account","pool_ids":["pool"],"capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points","remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+60000}]}]});
+    let result=d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,"job_id":"j","target_id":"target","request_id":"expired","snapshot":snapshot,"now_ms":at,"required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(result["reason"], "run_deadline");
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopped");
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["stop_reason"], "deadline");
+    assert_eq!(
+        d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["status"],
+        "cancelled"
+    );
+}
+
+#[test]
+fn deadline_expires_without_another_admission_while_active_or_blocked() {
+    let d = Daemon::start(&[]);
+    let active = d.call("swarm.create", json!({"category":"Timed active","objective":"Audit",
+        "allowed_targets":["system-codex"],"policy":{"deadline_ms":1500}}));
+    let active_id = active["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":active_id,"generation":1,"revision":0,"jobs":[
+        {"id":"working","title":"Working","acceptance":"evidence","deps":[]},
+        {"id":"queued","title":"Queued","acceptance":"evidence","deps":[]}
+    ]}));
+    let attempt=d.call("swarm.attempt.register",json!({"run_id":active_id,"job_id":"working",
+        "generation":1,"revision":1}));
+    let blocked = d.call("swarm.create", json!({"category":"Timed blocked","objective":"Audit",
+        "allowed_targets":[],"policy":{"deadline_ms":1500}}));
+    let blocked_id = blocked["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":blocked_id,"generation":1,"revision":0,"jobs":[
+        {"id":"blocked","title":"Blocked","acceptance":"evidence","deps":[]}
+    ]}));
+    let deadline=std::time::Instant::now()+std::time::Duration::from_secs(5);
+    while std::time::Instant::now()<deadline {
+        if d.call("swarm.get",json!({"id":active_id}))["status"]=="stopping"
+            && d.call("swarm.get",json!({"id":blocked_id}))["status"]=="stopped" {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert_eq!(d.call("swarm.get",json!({"id":active_id}))["status"],"stopping");
+    assert_eq!(d.call("swarm.get",json!({"id":blocked_id}))["status"],"stopped");
+    assert_eq!(d.call("swarm.get",json!({"id":active_id}))["stop_reason"],"deadline");
+    assert_eq!(d.call("swarm.get",json!({"id":blocked_id}))["stop_reason"],"deadline");
+    let jobs=d.call("swarm.jobs",json!({"id":active_id}));
+    assert_eq!(jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="working").unwrap()["status"],"cancel_requested");
+    assert_eq!(jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="queued").unwrap()["status"],"cancelled");
+    assert_eq!(d.call("swarm.jobs",json!({"id":blocked_id}))["jobs"][0]["status"],"cancelled");
+    assert!(d.call("swarm.messages",json!({"run_id":active_id,"recipient":attempt["id"]}))["messages"]
+        .as_array().unwrap().iter().any(|m|m["type"]=="stop"));
+}

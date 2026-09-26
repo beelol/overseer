@@ -12,6 +12,7 @@ mod redact;
 mod server;
 mod shim;
 mod store;
+mod swarm;
 
 use std::io::{BufRead, BufReader, Write};
 
@@ -74,6 +75,8 @@ fn main() {
                 log(&format!("overseerd {} starting, data dir {}", env!("CARGO_PKG_VERSION"), paths::data_dir().display()));
                 let report = d.reconcile()?;
                 log(&format!("reconcile: {report}"));
+                let dispatches = swarm::recover_pending_dispatches(&d)?;
+                log(&format!("swarm dispatch recovery: {dispatches}"));
                 server::serve(d).await
             });
             if let Err(e) = result {
