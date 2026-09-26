@@ -220,9 +220,13 @@
       "blocker": "An explicit fixture override admits 32 attempts without a hidden eight-worker cap; no live workers, 100-job execution or acceptance chain exists."
     },
     "SWARM-30": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_director.rs",
+        "docs/verification/swarm/SWARM-30.md",
+        "docs/verification/swarm/milestone-11.md"
+      ],
+      "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result, and requeues an unapplied batch after confirmed replacement with generation fencing; live process liveness, replacement availability and actual director execution are unverified."
     },
     "SWARM-31": {
       "status": "unverified",
