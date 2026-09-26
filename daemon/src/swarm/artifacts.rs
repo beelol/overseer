@@ -324,17 +324,29 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
     if job_status == "accepted" {
         release_and_unlock(&tx, run, job, now)?;
     } else if current["status"] == "stopping" {
-        tx.execute(
-            "UPDATE swarm_jobs SET status='cancelled',updated_ms=?3 WHERE run_id=?1 AND id=?2",
-            params![run, job, now],
+        let unsafe_effects: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+            params![run,job], |r| r.get(0),
         )?;
-        tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        tx.execute(
+            "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
+            params![run, job, if unsafe_effects > 0 { "blocked" } else { "cancelled" }, now],
+        )?;
+        if unsafe_effects == 0 {
+            tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        }
     } else if job_status == "cancel_requested" && job_stop_reason.as_deref() == Some("job_deadline") {
-        tx.execute(
-            "UPDATE swarm_jobs SET status='failed',updated_ms=?3 WHERE run_id=?1 AND id=?2",
-            params![run,job,now],
+        let unsafe_effects: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
+            params![run,job], |r| r.get(0),
         )?;
-        tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        tx.execute(
+            "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
+            params![run,job,if unsafe_effects > 0 { "blocked" } else { "failed" },now],
+        )?;
+        if unsafe_effects == 0 {
+            tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        }
     } else if job_status == "rejected" {
         let unsafe_effects: i64 = tx.query_row(
             "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
@@ -351,7 +363,9 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
             "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
             params![run, job, next, now],
         )?;
-        tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        if unsafe_effects == 0 {
+            tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        }
     } else if job_status == "cancel_requested" && job_revision > attempt_revision {
         let unsafe_effects: i64 = tx.query_row(
             "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
@@ -391,7 +405,9 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
             "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
             params![run, job, next, now],
         )?;
-        tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        if unsafe_effects == 0 {
+            tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+        }
     }
     tx.commit()?;
     Ok(json!({"attempt_id":attempt,"status":"finished","duplicate":false}))

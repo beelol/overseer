@@ -173,7 +173,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
             stop_reason=CASE WHEN ?9=1 THEN NULL ELSE stop_reason END,updated_ms=?8
             WHERE run_id=?1 AND id=?2",
             params![id,job.id,revision,job.title,job.acceptance,serde_json::to_string(&job.deps)?,state,now,i64::from(live.is_empty())])?;
-        if live.is_empty() {
+        if live.is_empty() && unsafe_effects == 0 {
             tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![id,job.id,now])?;
         }
         for attempt in live {

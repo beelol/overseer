@@ -237,6 +237,8 @@ fn revision_during_an_uncertain_effect_cannot_requeue_after_worker_exit() {
         json!({"run_id":id,"generation":1,
         "revision":1,"job_id":"mutate"}),
     );
+    d.call("swarm.claim", json!({"run_id":id,"job_id":"mutate",
+        "resource":"ledgerpay:evt-43","mode":"write","generation":1,"revision":1}));
     assert_eq!(
         d.call(
             "swarm.effect.begin",
@@ -274,4 +276,46 @@ fn revision_during_an_uncertain_effect_cannot_requeue_after_worker_exit() {
         "revision":2,"job_id":"mutate"})
         )
         .is_err());
+    let other = d.call("swarm.create", json!({"category":"Other effect revision",
+        "objective":"Inspect evt-43","allowed_targets":["fixture-local"]}));
+    let other_id = other["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":other_id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect event","acceptance":"evidence","deps":[]}
+    ]}));
+    assert!(d.try_call("swarm.claim", json!({"run_id":other_id,"job_id":"inspect",
+        "resource":"ledgerpay:evt-43","mode":"write","generation":1,"revision":1}))
+        .unwrap_err().contains("claim conflict"));
+}
+
+#[test]
+fn stopping_an_uncertain_effect_keeps_its_resource_quarantined() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"LedgerPay stop",
+        "objective":"Inspect entitlement state","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"grant","title":"Grant entitlement","acceptance":"evidence","deps":[]}
+    ]}));
+    let attempt = d.call("swarm.attempt.register", json!({"run_id":id,
+        "generation":1,"revision":1,"job_id":"grant"}));
+    d.call("swarm.claim", json!({"run_id":id,"job_id":"grant",
+        "resource":"ledgerpay:entitlements","mode":"write","generation":1,"revision":1}));
+    d.call("swarm.effect.begin", json!({"run_id":id,"job_id":"grant",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "effect_id":"evt-44-grant","operation_id":"fixture:ledgerpay:evt-44:grant",
+        "revision":1}));
+    d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"job_id":"grant",
+        "attempt_id":attempt["id"],"generation":1,"revision":1}));
+    assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["status"], "blocked");
+
+    let other = d.call("swarm.create", json!({"category":"LedgerPay followup",
+        "objective":"Inspect same entitlement table","allowed_targets":["fixture-local"]}));
+    let other_id = other["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":other_id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect entitlements","acceptance":"evidence","deps":[]}
+    ]}));
+    assert!(d.try_call("swarm.claim", json!({"run_id":other_id,"job_id":"inspect",
+        "resource":"ledgerpay:entitlements","mode":"write","generation":1,"revision":1}))
+        .unwrap_err().contains("claim conflict"));
 }
