@@ -418,6 +418,15 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     }
                 }
                 if routes.len() > 128 { return Err(anyhow!("automatic candidate catalog exceeded its bound")); }
+                let health_now = crate::daemon::now();
+                match crate::auto_health::recent_local_observations(&d.store.lock().unwrap(), health_now) {
+                    Ok(observations) => {
+                        for route in &mut routes {
+                            route.health = crate::auto_health::evaluate(route, &observations, health_now);
+                        }
+                    }
+                    Err(_) => discovery_failures.push(json!({"reason":"local_health_evidence_unavailable"})),
+                }
                 let work = WorkUnit { id:work_unit_id.into(), min_tier, required_tools:required_tools.clone(),
                     context_needed, requires_approvals, min_sandbox:Sandbox::WorkspaceWrite,
                     max_sandbox:Sandbox::WorkspaceWrite,

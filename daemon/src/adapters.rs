@@ -351,13 +351,15 @@ pub fn permission_reply(harness: &str, request_id: &str, allow: bool, input: &Va
     }
 }
 
-/// Classify an error message into auth / rate_limit / quota / other.
+/// Classify a direct harness error without inferring account quota from HTTP throttling.
 pub fn classify_error(message: &str) -> &'static str {
     let m = message.to_ascii_lowercase();
     if m.contains("usage limit") || m.contains("quota") || m.contains("exceeded your") || m.contains("out of credits") || m.contains("credit limit") || m.contains("insufficient_quota") {
         "quota"
     } else if m.contains("rate limit") || m.contains("rate_limit") || m.contains("429") || m.contains("too many requests") {
         "rate_limit"
+    } else if m.contains("503 service unavailable") || m.contains("http status 503") {
+        "service_unavailable"
     } else if m.contains("authenticat") || m.contains("401") || m.contains("unauthorized") || m.contains("not logged in") || m.contains("log in") || m.contains("login") || m.contains("oauth") || m.contains("token expired") {
         "auth"
     } else {
@@ -849,6 +851,7 @@ mod tests {
     fn classify_errors() {
         assert_eq!(classify_error("Failed to authenticate: OAuth session expired and could not be refreshed"), "auth");
         assert_eq!(classify_error("stream error: 429 Too Many Requests"), "rate_limit");
+        assert_eq!(classify_error("HTTP 503 Service Unavailable"), "service_unavailable");
         assert_eq!(classify_error("You've hit your usage limit. Upgrade to Pro"), "quota");
         assert_eq!(classify_error("file not found"), "other");
         // Real message formats found in the pinned codex 0.155 binary (strings probe).

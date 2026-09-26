@@ -6,6 +6,7 @@ mod auto_opencode;
 mod auto_collect;
 mod auto_consumption;
 mod auto_select;
+mod auto_health;
 mod adapters;
 mod background;
 mod daemon;

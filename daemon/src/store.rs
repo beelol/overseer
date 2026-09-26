@@ -173,6 +173,7 @@ impl Store {
               process_generation INTEGER NOT NULL DEFAULT 0, run_dir TEXT, segment INTEGER NOT NULL DEFAULT 0,
               seg_offset INTEGER NOT NULL DEFAULT 0, attention TEXT, launch TEXT);
             CREATE UNIQUE INDEX IF NOT EXISTS runs_native ON runs(parent_run_id, native_id) WHERE parent_run_id IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS runs_recent_completion ON runs(status, ended_ms);
             CREATE TABLE IF NOT EXISTS turns(
               id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), n INTEGER NOT NULL, prompt TEXT NOT NULL,
               snapshot_id TEXT, started_ms INTEGER NOT NULL, ended_ms INTEGER, status TEXT NOT NULL);
@@ -186,6 +187,7 @@ impl Store {
               seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, task_id TEXT, run_id TEXT, kind TEXT NOT NULL,
               source TEXT NOT NULL, confidence TEXT NOT NULL, payload TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS events_run ON events(run_id, seq);
+            CREATE INDEX IF NOT EXISTS events_health_recent ON events(kind, ts);
             CREATE TABLE IF NOT EXISTS auto_measurements(
               event_seq INTEGER PRIMARY KEY, observed_ms INTEGER NOT NULL, task_id TEXT NOT NULL,
               run_id TEXT NOT NULL, harness TEXT NOT NULL, profile_id TEXT, model TEXT, effort TEXT,

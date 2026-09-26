@@ -117,6 +117,12 @@ rl.on('line', line => {
     out({ method: 'turn/started', params: { threadId: thread, turn: { id: turn } } });
     if (process.env.FIXTURE_MODE?.startsWith('managed')) {
       const prompt = m.params.input?.[0]?.text ?? '';
+      if (prompt === 'simulate direct 429' || prompt === 'simulate direct 503') {
+        out({ method: 'turn/completed', params: { threadId: thread,
+          turn: { id: turn, status: 'failed', error: { message: prompt === 'simulate direct 429'
+            ? 'HTTP 429 Too Many Requests' : 'HTTP 503 Service Unavailable' } } } });
+        return;
+      }
       let text;
       if (prompt === 'seed context') {
         fs.writeFileSync(path.join(process.cwd(), 'parent-context.txt'), 'from parent\n');

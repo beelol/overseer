@@ -1862,6 +1862,67 @@ fn auto_dispatch_from_claude_exhausted_frontier_pool_uses_allowed_codex_child() 
 }
 
 #[test]
+fn auto_recent_429_excludes_only_its_route_without_inventing_quota_exhaustion() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "prose")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let failing = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium","prompt":"simulate direct 429","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&failing, 15)["status"], "failed");
+    assert!(d.events(&failing).iter().any(|event| event["kind"] == "error"
+        && event["payload"]["class"] == "rate_limit"));
+    let result = d.call("auto.dispatch", json!({"work_unit_id":"recent-429-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-codex","system-claude"],
+        "preferred_harness":"codex-app","prompt":"continue on an available route"}));
+    assert_eq!(result["state"], "dispatched", "{result}");
+    assert_eq!(result["decision"]["selected"], "system-claude/sonnet/medium", "{result}");
+    assert!(result["decision"]["exclusions"].as_array().unwrap().iter()
+        .any(|entry| entry["reason"] == "route_unavailable"
+            && entry["route_id"].as_str().unwrap().starts_with("system-codex/")));
+    assert_ne!(d.call("auto.quota.state", json!({"profile_id":"system-codex",
+        "harness":"codex-app","model":"gpt-6-sol"}))["state"], "exhausted");
+    let decision_event = d.events(&parent).into_iter()
+        .find(|event| event["kind"] == "auto_decision").unwrap();
+    assert_eq!(d.call("auto.decision.replay", json!({"event_seq":decision_event["seq"]}))["matches_recorded"], true);
+    assert_eq!(d.wait_done(&run_id(&result), 15)["status"], "completed");
+}
+
+#[test]
+fn auto_recent_503_blocks_the_failed_endpoint_before_an_independent_child() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "prose")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let failing = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium","prompt":"simulate direct 503","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&failing, 15)["status"], "failed");
+    assert!(d.events(&failing).iter().any(|event| event["kind"] == "error"
+        && event["payload"]["class"] == "service_unavailable"));
+    let result = d.call("auto.dispatch", json!({"work_unit_id":"recent-503-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-codex","system-claude"],
+        "preferred_harness":"codex-app","prompt":"continue on an independent route"}));
+    assert_eq!(result["state"], "dispatched", "{result}");
+    assert_eq!(result["decision"]["selected"], "system-claude/sonnet/medium", "{result}");
+    assert!(result["decision"]["exclusions"].as_array().unwrap().iter()
+        .any(|entry| entry["reason"] == "route_unavailable"
+            && entry["route_id"].as_str().unwrap().starts_with("system-codex/")));
+    assert_eq!(d.wait_done(&run_id(&result), 15)["status"], "completed");
+}
+
+#[test]
 fn auto_claude_api_key_auth_is_excluded_without_a_child() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

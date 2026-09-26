@@ -52,6 +52,11 @@ fn loopback_port(url: &str) -> Option<u16> {
     port.parse::<u16>().ok().filter(|value| *value > 0)
 }
 
+/// Only a validated local endpoint escapes a host-offline health signal.
+pub fn is_verified_loopback_endpoint(url: &str) -> bool {
+    loopback_port(url).is_some()
+}
+
 /// A loopback TCP check is metadata-only; reachability is not a model-turn
 /// success or evidence about the provider's quality, permissions, or quota.
 pub fn probe_local_endpoint(url: &str) -> EndpointProbe {
