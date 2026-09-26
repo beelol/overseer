@@ -69,6 +69,8 @@ pub struct Feed {
     pub version: u64,
     /// Workspace path, to show paths relative to it.
     pub root: Option<String>,
+    /// The task's repository (path, name): its paths in output show as `name/…`.
+    pub repo: Option<(String, String)>,
 }
 
 impl Feed {
@@ -113,8 +115,8 @@ impl Feed {
                     "assistant" => push(self, Kind::Agent, text),
                     "reasoning" => push(self, Kind::Thinking, first_line(&text)),
                     "plan" => push(self, Kind::Thinking, format!("plan: {}", first_line(&text))),
-                    "stdout" => push(self, Kind::Out, text),
-                    "stderr" => push(self, Kind::ErrOut, text),
+                    "stdout" => push(self, Kind::Out, self.shorten(&text)),
+                    "stderr" => push(self, Kind::ErrOut, self.shorten(&text)),
                     "user" => push(self, Kind::User, text),
                     // Harness notices ("session started (model …)") are noise in a tile.
                     "system" => return self.bump(),
@@ -219,6 +221,23 @@ impl Feed {
             self.items.remove(&first);
         }
         self.bump()
+    }
+
+    /// Display-only: the workspace path becomes `.`, the repository `name`, home `~`.
+    pub fn shorten(&self, text: &str) -> String {
+        let mut out = text.to_string();
+        if let Some(r) = self.root.as_deref().filter(|r| r.len() > 1) {
+            out = out.replace(&format!("{r}/"), "./").replace(r, ".");
+        }
+        if let Some((path, name)) = &self.repo {
+            if path.len() > 1 {
+                out = out.replace(path.as_str(), name);
+            }
+        }
+        if let Some(home) = std::env::var_os("HOME").map(|h| h.to_string_lossy().to_string()).filter(|h| h.len() > 1) {
+            out = out.replace(&home, "~");
+        }
+        out
     }
 
     fn bump(&mut self) -> bool {

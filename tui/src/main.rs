@@ -89,15 +89,16 @@ fn main() -> Result<()> {
     if mouse {
         let _ = execute!(std::io::stdout(), EnableMouseCapture);
     }
+    // Test-only: proves the terminal is restored after a panic (tests/look.rs).
+    if std::env::var_os("OVERSEER_TUI_TEST_PANIC").is_some() {
+        panic!("overseer-tui test panic");
+    }
     let input = tx.clone();
-    std::thread::spawn(move || loop {
-        match event::read() {
-            Ok(e) => {
-                if input.send(Ev::Term(e)).is_err() {
-                    break;
-                }
+    std::thread::spawn(move || {
+        while let Ok(e) = event::read() {
+            if input.send(Ev::Term(e)).is_err() {
+                break;
             }
-            Err(_) => break,
         }
     });
 

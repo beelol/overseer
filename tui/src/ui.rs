@@ -146,6 +146,7 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Compose => &[("enter", "send"), ("alt+enter", "new line"), ("esc", "close (keeps draft)"), ("ctrl+u", "clear")],
         Mode::Zoom { .. } => &[("j/k", "scroll"), ("g/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
+        _ if area.width < 110 => &[("i", "message"), ("z", "zoom"), ("a/d", "answer"), ("n", "new"), ("?", "keys"), ("q", "quit")],
         _ => &[("←↑↓→", "move"), ("i", "message"), ("z", "zoom"), ("a/d", "allow/deny"), ("w", "next waiting"), ("]/[", "page"), ("n", "new"), ("f", "filter"), ("?", "help"), ("q", "quit")],
     };
     let mut spans = vec![Span::raw(" ")];
@@ -241,7 +242,11 @@ fn tile(f: &mut Frame, app: &mut App, run: &Run, slot: usize, area: Rect, zoomed
     } else if app.drafts.get(&run.id).is_some_and(|d| !d.trim().is_empty()) && !matches!(app.mode, Mode::Compose) {
         Some(Line::from(Span::styled(" ✎ draft ", Style::new().fg(accent()))))
     } else if !run.active() {
-        let word = run.exit_reason.as_deref().filter(|_| run.status != "completed").map(|r| format!(" {} · {} ", status_word(&run.status), short(r, 40))).unwrap_or_else(|| format!(" {} ", status_word(&run.status)));
+        // "interrupted · by user (exit signal 2)": the reason without repeating the status.
+        let word = run.exit_reason.as_deref().filter(|_| run.status != "completed").map(|r| {
+            let r = r.strip_prefix(status_word(&run.status)).map(str::trim_start).unwrap_or(r);
+            format!(" {} · {} ", status_word(&run.status), short(r, 40))
+        }).unwrap_or_else(|| format!(" {} ", status_word(&run.status)));
         Some(Line::from(Span::styled(word, Style::new().fg(color))))
     } else {
         feed.filter(|f| f.tokens_in + f.tokens_out > 0).map(|f| Line::from(Span::styled(format!(" {} in / {} out ", compact(f.tokens_in), compact(f.tokens_out)), Style::new().fg(MUTED))))

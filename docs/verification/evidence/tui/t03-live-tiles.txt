@@ -1,48 +1,48 @@
  ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                       ● connected 
-╭ 1 ✓ Ticker ───────────────────────── generic · 2s ╮┏ 2 ● Latency probe ━━━━━━━━━━━━━━━━━━━ generic · 5s ┓                                                     
-│ tick 47                                           │┃ got p3                                             ┃                                                     
-│ tick 48                                           │┃ › p4                                               ┃                                                     
-│ tick 49                                           │┃ got p4                                             ┃                                                     
-│ tick 50                                           │┃ › p5                                               ┃                                                     
-│ tick 51                                           │┃ got p5                                             ┃                                                     
-│ tick 52                                           │┃ › p6                                               ┃                                                     
-│ tick 53                                           │┃ got p6                                             ┃                                                     
-│ tick 54                                           │┃ › p7                                               ┃                                                     
-│ tick 55                                           │┃ got p7                                             ┃                                                     
-│ tick 56                                           │┃ › p8                                               ┃                                                     
-│ tick 57                                           │┃ got p8                                             ┃                                                     
-│ tick 58                                           │┃ › p9                                               ┃                                                     
-│ tick 59                                           │┃ got p9                                             ┃                                                     
-╰ completed ────────────────────────────────────────╯┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                                                     
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
-                                                                                                                                                                
+╭ 1 ✓ Ticker ──────────────────────────────────────────────────── generic · 2s ╮┏ 2 ● Latency probe ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 5s ┓
+│ tick 16                                                                      │┃ › p0                                                                         ┃
+│ tick 17                                                                      │┃ got p0                                                                       ┃
+│ tick 18                                                                      │┃ › p1                                                                         ┃
+│ tick 19                                                                      │┃ got p1                                                                       ┃
+│ tick 20                                                                      │┃ › p2                                                                         ┃
+│ tick 21                                                                      │┃ got p2                                                                       ┃
+│ tick 22                                                                      │┃ › p3                                                                         ┃
+│ tick 23                                                                      │┃ got p3                                                                       ┃
+│ tick 24                                                                      │┃ › p4                                                                         ┃
+│ tick 25                                                                      │┃ got p4                                                                       ┃
+│ tick 26                                                                      │┃ › p5                                                                         ┃
+│ tick 27                                                                      │┃ got p5                                                                       ┃
+│ tick 28                                                                      │┃ › p6                                                                         ┃
+│ tick 29                                                                      │┃ got p6                                                                       ┃
+│ tick 30                                                                      │┃ › p7                                                                         ┃
+│ tick 31                                                                      │┃ got p7                                                                       ┃
+│ tick 32                                                                      │┃ › p8                                                                         ┃
+│ tick 33                                                                      │┃ got p8                                                                       ┃
+│ tick 34                                                                      │┃ › p9                                                                         ┃
+│ tick 35                                                                      │┃ got p9                                                                       ┃
+│ tick 36                                                                      │┃                                                                              ┃
+│ tick 37                                                                      │┃                                                                              ┃
+│ tick 38                                                                      │┃                                                                              ┃
+│ tick 39                                                                      │┃                                                                              ┃
+│ tick 40                                                                      │┃                                                                              ┃
+│ tick 41                                                                      │┃                                                                              ┃
+│ tick 42                                                                      │┃                                                                              ┃
+│ tick 43                                                                      │┃                                                                              ┃
+│ tick 44                                                                      │┃                                                                              ┃
+│ tick 45                                                                      │┃                                                                              ┃
+│ tick 46                                                                      │┃                                                                              ┃
+│ tick 47                                                                      │┃                                                                              ┃
+│ tick 48                                                                      │┃                                                                              ┃
+│ tick 49                                                                      │┃                                                                              ┃
+│ tick 50                                                                      │┃                                                                              ┃
+│ tick 51                                                                      │┃                                                                              ┃
+│ tick 52                                                                      │┃                                                                              ┃
+│ tick 53                                                                      │┃                                                                              ┃
+│ tick 54                                                                      │┃                                                                              ┃
+│ tick 55                                                                      │┃                                                                              ┃
+│ tick 56                                                                      │┃                                                                              ┃
+│ tick 57                                                                      │┃                                                                              ┃
+│ tick 58                                                                      │┃                                                                              ┃
+│ tick 59                                                                      │┃                                                                              ┃
+╰ completed ───────────────────────────────────────────────────────────────────╯┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
  Reconnecting to overseerd (the daemon closed the connection)…                                                                                                  

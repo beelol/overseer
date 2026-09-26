@@ -396,6 +396,16 @@ impl App {
         changed
     }
 
+    /// Where a feed's paths are shortened from: its workspace and repository.
+    fn locate_feed(state: &State, root: &str, feed: &mut Feed) {
+        if feed.root.is_none() {
+            feed.root = state.run(root).and_then(|r| state.workspace(&r.workspace_id)).map(|w| w.path.clone());
+        }
+        if feed.repo.is_none() {
+            feed.repo = state.run(root).and_then(|r| state.task(&r.task_id)).map(|t| (t.repo_root.clone(), t.repo_root.rsplit('/').next().unwrap_or_default().to_string()));
+        }
+    }
+
     fn on_event(&mut self, ev: Value) {
         self.stats.events += 1;
         if let Some(ts) = ev["ts"].as_i64() {
@@ -409,21 +419,17 @@ impl App {
         if !run_id.is_empty() {
             let root = self.state.root_of(&run_id);
             let child = if root != run_id { Some(self.state.run(&run_id).map(|r| r.title.clone()).unwrap_or_else(|| "sub-agent".into())) } else { None };
-            let ws_path = self.state.run(&root).and_then(|r| self.state.workspace(&r.workspace_id)).map(|w| w.path.clone());
             let feed = self.feeds.entry(root.clone()).or_default();
-            if feed.root.is_none() {
-                feed.root = ws_path;
-            }
+            Self::locate_feed(&self.state, &root, feed);
             feed.add(&ev, child.as_deref());
             self.last_event.insert(root, Instant::now());
         }
         // Statuses, turns and new runs come from `state`, reloaded like VS Code does.
-        if matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached")
-            || (!run_id.is_empty() && self.state.run(&run_id).is_none())
+        if (matches!(kind.as_str(), "status" | "turn_started" | "turn_done" | "permission" | "permission_answered" | "child" | "child_reparented" | "task_created" | "workspace_removed" | "reattached")
+            || (!run_id.is_empty() && self.state.run(&run_id).is_none()))
+            && self.state_due.is_none()
         {
-            if self.state_due.is_none() {
-                self.state_due = Some(Instant::now() + Duration::from_millis(80));
-            }
+            self.state_due = Some(Instant::now() + Duration::from_millis(80));
         }
     }
 
@@ -436,9 +442,7 @@ impl App {
                         let cursor = state.cursor;
                         self.state = state;
                         for (root, feed) in self.feeds.iter_mut() {
-                            if feed.root.is_none() {
-                                feed.root = self.state.run(root).and_then(|r| self.state.workspace(&r.workspace_id)).map(|w| w.path.clone());
-                            }
+                            Self::locate_feed(&self.state, root, feed);
                         }
                         if self.subscribed_generation != self.connect_generation {
                             self.subscribed_generation = self.connect_generation;
@@ -461,11 +465,8 @@ impl App {
             (Pending::History { root, run, page }, Ok(v)) => {
                 let events = v["events"].as_array().cloned().unwrap_or_default();
                 let child = if root != run { Some(self.state.run(&run).map(|r| r.title.clone()).unwrap_or_else(|| "sub-agent".into())) } else { None };
-                let ws = self.state.run(&root).and_then(|r| self.state.workspace(&r.workspace_id)).map(|w| w.path.clone());
                 let feed = self.feeds.entry(root.clone()).or_default();
-                if feed.root.is_none() {
-                    feed.root = ws;
-                }
+                Self::locate_feed(&self.state, &root, feed);
                 for e in &events {
                     feed.add(e, child.as_deref());
                 }

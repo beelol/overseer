@@ -1,0 +1,60 @@
+ ◆ Overseer  page 1/1 · 9 agents · ● 3 active · ◆ 1 needs you                                                                                                                               ● connected 
+┏ 1 ✓ Write API docs ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓╭ 2 ✓ Bump dependencies ─────────────────────────── generic · 0s ╮╭ 3 ✓ Tidy lint warnings ─────────────────────────── generic · 0s ╮
+┃ step 2 done                                                     ┃│ step 1 done                                                    ││ step 0 done                                                     │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┃                                                                 ┃│                                                                ││                                                                 │
+┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ─────────────────────────────────────────────────────╯╰ completed ──────────────────────────────────────────────────────╯
+╭ 4 ◆ Add a changelog entry ───────────────────────── claude · 2s ╮╭ 5 ● Watch the build ───────────────────────────── generic · 3s ╮╭ 6 ● Refactor the payment service so every provid…  generic · 3s ╮
+│ › Add a changelog entry for the session refresh change          ││ watching the build…                                            ││ Reading                                                         │
+│ ✎ perm.txt                                                      ││                                                                ││ web-app/src/payments/providers/stripe/adapters/refund-reconcilia│
+│ ⚙ Write perm.txt …                                              ││                                                                ││ tion-worker.ts                                                  │
+│ ◆ wants Write perm.txt                                          ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+╰ ◆ Write perm.txt  a allow d deny ───────────────────────────────╯╰────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────────────╯
+╭ 7 ■ Long soak test ─────────────────────────────── generic · 0s ╮╭ 8 ✗ Migration dry-run ─────────────────────────── generic · 0s ╮╭ 9 ✓ Refresh sessions once ──────────────────────── generic · 0s ╮
+│ soaking                                                         ││ error: relation users_v2 missing                               ││ Sessions now refresh once.                                      │
+│ · interrupted: interrupted by user (exit signal 2)              ││ migration dry-run: 3 pending                                   ││ 2 tests passing                                                 │
+│                                                                 ││ · failed: exit code 1                                          ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+│                                                                 ││                                                                ││                                                                 │
+╰ interrupted · by user (exit signal 2) ──────────────────────────╯╰ failed · exit code 1 ──────────────────────────────────────────╯╰ completed ──────────────────────────────────────────────────────╯
+ ←↑↓→ move   i message   z zoom   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                                                       
