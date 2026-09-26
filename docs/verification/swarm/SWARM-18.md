@@ -14,4 +14,6 @@ Evidence: `daemon/tests/swarm_runtime.rs` (`swarm_writers_keep_conflicting_chang
 
 Follow-up at `14faa93`: accepted patch artifacts apply in an Overseer-owned integration worktree, leaving the source checkout fingerprint unchanged. Two conflicting accepted patches preserve the first integrated commit and the second artifact. An active source-repository commit hook blocks unattended integration before running. The focused integration fixture and full offline Rust suite passed 166 tests.
 
-Remaining: no combined result/check or director conflict resolution was tested. The fixture does not simulate unsaved editor buffers, service-side writes, or all normal launch paths. Crash reconciliation between Git and SQLite remains incomplete. Keep the RFC box unchecked.
+Follow-up at `fca22c0`: fixture interruptions after patch application and after Git commit recover in the integration worktree after daemon restart, without a duplicate commit or source checkout mutation. Unexpected workspace edits block recovery. The eight focused integration tests and the 168-test offline Rust suite passed.
+
+Remaining: no combined result/check or director conflict resolution was tested. The fixture does not simulate unsaved editor buffers, service-side writes, or all normal launch paths. Keep the RFC box unchecked.

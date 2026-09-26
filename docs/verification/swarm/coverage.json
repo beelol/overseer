@@ -153,7 +153,7 @@
         "docs/verification/swarm/SWARM-18.md",
         "daemon/tests/swarm_integration.rs"
       ],
-      "blocker": "Fixture workers and accepted patch integration use separate worktrees and preserve a dirty source checkout. Conflicting patches retain the first commit and second artifact. Combined checks, crash reconciliation, unsaved buffers, service-side writes and normal launch-path enforcement remain unverified."
+      "blocker": "Fixture workers and accepted patch integration use separate worktrees and preserve a dirty source checkout. Conflicting patches retain the first commit and second artifact. Fixture interruptions around Git commit reconcile from durable intent; unexpected worktree edits block replay. Combined checks, unsaved buffers, service-side writes and normal launch-path enforcement remain unverified."
     },
     "SWARM-19": {
       "status": "partial",
@@ -163,7 +163,7 @@
         "daemon/tests/swarm_integration.rs",
         "docs/verification/swarm/SWARM-19.md"
       ],
-      "blocker": "Accepted patch artifacts integrate in an isolated fixture worktree after confirmed exit; dependents and final completion remain held until then. Combined build/test verification, conflict resolution, crash reconciliation and normal live adapter integration remain unimplemented."
+      "blocker": "Accepted patch artifacts integrate in an isolated fixture worktree after confirmed exit; dependents and final completion remain held until then. Fixture crash windows before and after Git commit reconcile without duplicate commits. Combined build/test verification, conflict resolution and normal live adapter integration remain unimplemented."
     },
     "SWARM-20": {
       "status": "partial",

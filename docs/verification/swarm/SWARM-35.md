@@ -12,4 +12,6 @@ Replay: `cargo test --offline -p overseerd --test swarm_integration -- --nocaptu
 
 Evidence: `daemon/tests/swarm_integration.rs` (`dependent_job_waits_for_accepted_patch_to_integrate`, `source_commit_change_blocks_stale_patch_integration`, `conflicting_accepted_patches_preserve_first_commit_and_second_artifact`), `daemon/src/swarm/artifacts.rs`, `daemon/src/swarm/integration.rs`, and the prior plan-revision fixtures in `daemon/tests/swarm_plan.rs`.
 
+Follow-up at `fca22c0`: interrupted patch integration now replays from a durable intent, preserving the accepted dependency artifact and one integration commit. This does not change the contract revision and session-reuse gaps.
+
 Remaining: the combined check and session-reuse clauses are not implemented. No S3 multi-module run or live worker path has been replayed. This criterion stays unchecked.
