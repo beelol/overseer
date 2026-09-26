@@ -167,8 +167,11 @@ pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
         )
         .optional()?
         .ok_or_else(|| anyhow!("unknown job"))?;
-    if job_status != "accepted" || job_revision != revision {
-        bail!("job is not accepted at this revision");
+    // An unrelated plan edit advances the run revision but leaves an accepted
+    // job's plan revision intact. Its evidence remains valid only at that job
+    // revision; the caller must still hold the current run revision above.
+    if job_status != "accepted" || job_revision > revision {
+        bail!("job is not accepted at its retained revision");
     }
     let (attempt, source_revision, kind, content, digest): (String, i64, String, String, String) =
         store
@@ -181,21 +184,21 @@ pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
             )
             .optional()?
             .ok_or_else(|| anyhow!("missing patch artifact"))?;
-    if source_revision != revision || kind != "patch" {
+    if source_revision != job_revision || kind != "patch" {
         bail!("stale or non-patch artifact");
     }
     if format!("{:x}", Sha256::digest(content.as_bytes())) != digest {
         bail!("artifact integrity check failed");
     }
     let finished: bool = store.conn.prepare(
-        "SELECT 1 FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3 AND status='finished'"
-    )?.exists(params![attempt,run,job])?;
+        "SELECT 1 FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3 AND revision=?4 AND status='finished'"
+    )?.exists(params![attempt,run,job,job_revision])?;
     if !finished {
         bail!("worker exit is not confirmed");
     }
     let accepted = store.conn.prepare(
-        "SELECT evidence FROM swarm_decisions WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND decision='accept'"
-    )?.query_map(params![run,job,attempt], |r| r.get::<_,String>(0))?
+        "SELECT evidence FROM swarm_decisions WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND revision=?4 AND decision='accept'"
+    )?.query_map(params![run,job,attempt,job_revision], |r| r.get::<_,String>(0))?
         .collect::<rusqlite::Result<Vec<_>>>()?.into_iter().any(|raw| {
             serde_json::from_str::<Vec<String>>(&raw).ok()
                 .is_some_and(|ids| ids.iter().any(|id| id == artifact))

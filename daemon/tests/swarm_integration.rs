@@ -141,6 +141,60 @@ fn accepted_patch_integrates_in_isolated_workspace_without_touching_checkout() {
 }
 
 #[test]
+fn unrelated_plan_revision_preserves_an_accepted_patch_for_integration() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("revised-source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "accepted change\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call("swarm.create", json!({"category":"Unrelated plan change",
+        "objective":"Change a.txt and inspect b.txt","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]},
+        {"id":"other","title":"Inspect b.txt","acceptance":"finding","deps":[]}
+    ]}));
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    let revised = d.call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Clarify unrelated audit","jobs":[
+        {"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]},
+        {"id":"other","title":"Inspect b.txt","acceptance":"check missing indexes","deps":[]}
+    ]}));
+    assert_eq!(revised["revision"], 2);
+    let jobs = d.call("swarm.jobs",json!({"id":run}));
+    let writer = jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="writer").unwrap();
+    assert_eq!(writer["status"],"accepted");
+    assert_eq!(writer["plan_revision"],1);
+    let request = json!({"run_id":run,"generation":1,"revision":2,"job_id":"writer",
+        "artifact_id":"writer-patch","repo":checkout,"base_revision":base});
+    let integrated = d.call("swarm.integrate",request.clone());
+    assert_eq!(integrated["status"],"integrated","{integrated}");
+    assert_eq!(d.call("swarm.integrate",request)["duplicate"],true);
+    let stale_request = json!({"run_id":run,"generation":1,"revision":1,"job_id":"writer",
+        "artifact_id":"writer-patch","repo":checkout,"base_revision":base});
+    assert!(d.try_call("swarm.integrate",stale_request).unwrap_err().contains("stale plan revision"));
+
+    let changed = d.call("swarm.create",json!({"category":"Changed patch requirement",
+        "objective":"Change a.txt again","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let changed_run = changed["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":changed_run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}));
+    accepted_patch(&d,changed_run,"writer","superseded-patch",&patch);
+    d.call("swarm.revise",json!({"id":changed_run,"generation":1,
+        "expected_revision":1,"reason":"Change writer acceptance","jobs":[
+        {"id":"writer","title":"Change a.txt","acceptance":"patch plus new check","deps":[]}
+    ]}));
+    let stale_artifact = d.try_call("swarm.integrate",json!({"run_id":changed_run,
+        "generation":1,"revision":2,"job_id":"writer","artifact_id":"superseded-patch",
+        "repo":checkout,"base_revision":base})).unwrap_err();
+    assert!(stale_artifact.contains("job is not accepted"),"{stale_artifact}");
+}
+
+#[test]
 fn stop_remains_responsive_during_slow_integration_and_cannot_ack_its_patch() {
     use std::time::{Duration, Instant};
 
