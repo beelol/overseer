@@ -985,12 +985,16 @@ rec(81, "Gate J still holds", "partial", commit=GK, date="2026-09-26",
     limits="restore (AC-49) opens several reviews at once, which Gate K replaced with one review beside the chat; AC-80's place scenario covers restoring in the new layout. merge and background are live scenarios and perf is the 10-minute AC-35 load test; none was rerun.",
     blocker="Next: rerun scenario-live-gatej.js on the Gate K build when paid turns on both ChatGPT accounts are wanted.")
 rec(82, "Gate K design review (owner-confirmed)", "partial", commit=GK, date="2026-09-26",
-    proven="the review page shows every view in Gate J and Gate K in both Overseer themes (and High Contrast where captured), with a Looks right / Needs work mark and a note per view saved for the owner: https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv",
-    deferred="the owner's marks, the changes they ask for, and the owner's dated confirmation",
+    proven="the review page shows every view in Gate J and Gate K in both Overseer themes; the owner marked all 19 views on 2026-09-26: 16 Looks right (editor area and agents list \"gate k looking great\", chat, chat beside a diff, arrangement, review, scopes, follow, endings, grid, new agent, Needs you, take out, remembered place, themes, and Overall) and 3 Needs work",
+    deferred="the three Needs work items changed and shown again, and the owner's confirmation after them",
     expected="The published page, the owner's marks with outcomes and the dated confirmation.",
-    actual="The page is published and ready for marks; no marks yet.",
-    evidence="https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv", live="—",
-    blocker="Owner review. Next: the owner marks each view; each Needs work is changed and shown again until the owner confirms.")
+    actual="""- **Marks (2026-09-26, owner):** 16 Looks right, 3 Needs work; the notes are kept verbatim in [owner-marks-2026-09-26.json](evidence/ac-82/owner-marks-2026-09-26.json).
+- **Needs work, composer (Accounts and usage):** the chips wrap inside the text field (move some underneath); "Codex · codex (existing login)" reads as Codex twice; the headline should say something like "What's next?" or "Send off a task", with the Overseer logo instead of the generic one.
+- **Needs work, history:** in Gate K it is not clear where the search term was typed; search should be visible in the Overseer side bar and reachable by a hotkey and the command palette.
+- **Needs work, grid and dashboard mode:** the empty grid ("No agents running", "New agent") is confusing and should lead back to the home chat; the screenshots had too little data to follow.
+- **Also from the owner's review (spoken):** the review should be where files live, nothing shown twice, a less VS Code-like editor area with a bold third theme, the grid built by dragging (16 at most), tracking an agent from the grid, not losing track of windows, and a chat with Overseer itself. These became Gate M (AC-99 to AC-108).""",
+    evidence="https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv, [owner marks](evidence/ac-82/owner-marks-2026-09-26.json)", live="—",
+    blocker="Next: change the three Needs work items on the Gate K branch, show them again on the page, and get the owner's confirmation.")
 
 # Gate L, Continuity (added by the owner on 2026-09-26; docs/rfcs/offline-mode.md). Not started; built in its own worktree.
 rec(83, "Offline is not an outage", "not started", date="—", commit="—",
@@ -1042,6 +1046,38 @@ rec(98, "On by default, explained once", "not started", date="—", commit="—"
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 
+# Gate M, Overseer as the whole surface (added by the owner on 2026-09-26; docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface). Not started; built in its own pull request.
+rec(99, "The review is where files live", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(100, "Nothing shown twice", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(101, "Overseer's own reviewer", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(102, "An immersive editor area", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(103, "The Overseer theme", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(104, "Build the grid by dragging", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(105, "Track an agent from the grid", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(106, "Never lose track of windows", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(107, "Talk to Overseer", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(108, "Gate M design review (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+
 SHORT_BLOCKERS = {
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
@@ -1066,7 +1102,7 @@ SHORT_BLOCKERS = {
     65: "not started (added by the owner on 2026-09-26)",
     66: "owner design review after the Gate J build",
     81: "partial: the live Gate J scenario not rerun on the Gate K build",
-    82: "owner design review of Gate K (page published)",
+    82: "owner marked 19 views: 16 Looks right, 3 Needs work being changed",
     83: "not started (Gate L, added by the owner on 2026-09-26)",
     84: "not started (Gate L, added by the owner on 2026-09-26)",
     85: "not started (Gate L, added by the owner on 2026-09-26)",
@@ -1083,6 +1119,16 @@ SHORT_BLOCKERS = {
     96: "not started (Gate L, added by the owner on 2026-09-26)",
     97: "not started (Gate L, added by the owner on 2026-09-26)",
     98: "not started (Gate L, added by the owner on 2026-09-26)",
+    99: "not started (Gate M, added by the owner on 2026-09-26)",
+    100: "not started (Gate M, added by the owner on 2026-09-26)",
+    101: "not started (Gate M, added by the owner on 2026-09-26)",
+    102: "not started (Gate M, added by the owner on 2026-09-26)",
+    103: "not started (Gate M, added by the owner on 2026-09-26)",
+    104: "not started (Gate M, added by the owner on 2026-09-26)",
+    105: "not started (Gate M, added by the owner on 2026-09-26)",
+    106: "not started (Gate M, added by the owner on 2026-09-26)",
+    107: "not started (Gate M, added by the owner on 2026-09-26)",
+    108: "not started (Gate M, added by the owner on 2026-09-26)",
 }
 TOTAL = 53
 
@@ -1106,7 +1152,7 @@ def sync(out):
     root = out.parent.parent
     rfc = root / "docs/overseer-rfc.md"
     text = rfc.read_text()
-    titles = dict(re.findall(r"\*\*AC-(\d\d) — ([^*]+?)\.\*\*", text))
+    titles = dict(re.findall(r"\*\*AC-(\d{2,3}) — ([^*]+?)\.\*\*", text))
     global TOTAL
     TOTAL = max(int(n) for n in titles)
     statuses = {}
