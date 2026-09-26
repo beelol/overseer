@@ -1,0 +1,68 @@
+use anyhow::Result;
+use rusqlite::Connection;
+
+pub fn migrate(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS swarm_runs(
+          id TEXT PRIMARY KEY,
+          category TEXT NOT NULL,
+          category_key TEXT NOT NULL,
+          objective TEXT NOT NULL,
+          status TEXT NOT NULL,
+          generation INTEGER NOT NULL,
+          revision INTEGER NOT NULL,
+          allowed_targets TEXT NOT NULL,
+          policy TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          updated_ms INTEGER NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS swarm_active_category
+          ON swarm_runs(category_key)
+          WHERE status IN ('planning','running','paused','stalled','stopping');
+        CREATE TABLE IF NOT EXISTS swarm_jobs(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          id TEXT NOT NULL,
+          plan_revision INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          acceptance TEXT NOT NULL,
+          deps TEXT NOT NULL,
+          status TEXT NOT NULL,
+          attempt_count INTEGER NOT NULL DEFAULT 0,
+          created_ms INTEGER NOT NULL,
+          updated_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,id)
+        );
+        CREATE INDEX IF NOT EXISTS swarm_jobs_page ON swarm_jobs(run_id,id);
+        CREATE TABLE IF NOT EXISTS swarm_attempts(
+          id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          revision INTEGER NOT NULL,
+          token_sha256 TEXT NOT NULL,
+          status TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          FOREIGN KEY(run_id,job_id) REFERENCES swarm_jobs(run_id,id)
+        );
+        CREATE INDEX IF NOT EXISTS swarm_attempts_job ON swarm_attempts(run_id,job_id);
+        CREATE TABLE IF NOT EXISTS swarm_messages(
+          seq INTEGER PRIMARY KEY AUTOINCREMENT,
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id),
+          message_id TEXT NOT NULL,
+          job_id TEXT,
+          attempt_id TEXT,
+          sender TEXT NOT NULL,
+          recipient TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          revision INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          phase TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          updated_ms INTEGER NOT NULL,
+          UNIQUE(run_id,message_id)
+        );
+        CREATE INDEX IF NOT EXISTS swarm_inbox ON swarm_messages(run_id,recipient,seq);
+        "#,
+    )?;
+    Ok(())
+}

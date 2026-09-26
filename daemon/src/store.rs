@@ -169,6 +169,7 @@ impl Store {
         if !has_pending {
             self.conn.execute_batch("ALTER TABLE runs ADD COLUMN pending_parent_native TEXT;")?;
         }
+        crate::swarm::schema::migrate(&self.conn)?;
         self.conn.execute("INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', ?1)", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
     }

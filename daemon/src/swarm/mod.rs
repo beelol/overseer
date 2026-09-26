@@ -1,0 +1,158 @@
+mod broker;
+mod plan;
+pub mod schema;
+pub use broker::{ack, direct, messages, register, report};
+
+use crate::store::Store;
+use anyhow::{anyhow, bail, Result};
+use plan::JobSpec;
+use rusqlite::{params, OptionalExtension};
+use serde_json::{json, Value};
+
+fn required<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
+    p[key]
+        .as_str()
+        .ok_or_else(|| anyhow!("missing string parameter {key}"))
+}
+
+fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
+    let targets: String = row.get("allowed_targets")?;
+    let policy: String = row.get("policy")?;
+    Ok(json!({
+        "id": row.get::<_, String>("id")?,
+        "category": row.get::<_, String>("category")?,
+        "objective": row.get::<_, String>("objective")?,
+        "status": row.get::<_, String>("status")?,
+        "generation": row.get::<_, i64>("generation")?,
+        "revision": row.get::<_, i64>("revision")?,
+        "allowed_targets": serde_json::from_str::<Value>(&targets).unwrap_or(Value::Null),
+        "policy": serde_json::from_str::<Value>(&policy).unwrap_or(Value::Null),
+        "created_ms": row.get::<_, i64>("created_ms")?,
+        "updated_ms": row.get::<_, i64>("updated_ms")?,
+    }))
+}
+
+pub fn create(store: &mut Store, p: &Value) -> Result<Value> {
+    let category = required(p, "category")?.trim();
+    let objective = required(p, "objective")?.trim();
+    if category.is_empty() || category.len() > 160 || objective.is_empty() || objective.len() > 8000
+    {
+        bail!("category or objective is empty or too long");
+    }
+    let key = category.to_lowercase();
+    let occupied: bool = store.conn.query_row(
+        "SELECT 1 FROM swarm_runs WHERE category_key=?1 AND status IN ('planning','running','paused','stalled','stopping') LIMIT 1",
+        params![key], |_| Ok(()),
+    ).optional()?.is_some();
+    if occupied {
+        bail!("category already has an active swarm run");
+    }
+    let targets = p.get("allowed_targets").cloned().unwrap_or(json!([]));
+    if !targets.is_array() || targets.as_array().unwrap().iter().any(|v| !v.is_string()) {
+        bail!("allowed_targets must be a string array");
+    }
+    let policy = p.get("policy").cloned().unwrap_or(json!({}));
+    if !policy.is_object() {
+        bail!("policy must be an object");
+    }
+    let id = format!("sw-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
+    let now = crate::daemon::now();
+    store.conn.execute(
+        "INSERT INTO swarm_runs(id,category,category_key,objective,status,generation,revision,allowed_targets,policy,created_ms,updated_ms) VALUES(?1,?2,?3,?4,'planning',1,0,?5,?6,?7,?7)",
+        params![id,category,key,objective,targets.to_string(),policy.to_string(),now],
+    )?;
+    get(store, &id)
+}
+
+pub fn get(store: &Store, id: &str) -> Result<Value> {
+    store
+        .conn
+        .query_row("SELECT * FROM swarm_runs WHERE id=?1", params![id], row_run)
+        .optional()?
+        .ok_or_else(|| anyhow!("unknown swarm run {id}"))
+}
+
+pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
+    let id = required(p, "id")?;
+    let generation = p["generation"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing generation"))?;
+    let revision = p["revision"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing revision"))?;
+    let jobs: Vec<JobSpec> =
+        serde_json::from_value(p["jobs"].clone()).map_err(|e| anyhow!("invalid jobs: {e}"))?;
+    plan::validate(&jobs)?;
+    let tx = store.conn.transaction()?;
+    let current: (i64, i64, String) = tx
+        .query_row(
+            "SELECT generation,revision,status FROM swarm_runs WHERE id=?1",
+            params![id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("unknown swarm run {id}"))?;
+    if generation != current.0 {
+        bail!("stale director generation");
+    }
+    if revision != current.1 {
+        bail!("stale plan revision");
+    }
+    if !["planning", "running", "paused", "stalled"].contains(&current.2.as_str()) {
+        bail!("swarm run is not plannable");
+    }
+    let progressed: bool = tx.query_row(
+        "SELECT 1 FROM swarm_jobs WHERE run_id=?1 AND status NOT IN ('planned','ready') LIMIT 1",
+        params![id], |_| Ok(()),
+    ).optional()?.is_some();
+    if progressed {
+        bail!("cannot replace a plan with active or completed jobs; use a revision transition");
+    }
+    tx.execute("DELETE FROM swarm_jobs WHERE run_id=?1", params![id])?;
+    let now = crate::daemon::now();
+    for job in &jobs {
+        let status = if job.deps.is_empty() {
+            "ready"
+        } else {
+            "planned"
+        };
+        tx.execute(
+            "INSERT INTO swarm_jobs(run_id,id,plan_revision,title,acceptance,deps,status,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?8)",
+            params![id,job.id,revision+1,job.title,job.acceptance,serde_json::to_string(&job.deps)?,status,now],
+        )?;
+    }
+    tx.execute(
+        "UPDATE swarm_runs SET revision=?2,updated_ms=?3 WHERE id=?1",
+        params![id, revision + 1, now],
+    )?;
+    tx.commit()?;
+    Ok(json!({"id":id,"generation":generation,"revision":revision+1,"job_count":jobs.len()}))
+}
+
+pub fn jobs(store: &Store, p: &Value) -> Result<Value> {
+    let id = required(p, "id")?;
+    get(store, id)?;
+    let cursor = p["cursor"].as_str().unwrap_or("");
+    let limit = p["limit"].as_i64().unwrap_or(50).clamp(1, 100);
+    let mut stmt = store
+        .conn
+        .prepare("SELECT * FROM swarm_jobs WHERE run_id=?1 AND id>?2 ORDER BY id LIMIT ?3")?;
+    let rows = stmt.query_map(params![id,cursor,limit+1], |r| {
+        let deps: String = r.get("deps")?;
+        Ok(json!({
+            "id":r.get::<_,String>("id")?,"run_id":r.get::<_,String>("run_id")?,
+            "plan_revision":r.get::<_,i64>("plan_revision")?,
+            "title":r.get::<_,String>("title")?,"acceptance":r.get::<_,String>("acceptance")?,
+            "deps":serde_json::from_str::<Value>(&deps).unwrap_or(Value::Null),
+            "status":r.get::<_,String>("status")?,"attempt_count":r.get::<_,i64>("attempt_count")?,
+        }))
+    })?.collect::<rusqlite::Result<Vec<_>>>()?;
+    let has_more = rows.len() as i64 > limit;
+    let page: Vec<Value> = rows.into_iter().take(limit as usize).collect();
+    let next_cursor = if has_more {
+        page.last().and_then(|j| j["id"].as_str())
+    } else {
+        None
+    };
+    Ok(json!({"jobs":page,"next_cursor":next_cursor}))
+}

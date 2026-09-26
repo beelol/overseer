@@ -17,9 +17,13 @@
       "blocker": null
     },
     "SWARM-03": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Scheduler concurrency and overlapping writer control are not implemented."
     },
     "SWARM-04": {
       "status": "unverified",
@@ -107,14 +111,22 @@
       "blocker": null
     },
     "SWARM-21": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Revision CAS exists; active-job invalidation and stale result acceptance are not implemented."
     },
     "SWARM-22": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Pre-launch state and broker replay survive restart; launch/reservation reconciliation is not implemented."
     },
     "SWARM-23": {
       "status": "unverified",
@@ -137,9 +149,13 @@
       "blocker": null
     },
     "SWARM-27": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Category and job identity persist; director decomposition, review and synthesis are not implemented."
     },
     "SWARM-28": {
       "status": "unverified",
@@ -147,9 +163,13 @@
       "blocker": null
     },
     "SWARM-29": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "100-job pagination works; 32-worker scheduling and acceptance are not implemented."
     },
     "SWARM-30": {
       "status": "unverified",
@@ -207,19 +227,31 @@
       "blocker": null
     },
     "SWARM-41": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Discovery persists in the director inbox; bounded model turns and targeted peer advisories are not implemented."
     },
     "SWARM-42": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Stable-ID dedupe, restart replay and stale generation checks work; dispatch/accounting and delayed ordering remain untested."
     },
     "SWARM-43": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Delivered/applied states are distinct; live turn-boundary delivery and timeout response are not implemented."
     },
     "SWARM-44": {
       "status": "unverified",
@@ -242,19 +274,31 @@
       "blocker": null
     },
     "SWARM-48": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Cycles, unknown dependencies, duplicate IDs and missing acceptance are rejected; conflict claims and stalled planning are not implemented."
     },
     "SWARM-49": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "32 KiB limit, role rejection and 2,000 duplicate replays pass; high-water and Stop responsiveness remain untested."
     },
     "SWARM-50": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Message insert precedes receipt; storage-full and launch-intent fault tests are not implemented."
     },
     "SWARM-51": {
       "status": "unverified",
@@ -302,9 +346,13 @@
       "blocker": null
     },
     "SWARM-60": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Worker discoveries reach a durable director inbox; authorized peer routing and artifact permissions are not implemented."
     },
     "SWARM-61": {
       "status": "unverified",

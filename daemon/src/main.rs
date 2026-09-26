@@ -6,6 +6,7 @@ mod redact;
 mod server;
 mod shim;
 mod store;
+mod swarm;
 
 use std::io::{BufRead, BufReader, Write};
 

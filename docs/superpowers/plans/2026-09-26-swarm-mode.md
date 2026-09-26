@@ -58,7 +58,7 @@ Only add a new adapter surface to `adapters.rs` when the existing one cannot del
 
 - [x] Record base SHA, the three RFC file hashes, baseline test results and current automode contract evidence. Compare any concurrent automode branch without merging its work by assumption.
 - [x] Write a coverage ledger that marks all 64 criteria unverified initially and tracks `implemented / unverified`, `partial`, `blocked`, `failed`, `verified` without conflating them.
-- [ ] Check every local RFC link and number, then commit the copied RFCs, ledger and this plan on the isolated branch.
+- [x] Check every local RFC link and number, then commit the copied RFCs, ledger and this plan on the isolated branch.
 
 ### Task 2: Durable category, job and attempt state
 
@@ -66,10 +66,10 @@ Only add a new adapter surface to `adapters.rs` when the existing one cannot del
 
 **Interfaces:** `swarm.create({category,objective,allowed_targets,policy}) -> SwarmSummary`; `swarm.get({id}) -> SwarmSummary`; `swarm.plan({id,generation,revision,jobs}) -> PlanRevision`; `swarm.jobs({id,cursor,limit}) -> Page`.
 
-- [ ] Write failing tests for category uniqueness, one active run, 100-job pagination, invalid cycles/dependencies, revision CAS, and unchanged non-swarm state.
-- [ ] Run `cargo test --offline --test swarm_state` and confirm those named cases fail.
-- [ ] Implement schema/mapping/validation and protocol methods; keep object identity separate from attempts and process IDs.
-- [ ] Run focused test and `cargo test --offline`; record expected/actual state, then commit.
+- [x] Write failing tests for category uniqueness, one active run, 100-job pagination, invalid cycles/dependencies, revision CAS, and unchanged non-swarm state.
+- [x] Run `cargo test --offline --test swarm_state` and confirm those named cases fail.
+- [x] Implement schema/mapping/validation and protocol methods; keep object identity separate from attempts and process IDs.
+- [x] Run focused test and `cargo test --offline`; record expected/actual state, then commit.
 
 ### Task 3: Durable broker and applied directives
 
