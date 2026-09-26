@@ -132,3 +132,10 @@ fn affected_targets_fail_independently_and_estimated_permission_is_explicit() {
     );
     assert_eq!(estimated["authoritative_reservation"], false);
 }
+
+#[test]
+fn zero_upper_estimate_cannot_authorize_free_fanout() {
+    let d=Daemon::start(&[]);
+    let result=preview(&d,snapshot(Some(60000),true), &["qualified"],0,0);
+    assert_eq!(result["targets"]["qualified"]["reason"],"uncalibrated_estimate");
+}

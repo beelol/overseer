@@ -124,6 +124,47 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           updated_ms INTEGER NOT NULL,
           PRIMARY KEY(scope,scope_key)
         );
+        CREATE TABLE IF NOT EXISTS swarm_allocations(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id),
+          pool_id TEXT NOT NULL,
+          window_id TEXT NOT NULL,
+          unit TEXT NOT NULL,
+          allocation_milli INTEGER NOT NULL,
+          reserve_milli INTEGER NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,pool_id,window_id)
+        );
+        CREATE TABLE IF NOT EXISTS swarm_admissions(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id),
+          request_id TEXT NOT NULL,
+          request_sha256 TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          attempt_id TEXT NOT NULL REFERENCES swarm_attempts(id),
+          target_id TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,request_id)
+        );
+        CREATE TABLE IF NOT EXISTS swarm_reservations(
+          attempt_id TEXT NOT NULL REFERENCES swarm_attempts(id),
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id),
+          pool_id TEXT NOT NULL,
+          window_id TEXT NOT NULL,
+          unit TEXT NOT NULL,
+          amount_milli INTEGER NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('active','uncertain','reconciled')),
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(attempt_id,pool_id,window_id)
+        );
+        CREATE INDEX IF NOT EXISTS swarm_reservations_pool ON swarm_reservations(pool_id,window_id,status);
+        CREATE TABLE IF NOT EXISTS swarm_growth(
+          run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id),
+          wave_start_ms INTEGER NOT NULL,
+          admitted_count INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS swarm_review_gate(
+          run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id),
+          held INTEGER NOT NULL CHECK(held IN (0,1))
+        );
         "#,
     )?;
     Ok(())

@@ -39,6 +39,16 @@ fn unfinished_runtime_transitions_are_disabled_without_fixture_opt_in() {
 }
 
 #[test]
+fn result_submission_is_durable_with_awaiting_review_state() {
+    let d=Daemon::start(&[]);
+    let (run_id,attempt_id,token)=planned(&d);
+    d.call("swarm.report",json!({"run_id":run_id,"job_id":"routes","attempt_id":attempt_id,"token":token,
+        "message_id":"submitted","type":"result","revision":1,"payload":{"artifact_ids":[]}}));
+    let jobs=d.call("swarm.jobs",json!({"id":run_id}));
+    assert_eq!(jobs["jobs"][0]["status"],"submitted");
+}
+
+#[test]
 fn report_is_durable_before_ack_and_replay_is_idempotent() {
     let mut d = Daemon::start(&[]);
     let (run_id, attempt_id, token) = planned(&d);

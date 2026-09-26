@@ -46,38 +46,50 @@
       "blocker": "Capability requirements reject a cheaper unqualified target in fixtures; real quality routing and launch gating are not implemented."
     },
     "SWARM-07": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
+      ],
+      "blocker": "Fixture admission counts director and worker slots and enforces per-run/global ceilings; reviewers, native descendants, drain on lower maximum and live activation remain unimplemented."
     },
     "SWARM-08": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
+      ],
+      "blocker": "Concurrent fixture swarm admissions share an atomic reservation transaction; ordinary task.create does not yet participate in this ledger."
     },
     "SWARM-09": {
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
-        "docs/verification/swarm/milestone-4.md"
+        "docs/verification/swarm/milestone-4.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
       ],
-      "blocker": "Two fixture targets can reference one shared pool identity; atomic shared reservations and uncertain-identity handling are not implemented."
+      "blocker": "Cross-harness fixture targets with one pool identity share reservations across categories; verified account discovery and uncertain-identity handling remain unavailable."
     },
     "SWARM-10": {
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
-        "docs/verification/swarm/milestone-4.md"
+        "docs/verification/swarm/milestone-4.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
       ],
-      "blocker": "Preview computes 10% allocation and 20% or larger finishing reserve; durable per-run reservation and actual usage reconciliation are not implemented."
+      "blocker": "Fixture allocation freezes at first admission and preserves a finishing reserve; actual usage reconciliation and finishing-work draw are not implemented."
     },
     "SWARM-11": {
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
-        "docs/verification/swarm/milestone-4.md"
+        "docs/verification/swarm/milestone-4.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
       ],
-      "blocker": "Every fixture window binds independently and unlike units need estimates; allocation freeze and reset behavior are not implemented."
+      "blocker": "Each fixture quota window is reserved separately and a larger later snapshot cannot expand an existing allocation; reset and unlike-unit end-to-end admission remain incomplete."
     },
     "SWARM-12": {
       "status": "partial",
@@ -162,9 +174,12 @@
       "blocker": null
     },
     "SWARM-24": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
+      ],
+      "blocker": "The fixture admission revalidates a target snapshot transactionally; the actual Auto Mode producer and shared ordinary-task authority are not integrated."
     },
     "SWARM-25": {
       "status": "unverified",
@@ -195,9 +210,11 @@
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
       ],
-      "blocker": "100-job pagination works; 32-worker scheduling and acceptance are not implemented."
+      "blocker": "An explicit fixture override admits 32 attempts without a hidden eight-worker cap; no live workers, 100-job execution or acceptance chain exists."
     },
     "SWARM-30": {
       "status": "unverified",
@@ -210,9 +227,12 @@
       "blocker": null
     },
     "SWARM-32": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
+      ],
+      "blocker": "Fixture admission holds at eight submitted results and resumes below four with bounded waves; outage recovery and actual director review capacity remain unimplemented."
     },
     "SWARM-33": {
       "status": "partial",
@@ -265,9 +285,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
-        "docs/verification/swarm/milestone-4.md"
+        "docs/verification/swarm/milestone-4.md",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
       ],
-      "blocker": "Fixture with 60 points computes a 6-point allocation and 1.2-point reserve, with binding short windows; allocations are not frozen or shared across work yet."
+      "blocker": "The fixture allocation freezes 10% of available native units, preserves at least 20% for finishing, and rejects zero estimates; all cost classes and live shared accounting remain incomplete."
     },
     "SWARM-41": {
       "status": "partial",
@@ -391,9 +413,12 @@
       "blocker": null
     },
     "SWARM-56": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-7.md"
+      ],
+      "blocker": "A fixture admits 32 with explicit ceilings and holds new work at eight pending results until fewer than four remain; actual 32-worker execution and account use are unverified."
     },
     "SWARM-57": {
       "status": "unverified",

@@ -176,9 +176,14 @@ fn insert_message(
         }
     }
     let now = crate::daemon::now();
-    store.conn.execute("INSERT INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,'queued',?10,?10)",
+    let tx = store.conn.transaction()?;
+    tx.execute("INSERT INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,'queued',?10,?10)",
         params![run,id,job,attempt,sender,recipient,kind,revision,payload,now])?;
-    let seq = store.conn.last_insert_rowid();
+    let seq = tx.last_insert_rowid();
+    if recipient == "director" && (kind == "result" || kind == "submit") {
+        tx.execute("UPDATE swarm_jobs SET status='submitted',updated_ms=?3 WHERE run_id=?1 AND id=?2 AND status IN ('reserved','running')",params![run,job,now])?;
+    }
+    tx.commit()?;
     Ok(json!({"message_id":id,"seq":seq,"phase":"queued","duplicate":false}))
 }
 

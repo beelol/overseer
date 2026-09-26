@@ -162,6 +162,10 @@ pub fn preview(p: &Value) -> Result<Value> {
                         reason = Some("missing_estimate");
                         break;
                     };
+                    if *estimate == 0 {
+                        reason = Some("uncalibrated_estimate");
+                        break;
+                    }
                     let usable = remaining
                         .saturating_sub(window.protected_milli)
                         .saturating_sub(window.reserved_milli)
@@ -181,7 +185,8 @@ pub fn preview(p: &Value) -> Result<Value> {
                     };
                     windows.push(json!({"pool_id":pool_id,"window_id":window.id,"unit":window.unit,
                         "allocation_milli":allocation,"finishing_reserve_milli":reserve,
-                        "available_milli":available,"estimate_milli":estimate,"confidence":window.confidence}));
+                        "available_milli":available,"usable_milli":usable,
+                        "estimate_milli":estimate,"confidence":window.confidence}));
                     if *estimate > available {
                         reason = Some("finishing_reserve");
                         break;
