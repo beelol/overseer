@@ -49,6 +49,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
                 for run in expired {
                     crate::swarm::interrupt_workers(&daemon, &run)?;
                 }
+                crate::swarm::reconcile_terminal_workers(&daemon)?;
                 Ok::<(), anyhow::Error>(())
             })
             .await

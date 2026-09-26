@@ -185,3 +185,46 @@ pub fn reconcile_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         "worker_status":worker_status,"duplicate":previous.is_some()}),
     )
 }
+
+/// Observe completed linked processes without requiring a caller to poll each worker.
+/// The bounded scan resumes after a crash because unfinished attempts remain registered.
+pub fn reconcile_terminal_workers(d: &Arc<Daemon>) -> Result<usize> {
+    let due = {
+        let store = d.store.lock().unwrap();
+        let mut stmt = store.conn.prepare(
+            "SELECT l.run_id,l.job_id,l.attempt_id,s.generation,s.revision
+             FROM swarm_worker_launches l
+             JOIN swarm_attempts a ON a.id=l.attempt_id AND a.status='registered'
+             JOIN swarm_runs s ON s.id=l.run_id
+             JOIN runs r ON r.id=l.overseer_run_id AND r.ended_ms IS NOT NULL
+             ORDER BY r.ended_ms LIMIT 100",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
+    };
+    let mut reconciled = 0;
+    for (run, job, attempt, generation, revision) in due {
+        match reconcile_worker(
+            d,
+            &json!({"run_id":run,"job_id":job,"attempt_id":attempt,
+            "generation":generation,"revision":revision}),
+        ) {
+            Ok(result) if result["status"] == "terminal" => reconciled += 1,
+            Ok(_) => {}
+            Err(error) => crate::log(&format!(
+                "swarm worker {attempt} reconciliation failed: {error}"
+            )),
+        }
+    }
+    Ok(reconciled)
+}

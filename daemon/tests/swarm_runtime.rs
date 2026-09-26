@@ -47,6 +47,17 @@ fn deadline_interrupts_a_linked_worker_without_another_admission() {
     }
     assert_eq!(d.call("swarm.get",json!({"id":id}))["stop_reason"],"deadline");
     assert_ne!(d.wait_done(worker,5)["status"],"completed");
+    let until = std::time::Instant::now()+std::time::Duration::from_secs(5);
+    loop {
+        let inbox = d.call("swarm.messages",json!({"run_id":id,"recipient":"director"}));
+        if inbox["messages"].as_array().unwrap().iter().any(|m|m["type"]=="terminal") {
+            break;
+        }
+        assert!(std::time::Instant::now()<until,"terminal event never reached the director");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    let job=&d.call("swarm.jobs",json!({"id":id}))["jobs"][0];
+    assert_eq!(job["status"],"cancelled");
 }
 
 #[test]

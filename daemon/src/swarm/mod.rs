@@ -17,7 +17,7 @@ pub use director::{claim_batch, complete_batch, recover};
 pub use policy::preview;
 pub use settings::set_policy;
 pub use revision::revise;
-pub use runtime::{interrupt_workers, launch_worker, reconcile_worker};
+pub use runtime::{interrupt_workers, launch_worker, reconcile_terminal_workers, reconcile_worker};
 
 use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
