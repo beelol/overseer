@@ -149,6 +149,9 @@ pub fn create(store: &mut Store, p: &Value) -> Result<Value> {
     {
         bail!("category or objective is empty or too long");
     }
+    if crate::redact::redact(category) != category || crate::redact::redact(objective) != objective {
+        bail!("category or objective contains sensitive text");
+    }
     let source_change_permission = p.get("source_change_permission")
         .map(Value::as_str)
         .unwrap_or(Some("none"))

@@ -5,6 +5,26 @@ use common::*;
 use serde_json::json;
 
 #[test]
+fn swarm_create_rejects_secret_shaped_category_and_objective_without_persisting_them() {
+    let d = Daemon::start(&[]);
+    let secret = "sk-abcdefghijklmnopqrstuv";
+    for (category, objective) in [
+        (format!("Audit {secret}"), "Inspect routes".to_string()),
+        ("Backend audit".to_string(), format!("Inspect routes with {secret}")),
+    ] {
+        let error = d.try_call("swarm.create", json!({"category":category,
+            "objective":objective,"allowed_targets":["system-codex"]})).unwrap_err();
+        assert!(error.contains("sensitive text"), "{error}");
+    }
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let count: i64 = db.query_row("SELECT COUNT(*) FROM swarm_runs", [], |r| r.get(0)).unwrap();
+    assert_eq!(count, 0);
+    let valid = d.call("swarm.create", json!({"category":"Backend audit",
+        "objective":"Inspect routes","allowed_targets":["system-codex"]}));
+    assert_eq!(valid["status"], "planning");
+}
+
+#[test]
 fn one_active_category_run_survives_restart() {
     let mut d = Daemon::start(&[]);
     let made = d.call(
