@@ -20,7 +20,8 @@ fn fixture(name: &str) -> String {
 fn auto_disabled_preserves_manual_create_follow_up_and_interrupt() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
-    let d = Daemon::start(&[]);
+    let d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1")]);
+    assert_eq!(d.call("auto.mode.get", json!({}))["enabled"], false);
     let created = d.generic(&repo, "worktree", "/bin/sh", &["-c", "cat >> input.txt"]);
     let run = run_id(&created);
     d.wait_status(&run, |status| status == "running", 10);
@@ -32,6 +33,79 @@ fn auto_disabled_preserves_manual_create_follow_up_and_interrupt() {
         "manual continuation\n");
     assert_eq!(d.runs().len(), 1, "manual routing must not create an Auto child");
     assert!(!d.events(&run).iter().any(|event| event["kind"] == "auto_decision"));
+}
+
+#[test]
+fn auto_mode_defaults_off_and_only_explicit_enable_allows_new_dispatch() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mut d = Daemon::start(&[("OVERSEER_TEST_AUTO_DISABLED", "1"),
+        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"manual parent"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"disabled-auto-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"prompt":"bounded browser check"});
+    assert!(d.try_call("auto.dispatch", request.clone()).is_err(),
+        "the default-off daemon must refuse new Auto work");
+    assert_eq!(d.runs().len(), 1);
+    assert!(!d.events(&parent).iter().any(|event| event["kind"] == "auto_decision"));
+    assert_eq!(d.call("auto.mode.get", json!({}))["enabled"], false);
+
+    assert_eq!(d.call("auto.mode.set", json!({"enabled":true}))["enabled"], true);
+    assert!(d.try_call("auto.mode.set", json!({"enabled":"yes"})).is_err());
+    let selected = d.call("auto.dispatch", request.clone());
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    let child = run_id(&selected);
+    assert_eq!(d.call("auto.mode.set", json!({"enabled":false}))["enabled"], false);
+    assert!(d.try_call("auto.dispatch", json!({"work_unit_id":"disabled-auto-2",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "prompt":"another child"})).is_err());
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed",
+        "turning Auto off must not interrupt an existing child");
+    let replay = d.call("auto.dispatch", request);
+    assert_eq!(run_id(&replay), child);
+    assert_eq!(replay["replayed"], true);
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("auto.mode.get", json!({}))["enabled"], false,
+        "the off state must survive daemon restart");
+    assert_eq!(d.runs().len(), 2);
+}
+
+
+#[test]
+fn disabling_auto_during_collection_prevents_new_admission() {
+    use std::time::Instant;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("disable-during-collection-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_MODEL_DELAY_MS,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_MODEL_DELAY_MS", "1500"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"manual parent"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    std::fs::write(&trace, "").unwrap();
+    let request = json!({"work_unit_id":"disable-during-collect-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"prompt":"bounded browser check"});
+    let outcome = std::thread::scope(|scope| {
+        let pending = scope.spawn(|| d.try_call("auto.dispatch", request));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !std::fs::read_to_string(&trace).unwrap_or_default().contains("model_read") {
+            assert!(Instant::now() < deadline, "Auto metadata collection did not begin");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(d.call("auto.mode.set", json!({"enabled":false}))["enabled"], false);
+        pending.join().unwrap()
+    });
+    assert!(outcome.is_err(), "new work was admitted after Auto was disabled: {outcome:?}");
+    assert_eq!(d.runs().len(), 1, "no child may launch after the disable");
+    assert!(!d.events(&parent).iter().any(|event| event["kind"] == "auto_decision"),
+        "disabled work must not persist an admission decision");
 }
 
 // ---------------------------------------------------------------- AC-05 / AC-07

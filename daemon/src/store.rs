@@ -425,6 +425,24 @@ impl Store {
         Ok(!self.learning_persistent || self.learning_reset_pending()?)
     }
 
+    /// Auto is a user-visible mode switch, not a routing-policy file.
+    /// Absent or unexpected values fail closed after an upgrade or restart.
+    pub fn auto_mode_enabled(&self) -> Result<bool> {
+        let value: Option<String> = self.conn.query_row(
+            "SELECT value FROM meta WHERE key='auto_mode_enabled'", [], |row| row.get(0),
+        ).optional()?;
+        Ok(value.as_deref() == Some("1"))
+    }
+
+    pub fn set_auto_mode_enabled(&self, enabled: bool) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO meta(key,value) VALUES('auto_mode_enabled',?1)
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            [if enabled { "1" } else { "0" }],
+        )?;
+        Ok(())
+    }
+
     // ---- workspaces
     pub fn insert_workspace(&self, w: &Workspace) -> Result<()> {
         self.conn.execute(

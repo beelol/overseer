@@ -643,6 +643,16 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "task.create" => d.create_task(p)?,
         "run.delegate" => d.delegate_run(p, false)?,
+        "auto.mode.get" => json!({"enabled":d.store.lock().unwrap().auto_mode_enabled()?}),
+        "auto.mode.set" => {
+            if p.as_object().is_none_or(|fields| fields.len() != 1)
+                || !p["enabled"].is_boolean() {
+                return Err(anyhow!("enabled must be a boolean"));
+            }
+            let enabled = p["enabled"].as_bool().unwrap();
+            d.store.lock().unwrap().set_auto_mode_enabled(enabled)?;
+            json!({"enabled":enabled})
+        }
         "auto.dispatch" => {
             use crate::auto_select::{CapabilityTier, Sandbox, WorkUnit};
             use sha2::{Digest, Sha256};
@@ -813,6 +823,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         "exclusions":[],"reason":"replayed_unsettled_launch"},
                     "actions":["inspect_launch","choose_manual_route"]})
             } else {
+                if !d.store.lock().unwrap().auto_mode_enabled()? {
+                    return Err(anyhow!("Auto Mode is disabled; enable it before dispatch"));
+                }
                 if parent.status != "completed" {
                     return Err(anyhow!("automatic delegation requires a completed top-level parent"));
                 }

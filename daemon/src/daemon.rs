@@ -110,8 +110,13 @@ impl Daemon {
     pub fn record_auto_selected_decision(&self, work_unit_id: &str, parent: &Run,
         requirements_hash: &str, route_id: &str, account_generation: Option<i64>,
         trace: Value) -> Result<Event> {
-        let event = self.store.lock().unwrap().insert_auto_selected_decision(work_unit_id,
+        let store = self.store.lock().unwrap();
+        if !store.auto_mode_enabled()? {
+            return Err(anyhow!("Auto Mode was disabled before admission"));
+        }
+        let event = store.insert_auto_selected_decision(work_unit_id,
             parent, requirements_hash, route_id, account_generation, &redact_value(trace))?;
+        drop(store);
         let _ = self.events.send(event.clone());
         Ok(event)
     }

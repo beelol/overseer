@@ -31,8 +31,15 @@ impl Daemon {
                 env.push((key.to_string(), "/nonexistent/harness-disabled-in-tests".to_string()));
             }
         }
+        let enable_auto = !env.iter().any(|(key, value)|
+            key == "OVERSEER_TEST_AUTO_DISABLED" && value == "1");
         let mut d = Daemon { home, child: None, env };
         d.spawn();
+        if enable_auto {
+            // Most existing Auto protocol fixtures opt in explicitly; the
+            // default-off regression opts out through this test-only flag.
+            d.call("auto.mode.set", json!({"enabled":true}));
+        }
         d
     }
 
