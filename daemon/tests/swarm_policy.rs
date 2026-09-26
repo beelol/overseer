@@ -154,3 +154,19 @@ fn one_account_without_a_common_verified_pool_cannot_double_its_allowance() {
     assert_eq!(result["targets"]["qualified"]["eligible"],true);
     assert_eq!(result["targets"]["qualified"]["windows"].as_array().unwrap().len(),2);
 }
+
+#[test]
+fn preview_uses_explicit_percentage_bounds_instead_of_builtin_values() {
+    let d=Daemon::start(&[]);
+    let result=d.call("swarm.policy.preview",json!({
+        "snapshot":snapshot(Some(60000),true),
+        "request":{"now_ms":1200,"allowed_targets":["qualified"],
+            "required_capabilities":["write"],"purpose":"worker",
+            "estimate_milli":{"points":8000},"allocation_percent":20,
+            "finishing_reserve_percent":30}
+    }));
+    assert_eq!(result["targets"]["qualified"]["eligible"],true);
+    assert_eq!(result["applied_percentages"]["run_allocation_percent"],20);
+    assert_eq!(result["targets"]["qualified"]["windows"][0]["allocation_milli"],12000);
+    assert_eq!(result["targets"]["qualified"]["windows"][0]["finishing_reserve_milli"],3600);
+}

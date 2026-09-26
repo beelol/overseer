@@ -43,6 +43,10 @@ fn validate_policy(v: &Value) -> Result<&Map<String, Value>> {
             if !value.is_boolean() {
                 bail!("policy {key} must be boolean");
             }
+        } else if ["run_allocation_percent", "finishing_reserve_percent"].contains(&key.as_str()) {
+            if value.as_i64().is_none_or(|n| !(1..=100).contains(&n)) {
+                bail!("policy {key} must be an integer percentage from 1 to 100");
+            }
         } else if value.as_i64().is_none_or(|n| n <= 0 || n > 86_400_000) {
             bail!("policy {key} must be a positive bounded integer");
         }

@@ -53,7 +53,14 @@ struct Request {
     finishing_estimate_milli: HashMap<String, i64>,
     #[serde(default)]
     allow_estimated: bool,
+    #[serde(default = "default_allocation_percent")]
+    allocation_percent: i64,
+    #[serde(default = "default_finishing_reserve_percent")]
+    finishing_reserve_percent: i64,
 }
+
+fn default_allocation_percent() -> i64 { 10 }
+fn default_finishing_reserve_percent() -> i64 { 20 }
 
 pub fn preview(p: &Value) -> Result<Value> {
     let snapshot: Snapshot = serde_json::from_value(p["snapshot"].clone())
@@ -65,6 +72,11 @@ pub fn preview(p: &Value) -> Result<Value> {
     }
     if request.purpose != "worker" && request.purpose != "finishing" {
         bail!("purpose must be worker or finishing");
+    }
+    if !(1..=100).contains(&request.allocation_percent)
+        || !(1..=100).contains(&request.finishing_reserve_percent)
+    {
+        bail!("allocation and finishing reserve percentages must be 1-100");
     }
     if request.estimate_milli.values().any(|v| *v < 0)
         || request.finishing_estimate_milli.values().any(|v| *v < 0)
@@ -183,8 +195,9 @@ pub fn preview(p: &Value) -> Result<Value> {
                         .saturating_sub(window.protected_milli)
                         .saturating_sub(window.reserved_milli)
                         .max(0);
-                    let allocation = usable / 10;
-                    let minimum_reserve = allocation / 5;
+                    let allocation = usable.saturating_mul(request.allocation_percent) / 100;
+                    let minimum_reserve = allocation
+                        .saturating_mul(request.finishing_reserve_percent) / 100;
                     let finishing = request
                         .finishing_estimate_milli
                         .get(&window.unit)
@@ -224,6 +237,8 @@ pub fn preview(p: &Value) -> Result<Value> {
         "defaults":{"max_workers":8,"max_executing":9,"growth_per_wave":4,
             "growth_interval_ms":5000,"deadline_ms":3600000,"run_allocation_percent":10,
             "minimum_finishing_reserve_percent":20},
+        "applied_percentages":{"run_allocation_percent":request.allocation_percent,
+            "finishing_reserve_percent":request.finishing_reserve_percent},
         "targets":target_json,
         "authoritative_reservation":false
     }))

@@ -49,6 +49,8 @@ fn empty_approval_requires_one_selection_and_invalid_overrides_fail() {
             json!({"scope":"application","policy":{"max_workers":0}})
         )
         .is_err());
+    assert!(d.try_call("swarm.policy.set",json!({"scope":"application",
+        "policy":{"run_allocation_percent":101}})).is_err());
     assert!(d
         .try_call(
             "swarm.create",

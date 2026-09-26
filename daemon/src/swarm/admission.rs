@@ -118,6 +118,8 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
         "estimate_milli":p["estimate_milli"],
         "finishing_estimate_milli":p.get("finishing_estimate_milli").cloned().unwrap_or(json!({})),
         "allow_estimated":effective["allow_estimated_quota"].as_bool().unwrap_or(false),
+        "allocation_percent":effective["run_allocation_percent"],
+        "finishing_reserve_percent":effective["finishing_reserve_percent"],
     });
     let preview = policy::preview(&json!({"snapshot":p["snapshot"],"request":request}))?;
     let candidate = &preview["targets"][target];
@@ -286,9 +288,16 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
             }
             (allocation, reserve)
         } else {
-            let allocation = usable.saturating_sub(global_reserved).max(0) / 10;
+            let allocation = usable
+                .saturating_sub(global_reserved)
+                .max(0)
+                .saturating_mul(effective["run_allocation_percent"].as_i64().unwrap_or(10))
+                / 100;
             let finish = p["finishing_estimate_milli"][unit].as_i64().unwrap_or(0);
-            (allocation, (allocation / 5).max(finish))
+            let minimum_reserve = allocation
+                .saturating_mul(effective["finishing_reserve_percent"].as_i64().unwrap_or(20))
+                / 100;
+            (allocation, minimum_reserve.max(finish))
         };
         let own_reserved: i64 = tx.query_row(
             "SELECT COALESCE(SUM(amount_milli),0) FROM swarm_reservations WHERE run_id=?1 AND pool_id=?2 AND window_id=?3 AND status IN ('active','uncertain')",

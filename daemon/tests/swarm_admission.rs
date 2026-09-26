@@ -156,6 +156,32 @@ fn mutable_resource_conflict_is_rejected_before_reserving_an_attempt() {
 }
 
 #[test]
+fn run_percentage_overrides_change_frozen_allocation_and_finishing_reserve() {
+    let d=Daemon::start(&[]);
+    let run=d.call("swarm.create",json!({"category":"Budget override","objective":"Audit",
+        "allowed_targets":["codex-a"],
+        "policy":{"run_allocation_percent":20,"finishing_reserve_percent":30}}));
+    let id=run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"first","title":"First","acceptance":"evidence","deps":[]},
+        {"id":"second","title":"Second","acceptance":"evidence","deps":[]}
+    ]}));
+    let at=now();
+    let request=|job:&str,estimate:i64|json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":job,"target_id":"codex-a","request_id":job,"snapshot":snapshot(at,60000),
+        "now_ms":at,"required_capabilities":["code"],
+        "estimate_milli":{"points":estimate},"purpose":"worker"});
+    let first=d.call("swarm.admit",request("first",8000));
+    assert_eq!(first["status"],"admitted");
+    assert_eq!(first["allocation_milli"],12000);
+    let second=d.call("swarm.admit",request("second",500));
+    assert_eq!(second["reason"],"finishing_reserve");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let saved:(i64,i64)=db.query_row("SELECT allocation_milli,reserve_milli FROM swarm_allocations WHERE run_id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!(saved,(12000,3600));
+}
+
+#[test]
 fn default_worker_ceiling_and_four_per_wave_are_admission_bounds() {
     let d = Daemon::start(&[]);
     let id = setup(&d, "Scale admission", 9);
