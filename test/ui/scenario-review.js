@@ -210,8 +210,11 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     const draftKept = /NATIVE.DRAFT/.test(await textNow());
     const diskHasAgent = fs.readFileSync(path.join(repoA, 'a.txt'), 'utf8').includes('AGENT-EXTERNAL-WRITE');
     check('same-line external write does not overwrite the unsaved draft; both versions exist', draftKept && diskHasAgent, { draftKept, diskHasAgent });
-    await cdp.evalWorkbench('0');
-    const draftListed = await reviewC.waitFor(`[...document.querySelectorAll('#tree .file')].some(b => /^a\\.txt, .*unsaved/.test(b.getAttribute('aria-label') || '') && !!b.querySelector('.marker.codicon-circle-filled'))`, 8000).then(() => true, () => false);
+    // Bring the review back to the front of its group (the native diff editor was on top of it).
+    const reviewTab = await cdp.waitFor(`(() => { const t = [...document.querySelectorAll('.tab')].find(t => /Review.*C current/.test(t.getAttribute('aria-label') || '')); if (!t) return null; const b = t.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 10000, 'review tab').catch(() => null);
+    if (reviewTab) { await cdp.click(reviewTab.x, reviewTab.y); await delay(1200); }
+    const reviewC2 = await cdp.webview(`!!document.getElementById('diffs') && document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(repoA)})`, 15000).catch(() => reviewC);
+    const draftListed = await reviewC2.waitFor(`[...document.querySelectorAll('#tree .file')].some(b => /^a\\.txt, .*unsaved/.test(b.getAttribute('aria-label') || '') && !!b.querySelector('.marker.codicon-circle-filled'))`, 8000).then(() => true, () => false);
     await s.screenshot('unsaved-marker');
     check('unsaved draft marked in the review file list (AC-75 replaced Workspace Dirty)', draftListed);
     // Reload the window; the draft must survive.

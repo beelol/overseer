@@ -147,6 +147,7 @@ async function activate(context) {
     if (!ACTIVE.has(picked.status)) markReviewed(model.rootRun(picked)?.id || runId);
     context.workspaceState.update('overseer.selectedRun', runId);
     await arrangement.show(runId, { follow });
+    say(`selected ${runId} (${arrangement.current})`);
     await center.select(runId);
     if (reveal) revealInTree(runId);
     model.emitter.fire();

@@ -173,6 +173,10 @@ class Session {
     const pt = await this.cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(label)}).pop(); if (!r) return null;
       const t = r.querySelector('.monaco-tl-twistie'); const b = (${twisty} && t ? t : r).getBoundingClientRect(); return ${twisty} ? { x: b.left + b.width / 2, y: b.top + b.height / 2 } : { x: b.left + 80, y: b.top + b.height / 2 }; })()`, 20000, 'row ' + label);
     await this.cdp.click(pt.x, pt.y);
+    // A first click coming from a focused webview can be taken by focus alone: click again if the row is not selected.
+    const selected = () => this.cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row.selected')].some(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(title)})`);
+    for (let i = 0; i < 10 && !(await selected()); i++) await delay(100);
+    if (!(await selected())) { this.note('selectAgent: row not selected after the first click; clicking again', title); await this.cdp.click(pt.x, pt.y); }
     await delay(settle);
   }
 

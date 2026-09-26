@@ -40,7 +40,12 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     // An unsaved editor on README.md in the checkout.
     await cdp.command('Go to File'); await delay(600); await cdp.type('README.md'); await delay(900); await cdp.key('Enter'); await delay(1500);
     s.note('unsaved editor', await cdp.evalWorkbench(`[...document.querySelectorAll('.tab')].map(t => t.getAttribute('aria-label') + (t.classList.contains('dirty') ? ' (dirty)' : ''))`));
-    await cdp.key('End', { meta: true }); await cdp.type('unsaved draft line'); await delay(500);
+    // Click into the editor's last line (keyboard focus must be there), then type.
+    const line = await cdp.waitFor(`(() => { const l = [...document.querySelectorAll('.editor-instance .view-lines .view-line')].pop(); if (!l) return null; const b = l.getBoundingClientRect(); return { x: b.left + 40, y: b.top + b.height / 2 }; })()`, 10000, 'editor line');
+    await cdp.click(line.x, line.y); await delay(200);
+    // (The click on the last line puts the cursor there; ⌘End through CDP is read as another shortcut.)
+    await cdp.type('unsaved draft line'); await delay(500);
+    s.note('dirty tab', await cdp.evalWorkbench(`[...document.querySelectorAll('.tab.dirty')].map(t => t.getAttribute('aria-label'))`));
 
     await cdp.command('Overseer: Switch Agent…'); await cdp.waitQuickTitle('Switch to agent'); await cdp.type('Dirty checkout'); await delay(300); await cdp.key('Enter'); await delay(1500);
     await cdp.command('Overseer: Open Review'); await delay(2500);

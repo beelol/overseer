@@ -57,6 +57,10 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // Expand and collapse a tool call (first open the folded steps it sits in, as a user would).
     if (await tag(a, `(() => { const t = [...document.querySelectorAll('#conv details.tool')].find(t => t.dataset.name === 'shell'); const f = t?.closest('details.steps-fold'); return f && !f.open ? f.querySelector('summary') : null; })()`, 'steps-summary')) await clickIn(a, '#steps-summary');
     await tag(a, `[...document.querySelectorAll('#conv details.tool')].find(t => t.dataset.name === 'shell')?.querySelector('summary')`, 'shell-summary');
+    // The approved edit brought the review in beside the chat (focus is there): focus the chat first
+    // with a click on an empty spot, as a user's first click into the other column does.
+    await a.eval(`(() => { const c = document.createElement('div'); c.id = 'focus-spot'; c.style.cssText = 'position:fixed;right:2px;bottom:2px;width:3px;height:3px;z-index:9'; document.body.append(c); return true; })()`);
+    await clickIn(a, '#focus-spot');
     await clickIn(a, '#shell-summary');
     const open = await a.eval(`(() => { const d = document.getElementById('shell-summary').parentElement; const r = d.querySelector('.tool-result'); return { open: d.open, input: d.querySelector('.tool-section pre')?.textContent, status: r.classList.contains('bad') ? 'failed' : r.classList.contains('run') ? 'running' : r.querySelector('.codicon-check') ? 'completed' : r.textContent }; })()`);
     await s.screenshot('tool-expanded');
@@ -96,7 +100,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
     // --- Retention-bound history and a live burst stay responsive; truncation is visible.
     await selectRun('burst history', 'generic');
-    const b = await panel(burst.run.id);
+    const b = await panel(burst.run.id).catch(async e => { const v = await s.editorView().catch(() => null); s.note('burst toasts', await cdp.evalWorkbench(`[...document.querySelectorAll('.notification-toast, .notifications-list-container .monaco-list-row')].map(t => t.innerText.slice(0, 300))`)); s.note('burst chat state', v && await v.eval(`({ selected: window.__overseer?.selected?.(), mode: document.body.dataset.mode, title: document.getElementById('title')?.textContent, turns: document.querySelectorAll('#conv .turn').length, msgs: document.querySelectorAll('#conv .msg').length, conv: document.getElementById('conv')?.innerText.slice(0, 200) })`)); throw e; });
     const hist = await b.eval(`({ last: [...document.querySelectorAll('#conv .msg .text')].pop()?.textContent, ms: Number(document.body.dataset.historyMs), events: Number(document.body.dataset.historyEvents), banner: document.querySelector('#conv .conv-banner:not([hidden])')?.textContent, msgs: document.querySelectorAll('#conv .msg').length })`);
     check('history at the retention bound renders within 1.5 s with truncation visible', hist.ms < 1500 && hist.events >= 4900 && /trimmed|truncated/.test(hist.banner || '') && hist.last === 'burst line 5999', hist);
     const live = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'sleep 4; i=0; while [ $i -lt 6000 ]; do echo "live line $i"; i=$((i+1)); done; sleep 1'], prompt: '', title: 'burst live' });

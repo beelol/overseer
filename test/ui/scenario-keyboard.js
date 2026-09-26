@@ -94,8 +94,13 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
 
     // Follow-up with Enter in the chat (focus lands in the composer after switching).
     fs.writeFileSync(modeFile, 'echo');
-    await dash.eval(`document.getElementById('prompt').focus()`);
-    await cdp.type('And add a test'); await delay(200); await cdp.key('Enter');
+    // The agent's edits brought the review in beside the chat: click into the chat, then its prompt.
+    await dash.eval(`(() => { if (!document.getElementById('focus-spot')) { const c = document.createElement('div'); c.id = 'focus-spot'; c.style.cssText = 'position:fixed;right:2px;top:60px;width:3px;height:3px;z-index:9'; document.body.append(c); } return true; })()`);
+    { const f = await s.webviewPoint(dash, '#focus-spot'); await cdp.click(f.x, f.y); await delay(200); }
+    { const at = await s.webviewPoint(dash, '#prompt'); await cdp.click(at.x, at.y); await delay(200); }
+    await cdp.type('And add a test'); await delay(200);
+    s.note('prompt before Enter', await dash.eval(`({ value: document.getElementById('prompt').value, focused: document.activeElement?.id })`));
+    await cdp.key('Enter');
     const turns = async () => s.ctl('run.turns', { run_id: created.id }).length;
     let n = 0; for (let i = 0; i < 30 && n < 2; i++) { n = await turns(); await delay(300); }
     check('Enter in the chat composer sends a follow-up', n === 2, { turns: n });

@@ -70,7 +70,9 @@ class AgentsProvider {
     this.showArchived = false;
     this.emitter = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.emitter.event;
-    model.onDidChange(() => this.emitter.fire());
+    // Redraw only when something the list shows changed: a redraw between a click's mouse-down and
+    // mouse-up loses the click, and busy agents change the model many times a second.
+    model.onDidChange(() => { const sig = this.signature(); if (sig === this.shownSignature) return; this.shownSignature = sig; this.emitter.fire(); this.decorationEmitter?.fire(undefined); });
     // Status badges and colors for agent rows (resourceUri overseer-agent:/<run id>).
     this.decorationEmitter = new vscode.EventEmitter();
     this.decorations = {
@@ -83,7 +85,14 @@ class AgentsProvider {
         return { badge, color: ['failed', 'disconnected', 'waiting_for_user'].includes(run.status) ? new vscode.ThemeColor(color) : undefined, tooltip: STATUS_TEXT[run.status] || run.status, propagate: false };
       },
     };
-    model.onDidChange(() => this.decorationEmitter.fire(undefined));
+  }
+  /** What the list shows (relative times in 30-second steps). */
+  signature() {
+    const st = this.model.state || {};
+    return JSON.stringify([Math.floor(Date.now() / 30000), (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
+      (st.runs || []).map(r => [r.id, r.status, r.parent_run_id, r.attention?.kind, r.harness, r.model, r.profile_id, r.workspace_id, r.title, r.exit_reason, r.ended_ms ? 1 : 0]),
+      (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
+      (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || []]);
   }
   getTreeItem(node) { return node.item; }
   getParent(node) { return node.parent; }

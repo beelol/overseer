@@ -87,13 +87,16 @@ class Arrangement {
     const chatTab = () => vscode.window.tabGroups.all.flatMap(g => g.tabs).find(t => t.input?.viewType?.endsWith('overseer.center'));
     const panel = this.center.panel;
     if (!panel) { await this.center.open({ column: vscode.ViewColumn.Two, preserveFocus: true }); return; }
+    // Someone typing in the chat (a new agent's first edit arrives) keeps typing there.
+    const chatHadFocus = panel.active && vscode.window.tabGroups.activeTabGroup.activeTab?.input?.viewType?.endsWith('overseer.center');
     if (chatTab()?.group.viewColumn !== vscode.ViewColumn.Two) {
       panel.reveal(chatTab()?.group.viewColumn ?? vscode.ViewColumn.One, false);
       for (let i = 0; i < 50 && !(panel.active && vscode.window.tabGroups.activeTabGroup.activeTab?.input?.viewType?.endsWith('overseer.center')); i++) await new Promise(r => setTimeout(r, 10));
       await vscode.commands.executeCommand('workbench.action.moveEditorToRightGroup');
     }
-    // Focus goes to the review's group; a text editor left open there stays behind the review.
-    await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
+    // Otherwise focus goes to the review's group; a text editor left open there stays behind the review.
+    if (chatHadFocus) { this.center.panel?.reveal(vscode.ViewColumn.Two, false); this.center.focus?.('chat'); }
+    else await vscode.commands.executeCommand('workbench.action.focusFirstEditorGroup');
   }
 
   /** The grid takes the editor area; leaving it returns to the arrangement before (AC-79). */
