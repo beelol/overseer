@@ -32,12 +32,12 @@
 │                                                          │││  f                 filter: all → active → needs you    │││                                                          │
 │                                                          │││  /                 search agents (esc clears)          │││                                                          │
 │                                                          │││  A                 accounts and sign-in                │││                                                          │
-│                                                          │││  r                 reload (after X: start the daemon)  │││                                                          │
-╰ completed ───────────────────────────────────────────────╯╰│  X                 stop all agents and the daemon      │╯╰ completed ───────────────────────────────────────────────╯
-╭ 7 ✓ agent 06 ────────────────────────────── generic · 0s ╮╭│  q                 quit (agents keep running)          │╮╭ 9 ✓ agent 04 ────────────────────────────── generic · 0s ╮
-│ hi                                                       │││                                                        │││ hi                                                       │
+│                                                          │││  S                 Audio Mode: settings and preview    │││                                                          │
+╰ completed ───────────────────────────────────────────────╯╰│  r                 reload (after X: start the daemon)  │╯╰ completed ───────────────────────────────────────────────╯
+╭ 7 ✓ agent 06 ────────────────────────────── generic · 0s ╮╭│  X                 stop all agents and the daemon      │╮╭ 9 ✓ agent 04 ────────────────────────────── generic · 0s ╮
+│ hi                                                       │││  q                 quit (agents keep running)          │││ hi                                                       │
+│                                                          │││                                                        │││                                                          │
 │                                                          ││╰──────────────────────────────────────── any key closes ╯││                                                          │
-│                                                          ││                                                          ││                                                          │
 │                                                          ││                                                          ││                                                          │
 │                                                          ││                                                          ││                                                          │
 │                                                          ││                                                          ││                                                          │

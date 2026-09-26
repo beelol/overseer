@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 pub const PAGE: usize = 9;
 /// Pages of history fetched per run (5,000 events each), newest kept by the feed cap.
 const HISTORY_PAGES: usize = 10;
+const MAX_AUDIO_IMPORT_PATH: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Filter {
@@ -62,6 +63,10 @@ pub enum Mode {
     Search,
     /// Accounts and their sign-in status (`A`).
     Accounts,
+    /// Daemon-owned Audio Mode settings and cue previews.
+    Audio,
+    /// Private Commander folder path entry.
+    AudioImport,
 }
 
 /// A program to run in the terminal with the TUI suspended (a provider's own sign-in).
@@ -131,6 +136,11 @@ enum Pending {
     PrPrepare { run: String, plan: Value },
     PrPublish { run: String },
     PrOpened,
+    AudioGet { bell: bool },
+    AudioSet,
+    AudioPreview,
+    AudioVoices,
+    AudioImport,
 }
 
 /// The New Agent form.
@@ -196,6 +206,45 @@ pub struct ChangesView {
     pub loading: bool,
 }
 
+/// The TUI only holds settings; the daemon owns playback and persistence.
+#[derive(Debug, Clone)]
+pub struct AudioSettings {
+    pub loaded: bool,
+    pub enabled: bool,
+    pub available: bool,
+    pub track: String,
+    pub voice: String,
+    pub commander_imported: bool,
+    pub voices: Vec<String>,
+    pub preview: usize,
+    pub import_path: String,
+}
+
+impl Default for AudioSettings {
+    fn default() -> Self {
+        Self { loaded: false, enabled: false, available: false, track: "reactor".into(),
+            voice: String::new(), commander_imported: false, voices: Vec::new(), preview: 0,
+            import_path: String::new() }
+    }
+}
+
+impl AudioSettings {
+    pub const CORE_KEYS: [&'static str; 3] = ["agent_started", "agent_complete", "agent_needs_attention"];
+
+    fn update(&mut self, value: &Value) {
+        self.loaded = true;
+        self.enabled = value["enabled"].as_bool().unwrap_or(false);
+        self.available = value["available"].as_bool().unwrap_or(false);
+        self.track = value["track"].as_str().unwrap_or("reactor").to_string();
+        self.voice = value["voice"].as_str().unwrap_or_default().to_string();
+        self.commander_imported = value["commander_imported"].as_bool().unwrap_or(false);
+    }
+
+    pub fn preview_key(&self) -> &'static str {
+        Self::CORE_KEYS[self.preview % Self::CORE_KEYS.len()]
+    }
+}
+
 /// Lines of diff shown for one file at most.
 const DIFF_LINES: usize = 4000;
 
@@ -249,6 +298,7 @@ pub struct App {
     pub search: String,
     pub accounts: Vec<AccountRow>,
     pub account_sel: usize,
+    pub audio: AudioSettings,
     /// Set when a program must run with the terminal (the event loop suspends the TUI for it).
     pub exec: Option<Exec>,
     /// Zoom shows tool inputs and results under each tool call.
@@ -308,6 +358,7 @@ impl App {
             search: String::new(),
             accounts: Vec::new(),
             account_sel: 0,
+            audio: AudioSettings::default(),
             exec: None,
             expand_tools: false,
             waiting: HashSet::new(),
@@ -631,8 +682,8 @@ impl App {
                         self.waiting = now_waiting;
                         self.state = state;
                         if !first_load && !new.is_empty() {
-                            // Someone needs you: a bell, and a pointer to it unless it is already focused.
-                            self.bell = true;
+                            // Ask the daemon before ringing: Audio Mode may have changed in VS Code.
+                            self.request("audio.get", json!({}), Pending::AudioGet { bell: true });
                             if new.iter().all(|id| Some(id.as_str()) != self.focus.as_deref()) {
                                 let name = self.state.run(&new[0]).map(|r| r.title.clone()).unwrap_or_default();
                                 let more = if new.len() > 1 { format!(" and {} more", new.len() - 1) } else { String::new() };
@@ -659,6 +710,33 @@ impl App {
             (Pending::State, Err(e)) => {
                 self.state_inflight = false;
                 self.say(format!("state: {e}"), true);
+            }
+            (Pending::AudioGet { bell }, Ok(v)) => {
+                self.audio.update(&v);
+                if bell && !self.audio.enabled { self.bell = true; }
+                self.dirty = true;
+            }
+            (Pending::AudioGet { bell }, Err(e)) => {
+                // Old daemons still keep the TUI's existing attention bell.
+                if bell { self.bell = true; }
+                else { self.say(format!("Audio Mode is unavailable: {e}"), true); }
+            }
+            (Pending::AudioSet, Ok(v)) => {
+                self.audio.update(&v);
+                self.say(format!("Audio Mode {} · {}", if self.audio.enabled { "on" } else { "off" }, self.audio.track), false);
+            }
+            (Pending::AudioPreview, Ok(_)) => self.say("Preview queued by overseerd", false),
+            (Pending::AudioVoices, Ok(v)) => {
+                self.audio.voices = v.as_array().into_iter().flatten()
+                    .filter_map(|item| item["name"].as_str().map(str::to_string)).collect();
+                self.dirty = true;
+            }
+            (Pending::AudioVoices, Err(_)) => {
+                // Reactor and private Commander still work if system speech is unavailable.
+            }
+            (Pending::AudioImport, Ok(_)) => {
+                self.mode = Mode::Audio;
+                self.request("audio.set", json!({"track": "commander"}), Pending::AudioSet);
             }
             (Pending::History { root, run, page }, Ok(v)) => {
                 let events = v["events"].as_array().cloned().unwrap_or_default();
@@ -1126,6 +1204,61 @@ impl App {
         }
     }
 
+    fn open_audio(&mut self) {
+        self.mode = Mode::Audio;
+        self.request("audio.get", json!({}), Pending::AudioGet { bell: false });
+        self.request("audio.voices", json!({}), Pending::AudioVoices);
+    }
+
+    fn audio_key(&mut self, k: KeyEvent) {
+        match k.code {
+            KeyCode::Esc | KeyCode::Char('S') => self.mode = Mode::Grid,
+            KeyCode::Char(' ') | KeyCode::Char('e') =>
+                self.request("audio.set", json!({"enabled": !self.audio.enabled}), Pending::AudioSet),
+            KeyCode::Char('1') => self.request("audio.set", json!({"track": "reactor"}), Pending::AudioSet),
+            KeyCode::Char('2') => self.request("audio.set", json!({"track": "system"}), Pending::AudioSet),
+            KeyCode::Char('3') => self.request("audio.set", json!({"track": "commander"}), Pending::AudioSet),
+            KeyCode::Tab | KeyCode::Right =>
+                self.audio.preview = (self.audio.preview + 1) % AudioSettings::CORE_KEYS.len(),
+            KeyCode::BackTab | KeyCode::Left =>
+                self.audio.preview = (self.audio.preview + AudioSettings::CORE_KEYS.len() - 1) % AudioSettings::CORE_KEYS.len(),
+            KeyCode::Char('p') => self.request("audio.preview", json!({"key": self.audio.preview_key()}), Pending::AudioPreview),
+            KeyCode::Char('v') | KeyCode::Char('V') => {
+                if self.audio.voices.is_empty() {
+                    self.say("No installed macOS voices are available", true);
+                } else {
+                    let current = self.audio.voices.iter().position(|v| v == &self.audio.voice);
+                    let index = if k.code == KeyCode::Char('V') {
+                        current.unwrap_or(0).wrapping_add(self.audio.voices.len() - 1) % self.audio.voices.len()
+                    } else {
+                        (current.map(|i| i + 1).unwrap_or(0)) % self.audio.voices.len()
+                    };
+                    self.request("audio.set", json!({"track": "system", "voice": self.audio.voices[index]}), Pending::AudioSet);
+                }
+            }
+            KeyCode::Char('i') => self.mode = Mode::AudioImport,
+            KeyCode::Char('r') => self.request("audio.get", json!({}), Pending::AudioGet { bell: false }),
+            _ => self.dirty = false,
+        }
+    }
+
+    fn audio_import_key(&mut self, k: KeyEvent) {
+        match k.code {
+            KeyCode::Esc => self.mode = Mode::Audio,
+            KeyCode::Enter => {
+                let path = self.audio.import_path.trim();
+                if path.is_empty() {
+                    self.say("Enter the private Commander folder path", true);
+                } else {
+                    self.request("audio.import_commander", json!({"path": path}), Pending::AudioImport);
+                }
+            }
+            KeyCode::Backspace => { self.audio.import_path.pop(); }
+            KeyCode::Char(c) if !c.is_control() && self.audio.import_path.chars().count() < MAX_AUDIO_IMPORT_PATH => self.audio.import_path.push(c),
+            _ => self.dirty = false,
+        }
+    }
+
     fn open_accounts(&mut self) {
         self.mode = Mode::Accounts;
         self.request("account.list", json!({}), Pending::AccountList);
@@ -1264,6 +1397,8 @@ impl App {
             Mode::Changes => self.changes_key(k),
             Mode::Search => self.search_key(k),
             Mode::Accounts => self.accounts_key(k),
+            Mode::Audio => self.audio_key(k),
+            Mode::AudioImport => self.audio_import_key(k),
             Mode::Grid | Mode::Zoom { .. } => self.nav_key(k),
         }
     }
@@ -1307,6 +1442,7 @@ impl App {
             KeyCode::Char('n') => self.open_new_agent(),
             KeyCode::Char('v') => self.open_changes(),
             KeyCode::Char('A') => self.open_accounts(),
+            KeyCode::Char('S') => self.open_audio(),
             KeyCode::Char('P') => {
                 if let Some(run) = self.focused().cloned() {
                     if run.active() {
@@ -1447,6 +1583,10 @@ impl App {
                 if let Some(s) = self.form_text() {
                     s.push_str(text);
                 }
+            }
+            Mode::AudioImport => {
+                let remaining = MAX_AUDIO_IMPORT_PATH.saturating_sub(self.audio.import_path.chars().count());
+                self.audio.import_path.extend(text.chars().take(remaining));
             }
             _ => {}
         }
