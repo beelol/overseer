@@ -1877,6 +1877,9 @@ fn auto_thread_credit_read_loses_plan_attribution_when_the_account_plan_changes(
     assert_eq!(changed["observation"]["id"], original["observation"]["id"],
         "a later read is a correction to the same cumulative sample");
     assert_eq!(changed["observation"]["attribution"], "unverified_plan_scope", "{changed}");
+    assert_eq!(changed["allowance_delta"]["state"], "unverified");
+    assert!(changed["allowance_delta"]["reasons"].as_array().unwrap().iter().any(|reason|
+        reason == "account_plan_changed"), "{changed}");
     assert_eq!(changed["observation"]["estimate"]["plan_type"], "plus");
     assert_eq!(changed["observation"]["subscription_window_relation"], "unverified");
     assert_eq!(d.runs().len(), 2, "metadata-only correction must not launch work");
@@ -1896,7 +1899,13 @@ fn auto_managed_codex_quota_reads_are_linked_to_the_child_without_raw_response()
         "parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol",
         "effort":"medium","prompt":"bounded work"})));
     assert_eq!(d.wait_done(&child, 15)["status"], "completed");
-    d.call("auto.usage.thread.refresh", json!({"run_id":child}));
+    let refreshed = d.call("auto.usage.thread.refresh", json!({"run_id":child}));
+    assert_eq!(refreshed["allowance_delta"]["state"], "unverified", "{refreshed}");
+    assert!(refreshed["allowance_delta"]["windows"].as_array().unwrap().is_empty());
+    let reasons = refreshed["allowance_delta"]["reasons"].as_array().unwrap();
+    for reason in ["external_usage_unexcluded", "reporting_not_settled", "meter_precision_unknown"] {
+        assert!(reasons.iter().any(|item| item == reason), "{refreshed}");
+    }
     let observations = d.events(&child).into_iter().filter(|event|
         event["kind"] == "auto_quota" || event["kind"] == "quota").collect::<Vec<_>>();
     assert_eq!(observations.len(), 2, "before and after allowance reads must belong to the same child: {observations:?}");

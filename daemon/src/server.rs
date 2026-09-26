@@ -1355,18 +1355,31 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             };
             let store = d.store.lock().unwrap();
             store.record_auto_account_identity(profile_id, &fingerprint)?;
+            let generation = store.auto_account_generation(profile_id)?.ok_or_else(|| anyhow!("account generation is unavailable"))?;
+            let prior = store.auto_run_pre_turn_quota(&run.id)?;
+            // External usage, source precision, and reporting settlement are not
+            // established by a completed local thread. Keep observed changes
+            // visible as unverified, never as a numeric subscription charge.
+            let allowance_delta = crate::auto_consumption::assess_window_delta(prior.as_ref(),
+                &snapshot, &crate::auto_consumption::DeltaContext {
+                    model:run.model.as_deref(), effort:run.effort.as_deref(),
+                    same_account_generation:store.auto_run_account_matches(&run.id, profile_id, generation)?,
+                    model_version_stable:false, local_overlap_excluded:false,
+                    external_usage_excluded:false, reporting_settled:false,
+                    meter_error_percent:None,
+                });
             let event = store.insert_event(observed_ms, Some(&run.task_id), Some(&run.id), "quota",
                 "codex-app/metadata-read", "reported", &json!({"profile_id":profile_id,"snapshot":snapshot}))?;
             store.insert_auto_quota(event.seq, profile_id, "codex-app/metadata-read", &snapshot)?;
             let observation = if let Some(mut estimate) = estimate {
-                let generation = store.auto_account_generation(profile_id)?.ok_or_else(|| anyhow!("account generation is unavailable"))?;
                 estimate.plan_type = snapshot.reported_plan_type().map(str::to_string);
                 let attribution = store.auto_thread_usage_attribution(&run.id, profile_id,
                     generation, estimate.plan_type.as_deref())?;
                 let id = store.insert_auto_thread_usage(&run.id, profile_id, generation, "codex-app/account-usage-read", &estimate)?;
                 Some(json!({"id":id,"run_id":run.id,"profile_id":profile_id,"read_account_generation":generation,"attribution":attribution,"subscription_window_relation":"unverified","source":"codex-app/account-usage-read","estimate":estimate}))
             } else { None };
-            json!({"state":if observation.is_some() {"estimated"} else {"unavailable"},"observation":observation})
+            json!({"state":if observation.is_some() {"estimated"} else {"unavailable"},
+                "observation":observation,"allowance_delta":allowance_delta})
         }
         "auto.usage.thread.list" => {
             let rows = d.store.lock().unwrap().auto_thread_usage_observations(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;

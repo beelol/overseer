@@ -133,6 +133,129 @@ pub fn parse_codex_thread_usage(
     }))
 }
 
+/// Conditions for attributing a *window percentage* change to one completed
+/// work unit. An adapter may set the error bound only after validating that
+/// provider meter's precision. These flags are evidence, not user policy.
+#[derive(Clone, Debug)]
+pub struct DeltaContext<'a> {
+    pub model: Option<&'a str>,
+    pub effort: Option<&'a str>,
+    pub same_account_generation: bool,
+    pub model_version_stable: bool,
+    pub local_overlap_excluded: bool,
+    pub external_usage_excluded: bool,
+    pub reporting_settled: bool,
+    /// Maximum absolute error of each reported percentage, in percentage points.
+    pub meter_error_percent: Option<f64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct WindowDeltaInterval {
+    pub pool_id: String,
+    pub bucket_id: String,
+    pub window: String,
+    pub model: Option<String>,
+    pub model_family: Option<String>,
+    pub lower_percent: f64,
+    pub upper_percent: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct WindowDeltaAssessment {
+    pub state: String,
+    pub reasons: Vec<String>,
+    pub windows: Vec<WindowDeltaInterval>,
+}
+
+/// Compare normalized readings without interpreting tokens or estimated thread
+/// credits as a subscription charge. A visible zero is never proof of free work.
+/// Every applicable window must have the same pool, scope, plan and reset.
+pub fn assess_window_delta(
+    before: Option<&crate::auto_quota::QuotaSnapshot>,
+    after: &crate::auto_quota::QuotaSnapshot,
+    context: &DeltaContext<'_>,
+) -> WindowDeltaAssessment {
+    let mut reasons = Vec::<String>::new();
+    let mut add = |reason: &str| {
+        if !reasons.iter().any(|existing| existing == reason) { reasons.push(reason.into()); }
+    };
+    if !context.same_account_generation { add("account_generation_unverified"); }
+    if context.model.is_none() { add("model_unknown"); }
+    if context.effort.is_none() { add("effort_unknown"); }
+    if !context.model_version_stable { add("model_version_unverified"); }
+    if !context.local_overlap_excluded { add("local_overlap_unexcluded"); }
+    if !context.external_usage_excluded { add("external_usage_unexcluded"); }
+    if !context.reporting_settled { add("reporting_not_settled"); }
+    let error = context.meter_error_percent.filter(|value|
+        value.is_finite() && (0.0..=100.0).contains(value));
+    if error.is_none() { add("meter_precision_unknown"); }
+    let Some(before) = before else {
+        add("pre_turn_read_missing");
+        return WindowDeltaAssessment { state:"unverified".into(), reasons, windows:Vec::new() };
+    };
+    if after.observed_ms <= before.observed_ms { add("observation_order_invalid"); }
+    if before.ordinary_usage_allowed == Some(false) || after.ordinary_usage_allowed == Some(false) {
+        add("account_denied");
+    }
+    match (before.reported_plan_type(), after.reported_plan_type()) {
+        (Some(left), Some(right)) if left == right => {}
+        (Some(_), Some(_)) => add("account_plan_changed"),
+        _ => add("account_plan_unknown"),
+    }
+    let Some(model) = context.model else {
+        return WindowDeltaAssessment { state:"unverified".into(), reasons, windows:Vec::new() };
+    };
+    let earlier = before.applicable_to(model);
+    let later = after.applicable_to(model);
+    if earlier.is_empty() || earlier.len() != later.len() { add("window_scope_changed"); }
+    let mut intervals = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
+    for old in earlier {
+        let key = (&old.pool_id, &old.bucket_id, &old.window, &old.model, &old.model_family);
+        if !seen.insert(key) { add("window_scope_duplicated"); continue; }
+        let matches = later.iter().copied().filter(|new|
+            new.pool_id == old.pool_id && new.bucket_id == old.bucket_id
+                && new.window == old.window && new.model == old.model
+                && new.model_family == old.model_family).collect::<Vec<_>>();
+        if matches.len() != 1 { add("window_scope_changed"); continue; }
+        let new = matches[0];
+        match (&old.plan_type, &new.plan_type) {
+            (Some(left), Some(right)) if left == right => {}
+            (Some(_), Some(_)) => add("account_plan_changed"),
+            _ => add("account_plan_unknown"),
+        }
+        if old.reset_ms.is_none() || new.reset_ms.is_none() {
+            add("window_reset_unknown");
+        } else if old.reset_ms != new.reset_ms
+            || old.reset_ms.is_some_and(|reset| reset <= after.observed_ms) {
+            add("window_reset_changed");
+        }
+        if !old.used_percent.is_finite() || !new.used_percent.is_finite()
+            || !(0.0..=100.0).contains(&old.used_percent)
+            || !(0.0..=100.0).contains(&new.used_percent) {
+            add("meter_invalid");
+            continue;
+        }
+        let visible = new.used_percent - old.used_percent;
+        if visible < 0.0 { add("meter_decreased"); }
+        if visible == 0.0 { add("zero_visible_delta"); }
+        if let Some(error) = error {
+            let lower = (visible - 2.0 * error).max(0.0);
+            let upper = (visible + 2.0 * error).min(100.0);
+            if lower == 0.0 && upper == 100.0 { add("meter_too_coarse"); }
+            intervals.push(WindowDeltaInterval { pool_id:old.pool_id.clone(),
+                bucket_id:old.bucket_id.clone(), window:old.window.clone(),
+                model:old.model.clone(), model_family:old.model_family.clone(),
+                lower_percent:lower, upper_percent:upper });
+        }
+    }
+    if reasons.is_empty() {
+        WindowDeltaAssessment { state:"bounded".into(), reasons, windows:intervals }
+    } else {
+        WindowDeltaAssessment { state:"unverified".into(), reasons, windows:Vec::new() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,6 +283,87 @@ mod tests {
         assert!(!output.contains("secret-prompt-sentinel"));
         assert!(!output.contains("lifetimeTokens"));
         assert!(!output.contains("estimatedUsageUsdMicros"));
+    }
+
+    #[test]
+    fn isolated_same_window_delta_is_a_bounded_interval_not_a_point_price() {
+        use crate::auto_quota::parse_codex_rate_limits;
+        let at = 1_800_000_000_000_i64;
+        let reading = |used: f64, reset: i64, plan: &str, observed| {
+            parse_codex_rate_limits(&json!({"rateLimits":{"limitId":"codex",
+                "planType":plan,"primary":{"usedPercent":used,"resetsAt":reset}}}),
+                "pool-1", observed).unwrap()
+        };
+        let before = reading(40.0, 1_800_003_600, "pro", at);
+        let after = reading(42.0, 1_800_003_600, "pro", at + 20_000);
+        let trusted = DeltaContext { model:Some("gpt-6-sol"), effort:Some("medium"),
+            same_account_generation:true, model_version_stable:true,
+            local_overlap_excluded:true, external_usage_excluded:true,
+            reporting_settled:true, meter_error_percent:Some(0.1) };
+        let bounded = assess_window_delta(Some(&before), &after, &trusted);
+        assert_eq!(bounded.state, "bounded");
+        assert!(bounded.reasons.is_empty());
+        assert_eq!(bounded.windows.len(), 1);
+        assert!((bounded.windows[0].lower_percent - 1.8).abs() < 1e-9);
+        assert!((bounded.windows[0].upper_percent - 2.2).abs() < 1e-9);
+        let rounded_zero = reading(40.0, 1_800_003_600, "pro", at + 20_000);
+        let uncertain = assess_window_delta(Some(&before), &rounded_zero, &trusted);
+        assert_eq!(uncertain.state, "unverified");
+        assert!(uncertain.reasons.contains(&"zero_visible_delta".to_string()));
+        assert!(uncertain.windows.is_empty(), "zero visible change is not free work");
+    }
+
+    #[test]
+    fn allowance_delta_rejects_reset_overlap_external_work_and_unverified_precision() {
+        use crate::auto_quota::parse_codex_rate_limits;
+        let at = 1_800_000_000_000_i64;
+        let reading = |used: f64, reset: i64, plan: &str, observed| {
+            parse_codex_rate_limits(&json!({"rateLimits":{"limitId":"codex",
+                "planType":plan,"primary":{"usedPercent":used,"resetsAt":reset}}}),
+                "pool-1", observed).unwrap()
+        };
+        let before = reading(40.0, 1_800_003_600, "pro", at);
+        let after = reading(42.0, 1_800_003_600, "pro", at + 20_000);
+        let mut context = DeltaContext { model:Some("gpt-6-sol"), effort:Some("medium"),
+            same_account_generation:true, model_version_stable:true,
+            local_overlap_excluded:true, external_usage_excluded:true,
+            reporting_settled:true, meter_error_percent:Some(0.1) };
+        context.external_usage_excluded = false;
+        context.local_overlap_excluded = false;
+        context.reporting_settled = false;
+        context.meter_error_percent = None;
+        let uncertain = assess_window_delta(Some(&before), &after, &context);
+        assert_eq!(uncertain.state, "unverified");
+        for reason in ["local_overlap_unexcluded", "external_usage_unexcluded",
+            "reporting_not_settled", "meter_precision_unknown"] {
+            assert!(uncertain.reasons.contains(&reason.to_string()), "{uncertain:?}");
+        }
+        assert!(uncertain.windows.is_empty());
+        context.local_overlap_excluded = true;
+        context.external_usage_excluded = true;
+        context.reporting_settled = true;
+        context.meter_error_percent = Some(0.1);
+        let reset = reading(42.0, 1_800_007_200, "pro", at + 20_000);
+        assert!(assess_window_delta(Some(&before), &reset, &context).reasons.contains(&"window_reset_changed".to_string()));
+        let plan = reading(42.0, 1_800_003_600, "plus", at + 20_000);
+        assert!(assess_window_delta(Some(&before), &plan, &context).reasons.contains(&"account_plan_changed".to_string()));
+        let denied = parse_codex_rate_limits(&json!({"ordinaryUsageAllowed":false,
+            "rateLimits":{"limitId":"codex","planType":"pro",
+            "primary":{"usedPercent":42.0,"resetsAt":1_800_003_600}}}),
+            "pool-1", at + 20_000).unwrap();
+        assert!(assess_window_delta(Some(&before), &denied, &context).reasons.contains(&"account_denied".to_string()));
+        context.effort = None;
+        assert!(assess_window_delta(Some(&before), &after, &context).reasons.contains(&"effort_unknown".to_string()));
+        context.effort = Some("medium");
+        context.model_version_stable = false;
+        assert!(assess_window_delta(Some(&before), &after, &context).reasons.contains(&"model_version_unverified".to_string()));
+        context.model_version_stable = true;
+        context.meter_error_percent = Some(50.0);
+        assert!(assess_window_delta(Some(&before), &after, &context).reasons.contains(&"meter_too_coarse".to_string()));
+        context.meter_error_percent = Some(0.1);
+        let out_of_order = reading(42.0, 1_800_003_600, "pro", at);
+        assert!(assess_window_delta(Some(&before), &out_of_order, &context).reasons.contains(&"observation_order_invalid".to_string()));
+        assert!(assess_window_delta(None, &after, &context).reasons.contains(&"pre_turn_read_missing".to_string()));
     }
 
     #[test]

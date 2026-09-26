@@ -1093,6 +1093,16 @@ impl Store {
     }
 
     // ---- normalized, account-scoped allowance observations
+    pub fn auto_run_pre_turn_quota(&self, run_id: &str) -> Result<Option<QuotaSnapshot>> {
+        let encoded: Option<String> = self.conn.query_row(
+            "SELECT q.snapshot FROM auto_quota_observations q JOIN events e ON e.seq=q.event_seq \
+             WHERE e.run_id=?1 AND q.source='codex-app/managed-pre-turn' \
+             ORDER BY q.observed_ms DESC,q.event_seq DESC LIMIT 1",
+            params![run_id], |row| row.get(0),
+        ).optional()?;
+        encoded.map(|value| serde_json::from_str(&value).map_err(Into::into)).transpose()
+    }
+
     pub fn insert_auto_quota(&self, event_seq: i64, pool_id: &str, source: &str, snapshot: &QuotaSnapshot) -> Result<bool> {
         let inserted = self.conn.execute(
             "INSERT OR IGNORE INTO auto_quota_observations(event_seq,pool_id,source,observed_ms,snapshot) VALUES(?1,?2,?3,?4,?5)",
