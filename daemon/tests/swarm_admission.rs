@@ -113,13 +113,26 @@ fn shared_pool_reservation_blocks_stale_capacity_across_categories() {
     let first = setup(&d, "Backend pool", 1);
     let second = setup(&d, "QA pool", 1);
     let at = now();
-    assert_eq!(
-        admit(&d, &first, "j0", "codex-a", "first", at, 60000, 4000).unwrap()["status"],
-        "admitted"
-    );
+    let admitted = admit(&d, &first, "j0", "codex-a", "first", at, 60000, 4000).unwrap();
+    assert_eq!(admitted["status"], "admitted");
     let denied = admit(&d, &second, "j0", "opencode-a", "second", at, 5000, 1000).unwrap();
     assert_eq!(denied["status"], "blocked");
     assert!(denied["reason"] == "finishing_reserve" || denied["reason"] == "shared_pool_headroom");
+    d.call("swarm.artifact.put", json!({"run_id":first,"job_id":"j0",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "artifact_id":"first-evidence","source_revision":1,
+        "kind":"finding","content":"checked"}));
+    d.call("swarm.report", json!({"run_id":first,"job_id":"j0",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "message_id":"first-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["first-evidence"]}}));
+    d.call("swarm.decide", json!({"run_id":first,"generation":1,"revision":1,
+        "job_id":"j0","decision":"accept","evidence":["first-evidence"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":first,"generation":1,
+        "revision":1,"job_id":"j0","attempt_id":admitted["attempt_id"]}));
+    let still_held = admit(&d, &second, "j0", "opencode-a", "after-exit", at, 5000, 1000).unwrap();
+    assert_eq!(still_held["status"], "blocked", "{still_held}");
+    assert!(still_held["reason"] == "finishing_reserve" || still_held["reason"] == "shared_pool_headroom");
     assert_eq!(
         d.call("swarm.jobs", json!({"id":second}))["jobs"][0]["status"],
         "ready"
