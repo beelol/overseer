@@ -443,6 +443,22 @@ fn auto_pending_response(work_unit_id: &str, route_id: &str, replayed: bool) -> 
         "actions":["refresh"]})
 }
 
+fn apply_account_pool(routes: &mut [crate::auto_select::Route], pool_id: &str,
+    observations: &[crate::auto_quota::StoredQuotaObservation], now_ms: i64) {
+    for route in routes {
+        route.pool_id = pool_id.to_string();
+        for observation in observations {
+            if observation.snapshot.state_for(&route.model, now_ms)
+                == crate::auto_quota::QuotaState::Exhausted {
+                route.quota = crate::auto_select::Allowance::Exhausted;
+                route.quota_blocks.extend(observation.snapshot.blocking_scopes(&route.model, now_ms));
+            }
+        }
+        route.quota_blocks.sort();
+        route.quota_blocks.dedup();
+    }
+}
+
 fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
     budget: Duration) -> Result<AutoProfileDiscovery> {
     let deadline = Instant::now() + budget;
@@ -473,19 +489,21 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
             }
             let catalog: crate::auto_route::ModelCatalog = serde_json::from_value(models["catalog"].clone())?;
             let tool_catalog: crate::auto_route::ToolCatalog = serde_json::from_value(tools["catalog"].clone())?;
-            let observation = store.latest_auto_quota(profile_id)?;
+            let observations = store.auto_account_quota_observations(profile_id)?;
+            let observation = observations.iter().find(|value| value.pool_id == profile_id).cloned();
             let pool_id = store.auto_account_pool_id(profile_id)?
                 .ok_or_else(|| anyhow!("Codex account pool identity unavailable"))?;
             drop(store);
             let now_ms = crate::daemon::now();
             let mut routes = crate::auto_route::codex_auto_routes(&catalog, &tool_catalog,
                 observation.as_ref().map(|value| &value.snapshot), profile_id, now_ms);
-            for route in &mut routes { route.pool_id = pool_id.clone(); }
+            apply_account_pool(&mut routes, &pool_id, &observations, now_ms);
             Ok(AutoProfileDiscovery {
                 routes,
                 evidence:json!({"profile_id":profile_id,"source":"codex-app/model-and-tool-metadata",
                     "model_observed_ms":catalog.observed_ms,"tool_observed_ms":tool_catalog.observed_ms,
                     "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
+                    "shared_account_quota_observed_ms":observations.iter().map(|value| value.snapshot.observed_ms).collect::<Vec<_>>(),
                     "account_generation":generation}),
                 generation,
             })
@@ -512,18 +530,20 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
             if store.auto_account_generation(profile_id)? != Some(read.generation) {
                 return Err(anyhow!("Claude account changed during shared discovery"));
             }
-            let observation = store.latest_auto_quota(profile_id)?;
+            let observations = store.auto_account_quota_observations(profile_id)?;
+            let observation = observations.iter().find(|value| value.pool_id == profile_id).cloned();
             let pool_id = store.auto_account_pool_id(profile_id)?
                 .ok_or_else(|| anyhow!("Claude account pool identity unavailable"))?;
             let now_ms = crate::daemon::now();
             let mut routes = crate::auto_route::claude_auto_routes(&read.auth,
                 observation.as_ref().map(|value| &value.snapshot), profile_id, now_ms);
-            for route in &mut routes { route.pool_id = pool_id.clone(); }
+            apply_account_pool(&mut routes, &pool_id, &observations, now_ms);
             Ok(AutoProfileDiscovery {
                 routes,
                 evidence:json!({"profile_id":profile_id,"source":"claude/auth-status-and-native-quota",
                     "auth_observed_ms":read.auth.observed_ms,
                     "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
+                    "shared_account_quota_observed_ms":observations.iter().map(|value| value.snapshot.observed_ms).collect::<Vec<_>>(),
                     "account_generation":read.generation}),
                 generation:Some(read.generation),
             })

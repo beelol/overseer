@@ -769,6 +769,28 @@ impl Store {
         Ok(fingerprint.map(|value| format!("account/{value}")))
     }
 
+    /// Read each profile's newest quota observation for this authenticated
+    /// account, including profiles omitted from the current allowed routes.
+    /// The bounded lookup fails closed instead of silently dropping a block.
+    pub fn auto_account_quota_observations(&self, profile_id: &str) -> Result<Vec<StoredQuotaObservation>> {
+        let profile_ids = {
+            let mut stmt = self.conn.prepare(
+                "SELECT profile_id FROM auto_account_identity WHERE fingerprint=(SELECT fingerprint FROM auto_account_identity WHERE profile_id=?1) ORDER BY profile_id LIMIT 129"
+            )?;
+            let ids = stmt.query_map(params![profile_id], |row| row.get::<_, String>(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            ids
+        };
+        if profile_ids.len() > 128 { return Err(anyhow!("shared account profile bound exceeded")); }
+        let mut observations = Vec::new();
+        for id in profile_ids {
+            if let Some(observation) = self.latest_auto_quota(&id)? {
+                observations.push(observation);
+            }
+        }
+        Ok(observations)
+    }
+
     /// A same-process Codex app-server metadata reply observed before a turn.
     /// Every turn of the thread must be stamped before its cumulative usage can
     /// be tied to one account generation.

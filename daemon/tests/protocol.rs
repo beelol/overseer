@@ -2384,11 +2384,24 @@ fn auto_dispatch_blocks_two_profiles_on_one_codex_account_but_uses_an_independen
     let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
         "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let exhausted = profiles[0]["id"].as_str().unwrap();
+    let independent = profiles[2]["id"].as_str().unwrap();
+    let primed = d.call("auto.dispatch", json!({"work_unit_id":"shared-account-prime-0",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[exhausted],"prompt":"check exhausted account"}));
+    assert_eq!(primed["state"], "paused", "{primed}");
+    let remaining = [profiles[1]["id"].as_str().unwrap(), independent];
+    let hidden = d.call("auto.dispatch", json!({"work_unit_id":"shared-account-hidden-block-2",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":remaining,"prompt":"summarize another result"}));
+    assert_eq!(hidden["state"], "dispatched", "{hidden}");
+    assert_eq!(hidden["run"]["profile_id"], independent,
+        "a previously observed account block must survive candidate filtering: {hidden}");
+    assert_eq!(d.wait_done(&run_id(&hidden), 15)["status"], "completed");
     let allowed: Vec<_> = profiles.iter().map(|profile| profile["id"].as_str().unwrap()).collect();
     let outcome = d.call("auto.dispatch", json!({"work_unit_id":"shared-account-pool-1",
         "parent_run_id":parent,"min_tier":"general","required_tools":[],
         "allowed_profiles":allowed,"prompt":"summarize the result"}));
-    let independent = profiles[2]["id"].as_str().unwrap();
     assert_eq!(outcome["state"], "dispatched", "{outcome}");
     assert_eq!(outcome["run"]["profile_id"], independent, "{outcome}");
     for profile in &profiles[..2] {
@@ -2397,7 +2410,8 @@ fn auto_dispatch_blocks_two_profiles_on_one_codex_account_but_uses_an_independen
             entry["route_id"].as_str().unwrap().starts_with(&format!("{id}/"))
                 && entry["reason"] == "quota_exhausted"), "{outcome}");
     }
-    let event = d.events(&parent).into_iter().find(|item| item["kind"] == "auto_decision").unwrap();
+    let event = d.events(&parent).into_iter().find(|item| item["kind"] == "auto_decision"
+        && item["payload"]["decision"]["work_unit_id"] == "shared-account-pool-1").unwrap();
     let routes = event["payload"]["selection_input"]["routes"].as_array().unwrap();
     let pool_for = |id: &str| routes.iter().find(|route| route["profile_id"] == id).unwrap()["pool_id"].clone();
     assert_eq!(pool_for(profiles[0]["id"].as_str().unwrap()), pool_for(profiles[1]["id"].as_str().unwrap()));
