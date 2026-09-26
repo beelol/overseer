@@ -83,6 +83,11 @@ async function activate(context) {
     agentsVisible: () => agentsView.visible });
   const pullRequests = new PullRequests(client, model, say);
   const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => vscode.ViewColumn.Beside });
+  // An agent dragged from the side bar into the editor opens its chat there (AC-71): a read-only
+  // virtual file per agent (overseer-chat:/<run id>/<title>.overseer-chat) shown by a custom editor.
+  context.subscriptions.push(
+    vscode.workspace.registerFileSystemProvider('overseer-chat', chatFileSystem(), { isReadonly: true, isCaseSensitive: true }),
+    vscode.window.registerCustomEditorProvider('overseer.chatEditor', outputs.chatEditorProvider(), { webviewOptions: { retainContextWhenHidden: true }, supportsMultipleEditorsPerDocument: false }));
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.output', outputs),
     agentsView.onDidExpandElement(e => agents.setCollapsed(e.element, false)),
     agentsView.onDidCollapseElement(e => agents.setCollapsed(e.element, true)));
@@ -207,6 +212,18 @@ async function activate(context) {
     input.onDidAccept(() => { accepted = true; input.hide(); });
     input.onDidHide(() => { clearTimeout(timer); if (!accepted) setAgentFilter(undefined); input.dispose(); });
     input.show();
+  }
+
+  /** Read-only, empty files: the custom editor shows the chat instead of their content. */
+  function chatFileSystem() {
+    const emitter = new vscode.EventEmitter();
+    const deny = () => { throw vscode.FileSystemError.NoPermissions('Overseer chats are read-only'); };
+    return {
+      onDidChangeFile: emitter.event,
+      watch: () => new vscode.Disposable(() => {}),
+      stat: uri => ({ type: uri.path.endsWith('.overseer-chat') ? vscode.FileType.File : vscode.FileType.Directory, ctime: 0, mtime: 0, size: 0, permissions: vscode.FilePermission.Readonly }),
+      readDirectory: () => [], readFile: () => new Uint8Array(), createDirectory: deny, writeFile: deny, delete: deny, rename: deny,
+    };
   }
 
   /** A virtual document for an agent's chat: dropping an agent in the editor opens it (AC-71). */

@@ -1,0 +1,29 @@
+{
+  "checks": [
+    {
+      "name": "dragging an agent from the side bar into the editor area opens its chat there",
+      "ok": true,
+      "detail": {
+        "dragTypes": [
+          "codeeditors",
+          "application/vnd.code.uri-list",
+          "resourceurls",
+          "text/uri-list",
+          "application/vnd.code.tree.overseer.agents"
+        ],
+        "opened": true,
+        "tabs": [
+          "Drag me"
+        ]
+      }
+    },
+    {
+      "name": "Open to the Side (context menu) opens the agent's chat beside",
+      "ok": true
+    },
+    {
+      "name": "Pin to Grid (row action) puts the agent on the grid",
+      "ok": true
+    }
+  ]
+}

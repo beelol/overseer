@@ -9,7 +9,7 @@
   "engines": { "vscode": "^1.136.0" },
   "categories": ["SCM Providers", "Other"],
   "main": "./src/extension.js",
-  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review", "onWebviewPanel:overseer.output", "onWebviewPanel:overseer.center", "onUri"],
+  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review", "onWebviewPanel:overseer.output", "onWebviewPanel:overseer.center", "onCustomEditor:overseer.chatEditor", "onFileSystem:overseer-chat", "onUri"],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
@@ -21,6 +21,9 @@
     "themes": [
       { "label": "Overseer Dark", "uiTheme": "vs-dark", "path": "./themes/overseer-dark-color-theme.json" },
       { "label": "Overseer Light", "uiTheme": "vs", "path": "./themes/overseer-light-color-theme.json" }
+    ],
+    "customEditors": [
+      { "viewType": "overseer.chatEditor", "displayName": "Overseer Agent Chat", "selector": [{ "filenamePattern": "*.overseer-chat" }], "priority": "default" }
     ],
     "viewsContainers": {
       "activitybar": [{ "id": "overseer", "title": "Overseer", "icon": "media/overseer.svg" }]

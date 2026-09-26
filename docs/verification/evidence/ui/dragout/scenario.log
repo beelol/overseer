@@ -1,0 +1,6 @@
+[2026-09-26T20:07:51.759Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T20:08:03.770Z] screenshot docs/verification/evidence/ui/dragout/01-dragged-into-editor.png
+[2026-09-26T20:08:03.770Z] PASS dragging an agent from the side bar into the editor area opens its chat there {"dragTypes":["codeeditors","application/vnd.code.uri-list","resourceurls","text/uri-list","application/vnd.code.tree.overseer.agents"],"opened":true,"tabs":["Drag me"]}
+[2026-09-26T20:08:06.791Z] PASS Open to the Side (context menu) opens the agent's chat beside
+[2026-09-26T20:08:12.036Z] screenshot docs/verification/evidence/ui/dragout/02-pinned-in-grid.png
+[2026-09-26T20:08:12.036Z] PASS Pin to Grid (row action) puts the agent on the grid

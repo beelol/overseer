@@ -64,6 +64,20 @@ class OutputPanels {
     await handleRunMessage(this, runId, message, m => this.panels.get(runId)?.panel.webview.postMessage(m));
   }
 
+  /** Opens an agent's chat as an editor for an overseer-chat: URI (an agent dropped from the side bar, AC-71). */
+  chatEditorProvider() {
+    return {
+      openCustomDocument: uri => ({ uri, dispose() {} }),
+      resolveCustomEditor: async (document, panel) => {
+        const runId = document.uri.path.split('/').filter(Boolean)[0] || '';
+        await this.client.waitConnected(20000).catch(() => {});
+        if (!this.model.run(runId)) await this.model.refresh();
+        if (!this.model.run(runId)) { panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Agent unavailable', body: '<div class="empty-state"><span class="codicon codicon-debug-disconnect"></span><div>This agent is no longer in Overseer.</div></div>' }); return; }
+        await this.attach(runId, panel);
+      },
+    };
+  }
+
   /** Restores run panels after a window reload or VS Code restart (webview state holds the run id). */
   async deserializeWebviewPanel(panel, state) {
     const runId = state && typeof state.runId === 'string' ? state.runId : undefined;

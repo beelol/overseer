@@ -19,7 +19,27 @@ class Cdp {
       } else if (message.method === 'Runtime.executionContextDestroyed') {
         this.contexts.delete(message.sessionId + ':' + message.params.executionContextId);
       } else if (message.method === 'Runtime.exceptionThrown') this.errors.push(message.params.exceptionDetails);
+      else if (message.method === 'Input.dragIntercepted') this.dragData = message.params.data;
     });
+  }
+
+  /** Drags from one point to another with real HTML drag events (Input.setInterceptDrags). */
+  async drag(from, to) {
+    this.dragData = undefined;
+    await this.call('Input.setInterceptDrags', { enabled: true }, this.workbench);
+    await this.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x, y: from.y, button: 'none' }, this.workbench);
+    await this.call('Input.dispatchMouseEvent', { type: 'mousePressed', x: from.x, y: from.y, button: 'left', clickCount: 1 }, this.workbench);
+    for (let i = 1; i <= 6 && !this.dragData; i++) {
+      await this.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x + (to.x - from.x) * i / 6, y: from.y + (to.y - from.y) * i / 6, button: 'left', buttons: 1 }, this.workbench);
+      await delay(60);
+    }
+    const data = this.dragData;
+    if (data) {
+      for (const type of ['dragEnter', 'dragOver', 'drop']) { await this.call('Input.dispatchDragEvent', { type, x: to.x, y: to.y, data }, this.workbench); await delay(120); }
+    }
+    await this.call('Input.dispatchMouseEvent', { type: 'mouseReleased', x: to.x, y: to.y, button: 'left', clickCount: 1 }, this.workbench);
+    await this.call('Input.setInterceptDrags', { enabled: false }, this.workbench);
+    return data;
   }
 
   call(method, params = {}, sessionId) {
