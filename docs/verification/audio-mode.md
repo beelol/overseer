@@ -10,11 +10,11 @@ The source pack is `daemon/assets/reactor`: twelve original synthesized MP3 file
 | A second UI client does not duplicate playback | Same two-client protocol test | Verified with fixture |
 | Permission event and waiting status share one attention cue | `live_permission_and_waiting_status_share_one_attention_cue` | Verified with fixture |
 | Auth failure needs attention once | `authentication_failure_makes_one_attention_cue` | Verified with fixture |
-| Simultaneous needs coalesce, including interleaved starts | `simultaneous_attention_is_coalesced_even_when_starts_interleave` | Verified in classifier; live multi-agent timing remains |
+| Simultaneous needs coalesce, including interleaved starts | `simultaneous_attention_is_coalesced_even_when_starts_interleave` and `simultaneous_permissions_make_one_cue_and_two_visible_needs` | Verified with two live fixture agents |
 | Attention remains queueable after routine bursts; memory stays bounded | `attention_can_queue_when_routine_cues_fill_their_lane`, `attention_history_stays_bounded_during_long_daemon_uptime` | Verified in queue tests |
 | Missing local cache does not interrupt agents | `missing_local_cache_does_not_interrupt_agents` | Verified |
 | System speech and private Commander import | `system_and_private_commander_tracks_are_selectable_without_bundling_voice_files`, `installed_system_voice_can_be_selected`; isolated macOS playback smoke for both | Verified locally |
-| Visible count for multiple needs | Existing VS Code status bar counts `attention()` entries in `extension/src/extension.js` | Needs live UI check |
+| Visible count for multiple needs | Two-agent fixture confirms two waiting roots remain in daemon state; existing VS Code status bar counts `attention()` entries in `extension/src/extension.js` | Needs live VS Code display check |
 | Auto Mode, Swarm, and TUI changes | A non-checkout merge check at the current heads merges #2 and #3 cleanly. #4 has a README conflict from its older base; its daemon server changes auto-merge. All three remain in flight. | Recheck and run live integration when their event contracts settle |
 
 The daemon tests use a disposable log sink instead of starting a player. A separate isolated macOS smoke test exercised `afplay` for Reactor and Commander, and `say` with an installed voice. The extension's `npm test` command currently references a missing `extension/test/run.js`; `npm run check` verifies its JavaScript syntax.

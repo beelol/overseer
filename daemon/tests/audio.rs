@@ -338,3 +338,62 @@ fn installed_system_voice_can_be_selected() {
         "Daniel"
     );
 }
+
+#[test]
+fn simultaneous_permissions_make_one_cue_and_two_visible_needs() {
+    let root = tmp();
+    let repo = repo(&root.path().join("repo"));
+    let audio_log = root.path().join("audio.log");
+    let audio_log_str = audio_log.to_str().unwrap();
+    let barrier = root.path().join("release-permissions");
+    let barrier_str = barrier.to_str().unwrap();
+    let fixture = repo_root()
+        .join("fixtures/fake-harness/claude-fixture.js")
+        .display()
+        .to_string();
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_LOG", audio_log_str),
+        ("OVERSEER_CLAUDE_PATH", &fixture),
+        (
+            "OVERSEER_HARNESS_ENV_PASSTHROUGH",
+            "FIXTURE_MODE,FIXTURE_PERMISSION_BARRIER",
+        ),
+        ("FIXTURE_MODE", "permission"),
+        ("FIXTURE_PERMISSION_BARRIER", barrier_str),
+    ]);
+    d.call("audio.set", json!({"enabled": true}));
+    let one = run_id(&d.call(
+        "task.create",
+        json!({"repo": repo, "harness": "claude", "prompt": "one", "title": "permission one"}),
+    ));
+    let two = run_id(&d.call(
+        "task.create",
+        json!({"repo": repo, "harness": "claude", "prompt": "two", "title": "permission two"}),
+    ));
+    d.wait_status(&one, |s| s == "running", 5);
+    d.wait_status(&two, |s| s == "running", 5);
+    assert_eq!(d.run(&one)["attention"], serde_json::Value::Null);
+    assert_eq!(d.run(&two)["attention"], serde_json::Value::Null);
+    std::fs::write(barrier, b"go").unwrap();
+    d.wait_status(&one, |s| s == "waiting_for_user", 15);
+    d.wait_status(&two, |s| s == "waiting_for_user", 15);
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    let needs = d
+        .runs()
+        .iter()
+        .filter(|r| r["parent_run_id"].is_null() && r["status"] == "waiting_for_user")
+        .count();
+    assert_eq!(needs, 2, "both needs remain visible to the UI");
+    let lines = std::fs::read_to_string(&audio_log).unwrap_or_default();
+    assert_eq!(
+        lines
+            .lines()
+            .filter(|line| *line == "reactor:agent_needs_attention")
+            .count(),
+        1,
+        "{lines}"
+    );
+    for run in [&one, &two] {
+        d.call("run.interrupt", json!({"run_id": run}));
+    }
+}
