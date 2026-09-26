@@ -418,9 +418,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
-        "docs/verification/swarm/milestone-2.md"
+        "docs/verification/swarm/milestone-2.md",
+        "docs/verification/swarm/milestone-12.md",
+        "docs/verification/swarm/SWARM-54.md"
       ],
-      "blocker": "Artifacts have attempt, job, revision and hash provenance; missing source revisions are rejected, but file removal and revalidation are not tested."
+      "blocker": "Acceptance rejects removed, stale-revision and hash-mismatched stored evidence before retrying after restoration; filesystem artifacts, final-report revalidation and permission-scoped replacement retrieval remain unimplemented."
     },
     "SWARM-55": {
       "status": "unverified",
