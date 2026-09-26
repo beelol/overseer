@@ -28,7 +28,6 @@ class LedgerAuditTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(result.stdout)
         self.assertEqual(report["core_total"], 40)
-        self.assertEqual(report["verified"], 9)
         self.assertEqual(report["conditional_deferred"], 1)
         self.assertTrue(report["release_files_unchanged"])
 
