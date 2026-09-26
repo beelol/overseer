@@ -12,4 +12,6 @@ Command: `cargo test --offline -p overseerd --test swarm_runtime swarm_writers_k
 
 Evidence: `daemon/tests/swarm_runtime.rs` (`swarm_writers_keep_conflicting_changes_out_of_a_dirty_source_checkout`), `daemon/src/swarm/runtime.rs`, `daemon/src/daemon.rs`. The existing current-checkout one-writer rule is covered separately in `daemon/tests/protocol.rs`.
 
-Remaining: this demonstrates Swarm launch isolation and source preservation, not safe integration of conflicting patches. No worker submitted either patch for director review, and no combined result or conflict resolution was tested. The fixture does not simulate unsaved editor buffers, service-side writes, or all normal launch paths. Keep the RFC box unchecked.
+Follow-up at `14faa93`: accepted patch artifacts apply in an Overseer-owned integration worktree, leaving the source checkout fingerprint unchanged. Two conflicting accepted patches preserve the first integrated commit and the second artifact. An active source-repository commit hook blocks unattended integration before running. The focused integration fixture and full offline Rust suite passed 166 tests.
+
+Remaining: no combined result/check or director conflict resolution was tested. The fixture does not simulate unsaved editor buffers, service-side writes, or all normal launch paths. Crash reconciliation between Git and SQLite remains incomplete. Keep the RFC box unchecked.

@@ -150,17 +150,20 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_runtime.rs",
-        "docs/verification/swarm/SWARM-18.md"
+        "docs/verification/swarm/SWARM-18.md",
+        "daemon/tests/swarm_integration.rs"
       ],
-      "blocker": "Two fixture Swarm writers receive separate worktrees and leave a dirty source checkout unchanged despite conflicting edits. Safe patch integration, unsaved buffers, service-side writes and normal launch-path enforcement remain unverified."
+      "blocker": "Fixture workers and accepted patch integration use separate worktrees and preserve a dirty source checkout. Conflicting patches retain the first commit and second artifact. Combined checks, crash reconciliation, unsaved buffers, service-side writes and normal launch-path enforcement remain unverified."
     },
     "SWARM-19": {
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
-        "docs/verification/swarm/milestone-2.md"
+        "docs/verification/swarm/milestone-2.md",
+        "daemon/tests/swarm_integration.rs",
+        "docs/verification/swarm/SWARM-19.md"
       ],
-      "blocker": "Submitted artifacts require review and confirmed exit before dependents become ready; combined integration checks remain unimplemented."
+      "blocker": "Accepted patch artifacts integrate in an isolated fixture worktree after confirmed exit; dependents and final completion remain held until then. Combined build/test verification, conflict resolution, crash reconciliation and normal live adapter integration remain unimplemented."
     },
     "SWARM-20": {
       "status": "partial",
@@ -298,9 +301,11 @@
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "docs/verification/swarm/milestone-2.md",
-        "docs/verification/swarm/milestone-3.md"
+        "docs/verification/swarm/milestone-3.md",
+        "daemon/tests/swarm_integration.rs",
+        "docs/verification/swarm/SWARM-35.md"
       ],
-      "blocker": "Rejected results do not unlock dependents and contract revisions invalidate affected jobs; session reuse and integration remain unimplemented."
+      "blocker": "Rejected results do not unlock dependents, revisions invalidate affected jobs, and an accepted patch holds a dependent until isolated integration. Combined verification, conflict resolution, qualified session reuse and S3 replay remain unimplemented."
     },
     "SWARM-36": {
       "status": "partial",
