@@ -777,6 +777,7 @@ fn stop_remains_responsive_while_combined_checker_is_running() {
     assert_eq!(stopped["status"], "stopping");
     let result = checker.join().unwrap();
     assert_eq!(result["result"]["status"], "interrupted", "{result}");
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["status"],"stopped");
 }
 
 #[test]

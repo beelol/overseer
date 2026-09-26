@@ -271,5 +271,5 @@ fn eligibility_recovery_after_original_deadline_does_not_wake_run() {
     assert_eq!(recovery["state"], "blocked");
     assert_eq!(recovery["reason"], "run_deadline");
     assert_eq!(recovery["woken"], false);
-    assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopping");
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopped");
 }

@@ -219,6 +219,7 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
         release_and_unlock(&tx, run, job, now)?;
         super::record_operation(&tx, run, "accept")?;
     }
+    super::finalize_control_if_idle(&tx,run,now)?;
     tx.commit()?;
     Ok(json!({"job_id":job,"decision":decision,"status":next,"duplicate":false}))
 }
@@ -479,6 +480,7 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
             params![attempt,actual_elapsed_ms,now],
         )?;
     }
+    super::finalize_control_if_idle(&tx,run,now)?;
     tx.commit()?;
     Ok(json!({"attempt_id":attempt,"status":"finished","duplicate":false}))
 }

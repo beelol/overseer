@@ -349,6 +349,7 @@ pub fn record(
     if changed != 1 {
         bail!("verification attempt changed before acknowledgement");
     }
+    super::finalize_control_if_idle(&store.conn,&plan.run,crate::daemon::now())?;
     Ok(
         json!({"status":status,"commit":plan.commit,"exit_code":outcome.exit_code,
         "stdout":outcome.stdout,"stderr":outcome.stderr,"duplicate":false}),

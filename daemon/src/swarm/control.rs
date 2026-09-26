@@ -74,8 +74,9 @@ pub fn off(store: &mut Store, p: &Value) -> Result<Value> {
         params![id, now],
     )?;
     tx.execute("UPDATE swarm_jobs SET status='cancelled',updated_ms=?2 WHERE run_id=?1 AND status IN ('planned','ready')",params![id,now])?;
+    let status = super::finalize_control_if_idle(&tx,&id,now)?;
     tx.commit()?;
-    Ok(json!({"id":id,"status":"draining","duplicate":false}))
+    Ok(json!({"id":id,"status":status,"duplicate":false}))
 }
 
 /// Expire runs independently of admission requests, including runs waiting for an account.

@@ -65,6 +65,59 @@ fn record_operation(conn: &rusqlite::Connection, run: &str, kind: &str) -> Resul
     Ok(())
 }
 
+/// A control request is terminal only after every linked process has a
+/// confirmed exit and every admitted attempt is finished. Draining also waits
+/// for submitted work to receive a director decision; neither path asserts a
+/// successful audit without the separate evidence-gated completion call.
+fn finalize_control_if_idle(conn: &rusqlite::Connection, run: &str, now: i64) -> Result<String> {
+    let status: String = conn.query_row("SELECT status FROM swarm_runs WHERE id=?1", [run], |r| r.get(0))?;
+    if status != "stopping" && status != "draining" {
+        return Ok(status);
+    }
+    // Queued jobs cannot produce more work once control cancels them. Free
+    // their claims even if a different job in this run is still draining.
+    // Keep any claim whose attempt or external effect remains unresolved.
+    conn.execute(
+        "UPDATE swarm_claims SET status='released',updated_ms=?2
+         WHERE run_id=?1 AND status='active'
+           AND EXISTS (SELECT 1 FROM swarm_jobs j WHERE j.run_id=swarm_claims.run_id
+                       AND j.id=swarm_claims.job_id AND j.status='cancelled')
+           AND NOT EXISTS (SELECT 1 FROM swarm_attempts a WHERE a.run_id=swarm_claims.run_id
+                           AND a.job_id=swarm_claims.job_id AND a.status='registered')
+           AND NOT EXISTS (SELECT 1 FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+                           WHERE l.run_id=swarm_claims.run_id AND l.job_id=swarm_claims.job_id
+                           AND (r.ended_ms IS NULL OR r.status='disconnected'))
+           AND NOT EXISTS (SELECT 1 FROM swarm_effects e WHERE e.run_id=swarm_claims.run_id
+                           AND e.job_id=swarm_claims.job_id AND e.outcome IN ('unknown','applied'))",
+        params![run, now],
+    )?;
+    let registered: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND status='registered'",
+        [run], |r| r.get(0))?;
+    let unconfirmed: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+         WHERE l.run_id=?1 AND (r.ended_ms IS NULL OR r.status='disconnected')",
+        [run], |r| r.get(0))?;
+    let checking: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM swarm_verifications WHERE run_id=?1 AND status='running'",
+        [run], |r| r.get(0))?;
+    if registered != 0 || unconfirmed != 0 || checking != 0 {
+        return Ok(status);
+    }
+    if status == "draining" {
+        let pending: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM swarm_jobs WHERE run_id=?1
+             AND status IN ('planned','ready','reserved','launching','running','submitted','cancel_requested')",
+            [run], |r| r.get(0))?;
+        if pending != 0 {
+            return Ok(status);
+        }
+    }
+    conn.execute("UPDATE swarm_runs SET status='stopped',updated_ms=?2 WHERE id=?1 AND status=?3",
+        params![run,now,status])?;
+    Ok("stopped".into())
+}
+
 fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
     let targets: String = row.get("allowed_targets")?;
     let policy: String = row.get("policy")?;
@@ -326,6 +379,9 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str) -> Result<Value>
     if current["status"] == "stopping" {
         return Ok(json!({"id":id,"status":"stopping","duplicate":true}));
     }
+    if current["status"] == "stopped" && !current["stop_reason"].is_null() {
+        return Ok(json!({"id":id,"status":"stopped","duplicate":true}));
+    }
     if current["status"] == "stopped" || current["status"] == "completed" {
         bail!("swarm run is terminal");
     }
@@ -342,8 +398,9 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str) -> Result<Value>
         params![id,now],
     )?;
     record_operation(&tx, id, "stop")?;
+    let status = finalize_control_if_idle(&tx,id,now)?;
     tx.commit()?;
-    Ok(json!({"id":id,"status":"stopping","stop_reason":reason,"duplicate":false}))
+    Ok(json!({"id":id,"status":status,"stop_reason":reason,"duplicate":false}))
 }
 
 pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {

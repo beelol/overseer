@@ -742,7 +742,7 @@ fn stop_retries_an_initially_unreachable_worker_after_daemon_restart() {
     assert!(later.0 >= 2, "stop interrupt was not retried: {later:?}");
     assert_eq!(later.1, "requested");
     let after = d.call("swarm.get", json!({"id":id}));
-    assert_eq!(after["status"], "stopping");
+    assert_eq!(after["status"], "stopped");
     assert_eq!(after["unconfirmed_exit_count"], 0);
     assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["attempt_count"], 1);
 }

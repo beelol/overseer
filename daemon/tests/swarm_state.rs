@@ -33,6 +33,42 @@ fn one_active_category_run_survives_restart() {
 }
 
 #[test]
+fn stopped_empty_swarm_is_terminal_and_releases_category() {
+    let d = Daemon::start(&[]);
+    let made = d.call("swarm.create", json!({"category":"Reusable", "objective":"Audit",
+        "allowed_targets":[]}));
+    let id = made["id"].as_str().unwrap();
+    let stopped = d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":0}));
+    assert_eq!(stopped["status"],"stopped","{stopped}");
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["status"],"stopped");
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["stop_reason"],"requested");
+    let again = d.call("swarm.create",json!({"category":"Reusable", "objective":"Next audit",
+        "allowed_targets":[]}));
+    assert_ne!(again["id"],id);
+}
+
+#[test]
+fn cancelled_jobs_release_claims_for_later_swarms() {
+    let d = Daemon::start(&[]);
+    for (category, action) in [("Stop claim", "swarm.stop"), ("Off claim", "swarm.off")] {
+        let made = d.call("swarm.create", json!({"category":category,"objective":"Audit",
+            "allowed_targets":[]}));
+        let id = made["id"].as_str().unwrap();
+        d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+            {"id":"j","title":"Inspect","acceptance":"evidence","deps":[]}
+        ]}));
+        d.call("swarm.claim",json!({"run_id":id,"job_id":"j","generation":1,
+            "revision":1,"resource":"db:shared-stop","mode":"write"}));
+        let ended = d.call(action,json!({"run_id":id,"generation":1,"revision":1}));
+        assert_eq!(ended["status"],"stopped","{ended}");
+        let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let status: String = db.query_row(
+            "SELECT status FROM swarm_claims WHERE run_id=?1 AND job_id='j'",[id],|r|r.get(0)).unwrap();
+        assert_eq!(status,"released");
+    }
+}
+
+#[test]
 fn earlier_swarm_database_gains_recovery_columns_without_losing_its_run() {
     let mut d = Daemon::start(&[]);
     let made = d.call("swarm.create",json!({"category":"Migration","objective":"Audit",
@@ -134,7 +170,7 @@ fn two_invalid_planning_turns_stall_but_stale_calls_do_not_count() {
     assert!(d.try_call("swarm.director.recover",json!({"run_id":id,"generation":1,
         "revision":0,"termination":"confirmed_dead"})).is_err());
     assert_eq!(d.call("swarm.stop",json!({"run_id":id,"generation":1,
-        "revision":0}))["status"],"stopping");
+        "revision":0}))["status"],"stopped");
 }
 
 #[test]
