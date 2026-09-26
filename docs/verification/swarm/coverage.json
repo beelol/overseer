@@ -106,9 +106,12 @@
       "blocker": null
     },
     "SWARM-20": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Stop records queued cancellation and cancel-requested attempts; live interruption, Pause, Resume and Swarm off remain unimplemented."
     },
     "SWARM-21": {
       "status": "partial",
@@ -285,11 +288,10 @@
     "SWARM-49": {
       "status": "partial",
       "evidence": [
-        "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md"
       ],
-      "blocker": "32 KiB limit, role rejection and 2,000 duplicate replays pass; high-water and Stop responsiveness remain untested."
+      "blocker": "32 KiB payload limit, role rejection, 2,000 duplicate replays and 1,000-envelope high-water behavior pass; model-turn batching and Stop latency remain untested."
     },
     "SWARM-50": {
       "status": "partial",
@@ -355,9 +357,12 @@
       "blocker": "Worker discoveries reach a durable director inbox; authorized peer routing and artifact permissions are not implemented."
     },
     "SWARM-61": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_broker.rs",
+        "docs/verification/swarm/milestone-1.md"
+      ],
+      "blocker": "Stop prevents new attempt registration and preserves late evidence; permission revocation, director acceptance race and live launch hold remain unimplemented."
     },
     "SWARM-62": {
       "status": "unverified",

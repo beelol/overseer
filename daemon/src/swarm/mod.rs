@@ -156,3 +156,40 @@ pub fn jobs(store: &Store, p: &Value) -> Result<Value> {
     };
     Ok(json!({"jobs":page,"next_cursor":next_cursor}))
 }
+
+pub fn stop(store: &mut Store, p: &Value) -> Result<Value> {
+    let id = required(p, "run_id")?;
+    let generation = p["generation"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing generation"))?;
+    let revision = p["revision"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing revision"))?;
+    let current = get(store, id)?;
+    if current["generation"] != generation {
+        bail!("stale director generation");
+    }
+    if current["revision"] != revision {
+        bail!("stale plan revision");
+    }
+    if current["status"] == "stopping" {
+        return Ok(json!({"id":id,"status":"stopping","duplicate":true}));
+    }
+    if current["status"] == "stopped" || current["status"] == "completed" {
+        bail!("swarm run is terminal");
+    }
+    let now = crate::daemon::now();
+    let tx = store.conn.transaction()?;
+    tx.execute(
+        "UPDATE swarm_runs SET status='stopping',updated_ms=?2 WHERE id=?1",
+        params![id, now],
+    )?;
+    tx.execute("UPDATE swarm_jobs SET status='cancelled',updated_ms=?2 WHERE run_id=?1 AND status IN ('planned','ready')", params![id,now])?;
+    tx.execute("UPDATE swarm_jobs SET status='cancel_requested',updated_ms=?2 WHERE run_id=?1 AND status IN ('reserved','launching','running')", params![id,now])?;
+    tx.execute(
+        "INSERT OR IGNORE INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms) SELECT a.run_id,'stop-'||a.id,a.job_id,a.id,'control',a.id,'stop',a.revision,'{}','queued',?2,?2 FROM swarm_attempts a WHERE a.run_id=?1 AND a.status='registered'",
+        params![id,now],
+    )?;
+    tx.commit()?;
+    Ok(json!({"id":id,"status":"stopping","duplicate":false}))
+}

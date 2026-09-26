@@ -38,6 +38,9 @@ pub fn register(store: &mut Store, p: &Value) -> Result<Value> {
     if current["revision"] != revision {
         bail!("stale plan revision");
     }
+    if current["status"] != "planning" && current["status"] != "running" {
+        bail!("swarm run does not permit new attempts");
+    }
     let status: String = store
         .conn
         .query_row(
@@ -211,6 +214,9 @@ pub fn direct(store: &mut Store, p: &Value) -> Result<Value> {
     }
     if p["revision"] != current["revision"] {
         bail!("stale plan revision");
+    }
+    if current["status"] == "stopping" && p["type"] != "stop" && p["type"] != "checkpoint" {
+        bail!("swarm run is stopping");
     }
     if !["redirect", "checkpoint", "stop", "retract"].contains(&required(p, "type")?) {
         bail!("director cannot send this message type");

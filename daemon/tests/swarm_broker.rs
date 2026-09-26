@@ -88,3 +88,63 @@ fn repeated_progress_dedupes_before_reaching_director() {
     );
     assert_eq!(inbox["messages"].as_array().unwrap().len(), 1);
 }
+
+#[test]
+fn full_inbox_rejects_routine_progress_but_keeps_terminal_result() {
+    let d = Daemon::start(&[]);
+    let (run_id, attempt_id, token) = planned(&d);
+    for n in 0..1000 {
+        d.call(
+            "swarm.report",
+            json!({"run_id":run_id,"job_id":"routes","attempt_id":attempt_id,"token":token,
+            "message_id":format!("event-{n}"),"type":"progress","revision":1,"payload":{"n":n}}),
+        );
+    }
+    let rejected = d
+        .try_call(
+            "swarm.report",
+            json!({"run_id":run_id,"job_id":"routes","attempt_id":attempt_id,"token":token,
+        "message_id":"overflow","type":"progress","revision":1,"payload":{}}),
+        )
+        .unwrap_err();
+    assert!(rejected.contains("inbox is full"));
+    d.call("swarm.report", json!({"run_id":run_id,"job_id":"routes","attempt_id":attempt_id,"token":token,
+        "message_id":"terminal-result","type":"result","revision":1,"payload":{"artifact":"evidence"}}));
+}
+
+#[test]
+fn stop_blocks_new_attempts_without_discarding_late_evidence() {
+    let d = Daemon::start(&[]);
+    let (run_id, attempt_id, token) = planned(&d);
+    d.call(
+        "swarm.stop",
+        json!({"run_id":run_id,"generation":1,"revision":1}),
+    );
+    assert!(d
+        .try_call(
+            "swarm.attempt.register",
+            json!({"run_id":run_id,"job_id":"routes","generation":1,"revision":1})
+        )
+        .is_err());
+    d.call(
+        "swarm.report",
+        json!({"run_id":run_id,"job_id":"routes","attempt_id":attempt_id,"token":token,
+        "message_id":"late-result","type":"result","revision":1,"payload":{"artifact":"partial"}}),
+    );
+    let inbox = d.call(
+        "swarm.messages",
+        json!({"run_id":run_id,"recipient":"director"}),
+    );
+    assert_eq!(inbox["messages"][0]["message_id"], "late-result");
+    assert_eq!(
+        d.call("swarm.get", json!({"id":run_id}))["status"],
+        "stopping"
+    );
+    let jobs = d.call("swarm.jobs", json!({"id":run_id}));
+    assert_eq!(jobs["jobs"][0]["status"], "cancel_requested");
+    let control = d.call(
+        "swarm.messages",
+        json!({"run_id":run_id,"recipient":attempt_id}),
+    );
+    assert_eq!(control["messages"][0]["type"], "stop");
+}
