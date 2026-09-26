@@ -236,22 +236,155 @@ fn catalog_s3_twenty_four_patches_need_a_combined_cursor_check() {
     let second = integrate(2, "contract", "contract-patch-v2");
     assert_eq!(second["status"], "integrated", "{second}");
     let mut latest = second;
-    for (index, name) in names.iter().enumerate() {
+    let at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    let snapshot = json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"system-codex","account_id":"fixture-account","pool_ids":["fixture-pool"],
+            "capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"fixture-pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+120000}]}]});
+    let commit_batch = |ids: &[String]| {
+        let workers = ids
+            .iter()
+            .map(|id| {
+                json!({"id":id,"elapsed_ms":100,
+            "usage_milli":{"points":10}})
+            })
+            .collect::<Vec<_>>();
+        let serial = json!({"planning":{"elapsed_ms":10,"usage_milli":{"points":1}},
+            "context":{"elapsed_ms":10,"usage_milli":{"points":1}},
+            "integration":{"elapsed_ms":10,"usage_milli":{"points":1}},
+            "review":{"elapsed_ms":10,"usage_milli":{"points":1}},
+            "retries":{"elapsed_ms":0,"usage_milli":{"points":1}},"workers":workers});
+        let mut parallel = serial.clone();
+        parallel["context"]["elapsed_ms"] = json!(20);
+        let decision = d.call(
+            "swarm.benefit.commit",
+            json!({"run_id":run,
+            "generation":1,"revision":2,"estimate":{"independent":true,
+            "max_workers":ids.len(),"allocation_milli":{"points":100000},
+            "finishing_reserve_milli":{"points":20000},
+            "serial":serial,"parallel":parallel}}),
+        );
+        assert_eq!(decision["decision"], "parallel", "{decision}");
+        assert_eq!(decision["max_parallel_workers"], ids.len());
+    };
+    let admit = |name: &str, offset: i64| {
+        d.call(
+            "swarm.admit",
+            json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":name,"target_id":"system-codex",
+        "request_id":format!("catalog-{name}"),"snapshot":snapshot,"now_ms":at+offset,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}),
+        )
+    };
+    let submit_patch = |name: &str, admitted: &serde_json::Value| {
         let relative = format!("src/resources/{name}.ts");
         let replacement = template.replace("RESOURCE_NAME", name);
         let patch = patch_from_replacement(&checkout, &relative, &replacement);
         let artifact = format!("patch-{name}");
-        accept_patch(&d, run, 2, name, &artifact, &patch);
-        latest = integrate(2, name, &artifact);
-        assert_eq!(latest["status"], "integrated", "{latest}");
-        if index == 3 {
-            let partial = d.call(
-                "swarm.verify",
-                json!({"run_id":run,"generation":1,
-                "revision":2,"request_id":"four-of-twenty-four"}),
-            );
-            assert_eq!(partial["status"], "failed", "{partial}");
-        }
+        d.call(
+            "swarm.artifact.put",
+            json!({"run_id":run,"job_id":name,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "artifact_id":artifact,"source_revision":2,"kind":"patch","content":patch}),
+        );
+        d.call(
+            "swarm.report",
+            json!({"run_id":run,"job_id":name,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "message_id":format!("result-{name}-r2"),"type":"result","revision":2,
+            "payload":{"artifact_ids":[artifact]}}),
+        );
+        artifact
+    };
+    let finish = |name: &str, admitted: &serde_json::Value, artifact: &str| {
+        d.call(
+            "swarm.decide",
+            json!({"run_id":run,"generation":1,"revision":2,
+            "job_id":name,"decision":"accept","evidence":[artifact]}),
+        );
+        d.call(
+            "swarm.attempt.confirm_exit",
+            json!({"run_id":run,"generation":1,
+            "revision":2,"job_id":name,"attempt_id":admitted["attempt_id"]}),
+        );
+        let result = integrate(2, name, artifact);
+        assert_eq!(result["status"], "integrated", "{name}: {result}");
+        result
+    };
+
+    commit_batch(&names[..4]);
+    let first_wave = names[..4]
+        .iter()
+        .map(|name| {
+            let admitted = admit(name, 0);
+            assert_eq!(admitted["status"], "admitted", "{name}: {admitted}");
+            admitted
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(admit(&names[4], 0)["reason"], "growth_wave_full");
+    for (name, admitted) in names[..4].iter().zip(&first_wave) {
+        let artifact = submit_patch(name, admitted);
+        latest = finish(name, admitted, &artifact);
+    }
+    let partial = d.call(
+        "swarm.verify",
+        json!({"run_id":run,"generation":1,
+        "revision":2,"request_id":"four-of-twenty-four"}),
+    );
+    assert_eq!(partial["status"], "failed", "{partial}");
+
+    commit_batch(&names[4..12]);
+    let second_wave = names[4..12]
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            let admitted = admit(name, if index < 4 { 5000 } else { 10000 });
+            assert_eq!(admitted["status"], "admitted", "{name}: {admitted}");
+            let artifact = submit_patch(name, &admitted);
+            (admitted, artifact)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(admit(&names[12], 15000)["reason"], "review_backlog");
+    let first_review = d.call(
+        "swarm.director.claim_batch",
+        json!({"run_id":run,
+        "generation":1,"revision":2,"now_ms":at+15000}),
+    );
+    assert_eq!(first_review["status"], "claimed", "{first_review}");
+    for (name, (admitted, artifact)) in names[4..9].iter().zip(&second_wave[..5]) {
+        latest = finish(name, admitted, artifact);
+    }
+    let reviewed = d.call(
+        "swarm.director.complete_batch",
+        json!({"run_id":run,
+        "generation":1,"turn_id":first_review["turn_id"],"token":first_review["token"],
+        "outcome":"progress"}),
+    );
+    assert_eq!(reviewed["no_progress_turns"], 0, "{reviewed}");
+    assert_ne!(admit(&names[12], 15000)["reason"], "review_backlog");
+    for (name, (admitted, artifact)) in names[9..12].iter().zip(&second_wave[5..]) {
+        latest = finish(name, admitted, artifact);
+    }
+
+    commit_batch(&names[12..20]);
+    for (index, name) in names[12..20].iter().enumerate() {
+        let admitted = admit(name, if index < 4 { 15000 } else { 20000 });
+        assert_eq!(admitted["status"], "admitted", "{name}: {admitted}");
+        let artifact = submit_patch(name, &admitted);
+        latest = finish(name, &admitted, &artifact);
+    }
+    commit_batch(&names[20..24]);
+    for name in &names[20..24] {
+        let admitted = admit(name, 25000);
+        assert_eq!(admitted["status"], "admitted", "{name}: {admitted}");
+        let artifact = submit_patch(name, &admitted);
+        latest = finish(name, &admitted, &artifact);
     }
     let verified = d.call(
         "swarm.verify",
@@ -260,6 +393,55 @@ fn catalog_s3_twenty_four_patches_need_a_combined_cursor_check() {
     );
     assert_eq!(verified["status"], "passed", "{verified}");
     assert_eq!(verified["commit"], latest["commit"]);
+    let final_jobs = d.call("swarm.jobs", json!({"id":run,"limit":100}));
+    assert_eq!(final_jobs["jobs"].as_array().unwrap().len(), 25);
+    assert!(final_jobs["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|job| job["status"] == "accepted"));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let count = |table: &str| -> i64 {
+        db.query_row(
+            &format!("SELECT COUNT(*) FROM {table} WHERE run_id=?1"),
+            [run],
+            |row| row.get(0),
+        )
+        .unwrap()
+    };
+    assert_eq!(count("swarm_admissions"), 24);
+    assert_eq!(count("swarm_benefit_decisions"), 4);
+    assert_eq!(count("swarm_integrated_artifacts"), 26);
+    let final_review = d.call(
+        "swarm.director.claim_batch",
+        json!({"run_id":run,
+        "generation":1,"revision":2,"now_ms":at+30000}),
+    );
+    assert_eq!(final_review["status"], "claimed", "{final_review}");
+    assert_eq!(final_review["more_pending"], false);
+    d.call(
+        "swarm.director.complete_batch",
+        json!({"run_id":run,
+        "generation":1,"turn_id":final_review["turn_id"],"token":final_review["token"],
+        "outcome":"no_progress"}),
+    );
+    let checks = std::iter::once(json!({"job_id":"contract","outcome":"passed",
+        "evidence":["contract-patch-v2"]}))
+    .chain(names.iter().map(|name| {
+        json!({"job_id":name,"outcome":"passed",
+            "evidence":[format!("patch-{name}")]})
+    }))
+    .collect::<Vec<_>>();
+    let completed = d.call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":2,"request_id":"catalog-s3-complete",
+        "summary":"Migrated 24 resource endpoints to tuple cursor pagination",
+        "verification":"Combined Node 24 Catalog acceptance check passed on the final integration commit",
+        "checks":checks}));
+    assert_eq!(completed["status"], "completed", "{completed}");
+    assert_eq!(
+        d.call("swarm.get", json!({"id":run}))["status"],
+        "completed"
+    );
     assert_eq!(fingerprint(&checkout), source_before);
     assert!(workspace.starts_with(std::fs::canonicalize(d.home.path()).unwrap()));
     assert_eq!(
