@@ -30,6 +30,10 @@ pub struct LaunchFile {
     #[serde(default)]
     pub close_stdin: bool,
     pub control_socket: String,
+    /// Absolute deadline for an Auto-managed child. The supervisor enforces it
+    /// even when its owning daemon is unavailable.
+    #[serde(default)]
+    pub auto_execution_deadline_ms: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -126,6 +130,32 @@ fn pump<R: Read + Send + 'static>(reader: R, stream: &'static str, out: Arc<Mute
     })
 }
 
+fn watch_auto_deadline(dir: PathBuf, child_pid: u32, deadline_ms: u64,
+    out: Arc<Mutex<SegmentWriter>>) -> std::sync::mpsc::Sender<()> {
+    use std::sync::mpsc::{channel, RecvTimeoutError};
+    let (done, stopped) = channel();
+    std::thread::spawn(move || {
+        let wait_ms = deadline_ms.saturating_sub(now_ms());
+        if !matches!(stopped.recv_timeout(Duration::from_millis(wait_ms)), Err(RecvTimeoutError::Timeout)) {
+            return;
+        }
+        // The marker is written before the signal so a daemon that reattaches
+        // can distinguish this stop from a user interrupt or harness failure.
+        let _ = std::fs::write(dir.join("auto-budget.requested"), deadline_ms.to_string());
+        out.lock().unwrap().record("x", b"auto execution budget elapsed");
+        for (signal, next_wait) in [(libc::SIGINT, Some(10_000)),
+            (libc::SIGTERM, Some(5_000)), (libc::SIGKILL, None)] {
+            let _ = unsafe { libc::kill(-(child_pid as i32), signal) };
+            if let Some(wait_ms) = next_wait {
+                if !matches!(stopped.recv_timeout(Duration::from_millis(wait_ms)), Err(RecvTimeoutError::Timeout)) {
+                    return;
+                }
+            }
+        }
+    });
+    done
+}
+
 /// Entry point for `overseerd shim <run-dir>`.
 pub fn run(dir: PathBuf) -> anyhow::Result<()> {
     let launch: LaunchFile = serde_json::from_slice(&std::fs::read(dir.join("launch.json"))?)?;
@@ -162,6 +192,8 @@ pub fn run(dir: PathBuf) -> anyhow::Result<()> {
     };
     let child_pid = child.id();
     write_json(&dir.join("shim.json"), &ShimInfo { shim_pid: std::process::id(), child_pid, started_ms: now_ms() });
+    let deadline_watch = launch.auto_execution_deadline_ms.map(|deadline|
+        watch_auto_deadline(dir.clone(), child_pid, deadline, out.clone()));
     let stdin = Arc::new(Mutex::new(child.stdin.take()));
     let t_out = pump(child.stdout.take().unwrap(), "o", out.clone());
     let t_err = pump(child.stderr.take().unwrap(), "e", out.clone());
@@ -200,6 +232,7 @@ pub fn run(dir: PathBuf) -> anyhow::Result<()> {
     }
 
     let status = child.wait();
+    if let Some(done) = deadline_watch { let _ = done.send(()); }
     // Grandchildren may keep the pipes open; do not block exit on them forever.
     let deadline = std::time::Instant::now() + Duration::from_secs(3);
     while (!t_out.is_finished() || !t_err.is_finished()) && std::time::Instant::now() < deadline {

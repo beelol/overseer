@@ -835,6 +835,15 @@ impl Daemon {
         let run_dir = paths::runs_dir().join(&run.id).join(format!("p{generation}"));
         paths::ensure_private_dir(&run_dir)?;
         let control = control_socket_path(&run.id, generation);
+        let auto_execution_deadline_ms = if meta["generic"]["auto_selected"] == true {
+            let budget = meta["generic"]["execution_budget_ms"].as_u64()
+                .filter(|ms| (1_000..=1_800_000).contains(ms))
+                .ok_or_else(|| anyhow!("automatic child execution budget is unavailable"))?;
+            let started = self.store.lock().unwrap().turns(&run.id)?.first()
+                .map(|turn| turn.started_ms).filter(|ms| *ms > 0)
+                .ok_or_else(|| anyhow!("automatic child turn start is unavailable"))? as u64;
+            Some(started.saturating_add(budget))
+        } else { None };
         let file = LaunchFile {
             program: launch.program.clone(),
             args: launch.args.clone(),
@@ -843,6 +852,7 @@ impl Daemon {
             initial_stdin: launch.initial_stdin.clone(),
             close_stdin: launch.close_stdin,
             control_socket: control.display().to_string(),
+            auto_execution_deadline_ms,
         };
         std::fs::write(run_dir.join("launch.json"), serde_json::to_vec_pretty(&file)?)?;
         if run.relation_source.as_deref() == Some("managed-delegation") && run.harness == "codex-app" {
@@ -1653,6 +1663,15 @@ impl Daemon {
     fn finalize(&self, run: &Run, dir: &Path, exit: &ExitInfo, state: &TailState) -> Result<()> {
         let interrupted = dir.join("interrupt.requested").exists();
         let auto_budget = dir.join("auto-budget.requested").exists();
+        if auto_budget {
+            let reported: i64 = self.store.lock().unwrap().conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM events WHERE run_id=?1 AND kind='auto_execution_budget_exhausted')",
+                [&run.id], |row| row.get(0))?;
+            if reported == 0 {
+                self.emit(Some(&run.task_id), Some(&run.id), "auto_execution_budget_exhausted",
+                    "supervisor", "exact", json!({"outcome":"stopped_existing_child"}))?;
+            }
+        }
         let durable_turn_done = if state.turn_done.is_none() && run.harness != "generic" {
             self.store.lock().unwrap().last_turn_completion(&run.id)?
         } else { None };

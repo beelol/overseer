@@ -1888,7 +1888,7 @@ fn auto_dispatch_selects_reachable_local_opencode_provider_after_another_fails()
 }
 
 #[test]
-fn auto_opencode_silent_503_budget_survives_restart_and_pauses_without_duplicate() {
+fn auto_opencode_silent_503_budget_stops_while_daemon_is_down_without_duplicate() {
     let Some(program) = std::env::var_os("PATH").and_then(|path| std::env::split_paths(&path)
         .map(|dir| dir.join("opencode")).find(|candidate| candidate.is_file())) else { return };
     struct MockServer(std::process::Child);
@@ -1960,13 +1960,23 @@ fn auto_opencode_silent_503_budget_survives_restart_and_pauses_without_duplicate
     assert!(d.events(&first_id).iter().all(|event| event["kind"] != "error"),
         "the installed OpenCode CLI has not surfaced its retry as a classified error yet");
     // The installed CLI retries a 503 without emitting an error promptly.
-    // Restart must preserve the original deadline and stop that same child.
+    // The supervisor must enforce the original deadline without a daemon.
     d.kill9();
+    let process_dir = d.home.path().join("runs").join(&first_id).join("p1");
+    let offline_deadline = std::time::Instant::now() + Duration::from_secs(12);
+    while !process_dir.join("exit.json").exists() {
+        assert!(std::time::Instant::now() < offline_deadline,
+            "the child outlived its budget while the daemon was down");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(process_dir.join("auto-budget.requested").exists());
     d.spawn();
     let ended = d.wait_done(&first_id, 20);
     assert_eq!(ended["status"], "failed", "{ended}");
     assert!(ended["exit_reason"].as_str().unwrap_or_default().contains("execution budget"));
-    assert!(d.events(&first_id).iter().any(|event| event["kind"] == "auto_execution_budget_exhausted"));
+    assert_eq!(d.events(&first_id).iter().filter(|event|
+        event["kind"] == "auto_execution_budget_exhausted").count(), 1,
+        "reattachment should publish one budget outcome");
     let replay = d.call("auto.dispatch", request("local-503-first"));
     assert_eq!(replay["state"], "paused", "{replay}");
     assert_eq!(replay["run"]["id"], first_id);
