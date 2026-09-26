@@ -269,9 +269,11 @@
       "blocker": null
     },
     "SWARM-38": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "docs/verification/swarm/agetor-parity.md"
+      ],
+      "blocker": "Pinned behavior and intentional reuse differences are documented, but Auto Mode usage/discovery and Swarm director recovery/native-child ordering gaps remain unverified."
     },
     "SWARM-39": {
       "status": "partial",
