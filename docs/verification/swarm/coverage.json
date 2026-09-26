@@ -67,9 +67,11 @@
         "daemon/tests/swarm_policy.rs",
         "docs/verification/swarm/milestone-4.md",
         "daemon/tests/swarm_admission.rs",
-        "docs/verification/swarm/milestone-7.md"
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/milestone-14.md",
+        "docs/verification/swarm/SWARM-09.md"
       ],
-      "blocker": "Cross-harness fixture targets with one pool identity share reservations across categories; verified account discovery and uncertain-identity handling remain unavailable."
+      "blocker": "Fixture targets sharing a pool share reservations across categories, and targets labeled as one account with no common pool now fail closed; live account identity discovery and proof of independent accounts remain unavailable."
     },
     "SWARM-10": {
       "status": "partial",
