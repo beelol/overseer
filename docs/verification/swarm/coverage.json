@@ -64,7 +64,7 @@
         "docs/verification/swarm/SWARM-08.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Fixture Swarm and ordinary launches share the global slot check in both directions; lower-maximum draining, reviewer/native-descendant control and live activation remain unimplemented."
+      "blocker": "Fixture Swarm admission counts ordinary active runs and holds new workers at its ceiling. Manual task creation is no longer refused by a Swarm-specific ceiling; app-level max enforcement, lower-maximum draining, reviewer/native-descendant control and live activation remain unimplemented."
     },
     "SWARM-08": {
       "status": "partial",
@@ -74,7 +74,7 @@
         "docs/verification/swarm/SWARM-08.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Fixture swarm admissions and ordinary task.create serialize global slots, including concurrent ordinary launches after Swarm admission; ordinary tasks still lack shared account-quota reservations and live Auto Mode pool identity."
+      "blocker": "Fixture Swarm admissions count ordinary active runs and hold new workers while manual activity occupies capacity. Manual launches are allowed even at a Swarm-specific ceiling and no longer share a launch lock with Swarm, so a single app-level limit and atomic shared account-quota reservation across ordinary, Auto and Swarm launches remain unimplemented."
     },
     "SWARM-09": {
       "status": "partial",

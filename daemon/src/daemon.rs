@@ -340,7 +340,6 @@ impl Daemon {
     }
 
     pub fn create_task(self: &Arc<Self>, p: &Value) -> Result<Value> {
-        let _serial = self.swarm_launch_lock.lock().unwrap();
         self.create_task_internal(p, None)
     }
 
@@ -377,9 +376,6 @@ impl Daemon {
             if git::rev_parse(&repo, t).is_none() {
                 bail!("target ref {t} does not exist");
             }
-        }
-        if swarm_identity.is_none() && !crate::swarm::ordinary_slot_available(&self.store.lock().unwrap())? {
-            bail!("global agent limit is full while Swarm is active");
         }
         let (ws, fork_commit, fork_prov) = match mode {
             "worktree" => {

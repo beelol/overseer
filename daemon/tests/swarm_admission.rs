@@ -165,24 +165,26 @@ fn ordinary_run_occupies_global_slot_until_confirmed_exit() {
 }
 
 #[test]
-fn active_swarm_director_holds_global_slot_against_ordinary_launches() {
+fn ordinary_launches_take_priority_over_active_swarm_capacity() {
     let d = Daemon::start(&[]);
     let temp = tmp();
     let checkout = repo(&temp.path().join("ordinary-after-swarm"));
     let swarm = d.call("swarm.create", json!({"category":"Reverse shared slots",
         "objective":"Audit", "allowed_targets":["codex-a"],
-        "policy":{"max_executing":2,"max_workers":1}}));
+        "policy":{"max_executing":2,"max_workers":2}}));
     let id = swarm["id"].as_str().unwrap();
     d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
-        {"id":"j0","title":"Inspect","acceptance":"evidence","deps":[]}
+        {"id":"j0","title":"Inspect","acceptance":"evidence","deps":[]},
+        {"id":"j1","title":"Inspect again","acceptance":"evidence","deps":[]}
     ]}));
     let first = admit(&d,id,"j0","codex-a","reserve-first",now(),100000,100).unwrap();
     assert_eq!(first["status"],"admitted");
-    let denied = d.try_call("task.create",json!({"repo":checkout,
+    let manual = d.call("task.create",json!({"repo":checkout,
         "harness":"generic","workspace_mode":"worktree", "program":"/bin/sleep",
-        "args":["2"],"prompt":"","title":"ordinary when full"})).unwrap_err();
-    assert!(denied.contains("global agent limit"),"{denied}");
-    assert!(d.call("state",json!({}))["runs"].as_array().unwrap().is_empty());
+        "args":["5"],"prompt":"","title":"ordinary when full"}));
+    assert!(manual["launch_error"].is_null(),"{manual}");
+    let held = admit(&d,id,"j1","codex-a","manual-priority",now(),100000,100).unwrap();
+    assert_eq!(held["reason"],"global_agent_limit","{held}");
 
     d.call("swarm.attempt.confirm_exit",json!({"run_id":id,"generation":1,
         "revision":1,"job_id":"j0","attempt_id":first["attempt_id"]}));
@@ -192,19 +194,20 @@ fn active_swarm_director_holds_global_slot_against_ordinary_launches() {
             barrier.wait();
             d.try_call("task.create",json!({"repo":checkout,
                 "harness":"generic","workspace_mode":"worktree","program":"/bin/sleep",
-                "args":["2"],"prompt":"","title":"ordinary a"}))
+                "args":["5"],"prompt":"","title":"ordinary a"}))
         });
         let second = scope.spawn(|| {
             barrier.wait();
             d.try_call("task.create",json!({"repo":checkout,
                 "harness":"generic","workspace_mode":"worktree","program":"/bin/sleep",
-                "args":["2"],"prompt":"","title":"ordinary b"}))
+                "args":["5"],"prompt":"","title":"ordinary b"}))
         });
         barrier.wait();
         [first.join().unwrap(),second.join().unwrap()]
     });
-    assert_eq!(launches.iter().filter(|r| r.is_ok()).count(),1,"{launches:?}");
-    assert_eq!(launches.iter().filter(|r| r.as_ref().err().is_some_and(|e| e.contains("global agent limit"))).count(),1,"{launches:?}");
+    assert_eq!(launches.iter().filter(|r| r.as_ref().is_ok_and(|v| v["launch_error"].is_null())).count(),2,"{launches:?}");
+    let still_held = admit(&d,id,"j1","codex-a","manual-priority-concurrent",now(),100000,100).unwrap();
+    assert_eq!(still_held["reason"],"global_agent_limit","{still_held}");
 }
 
 #[test]
