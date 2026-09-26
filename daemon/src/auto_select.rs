@@ -211,7 +211,7 @@ pub struct Decision {
     pub reason: String,
 }
 
-fn excluded(work: &WorkUnit, route: &Route) -> Option<&'static str> {
+fn excluded(work: &WorkUnit, route: &Route, exhausted_pools: &BTreeSet<&str>) -> Option<&'static str> {
     if work
         .pinned_route
         .as_deref()
@@ -225,7 +225,7 @@ fn excluded(work: &WorkUnit, route: &Route) -> Option<&'static str> {
     if route.health == Health::Unavailable {
         return Some("route_unavailable");
     }
-    if route.quota == Allowance::Exhausted {
+    if route.quota == Allowance::Exhausted || exhausted_pools.contains(route.pool_id.as_str()) {
         return Some("quota_exhausted");
     }
     if route.fit == Fit::Unaffordable {
@@ -254,8 +254,11 @@ fn excluded(work: &WorkUnit, route: &Route) -> Option<&'static str> {
 pub fn select(work: &WorkUnit, routes: &[Route]) -> Decision {
     let mut exclusions = Vec::new();
     let mut eligible = Vec::new();
+    let exhausted_pools: BTreeSet<&str> = routes.iter()
+        .filter(|route| route.quota == Allowance::Exhausted && !route.pool_id.is_empty())
+        .map(|route| route.pool_id.as_str()).collect();
     for route in routes {
-        if let Some(reason) = excluded(work, route) {
+        if let Some(reason) = excluded(work, route, &exhausted_pools) {
             exclusions.push(Exclusion {
                 route_id: route.id.clone(),
                 reason: reason.into(),
@@ -451,6 +454,21 @@ mod tests {
                 .count(),
             2
         );
+    }
+
+    #[test]
+    fn one_authoritative_pool_block_overrides_another_harnesses_stale_capacity() {
+        let mut exhausted = route("codex", "codex", "pool-a", CapabilityTier::General,
+            "medium", &["browser"]);
+        let alternate = route("codex-app", "codex-app", "pool-a", CapabilityTier::General,
+            "medium", &["browser"]);
+        let independent = route("local", "opencode", "pool-b", CapabilityTier::General,
+            "medium", &["browser"]);
+        exhausted.quota = Allowance::Exhausted;
+        let choice = select(&unit(CapabilityTier::General, &["browser"]),
+            &[exhausted, alternate, independent]);
+        assert_eq!(choice.selected.as_deref(), Some("local"));
+        assert_eq!(choice.exclusions.iter().filter(|e| e.reason == "quota_exhausted").count(), 2);
     }
 
     #[test]
