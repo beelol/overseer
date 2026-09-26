@@ -408,6 +408,16 @@ fn collect_public_status_shared(program: &std::path::Path, provider: &str,
     })
 }
 
+fn auto_launch_resources(d: &Arc<Daemon>, work_unit_id: &str) -> Result<Value> {
+    let resources = d.store.lock().unwrap().auto_launch_resources(work_unit_id)?;
+    Ok(match resources {
+        Some((branch, path, snapshot_id, snapshot_commit)) =>
+            json!({"branch":branch,"path":path,"snapshot_id":snapshot_id,
+                "snapshot_commit":snapshot_commit}),
+        None => Value::Null,
+    })
+}
+
 fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
     budget: Duration) -> Result<AutoProfileDiscovery> {
     let deadline = Instant::now() + budget;
@@ -726,6 +736,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 // survived. Replaying the same request must not repeat that effect.
                 json!({"state":"paused","work_unit_id":work_unit_id,"replayed":true,
                     "pause_reason":"launch_effects_uncertain","launch_phase":phase,
+                    "launch_resources":auto_launch_resources(d, work_unit_id)?,
                     "decision":{"work_unit_id":work_unit_id,"selected":route_id,
                         "exclusions":[],"reason":"replayed_unsettled_launch"},
                     "actions":["inspect_launch","choose_manual_route"]})
@@ -919,6 +930,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                             d.store.lock().unwrap().set_auto_launch_intent_phase(work_unit_id, "paused")?;
                             json!({"state":"paused","work_unit_id":work_unit_id,
                                 "pause_reason":"launch_effects_uncertain",
+                                "launch_resources":auto_launch_resources(d, work_unit_id)?,
                                 "decision":decision,"discovery_failures":discovery_failures,
                                 "pre_effect_failures":pre_effect_failures,
                                 "actions":["inspect_launch","choose_manual_route"]})

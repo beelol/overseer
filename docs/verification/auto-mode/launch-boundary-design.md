@@ -1,6 +1,6 @@
 # Auto Mode durable launch boundary
 
-Status: design and implementation plan; a conservative launch-intent safeguard is implemented, while the launch deadline and full crash reconciliation remain unverified. Date: 2026-09-26.
+Status: design and implementation plan; selected launch intent and pre-Git resource journaling are implemented, while the launch deadline and full crash reconciliation remain unverified. Date: 2026-09-26.
 
 ## Why this boundary is needed
 
@@ -33,4 +33,4 @@ The named phases describe durable facts, not in-memory thread states. Phase tran
 4. Integrate account-generation checks, available measured window commitments, shared-pool identity, competing manual writers, release on settlement, and recovery of stale claims. Test two distinct concurrent units against a known limiting window and a manual writer entering before launch.
 5. Run the 100-candidate stalled-collector/launch test against the real daemon boundary and measure a concurrent UI request. Then exercise live authenticated routes separately where the RFC requires them. Fixture results cannot stand in for live account behavior.
 
-Current focused tests cover metadata collection, pre-child rejection, child reattachment, and some idempotent replay. A controlled failed `git worktree add` now demonstrates that a selected intent is persisted before that command and survives restart; replay and the manual delegation RPC do not attempt the Git operation again. This is an error after snapshotting, not a crash during a successful Git mutation. Tests do **not** yet cover the Git-effect crash windows, an atomic allowance commitment, a synchronous launch stall after selection, or end-to-end ten-second response. AUTO-AC-17, AUTO-AC-18, and AUTO-AC-24 therefore remain open.
+Current focused tests cover metadata collection, pre-child rejection, child reattachment, and some idempotent replay. A controlled failed `git worktree add` demonstrates that a selected intent is persisted before that command and survives restart; replay and the manual delegation RPC do not attempt the Git operation again. A second controlled test lets Git create a worktree, then kills the daemon while its Git wrapper is still blocking before the child row can be written. The selected intent replays as effects-uncertain with the exact journaled path and branch and no second Git attempt. This tests one real Git-effect crash window but does not confirm ownership or automatically reconcile the orphan. Other crash phases, an atomic allowance commitment, a synchronous launch stall after selection, and the end-to-end ten-second response remain unproved. AUTO-AC-17, AUTO-AC-18, and AUTO-AC-24 therefore remain open.

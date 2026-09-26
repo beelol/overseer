@@ -2925,6 +2925,66 @@ fn auto_failed_worktree_launch_keeps_one_intent_across_restart() {
 }
 
 #[test]
+fn auto_crash_after_git_worktree_effect_reports_planned_resource_without_retry() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::net::UnixStream;
+    use std::time::Instant;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let bin = r.path().join("bin");
+    std::fs::create_dir(&bin).unwrap();
+    let marker = r.path().join("git-effect");
+    let attempts = r.path().join("git-attempts");
+    let wrapper = bin.join("git");
+    std::fs::write(&wrapper, format!("#!/bin/sh\nif [ \"$1\" = worktree ] && [ \"$2\" = add ] && [ \"$3\" = -b ]; then\n  case \"$4\" in overseer/delegate-*|overseer/auto-*)\n    printf 'x\\n' >> '{}'\n    /usr/bin/git \"$@\" || exit $?\n    printf '%s\\n%s\\n%s\\n' \"$$\" \"$4\" \"$5\" > '{}'\n    exec /bin/sleep 30;;\n  esac\nfi\nexec /usr/bin/git \"$@\"\n", attempts.display(), marker.display())).unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap());
+    let mut d = Daemon::start(&[("PATH", &path),
+        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"git-effect-crash-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "prompt":"continue after the checkpoint"});
+    let socket = d.socket();
+    let sent = request.clone();
+    let pending = std::thread::spawn(move || {
+        let mut conn = UnixStream::connect(socket).unwrap();
+        conn.set_read_timeout(Some(Duration::from_secs(15))).unwrap();
+        conn.write_all(format!("{}\n", json!({"id":1,"method":"auto.dispatch","params":sent})).as_bytes()).unwrap();
+        let mut line = String::new();
+        let _ = BufReader::new(conn).read_line(&mut line);
+    });
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !marker.exists() {
+        assert!(Instant::now() < deadline, "Git worktree creation did not reach the crash window");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let effect = std::fs::read_to_string(&marker).unwrap();
+    let mut parts = effect.lines();
+    let wrapper_pid: i64 = parts.next().unwrap().parse().unwrap();
+    let branch = parts.next().unwrap().to_string();
+    let worktree = parts.next().unwrap().to_string();
+    assert!(Path::new(&worktree).exists(), "the Git effect must have happened before the crash");
+    d.kill9();
+    signal(wrapper_pid, 9);
+    pending.join().unwrap();
+    d.spawn();
+    let replay = d.call("auto.dispatch", request);
+    assert_eq!(replay["state"], "paused", "{replay}");
+    assert_eq!(replay["pause_reason"], "launch_effects_uncertain");
+    assert_eq!(replay["launch_resources"]["branch"], branch);
+    assert_eq!(replay["launch_resources"]["path"], worktree);
+    assert_eq!(std::fs::read_to_string(&attempts).unwrap().lines().count(), 1,
+        "a crash after the Git effect must not attempt another worktree add");
+    assert_eq!(d.runs().len(), 1, "no child was committed before the crash");
+}
+
+#[test]
 fn auto_codex_null_thread_usage_stays_unavailable_without_token_based_guess() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

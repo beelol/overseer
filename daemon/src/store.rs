@@ -231,7 +231,8 @@ impl Store {
             CREATE TABLE IF NOT EXISTS auto_launch_intents(
               work_unit_id TEXT PRIMARY KEY, parent_run_id TEXT NOT NULL REFERENCES runs(id),
               requirements_hash TEXT NOT NULL, route_id TEXT NOT NULL,
-              account_generation INTEGER, phase TEXT NOT NULL, created_ms INTEGER NOT NULL);
+              account_generation INTEGER, phase TEXT NOT NULL, created_ms INTEGER NOT NULL,
+              planned_branch TEXT, planned_path TEXT, snapshot_id TEXT, snapshot_commit TEXT);
             "#,
         )?;
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;
@@ -245,6 +246,13 @@ impl Store {
         let has_result_notice: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('managed_work_units') WHERE name='result_event_seq'")?.exists([])?;
         if !has_result_notice {
             self.conn.execute_batch("ALTER TABLE managed_work_units ADD COLUMN result_event_seq INTEGER;")?;
+        }
+        for column in ["planned_branch", "planned_path", "snapshot_id", "snapshot_commit"] {
+            let present = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_launch_intents') WHERE name=?1")?
+                .exists([column])?;
+            if !present {
+                self.conn.execute_batch(&format!("ALTER TABLE auto_launch_intents ADD COLUMN {column} TEXT;"))?;
+            }
         }
         let has_measurement_effort: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_measurements') WHERE name='effort'")?.exists([])?;
         if !has_measurement_effort {
@@ -456,6 +464,23 @@ impl Store {
         }
         self.conn.execute("UPDATE auto_launch_intents SET phase=?2 WHERE work_unit_id=?1", params![id, phase])?;
         Ok(())
+    }
+
+    pub fn journal_auto_launch_worktree(&self, id: &str, branch: &str, path: &str,
+        snapshot_id: &str, snapshot_commit: &str) -> Result<()> {
+        let updated = self.conn.execute(
+            "UPDATE auto_launch_intents SET planned_branch=?2,planned_path=?3,snapshot_id=?4,snapshot_commit=?5 WHERE work_unit_id=?1 AND phase='preparing' AND planned_path IS NULL",
+            params![id, branch, path, snapshot_id, snapshot_commit],
+        )?;
+        if updated != 1 { return Err(anyhow!("automatic launch worktree plan was already recorded")); }
+        Ok(())
+    }
+
+    pub fn auto_launch_resources(&self, id: &str) -> Result<Option<(String, String, String, String)>> {
+        Ok(self.conn.query_row(
+            "SELECT planned_branch,planned_path,snapshot_id,snapshot_commit FROM auto_launch_intents WHERE work_unit_id=?1 AND planned_branch IS NOT NULL AND planned_path IS NOT NULL AND snapshot_id IS NOT NULL AND snapshot_commit IS NOT NULL",
+            params![id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        ).optional()?)
     }
 
     pub fn insert_managed_work_unit(&self, id: &str, parent: &str, child: &str, request_hash: &str) -> Result<()> {
@@ -1045,6 +1070,26 @@ impl Store {
 #[cfg(test)]
 mod schema_migration_tests {
     use super::*;
+
+    #[test]
+    fn prior_auto_launch_intent_gains_a_journal_without_losing_the_claim() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE auto_launch_intents(
+            work_unit_id TEXT PRIMARY KEY, parent_run_id TEXT NOT NULL,
+            requirements_hash TEXT NOT NULL, route_id TEXT NOT NULL,
+            account_generation INTEGER, phase TEXT NOT NULL, created_ms INTEGER NOT NULL);
+            INSERT INTO auto_launch_intents VALUES('browser-1','parent-1','hash-1',
+                'system-codex/gpt-6-sol/medium',4,'preparing',1000);").unwrap();
+        let store = Store { conn };
+        store.migrate().unwrap();
+        store.migrate().unwrap();
+        assert_eq!(store.auto_launch_intent("browser-1").unwrap().unwrap().3, Some(4));
+        store.journal_auto_launch_worktree("browser-1", "overseer/browser-1",
+            "/tmp/browser-1", "snapshot-1", "commit-1").unwrap();
+        assert_eq!(store.auto_launch_resources("browser-1").unwrap(),
+            Some(("overseer/browser-1".into(), "/tmp/browser-1".into(),
+                "snapshot-1".into(), "commit-1".into())));
+    }
 
     #[test]
     fn existing_run_table_gains_effort_column_idempotently() {

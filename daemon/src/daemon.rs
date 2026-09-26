@@ -642,7 +642,16 @@ impl Daemon {
         let repo_name = repo.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "repo".into());
         let hash = &fingerprint(&parent_ws.common_dir)[..8];
         let worktrees = paths::worktrees_dir().join(format!("{repo_name}-{hash}"));
-        let (path, branch) = git::worktree_add(repo, &worktrees, &format!("delegate-{}-{title}", parent.id), &snapshot.commit_sha)?;
+        let worktree_name = format!("delegate-{}-{title}", parent.id);
+        let (path, branch) = if auto_launch_claimed {
+            let (planned_path, planned_branch) = git::plan_worktree_add(repo, &worktrees, &worktree_name)?;
+            let path_text = planned_path.to_str().ok_or_else(|| anyhow!("non-UTF-8 planned worktree path"))?;
+            self.store.lock().unwrap().journal_auto_launch_worktree(work_unit_id,
+                &planned_branch, path_text, &snapshot.id, &snapshot.commit_sha)?;
+            git::worktree_add_planned(repo, &planned_path, &planned_branch, &snapshot.commit_sha)?
+        } else {
+            git::worktree_add(repo, &worktrees, &worktree_name, &snapshot.commit_sha)?
+        };
         let ws = Workspace {
             id: format!("w-{}", short_id()), path: path.display().to_string(),
             repo_root: parent_ws.repo_root.clone(), common_dir: parent_ws.common_dir.clone(),

@@ -93,7 +93,7 @@ fn valid_branch_name(path: &Path, name: &str) -> bool {
 
 /// Create a new worktree on a new branch. Existing branches and paths are never reused
 /// or deleted: a numeric suffix is appended until both are free.
-pub fn worktree_add(repo: &Path, parent_dir: &Path, name: &str, start: &str) -> Result<(PathBuf, String)> {
+pub fn plan_worktree_add(repo: &Path, parent_dir: &Path, name: &str) -> Result<(PathBuf, String)> {
     let slug: String = name
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c.to_ascii_lowercase() } else { '-' })
@@ -103,7 +103,6 @@ pub fn worktree_add(repo: &Path, parent_dir: &Path, name: &str, start: &str) -> 
         .take(40)
         .collect();
     let slug = if slug.is_empty() { "task".to_string() } else { slug };
-    std::fs::create_dir_all(parent_dir)?;
     for n in 0..100 {
         let suffix = if n == 0 { String::new() } else { format!("-{}", n + 1) };
         let branch = format!("overseer/{slug}{suffix}");
@@ -111,11 +110,27 @@ pub fn worktree_add(repo: &Path, parent_dir: &Path, name: &str, start: &str) -> 
         if path.exists() || rev_parse(repo, &format!("refs/heads/{branch}")).is_some() || !valid_branch_name(repo, &branch) {
             continue;
         }
-        let path_str = path.to_str().ok_or_else(|| anyhow!("non-UTF-8 path"))?;
-        git(repo, &["worktree", "add", "-b", &branch, path_str, start])?;
-        return Ok((std::fs::canonicalize(&path)?, branch));
+        return Ok((path, branch));
     }
     bail!("could not find a free branch/path name for {slug}")
+}
+
+/// Perform only the exact branch/path that was selected before the external Git
+/// effect. Auto journals this plan first, so recovery never guesses a suffix.
+pub fn worktree_add_planned(repo: &Path, path: &Path, branch: &str, start: &str) -> Result<(PathBuf, String)> {
+    if path.exists() || rev_parse(repo, &format!("refs/heads/{branch}")).is_some()
+        || !valid_branch_name(repo, branch) {
+        bail!("planned worktree branch or path is no longer free");
+    }
+    std::fs::create_dir_all(path.parent().ok_or_else(|| anyhow!("worktree parent unavailable"))?)?;
+    let path_str = path.to_str().ok_or_else(|| anyhow!("non-UTF-8 path"))?;
+    git(repo, &["worktree", "add", "-b", branch, path_str, start])?;
+    Ok((std::fs::canonicalize(path)?, branch.to_string()))
+}
+
+pub fn worktree_add(repo: &Path, parent_dir: &Path, name: &str, start: &str) -> Result<(PathBuf, String)> {
+    let (path, branch) = plan_worktree_add(repo, parent_dir, name)?;
+    worktree_add_planned(repo, &path, &branch, start)
 }
 
 #[derive(Debug, Clone, Serialize)]
