@@ -39,3 +39,7 @@ and reads GitHub with `gh` (read-only).
    automatically"). `master` is still `78db700 Initial commit`. The daemon recorded a `pull_request` event (URL and
    number only). Token-like strings (`gh?_…`, `x-access-token:`, `AUTHORIZATION: basic`) in Overseer's database, the
    daemon log and the extension log: 0, 0, 0; `extraheader` in the worktree's and the clone's git config: 0, 0.
+8. Cleanup on the owner's explicit yes. Asked: close PR #1 and delete its branch (and the repository)? Owner
+   (quote): "Yes clean up the pr". Agent: `gh pr close 1 --delete-branch` → PR #1 CLOSED, not merged; remote
+   branches: `master` only; `master` still `78db700`. The private repository `beelol/overseer-pr-sandbox` is kept
+   (repository deletion was not asked for).
