@@ -648,7 +648,7 @@ impl Daemon {
             let path_text = planned_path.to_str().ok_or_else(|| anyhow!("non-UTF-8 planned worktree path"))?;
             self.store.lock().unwrap().journal_auto_launch_worktree(work_unit_id,
                 &planned_branch, path_text, &snapshot.id, &snapshot.commit_sha)?;
-            git::worktree_add_planned(repo, &planned_path, &planned_branch, &snapshot.commit_sha)?
+            git::worktree_add_planned_auto(repo, &planned_path, &planned_branch, &snapshot.commit_sha)?
         } else {
             git::worktree_add(repo, &worktrees, &worktree_name, &snapshot.commit_sha)?
         };

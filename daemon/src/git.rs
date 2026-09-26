@@ -5,8 +5,10 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Serialize;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 const SNAPSHOT_IDENTITY: [(&str, &str); 4] = [
     ("GIT_AUTHOR_NAME", "Overseer Snapshot"),
@@ -35,6 +37,35 @@ pub fn git_env(cwd: &Path, args: &[&str], env: &[(&str, &str)]) -> Result<Vec<u8
 
 pub fn git(cwd: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&git_env(cwd, args, &[])?).trim_end_matches('\n').to_string())
+}
+
+/// Auto's external worktree effect must settle even when Git or a hook stalls.
+/// Output is discarded because this command only needs a success status.
+fn bounded_git_effect(cwd: &Path, args: &[&str], timeout: Duration) -> Result<()> {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(cwd).args(args).stdin(Stdio::null()).stdout(Stdio::null())
+        .stderr(Stdio::null()).process_group(0);
+    for var in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR"] {
+        cmd.env_remove(var);
+    }
+    cmd.env("GIT_OPTIONAL_LOCKS", "0").env("GIT_TERMINAL_PROMPT", "0");
+    let mut child = cmd.spawn().context("starting bounded Git worktree effect")?;
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Some(status) = child.try_wait()? {
+            if status.success() { return Ok(()); }
+            bail!("bounded Git worktree effect failed with {status}");
+        }
+        if Instant::now() >= deadline {
+            // The launched Git process leads a separate group, so a helper or
+            // hook cannot keep changing the worktree after this timeout.
+            let _ = unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL) };
+            let _ = child.kill();
+            let _ = child.wait();
+            bail!("bounded Git worktree effect timed out");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
 }
 
 pub fn toplevel(path: &Path) -> Result<PathBuf> {
@@ -118,13 +149,24 @@ pub fn plan_worktree_add(repo: &Path, parent_dir: &Path, name: &str) -> Result<(
 /// Perform only the exact branch/path that was selected before the external Git
 /// effect. Auto journals this plan first, so recovery never guesses a suffix.
 pub fn worktree_add_planned(repo: &Path, path: &Path, branch: &str, start: &str) -> Result<(PathBuf, String)> {
+    worktree_add_planned_inner(repo, path, branch, start, false)
+}
+
+pub fn worktree_add_planned_auto(repo: &Path, path: &Path, branch: &str, start: &str) -> Result<(PathBuf, String)> {
+    worktree_add_planned_inner(repo, path, branch, start, true)
+}
+
+fn worktree_add_planned_inner(repo: &Path, path: &Path, branch: &str, start: &str,
+    auto: bool) -> Result<(PathBuf, String)> {
     if path.exists() || rev_parse(repo, &format!("refs/heads/{branch}")).is_some()
         || !valid_branch_name(repo, branch) {
         bail!("planned worktree branch or path is no longer free");
     }
     std::fs::create_dir_all(path.parent().ok_or_else(|| anyhow!("worktree parent unavailable"))?)?;
     let path_str = path.to_str().ok_or_else(|| anyhow!("non-UTF-8 path"))?;
-    git(repo, &["worktree", "add", "-b", branch, path_str, start])?;
+    let args = ["worktree", "add", "-b", branch, path_str, start];
+    if auto { bounded_git_effect(repo, &args, Duration::from_secs(20))?; }
+    else { git(repo, &args)?; }
     Ok((std::fs::canonicalize(path)?, branch.to_string()))
 }
 

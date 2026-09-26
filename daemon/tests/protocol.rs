@@ -2951,13 +2951,15 @@ fn auto_crash_after_git_worktree_effect_reports_planned_resource_without_retry()
         "parent_run_id":parent,"min_tier":"general","required_tools":[],
         "prompt":"continue after the checkpoint"});
     let socket = d.socket();
+    let started = Instant::now();
     let sent = request.clone();
     let pending = std::thread::spawn(move || {
         let mut conn = UnixStream::connect(socket).unwrap();
-        conn.set_read_timeout(Some(Duration::from_secs(15))).unwrap();
+        conn.set_read_timeout(Some(Duration::from_secs(12))).unwrap();
         conn.write_all(format!("{}\n", json!({"id":1,"method":"auto.dispatch","params":sent})).as_bytes()).unwrap();
         let mut line = String::new();
-        let _ = BufReader::new(conn).read_line(&mut line);
+        BufReader::new(conn).read_line(&mut line).unwrap();
+        serde_json::from_str::<serde_json::Value>(&line).unwrap()
     });
     let deadline = Instant::now() + Duration::from_secs(10);
     while !marker.exists() {
@@ -2970,9 +2972,15 @@ fn auto_crash_after_git_worktree_effect_reports_planned_resource_without_retry()
     let branch = parts.next().unwrap().to_string();
     let worktree = parts.next().unwrap().to_string();
     assert!(Path::new(&worktree).exists(), "the Git effect must have happened before the crash");
+    let first = pending.join().unwrap();
+    assert!(started.elapsed() < Duration::from_secs(11), "selected launch must respond before its deadline");
+    assert_eq!(first["result"]["state"], "launch_pending", "{first}");
+    assert_eq!(first["result"]["work_unit_id"], "git-effect-crash-1");
+    let during = d.call("auto.dispatch", request.clone());
+    assert_eq!(during["state"], "launch_pending", "{during}");
+    assert!(during["replayed"] == true);
     d.kill9();
     signal(wrapper_pid, 9);
-    pending.join().unwrap();
     d.spawn();
     let replay = d.call("auto.dispatch", request);
     assert_eq!(replay["state"], "paused", "{replay}");
@@ -2982,6 +2990,54 @@ fn auto_crash_after_git_worktree_effect_reports_planned_resource_without_retry()
     assert_eq!(std::fs::read_to_string(&attempts).unwrap().lines().count(), 1,
         "a crash after the Git effect must not attempt another worktree add");
     assert_eq!(d.runs().len(), 1, "no child was committed before the crash");
+}
+
+#[test]
+fn auto_stalled_git_worktree_add_stops_and_pauses_one_launch() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::Instant;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let bin = r.path().join("bin");
+    std::fs::create_dir(&bin).unwrap();
+    let marker = r.path().join("stalled-git");
+    let attempts = r.path().join("git-attempts");
+    let wrapper = bin.join("git");
+    std::fs::write(&wrapper, format!("#!/bin/sh\nif [ \"$1\" = worktree ] && [ \"$2\" = add ] && [ \"$3\" = -b ]; then\n  case \"$4\" in overseer/delegate-*|overseer/auto-*)\n    printf 'x\\n' >> '{}'\n    printf '%s\\n' \"$$\" > '{}'\n    exec /bin/sleep 60;;\n  esac\nfi\nexec /usr/bin/git \"$@\"\n", attempts.display(), marker.display())).unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap());
+    let d = Daemon::start(&[("PATH", &path),
+        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"stalled-git-1", "parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"prompt":"continue after the checkpoint"});
+    let start = Instant::now();
+    let first = d.call("auto.dispatch", request.clone());
+    assert_eq!(first["state"], "launch_pending", "{first}");
+    assert!(start.elapsed() < Duration::from_secs(11));
+    let ui_start = Instant::now();
+    assert_eq!(d.call("state", json!({}))["runs"].as_array().unwrap().len(), 1);
+    assert!(ui_start.elapsed() < Duration::from_secs(2),
+        "a pending Git launch must not block an ordinary UI state read");
+    let deadline = Instant::now() + Duration::from_secs(23);
+    let last = loop {
+        let replay = d.call("auto.dispatch", request.clone());
+        if replay["state"] == "paused" { break replay; }
+        if Instant::now() >= deadline { break replay; }
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    let pid: i32 = std::fs::read_to_string(&marker).unwrap().trim().parse().unwrap();
+    let still_running = unsafe { libc::kill(pid, 0) } == 0;
+    if still_running { signal(pid as i64, 9); }
+    assert_eq!(last["state"], "paused", "stalled Git never settled: {last}");
+    assert!(!still_running, "timed-out Git process remained alive");
+    assert_eq!(last["pause_reason"], "launch_effects_uncertain");
+    assert_eq!(std::fs::read_to_string(&attempts).unwrap().lines().count(), 1);
+    assert_eq!(d.runs().len(), 1, "a stalled Git operation cannot create a child");
 }
 
 #[test]

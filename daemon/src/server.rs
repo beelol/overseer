@@ -418,6 +418,31 @@ fn auto_launch_resources(d: &Arc<Daemon>, work_unit_id: &str) -> Result<Value> {
     })
 }
 
+static AUTO_LAUNCHES: OnceLock<Mutex<std::collections::BTreeSet<String>>> = OnceLock::new();
+
+fn auto_launches() -> &'static Mutex<std::collections::BTreeSet<String>> {
+    AUTO_LAUNCHES.get_or_init(|| Mutex::new(std::collections::BTreeSet::new()))
+}
+
+fn auto_launch_active(work_unit_id: &str) -> bool {
+    auto_launches().lock().unwrap().contains(work_unit_id)
+}
+
+struct ActiveAutoLaunch(String);
+
+impl Drop for ActiveAutoLaunch {
+    fn drop(&mut self) {
+        auto_launches().lock().unwrap().remove(&self.0);
+    }
+}
+
+fn auto_pending_response(work_unit_id: &str, route_id: &str, replayed: bool) -> Value {
+    json!({"state":"launch_pending","work_unit_id":work_unit_id,"replayed":replayed,
+        "decision":{"work_unit_id":work_unit_id,"selected":route_id,
+            "exclusions":[],"reason":"selected_launch_in_progress"},
+        "actions":["refresh"]})
+}
+
 fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
     budget: Duration) -> Result<AutoProfileDiscovery> {
     let deadline = Instant::now() + budget;
@@ -732,6 +757,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 if intent_parent != parent.id || intent_hash != requirements_hash {
                     return Err(anyhow!("work unit was already used for different automatic work"));
                 }
+                if phase == "preparing" && auto_launch_active(work_unit_id) {
+                    return Ok(auto_pending_response(work_unit_id, &route_id, true));
+                }
                 // Preparation may already have changed Git even when no child row
                 // survived. Replaying the same request must not repeat that effect.
                 json!({"state":"paused","work_unit_id":work_unit_id,"replayed":true,
@@ -904,37 +932,63 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     let required = required_tools.iter().cloned().collect::<Vec<_>>();
                     d.store.lock().unwrap().insert_auto_launch_intent(work_unit_id, &parent.id,
                         &requirements_hash, selected, generation.copied())?;
-                    let launched = d.delegate_run(&json!({"work_unit_id":work_unit_id,
+                    let launch_request = json!({"work_unit_id":work_unit_id,
                         "parent_run_id":parent.id,"harness":route.harness,"profile_id":route.profile_id,
                         "model":route.model,"effort":route.effort,"prompt":prompt,"title":title,
                         "required_tools":required,"auto_selected":true,
                         "execution_budget_ms":execution_budget_ms,
                         "requirements_hash":requirements_hash,"expected_account_generation":generation,
                         "auto_local_endpoint":if route.harness == "opencode" {
-                            Some(route.endpoint.as_str()) } else { None }}), true);
-                    match launched {
-                        Ok(mut delegated) => {
-                            d.store.lock().unwrap().set_auto_launch_intent_phase(work_unit_id, "child_created")?;
-                            if delegated.get("launch_error").is_some() {
-                                delegated["state"] = json!("paused");
-                                delegated["actions"] = json!(["refresh", "choose_manual_route"]);
-                            } else {
-                                delegated["state"] = json!("dispatched");
+                            Some(route.endpoint.as_str()) } else { None }});
+                    let launch_id = work_unit_id.to_string();
+                    let selected_route = selected.to_string();
+                    let worker_daemon = d.clone();
+                    let runtime = tokio::runtime::Handle::current();
+                    let (result_tx, result_rx) = std::sync::mpsc::channel();
+                    auto_launches().lock().unwrap().insert(launch_id.clone());
+                    let spawn = std::thread::Builder::new().name("auto-launch".into()).spawn(move || {
+                        let _active = ActiveAutoLaunch(launch_id.clone());
+                        let _runtime = runtime.enter();
+                        let outcome = (|| -> Result<Value> {
+                            match worker_daemon.delegate_run(&launch_request, true) {
+                                Ok(mut delegated) => {
+                                    worker_daemon.store.lock().unwrap().set_auto_launch_intent_phase(&launch_id, "child_created")?;
+                                    if delegated.get("launch_error").is_some() {
+                                        delegated["state"] = json!("paused");
+                                        delegated["actions"] = json!(["refresh", "choose_manual_route"]);
+                                    } else {
+                                        delegated["state"] = json!("dispatched");
+                                    }
+                                    delegated["decision"] = json!(decision);
+                                    delegated["discovery_failures"] = json!(discovery_failures);
+                                    delegated["pre_effect_failures"] = json!(pre_effect_failures);
+                                    Ok(delegated)
+                                }
+                                Err(_) => {
+                                    worker_daemon.store.lock().unwrap().set_auto_launch_intent_phase(&launch_id, "paused")?;
+                                    Ok(json!({"state":"paused","work_unit_id":launch_id,
+                                        "pause_reason":"launch_effects_uncertain",
+                                        "launch_resources":auto_launch_resources(&worker_daemon, &launch_id)?,
+                                        "decision":decision,"discovery_failures":discovery_failures,
+                                        "pre_effect_failures":pre_effect_failures,
+                                        "actions":["inspect_launch","choose_manual_route"]}))
+                                }
                             }
-                            delegated["decision"] = json!(decision);
-                            delegated["discovery_failures"] = json!(discovery_failures);
-                            delegated["pre_effect_failures"] = json!(pre_effect_failures);
-                            delegated
-                        }
-                        Err(_) => {
-                            d.store.lock().unwrap().set_auto_launch_intent_phase(work_unit_id, "paused")?;
-                            json!({"state":"paused","work_unit_id":work_unit_id,
-                                "pause_reason":"launch_effects_uncertain",
-                                "launch_resources":auto_launch_resources(d, work_unit_id)?,
-                                "decision":decision,"discovery_failures":discovery_failures,
-                                "pre_effect_failures":pre_effect_failures,
-                                "actions":["inspect_launch","choose_manual_route"]})
-                        }
+                        })();
+                        let _ = result_tx.send(outcome);
+                    });
+                    if let Err(error) = spawn {
+                        auto_launches().lock().unwrap().remove(work_unit_id);
+                        d.store.lock().unwrap().set_auto_launch_intent_phase(work_unit_id, "paused")?;
+                        return Err(error.into());
+                    }
+                    let wait = decision_deadline.saturating_duration_since(Instant::now());
+                    match result_rx.recv_timeout(wait) {
+                        Ok(result) => result?,
+                        Err(std::sync::mpsc::RecvTimeoutError::Timeout) =>
+                            auto_pending_response(work_unit_id, &selected_route, false),
+                        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) =>
+                            return Err(anyhow!("automatic launch worker stopped unexpectedly")),
                     }
                 } else {
                     json!({"state":"paused","work_unit_id":work_unit_id,"decision":decision,
