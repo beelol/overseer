@@ -377,6 +377,19 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             }
             json!({"sampled": crate::swarm::sample_due_workers(d, now_ms)?})
         }
+        "swarm.job.deadline.persist_due" => {
+            fixture_only()?;
+            let now_ms = p["now_ms"]
+                .as_i64()
+                .ok_or_else(|| anyhow!("missing deadline time"))?;
+            if now_ms < 0 {
+                return Err(anyhow!("invalid deadline time"));
+            }
+            // Fault seam: commit the timeout and stop message but leave the external
+            // interrupt unsent, as if the daemon died between these two steps.
+            let pending = crate::swarm::expire_jobs_due(&mut d.store.lock().unwrap(), now_ms)?;
+            json!({"interrupt_pending": pending})
+        }
         "swarm.director.claim_batch" => {
             fixture_only()?;
             crate::swarm::claim_batch(&mut d.store.lock().unwrap(), p)?
