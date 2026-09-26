@@ -100,10 +100,8 @@ rec(10, "Event replay and bounded output", "verified",
     expected="Cursor-based replay without duplicates or gaps; bounded, redacted, inspectable output with explicit truncation markers.",
     actual="All pass.", evidence="protocol tests; load scenario retention samples (AC-35)", live="Fixtures.")
 
-rec(11, "Account profiles", "partial", commit="1c4c856", date="2026-09-25",
-    harness="LIVE: the owner's two ChatGPT accounts signed in through Overseer's per-account login command (A in the browser, B with a device code; 2026-09-25). Fixtures: synthetic account CLI for missing, expired and renewed logins",
-    proven="add/name/select accounts and sign in through each account's own flow in the UI (ChatGPT browser and device code, live for A/B; Claude via the fixture CLI); folders created at creation (0700); a missing login is shown and blocks the account tile; an expired login fails with a classified auth error and \"Sign in again\" reauthenticates that account, after which the follow-up works; no API keys",
-    deferred="a live re-sign-in (reauthentication) of a ChatGPT account through the UI (needs the owner's browser login; A and B are never signed out). Fixed Claude accounts moved to AC-53",
+rec(11, "Account profiles", "verified", commit="adab32b", date="2026-09-25 (owner-confirmed live on the owner's Mac)",
+    harness="LIVE: a throwaway Overseer ChatGPT account signed in, signed out and signed in again by the owner through the UI (2026-09-25); the owner's two ChatGPT accounts signed in through Overseer's per-account login command (A in the browser, B with a device code; 2026-09-25). Fixtures: synthetic account CLI for missing, expired and renewed logins",
     steps="""1. `cargo test` — `ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_removal` (creation-time folders, sign-in/sign-out/re-sign-in isolation).
 2. `node test/ui/scenario-signin.js` (synthetic account CLI):
    - Add and name "Claude work" without signing in; open New Task → Claude Code.
@@ -111,17 +109,23 @@ rec(11, "Account profiles", "partial", commit="1c4c856", date="2026-09-25",
    - Delete the credential (expired login); send a follow-up.
    - Click **Sign in again** in the conversation; send another follow-up.
 3. `node test/ui/scenario-accounts.js`: provider picker, device-code/browser choice, sign out and sign in again.
-4. Live: `profile.status` for ChatGPT A and B on the owner's daemon ([live-accounts.txt](evidence/ac-46/live-accounts.txt)).""",
+4. Live: `profile.status` for ChatGPT A and B on the owner's daemon ([live-accounts.txt](evidence/ac-46/live-accounts.txt)).
+5. Live re-sign-in with the owner ([session](evidence/ac-13/session.md), shared with AC-13). A throwaway Overseer ChatGPT account was created signed out. The owner signed it in through the UI; the agent signed it out; the owner signed it in again through the UI (right-click → **Sign In…**).""",
     expected="Login and reauthentication through the UI for each claimed supported account path, including a missing/expired login; no API keys.",
     actual="""- **Missing login:** "Claude work" shows "not signed in". Its New Task tile is disabled with "Sign in first (Accounts → Sign In). Account login only; no API keys."
 - **Sign in:** **Overseer: Sign In** → Claude work ran the account's own login in a terminal; the account shows "signed in · max · f03ab3f8" and a task ran with it.
 - **Expired login:** the next turn failed with `[auth]: Failed to authenticate: OAuth session expired and could not be refreshed`. The conversation shows the auth error with a **Sign in again** button.
 - **Reauthentication:** clicking **Sign in again** ran that account's login again ("signed in · max · 55f70cc2"); the follow-up completed ("hello from claudia-again…").
 - **ChatGPT:** Sign In offers "in the browser" and "with a device code" (`codex login --device-auth`).
-- **Live:** ChatGPT A (Team, `2bb3fae1`) signed in through the browser flow and ChatGPT B (Plus, `27e64e3a`) through the device-code flow, each into its own profile folder. Both report ChatGPT-account login and no API key. The device-code attempt for one account first failed until the owner enabled device-code sign-in in ChatGPT security settings; the error text is passed through.""",
-    evidence="[signin scenario](evidence/ui/signin/) (missing login, expired login with Sign in again, after re-sign-in), [accounts scenario](evidence/ui/accounts/), [live account status](evidence/ac-46/live-accounts.txt)",
-    live="Live ChatGPT sign-ins (A browser, B device code). Claude live sign-in and live re-sign-in: deferred.",
-    blocker="Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: sign a throwaway Overseer ChatGPT account in, Sign Out, and Sign In again through the UI (two browser logins). The Claude part is AC-53.")
+- **Live:** ChatGPT A (Team, `2bb3fae1`) signed in through the browser flow and ChatGPT B (Plus, `27e64e3a`) through the device-code flow, each into its own profile folder. Both report ChatGPT-account login and no API key. The device-code attempt for one account first failed until the owner enabled device-code sign-in in ChatGPT security settings; the error text is passed through.
+- **Live re-sign-in (2026-09-25):**
+  - The throwaway account started "not signed in". The owner signed it in through the UI (team, `2bb3fae1`) and the agent signed it out (`logged_in: false`, its auth.json gone). The owner then signed it in again through the UI with another ChatGPT login (plus, `27e64e3a`). Owner: "ok i sigend into a diff acc".
+  - Each login landed only in the throwaway's folder: `chatgpt-account`, no API key.
+  - **Bug found:** a signed-out account's menu offered Sign Out, and Sign In was only an inline icon. The menu now follows the sign-in state (adab32b; checked in `scenario-accounts.js`).
+- **Claude:** the Claude account paths are AC-53.""",
+    evidence="[live re-sign-in session](evidence/ac-13/session.md), [signin scenario](evidence/ui/signin/) (missing login, expired login with Sign in again, after re-sign-in), [accounts scenario](evidence/ui/accounts/), [live account status](evidence/ac-46/live-accounts.txt)",
+    live="Live ChatGPT sign-ins (A browser, B device code) and a live sign-in → sign-out → sign-in again of a throwaway ChatGPT account through the UI. Expiry is exercised with the synthetic CLI. Claude accounts: AC-53.",
+    blocker="not blocked")
 
 rec(12, "Two simultaneous ChatGPT subscriptions", "verified", commit="1c4c856", date="2026-09-25",
     harness="LIVE: Codex 0.155 exec, model gpt-5.6-luna, on the owner's daemon with two fixed accounts: ChatGPT A (Team) and ChatGPT B (Plus), each signed in through Overseer into its own profile folder",
@@ -143,17 +147,16 @@ rec(12, "Two simultaneous ChatGPT subscriptions", "verified", commit="1c4c856", 
     live="Live, two paid ChatGPT subscriptions (Team and Plus).",
     limits="Codex exec transport; the same accounts work with codex-app (shared profile folder).")
 
-rec(13, "Credential isolation on macOS", "partial", commit="1c4c856", date="2026-09-25",
-    harness="LIVE on the owner's daemon: ChatGPT B (Plus) doing real Codex work, ChatGPT A (Team), the desktop-linked login (Pro), and a disposable OpenAI account C. Fixtures: synthetic account CLI for sign-in/out/expiry isolation",
-    proven="while B ran live Codex work, a disposable account C was created, given its own device-code sign-in command, signed out and removed; A, B and the desktop login kept identical identities, including after a daemon restart; B's run and file were unaffected; no token from any Codex credential home appears in Overseer's database, logs or raw outputs; fixture sign-out/sign-in/expiry of one account never changes another",
-    deferred="a live logout/login of a signed-in disposable ChatGPT account during B's work (needs the owner's browser login; A and B are never signed out). The Claude Keychain case moved to AC-53",
+rec(13, "Credential isolation on macOS", "verified", commit="adab32b", date="2026-09-25 (owner-confirmed live on the owner's Mac)",
+    harness="LIVE on the owner's daemon: ChatGPT B (Plus) doing real Codex work, ChatGPT A (Team), the desktop-linked login (Pro), a disposable OpenAI account C, and a throwaway ChatGPT account the owner signed in, the agent signed out, and the owner signed in again (2026-09-25). Fixtures: synthetic account CLI for sign-in/out/expiry isolation",
     steps="""1. `node docs/verification/evidence/ac-13/run-ac13.js` against the owner's daemon (no other runs active):
    - Record the identities of A, B and the desktop login; start B on a Codex task (sleep 25, then write b.txt) in a disposable repository.
    - While it runs: create account C, fetch its sign-in command, sign it out, remove it.
    - After B finishes: restart the daemon and re-check identities.
    - Scan every file under the Overseer data directory, except credential homes and worktrees, for the last 40 characters of each real token and for JWT-like strings. Only counts are printed.
 2. `cargo test` — `ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_removal` (fixture sign-in/sign-out/re-sign-in isolation, including the desktop login switching).
-3. `node test/ui/scenario-signin.js` (fixture expiry of one account and re-sign-in from the UI).""",
+3. `node test/ui/scenario-signin.js` (fixture expiry of one account and re-sign-in from the UI).
+4. Live session with the owner ([session](evidence/ac-13/session.md)): identities recorded; a throwaway Overseer ChatGPT account was created and ChatGPT B started on tiny Codex tasks in a throwaway repository. The owner signed the throwaway in through the UI while B was running. The agent signed it out while B was running. The owner signed it in again through the UI. After B finished, [step-d.js](evidence/ac-13/step-d.js) restarted the daemon (no runs active), re-checked the identities, ran the leak scan (counts only) and removed the throwaway.""",
     expected="Login, logout, refresh and expiry in profile A do not switch profile B's identity or corrupt its credentials/configuration; no leakage in logs/database; unrelated active logins undisturbed.",
     actual="""- **Before:** A team `2bb3fae1`, B plus `27e64e3a`, desktop pro `2e1fa921`. All `chatgpt-account`, no API key.
 - **During B's run** (r-53d79f5a9418, running):
@@ -164,11 +167,18 @@ rec(13, "Credential isolation on macOS", "partial", commit="1c4c856", date="2026
 - **B finished:** completed (exit 0), and b.txt reads "B still works.".
 - **Daemon restart:** pid 63741 → 21639. A, B and the desktop login had identical identities afterwards, and B's run stayed `completed`.
 - **Leak scan:** 9 token suffixes checked against 99 files (database, WAL, logs, launch files, raw output segments): 0 hits, and no JWT-like content.
-- **Fixtures:** signing one account out, in again, or letting it expire only changes that account. The desktop login switching changes only the linked account.""",
-    evidence="[isolation-live.json](evidence/ac-13/isolation-live.json), [run-ac13.js](evidence/ac-13/run-ac13.js), [accounts scenario](evidence/ui/accounts/), [signin scenario](evidence/ui/signin/)",
-    live="Live for B's concurrent work, the disposable account's lifecycle (no login), the daemon restart and the leak scan. Live sign-in/out of a signed-in disposable account: deferred.",
+- **Fixtures:** signing one account out, in again, or letting it expire only changes that account. The desktop login switching changes only the linked account.
+- **Live sign-in / sign-out / sign-in again (2026-09-25):**
+  - **Sign-in:** the owner signed the throwaway in during B's run r-f7dc53c30938 (team `2bb3fae1`, the same ChatGPT account as A, in its own folder). A, B and the desktop login were unchanged, and B completed and wrote b2.txt.
+  - **Sign-out:** the agent signed the throwaway out during B's run r-c180b4e20206. A (the same ChatGPT account) stayed signed in, B and the desktop login were unchanged, and B completed and wrote b3.txt.
+  - **Sign-in again:** the owner signed it in again through the UI with B's ChatGPT account (plus `27e64e3a`). A, B and the desktop login were unchanged.
+  - **Daemon restart:** pid 73218 → 76753, with identical identities afterwards.
+  - **Leak scan:** 12 token suffixes (A, B, throwaway, desktop) checked in 125 Overseer files and 4 extension logs: 0 hits, and no JWT-like content.
+  - **Throwaway removed:** its folder is gone. A, B and the desktop login were never signed out.""",
+    evidence="[live session](evidence/ac-13/session.md), [step-d result](evidence/ac-13/step-d-result.json), [isolation-live.json](evidence/ac-13/isolation-live.json), [run-ac13.js](evidence/ac-13/run-ac13.js), [accounts scenario](evidence/ui/accounts/), [signin scenario](evidence/ui/signin/)",
+    live="Live for B's concurrent work, a throwaway account's sign-in, sign-out and sign-in again through the UI (two real ChatGPT logins), the daemon restart and the leak scan. Token refresh and expiry are exercised with the synthetic CLI.",
     limits="Codex stores credentials in each account's auth.json (file backend). Claude Code on macOS may use the Keychain; its per-account isolation is checked only with fixtures here.",
-    blocker="Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: sign a throwaway Overseer ChatGPT account in, then Sign Out and Sign In it again while ChatGPT B runs a task (two browser logins); Overseer checks that B and A are unchanged.")
+    blocker="not blocked")
 
 rec(14, "Initial adapters", "verified",
     commit=f"{CODEX_COMMIT} (Codex exec live), 7036cd6 (Codex app-server live), fdf1340 (Claude Code live), b5693b8 (OpenCode)",
@@ -652,9 +662,7 @@ def main():
 
 SHORT_BLOCKERS = {
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
-    11: "blocked: sign-in and reauthentication flows need the owner's logins",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
-    13: "not yet run: isolation check with a disposable extra profile pending",
     41: "deferred: no Linux environment",
     42: "not started (added by the owner on 2026-09-25)",
     43: "not started (added by the owner on 2026-09-25)",

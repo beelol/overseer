@@ -5,11 +5,9 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **49 / 53** · **3** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-11, AC-13, AC-41, AC-53. The biggest gaps are owner actions, not
-code. Three criteria are partial, each with its proven part and the owner's step in
-[Follow-ups](#follow-ups): a live ChatGPT re-sign-in (AC-11) and a live sign-in cycle of a
-disposable ChatGPT account while another works (AC-13); and fixed Claude accounts (AC-53,
+criteria: **51 / 53** · **1** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53. One criterion is partial, with its proven part and the owner's step in
+[Follow-ups](#follow-ups): fixed Claude accounts (AC-53,
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account. Linux (AC-41)
 is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
@@ -31,9 +29,9 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-08** Local access boundary — [evidence](docs/verification/AC-08.md)
 - [x] **AC-09** Complete task controls — [evidence](docs/verification/AC-09.md)
 - [x] **AC-10** Event replay and bounded output — [evidence](docs/verification/AC-10.md)
-- [ ] **AC-11** Account profiles — ◐ partial: add/name/select accounts and sign in through each account's own flow in the UI (ChatGPT browser and device code, live for A/B; Claude via the fixture CLI); folders created at creation (0700); a missing login is shown and blocks the account tile; an expired login fails with a classified auth error and "Sign in again" reauthenticates that account, after which the follow-up works; no API keys / deferred: a live re-sign-in (reauthentication) of a ChatGPT account through the UI (needs the owner's browser login; A and B are never signed out). Fixed Claude accounts moved to AC-53 — [evidence](docs/verification/AC-11.md)
+- [x] **AC-11** Account profiles — [evidence](docs/verification/AC-11.md)
 - [x] **AC-12** Two simultaneous ChatGPT subscriptions — [evidence](docs/verification/AC-12.md)
-- [ ] **AC-13** Credential isolation on macOS — ◐ partial: while B ran live Codex work, a disposable account C was created, given its own device-code sign-in command, signed out and removed; A, B and the desktop login kept identical identities, including after a daemon restart; B's run and file were unaffected; no token from any Codex credential home appears in Overseer's database, logs or raw outputs; fixture sign-out/sign-in/expiry of one account never changes another / deferred: a live logout/login of a signed-in disposable ChatGPT account during B's work (needs the owner's browser login; A and B are never signed out). The Claude Keychain case moved to AC-53 — [evidence](docs/verification/AC-13.md)
+- [x] **AC-13** Credential isolation on macOS — [evidence](docs/verification/AC-13.md)
 - [x] **AC-14** Initial adapters — [evidence](docs/verification/AC-14.md)
 - [x] **AC-15** Generic harness fallback — [evidence](docs/verification/AC-15.md)
 - [x] **AC-16** Permissions and limits — [evidence](docs/verification/AC-16.md)
@@ -200,8 +198,6 @@ node test/ui/scenario-main.js
 Unchecked criteria keep their AC in the [RFC](docs/overseer-rfc.md); this list only tracks
 the owner action or decision each one needs.
 
-- [ ] [AC-11](docs/verification/AC-11.md) (Account profiles): Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: sign a throwaway Overseer ChatGPT account in, Sign Out, and Sign In again through the UI (two browser logins). The Claude part is AC-53.
-- [ ] [AC-13](docs/verification/AC-13.md) (Credential isolation on macOS): Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: sign a throwaway Overseer ChatGPT account in, then Sign Out and Sign In it again while ChatGPT B runs a task (two browser logins); Overseer checks that B and A are unchanged.
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
 - [ ] [AC-53](docs/verification/AC-53.md) (Fixed Claude accounts): Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.

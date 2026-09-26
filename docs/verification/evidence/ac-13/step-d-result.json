@@ -1,0 +1,77 @@
+{
+  "B_run": {
+    "status": "completed",
+    "reason": "turn completed; exit 0",
+    "b3_txt": "B still works."
+  },
+  "restart": {
+    "old_pid": 73218,
+    "new_pid": 76753
+  },
+  "after_restart": {
+    "A": {
+      "logged_in": true,
+      "method": "chatgpt-account",
+      "plan": "team",
+      "account": "2bb3fae1",
+      "api_key": false
+    },
+    "B": {
+      "logged_in": true,
+      "method": "chatgpt-account",
+      "plan": "plus",
+      "account": "27e64e3a",
+      "api_key": false
+    },
+    "desktop": {
+      "logged_in": true,
+      "method": "chatgpt-account",
+      "plan": "pro",
+      "account": "2e1fa921",
+      "api_key": false
+    },
+    "throwaway": {
+      "logged_in": true,
+      "method": "chatgpt-account",
+      "plan": "plus",
+      "account": "27e64e3a",
+      "api_key": false
+    }
+  },
+  "leak_scan": {
+    "secrets_checked": 12,
+    "overseer_files_scanned": 125,
+    "token_hits": 0,
+    "jwt_like_files": 0,
+    "vscode_overseer_log_files": 4,
+    "vscode_log_hits": 0
+  },
+  "throwaway_removed": {
+    "folder_gone": true,
+    "listed": false
+  },
+  "final": {
+    "A": {
+      "logged_in": true,
+      "method": "chatgpt-account",
+      "plan": "team",
+      "account": "2bb3fae1",
+      "api_key": false
+    },
+    "B": {
+      "logged_in": true,
+      "method": "chatgpt-account",
+      "plan": "plus",
+      "account": "27e64e3a",
+      "api_key": false
+    },
+    "desktop": {
+      "logged_in": true,
+      "method": "chatgpt-account",
+      "plan": "pro",
+      "account": "2e1fa921",
+      "api_key": false
+    }
+  },
+  "at": "2026-09-26T06:23:33.970Z"
+}
