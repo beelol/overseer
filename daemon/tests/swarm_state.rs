@@ -33,6 +33,26 @@ fn one_active_category_run_survives_restart() {
 }
 
 #[test]
+fn earlier_swarm_database_gains_stop_reason_without_losing_its_run() {
+    let mut d = Daemon::start(&[]);
+    let made = d.call("swarm.create",json!({"category":"Migration","objective":"Audit",
+        "allowed_targets":["system-codex"]}));
+    let id = made["id"].as_str().unwrap();
+    d.kill9();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("ALTER TABLE swarm_runs DROP COLUMN stop_reason;").unwrap();
+    drop(db);
+    d.spawn();
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["objective"],"Audit");
+    assert!(d.call("swarm.get",json!({"id":id}))["stop_reason"].is_null());
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let version: String = db.query_row("SELECT value FROM meta WHERE key='schema_version'",[],|row|row.get(0)).unwrap();
+    assert_eq!(version,"2");
+    d.call("swarm.stop",json!({"run_id":id,"generation":1,"revision":0}));
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["stop_reason"],"requested");
+}
+
+#[test]
 fn plan_validates_dependencies_and_revision_before_dispatch() {
     let d = Daemon::start(&[]);
     let made = d.call("swarm.create", json!({"category":"Backend", "objective":"Check routes", "allowed_targets":["system-codex"]}));

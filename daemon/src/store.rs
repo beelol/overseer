@@ -1,12 +1,12 @@
 //! Durable state in SQLite. The daemon is the only writer.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -165,12 +165,24 @@ impl Store {
             CREATE INDEX IF NOT EXISTS events_run ON events(run_id, seq);
             "#,
         )?;
+        let old_version: Option<String> = self.conn.query_row(
+            "SELECT value FROM meta WHERE key='schema_version'",
+            [],
+            |row| row.get(0),
+        ).optional()?;
+        if let Some(version) = old_version {
+            let version: i64 = version.parse()?;
+            if version > SCHEMA_VERSION {
+                bail!("database schema version {version} is newer than this daemon supports");
+            }
+        }
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;
         if !has_pending {
             self.conn.execute_batch("ALTER TABLE runs ADD COLUMN pending_parent_native TEXT;")?;
         }
         crate::swarm::schema::migrate(&self.conn)?;
-        self.conn.execute("INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', ?1)", params![SCHEMA_VERSION.to_string()])?;
+        self.conn.execute("INSERT INTO meta(key, value) VALUES('schema_version', ?1)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
     }
 

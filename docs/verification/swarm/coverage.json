@@ -166,9 +166,10 @@
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/milestone-10.md"
       ],
-      "blocker": "Pre-launch state and broker replay survive restart; launch/reservation reconciliation is not implemented."
+      "blocker": "Pre-launch state, broker replay and an additive database migration survive restart; launch/reservation reconciliation and VS Code restart cases are not implemented."
     },
     "SWARM-23": {
       "status": "unverified",
@@ -466,9 +467,10 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_control.rs",
-        "docs/verification/swarm/milestone-8.md"
+        "docs/verification/swarm/milestone-8.md",
+        "docs/verification/swarm/milestone-10.md"
       ],
-      "blocker": "An admission at the snapshotted deadline triggers Stop and cancels queued work; periodic evaluation while idle, live checkpoint/interrupt and explicit extension remain unimplemented."
+      "blocker": "A daemon timer checks deadlines without admission requests, records a deadline reason, cancels queued work and requests active stops; live checkpoint/interrupt, confirmed exit and explicit extension remain unimplemented."
     },
     "SWARM-63": {
       "status": "unverified",

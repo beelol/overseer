@@ -10,6 +10,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           category_key TEXT NOT NULL,
           objective TEXT NOT NULL,
           status TEXT NOT NULL,
+          stop_reason TEXT,
           generation INTEGER NOT NULL,
           revision INTEGER NOT NULL,
           allowed_targets TEXT NOT NULL,
@@ -168,5 +169,11 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         );
         "#,
     )?;
+    let has_stop_reason = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='stop_reason'")?
+        .exists([])?;
+    if !has_stop_reason {
+        conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN stop_reason TEXT;")?;
+    }
     Ok(())
 }

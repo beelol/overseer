@@ -77,3 +77,38 @@ pub fn off(store: &mut Store, p: &Value) -> Result<Value> {
     tx.commit()?;
     Ok(json!({"id":id,"status":"draining","duplicate":false}))
 }
+
+/// Expire runs independently of admission requests, including runs waiting for an account.
+pub fn expire_due(store: &mut Store, now: i64) -> Result<usize> {
+    let mut stmt = store.conn.prepare(
+        "SELECT id,generation,revision,created_ms,policy FROM swarm_runs
+         WHERE status IN ('planning','running','paused','stalled','draining')",
+    )?;
+    let active = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, String>(4)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    let mut expired = 0;
+    for (id, generation, revision, created, raw_policy) in active {
+        let policy: Value = serde_json::from_str(&raw_policy)?;
+        let deadline = policy["effective"]["deadline_ms"]
+            .as_i64()
+            .unwrap_or(3_600_000);
+        if now >= created.saturating_add(deadline) {
+            super::stop_for_deadline(
+                store,
+                &json!({"run_id":id,"generation":generation,"revision":revision}),
+            )?;
+            expired += 1;
+        }
+    }
+    Ok(expired)
+}

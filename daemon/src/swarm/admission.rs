@@ -59,7 +59,7 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
             && current["status"] != "stopped"
             && current["status"] != "completed"
         {
-            super::stop(
+            super::stop_for_deadline(
                 store,
                 &json!({"run_id":run,"generation":generation,"revision":revision}),
             )?;

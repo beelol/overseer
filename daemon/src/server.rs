@@ -33,6 +33,24 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
     }
     crate::log(&format!("listening on {}", path.display()));
+    let deadline_daemon = daemon.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            let daemon = deadline_daemon.clone();
+            match tokio::task::spawn_blocking(move || {
+                crate::swarm::expire_due(&mut daemon.store.lock().unwrap(), crate::daemon::now())
+            })
+            .await
+            {
+                Ok(Ok(_)) => {}
+                Ok(Err(error)) => crate::log(&format!("swarm deadline check failed: {error}")),
+                Err(error) => crate::log(&format!("swarm deadline task failed: {error}")),
+            }
+        }
+    });
     let uid = unsafe { libc::getuid() };
     loop {
         let (stream, _) = listener.accept().await?;

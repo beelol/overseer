@@ -11,7 +11,7 @@ pub mod schema;
 pub use artifacts::{confirm_exit, decide, put};
 pub use admission::admit;
 pub use broker::{ack, direct, messages, register, report};
-pub use control::{off, pause, resume};
+pub use control::{expire_due, off, pause, resume};
 pub use director::{claim_batch, complete_batch};
 pub use policy::preview;
 pub use settings::set_policy;
@@ -37,6 +37,7 @@ fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
         "category": row.get::<_, String>("category")?,
         "objective": row.get::<_, String>("objective")?,
         "status": row.get::<_, String>("status")?,
+        "stop_reason": row.get::<_, Option<String>>("stop_reason")?,
         "generation": row.get::<_, i64>("generation")?,
         "revision": row.get::<_, i64>("revision")?,
         "allowed_targets": serde_json::from_str::<Value>(&targets).unwrap_or(Value::Null),
@@ -166,6 +167,14 @@ pub fn jobs(store: &Store, p: &Value) -> Result<Value> {
 }
 
 pub fn stop(store: &mut Store, p: &Value) -> Result<Value> {
+    stop_with_reason(store, p, "requested")
+}
+
+pub(super) fn stop_for_deadline(store: &mut Store, p: &Value) -> Result<Value> {
+    stop_with_reason(store, p, "deadline")
+}
+
+fn stop_with_reason(store: &mut Store, p: &Value, reason: &str) -> Result<Value> {
     let id = required(p, "run_id")?;
     let generation = p["generation"]
         .as_i64()
@@ -189,8 +198,8 @@ pub fn stop(store: &mut Store, p: &Value) -> Result<Value> {
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
     tx.execute(
-        "UPDATE swarm_runs SET status='stopping',updated_ms=?2 WHERE id=?1",
-        params![id, now],
+        "UPDATE swarm_runs SET status='stopping',stop_reason=?3,updated_ms=?2 WHERE id=?1",
+        params![id, now, reason],
     )?;
     tx.execute("UPDATE swarm_jobs SET status='cancelled',updated_ms=?2 WHERE run_id=?1 AND status IN ('planned','ready')", params![id,now])?;
     tx.execute("UPDATE swarm_jobs SET status='cancel_requested',updated_ms=?2 WHERE run_id=?1 AND status IN ('reserved','launching','running')", params![id,now])?;
@@ -199,7 +208,7 @@ pub fn stop(store: &mut Store, p: &Value) -> Result<Value> {
         params![id,now],
     )?;
     tx.commit()?;
-    Ok(json!({"id":id,"status":"stopping","duplicate":false}))
+    Ok(json!({"id":id,"status":"stopping","stop_reason":reason,"duplicate":false}))
 }
 
 pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {

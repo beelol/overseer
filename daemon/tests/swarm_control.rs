@@ -111,8 +111,47 @@ fn deadline_on_admission_stops_queued_work_without_claiming_completion() {
     let result=d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,"job_id":"j","target_id":"target","request_id":"expired","snapshot":snapshot,"now_ms":at,"required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
     assert_eq!(result["reason"], "run_deadline");
     assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopping");
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["stop_reason"], "deadline");
     assert_eq!(
         d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["status"],
         "cancelled"
     );
+}
+
+#[test]
+fn deadline_expires_without_another_admission_while_active_or_blocked() {
+    let d = Daemon::start(&[]);
+    let active = d.call("swarm.create", json!({"category":"Timed active","objective":"Audit",
+        "allowed_targets":["system-codex"],"policy":{"deadline_ms":1500}}));
+    let active_id = active["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":active_id,"generation":1,"revision":0,"jobs":[
+        {"id":"working","title":"Working","acceptance":"evidence","deps":[]},
+        {"id":"queued","title":"Queued","acceptance":"evidence","deps":[]}
+    ]}));
+    let attempt=d.call("swarm.attempt.register",json!({"run_id":active_id,"job_id":"working",
+        "generation":1,"revision":1}));
+    let blocked = d.call("swarm.create", json!({"category":"Timed blocked","objective":"Audit",
+        "allowed_targets":[],"policy":{"deadline_ms":1500}}));
+    let blocked_id = blocked["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":blocked_id,"generation":1,"revision":0,"jobs":[
+        {"id":"blocked","title":"Blocked","acceptance":"evidence","deps":[]}
+    ]}));
+    let deadline=std::time::Instant::now()+std::time::Duration::from_secs(5);
+    while std::time::Instant::now()<deadline {
+        if d.call("swarm.get",json!({"id":active_id}))["status"]=="stopping"
+            && d.call("swarm.get",json!({"id":blocked_id}))["status"]=="stopping" {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert_eq!(d.call("swarm.get",json!({"id":active_id}))["status"],"stopping");
+    assert_eq!(d.call("swarm.get",json!({"id":blocked_id}))["status"],"stopping");
+    assert_eq!(d.call("swarm.get",json!({"id":active_id}))["stop_reason"],"deadline");
+    assert_eq!(d.call("swarm.get",json!({"id":blocked_id}))["stop_reason"],"deadline");
+    let jobs=d.call("swarm.jobs",json!({"id":active_id}));
+    assert_eq!(jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="working").unwrap()["status"],"cancel_requested");
+    assert_eq!(jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="queued").unwrap()["status"],"cancelled");
+    assert_eq!(d.call("swarm.jobs",json!({"id":blocked_id}))["jobs"][0]["status"],"cancelled");
+    assert!(d.call("swarm.messages",json!({"run_id":active_id,"recipient":attempt["id"]}))["messages"]
+        .as_array().unwrap().iter().any(|m|m["type"]=="stop"));
 }
