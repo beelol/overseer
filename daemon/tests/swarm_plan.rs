@@ -135,6 +135,34 @@ fn evidence_review_and_confirmed_exit_gate_dependent_work() {
 }
 
 #[test]
+fn acceptance_revalidates_present_revisioned_untampered_evidence() {
+    let d=Daemon::start(&[]);
+    let run=run_with_job(&d,"Evidence integrity","j");
+    let attempt=d.call("swarm.attempt.register",json!({"run_id":run,"job_id":"j",
+        "generation":1,"revision":1}));
+    let artifact=json!({"run_id":run,"job_id":"j","attempt_id":attempt["id"],
+        "token":attempt["token"],"artifact_id":"proof","source_revision":1,
+        "kind":"finding","content":"reproduced against source revision 1"});
+    d.call("swarm.artifact.put",artifact.clone());
+    d.call("swarm.report",json!({"run_id":run,"job_id":"j",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "message_id":"submitted-proof","type":"result","revision":1,
+        "payload":{"artifact_ids":["proof"]}}));
+    let decision=json!({"run_id":run,"generation":1,"revision":1,"job_id":"j",
+        "decision":"accept","evidence":["proof"]});
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute("DELETE FROM swarm_artifacts WHERE run_id=?1 AND id='proof'",[&run]).unwrap();
+    assert!(d.try_call("swarm.decide",decision.clone()).unwrap_err().contains("missing artifact"));
+    d.call("swarm.artifact.put",artifact);
+    db.execute("UPDATE swarm_artifacts SET source_revision=0 WHERE run_id=?1 AND id='proof'",[&run]).unwrap();
+    assert!(d.try_call("swarm.decide",decision.clone()).unwrap_err().contains("stale artifact"));
+    db.execute("UPDATE swarm_artifacts SET source_revision=1,content='tampered' WHERE run_id=?1 AND id='proof'",[&run]).unwrap();
+    assert!(d.try_call("swarm.decide",decision.clone()).unwrap_err().contains("artifact integrity"));
+    db.execute("UPDATE swarm_artifacts SET content='reproduced against source revision 1' WHERE run_id=?1 AND id='proof'",[&run]).unwrap();
+    assert_eq!(d.call("swarm.decide",decision)["status"],"accepted");
+}
+
+#[test]
 fn revision_invalidates_affected_work_and_preserves_unrelated_acceptance() {
     let d = Daemon::start(&[]);
     let run = d.call("swarm.create", json!({"category":"Catalog revision","objective":"Change paging","allowed_targets":["system-codex"]}));

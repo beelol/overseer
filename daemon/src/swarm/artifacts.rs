@@ -30,11 +30,14 @@ pub fn put(store: &mut Store, p: &Value) -> Result<Value> {
     }
     let safe = crate::redact::redact(content);
     let digest = format!("{:x}", Sha256::digest(safe.as_bytes()));
-    let old: Option<(String, String, String, i64, String)> = store.conn.query_row(
-        "SELECT job_id,attempt_id,kind,source_revision,sha256 FROM swarm_artifacts WHERE run_id=?1 AND id=?2",
-        params![run,id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+    let old: Option<(String, String, String, i64, String, String)> = store.conn.query_row(
+        "SELECT job_id,attempt_id,kind,source_revision,content,sha256 FROM swarm_artifacts WHERE run_id=?1 AND id=?2",
+        params![run,id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?)),
     ).optional()?;
-    if let Some((old_job, old_attempt, old_kind, old_rev, old_digest)) = old {
+    if let Some((old_job, old_attempt, old_kind, old_rev, old_content, old_digest)) = old {
+        if format!("{:x}", Sha256::digest(old_content.as_bytes())) != old_digest {
+            bail!("artifact integrity check failed");
+        }
         if (
             old_job.as_str(),
             old_attempt.as_str(),
@@ -96,14 +99,17 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
     let mut attempt_id: Option<String> = None;
     for artifact in evidence {
         let id = artifact.as_str().unwrap();
-        let found: Option<(String,i64)> = store.conn.query_row(
-            "SELECT attempt_id,source_revision FROM swarm_artifacts WHERE run_id=?1 AND job_id=?2 AND id=?3",
-            params![run,job,id], |r| Ok((r.get(0)?,r.get(1)?)),
+        let found: Option<(String,i64,String,String)> = store.conn.query_row(
+            "SELECT attempt_id,source_revision,content,sha256 FROM swarm_artifacts WHERE run_id=?1 AND job_id=?2 AND id=?3",
+            params![run,job,id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
         ).optional()?;
-        let (attempt, source_rev) =
+        let (attempt, source_rev, content, digest) =
             found.ok_or_else(|| anyhow!("missing artifact evidence {id}"))?;
         if source_rev != job_revision {
             bail!("stale artifact source revision");
+        }
+        if format!("{:x}", Sha256::digest(content.as_bytes())) != digest {
+            bail!("artifact integrity check failed");
         }
         if attempt_id.as_deref().is_some_and(|a| a != attempt) {
             bail!("mixed attempt evidence requires separate review");
