@@ -88,6 +88,31 @@ fn shared_pool_reservation_blocks_stale_capacity_across_categories() {
 }
 
 #[test]
+fn ordinary_run_occupies_global_slot_until_confirmed_exit() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("ordinary"));
+    let ordinary = d.generic(&checkout, "worktree", "/bin/sleep", &["2"]);
+    assert!(ordinary["launch_error"].is_null());
+    let ordinary_id = run_id(&ordinary);
+    assert!(["starting", "running"].contains(&d.run(&ordinary_id)["status"].as_str().unwrap()));
+    let swarm = d.call("swarm.create", json!({"category":"Shared global slots",
+        "objective":"Audit", "allowed_targets":["codex-a"],
+        "policy":{"max_executing":2,"max_workers":1}}));
+    let id = swarm["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j0","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let at = now();
+    let held = admit(&d,id,"j0","codex-a","ordinary-active",at,100000,100).unwrap();
+    assert_eq!(held["status"],"blocked");
+    assert_eq!(held["reason"],"global_agent_limit");
+    d.wait_done(&ordinary_id,5);
+    let admitted = admit(&d,id,"j0","codex-a","ordinary-finished",now(),100000,100).unwrap();
+    assert_eq!(admitted["status"],"admitted");
+}
+
+#[test]
 fn full_director_inbox_holds_new_admissions_but_keeps_terminal_reports() {
     let d = Daemon::start(&[]);
     let id = setup(&d, "Inbox pressure", 2);

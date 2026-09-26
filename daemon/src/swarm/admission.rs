@@ -223,12 +223,17 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
         [],
         |r| r.get(0),
     )?;
+    let ordinary_agents: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM runs WHERE status IN ('queued','starting','running','waiting_for_user')",
+        [],
+        |r| r.get(0),
+    )?;
     let new_director = if current["status"] == "planning" {
         1
     } else {
         0
     };
-    if global_workers + global_directors + new_director
+    if global_workers + global_directors + ordinary_agents + new_director
         >= effective["max_executing"].as_i64().unwrap_or(9)
     {
         return Ok(blocked("global_agent_limit"));
