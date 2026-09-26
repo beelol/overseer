@@ -602,7 +602,7 @@
         "docs/verification/swarm/S3.md",
         "docs/verification/swarm/SWARM-64.md"
       ],
-      "blocker": "S3 now has a versioned backend and one scripted run joining four-to-eight-worker admission, review pressure, 26 isolated integration commits and evidence-gated completion. S0–S2/S4–S5 and the complete S3 autonomous director, fault and user-facing artifact trace remain unverified."
+      "blocker": "S3 has a versioned backend and a joined scripted run; S1 now has a versioned Express/PostgreSQL backend with seven isolated service checks. S0/S2/S4/S5, the S1 director/message/acceptance trace, and the complete S3 autonomous director, fault and user-facing artifact trace remain unverified."
     }
   },
   "scenarios": {
@@ -612,9 +612,13 @@
       "blocker": "No normal category + objective launch control or live director selection exists; policy defaults only have daemon fixture coverage."
     },
     "S1": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "No versioned Atlas backend fixture, live worker route, scoped reproduction, directed overlap sequence or final evidence synthesis exists."
+      "status": "partial",
+      "evidence": [
+        "fixtures/swarm/atlas-v1/manifest.json",
+        "fixtures/swarm/atlas-v1/acceptance.test.mjs",
+        "docs/verification/swarm/S1.md"
+      ],
+      "blocker": "Versioned Express/PostgreSQL backend checks pass for seeded findings, protected paths and isolated J2/J7 schemas. No Swarm dispatch, broker coordination, review, final report, missing-queue variant or S1 fault replay exists."
     },
     "S2": {
       "status": "unverified",
