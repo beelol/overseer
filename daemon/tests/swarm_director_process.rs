@@ -91,3 +91,58 @@ fn supervised_director_spawn_error_is_recorded_before_replacement() {
     assert_eq!(recovered["generation"],2);
     assert_eq!(recovered["replacement_pending"],true);
 }
+
+#[test]
+fn director_identity_is_durable_before_supervisor_launch() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("blocked-director-source"));
+    let run = d.call("swarm.create", json!({"category":"Blocked director launch",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER abort_director_launch BEFORE UPDATE OF launch ON runs
+        WHEN NEW.title='Blocked director' BEGIN
+        SELECT RAISE(ABORT, 'fixture launch failure before supervisor'); END;").unwrap();
+
+    let error = d.try_call("swarm.director.launch", json!({"run_id":id,
+        "generation":1,"repo":checkout,"program":"/bin/sleep",
+        "args":["30"],"prompt":"Audit backend","title":"Blocked director"})).unwrap_err();
+    assert!(error.contains("fixture launch failure before supervisor"),"{error}");
+    let (linked, process, directory): (Option<String>, String, Option<String>) = db.query_row(
+        "SELECT o.overseer_run_id,r.id,r.run_dir FROM swarm_director_owners o
+         JOIN runs r ON r.title='Blocked director' WHERE o.run_id=?1",
+        [id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    ).unwrap();
+    assert_eq!(linked.as_deref(), Some(process.as_str()),
+        "a queued director must be linked before it could ever spawn");
+    assert!(directory.is_none());
+    assert!(d.try_call("swarm.director.recover",json!({"run_id":id,
+        "generation":1,"revision":0,"termination":"confirmed_dead"})).is_err(),
+        "caller assertion cannot replace a director with an unconfirmed launch");
+}
+
+#[test]
+fn failed_prelaunch_setup_cannot_be_confirmed_dead_by_caller() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("prelaunch-failure-source"));
+    let run = d.call("swarm.create", json!({"category":"Prelaunch failure",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER abort_director_task BEFORE INSERT ON tasks
+        WHEN NEW.title='Prelaunch director' BEGIN
+        SELECT RAISE(ABORT, 'fixture failure before task and run'); END;").unwrap();
+    let error = d.try_call("swarm.director.launch", json!({"run_id":id,
+        "generation":1,"repo":checkout,"program":"/bin/sleep",
+        "args":["30"],"prompt":"Audit backend","title":"Prelaunch director"})).unwrap_err();
+    assert!(error.contains("fixture failure before task and run"),"{error}");
+    let linked: Option<String> = db.query_row(
+        "SELECT overseer_run_id FROM swarm_director_owners WHERE run_id=?1",
+        [id], |row| row.get(0)).unwrap();
+    assert!(linked.is_none());
+    assert!(d.try_call("swarm.director.recover",json!({"run_id":id,
+        "generation":1,"revision":0,"termination":"confirmed_dead"})).is_err(),
+        "an unlinked supervised launch must remain reserved until reconciled");
+}

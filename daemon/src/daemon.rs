@@ -5,7 +5,7 @@ use crate::git;
 use crate::paths;
 use crate::redact::redact;
 use crate::shim::{self, ExitInfo, LaunchFile, ShimInfo};
-use crate::store::{self, Event, Profile, Run, Snapshot, Store, Task, Turn, Workspace};
+use crate::store::{self, DirectorOwnerLink, Event, Profile, Run, Snapshot, Store, Task, Turn, Workspace};
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
@@ -39,9 +39,10 @@ struct AgentSlotReservation<'a> {
 }
 
 impl AgentSlotReservation<'_> {
-    fn insert_task_and_run(&mut self, task: &Task, run: &Run) -> Result<()> {
+    fn insert_task_and_run(&mut self, task: &Task, run: &Run,
+        director: Option<DirectorOwnerLink<'_>>) -> Result<()> {
         let mut pending = self.daemon.pending_agent_slots.lock().unwrap();
-        self.daemon.store.lock().unwrap().insert_task_and_run(task, run, None)?;
+        self.daemon.store.lock().unwrap().insert_task_and_run(task, run, None, director)?;
         *pending -= 1;
         self.pending = false;
         Ok(())
@@ -558,10 +559,18 @@ impl Daemon {
         {
             // Task and run appear together: a state snapshot never shows a task without its run.
             if let Some(reservation) = &mut slot {
-                reservation.insert_task_and_run(&task, &run)?;
+                let director = match swarm_identity.as_ref() {
+                    Some(SwarmLaunchIdentity::Director(identity)) => Some(DirectorOwnerLink {
+                        swarm_run_id: &identity.run_id,
+                        generation: identity.generation,
+                        token: &identity.token,
+                    }),
+                    _ => None,
+                };
+                reservation.insert_task_and_run(&task, &run, director)?;
             } else {
                 self.store.lock().unwrap().insert_task_and_run(
-                    &task, &run, match swarm_identity.as_ref() { Some(SwarmLaunchIdentity::Worker(identity)) => Some(identity.attempt_id.as_str()), _ => None }
+                    &task, &run, match swarm_identity.as_ref() { Some(SwarmLaunchIdentity::Worker(identity)) => Some(identity.attempt_id.as_str()), _ => None }, None
                 )?;
             }
         }

@@ -252,7 +252,8 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           renewed_ms INTEGER NOT NULL,
           lease_expires_ms INTEGER NOT NULL,
-          overseer_run_id TEXT REFERENCES runs(id)
+          overseer_run_id TEXT REFERENCES runs(id),
+          supervised_launch INTEGER NOT NULL DEFAULT 0 CHECK(supervised_launch IN (0,1))
         );
         CREATE UNIQUE INDEX IF NOT EXISTS swarm_one_director_turn
           ON swarm_director_turns(run_id) WHERE status='active';
@@ -383,6 +384,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     if !has_director_process {
         conn.execute_batch("ALTER TABLE swarm_director_owners ADD COLUMN overseer_run_id TEXT REFERENCES runs(id);")?;
     }
+    let has_supervised_launch = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_director_owners') WHERE name='supervised_launch'")?
+        .exists([])?;
+    if !has_supervised_launch {
+        conn.execute_batch("ALTER TABLE swarm_director_owners ADD COLUMN supervised_launch INTEGER NOT NULL DEFAULT 0 CHECK(supervised_launch IN (0,1));")?;
+    }
     let has_source_change_permission = conn
         .prepare(
             "SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='source_change_permission'",
@@ -505,10 +512,10 @@ mod tests {
             lease_expires_ms INTEGER NOT NULL);
             INSERT INTO swarm_director_owners VALUES('old-run',1,'digest','active',1,2,30000);").unwrap();
         migrate(&conn).unwrap();
-        let owner: (i64,String,Option<String>)=conn.query_row(
-            "SELECT generation,status,overseer_run_id FROM swarm_director_owners WHERE run_id='old-run'",
-            [],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
-        assert_eq!(owner,(1,"active".into(),None));
+        let owner: (i64,String,Option<String>,i64)=conn.query_row(
+            "SELECT generation,status,overseer_run_id,supervised_launch FROM swarm_director_owners WHERE run_id='old-run'",
+            [],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).unwrap();
+        assert_eq!(owner,(1,"active".into(),None,0));
         migrate(&conn).unwrap();
     }
 

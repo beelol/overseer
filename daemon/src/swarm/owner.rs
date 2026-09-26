@@ -30,6 +30,7 @@ pub fn begin(store: &mut Store, p: &Value) -> Result<Value> {
     }
     let now = crate::daemon::now();
     let token = uuid::Uuid::new_v4().simple().to_string();
+    let supervised = i64::from(p["supervised_launch"].as_bool().unwrap_or(false));
     let tx = store.conn.transaction()?;
     let existing: Option<(i64,String)> = tx.query_row(
         "SELECT generation,status FROM swarm_director_owners WHERE run_id=?1",
@@ -45,13 +46,13 @@ pub fn begin(store: &mut Store, p: &Value) -> Result<Value> {
         bail!("active director turn requires reconciliation before owner binding");
     }
     tx.execute(
-        "INSERT INTO swarm_director_owners(run_id,generation,token_sha256,status,created_ms,renewed_ms,lease_expires_ms)
-         VALUES(?1,?2,?3,'active',?4,?4,?5)
+        "INSERT INTO swarm_director_owners(run_id,generation,token_sha256,status,created_ms,renewed_ms,lease_expires_ms,supervised_launch)
+         VALUES(?1,?2,?3,'active',?4,?4,?5,?6)
          ON CONFLICT(run_id) DO UPDATE SET generation=excluded.generation,
              token_sha256=excluded.token_sha256,status='active',created_ms=excluded.created_ms,
              renewed_ms=excluded.renewed_ms,lease_expires_ms=excluded.lease_expires_ms,
-             overseer_run_id=NULL",
-        params![run,generation,hash(&token),now,now+LEASE_MS],
+             overseer_run_id=NULL,supervised_launch=excluded.supervised_launch",
+        params![run,generation,hash(&token),now,now+LEASE_MS,supervised],
     )?;
     if replacement_pending {
         let restored = current["stalled_from"].as_str().unwrap_or("planning");
@@ -104,20 +105,6 @@ pub fn renew(store: &mut Store, p: &Value) -> Result<Value> {
     }
     Ok(json!({"run_id":run,"generation":p["generation"],
         "lease_expires_ms":now+LEASE_MS}))
-}
-
-pub fn link_process(store: &mut Store, run: &str, generation: i64, token: &str,
-    overseer_run_id: &str) -> Result<()> {
-    let updated = store.conn.execute(
-        "UPDATE swarm_director_owners SET overseer_run_id=?4
-         WHERE run_id=?1 AND generation=?2 AND token_sha256=?3
-         AND status='active' AND overseer_run_id IS NULL",
-        params![run,generation,hash(token),overseer_run_id],
-    )?;
-    if updated != 1 {
-        bail!("director process could not be linked to its owner");
-    }
-    Ok(())
 }
 
 /// A lease timeout only makes director termination uncertain. It never releases

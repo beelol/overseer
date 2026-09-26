@@ -4,6 +4,7 @@ use anyhow::{bail, Result};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::Serialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::path::Path;
 
 pub const SCHEMA_VERSION: i64 = 5;
@@ -12,6 +13,12 @@ pub const EVENTS_PER_RUN: i64 = 5000;
 
 pub struct Store {
     pub conn: Connection,
+}
+
+pub struct DirectorOwnerLink<'a> {
+    pub swarm_run_id: &'a str,
+    pub generation: i64,
+    pub token: &'a str,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -385,7 +392,11 @@ impl Store {
         Ok(())
     }
 
-    pub fn insert_task_and_run(&self, t: &Task, r: &Run, attempt_id: Option<&str>) -> Result<()> {
+    pub fn insert_task_and_run(&self, t: &Task, r: &Run, attempt_id: Option<&str>,
+        director: Option<DirectorOwnerLink<'_>>) -> Result<()> {
+        if attempt_id.is_some() && director.is_some() {
+            bail!("a run cannot be both a swarm worker and director");
+        }
         let tx = self.conn.unchecked_transaction()?;
         Self::insert_task_row(&tx, t)?;
         Self::insert_run_row(&tx, r)?;
@@ -396,6 +407,18 @@ impl Store {
             )?;
             if linked != 1 {
                 anyhow::bail!("swarm launch intent is missing or already linked");
+            }
+        }
+        if let Some(link) = director {
+            let token_hash = format!("{:x}", Sha256::digest(link.token.as_bytes()));
+            let linked = tx.execute(
+                "UPDATE swarm_director_owners SET overseer_run_id=?4
+                 WHERE run_id=?1 AND generation=?2 AND token_sha256=?3
+                 AND status='active' AND overseer_run_id IS NULL",
+                params![link.swarm_run_id, link.generation, token_hash, r.id],
+            )?;
+            if linked != 1 {
+                bail!("director process could not be linked to its owner");
             }
         }
         tx.execute("UPDATE workspaces SET owner_run_id=?2 WHERE id=?1",params![r.workspace_id,r.id])?;
@@ -696,7 +719,7 @@ mod tests {
             relation_source: None, relation_confidence: None, capabilities: json!({}),
             process_generation: 0, attention: None,
         };
-        assert!(store.insert_task_and_run(&task, &run, Some("missing-attempt")).is_err());
+        assert!(store.insert_task_and_run(&task, &run, Some("missing-attempt"), None).is_err());
         assert!(store.task(&task.id).unwrap().is_none());
         assert!(store.run(&run.id).unwrap().is_none());
     }

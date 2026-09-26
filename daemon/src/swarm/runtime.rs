@@ -35,7 +35,7 @@ pub fn launch_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     }
     crate::git::toplevel(std::path::Path::new(repo))?;
     let owner = super::owner::begin(&mut d.store.lock().unwrap(),
-        &json!({"run_id":run,"generation":generation}))?;
+        &json!({"run_id":run,"generation":generation,"supervised_launch":true}))?;
     let token = owner["owner_token"].as_str().unwrap();
     let task = d.create_task_for_swarm_director(&json!({
         "repo":repo,"harness":"generic","workspace_mode":"worktree",
@@ -43,7 +43,6 @@ pub fn launch_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     }), &SwarmDirectorIdentity { run_id:run.to_string(),generation,token:token.to_string() })?;
     let process = task["run"]["id"].as_str()
         .ok_or_else(|| anyhow!("director run was not recorded"))?;
-    super::owner::link_process(&mut d.store.lock().unwrap(),run,generation,token,process)?;
     if !task["launch_error"].is_null() {
         return Ok(json!({"status":"launch_failed","overseer_run_id":process,
             "error":task["launch_error"]}));

@@ -120,8 +120,8 @@ pub fn claim_batch(store: &mut Store, p: &Value) -> Result<Value> {
     )
 }
 
-/// Fixture recovery transition. A linked scripted director requires a persisted supervisor
-/// exit before `confirmed_dead`; unlinked fixtures still supply their own termination evidence.
+/// Fixture recovery transition. A supervised director requires a linked process and persisted
+/// exit before `confirmed_dead`; legacy unlinked fixtures supply their own termination evidence.
 /// An unreachable process remains `unknown` with its capacity reserved.
 pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
@@ -151,12 +151,15 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
         bail!("director is stalled by planning or no-progress policy; process recovery cannot clear it");
     }
     if termination == "confirmed_dead" {
-        let linked: Option<Option<String>> = store.conn.query_row(
-            "SELECT overseer_run_id FROM swarm_director_owners
+        let linked: Option<(Option<String>,i64)> = store.conn.query_row(
+            "SELECT overseer_run_id,supervised_launch FROM swarm_director_owners
              WHERE run_id=?1 AND generation=?2 AND status='active'",
-            params![run,generation], |r| r.get(0),
+            params![run,generation], |r| Ok((r.get(0)?,r.get(1)?)),
         ).optional()?;
-        if let Some(Some(process)) = linked {
+        if matches!(linked,Some((None,1))) {
+            bail!("supervised director launch has no linked process; reconciliation required");
+        }
+        if let Some((Some(process),_)) = linked {
             let (status, ended, dir): (String,Option<i64>,Option<String>) = store.conn.query_row(
                 "SELECT status,ended_ms,run_dir FROM runs WHERE id=?1",
                 [&process], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
