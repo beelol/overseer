@@ -1,0 +1,441 @@
+//! T-06, T-07 and T-08: answering permissions, interrupting, zoom with scrollback, and starting
+//! agents from the New Agent form. Real overseerd; generic agents and the SYNTHETIC Claude
+//! fixture (permission mode).
+mod support;
+
+use crossterm::event::KeyCode;
+use overseer_tui::app::{Confirm, Mode};
+use serde_json::json;
+use std::path::Path;
+use support::*;
+
+fn claude_daemon(mode: &str) -> Daemon {
+    let claude = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("fixtures/fake-harness/claude-fixture.js").display().to_string();
+    Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude), ("CLAUDE_FIXTURE_MODE", mode), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE")])
+}
+
+fn claude_task(d: &Daemon, repo: &Path, title: &str) -> String {
+    d.ctl("task.create", json!({ "repo": repo, "harness": "claude", "prompt": "write perm.txt", "title": title }))["run"]["id"].as_str().unwrap().to_string()
+}
+
+fn workspace_of(d: &Daemon, run: &str) -> std::path::PathBuf {
+    let st = d.ctl("state", json!({}));
+    let ws = d.run(run)["workspace_id"].clone();
+    std::path::PathBuf::from(st["workspaces"].as_array().unwrap().iter().find(|w| w["id"] == ws).unwrap()["path"].as_str().unwrap())
+}
+
+#[test]
+fn t06_answer_permissions_jump_to_waiting_agents_and_interrupt() {
+    let t = tempfile::tempdir().unwrap();
+    let d = claude_daemon("permission");
+    let repo = repo(&t.path().join("perm"));
+    let e1 = d.sh(&repo, "Echo one", "echo up; while read l; do echo $l; done");
+    let p1 = claude_task(&d, &repo, "Claude one");
+    let e2 = d.sh(&repo, "Echo two", "echo up; while read l; do echo $l; done");
+    let p2 = claude_task(&d, &repo, "Claude two");
+    for p in [&p1, &p2] {
+        d.wait_status(p, |s| s == "waiting_for_user", 20);
+    }
+    let mut tui = Tui::attach(&d, 180, 50);
+    tui.until(10, |a| a.visible().iter().filter(|r| r.needs_you()).count() == 2);
+    let s = tui.screen();
+    assert!(s.contains("◆ 2 need you"), "{s}");
+    assert!(s.contains("wants Write perm.txt") && s.contains("a allow d deny"), "readable summary, not JSON:\n{s}");
+    tui.snapshot("t06-waiting");
+
+    // w: next agent waiting for you (newest first: Claude two, then Claude one).
+    let focused = |tui: &Tui| tui.app.focus.clone().unwrap_or_default();
+    tui.key(KeyCode::Char('4')); // Echo one, the oldest
+    assert_eq!(focused(&tui), e1);
+    tui.key(KeyCode::Char('w'));
+    assert_eq!(focused(&tui), p2, "wraps to the first waiting agent");
+    tui.key(KeyCode::Char('a'));
+    tui.until(10, |a| a.state.run(&p2).is_some_and(|r| !r.needs_you()));
+    tui.key(KeyCode::Char('w'));
+    assert_eq!(focused(&tui), p1);
+    tui.key(KeyCode::Char('d'));
+    tui.until(10, |a| a.state.run(&p1).is_some_and(|r| !r.needs_you()));
+    let answered = |run: &str| d.events(run).iter().find(|e| e["kind"] == "permission_answered").map(|e| e["payload"]["allow"].as_bool().unwrap());
+    assert_eq!(answered(&p2), Some(true));
+    assert_eq!(answered(&p1), Some(false));
+    assert_eq!(std::fs::read_to_string(workspace_of(&d, &p2).join("perm.txt")).ok().as_deref(), Some("allowed\n"));
+    assert!(!workspace_of(&d, &p1).join("perm.txt").exists(), "denied: nothing written");
+    let s = tui.until_screen(10, "denied Write perm.txt");
+    assert!(s.contains("allowed Write perm.txt"), "{s}");
+    tui.key(KeyCode::Char('w'));
+    assert!(tui.screen().contains("No agent is waiting for you"));
+
+    // x interrupts only the focused agent, after y/n.
+    tui.key(KeyCode::Char(char::from_digit(tui.app.visible().iter().position(|r| r.id == e2).unwrap() as u32 + 1, 10).unwrap()));
+    tui.key(KeyCode::Char('x'));
+    assert_eq!(tui.app.mode, Mode::Confirm(Confirm::Interrupt(e2.clone())));
+    assert!(tui.screen().contains("Interrupt Echo two? y / n"));
+    tui.key(KeyCode::Char('n'));
+    assert_eq!(d.run(&e2)["status"], "running", "n cancels");
+    tui.key(KeyCode::Char('x'));
+    tui.key(KeyCode::Char('y'));
+    assert_eq!(d.wait_status(&e2, |s| s == "interrupted", 10), "interrupted");
+    assert_eq!(d.run(&e1)["status"], "running", "the other agent keeps running");
+    d.ctl("run.interrupt", json!({ "run_id": e1 }));
+}
+
+#[test]
+fn t07_zoom_shows_the_whole_conversation_with_scrollback() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("zoom"));
+    let long = d.sh(&repo, "Two thousand lines", "i=0; while [ $i -lt 2000 ]; do echo \"row $i\"; i=$((i+1)); done");
+    d.wait_status(&long, |s| s == "completed", 30);
+    let echo = d.sh(&repo, "Live echo", "while read l; do echo \"live: $l\"; done");
+    let mut tui = Tui::attach(&d, 140, 40);
+    tui.until(10, |a| a.visible().len() == 2);
+    tui.key(KeyCode::Char('2'));
+    tui.until(20, |a| a.feeds.get(&long).is_some_and(|f| f.items().any(|i| i.text == "row 1999")));
+    tui.key(KeyCode::Char('z'));
+    assert_eq!(tui.app.mode, Mode::Zoom { scroll: 0 });
+    let s = tui.screen();
+    assert!(s.contains("row 1999") && !s.contains("row 0\n") && !s.contains("row 1000 "), "{s}");
+    tui.snapshot("t07-zoom-bottom");
+    tui.key(KeyCode::Char('g'));
+    let s = tui.screen();
+    assert!(s.contains("│ row 0 ") || s.contains("┃ row 0 "), "top of history:\n{s}");
+    assert!(!s.contains("row 1999"));
+    tui.snapshot("t07-zoom-top");
+    tui.key(KeyCode::Char('j'));
+    tui.key(KeyCode::PageDown);
+    assert!(!tui.screen().contains("row 0 "), "scrolled down");
+    tui.key(KeyCode::Char('G'));
+    assert!(tui.screen().contains("row 1999"));
+    tui.key(KeyCode::Esc);
+    assert_eq!(tui.app.mode, Mode::Grid);
+    assert_eq!(tui.app.focus.as_deref(), Some(long.as_str()), "back on the same tile");
+
+    // Zoomed on a live agent: new output keeps following at the bottom; messages work from zoom.
+    tui.key(KeyCode::Char('1'));
+    tui.key(KeyCode::Char('z'));
+    tui.key(KeyCode::Char('i'));
+    tui.type_text("from zoom");
+    tui.key(KeyCode::Enter);
+    assert!(matches!(tui.app.mode, Mode::Zoom { .. }), "sending returns to zoom");
+    tui.until_screen(10, "live: from zoom");
+    d.ctl("run.follow_up", json!({ "run_id": echo, "prompt": "again" }));
+    tui.until_screen(10, "live: again");
+    d.ctl("run.interrupt", json!({ "run_id": echo }));
+}
+
+#[test]
+fn t08_start_agents_from_the_new_agent_form() {
+    let t = tempfile::tempdir().unwrap();
+    let d = claude_daemon("permission");
+    let repo = repo(&t.path().join("form"));
+    let old = d.sh(&repo, "Older agent", "echo older");
+    let mut tui = Tui::attach(&d, 160, 48);
+    tui.app.cwd_repo = Some(repo.display().to_string());
+    tui.until(10, |a| a.visible().len() == 1);
+
+    // A generic agent: program and arguments.
+    tui.key(KeyCode::Char('n'));
+    assert_eq!(tui.app.mode, Mode::NewAgent);
+    tui.until(10, |a| a.form.harnesses.iter().any(|h| h.0 == "generic") && !a.form.accounts.is_empty());
+    let s = tui.screen();
+    assert!(s.contains("new agent") && s.contains("Repository") && s.contains("Harness") && s.contains("Prompt"), "{s}");
+    tui.snapshot("t08-form");
+    tui.key(KeyCode::Tab); // → Repository
+    tui.key(KeyCode::Tab); // → Harness
+    for _ in 0..8 {
+        if tui.app.form.harness_id() == Some("generic") {
+            break;
+        }
+        tui.key(KeyCode::Right);
+    }
+    assert_eq!(tui.app.form.harness_id(), Some("generic"));
+    tui.key(KeyCode::Tab); // → Arguments
+    tui.key(KeyCode::Backspace);
+    tui.key(KeyCode::Backspace);
+    tui.type_text(r#"["-c","echo started from the form; sleep 20"]"#);
+    tui.key(KeyCode::Tab); // → Program
+    tui.type_text("/bin/sh");
+    tui.key(KeyCode::Tab); // → Prompt
+    tui.type_text("Watch the form's agent");
+    tui.key(KeyCode::Enter);
+    tui.until(10, |a| a.mode == Mode::Grid && a.focus.as_deref().is_some_and(|f| a.state.run(f).is_some_and(|r| r.harness == "generic" && r.title == "Watch the form's agent")));
+    let s = tui.until_screen(10, "started from the form");
+    assert!(s.contains("┏ 1 ● Watch the form's agent"), "the new agent is tile 1 and focused:\n{s}");
+    let new = tui.app.focus.clone().unwrap();
+    let st = d.ctl("state", json!({}));
+    let task = st["tasks"].as_array().unwrap().iter().find(|t| t["id"] == d.run(&new)["task_id"]).unwrap().clone();
+    assert_eq!(task["repo_root"].as_str(), Some(repo.to_str().unwrap()));
+    assert_eq!(task["prompt"], "Watch the form's agent");
+
+    // A Claude agent: compatible account, prompt required.
+    tui.key(KeyCode::Char('n'));
+    tui.until(10, |a| !a.form.harnesses.is_empty());
+    tui.key(KeyCode::Tab);
+    tui.key(KeyCode::Tab);
+    for _ in 0..8 {
+        if tui.app.form.harness_id() == Some("claude") {
+            break;
+        }
+        tui.key(KeyCode::Right);
+    }
+    assert_eq!(tui.app.form.harness_id(), Some("claude"));
+    tui.key(KeyCode::Enter);
+    assert_eq!(tui.app.form.error.as_deref(), Some("Type what the agent should do."));
+    let s = tui.screen();
+    assert!(s.contains("claude (existing login)"), "compatible account offered:\n{s}");
+    tui.key(KeyCode::BackTab); // → Repository
+    tui.key(KeyCode::BackTab); // → Prompt (wraps)
+    assert_eq!(tui.app.form.field, 4);
+    tui.type_text("write perm.txt from the form");
+    tui.key(KeyCode::Enter);
+    tui.until(10, |a| a.mode == Mode::Grid && a.focused().is_some_and(|r| r.harness == "claude"));
+    let run = tui.app.focus.clone().unwrap();
+    assert_eq!(d.run(&run)["profile_id"], "system-claude");
+    tui.until_screen(15, "wants Write perm.txt");
+    assert_ne!(tui.app.focus.as_deref(), Some(old.as_str()));
+    d.ctl("run.interrupt", json!({ "run_id": run }));
+    d.ctl("run.interrupt", json!({ "run_id": new }));
+}
+
+#[test]
+fn t14_changes_view_lists_files_and_diffs_like_the_review() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("changes"));
+    let run = d.sh(&repo, "Edits two files", "printf 'more docs\\n' >> README.md; mkdir -p src/deep/nested; printf 'fn main() {}\\n' > src/deep/nested/new.rs; echo edited; sleep 30");
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.until_screen(15, "edited");
+    tui.key(KeyCode::Char('v'));
+    assert_eq!(tui.app.mode, Mode::Changes);
+    tui.until(10, |a| a.changes.files.len() == 2 && !a.changes.loading);
+    let s = tui.screen();
+    assert!(s.contains("changes · Edits two files · Latest run · 2 files +2 −0"), "{s}");
+    assert!(s.contains("M README.md +1 −0") && s.contains("A src/deep/nested/new.rs +1 −0"), "{s}");
+    assert!(s.contains("+more docs"), "diff of the first file:\n{s}");
+    tui.snapshot("t14-changes");
+    tui.key(KeyCode::Char('j'));
+    let s = tui.screen();
+    assert!(s.contains("+fn main() {}") && !s.contains("+more docs"), "{s}");
+    // Another comparison, like the review's comparison picker.
+    tui.key(KeyCode::Char('c'));
+    tui.until(10, |a| !a.changes.loading && a.changes.option == 1 && !a.changes.files.is_empty());
+    assert!(tui.screen().contains("Since task start"), "{}", tui.screen());
+    tui.key(KeyCode::Esc);
+    assert_eq!(tui.app.mode, Mode::Grid);
+    d.ctl("run.interrupt", json!({ "run_id": run }));
+}
+
+#[test]
+fn t17_zoom_expands_tool_inputs_and_results() {
+    let t = tempfile::tempdir().unwrap();
+    let d = claude_daemon("permission");
+    let repo = repo(&t.path().join("tools"));
+    let run = claude_task(&d, &repo, "Writes a file");
+    d.wait_status(&run, |s| s == "waiting_for_user", 20);
+    let mut tui = Tui::attach(&d, 140, 40);
+    tui.until(10, |a| a.state.run(&run).is_some_and(|r| r.needs_you()));
+    tui.key(KeyCode::Char('a'));
+    tui.until(15, |a| a.state.run(&run).is_some_and(|r| r.status == "completed"));
+    tui.key(KeyCode::Char('z'));
+    let folded = tui.screen();
+    assert!(folded.contains("⚙ Write perm.txt ✓") && !folded.contains("│ perm.txt"), "{folded}");
+    tui.key(KeyCode::Char('e'));
+    let s = tui.screen();
+    assert!(s.contains("│ perm.txt") && s.contains("│ 1 line") && s.contains("│ File created successfully at: ./perm.txt"), "input and result under the tool call:\n{s}");
+    tui.snapshot("t17-expanded-tools");
+    tui.key(KeyCode::Char('e'));
+    assert!(!tui.screen().contains("│ perm.txt"), "e folds them again");
+}
+
+#[test]
+fn t18_merge_back_from_the_terminal_asks_before_each_step() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("merge"));
+    let git = |args: &[&str]| String::from_utf8_lossy(&std::process::Command::new("git").args(args).current_dir(&repo).output().unwrap().stdout).trim().to_string();
+    let main_before = git(&["rev-parse", "main"]);
+    let run = d.sh(&repo, "Document sessions", "printf '\\n## Sessions\\nThey refresh once.\\n' >> README.md; echo documented");
+    d.wait_status(&run, |s| s == "completed", 20);
+    let busy = d.sh(&repo, "Still running", "sleep 30");
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.until(10, |a| a.visible().len() == 2);
+    // Not while the agent runs.
+    tui.key(KeyCode::Char('1'));
+    assert_eq!(tui.app.focus.as_deref(), Some(busy.as_str()));
+    tui.key(KeyCode::Char('M'));
+    assert!(tui.screen().contains("Merge back waits until the agent is done"));
+    // Step 1: commit the worktree and merge main into the agent's branch.
+    tui.key(KeyCode::Char('2'));
+    tui.key(KeyCode::Char('M'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(Confirm::MergePrepare { .. })));
+    let s = tui.screen();
+    assert!(s.contains("Merge back overseer/document-sessions → main: commit 1 worktree file and merge main into overseer/document-sessions"), "{s}");
+    tui.snapshot("t18-merge-step-1");
+    tui.key(KeyCode::Char('y'));
+    // Step 2: exactly what lands, then merge into main in the source checkout.
+    tui.until(15, |a| matches!(a.mode, Mode::Confirm(Confirm::MergeComplete { .. })));
+    let s = tui.screen();
+    assert!(s.contains("Merge overseer/document-sessions into main in merge? 1 file lands. The worktree and branch are kept."), "{s}");
+    assert_eq!(git(&["rev-parse", "main"]), main_before, "nothing reaches main before the second yes");
+    tui.snapshot("t18-merge-step-2");
+    tui.key(KeyCode::Char('y'));
+    tui.until_screen(15, "Merged overseer/document-sessions into main");
+    assert_ne!(git(&["rev-parse", "main"]), main_before);
+    assert!(std::fs::read_to_string(repo.join("README.md")).unwrap().contains("They refresh once."), "the change is on main in the source checkout");
+    d.ctl("run.interrupt", json!({ "run_id": busy }));
+}
+
+#[test]
+fn t19_a_new_waiting_agent_rings_and_shows_in_the_window_title() {
+    let t = tempfile::tempdir().unwrap();
+    let d = claude_daemon("permission");
+    let repo = repo(&t.path().join("attention"));
+    let echo = d.sh(&repo, "Quiet agent", "echo quiet; while read l; do echo $l; done");
+    let mut tui = Tui::attach(&d, 140, 40);
+    tui.until_screen(10, "quiet");
+    assert!(!tui.app.bell);
+    assert_eq!(tui.app.window_title(), "Overseer · 1 active");
+    let asks = claude_task(&d, &repo, "Asks permission");
+    tui.until(20, |a| a.state.run(&asks).is_some_and(|r| r.needs_you()));
+    assert!(tui.app.bell, "a new waiting agent rings the bell");
+    assert_eq!(tui.app.window_title(), "Overseer · 1 needs you · 2 active");
+    let s = tui.screen();
+    assert!(s.contains("◆ Asks permission needs you — press w"), "{s}");
+    tui.key(KeyCode::Char('w'));
+    assert_eq!(tui.app.focus.as_deref(), Some(asks.as_str()));
+
+    // The real binary: a standalone bell and the title escape in its terminal output.
+    let bin = env!("CARGO_BIN_EXE_overseer-tui");
+    let helper = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/pty_run.py");
+    let dd = &d;
+    let script = std::thread::spawn({
+        let bin_dir = dd.bin.clone();
+        let home = dd.home.path().to_path_buf();
+        move || {
+            std::process::Command::new("python3").arg(helper).args(["30", "120", "6.0", "q", "--", bin, "--daemon"]).arg(bin_dir).arg("--home").arg(home).env("TERM", "xterm-256color").output().unwrap()
+        }
+    });
+    std::thread::sleep(std::time::Duration::from_millis(2500));
+    let second = claude_task(&d, &repo, "Also asks");
+    d.wait_status(&second, |s| s == "waiting_for_user", 20);
+    let out = script.join().unwrap();
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    assert!(text.contains("\u{1b}]0;Overseer · 2 need you · 3 active\u{7}"), "window title set");
+    let titles = text.matches("\u{1b}]0;").count();
+    let bells = text.matches('\u{7}').count();
+    assert!(bells > titles, "a bell beyond the title terminators ({bells} vs {titles})");
+    for r in [echo, asks, second] {
+        d.ctl("run.interrupt", json!({ "run_id": r }));
+    }
+}
+
+#[test]
+fn t20_cleanup_removes_a_finished_worktree_and_names_what_would_be_lost() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("cleanup"));
+    let run = d.sh(&repo, "Leaves a scratch file", "echo scratch > notes-draft.txt; echo done");
+    d.wait_status(&run, |s| s == "completed", 20);
+    let ws = workspace_of(&d, &run);
+    assert!(ws.exists());
+    let mut tui = Tui::attach(&d, 160, 40);
+    tui.until(10, |a| a.visible().len() == 1);
+    tui.key(KeyCode::Char('C'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(Confirm::Cleanup { .. })));
+    let s = tui.screen();
+    assert!(s.contains("Remove this worktree? overseer/leaves-a-scratch-file is kept, but 1 uncommitted file will be LOST: notes-draft.txt."), "{s}");
+    tui.snapshot("t20-cleanup");
+    tui.key(KeyCode::Char('n'));
+    assert!(ws.exists(), "n keeps it");
+    tui.key(KeyCode::Char('C'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(Confirm::Cleanup { .. })));
+    tui.key(KeyCode::Char('y'));
+    tui.until_screen(10, "Worktree removed; the branch is kept");
+    assert!(!ws.exists(), "the worktree is gone");
+    let branches = String::from_utf8_lossy(&std::process::Command::new("git").args(["branch", "--list", "overseer/*"]).current_dir(&repo).output().unwrap().stdout).to_string();
+    assert!(branches.contains("overseer/leaves-a-scratch-file"), "{branches}");
+}
+
+#[test]
+fn t21_stop_everything_and_start_the_daemon_again() {
+    let t = tempfile::tempdir().unwrap();
+    let mut d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("stop"));
+    let a = d.sh(&repo, "Long job one", "echo one; sleep 60");
+    let b = d.sh(&repo, "Long job two", "echo two; sleep 60");
+    for r in [&a, &b] {
+        d.wait_status(r, |s| s == "running", 10);
+    }
+    let mut tui = Tui::attach_spawning(&d, 160, 40);
+    tui.until(10, |app| app.visible().len() == 2);
+    tui.key(KeyCode::Char('X'));
+    let s = tui.screen();
+    assert!(s.contains("Stop 2 running agents (Long job two, Long job one) and the daemon? Worktrees and history are kept. y / n"), "{s}");
+    tui.snapshot("t21-stop-all");
+    tui.key(KeyCode::Char('y'));
+    tui.until(15, |app| app.stopped && !app.connected);
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !d.exited() && std::time::Instant::now() < end {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert!(d.exited(), "the daemon exited");
+    // Not started again behind the user's back.
+    tui.pump(2500);
+    assert!(std::os::unix::net::UnixStream::connect(&d.socket).is_err(), "no daemon was respawned");
+    assert!(tui.screen().contains("○ stopped · r starts"));
+    // r starts it again (in the same home); the agents were interrupted, not lost.
+    tui.key(KeyCode::Char('r'));
+    tui.until(20, |app| app.connected && !app.stopped);
+    tui.until(10, |app| [&a, &b].iter().all(|id| app.state.run(id).is_some_and(|r| r.status == "interrupted")));
+    let s = tui.screen();
+    assert!(s.contains("■ Long job one") && s.contains("■ Long job two") && s.contains("● connected"), "{s}");
+}
+
+#[test]
+fn t22_open_a_pull_request_with_the_users_git_and_gh() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("pr-demo"));
+    let git = |dir: &Path, args: &[&str]| String::from_utf8_lossy(&std::process::Command::new("git").args(args).current_dir(dir).output().unwrap().stdout).trim().to_string();
+    // A local bare repository stands in for github.com (no network, no tokens).
+    let bare = t.path().join("github-standin.git");
+    assert!(std::process::Command::new("git").args(["init", "-q", "--bare"]).arg(&bare).status().unwrap().success());
+    git(&repo, &["remote", "add", "origin", "https://github.com/test-owner/pr-demo.git"]);
+    git(&repo, &["config", &format!("url.{}.insteadOf", bare.display()), "https://github.com/test-owner/pr-demo.git"]);
+    // A fake GitHub CLI that records its arguments and answers like `gh pr create`.
+    let log = t.path().join("gh-args.json");
+    let gh = t.path().join("gh");
+    std::fs::write(&gh, format!("#!/bin/sh\nnode -e 'require(\"fs\").writeFileSync(process.argv[1], JSON.stringify(process.argv.slice(2)))' '{}' \"$@\"\necho 'Creating pull request for overseer/add-notes into main in test-owner/pr-demo'\necho 'https://github.com/test-owner/pr-demo/pull/7'\n", log.display())).unwrap();
+    std::process::Command::new("chmod").arg("+x").arg(&gh).status().unwrap();
+    std::env::set_var("OVERSEER_GH", &gh);
+    let main_before = git(&repo, &["rev-parse", "main"]);
+    let run = d.ctl("task.create", json!({ "repo": repo, "harness": "generic", "program": "/bin/sh", "args": ["-c", "printf 'notes\\n' > NOTES.md; echo wrote notes"], "prompt": "Add notes", "title": "Add notes", "workspace_mode": "worktree" }))["run"]["id"].as_str().unwrap().to_string();
+    d.wait_status(&run, |s| s == "completed", 20);
+    let busy = d.sh(&repo, "Busy", "sleep 30");
+    let mut tui = Tui::attach(&d, 170, 44);
+    tui.until(10, |a| a.visible().len() == 2);
+    tui.key(KeyCode::Char('1'));
+    tui.key(KeyCode::Char('P'));
+    assert!(tui.screen().contains("Open PR waits until the agent is done"));
+    tui.key(KeyCode::Char('2'));
+    tui.key(KeyCode::Char('P'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(Confirm::OpenPr { .. })));
+    let Mode::Confirm(Confirm::OpenPr { text, .. }) = tui.app.mode.clone() else { unreachable!() };
+    assert_eq!(text, "Open a pull request on test-owner/pr-demo: overseer/add-notes → main? This will commit 1 worktree file, push overseer/add-notes to origin with your Git credentials and create it with gh. Nothing is merged.");
+    assert!(tui.screen().contains("Open a pull request on test-owner/pr-demo"), "shown in the confirmation bar");
+    tui.snapshot("t22-open-pr");
+    tui.key(KeyCode::Char('y'));
+    let s = tui.until_screen(20, "Pull request #7 is open");
+    assert!(s.contains("https://github.com/test-owner/pr-demo/pull/7"), "{s}");
+    // Pushed with git (the worktree's HEAD is on the remote), created with gh, recorded, not merged.
+    let ws = workspace_of(&d, &run);
+    assert_eq!(git(&bare, &["rev-parse", "refs/heads/overseer/add-notes"]), git(&ws, &["rev-parse", "HEAD"]));
+    let args: Vec<String> = serde_json::from_str(&std::fs::read_to_string(&log).unwrap()).unwrap();
+    let arg = |k: &str| args.iter().position(|a| a == k).map(|i| args[i + 1].clone()).unwrap_or_default();
+    assert_eq!((arg("--repo"), arg("--head"), arg("--base"), arg("--title")), ("test-owner/pr-demo".into(), "overseer/add-notes".into(), "main".into(), "Add notes".into()));
+    let body = arg("--body");
+    assert!(body.contains(&format!("Opened by Overseer from run `{run}` (generic)")) && body.contains("> Add notes") && body.contains("`A` NOTES.md") && body.contains("never merges automatically"), "{body}");
+    tui.until(10, |_| d.events(&run).iter().any(|e| e["kind"] == "pull_request" && e["payload"]["number"] == 7));
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "nothing merged");
+    d.ctl("run.interrupt", json!({ "run_id": busy }));
+}

@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                       ● connected 
+╭ 1 ● Still running ───────────────────────────────────────────── generic · 0s ╮┏ 2 ✓ Document sessions ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓
+│ working…                                                                     │┃ documented                                                                   ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+╰──────────────────────────────────────────────────────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ Merge back overseer/document-sessions → main: commit 1 worktree file and merge main into overseer/document-sessions in the worktree (conflicts go back to the  
+agent)? y / n                                                                                                                                                   
+ Merge back waits until the agent is done (x interrupts it)                                                                                                     

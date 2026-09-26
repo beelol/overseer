@@ -1,0 +1,48 @@
+ ◆ Overseer  page 1/1 · 1 agent                                                                                                                     ● connected 
+┏ 1 ✓ Older agent ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓
+┃ older                                                                                                                                                        ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                     ╭ new agent ───────────────────────────────────────────────────────────────────────╮                                     ┃
+┃                                     │                                                                                  │                                     ┃
+┃                                     │   Repository  /private/var/folders/mk/vz_j1tqn0rz6w6f4ztwfv0gr0000gn/T/.tmpqDK1… │                                     ┃
+┃                                     │   Harness     ‹ claude claude-fixture 0.0.0 (synthetic) ›  (1/5)                 │                                     ┃
+┃                                     │                                                                                  │                                     ┃
+┃                                     │   Account     claude (existing login)  ✗ not signed in                           │                                     ┃
+┃                                     │   Model       harness default                                                    │                                     ┃
+┃                                     │                                                                                  │                                     ┃
+┃                                     │  ›Prompt      ▌                                                                  │                                     ┃
+┃                                     │                                                                                  │                                     ┃
+┃                                     │                                                                                  │                                     ┃
+┃                                     ╰────────────────────────────────────────────────────── enter starts · esc cancels ╯                                     ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┃                                                                                                                                                              ┃
+┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ tab next field   ←/→ choose   enter start   esc cancel                                                                                                         

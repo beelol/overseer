@@ -191,6 +191,27 @@ node test/ui/scenario-main.js
 6. Agents keep running when VS Code closes (you get a notification). **Stop Agents and
    Daemon** (Agents view menu) stops them all after confirmation.
 
+### In a terminal: `overseer-tui`
+
+A keyboard-first view of the same agents, live from the same daemon ([design](docs/rfcs/tui.md)):
+nine per page (page 1 is the newest nine), each tile streaming its agent's conversation.
+
+```bash
+cargo build --release -p overseer-tui
+```
+
+```bash
+target/release/overseer-tui
+```
+
+It finds the daemon VS Code uses (or pass `--daemon PATH`), starts it if needed, and quitting
+leaves every agent running. Keys: arrows or `hjkl` move, `1`–`9` jump, `]`/`[` page, `i` or
+Enter messages the focused agent, `z` zooms with scrollback, `a`/`d` answer a permission, `w`
+jumps to the next agent waiting for you, `x` interrupts, `n` starts a new agent, `f` filters,
+`/` searches, `v` shows an agent's changes and diffs, `M` merges it back (one confirmation per
+step), `P` opens a GitHub pull request with your `gh`, `C` removes a finished worktree, `A` lists accounts and signs them in, `X` stops every
+agent and the daemon, `?` lists every key, `q` quits.
+
 ## Recovery
 
 - State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run
@@ -240,7 +261,8 @@ the owner action or decision each one needs.
 - [Side RFC: native Overseer notifications on macOS](docs/rfcs/native-notifications.md)
 - [Side RFC: Overseer-managed Claude credentials](docs/rfcs/claude-credentials.md)
 - [Side RFC: daily-driver orchestrator UI](docs/rfcs/orchestrator-ui.md)
+- [Side RFC: terminal UI (`overseer-tui`)](docs/rfcs/tui.md)
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 
-Design targets macOS and Linux; only macOS is verified. Auto routing, a TUI, VSCodium,
+Design targets macOS and Linux; only macOS is verified. Auto routing, VSCodium,
 Windows/Remote SSH and review comments sent to agents are later milestones.

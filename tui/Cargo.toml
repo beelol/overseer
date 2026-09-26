@@ -1,0 +1,25 @@
+[package]
+name = "overseer-tui"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Terminal UI for Overseer: nine live agents per page on the same overseerd daemon"
+
+[[bin]]
+name = "overseer-tui"
+path = "src/main.rs"
+
+[lib]
+name = "overseer_tui"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1.0.104"
+crossterm = "0.29"
+ratatui = "0.30.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+unicode-width = "0.2.2"
+
+[dev-dependencies]
+tempfile = "3.27.0"

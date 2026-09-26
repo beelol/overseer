@@ -873,6 +873,47 @@ fn ac45_last_vscode_window_closing_with_active_runs_posts_a_notice_but_a_reload_
     d.wait_done(&run, 20);
 }
 
+/// A persistent connection that identifies itself as an overseer-tui.
+fn tui_client(d: &Daemon) -> std::os::unix::net::UnixStream {
+    use std::io::{BufRead, BufReader, Write};
+    let mut conn = std::os::unix::net::UnixStream::connect(d.socket()).unwrap();
+    conn.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+    conn.write_all(format!("{}\n", json!({"id": 1, "method": "hello", "params": {"client": "tui"}})).as_bytes()).unwrap();
+    let mut line = String::new();
+    BufReader::new(conn.try_clone().unwrap()).read_line(&mut line).unwrap();
+    assert!(line.contains("\"protocol\""), "{line}");
+    conn
+}
+
+#[test]
+fn t11_an_attached_tui_counts_as_a_watching_ui() {
+    let t = tmp();
+    let (cmd, log) = notifier(t.path());
+    let d = Daemon::start(&[("OVERSEER_BACKGROUND_NOTICE_MS", "500"), ("OVERSEER_NOTIFY_COMMAND", &cmd)]);
+    let repo = repo(&t.path().join("r"));
+    let run = run_id(&sh(&d, &repo, "worktree", "sleep 30"));
+    d.wait_status(&run, |s| s == "running", 20);
+    let window = vscode_window(&d);
+    let tui = tui_client(&d);
+    assert_eq!(d.call("daemon.clients", json!({}))["ui"], 2);
+    // VS Code closes while the TUI still shows the agents: they are not running unseen.
+    drop(window);
+    std::thread::sleep(Duration::from_millis(1100));
+    assert!(!log.exists(), "no notice while a TUI is attached");
+    // The TUI quits too: now they are.
+    drop(tui);
+    for _ in 0..50 {
+        if log.exists() { break; }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    std::thread::sleep(Duration::from_millis(300));
+    let text = std::fs::read_to_string(&log).expect("notice after the last UI closed");
+    assert_eq!(text.lines().count(), 1, "{text}");
+    assert_eq!(d.run(&run)["status"], "running", "quitting the TUI never stops agents");
+    d.call("run.interrupt", json!({"run_id": run}));
+    d.wait_done(&run, 20);
+}
+
 #[test]
 fn ac45_no_notice_when_nothing_is_running() {
     let t = tmp();
