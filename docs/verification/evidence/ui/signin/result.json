@@ -4,18 +4,17 @@
       "name": "a missing login is shown in Accounts and the account tile is disabled with the reason",
       "ok": true,
       "detail": {
-        "missing": "not signed in",
+        "missing": "signed out",
         "tile": {
           "disabled": true,
-          "why": "Sign in first (Accounts → Sign In). Account login only; no API keys.",
-          "pill": "not signed in"
+          "why": "Sign in first"
         }
       }
     },
     {
       "name": "sign in through the UI",
       "ok": true,
-      "detail": "signed in · max · f03ab3f8"
+      "detail": "max · f03ab3f8"
     },
     {
       "name": "a task runs with the signed-in account",
@@ -30,14 +29,14 @@
       "detail": {
         "status": "failed",
         "reason": "turn reported failure; last error [auth]: Failed to authenticate: OAuth session expired and could not be refreshed",
-        "errText": "✖ authFailed to authenticate: OAuth session expired and could not be refreshedSign in again"
+        "errText": "Signed outFailed to authenticate: OAuth session expired and could not be refreshedSign in again"
       }
     },
     {
       "name": "\"Sign in again\" reauthenticates only that account and the follow-up then succeeds",
       "ok": true,
       "detail": {
-        "again": "signed in · max · 55f70cc2",
+        "again": "max · 55f70cc2",
         "status": "completed",
         "hello": [
           "hello from claudia@example.invalid",

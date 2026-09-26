@@ -1,0 +1,62 @@
+{
+  "checks": [
+    {
+      "name": "nine agents tile as 3×3",
+      "ok": true,
+      "detail": {
+        "tiles": 9,
+        "cols": "3",
+        "rows": "3"
+      }
+    },
+    {
+      "name": "nine concurrent streams: each tile shows a line within 250 ms (p95) and event-loop lag p95 stays under 50 ms",
+      "ok": false,
+      "detail": {
+        "lines": 346,
+        "latP95": 853,
+        "latMax": 2279,
+        "lagN": 349,
+        "lagP95": 2,
+        "lagMax": 3
+      }
+    },
+    {
+      "name": "a permission request is answered from its tile (Allow → the agent continues and writes the file)",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "permFile": true
+      }
+    },
+    {
+      "name": "a pinned finished run stays on the grid",
+      "ok": true,
+      "detail": {
+        "pinnedTile": true,
+        "pressed": "true"
+      }
+    },
+    {
+      "name": "with a maximum of 4, the grid shows 2×2",
+      "ok": true,
+      "detail": {
+        "tiles": 4,
+        "cols": "2"
+      }
+    },
+    {
+      "name": "arrow keys move between tiles and Enter opens the agent in the chat",
+      "ok": true,
+      "detail": {
+        "first": "r-6f23aa136150",
+        "second": "r-ce5ea2ad5c13",
+        "opened": {
+          "mode": "chat",
+          "title": "Short 2",
+          "selected": "r-ce5ea2ad5c13"
+        }
+      }
+    }
+  ]
+}

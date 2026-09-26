@@ -1,0 +1,72 @@
+{
+  "checks": [
+    {
+      "name": "the VSIX ships the third-party notices and the license of every bundled logo source",
+      "ok": true,
+      "detail": [
+        [
+          "extension/NOTICE.md",
+          true
+        ],
+        [
+          "extension/media/vendor/licenses/simple-icons-LICENSE.md",
+          true
+        ],
+        [
+          "extension/media/vendor/licenses/lobehub-icons-LICENSE.txt",
+          true
+        ],
+        [
+          "extension/media/logos.js",
+          true
+        ],
+        [
+          "extension/media/logos/openai-dark.svg",
+          true
+        ],
+        [
+          "extension/media/logos/claudecode-light.svg",
+          true
+        ]
+      ]
+    },
+    {
+      "name": "provider logos on agent rows, the chat header, the composer agent chip and menu, grid tiles and the Accounts view",
+      "ok": true,
+      "detail": {
+        "rows": [
+          "logo logo-codex",
+          "logo logo-claudecode"
+        ],
+        "chatHeader": [
+          "logo logo-claudecode"
+        ],
+        "composerChip": "logo logo-codex",
+        "agentMenu": [
+          "logo logo-codex",
+          "logo logo-codex",
+          "logo logo-claudecode",
+          "logo logo-opencode"
+        ],
+        "gridTiles": [
+          "codicon codicon-terminal sm"
+        ],
+        "accounts": [
+          "openai-dark.svg",
+          "openai-dark.svg",
+          "claude-dark.svg",
+          "claude-dark.svg",
+          "opencode-dark.svg"
+        ]
+      }
+    },
+    {
+      "name": "switching themes restyles open Overseer views live",
+      "ok": true,
+      "detail": {
+        "darkBg": "rgb(23, 22, 29)",
+        "lightBg": "rgb(251, 250, 253)"
+      }
+    }
+  ]
+}

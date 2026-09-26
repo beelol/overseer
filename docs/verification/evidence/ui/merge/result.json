@@ -13,16 +13,16 @@
     {
       "name": "no automatic merge: main unchanged after the runs finished",
       "ok": true,
-      "detail": "fa4eacf fixture base"
+      "detail": "9932878 fixture base"
     },
     {
       "name": "clean merge back: explained, prepared, reviewed (merge-base with main), then merged on confirmation",
       "ok": true,
       "detail": {
-        "prepText": "Cancel\nPrepare Merge Back\nMerge back overseer/merge-clean into main?\noverseer/merge-clean → main in /private/tmp/ovs-ui-Vrn1jr/merge-demo\n1. Commit 1 uncommitted worktree file(s) to overseer/merge-clean.\n2. Merge main into overseer/merge-clean inside the worktree. Conflicts go back to codex in the same session.\n3. You review exactly what will land, then confirm. Nothing reaches main before that.",
+        "prepText": "Cancel\nPrepare Merge Back\nMerge back overseer/merge-clean into main?\noverseer/merge-clean → main in /private/tmp/ovs-ui-mWjSRj/merge-demo\n1. Commit 1 uncommitted worktree file(s) to overseer/merge-clean.\n2. Merge main into overseer/merge-clean inside the worktree. Conflicts go back to codex in the same session.\n3. You review exactly what will land, then confirm. Nothing reaches main before that.",
         "completeText": "Cancel\nComplete Merge Back\nMerge overseer/merge-clean into main in merge-demo?\nThe review now shows exactly what lands on main (merge-base comparison), 1 file(s):\nM b.txt\n\nThe worktree and overseer/merge-clean are kept.",
         "reviewLanding": true,
-        "log": "4b1a6b9 Merge overseer/merge-clean into main (Overseer merge back)\na0b8a1e Merge branch 'main' into overseer/merge-clean\ne08e09f Overseer: merge clean\n3871812 main changes L5"
+        "log": "1ac656c Merge overseer/merge-clean into main (Overseer merge back)\naf30968 Merge branch 'main' into overseer/merge-clean\n0aea843 Overseer: merge clean\n8393c41 main changes L5"
       }
     },
     {
@@ -42,7 +42,7 @@
             "prompt": "Overseer is merging main into your branch overseer/merge-conflict so your work c"
           }
         ],
-        "native": "01a0da0d-7e00-7ad1-a616-17591f606938"
+        "native": "01a0dd1a-a5e0-7ad3-a433-aa4ac6055909"
       }
     },
     {
@@ -58,8 +58,8 @@
       "name": "dirty target checkout: refused with an explanation, checkout untouched",
       "ok": true,
       "detail": {
-        "blocked": "Merge back is ready but blocked: The source checkout /private/tmp/ovs-ui-Vrn1jr/merge-demo has uncommitted changes (README.md). Overseer never disturbs them; commit or stash them first.",
-        "dirtyPrep": "Cancel\nPrepare Merge Back\nMerge back overseer/merge-dirty-target into main?\noverseer/merge-dirty-target → main in /private/tmp/ovs-ui-Vrn1jr/merge-demo\n1. Commit 1 uncommitted worktree file(s) to overseer/merge-dirty-target.\n2. Merge main into overseer/merge-dirty-target inside the worktree. Conflic"
+        "blocked": "Merge back is ready but blocked: The source checkout /private/tmp/ovs-ui-mWjSRj/merge-demo has uncommitted changes (README.md). Overseer never disturbs them; commit or stash them first.",
+        "dirtyPrep": "Cancel\nPrepare Merge Back\nMerge back overseer/merge-dirty-target into main?\noverseer/merge-dirty-target → main in /private/tmp/ovs-ui-mWjSRj/merge-demo\n1. Commit 1 uncommitted worktree file(s) to overseer/merge-dirty-target.\n2. Merge main into overseer/merge-dirty-target inside the worktree. Conflic"
       }
     },
     {
@@ -67,7 +67,7 @@
       "ok": true,
       "detail": {
         "disabled": true,
-        "title": "Wait for the run to finish or interrupt it before merging back."
+        "title": "Wait for the agent to finish or stop it first"
       }
     }
   ]

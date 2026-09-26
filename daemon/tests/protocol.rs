@@ -281,6 +281,21 @@ fn ac16_fixture_permission_allow_deny_and_interrupt_waiting_run() {
 }
 
 #[test]
+fn ac60_an_interrupted_claude_turn_is_interrupted_not_failed() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("slow");
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "a long task", "title": "slow"}));
+    let run = run_id(&created);
+    d.wait_status(&run, |s| s == "running", 15);
+    std::thread::sleep(Duration::from_millis(800));
+    d.call("run.interrupt", json!({"run_id": run}));
+    assert_eq!(d.wait_done(&run, 20)["status"], "interrupted");
+    let turns = d.call("run.turns", json!({"run_id": run}));
+    assert_eq!(turns[0]["status"], "interrupted", "{turns}");
+}
+
+#[test]
 fn ac16_fixture_error_classes_stay_distinct() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

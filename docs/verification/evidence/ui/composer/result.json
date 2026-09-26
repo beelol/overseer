@@ -1,0 +1,49 @@
+{
+  "checks": [
+    {
+      "name": "with no agent selected the middle of the dashboard is the new-agent composer",
+      "ok": true
+    },
+    {
+      "name": "Claude agent started keyboard-only from the composer; it becomes selected and streams in place",
+      "ok": true,
+      "detail": {
+        "claudeChip": "Agent: Claude Code · claude (existing login)",
+        "run": "r-c54cdf241ee8",
+        "shown": true
+      }
+    },
+    {
+      "name": "Codex agent started keyboard-only",
+      "ok": true,
+      "detail": {
+        "run": "r-52ea4c03ee1e",
+        "shown": true
+      }
+    },
+    {
+      "name": "generic program started keyboard-only",
+      "ok": false,
+      "detail": {
+        "note": "",
+        "chip": "Agent: Codex · codex (existing login)",
+        "program": ""
+      }
+    },
+    {
+      "name": "a signed-out account is explained inline with Sign in, and Start is disabled",
+      "ok": true,
+      "detail": {
+        "note": "ChatGPT Signed Out is not signed in.Sign in",
+        "fix": "Sign in",
+        "disabled": true
+      }
+    },
+    {
+      "name": "a harness that is not installed is shown as such",
+      "ok": true,
+      "detail": "OpenCode · not installed"
+    }
+  ],
+  "error": "Timed out in webview waiting for document.body.dataset.mode === 'composer' && !document.querySelector('[data-chip=\"repo\"]').textContent.includes('Loading') (last: false)"
+}

@@ -15,11 +15,11 @@ the same at every size and theme). Code inside diffs is not counted.
 | View | Before | After | Change |
 | --- | ---: | ---: | ---: |
 | Agents | 531 | 238 | −55% |
-| Chat (run conversation) | 2,795 | 1,040 | −63% |
+| Chat (run conversation) | 2,795 | 1,063 | −62% |
 | Files | 127 | 59 | −54% |
-| Review | 350 | 177 | −49% |
+| Review | 350 | 175 | −50% |
 | New agent | 1,037 | 133 | −87% |
-| Accounts | 381 | 185 | −51% |
+| Accounts | 381 | 189 | −50% |
 
 Before, the new-agent form had 68 horizontally overflowing elements at 900 px. After: no
 overflow, no long runs and no unnamed icon controls in any view, including the new dashboard and

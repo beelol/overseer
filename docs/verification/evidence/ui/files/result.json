@@ -28,7 +28,7 @@
       "ok": true,
       "detail": {
         "label": "a.txt, preview, Editor Group 2",
-        "path": "private/tmp/ovs-ui-9VpsVl/overseer-home/worktrees/repo-x-ec4dd003/x-files/a.txt"
+        "path": "private/tmp/ovs-ui-HrejRk/overseer-home/worktrees/repo-x-f8a0e5ce/x-files/a.txt"
       }
     },
     {
@@ -43,7 +43,7 @@
         ],
         "tabY": {
           "label": "b.txt, preview, Editor Group 2",
-          "path": "private/tmp/ovs-ui-9VpsVl/overseer-home/worktrees/repo-y-044a5fdf/y-files/b.txt"
+          "path": "private/tmp/ovs-ui-HrejRk/overseer-home/worktrees/repo-y-888fd97d/y-files/b.txt"
         }
       }
     },
@@ -63,12 +63,12 @@
       "name": "a 6,000-entry folder opens within 2 s, is capped with a visible note, and scrolling stays responsive (p95 lag < 250 ms)",
       "ok": true,
       "detail": {
-        "openMs": 995,
-        "truncated": "… 1000 more entries not shown",
+        "openMs": 985,
+        "truncated": "+1000 more (1000 more entries not shown)",
         "lag": {
           "n": 80,
-          "p95": 2,
-          "max": 10
+          "p95": 3,
+          "max": 3
         }
       }
     },
@@ -86,7 +86,7 @@
         },
         "tabZ": {
           "label": "x99.txt, preview, Editor Group 2",
-          "path": "private/tmp/ovs-ui-9VpsVl/overseer-home/worktrees/repo-z-723d46f1/z-large/pkg/m39/x99.txt"
+          "path": "private/tmp/ovs-ui-HrejRk/overseer-home/worktrees/repo-z-e79a20ee/z-large/pkg/m39/x99.txt"
         }
       }
     },

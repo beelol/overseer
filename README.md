@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **51 / 66** · **1** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-54, AC-55, AC-56, AC-57, AC-58, AC-59, AC-60, AC-61, AC-62, AC-63, AC-64, AC-65, AC-66. The biggest gaps are the daily-driver UI (Gate J, AC-54 to AC-66, added by the
+criteria: **58 / 66** · **6** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-58, AC-59, AC-60, AC-62, AC-64, AC-66. The biggest gaps are the daily-driver UI (Gate J, AC-54 to AC-66, added by the
 owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -72,19 +72,19 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-51** Worktree file hierarchy — [evidence](docs/verification/AC-51.md)
 - [x] **AC-52** Native Overseer notifications (macOS) — [evidence](docs/verification/AC-52.md)
 - [ ] **AC-53** Fixed Claude accounts — ◐ partial: the design for keeping each Claude account's credentials separate is written (docs/rfcs/claude-credentials.md: check per-folder Keychain entries first, otherwise Overseer-managed credentials); the account flows it builds on (Add Account → Anthropic → Sign In with its own CLAUDE_CONFIG_DIR, sign-out, expiry and Sign in again) pass with the synthetic account CLI / deferred: a live test with a second Claude account (the owner asked not to test Claude yet, and has one Claude account) — [evidence](docs/verification/AC-53.md)
-- [ ] **AC-54** Clean, calm presentation with less text — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-54.md)
-- [ ] **AC-55** A chat that feels great — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-55.md)
-- [ ] **AC-56** Overseer themes, light and dark — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-56.md)
-- [ ] **AC-57** Overseer dashboard — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-57.md)
-- [ ] **AC-58** Agent grid — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-58.md)
-- [ ] **AC-59** Start a new agent from the chat — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-59.md)
-- [ ] **AC-60** Native-CLI parity for everyday use — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-60.md)
-- [ ] **AC-61** Needs-you inbox and keyboard control — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-61.md)
-- [ ] **AC-62** Usage and limits — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-62.md)
-- [ ] **AC-63** History that stays tidy — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-63.md)
+- [x] **AC-54** Clean, calm presentation with less text — [evidence](docs/verification/AC-54.md)
+- [x] **AC-55** A chat that feels great — [evidence](docs/verification/AC-55.md)
+- [x] **AC-56** Overseer themes, light and dark — [evidence](docs/verification/AC-56.md)
+- [x] **AC-57** Overseer dashboard — [evidence](docs/verification/AC-57.md)
+- [ ] **AC-58** Agent grid — ◐ partial: nine concurrent fixture streams tile 3×3 and a maximum of 4 tiles 2×2; a permission request is answered from its tile; a pinned finished run stays; arrow keys move between tiles and Enter opens the agent; webview event-loop lag p95 2 ms; screenshots at 4 and 9 tiles in both themes / deferred: the per-tile update time: a streamed line reaches its tile in 853 ms at p95 (target 250 ms); the daemon records the same lines within 62 ms p95, so the delay is between the daemon and the webview — [evidence](docs/verification/AC-58.md)
+- [ ] **AC-59** Start a new agent from the chat — ◐ partial: with no agent selected the middle is the composer; Claude and Codex agents start keyboard-only and stream in place as the selected agent; a signed-out account is shown inline with Sign in and Start disabled; a harness that is not installed is labelled so; the Full form link stays / deferred: a generic program started keyboard-only (choosing Run a program from the agent menu left the chip on Codex) and defaults remembered across a reload (the composer did not finish loading after the reload in the scenario) — [evidence](docs/verification/AC-59.md)
+- [ ] **AC-60** Native-CLI parity for everyday use — ◐ partial: live Claude Code and Codex runs take model, reasoning effort and permission mode per turn (argv from each run's launch record), an attached image and a mentioned worktree file reach the agent (replies name the red color and README.md's first line), a running turn is stopped and the next message answered, and finished runs continue their session after the daemon restarts; support per harness is in docs/compatibility.md / deferred: the same capabilities driven from the chat composer in the packaged UI: after the options menu closes, Enter does not send, so the paste, @-mention, options, queue and ⌥Enter checks in scenario-parity.js fail; the live turns used the daemon API the composer calls — [evidence](docs/verification/AC-60.md)
+- [x] **AC-61** Needs-you inbox and keyboard control — [evidence](docs/verification/AC-61.md)
+- [ ] **AC-62** Usage and limits — ◐ partial: Claude's live usage (5 hours 17%, week 48%, reset times) is exactly its own rate_limit_event; both ChatGPT accounts report plan and usage from Codex's session log (ChatGPT A team 0%/0%, ChatGPT B plus 0%/16%); OpenCode says not reported; tokens and cost per turn are shown; near-limit warning with fixtures / deferred: an independent check of the Codex numbers against the raw token_count line in each account's session log (those logs sit in the account folders next to the credentials, which this session does not read) — [evidence](docs/verification/AC-62.md)
+- [x] **AC-63** History that stays tidy — [evidence](docs/verification/AC-63.md)
 - [ ] **AC-64** Default-to-Overseer session (owner-confirmed) — owner session after the rest of Gate J — [evidence](docs/verification/AC-64.md)
-- [ ] **AC-65** Provider logos — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-65.md)
-- [ ] **AC-66** Design review against references (owner-confirmed) — owner design review after the Gate J build — [evidence](docs/verification/AC-66.md)
+- [x] **AC-65** Provider logos — [evidence](docs/verification/AC-65.md)
+- [ ] **AC-66** Design review against references (owner-confirmed) — ◐ partial: the references are studied and what Overseer adopts is written down (docs/design/references.md, the RFC's "What Overseer adopts"); the review page shows every view before and after in both Overseer themes and a stock theme, plus the new views (chat, live chats, grid, dashboard mode, composer, Needs you, history, usage, themes and logos), with a Looks right / Needs work mark and a note per view saved for the owner / deferred: the owner's marks, the changes they ask for, and the owner's dated confirmation that the UI looks clean and polished — [evidence](docs/verification/AC-66.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -213,19 +213,12 @@ the owner action or decision each one needs.
 
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
 - [ ] [AC-53](docs/verification/AC-53.md) (Fixed Claude accounts): Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.
-- [ ] [AC-54](docs/verification/AC-54.md) (Clean, calm presentation with less text): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
-- [ ] [AC-55](docs/verification/AC-55.md) (A chat that feels great): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
-- [ ] [AC-56](docs/verification/AC-56.md) (Overseer themes, light and dark): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
-- [ ] [AC-57](docs/verification/AC-57.md) (Overseer dashboard): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
-- [ ] [AC-58](docs/verification/AC-58.md) (Agent grid): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
-- [ ] [AC-59](docs/verification/AC-59.md) (Start a new agent from the chat): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
-- [ ] [AC-60](docs/verification/AC-60.md) (Native-CLI parity for everyday use): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
-- [ ] [AC-61](docs/verification/AC-61.md) (Needs-you inbox and keyboard control): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
-- [ ] [AC-62](docs/verification/AC-62.md) (Usage and limits): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
-- [ ] [AC-63](docs/verification/AC-63.md) (History that stays tidy): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-58](docs/verification/AC-58.md) (Agent grid): Per-tile latency 853 ms p95 vs 250 ms. Next: time each hop in the extension host (daemon socket → RunFeed batch → postMessage) and the tile renderer, and remove the slow hop.
+- [ ] [AC-59](docs/verification/AC-59.md) (Start a new agent from the chat): Keyboard selection of Run a program and remembered defaults after reload. Next: fix the agent-menu keyboard pick for the generic entry and the composer's reload state, then rerun scenario-composer.js.
+- [ ] [AC-60](docs/verification/AC-60.md) (Native-CLI parity for everyday use): Composer keyboard focus after the options menu (and the queue display). Next: keep focus in the prompt when the options menu closes, then rerun scenario-parity.js.
+- [ ] [AC-62](docs/verification/AC-62.md) (Usage and limits): Independent Codex comparison. Next: have the daemon include the raw token_count line it read in account.usage (no credentials), then compare it in the live scenario.
 - [ ] [AC-64](docs/verification/AC-64.md) (Default-to-Overseer session (owner-confirmed)): Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.
-- [ ] [AC-65](docs/verification/AC-65.md) (Provider logos): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
-- [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Owner action after the Gate J build: review the published before/after page, mark what is not right, and confirm once it is.
+- [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.

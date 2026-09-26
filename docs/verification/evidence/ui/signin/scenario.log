@@ -1,9 +1,9 @@
-[2026-09-26T00:49:45.535Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-26T00:49:59.713Z] screenshot docs/verification/evidence/ui/signin/01-missing-login.png
-[2026-09-26T00:49:59.713Z] PASS a missing login is shown in Accounts and the account tile is disabled with the reason {"missing":"not signed in","tile":{"disabled":true,"why":"Sign in first (Accounts → Sign In). Account login only; no API keys.","pill":"not signed in"}}
-[2026-09-26T00:50:09.917Z] PASS sign in through the UI "signed in · max · f03ab3f8"
-[2026-09-26T00:50:10.638Z] PASS a task runs with the signed-in account {"status":"completed"}
-[2026-09-26T00:50:12.504Z] screenshot docs/verification/evidence/ui/signin/02-expired-login.png
-[2026-09-26T00:50:12.504Z] PASS an expired login fails the turn with an auth error that offers "Sign in again" {"status":"failed","reason":"turn reported failure; last error [auth]: Failed to authenticate: OAuth session expired and could not be refreshed","errText":"✖ authFailed to authenticate: OAuth session expired and could not be refreshedSign in again"}
-[2026-09-26T00:50:16.026Z] PASS "Sign in again" reauthenticates only that account and the follow-up then succeeds {"again":"signed in · max · 55f70cc2","status":"completed","hello":["hello from claudia@example.invalid","hello from claudia-again@example.invalid"]}
-[2026-09-26T00:50:16.103Z] screenshot docs/verification/evidence/ui/signin/03-after-resign-in.png
+[2026-09-26T09:32:28.702Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T09:32:42.837Z] screenshot docs/verification/evidence/ui/signin/01-missing-login.png
+[2026-09-26T09:32:42.837Z] PASS a missing login is shown in Accounts and the account tile is disabled with the reason {"missing":"signed out","tile":{"disabled":true,"why":"Sign in first"}}
+[2026-09-26T09:32:53.020Z] PASS sign in through the UI "max · f03ab3f8"
+[2026-09-26T09:32:53.751Z] PASS a task runs with the signed-in account {"status":"completed"}
+[2026-09-26T09:32:55.445Z] screenshot docs/verification/evidence/ui/signin/02-expired-login.png
+[2026-09-26T09:32:55.449Z] PASS an expired login fails the turn with an auth error that offers "Sign in again" {"status":"failed","reason":"turn reported failure; last error [auth]: Failed to authenticate: OAuth session expired and could not be refreshed","errText":"Signed outFailed to authenticate: OAuth session expired and could not be refreshedSign in again"}
+[2026-09-26T09:32:58.959Z] PASS "Sign in again" reauthenticates only that account and the follow-up then succeeds {"again":"max · 55f70cc2","status":"completed","hello":["hello from claudia@example.invalid","hello from claudia-again@example.invalid"]}
+[2026-09-26T09:32:59.030Z] screenshot docs/verification/evidence/ui/signin/03-after-resign-in.png

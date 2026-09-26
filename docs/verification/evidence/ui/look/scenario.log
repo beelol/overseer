@@ -1,0 +1,15 @@
+[2026-09-26T10:07:22.827Z] PASS the VSIX ships the third-party notices and the license of every bundled logo source [["extension/NOTICE.md",true],["extension/media/vendor/licenses/simple-icons-LICENSE.md",true],["extension/media/vendor/licenses/lobehub-icons-LICENSE.txt",true],["extension/media/logos.js",true],["extension/media/logos/openai-dark.svg",true],["extension/media/logos/claudecode-light.svg",true]]
+[2026-09-26T10:07:23.341Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T10:07:32.430Z] screenshot docs/verification/evidence/ui/look/01-composer-agent-menu-dark.png
+[2026-09-26T10:07:34.911Z] logos {"rows":["logo logo-codex","logo logo-claudecode"],"chatHeader":["logo logo-claudecode"],"composerChip":"logo logo-codex","agentMenu":["logo logo-codex","logo logo-codex","logo logo-claudecode","logo logo-opencode"],"gridTiles":["codicon codicon-terminal sm"],"accounts":["openai-dark.svg","openai-dark.svg","claude-dark.svg","claude-dark.svg","opencode-dark.svg"]}
+[2026-09-26T10:07:34.911Z] PASS provider logos on agent rows, the chat header, the composer agent chip and menu, grid tiles and the Accounts view {"rows":["logo logo-codex","logo logo-claudecode"],"chatHeader":["logo logo-claudecode"],"composerChip":"logo logo-codex","agentMenu":["logo logo-codex","logo logo-codex","logo logo-claudecode","logo logo-opencode"],"gridTiles":["codicon codicon-terminal sm"],"accounts":["openai-dark.svg","openai-dark.svg","claude-dark.svg","claude-dark.svg","opencode-dark.svg"]}
+[2026-09-26T10:07:36.915Z] PASS switching themes restyles open Overseer views live {"darkBg":"rgb(23, 22, 29)","lightBg":"rgb(251, 250, 253)"}
+[2026-09-26T10:07:43.974Z] screenshot docs/verification/evidence/ui/look/02-dashboard-diff-overseer-dark.png
+[2026-09-26T10:07:45.568Z] screenshot docs/verification/evidence/ui/look/03-grid-overseer-dark.png
+[2026-09-26T10:07:50.095Z] screenshot docs/verification/evidence/ui/look/04-terminal-overseer-dark.png
+[2026-09-26T10:07:58.883Z] screenshot docs/verification/evidence/ui/look/05-dashboard-diff-overseer-light.png
+[2026-09-26T10:08:00.479Z] screenshot docs/verification/evidence/ui/look/06-grid-overseer-light.png
+[2026-09-26T10:08:04.974Z] screenshot docs/verification/evidence/ui/look/07-terminal-overseer-light.png
+[2026-09-26T10:08:13.758Z] screenshot docs/verification/evidence/ui/look/08-dashboard-diff-high-contrast.png
+[2026-09-26T10:08:15.355Z] screenshot docs/verification/evidence/ui/look/09-grid-high-contrast.png
+[2026-09-26T10:08:19.858Z] screenshot docs/verification/evidence/ui/look/10-terminal-high-contrast.png

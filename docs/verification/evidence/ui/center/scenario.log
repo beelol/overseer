@@ -1,18 +1,18 @@
-[2026-09-26T01:15:07.810Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-26T01:15:13.971Z] PASS Overseer view works with the native sidebar closed and lists repositories not open in the window {"sidebarHidden":true,"repos":["repo-y","repo-x"]}
-[2026-09-26T01:15:13.971Z] PASS opens as three columns (agents | review | conversation) 3
-[2026-09-26T01:15:14.054Z] screenshot docs/verification/evidence/ui/center/01-center-wide.png
-[2026-09-26T01:15:14.055Z] PASS agents column shows task → run → native child → grandchild [["X nested agents",2],["child task",4],["grandchild task",5]]
-[2026-09-26T01:15:18.804Z] PASS expand/collapse at repository, task and native-child levels {"childCollapsed":true,"childExpanded":true,"taskCollapsed":true,"repoCollapsed":true}
-[2026-09-26T01:15:21.500Z] screenshot docs/verification/evidence/ui/center/02-selected-x.png
-[2026-09-26T01:15:24.105Z] PASS selecting a run in another repository switches the review column and the conversation column {"tabsX":["Overseer, Editor Group 1","Review: X edits (1), Editor Group 2","generic: X edits, Editor Group 3"],"tabsY":["Overseer, Editor Group 1","Review: Y live (1), Editor Group 2","generic: Y live, Editor Group 3"],"reviewX":true,"reviewY":true,"convY":true}
-[2026-09-26T01:15:24.207Z] screenshot docs/verification/evidence/ui/center/03-selected-y.png
-[2026-09-26T01:15:24.208Z] PASS live status shown in the agents column "dot status-running"
-[2026-09-26T01:15:25.528Z] PASS keyboard navigation: arrows move between labelled treeitems, Left collapses then goes to the parent, Right expands {"start":{"label":"generic","role":"treeitem","aria":"generic, running","level":"3"},"up":{"label":"Y live","role":"treeitem","aria":"Y live, overseer/y-live, running","level":"2"},"collapsedTask":"false","parent":{"label":"repo-y","role":"treeitem","aria":"repo-y, /private/tmp/ovs-ui-VuBHu9/repo-y, 1 active","level":"1"},"reopened":"true"}
-[2026-09-26T01:15:34.003Z] PASS Overseer view restored after a window reload ["generic"]
-[2026-09-26T01:15:35.514Z] window narrow {"w":1024,"groups":[220,463,283]}
-[2026-09-26T01:15:35.600Z] screenshot docs/verification/evidence/ui/center/04-window-narrow.png
-[2026-09-26T01:15:35.600Z] PASS narrow window: three columns remain usable and the agents column does not overflow {"dims":{"w":1024,"groups":[220,463,283]},"fits":true}
-[2026-09-26T01:15:37.104Z] window wide {"w":1900,"groups":[405,884,553]}
-[2026-09-26T01:15:37.230Z] screenshot docs/verification/evidence/ui/center/05-window-wide.png
-[2026-09-26T01:15:37.230Z] PASS wide window: three columns remain usable and the agents column does not overflow {"dims":{"w":1900,"groups":[405,884,553]},"fits":true}
+[2026-09-26T09:59:54.623Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T10:00:00.193Z] PASS Overseer view works with the native sidebar closed and lists repositories not open in the window {"sidebarHidden":true,"repos":["repo-y","repo-x"]}
+[2026-09-26T10:00:00.194Z] PASS opens as the dashboard (agents rail and conversation) with the review column beside it 2
+[2026-09-26T10:00:00.248Z] screenshot docs/verification/evidence/ui/center/01-center-wide.png
+[2026-09-26T10:00:00.249Z] PASS agents rail shows repository → task → native child → grandchild [["X nested agents",2],["child task",3],["grandchild task",4]]
+[2026-09-26T10:00:05.028Z] PASS expand/collapse at repository, task and native-child levels {"childCollapsed":true,"childExpanded":true,"taskCollapsed":true,"repoCollapsed":true}
+[2026-09-26T10:00:07.710Z] screenshot docs/verification/evidence/ui/center/02-selected-x.png
+[2026-09-26T10:00:10.315Z] PASS selecting a run in another repository switches the review column and the dashboard conversation {"tabsX":["Overseer, Editor Group 1","Review: X edits (1), Editor Group 2"],"tabsY":["Overseer, Editor Group 1","Review: Y live (1), Editor Group 2"],"chatX":{"title":"X edits","turns":1},"reviewX":true,"reviewY":true,"convY":true}
+[2026-09-26T10:00:10.394Z] screenshot docs/verification/evidence/ui/center/03-selected-y.png
+[2026-09-26T10:00:10.395Z] PASS live status shown in the agents rail "status st-running"
+[2026-09-26T10:00:11.996Z] PASS keyboard navigation: arrows move between labelled treeitems, Left collapses then goes to the parent, Right expands {"start":{"label":"X nested agents","role":"treeitem","aria":"X nested agents, Done","level":"2","expanded":"true"},"down":{"label":"child task","role":"treeitem","aria":"child task, Done","level":"3","expanded":"true"},"collapsedTask":"false","parent":{"label":"repo-x","role":"treeitem","aria":"repo-x","level":"1","expanded":"true"},"reopened":"true"}
+[2026-09-26T10:00:20.471Z] PASS Overseer view restored after a window reload (same agent selected) ["Y live"]
+[2026-09-26T10:00:21.984Z] window narrow {"w":1024,"groups":[599,367]}
+[2026-09-26T10:00:22.029Z] screenshot docs/verification/evidence/ui/center/04-window-narrow.png
+[2026-09-26T10:00:22.029Z] PASS narrow window: dashboard and review columns remain usable and the dashboard does not overflow {"dims":{"w":1024,"groups":[599,367]},"fits":true}
+[2026-09-26T10:00:23.535Z] window wide {"w":1900,"groups":[1142,700]}
+[2026-09-26T10:00:23.634Z] screenshot docs/verification/evidence/ui/center/05-window-wide.png
+[2026-09-26T10:00:23.634Z] PASS wide window: dashboard and review columns remain usable and the dashboard does not overflow {"dims":{"w":1900,"groups":[1142,700]},"fits":true}
