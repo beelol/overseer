@@ -1270,6 +1270,35 @@ impl Daemon {
                 }
                 out.push(event);
             }
+            Norm::Quota(raw) => {
+                if run.harness == "claude" {
+                    if let Some(pool_id) = run.profile_id.as_deref() {
+                        let observed_ms = now();
+                        let parsed = crate::auto_quota::parse_claude_rate_limit_event(&raw, pool_id, observed_ms);
+                        let mut snapshot = match parsed {
+                            Ok(snapshot) => snapshot,
+                            Err(_) if raw["rate_limit_info"]["status"] == "rejected" => {
+                                // The provider's structured rejection is still a block when
+                                // its meter or scope drifts beyond the supported schema.
+                                crate::auto_quota::parse_claude_rate_limit_event(
+                                    &json!({"type":"rate_limit_event","rate_limit_info":{"status":"rejected"}}),
+                                    pool_id, observed_ms)?
+                            }
+                            Err(_) => crate::auto_quota::QuotaSnapshot {
+                                ordinary_usage_allowed:None, observed_ms,
+                                expires_ms:observed_ms.saturating_add(60_000), windows:Vec::new(),
+                            },
+                        };
+                        if let Some(prior) = store.latest_auto_quota(pool_id)? {
+                            snapshot.preserve_uncleared_blocks(&prior.snapshot, observed_ms);
+                        }
+                        let event = store.insert_event(observed_ms, task, rid, "auto_quota", "harness", "normalized",
+                            &json!({"pool_id":pool_id,"snapshot":snapshot}))?;
+                        let _ = store.insert_auto_quota(event.seq, pool_id, "claude/native-rate-limit-event", &snapshot);
+                        out.push(event);
+                    }
+                }
+            }
             Norm::Permission { request_id, tool, input } => {
                 let attention = json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input});
                 store.set_run_attention(&run.id, Some(&attention))?;

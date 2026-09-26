@@ -22,6 +22,9 @@ pub enum Norm {
     /// result whose tool_use id may not belong to a delegation).
     Child { native_id: String, parent_native: Option<String>, title: Option<String>, status: Option<String>, text: Option<String>, only_if_known: bool, evidence: String },
     Usage(Value),
+    /// A native provider quota frame. The daemon validates and stores only
+    /// normalized scoped fields, never this raw event payload.
+    Quota(Value),
     Permission { request_id: String, tool: String, input: Value },
     Error { class: String, message: String },
     TurnDone { ok: bool, summary: Option<String> },
@@ -606,7 +609,7 @@ pub fn scope_codex_app_child(thread: &str, norms: Vec<Norm>) -> Vec<Norm> {
             Norm::Tool { name, summary, .. } => Norm::Child { native_id: thread.into(), parent_native: None, title: None, status: None, text: Some(format!("[tool {name}] {summary}")), only_if_known: true, evidence: evidence.clone() },
             Norm::TurnDone { ok, .. } => Norm::Child { native_id: thread.into(), parent_native: None, title: None, status: Some(if ok { "completed" } else { "failed" }.into()), text: None, only_if_known: true, evidence: evidence.clone() },
             Norm::Child { native_id, parent_native: None, title, status, text, only_if_known, evidence } => Norm::Child { native_id, parent_native: Some(thread.into()), title, status, text, only_if_known, evidence },
-            Norm::TurnId(_) | Norm::Running | Norm::Session(_) | Norm::Usage(_) | Norm::ToolDetail { .. } | Norm::BackgroundLaunched(_) | Norm::BackgroundNotified(_) => Norm::Ignored,
+            Norm::TurnId(_) | Norm::Running | Norm::Session(_) | Norm::Usage(_) | Norm::Quota(_) | Norm::ToolDetail { .. } | Norm::BackgroundLaunched(_) | Norm::BackgroundNotified(_) => Norm::Ignored,
             other => other,
         })
         .collect()
@@ -731,7 +734,8 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
                 vec![Norm::Unparsed(truncate(&v.to_string(), 2000))]
             }
         }
-        "control_response" | "stream_event" | "rate_limit_event" => vec![Norm::Ignored],
+        "rate_limit_event" => vec![Norm::Quota(v.clone())],
+        "control_response" | "stream_event" => vec![Norm::Ignored],
         _ => vec![Norm::Unparsed(truncate(&v.to_string(), 4000))],
     }
 }

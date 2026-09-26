@@ -1650,6 +1650,60 @@ fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_rout
 }
 
 #[test]
+fn auto_claude_native_quota_keeps_model_scope_and_drops_raw_provider_text() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("native-quota");
+    let created = d.call("task.create", json!({"repo":repo,"harness":"claude",
+        "model":"claude-opus-4-5","prompt":"inspect native quota","title":"quota event"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let opus = d.call("auto.quota.state", json!({"profile_id":"system-claude",
+        "harness":"claude","model":"claude-opus-4-5"}));
+    let sonnet = d.call("auto.quota.state", json!({"profile_id":"system-claude",
+        "harness":"claude","model":"claude-sonnet-4-5"}));
+    assert_eq!(opus["state"], "exhausted", "{opus}");
+    assert_eq!(sonnet["state"], "observed_non_exhausted", "{sonnet}");
+    assert_eq!(opus["observation"]["source"], "claude/native-rate-limit-event");
+    assert_eq!(opus["observation"]["snapshot"]["windows"].as_array().unwrap().len(), 3);
+    assert!(!opus.to_string().contains("secret-quota-sentinel"));
+    assert!(!serde_json::to_string(&d.events(&run)).unwrap().contains("secret-quota-sentinel"));
+}
+
+#[test]
+fn auto_claude_malformed_new_meter_supersedes_older_capacity_with_unknown() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("native-quota-invalid");
+    let created = d.call("task.create", json!({"repo":repo,"harness":"claude",
+        "prompt":"inspect invalid meter","title":"quota drift"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let state = d.call("auto.quota.state", json!({"profile_id":"system-claude",
+        "harness":"claude","model":"claude-sonnet-4-5"}));
+    assert_eq!(state["state"], "unknown", "{state}");
+    assert!(state["observation"]["snapshot"]["windows"].as_array().unwrap().is_empty());
+    assert!(!state.to_string().contains("secret-invalid-meter"));
+}
+
+#[test]
+fn auto_claude_malformed_followup_does_not_clear_a_native_rejection() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("native-quota-block-invalid");
+    let created = d.call("task.create", json!({"repo":repo,"harness":"claude",
+        "prompt":"inspect rejected meter","title":"quota block"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let opus = d.call("auto.quota.state", json!({"profile_id":"system-claude",
+        "harness":"claude","model":"claude-opus-4-5"}));
+    let sonnet = d.call("auto.quota.state", json!({"profile_id":"system-claude",
+        "harness":"claude","model":"claude-sonnet-4-5"}));
+    assert_eq!(opus["state"], "exhausted", "{opus}");
+    assert_eq!(sonnet["state"], "unknown", "{sonnet}");
+}
+
+#[test]
 fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_pauses_on_exhaustion() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

@@ -13,6 +13,8 @@ pub struct QuotaWindow {
     pub bucket_id: String,
     pub window: String,
     pub model: Option<String>,
+    #[serde(default)]
+    pub model_family: Option<String>,
     pub used_percent: f64,
     pub reset_ms: Option<i64>,
     pub duration_mins: Option<i64>,
@@ -44,10 +46,29 @@ pub enum QuotaState {
 }
 
 impl QuotaSnapshot {
+    /// A missing or malformed newer meter cannot clear an explicit quota
+    /// rejection. Only a fresh reading of that same scoped window, its reset,
+    /// or an explicit account-wide allow clears the corresponding block.
+    pub fn preserve_uncleared_blocks(&mut self, prior: &QuotaSnapshot, now_ms: i64) {
+        if prior.ordinary_usage_allowed == Some(false) && self.ordinary_usage_allowed != Some(true) {
+            self.ordinary_usage_allowed = Some(false);
+        }
+        for window in &prior.windows {
+            if window.used_percent < 100.0 || window.reset_ms.is_some_and(|reset| reset <= now_ms) {
+                continue;
+            }
+            let refreshed = self.windows.iter().any(|current| current.pool_id == window.pool_id
+                && current.bucket_id == window.bucket_id && current.window == window.window
+                && current.model == window.model && current.model_family == window.model_family);
+            if !refreshed { self.windows.push(window.clone()); }
+        }
+    }
+
     pub fn applicable_to(&self, model: &str) -> Vec<&QuotaWindow> {
         self.windows
             .iter()
-            .filter(|w| w.model.as_deref().is_none_or(|m| m == model))
+            .filter(|w| w.model.as_deref().is_none_or(|m| m == model)
+                && w.model_family.as_deref().is_none_or(|family| model.split('-').any(|part| part == family)))
             .collect()
     }
 
@@ -62,7 +83,7 @@ impl QuotaSnapshot {
     }
 
     pub fn state_for(&self, model: &str, now_ms: i64) -> QuotaState {
-        if now_ms < self.observed_ms || now_ms >= self.expires_ms {
+        if now_ms < self.observed_ms {
             return QuotaState::Unknown;
         }
         if self.ordinary_usage_allowed == Some(false) {
@@ -74,6 +95,9 @@ impl QuotaSnapshot {
             .any(|w| w.used_percent >= 100.0 && w.reset_ms.is_none_or(|reset| reset > now_ms))
         {
             return QuotaState::Exhausted;
+        }
+        if now_ms >= self.expires_ms {
+            return QuotaState::Unknown;
         }
         if applicable.is_empty()
             || applicable
@@ -176,6 +200,7 @@ fn windows(
             bucket_id: bucket_id.clone(),
             window: window.into(),
             model: model.clone(),
+            model_family: None,
             used_percent,
             reset_ms,
             duration_mins,
@@ -184,6 +209,95 @@ fn windows(
         });
     }
     Ok(())
+}
+
+fn claude_window(name: &str) -> Option<Option<&'static str>> {
+    match name {
+        "five_hour" | "seven_day" => Some(None),
+        "seven_day_opus" => Some(Some("opus")),
+        "seven_day_sonnet" => Some(Some("sonnet")),
+        // Paid overage meters are not subscription capacity.
+        _ => None,
+    }
+}
+
+fn claude_reset(value: Option<&Value>, observed_ms: i64) -> Result<Option<i64>> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => {
+            let reset = value.as_i64().and_then(|seconds| seconds.checked_mul(1000))
+                .filter(|reset| *reset > observed_ms && *reset <= observed_ms.saturating_add(370 * 86_400_000))
+                .ok_or_else(|| anyhow!("invalid Claude rate-limit reset"))?;
+            Ok(Some(reset))
+        }
+    }
+}
+
+fn claude_meter(name: &str, value: &Value, pool: &str, observed_ms: i64) -> Result<Option<QuotaWindow>> {
+    let Some(model_family) = claude_window(name) else { return Ok(None) };
+    let object = value.as_object().ok_or_else(|| anyhow!("Claude rate-limit meter must be an object"))?;
+    let Some(utilization) = object.get("utilization") else { return Ok(None) };
+    let used_percent = utilization.as_f64()
+        .filter(|number| number.is_finite() && (0.0..=1.0).contains(number))
+        .ok_or_else(|| anyhow!("invalid Claude rate-limit utilization"))? * 100.0;
+    Ok(Some(QuotaWindow { pool_id:pool.into(), bucket_id:name.into(), window:name.into(),
+        model:None, model_family:model_family.map(str::to_string), used_percent,
+        reset_ms:claude_reset(object.get("resetsAt"), observed_ms)?, duration_mins:None,
+        observed_ms, expires_ms:observed_ms.saturating_add(FRESH_MS) }))
+}
+
+/// Native Claude Code `rate_limit_event` only. A rejected, unrecognized scope
+/// conservatively blocks this account; absent or malformed meters never become
+/// an invented balance. The caller must retain only this normalized snapshot.
+pub fn parse_claude_rate_limit_event(value: &Value, pool_id: &str, observed_ms: i64) -> Result<QuotaSnapshot> {
+    if value.get("type").and_then(Value::as_str) != Some("rate_limit_event") {
+        return Err(anyhow!("not a Claude rate-limit event"));
+    }
+    let pool = identifier(pool_id)?;
+    let info = value.get("rate_limit_info").and_then(Value::as_object)
+        .ok_or_else(|| anyhow!("Claude rate-limit info is unavailable"))?;
+    let rejected = match info.get("status").and_then(Value::as_str) {
+        Some("rejected") => true,
+        Some("allowed" | "allowed_warning") => false,
+        _ => return Err(anyhow!("unsupported Claude rate-limit status")),
+    };
+    let current = info.get("rateLimitType").and_then(Value::as_str);
+    let mut out = Vec::new();
+    if let Some(unified) = info.get("unifiedWindows") {
+        let windows = unified.as_object().filter(|windows| windows.len() <= 16)
+            .ok_or_else(|| anyhow!("unsupported Claude unified window map"))?;
+        for (name, meter) in windows {
+            if let Some(window) = claude_meter(name, meter, &pool, observed_ms)? { out.push(window); }
+        }
+    }
+    if let Some(name) = current.filter(|name| claude_window(name).is_some()) {
+        let top = serde_json::json!({"utilization":info.get("utilization"), "resetsAt":info.get("resetsAt")});
+        let top_has_meter = info.get("utilization").is_some();
+        if let Some(existing) = out.iter().find(|window| window.bucket_id == name) {
+            if top_has_meter {
+                let parsed = claude_meter(name, &top, &pool, observed_ms)?
+                    .ok_or_else(|| anyhow!("Claude top-level meter disagrees with unified window"))?;
+                if parsed.used_percent != existing.used_percent
+                    || parsed.reset_ms.is_some_and(|reset| existing.reset_ms != Some(reset)) {
+                    return Err(anyhow!("conflicting Claude rate-limit meters"));
+                }
+            }
+        } else if top_has_meter {
+            if let Some(window) = claude_meter(name, &top, &pool, observed_ms)? { out.push(window); }
+        }
+        if rejected {
+            if let Some(window) = out.iter_mut().find(|window| window.bucket_id == name) {
+                window.used_percent = 100.0;
+            } else {
+                out.push(QuotaWindow { pool_id:pool.clone(), bucket_id:name.into(), window:name.into(),
+                    model:None, model_family:claude_window(name).flatten().map(str::to_string),
+                    used_percent:100.0, reset_ms:claude_reset(info.get("resetsAt"), observed_ms)?,
+                    duration_mins:None, observed_ms, expires_ms:observed_ms.saturating_add(FRESH_MS) });
+            }
+        }
+    }
+    Ok(QuotaSnapshot { ordinary_usage_allowed:(rejected && current.and_then(claude_window).is_none()).then_some(false),
+        observed_ms, expires_ms:observed_ms.saturating_add(FRESH_MS), windows:out })
 }
 
 /// Parse an account-scoped Codex app-server response. Token totals and credits
@@ -231,6 +345,59 @@ pub fn parse_codex_rate_limits(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn claude_native_windows_keep_account_and_model_family_scope() {
+        let now = 1_800_000_000_000_i64;
+        let allowed = parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+            "rate_limit_info":{"status":"allowed","rateLimitType":"five_hour",
+                "utilization":0.2,"resetsAt":1800003600,
+                "unifiedWindows":{"seven_day":{"utilization":0.3,"resetsAt":1800500000},
+                    "seven_day_opus":{"utilization":0.9,"resetsAt":1800500000}}}}),
+            "system-claude", now).unwrap();
+        assert_eq!(allowed.windows.len(), 3);
+        assert_eq!(allowed.applicable_to("claude-sonnet-4-5").len(), 2);
+        assert_eq!(allowed.applicable_to("claude-opus-4-5").len(), 3);
+        assert_eq!(allowed.state_for("claude-sonnet-4-5", now), QuotaState::ObservedNonExhausted);
+        let rejected = parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+            "rate_limit_info":{"status":"rejected","rateLimitType":"seven_day_opus",
+                "resetsAt":1800500000,"unifiedWindows":{"seven_day":{"utilization":0.3,"resetsAt":1800500000}}}}),
+            "system-claude", now).unwrap();
+        assert_eq!(rejected.state_for("claude-opus-4-5", now), QuotaState::Exhausted);
+        assert_eq!(rejected.state_for("claude-sonnet-4-5", now), QuotaState::ObservedNonExhausted);
+    }
+
+    #[test]
+    fn claude_missing_or_invalid_meter_never_invents_remaining_allowance() {
+        let now = 1_800_000_000_000_i64;
+        let info = |details: Value| json!({"type":"rate_limit_event","rate_limit_info":details});
+        let empty = parse_claude_rate_limit_event(&info(json!({"status":"allowed"})), "pool", now).unwrap();
+        assert_eq!(empty.state_for("claude-sonnet", now), QuotaState::Unknown);
+        for utilization in [json!(-0.1),json!(1.1),json!("0.5"),json!(null)] {
+            assert!(parse_claude_rate_limit_event(&info(json!({"status":"allowed",
+                "rateLimitType":"five_hour","utilization":utilization})), "pool", now).is_err());
+        }
+        let unknown_rejection = parse_claude_rate_limit_event(&info(json!({"status":"rejected",
+            "rateLimitType":"new_window"})), "pool", now).unwrap();
+        assert_eq!(unknown_rejection.state_for("claude-sonnet", now), QuotaState::Exhausted);
+        assert_eq!(unknown_rejection.state_for("claude-opus", now), QuotaState::Exhausted);
+    }
+
+    #[test]
+    fn known_claude_rejection_survives_malformed_followup_until_its_reset() {
+        let now = 1_800_000_000_000_i64;
+        let blocked = parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+            "rate_limit_info":{"status":"rejected","rateLimitType":"seven_day_opus",
+                "resetsAt":1800003600}}), "pool", now).unwrap();
+        assert_eq!(blocked.state_for("claude-opus-4-5", now + 120_000), QuotaState::Exhausted,
+            "a known rejection persists beyond the 60-second freshness of nonblocking meters");
+        let mut unknown = parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+            "rate_limit_info":{"status":"allowed"}}), "pool", now + 120_000).unwrap();
+        unknown.preserve_uncleared_blocks(&blocked, now + 120_000);
+        assert_eq!(unknown.state_for("claude-opus-4-5", now + 120_000), QuotaState::Exhausted);
+        assert_eq!(unknown.state_for("claude-sonnet-4-5", now + 120_000), QuotaState::Unknown);
+        assert_eq!(unknown.state_for("claude-opus-4-5", now + 3_600_000), QuotaState::Unknown);
+    }
 
     #[test]
     fn codex_preserves_each_bucket_and_blocks_an_exhausted_secondary_window() {
@@ -294,7 +461,8 @@ mod tests {
         assert_eq!(denied.state_for("gpt-6-sol", now), QuotaState::Exhausted);
         assert_eq!(
             denied.state_for("gpt-6-sol", now + 60_000),
-            QuotaState::Unknown
+            QuotaState::Exhausted,
+            "an explicit account denial without a reset cannot expire into new capacity"
         );
     }
 

@@ -9,6 +9,9 @@
 //   background:  interim result while a background Agent runs, then a Write permission request
 //   background-early: the background Agent finishes before the interim result; Claude then
 //                continues with a new turn that asks for Write permission (live 2.1.x order)
+//   native-quota: emits scoped structured rate-limit windows and a model-family rejection
+//   native-quota-invalid: a newer malformed meter must invalidate older apparent capacity
+//   native-quota-block-invalid: a malformed follow-up cannot clear a scoped rejection
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
@@ -86,6 +89,28 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   } else if (mode === 'ratelimit') {
     out({ type: 'assistant', session_id: sid, error: 'rate_limit', message: { role: 'assistant', content: [{ type: 'text', text: 'API Error: Request rejected (429) · rate limited' }] } });
     result(true, 'API Error: Request rejected (429) · rate limited');
+  } else if (mode === 'native-quota') {
+    const hourly = Math.floor(Date.now() / 1000) + 3600;
+    const weekly = Math.floor(Date.now() / 1000) + 7 * 86400;
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'rejected',
+      rateLimitType: 'seven_day_opus', resetsAt: weekly,
+      unifiedWindows: { five_hour: { utilization: 0.2, resetsAt: hourly },
+        seven_day: { utilization: 0.3, resetsAt: weekly } },
+      providerNote: 'secret-quota-sentinel' } });
+    result(false, 'native quota observation emitted');
+  } else if (mode === 'native-quota-invalid') {
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.2 } });
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 1.2, providerNote: 'secret-invalid-meter' } });
+    result(false, 'invalid meter observed');
+  } else if (mode === 'native-quota-block-invalid') {
+    const weekly = Math.floor(Date.now() / 1000) + 7 * 86400;
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'rejected',
+      rateLimitType: 'seven_day_opus', resetsAt: weekly } });
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 1.2 } });
+    result(false, 'later meter malformed');
   } else if (mode === 'quota') {
     result(true, "Claude usage limit reached. Your limit will reset at 5pm.");
   } else if (mode === 'auth') {

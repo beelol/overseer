@@ -520,6 +520,10 @@ mod tests {
         );
         assert_eq!(
             observed_allowance(Some(&quota), "sol", now + 60_000),
+            Allowance::Exhausted
+        );
+        assert_eq!(
+            observed_allowance(Some(&quota), "sol", now + 3_600_000),
             Allowance::Unknown
         );
     }

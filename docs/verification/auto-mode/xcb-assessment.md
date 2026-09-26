@@ -20,6 +20,8 @@ Inspected source: [`hraness/xcb` at `9b3590241f1faf15d669ad46bfde65467fda14d2`](
 
 The narrow native Codex allowance collector now provides a tested local path while XCB adoption remains open. Passing XCB's own tests is necessary for adoption but cannot establish the Overseer bridge. No fork has been created.
 
+A later Claude native-event slice inspected XCB 0.8.10's supported single-window and `unifiedWindows` event shapes and wrote an independent, strict Overseer normalizer. Its three daemon fixture scenarios pass, but this is not XCB integration or a fork. It does not satisfy the remaining custody bridge, toolchain, packaging, or rollback gates.
+
 ## Focused upstream test evidence (2026-09-25)
 
 The pinned source was tested from a read-only clone using a **temporary** Rust 1.97.1 toolchain and dependency cache under `/private/tmp`; Overseer's Rust 1.89.0 installation and `Cargo.toml` were unchanged. `xcb-core usage` passed 3 unit and 1 contract test. `xcb-runtime codex` passed 40 matching unit tests and 10 matching authentication tests. `xcb-runtime claude` passed 7 matching unit tests and 7 matching integration tests. No model turn or paid probe ran. The first attempt with Rust 1.89.0 failed at XCB's declared rust-version gate, as expected. These are upstream tests only; no Overseer integration or full XCB suite has run.
