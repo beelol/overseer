@@ -375,7 +375,8 @@
         "docs/verification/swarm/milestone-1.md",
         "daemon/tests/swarm_director.rs",
         "docs/verification/swarm/milestone-5.md",
-        "docs/verification/swarm/milestone-9.md"
+        "docs/verification/swarm/milestone-9.md",
+        "docs/verification/swarm/SWARM-49.md"
       ],
       "blocker": "Payload and inbox bounds, dedupe, bounded director batches, admission hold at a full inbox, and terminal report persistence pass in fixtures; live inference/context controls, malformed permission cases and Stop latency remain unverified."
     },
@@ -386,7 +387,8 @@
         "daemon/tests/swarm_broker.rs",
         "daemon/tests/swarm_faults.rs",
         "docs/verification/swarm/milestone-1.md",
-        "docs/verification/swarm/milestone-9.md"
+        "docs/verification/swarm/milestone-9.md",
+        "docs/verification/swarm/SWARM-50.md"
       ],
       "blocker": "Injected SQLite failures during result state update and reservation insertion roll back atomically; live launch intent, disk-full recovery, and persisted blocked-state UX remain unimplemented."
     },
@@ -468,7 +470,8 @@
       "evidence": [
         "daemon/tests/swarm_control.rs",
         "docs/verification/swarm/milestone-8.md",
-        "docs/verification/swarm/milestone-10.md"
+        "docs/verification/swarm/milestone-10.md",
+        "docs/verification/swarm/SWARM-62.md"
       ],
       "blocker": "A daemon timer checks deadlines without admission requests, records a deadline reason, cancels queued work and requests active stops; live checkpoint/interrupt, confirmed exit and explicit extension remain unimplemented."
     },
