@@ -19,6 +19,7 @@ pub use control::{expire_due, off, pause, resume};
 pub use context::{artifact_chunk, director_summary, worker_brief};
 pub use director::{claim_batch, complete_batch, recover};
 pub use dispatch::next as dispatch_next;
+pub use dispatch::recover_pending as recover_pending_dispatches;
 pub use policy::preview;
 pub use settings::set_policy;
 pub use revision::revise;

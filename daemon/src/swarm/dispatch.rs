@@ -46,6 +46,7 @@ pub fn next(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
                 bail!("dispatch request id reused with different input");
             }
         } else {
+            verify_snapshot_fresh(p)?;
             crate::git::toplevel(Path::new(repo))?;
             if !Path::new(program).is_file() {
                 bail!("scripted worker program is unavailable");
@@ -76,11 +77,12 @@ pub fn next(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         return Ok(json!({"status":"linked","run_id":run,"job_id":job,
             "attempt_id":attempt,"overseer_run_id":worker,"duplicate":true}));
     }
+    verify_pending_launch(d, p, run)?;
     crate::git::toplevel(Path::new(repo))?;
     if !Path::new(program).is_file() {
         bail!("scripted worker program is unavailable");
     }
-    if p["inject_failure_after_admit_once"] == true {
+    if scheduled["status"] == "admitted" && p["inject_failure_after_admit_once"] == true {
         let store = d.store.lock().unwrap();
         let changed = store.conn.execute(
             "UPDATE swarm_dispatch_intents SET failure_injected=1
@@ -146,4 +148,115 @@ pub fn next(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         "attempt_id":attempt,"overseer_run_id":launched["overseer_run_id"],
         "duplicate":launched["duplicate"],"error":launched["error"]}),
     )
+}
+
+fn verify_pending_launch(d: &Arc<Daemon>, p: &Value, run: &str) -> Result<()> {
+    verify_snapshot_fresh(p)?;
+    let now = crate::daemon::now();
+    let store = d.store.lock().unwrap();
+    let current = super::get(&store, run)?;
+    let target = required(p, "target_id")?;
+    if !current["allowed_targets"]
+        .as_array()
+        .is_some_and(|allowed| allowed.iter().any(|id| id == target))
+    {
+        bail!("dispatch target permission revoked before launch");
+    }
+    let deadline = current["policy"]["effective"]["deadline_ms"]
+        .as_i64()
+        .unwrap_or(3_600_000);
+    if now
+        >= current["created_ms"]
+            .as_i64()
+            .unwrap_or(now)
+            .saturating_add(deadline)
+    {
+        bail!("swarm deadline expired before dispatch launch");
+    }
+    Ok(())
+}
+
+fn verify_snapshot_fresh(p: &Value) -> Result<()> {
+    let now = crate::daemon::now();
+    let snapshot = &p["snapshot"];
+    if snapshot["expires_ms"]
+        .as_i64()
+        .is_none_or(|expires| expires <= now)
+    {
+        bail!("dispatch target snapshot expired before launch");
+    }
+    let pools = snapshot["pools"]
+        .as_array()
+        .ok_or_else(|| anyhow!("dispatch target snapshot has no pools"))?;
+    for pool in pools {
+        let windows = pool["windows"]
+            .as_array()
+            .ok_or_else(|| anyhow!("dispatch quota pool has no windows"))?;
+        for window in windows {
+            if window["expires_ms"]
+                .as_i64()
+                .is_none_or(|expires| expires <= now)
+            {
+                bail!("dispatch quota snapshot expired before launch");
+            }
+        }
+    }
+    Ok(())
+}
+
+/// On daemon startup, finish only already-admitted fixture dispatch intents.
+/// An invalid or stale intent stays reserved for explicit reconciliation; it is
+/// never turned into another admission or silently retried every background tick.
+pub fn recover_pending(d: &Arc<Daemon>) -> Result<Value> {
+    if std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() != Ok("1") {
+        return Ok(json!({"status":"disabled"}));
+    }
+    let mut after = String::new();
+    let mut launched = 0;
+    let mut skipped = 0;
+    loop {
+        let row: Option<(String, String)> = {
+            let store = d.store.lock().unwrap();
+            store
+                .conn
+                .query_row(
+                    "SELECT i.request_id,i.request_json FROM swarm_dispatch_intents i
+                 JOIN swarm_scheduler_admissions s ON s.request_id=i.request_id
+                 JOIN swarm_attempts a ON a.id=s.attempt_id AND a.status='registered'
+                 JOIN swarm_jobs j ON j.run_id=s.run_id AND j.id=s.job_id AND j.status='reserved'
+                 JOIN swarm_runs r ON r.id=s.run_id AND r.status IN ('planning','running')
+                 LEFT JOIN swarm_worker_launches l ON l.attempt_id=s.attempt_id
+                 WHERE i.request_id>?1 AND l.overseer_run_id IS NULL
+                 ORDER BY i.request_id LIMIT 1",
+                    params![after],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()?
+        };
+        let Some((id, request_json)) = row else {
+            break;
+        };
+        after = id.clone();
+        let result = serde_json::from_str::<Value>(&request_json)
+            .map_err(anyhow::Error::from)
+            .and_then(|request| next(d, &request));
+        match result {
+            Ok(value) if value["status"] == "launched" || value["status"] == "linked" => {
+                launched += 1;
+            }
+            Ok(value) => {
+                skipped += 1;
+                crate::log(&format!(
+                    "swarm dispatch intent {id} remained pending: {value}"
+                ));
+            }
+            Err(error) => {
+                skipped += 1;
+                crate::log(&format!(
+                    "swarm dispatch intent {id} remained pending: {error}"
+                ));
+            }
+        }
+    }
+    Ok(json!({"status":"reconciled","launched":launched,"skipped":skipped}))
 }
