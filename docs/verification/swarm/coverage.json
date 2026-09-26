@@ -240,9 +240,11 @@
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
         "daemon/tests/swarm_admission.rs",
-        "docs/verification/swarm/milestone-7.md"
+        "daemon/tests/swarm_runtime.rs",
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-29.md"
       ],
-      "blocker": "An explicit fixture override admits 32 attempts without a hidden eight-worker cap; no live workers, 100-job execution or acceptance chain exists."
+      "blocker": "A deterministic 100-job fixture admits 32 attempts at a time and accepts all 100 exactly once with intact synthetic evidence; a separate fixture launches 32 supervised local processes, and quota headroom reduces effective concurrency with a reason. A working director, executed checks and combined 100-job supervised/provider path remain unverified."
     },
     "SWARM-30": {
       "status": "partial",
