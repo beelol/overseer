@@ -2,13 +2,103 @@
 //! Live cross-account context transfer needs an explicit destination ACL.
 
 use super::{broker, get, required};
+use crate::daemon::Daemon;
 use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::sync::Arc;
 
 const MAX_INLINE: usize = 32 * 1024;
+
+pub(super) fn revoked_dependency(conn: &Connection, run: &str, job: &str, target: &str) -> Result<bool> {
+    Ok(conn.prepare(
+        "SELECT 1 FROM swarm_artifact_revocations v
+         JOIN swarm_artifacts a ON a.run_id=v.run_id AND a.id=v.artifact_id
+         JOIN swarm_jobs j ON j.run_id=v.run_id AND j.id=?2
+         WHERE v.run_id=?1 AND v.target_id=?3
+         AND EXISTS (SELECT 1 FROM json_each(j.deps) dep WHERE dep.value=a.job_id)
+         LIMIT 1",
+    )?.exists(params![run,job,target])?)
+}
+
+pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
+    let _serial = d.swarm_launch_lock.lock().unwrap();
+    let run = required(p, "run_id")?;
+    let artifact = required(p, "artifact_id")?;
+    let target = required(p, "target_id")?;
+    let generation = p["generation"].as_i64().ok_or_else(|| anyhow!("missing generation"))?;
+    let revision = p["revision"].as_i64().ok_or_else(|| anyhow!("missing revision"))?;
+    let (duplicate, workers, affected_jobs) = {
+        let mut store = d.store.lock().unwrap();
+        let current = get(&store, run)?;
+        if current["generation"] != generation || current["revision"] != revision {
+            bail!("stale director generation or plan revision");
+        }
+        if current["status"] == "completed" || current["status"] == "stopped" {
+            bail!("swarm run is terminal");
+        }
+        if !current["allowed_targets"].as_array()
+            .is_some_and(|allowed| allowed.iter().any(|value| value == target)) {
+            bail!("unknown or disallowed destination");
+        }
+        let source_job: String = store.conn.query_row(
+            "SELECT job_id FROM swarm_artifacts WHERE run_id=?1 AND id=?2",
+            params![run,artifact], |r| r.get(0),
+        ).optional()?.ok_or_else(|| anyhow!("unknown artifact"))?;
+        let tx = store.conn.transaction()?;
+        let inserted = tx.execute(
+            "INSERT OR IGNORE INTO swarm_artifact_revocations(run_id,artifact_id,target_id,created_ms)
+             VALUES(?1,?2,?3,?4)",
+            params![run,artifact,target,crate::daemon::now()],
+        )?;
+        let mut jobs_stmt = tx.prepare(
+            "SELECT DISTINCT a.job_id FROM swarm_attempts a
+             JOIN swarm_admissions s ON s.attempt_id=a.id AND s.run_id=a.run_id
+             JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
+             WHERE a.run_id=?1 AND s.target_id=?2
+             AND EXISTS (SELECT 1 FROM json_each(j.deps) dep WHERE dep.value=?3)",
+        )?;
+        let affected_jobs = jobs_stmt.query_map(params![run,target,source_job], |r| r.get::<_,String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(jobs_stmt);
+        let mut worker_stmt = tx.prepare(
+            "SELECT DISTINCT l.overseer_run_id FROM swarm_worker_launches l
+             JOIN swarm_attempts a ON a.id=l.attempt_id AND a.status='registered'
+             JOIN swarm_admissions s ON s.attempt_id=a.id AND s.target_id=?2
+             JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
+             JOIN runs r ON r.id=l.overseer_run_id
+               AND r.status IN ('queued','starting','running','waiting_for_user')
+             WHERE a.run_id=?1
+             AND EXISTS (SELECT 1 FROM json_each(j.deps) dep WHERE dep.value=?3)",
+        )?;
+        let workers = worker_stmt.query_map(params![run,target,source_job], |r| r.get::<_,String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(worker_stmt);
+        for job in &affected_jobs {
+            tx.execute(
+                "UPDATE swarm_jobs SET status='blocked',stop_reason='artifact_permission_revoked',updated_ms=?3
+                 WHERE run_id=?1 AND id=?2 AND status IN ('reserved','launching','running','submitted','accepted')",
+                params![run,job,crate::daemon::now()],
+            )?;
+        }
+        tx.commit()?;
+        (inserted == 0, workers, affected_jobs)
+    };
+    let mut interrupt_requested = Vec::new();
+    let mut unconfirmed = Vec::new();
+    for worker in workers {
+        if d.interrupt(&worker).is_ok() {
+            interrupt_requested.push(worker);
+        } else {
+            unconfirmed.push(worker);
+        }
+    }
+    Ok(json!({"status":"revoked","artifact_id":artifact,"target_id":target,
+        "duplicate":duplicate,"affected_jobs":affected_jobs,
+        "interrupt_requested":interrupt_requested,"unconfirmed":unconfirmed}))
+}
 
 fn inline_limit(p: &Value) -> Result<usize> {
     let limit = p["max_inline_bytes"].as_u64().unwrap_or(MAX_INLINE as u64);
@@ -44,6 +134,9 @@ fn attempt_target(store: &Store, p: &Value) -> Result<(String, i64)> {
     {
         bail!("attempt destination is no longer allowed");
     }
+    if revoked_dependency(&store.conn, run, job, &target)? {
+        bail!("attempt destination lost required artifact access");
+    }
     if current["status"] == "stopped" || current["status"] == "stopping" {
         bail!("swarm run no longer permits context delivery");
     }
@@ -65,6 +158,8 @@ fn visible_artifact(
          JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
          JOIN swarm_admissions s ON s.run_id=a.run_id AND s.attempt_id=a.attempt_id
          WHERE a.run_id=?1 AND a.id=?2 AND s.target_id=?3
+         AND NOT EXISTS (SELECT 1 FROM swarm_artifact_revocations v
+                         WHERE v.run_id=a.run_id AND v.artifact_id=a.id AND v.target_id=?3)
          AND (a.job_id=?4 OR (j.status='accepted' AND j.plan_revision=a.source_revision
              AND EXISTS (SELECT 1 FROM swarm_jobs consumer, json_each(consumer.deps) dep
                          WHERE consumer.run_id=a.run_id AND consumer.id=?4
@@ -114,6 +209,8 @@ pub fn worker_brief(store: &Store, p: &Value) -> Result<Value> {
          JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
          JOIN swarm_admissions s ON s.run_id=a.run_id AND s.attempt_id=a.attempt_id
          WHERE a.run_id=?1 AND s.target_id=?2
+         AND NOT EXISTS (SELECT 1 FROM swarm_artifact_revocations v
+                         WHERE v.run_id=a.run_id AND v.artifact_id=a.id AND v.target_id=?2)
          AND (a.job_id=?3 OR (j.status='accepted' AND j.plan_revision=a.source_revision
              AND EXISTS (SELECT 1 FROM swarm_jobs consumer, json_each(consumer.deps) dep
                          WHERE consumer.run_id=a.run_id AND consumer.id=?3

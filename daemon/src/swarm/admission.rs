@@ -166,6 +166,9 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
     let Some((job_status, job_revision, attempts, old_job_deadline)) = job_info else {
         return Ok(blocked("unknown_job"));
     };
+    if super::context::revoked_dependency(&tx, run, job, target)? {
+        return Ok(blocked("artifact_permission_revoked"));
+    }
     let job_deadline = old_job_deadline.unwrap_or_else(||
         now.saturating_add(job_duration).min(created.saturating_add(deadline)));
     if now >= job_deadline {

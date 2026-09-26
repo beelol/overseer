@@ -378,6 +378,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             crate::swarm::artifact_chunk(&d.store.lock().unwrap(), p)?
         }
+        "swarm.context.revoke" => {
+            fixture_only()?;
+            crate::swarm::revoke_artifact(d, p)?
+        }
         "swarm.director.summary" => {
             fixture_only()?;
             crate::swarm::director_summary(&d.store.lock().unwrap(), p)?

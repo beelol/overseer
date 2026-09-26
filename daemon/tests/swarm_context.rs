@@ -145,3 +145,72 @@ fn hundred_job_summary_and_scoped_large_artifact_context() {
     assert!(!saved_prompt.contains(&evidence));
     assert!(saved_prompt.len() <= 32 * 1024);
 }
+
+#[test]
+fn revoked_artifact_stops_dependent_delivery_and_worker_but_not_unrelated_work() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("revocation-source"));
+    let run = d.call("swarm.create", json!({"category":"Revoked context",
+        "objective":"Inspect backend","allowed_targets":["account-a"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"contract","title":"Contract","acceptance":"evidence","deps":[]},
+        {"id":"dependent","title":"Dependent","acceptance":"evidence","deps":["contract"]},
+        {"id":"later","title":"Later dependent","acceptance":"evidence","deps":["contract"]},
+        {"id":"unrelated","title":"Unrelated","acceptance":"evidence","deps":[]}
+    ]}));
+    let parent = admit(&d, id, "contract", "account-a");
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"contract",
+        "attempt_id":parent["attempt_id"],"token":parent["token"],
+        "artifact_id":"contract-evidence","source_revision":1,
+        "kind":"contract","content":"checked interface"}));
+    d.call("swarm.report", json!({"run_id":id,"job_id":"contract",
+        "attempt_id":parent["attempt_id"],"token":parent["token"],
+        "message_id":"contract-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["contract-evidence"]}}));
+    d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"contract","decision":"accept","evidence":["contract-evidence"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"contract","attempt_id":parent["attempt_id"]}));
+    commit_beneficial_batch(&d, id, &["dependent".into(), "later".into(), "unrelated".into()]);
+    let dependent = admit(&d, id, "dependent", "account-a");
+    let context = json!({"run_id":id,"job_id":"dependent",
+        "attempt_id":dependent["attempt_id"],"token":dependent["token"],
+        "artifact_id":"contract-evidence"});
+    assert_eq!(d.call("swarm.context.get", context.clone())["content"], "checked interface");
+    let launched = d.call("swarm.worker.launch", json!({"run_id":id,
+        "job_id":"dependent","attempt_id":dependent["attempt_id"],
+        "token":dependent["token"],"repo":checkout,
+        "program":"/bin/sleep","args":["30"],"prompt":"Use contract",
+        "title":"Dependent worker"}));
+    assert_eq!(launched["status"], "launched");
+    let worker = launched["overseer_run_id"].as_str().unwrap();
+    let revoked = d.call("swarm.context.revoke", json!({"run_id":id,
+        "generation":1,"revision":1,"artifact_id":"contract-evidence",
+        "target_id":"account-a"}));
+    assert_eq!(revoked["status"], "revoked");
+    assert!(revoked["interrupt_requested"].as_array().unwrap().iter().any(|r| r == worker));
+    assert!(d.try_call("swarm.context.get", context).is_err());
+    assert_ne!(d.wait_done(worker, 10)["status"], "completed");
+    let repeated = d.call("swarm.context.revoke", json!({"run_id":id,
+        "generation":1,"revision":1,"artifact_id":"contract-evidence",
+        "target_id":"account-a"}));
+    assert_eq!(repeated["duplicate"], true);
+    assert!(repeated["interrupt_requested"].as_array().unwrap().is_empty());
+    assert!(d.try_call("swarm.context.revoke", json!({"run_id":id,
+        "generation":0,"revision":1,"artifact_id":"contract-evidence",
+        "target_id":"account-a"})).is_err());
+    assert_eq!(d.call("swarm.admit", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"later","target_id":"account-a",
+        "request_id":"revoked-later","now_ms":now(),
+        "snapshot":{"version":1,"observed_ms":now()-1000,"expires_ms":now()+60000,
+            "targets":[{"id":"account-a","account_id":"a","pool_ids":["pool-a"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool-a","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":now()+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}))["reason"], "artifact_permission_revoked");
+    assert_eq!(admit(&d, id, "unrelated", "account-a")["status"], "admitted");
+}
