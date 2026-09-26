@@ -13,7 +13,12 @@ use std::time::Duration;
 
 const UNKNOWN_AFTER_MS: i64 = 60_000;
 const SAMPLE_INTERVAL_MS: i64 = 15_000;
+const SUSPECT_RETRY_MS: i64 = 1_000;
 const STOP_RETRY_MS: i64 = 5_000;
+
+fn sample_interval(state: &str) -> i64 {
+    if state == "suspect" { SUSPECT_RETRY_MS } else { SAMPLE_INTERVAL_MS }
+}
 
 pub fn liveness(store: &Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
@@ -28,7 +33,7 @@ pub fn liveness(store: &Store, p: &Value) -> Result<Value> {
     ).optional()?;
     Ok(match row {
         Some((state,since,last)) => json!({"state":state,"unreachable_since_ms":since,
-            "last_sample_ms":last,"sample_interval_ms":SAMPLE_INTERVAL_MS,
+            "last_sample_ms":last,"sample_interval_ms":sample_interval(&state),
             "unknown_after_ms":UNKNOWN_AFTER_MS}),
         None => json!({"state":"unobserved","unreachable_since_ms":null,
             "last_sample_ms":null,"sample_interval_ms":SAMPLE_INTERVAL_MS,
@@ -74,7 +79,7 @@ pub fn sample_liveness(store: &mut Store, p: &Value) -> Result<Value> {
         params![attempt,state,since,now],
     )?;
     Ok(json!({"state":state,"unreachable_since_ms":since,"last_sample_ms":now,
-        "sample_interval_ms":SAMPLE_INTERVAL_MS,"unknown_after_ms":UNKNOWN_AFTER_MS}))
+        "sample_interval_ms":sample_interval(state),"unknown_after_ms":UNKNOWN_AFTER_MS}))
 }
 
 /// Probe a bounded number of due local worker control sockets. This reads supervisor
@@ -88,10 +93,12 @@ pub fn sample_due_workers(d: &Arc<Daemon>, now: i64) -> Result<usize> {
              JOIN runs r ON r.id=l.overseer_run_id
              LEFT JOIN swarm_worker_liveness v ON v.attempt_id=l.attempt_id
              WHERE r.status IN ('queued','starting','running','waiting_for_user','disconnected')
-             AND (v.last_sample_ms IS NULL OR v.last_sample_ms<=?1)
+             AND (v.last_sample_ms IS NULL OR v.last_sample_ms<=?1
+                  OR (v.state='suspect' AND v.last_sample_ms<=?2))
              ORDER BY COALESCE(v.last_sample_ms,0),l.created_ms LIMIT 4",
         )?;
-        let rows = stmt.query_map(params![now.saturating_sub(SAMPLE_INTERVAL_MS)], |r| {
+        let rows = stmt.query_map(params![now.saturating_sub(SAMPLE_INTERVAL_MS),
+            now.saturating_sub(SUSPECT_RETRY_MS)], |r| {
             Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,
                 r.get::<_,String>(2)?,r.get::<_,String>(3)?))
         })?.collect::<rusqlite::Result<Vec<_>>>()?;

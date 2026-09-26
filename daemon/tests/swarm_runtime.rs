@@ -513,6 +513,13 @@ fn admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart() {
     assert_eq!(sample(probe_at + 60_002, true)["state"], "reachable");
     assert_eq!(d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
         "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}))["status"], "active");
+    let suspect = sample(probe_at + 60_003, false);
+    assert_eq!(suspect["state"], "suspect");
+    assert_eq!(suspect["sample_interval_ms"], 1_000);
+    let retried = d.call("swarm.worker.liveness.poll",json!({"now_ms":probe_at + 61_003}));
+    assert_eq!(retried["sampled"], 1, "suspect worker was not retried promptly: {retried}");
+    assert_eq!(d.call("swarm.worker.liveness",json!({"run_id":id,
+        "job_id":"inspect","attempt_id":admitted["attempt_id"]}))["state"], "reachable");
     let attempts: i64 = rusqlite::Connection::open(d.home.path().join("overseer.sqlite"))
         .unwrap().query_row("SELECT attempt_count FROM swarm_jobs WHERE run_id=?1 AND id='inspect'",
         rusqlite::params![id], |r|r.get(0)).unwrap();
