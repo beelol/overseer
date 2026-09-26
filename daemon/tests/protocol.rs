@@ -1247,3 +1247,86 @@ fn ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside() {
     assert_eq!(listing["truncated"], true);
     assert_eq!(listing["entries"].as_array().unwrap().len(), 5000);
 }
+
+// ---------------------------------------------------------------- AC-52 native notifications (fake helper)
+
+/// A fake `Overseer Notifier.app` whose executable logs its arguments and exits with `code`.
+fn fake_notifier(dir: &Path, code: i32) -> (std::path::PathBuf, std::path::PathBuf) {
+    let app = dir.join(format!("Fake{code}.app"));
+    let bin = app.join("Contents/MacOS");
+    std::fs::create_dir_all(&bin).unwrap();
+    let log = dir.join(format!("notifier-{code}.log"));
+    std::fs::write(bin.join("notifier"), format!("#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\nexit {code}\n", log.display())).unwrap();
+    std::process::Command::new("chmod").arg("+x").arg(bin.join("notifier")).status().unwrap();
+    (app, log)
+}
+
+#[test]
+fn ac52_notifications_use_the_overseer_helper_and_fall_back_when_denied_or_missing() {
+    let t = tmp();
+    let (fallback, fallback_log) = notifier(t.path()); // records fallback deliveries instead of osascript
+    // Helper present and allowed.
+    let (ok_app, ok_log) = fake_notifier(t.path(), 0);
+    let d = Daemon::start(&[("OVERSEER_NOTIFIER_APP", ok_app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    assert_eq!(d.call("daemon.test_notice", json!({}))["delivered_via"], "overseer-notifier (ok)");
+    let args = std::fs::read_to_string(&ok_log).unwrap();
+    assert!(args.contains("--title\nOverseer notifications are on\n--body\n"), "{args}");
+    assert!(args.contains("--open\nvscode://beelol.overseer/open-center"), "clicks open the Overseer view: {args}");
+    assert!(!fallback_log.exists(), "no fallback when the helper posted");
+    drop(d);
+    // Helper present but notifications denied: fall back, and say so.
+    let (denied_app, _) = fake_notifier(t.path(), 3);
+    let d = Daemon::start(&[("OVERSEER_NOTIFIER_APP", denied_app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    let via = d.call("daemon.test_notice", json!({}))["delivered_via"].as_str().unwrap().to_string();
+    assert_eq!(via, format!("overseer-notifier (denied); fell back to {fallback} (ok)"));
+    assert!(std::fs::read_to_string(&fallback_log).unwrap().contains("Overseer notifications are on"));
+    drop(d);
+    // No permission answer yet (exit 5) and helper missing: both fall back.
+    let (pending_app, _) = fake_notifier(t.path(), 5);
+    let d = Daemon::start(&[("OVERSEER_NOTIFIER_APP", pending_app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    assert!(d.call("daemon.test_notice", json!({}))["delivered_via"].as_str().unwrap().starts_with("overseer-notifier (permission not answered yet); fell back to"));
+    drop(d);
+    let d = Daemon::start(&[("OVERSEER_NOTIFIER_APP", "/nonexistent/Overseer Notifier.app"), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    assert!(d.call("daemon.test_notice", json!({}))["delivered_via"].as_str().unwrap().starts_with("overseer-notifier (not installed); fell back to"));
+}
+
+#[test]
+fn ac52_background_notice_is_delivered_by_the_helper() {
+    let t = tmp();
+    let (fallback, _) = notifier(t.path());
+    let (app, log) = fake_notifier(t.path(), 0);
+    let d = Daemon::start(&[("OVERSEER_NOTIFIER_APP", app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback), ("OVERSEER_BACKGROUND_NOTICE_MS", "300")]);
+    let repo = repo(&t.path().join("r"));
+    let run = run_id(&sh(&d, &repo, "worktree", "sleep 30"));
+    d.wait_status(&run, |s| s == "running", 20);
+    drop(vscode_window(&d));
+    let mut n = vec![];
+    for _ in 0..50 { n = notices(&d); if !n.is_empty() { break; } std::thread::sleep(Duration::from_millis(100)); }
+    assert_eq!(n.len(), 1);
+    assert_eq!(n[0]["payload"]["delivered_via"], "overseer-notifier (ok)");
+    assert!(std::fs::read_to_string(&log).unwrap().contains("Overseer: 1 agent still running"));
+    d.call("run.interrupt", json!({"run_id": run}));
+    d.wait_done(&run, 20);
+}
+
+#[test]
+fn ac52_the_daemon_finds_the_notifier_app_next_to_its_own_binary() {
+    // The installed layout: bin/overseerd-<platform> and bin/Overseer Notifier.app side by side.
+    let t = tmp();
+    let bin = t.path().join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    let daemon = bin.join("overseerd-test");
+    std::fs::copy(BIN, &daemon).unwrap();
+    let (fake, log) = fake_notifier(t.path(), 0);
+    std::fs::rename(&fake, bin.join("Overseer Notifier.app")).unwrap();
+    let home = t.path().join("home");
+    let mut child = std::process::Command::new(&daemon).arg("serve").env("OVERSEER_HOME", &home).env_remove("OVERSEER_NOTIFIER_APP")
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().unwrap();
+    let ctl = |m: &str| String::from_utf8(std::process::Command::new(&daemon).args(["ctl", m, "{}"]).env("OVERSEER_HOME", &home).output().unwrap().stdout).unwrap();
+    let mut out = String::new();
+    for _ in 0..50 { out = ctl("daemon.test_notice"); if out.contains("delivered_via") { break; } std::thread::sleep(Duration::from_millis(100)); }
+    assert!(out.contains("overseer-notifier (ok)"), "{out}");
+    assert!(std::fs::read_to_string(&log).unwrap().contains("--open\nvscode://beelol.overseer/open-center"));
+    let _ = child.kill();
+    let _ = child.wait();
+}

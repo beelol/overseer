@@ -9,7 +9,7 @@
   "engines": { "vscode": "^1.136.0" },
   "categories": ["SCM Providers", "Other"],
   "main": "./src/extension.js",
-  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review", "onWebviewPanel:overseer.output", "onWebviewPanel:overseer.center"],
+  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review", "onWebviewPanel:overseer.output", "onWebviewPanel:overseer.center", "onUri"],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
@@ -55,6 +55,7 @@
       { "command": "overseer.mergeBack", "title": "Merge Back…", "category": "Overseer", "icon": "$(git-merge)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.stopAll", "title": "Stop Agents and Daemon…", "category": "Overseer", "icon": "$(debug-stop)" },
       { "command": "overseer.startDaemon", "title": "Start Daemon", "category": "Overseer" },
+      { "command": "overseer.testNotification", "title": "Test Notification", "category": "Overseer", "icon": "$(bell)" },
       { "command": "overseer.showLog", "title": "Show Daemon Log", "category": "Overseer" },
       { "command": "overseer.restartDaemonConnection", "title": "Reconnect to Daemon", "category": "Overseer" }
     ],

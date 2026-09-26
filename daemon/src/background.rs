@@ -118,19 +118,53 @@ impl Daemon {
     }
 }
 
-/// Sends the OS notification. `OVERSEER_NOTIFY_COMMAND` (an executable taking title and body)
-/// replaces the platform notifier; tests use it to observe notices without desktop banners.
-fn notify(title: &str, body: &str) -> String {
+/// Where a notification click takes the user: VS Code's Overseer view (extension URI handler).
+pub const OPEN_URL: &str = "vscode://beelol.overseer/open-center";
+
+/// The bundled notifier app's executable (AC-52): `OVERSEER_NOTIFIER_APP` (a `.app` path), else
+/// `Overseer Notifier.app` next to this daemon binary (the extension's `bin/`).
+fn notifier_executable() -> Option<std::path::PathBuf> {
+    let app = std::env::var_os("OVERSEER_NOTIFIER_APP").map(std::path::PathBuf::from).or_else(|| {
+        std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join("Overseer Notifier.app")))
+    })?;
+    let exe = app.join("Contents/MacOS/notifier");
+    exe.is_file().then_some(exe)
+}
+
+/// Sends the OS notification and says how it was delivered.
+/// - `OVERSEER_NOTIFY_COMMAND` (an executable taking title and body) replaces everything (tests).
+/// - macOS: the bundled Overseer notifier app (shows as Overseer; a click opens the Overseer view).
+///   If it is missing, denied, or gets no answer to the first permission prompt, fall back to
+///   `osascript` (shows as Script Editor), or to `OVERSEER_NOTIFY_FALLBACK` in tests.
+pub fn notify(title: &str, body: &str) -> String {
     if let Ok(cmd) = std::env::var("OVERSEER_NOTIFY_COMMAND") {
         let ok = std::process::Command::new(&cmd).arg(title).arg(body).status().map(|s| s.success()).unwrap_or(false);
         return format!("{cmd} ({})", if ok { "ok" } else { "failed" });
     }
     #[cfg(target_os = "macos")]
     {
+        let mut note = String::new();
+        match notifier_executable() {
+            Some(exe) => {
+                let out = std::process::Command::new(&exe).args(["--title", title, "--body", body, "--open", OPEN_URL]).output();
+                match out.as_ref().map(|o| o.status.code()) {
+                    Ok(Some(0)) => return "overseer-notifier (ok)".into(),
+                    Ok(Some(3)) => note = "overseer-notifier (denied); ".into(),
+                    Ok(Some(5)) => note = "overseer-notifier (permission not answered yet); ".into(),
+                    Ok(code) => note = format!("overseer-notifier (failed, exit {code:?}); "),
+                    Err(e) => note = format!("overseer-notifier (could not start: {e}); "),
+                }
+            }
+            None => note = "overseer-notifier (not installed); ".into(),
+        }
+        if let Ok(cmd) = std::env::var("OVERSEER_NOTIFY_FALLBACK") {
+            let ok = std::process::Command::new(&cmd).arg(title).arg(body).status().map(|s| s.success()).unwrap_or(false);
+            return format!("{note}fell back to {cmd} ({})", if ok { "ok" } else { "failed" });
+        }
         let quote = |s: &str| format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""));
         let script = format!("display notification {} with title {}", quote(body), quote(title));
         let ok = std::process::Command::new("/usr/bin/osascript").arg("-e").arg(script).status().map(|s| s.success()).unwrap_or(false);
-        format!("osascript ({})", if ok { "ok" } else { "failed" })
+        format!("{note}fell back to osascript ({})", if ok { "ok" } else { "failed" })
     }
     #[cfg(not(target_os = "macos"))]
     {

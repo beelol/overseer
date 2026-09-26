@@ -369,6 +369,15 @@ async function activate(context) {
       await vscode.window.showTextDocument(doc, { preview: true });
     })),
     vscode.commands.registerCommand('overseer.stopAll', guard(stopAll)),
+    vscode.commands.registerCommand('overseer.testNotification', guard(async () => {
+      const { delivered_via: via } = await client.request('daemon.test_notice');
+      const native = /^overseer-notifier \(ok\)/.test(via);
+      vscode.window.showInformationMessage(native ? 'Sent a test notification from Overseer. If no banner appeared, allow Overseer in System Settings → Notifications.'
+        : `Sent a test notification, but not as Overseer: ${via}. Allow Overseer in System Settings → Notifications to get Overseer-branded banners.`);
+      return via;
+    })),
+    // Notification clicks open vscode://beelol.overseer/open-center (AC-52).
+    vscode.window.registerUriHandler({ handleUri: uri => { if (uri.path === '/open-center') vscode.commands.executeCommand('overseer.openCenter'); } }),
     vscode.commands.registerCommand('overseer.openCenter', guard(async () => { await model.refresh(); await center.open(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); })),
     vscode.commands.registerCommand('overseer.mergeBack', guard(mergeBack)),
     vscode.commands.registerCommand('overseer.startDaemon', guard(async () => { client.disposed = false; await client.start(); await model.refresh(); updateStatus(); })),

@@ -120,12 +120,13 @@ and Verify clauses. Both lists are generated from the records by
   accounts. Account login only, never API keys.
 - **Session restore and background agents** — reviews, run panels, comparisons, Follow
   (paused), scroll positions and the Agents tree return after reloads and restarts. Closing
-  VS Code with agents running posts a macOS notification naming them;
+  VS Code with agents running posts a macOS notification naming them (from the bundled
+  Overseer notifier app; clicking it opens the Overseer view; **Test Notification** checks it);
   **Stop Agents and Daemon** stops everything on request.
 
 ## Build and install (macOS)
 
-Requirements: Rust 1.89+ (`cargo`), Node 24, Git, and the VS Code `code` CLI.
+Requirements: Rust 1.89+ (`cargo`), Node 24, Git, the VS Code `code` CLI, and on macOS the Xcode command-line tools (`swiftc`, for the bundled Overseer notifier app).
 
 ```bash
 git clone https://github.com/beelol/overseer.git && cd overseer

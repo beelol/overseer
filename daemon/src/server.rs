@@ -284,6 +284,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "daemon.shutdown" => json!({"ok": true}),
         "daemon.stop_all" => d.stop_all()?,
         "daemon.background_notice" => json!({"notice": d.background_notice()?}),
+        "daemon.test_notice" => {
+            let via = crate::background::notify("Overseer notifications are on", "This is how Overseer tells you agents are still running after VS Code closes.");
+            crate::log(&format!("test notice ({via})"));
+            json!({"delivered_via": via})
+        }
         "daemon.last_notice" => {
             use rusqlite::OptionalExtension;
             let store = d.store.lock().unwrap();
