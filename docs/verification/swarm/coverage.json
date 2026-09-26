@@ -20,9 +20,12 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
-        "docs/verification/swarm/milestone-2.md"
+        "daemon/tests/swarm_benefit.rs",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/swarm/milestone-2.md",
+        "docs/verification/swarm/SWARM-03.md"
       ],
-      "blocker": "Dependencies and global read/write claims are stored; scheduler concurrency and overlapping worktree writers are not implemented."
+      "blocker": "Exact planned resource claims survive restart, constrain parallel benefit and cannot be omitted or downgraded at admission. Full chain/independent replay, real worktree writer isolation and undeclared-resource discovery remain incomplete."
     },
     "SWARM-04": {
       "status": "partial",
@@ -38,7 +41,7 @@
         "daemon/tests/swarm_benefit.rs",
         "docs/verification/swarm/SWARM-05.md"
       ],
-      "blocker": "A fixture-only decision persists cost estimates by revision and batch, gates second-worker admission, and preserves behavior over restart and refill. Supervised worker wall time is measured and retained, but actual native usage and phase costs, validated independence, live calibrated estimates and shared Auto Mode quota input remain absent."
+      "blocker": "A fixture-only decision persists cost estimates by revision and batch, gates second-worker admission, and preserves behavior over restart and refill. Planned exact-name write conflicts now force serial choice. Supervised worker wall time is measured, but actual native usage and phase costs, undeclared-resource independence, live calibrated estimates and shared Auto Mode quota input remain absent."
     },
     "SWARM-06": {
       "status": "partial",
@@ -462,7 +465,7 @@
         "docs/verification/swarm/milestone-13.md",
         "docs/verification/swarm/SWARM-53.md"
       ],
-      "blocker": "Fixture admission atomically acquires declared resource claims before reserving an attempt, and conflicting read/write requests wait until release; real tool/resource discovery, contamination detection and selective rerun remain unimplemented."
+      "blocker": "Fixture admission atomically acquires durable planned claims even when the request omits them, rejects claim downgrades, and holds conflicting read/write requests until release; real tool/resource discovery, contamination detection and selective rerun remain unimplemented."
     },
     "SWARM-54": {
       "status": "partial",
