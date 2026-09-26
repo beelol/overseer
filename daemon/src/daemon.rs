@@ -506,7 +506,10 @@ impl Daemon {
     /// Execute a bounded work unit in a separately supervised workspace made
     /// from a settled parent's exact snapshot. Route selection happens before
     /// this execution boundary; this method never guesses a model or account.
-    pub fn delegate_run(self: &Arc<Self>, p: &Value) -> Result<Value> {
+    pub fn delegate_run(self: &Arc<Self>, p: &Value, auto_launch_claimed: bool) -> Result<Value> {
+        if auto_launch_claimed && p["auto_selected"] != true {
+            bail!("automatic launch requires an internally claimed work unit");
+        }
         let work_unit_id = p["work_unit_id"].as_str().filter(|s| !s.is_empty() && s.len() <= 120
             && s.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_')))
             .ok_or_else(|| anyhow!("work_unit_id must be a stable 1-120 character identifier"))?;
@@ -580,6 +583,20 @@ impl Daemon {
             use sha2::{Digest, Sha256};
             Sha256::digest(serde_json::to_vec(&request)?).iter().map(|byte| format!("{byte:02x}")).collect::<String>()
         };
+        let intent = self.store.lock().unwrap().auto_launch_intent(work_unit_id)?;
+        if auto_launch_claimed {
+            let (intent_parent, intent_hash, intent_route, intent_generation, intent_phase) = intent
+                .ok_or_else(|| anyhow!("automatic launch intent is unavailable"))?;
+            let route = format!("{profile_id}/{model}/{effort}");
+            if p["auto_selected"] != true || intent_parent != parent_id
+                || Some(intent_hash.as_str()) != p["requirements_hash"].as_str()
+                || intent_route != route || intent_generation != p["expected_account_generation"].as_i64()
+                || intent_phase != "preparing" {
+                bail!("automatic launch intent does not match the selected route");
+            }
+        } else if intent.is_some() {
+            bail!("work-unit identity is reserved by an automatic launch");
+        }
         let saved_work_unit = { self.store.lock().unwrap().managed_work_unit(work_unit_id)? };
         if let Some((saved_parent, child_id, saved_hash)) = saved_work_unit {
             if saved_parent != parent_id || saved_hash != request_hash {

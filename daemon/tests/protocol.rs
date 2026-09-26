@@ -2880,6 +2880,51 @@ fn auto_managed_child_launch_failure_releases_its_workspace() {
 }
 
 #[test]
+fn auto_failed_worktree_launch_keeps_one_intent_across_restart() {
+    use std::os::unix::fs::PermissionsExt;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let bin = r.path().join("bin");
+    std::fs::create_dir(&bin).unwrap();
+    let attempts = r.path().join("worktree-attempts");
+    let wrapper = bin.join("git");
+    std::fs::write(&wrapper, format!("#!/bin/sh\nif [ \"$1\" = worktree ] && [ \"$2\" = add ] && [ \"$3\" = -b ]; then\n  case \"$4\" in overseer/delegate-*) printf 'x\\n' >> '{}'; exit 43;; esac\nfi\nexec /usr/bin/git \"$@\"\n", attempts.display())).unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap());
+    let mut d = Daemon::start(&[("PATH", &path),
+        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"intent-failed-worktree-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "prompt":"continue after the checkpoint"});
+    let first = d.call("auto.dispatch", request.clone());
+    assert_eq!(first["state"], "paused", "{first}");
+    assert_eq!(first["pause_reason"], "launch_effects_uncertain");
+    assert_eq!(std::fs::read_to_string(&attempts).unwrap().lines().count(), 1);
+    assert_eq!(d.runs().len(), 1, "no child was recorded after the Git failure");
+    d.kill9();
+    d.env.iter_mut().find(|(key, _)| key == "FIXTURE_MODE").unwrap().1 = "managed-delay".into();
+    d.spawn();
+    d.call("run.follow_up", json!({"run_id":parent,"prompt":"continue parent work"}));
+    d.wait_status(&parent, |status| status == "running", 10);
+    let replay = d.call("auto.dispatch", request);
+    assert_eq!(replay["state"], "paused", "{replay}");
+    assert_eq!(replay["pause_reason"], "launch_effects_uncertain");
+    assert_eq!(std::fs::read_to_string(&attempts).unwrap().lines().count(), 1,
+        "replay must not attempt the Git mutation again");
+    assert_eq!(d.runs().len(), 1, "replay must not create a second child");
+    assert!(d.try_call("run.delegate", json!({"work_unit_id":"intent-failed-worktree-1",
+        "parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol",
+        "effort":"medium","prompt":"manual retry with the same identity"})).is_err());
+    assert_eq!(std::fs::read_to_string(&attempts).unwrap().lines().count(), 1,
+        "manual delegation cannot reuse an unsettled Auto work-unit identity");
+}
+
+#[test]
 fn auto_codex_null_thread_usage_stays_unavailable_without_token_based_guess() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

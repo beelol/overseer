@@ -228,6 +228,10 @@ impl Store {
               child_run_id TEXT NOT NULL UNIQUE REFERENCES runs(id),
               request_hash TEXT NOT NULL, created_ms INTEGER NOT NULL,
               result_event_seq INTEGER);
+            CREATE TABLE IF NOT EXISTS auto_launch_intents(
+              work_unit_id TEXT PRIMARY KEY, parent_run_id TEXT NOT NULL REFERENCES runs(id),
+              requirements_hash TEXT NOT NULL, route_id TEXT NOT NULL,
+              account_generation INTEGER, phase TEXT NOT NULL, created_ms INTEGER NOT NULL);
             "#,
         )?;
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;
@@ -428,6 +432,30 @@ impl Store {
             "SELECT parent_run_id,child_run_id,request_hash FROM managed_work_units WHERE work_unit_id=?1",
             params![id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         ).optional()?)
+    }
+
+    pub fn auto_launch_intent(&self, id: &str) -> Result<Option<(String, String, String, Option<i64>, String)>> {
+        Ok(self.conn.query_row(
+            "SELECT parent_run_id,requirements_hash,route_id,account_generation,phase FROM auto_launch_intents WHERE work_unit_id=?1",
+            params![id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+        ).optional()?)
+    }
+
+    pub fn insert_auto_launch_intent(&self, id: &str, parent: &str, requirements_hash: &str,
+        route_id: &str, account_generation: Option<i64>) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO auto_launch_intents(work_unit_id,parent_run_id,requirements_hash,route_id,account_generation,phase,created_ms) VALUES(?1,?2,?3,?4,?5,'preparing',?6)",
+            params![id, parent, requirements_hash, route_id, account_generation, crate::daemon::now()],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_auto_launch_intent_phase(&self, id: &str, phase: &str) -> Result<()> {
+        if !matches!(phase, "paused" | "child_created") {
+            return Err(anyhow!("unsupported automatic launch phase"));
+        }
+        self.conn.execute("UPDATE auto_launch_intents SET phase=?2 WHERE work_unit_id=?1", params![id, phase])?;
+        Ok(())
     }
 
     pub fn insert_managed_work_unit(&self, id: &str, parent: &str, child: &str, request_hash: &str) -> Result<()> {

@@ -579,7 +579,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "branches": crate::git::branches(&root), "status": crate::git::status(&root)?})
         }
         "task.create" => d.create_task(p)?,
-        "run.delegate" => d.delegate_run(p)?,
+        "run.delegate" => d.delegate_run(p, false)?,
         "auto.dispatch" => {
             use crate::auto_select::{CapabilityTier, Sandbox, WorkUnit};
             use sha2::{Digest, Sha256};
@@ -601,8 +601,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let work_unit_gate = d.work_unit_gate(work_unit_id);
             let _work_unit_guard = work_unit_gate.lock().unwrap();
             let parent = d.run(s(p, "parent_run_id")?)?;
-            if parent.parent_run_id.is_some() || parent.status != "completed" {
-                return Err(anyhow!("automatic delegation requires a completed top-level parent"));
+            if parent.parent_run_id.is_some() {
+                return Err(anyhow!("automatic delegation requires a top-level parent"));
             }
             let profile_id = parent.profile_id.as_deref().ok_or_else(|| anyhow!("parent has no account profile"))?;
             let profile = d.profile(profile_id)?;
@@ -693,6 +693,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let store = d.store.lock().unwrap();
                 store.managed_work_unit(work_unit_id)?
             };
+            let saved_intent = {
+                let store = d.store.lock().unwrap();
+                store.auto_launch_intent(work_unit_id)?
+            };
             if let Some((saved_parent, child_id, _)) = saved_work_unit {
                 if saved_parent != parent.id { return Err(anyhow!("work unit belongs to another parent")); }
                 let child = d.run(&child_id)?;
@@ -714,7 +718,21 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     replay["actions"] = json!(["refresh", "choose_manual_route"]);
                 }
                 replay
+            } else if let Some((intent_parent, intent_hash, route_id, _, phase)) = saved_intent {
+                if intent_parent != parent.id || intent_hash != requirements_hash {
+                    return Err(anyhow!("work unit was already used for different automatic work"));
+                }
+                // Preparation may already have changed Git even when no child row
+                // survived. Replaying the same request must not repeat that effect.
+                json!({"state":"paused","work_unit_id":work_unit_id,"replayed":true,
+                    "pause_reason":"launch_effects_uncertain","launch_phase":phase,
+                    "decision":{"work_unit_id":work_unit_id,"selected":route_id,
+                        "exclusions":[],"reason":"replayed_unsettled_launch"},
+                    "actions":["inspect_launch","choose_manual_route"]})
             } else {
+                if parent.status != "completed" {
+                    return Err(anyhow!("automatic delegation requires a completed top-level parent"));
+                }
                 let mut routes = Vec::new();
                 let mut evidence = Vec::new();
                 let mut discovery_failures = Vec::new();
@@ -873,24 +891,39 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                             .ok_or_else(|| anyhow!("selected account generation unavailable"))?)
                     };
                     let required = required_tools.iter().cloned().collect::<Vec<_>>();
-                    let mut delegated = d.delegate_run(&json!({"work_unit_id":work_unit_id,
+                    d.store.lock().unwrap().insert_auto_launch_intent(work_unit_id, &parent.id,
+                        &requirements_hash, selected, generation.copied())?;
+                    let launched = d.delegate_run(&json!({"work_unit_id":work_unit_id,
                         "parent_run_id":parent.id,"harness":route.harness,"profile_id":route.profile_id,
                         "model":route.model,"effort":route.effort,"prompt":prompt,"title":title,
                         "required_tools":required,"auto_selected":true,
                         "execution_budget_ms":execution_budget_ms,
                         "requirements_hash":requirements_hash,"expected_account_generation":generation,
                         "auto_local_endpoint":if route.harness == "opencode" {
-                            Some(route.endpoint.as_str()) } else { None }}))?;
-                    if delegated.get("launch_error").is_some() {
-                        delegated["state"] = json!("paused");
-                        delegated["actions"] = json!(["refresh", "choose_manual_route"]);
-                    } else {
-                        delegated["state"] = json!("dispatched");
+                            Some(route.endpoint.as_str()) } else { None }}), true);
+                    match launched {
+                        Ok(mut delegated) => {
+                            d.store.lock().unwrap().set_auto_launch_intent_phase(work_unit_id, "child_created")?;
+                            if delegated.get("launch_error").is_some() {
+                                delegated["state"] = json!("paused");
+                                delegated["actions"] = json!(["refresh", "choose_manual_route"]);
+                            } else {
+                                delegated["state"] = json!("dispatched");
+                            }
+                            delegated["decision"] = json!(decision);
+                            delegated["discovery_failures"] = json!(discovery_failures);
+                            delegated["pre_effect_failures"] = json!(pre_effect_failures);
+                            delegated
+                        }
+                        Err(_) => {
+                            d.store.lock().unwrap().set_auto_launch_intent_phase(work_unit_id, "paused")?;
+                            json!({"state":"paused","work_unit_id":work_unit_id,
+                                "pause_reason":"launch_effects_uncertain",
+                                "decision":decision,"discovery_failures":discovery_failures,
+                                "pre_effect_failures":pre_effect_failures,
+                                "actions":["inspect_launch","choose_manual_route"]})
+                        }
                     }
-                    delegated["decision"] = json!(decision);
-                    delegated["discovery_failures"] = json!(discovery_failures);
-                    delegated["pre_effect_failures"] = json!(pre_effect_failures);
-                    delegated
                 } else {
                     json!({"state":"paused","work_unit_id":work_unit_id,"decision":decision,
                         "discovery_failures":discovery_failures,"pre_effect_failures":pre_effect_failures,
