@@ -8,6 +8,8 @@ Expected: the daemon expires both runs without a model wakeup, identifies deadli
 
 Actual: both runs enter `stopping` within the bounded test wait, expose `stop_reason: deadline`, and distinguish `cancel_requested` active work from `cancelled` queued work. The active attempt receives a queued Stop directive. A new fixture launches a supervised local process and then sends no more admissions; the daemon deadline timer interrupts the process, observes its terminal state, delivers a neutral director event, and marks the job cancelled. The admission-triggered path records the same reason. The combined-main workspace suite passed 102 tests.
 
+Follow-up revision `f91fa58`: the supervised-worker fixture sends ten progress messages during a 2.5-second run. The persisted creation time and effective deadline do not move, the daemon still interrupts the worker for `deadline`, and the job is cancelled with one attempt. The full Rust suite passed 128 tests.
+
 Evidence: `daemon/tests/swarm_control.rs`, `daemon/tests/swarm_state.rs`, `daemon/tests/swarm_runtime.rs`, `docs/verification/swarm/milestone-10.md`.
 
 Remaining: the generic local process is not a qualified live harness, and native descendants are not covered. Visible unconfirmed exits, UI display, and an explicit extension that preserves the original account allocation remain unverified.
