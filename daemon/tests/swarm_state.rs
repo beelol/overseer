@@ -309,3 +309,36 @@ fn large_plan_pages_without_loading_every_job() {
         0
     );
 }
+
+#[test]
+fn ready_window_materializes_only_one_hundred_jobs_and_refills_after_admission() {
+    let mut d = Daemon::start(&[]);
+    let made = d.call("swarm.create", json!({"category":"Ready window",
+        "objective":"Inspect independent modules","allowed_targets":["system-codex"]}));
+    let run = made["id"].as_str().unwrap();
+    let mut jobs: Vec<_> = (0..130).map(|n| json!({"id":format!("job-{n:03}"),
+        "title":format!("Module {n}"),"acceptance":"evidence","deps":[]})).collect();
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":jobs.clone()}));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let counts = || -> (i64,i64) {
+        let ready = db.query_row("SELECT COUNT(*) FROM swarm_jobs WHERE run_id=?1 AND status='ready'",
+            [run], |r| r.get(0)).unwrap();
+        let planned = db.query_row("SELECT COUNT(*) FROM swarm_jobs WHERE run_id=?1 AND status='planned'",
+            [run], |r| r.get(0)).unwrap();
+        (ready, planned)
+    };
+    assert_eq!(counts(), (100,30));
+    d.call("swarm.attempt.register", json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"job-000"}));
+    assert_eq!(counts(), (100,29));
+    let promoted: String = db.query_row("SELECT status FROM swarm_jobs WHERE run_id=?1 AND id='job-100'",
+        [run], |r| r.get(0)).unwrap();
+    assert_eq!(promoted, "ready");
+    d.kill9();
+    d.spawn();
+    assert_eq!(counts(), (100,29));
+    jobs.push(json!({"id":"job-130","title":"Module 130","acceptance":"evidence","deps":[]}));
+    d.call("swarm.revise", json!({"id":run,"generation":1,"expected_revision":1,
+        "reason":"Add another independent module","jobs":jobs}));
+    assert_eq!(counts(), (100,30));
+}

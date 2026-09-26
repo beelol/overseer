@@ -65,6 +65,56 @@ fn record_operation(conn: &rusqlite::Connection, run: &str, kind: &str) -> Resul
     Ok(())
 }
 
+/// Keep a bounded ready set while retaining the remaining eligible jobs durably as planned.
+/// Called in the same transaction as every transition that opens or closes a ready slot.
+fn materialize_ready(conn: &rusqlite::Connection, run: &str, now: i64) -> Result<()> {
+    let (status, raw_policy): (String, String) = conn.query_row(
+        "SELECT status,policy FROM swarm_runs WHERE id=?1", [run],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    if !["planning", "running", "paused"].contains(&status.as_str()) {
+        return Ok(());
+    }
+    let policy: Value = serde_json::from_str(&raw_policy)?;
+    let cap = policy["effective"]["ready_materialized_max"]
+        .as_i64().unwrap_or(100).clamp(1, 1000) as usize;
+    let mut stmt = conn.prepare(
+        "SELECT id FROM swarm_jobs WHERE run_id=?1 AND status='ready' ORDER BY id",
+    )?;
+    let ready = stmt.query_map([run], |r| r.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    for id in ready.iter().skip(cap) {
+        conn.execute("UPDATE swarm_jobs SET status='planned',updated_ms=?3 WHERE run_id=?1 AND id=?2",
+            params![run,id,now])?;
+    }
+    let mut room = cap.saturating_sub(ready.len().min(cap));
+    if room == 0 { return Ok(()); }
+    let mut stmt = conn.prepare(
+        "SELECT id,deps FROM swarm_jobs WHERE run_id=?1 AND status='planned' ORDER BY id",
+    )?;
+    let planned = stmt.query_map([run], |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?)))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    for (id, raw_deps) in planned {
+        if room == 0 { break; }
+        let deps: Vec<String> = serde_json::from_str(&raw_deps)?;
+        let mut eligible = true;
+        for dep in deps {
+            if !artifacts::dep_satisfied(conn, run, &dep)? {
+                eligible = false;
+                break;
+            }
+        }
+        if eligible {
+            conn.execute("UPDATE swarm_jobs SET status='ready',updated_ms=?3 WHERE run_id=?1 AND id=?2",
+                params![run,id,now])?;
+            room -= 1;
+        }
+    }
+    Ok(())
+}
+
 /// A control request is terminal only after every linked process has a
 /// confirmed exit and every admitted attempt is finished. Draining also waits
 /// for submitted work to receive a director decision; neither path asserts a
@@ -294,11 +344,7 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
     tx.execute("DELETE FROM swarm_jobs WHERE run_id=?1", params![id])?;
     let now = crate::daemon::now();
     for job in &jobs {
-        let status = if job.deps.is_empty() {
-            "ready"
-        } else {
-            "planned"
-        };
+        let status = "planned";
         tx.execute(
             "INSERT INTO swarm_jobs(run_id,id,plan_revision,title,acceptance,deps,resource_claims,status,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?9)",
             params![id,job.id,revision+1,job.title,job.acceptance,serde_json::to_string(&job.deps)?,serde_json::to_string(&job.resource_claims)?,status,now],
@@ -308,6 +354,7 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
         "UPDATE swarm_runs SET revision=?2,failed_planning_turns=0,no_progress_turns=0,updated_ms=?3 WHERE id=?1",
         params![id, revision + 1, now],
     )?;
+    materialize_ready(&tx, id, now)?;
     tx.commit()?;
     Ok(json!({"id":id,"generation":generation,"revision":revision+1,"job_count":jobs.len(),"rejected":rejected}))
 }

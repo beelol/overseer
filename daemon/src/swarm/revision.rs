@@ -199,6 +199,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         "UPDATE swarm_runs SET revision=?2,failed_planning_turns=0,no_progress_turns=0,updated_ms=?3 WHERE id=?1",
         params![id, revision, now],
     )?;
+    super::materialize_ready(&tx, id, now)?;
     tx.commit()?;
     Ok(
         json!({"id":id,"generation":generation,"revision":revision,"affected":affected.len(),"redirected":redirected}),

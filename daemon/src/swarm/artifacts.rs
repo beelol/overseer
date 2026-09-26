@@ -272,34 +272,7 @@ pub(super) fn release_and_unlock(tx: &Transaction<'_>, run: &str, job: &str, now
         return Ok(());
     }
     tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'", params![run,job,now])?;
-    let mut stmt =
-        tx.prepare("SELECT id,deps FROM swarm_jobs WHERE run_id=?1 AND status='planned'")?;
-    let planned = stmt
-        .query_map(params![run], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
-    drop(stmt);
-    for (id, raw_deps) in planned {
-        let deps: Vec<String> = serde_json::from_str(&raw_deps)?;
-        if deps.is_empty() {
-            continue;
-        }
-        let mut ready = true;
-        for dep in deps {
-            if !dep_satisfied(tx, run, &dep)? {
-                ready = false;
-                break;
-            }
-        }
-        if ready {
-            tx.execute(
-                "UPDATE swarm_jobs SET status='ready',updated_ms=?3 WHERE run_id=?1 AND id=?2",
-                params![run, id, now],
-            )?;
-        }
-    }
-    Ok(())
+    super::materialize_ready(tx, run, now)
 }
 
 pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
@@ -487,6 +460,7 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
         )?;
     }
     super::finalize_control_if_idle(&tx,run,now)?;
+    super::materialize_ready(&tx, run, now)?;
     tx.commit()?;
     Ok(json!({"attempt_id":attempt,"status":"finished","duplicate":false}))
 }

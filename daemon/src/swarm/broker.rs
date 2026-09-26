@@ -83,6 +83,7 @@ pub fn register(store: &mut Store, p: &Value) -> Result<Value> {
     tx.execute("INSERT INTO swarm_attempts(id,run_id,job_id,revision,token_sha256,status,created_ms) VALUES(?1,?2,?3,?4,?5,'registered',?6)",
         params![id,run,job,job_revision,token_hash(&token),now])?;
     tx.execute("UPDATE swarm_jobs SET attempt_count=attempt_count+1,status='reserved',updated_ms=?3 WHERE run_id=?1 AND id=?2",params![run,job,now])?;
+    super::materialize_ready(&tx, run, now)?;
     tx.commit()?;
     Ok(
         json!({"id":id,"token":token,"run_id":run,"job_id":job,"revision":job_revision,"status":"registered"}),

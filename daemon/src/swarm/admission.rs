@@ -504,6 +504,7 @@ fn admit_inner(
         deadline_at_ms=COALESCE(deadline_at_ms,?4),updated_ms=?3 WHERE run_id=?1 AND id=?2",
         params![run, job, now, job_deadline],
     )?;
+    super::materialize_ready(&tx, run, now)?;
     tx.execute(
         "UPDATE swarm_runs SET status='running',updated_ms=?2 WHERE id=?1 AND status='planning'",
         params![run, now],
