@@ -2,7 +2,7 @@
 
 Status: **draft; local implementation and verification in progress under the owner’s later goal**.
 Requested by the owner on 2026-09-25. Baseline: `2c2c7cf`. Revised after owner feedback: continuously assign the right model/effort to each work unit; no user-maintained routing policy; prefer evaluating XCB reuse or a pinned fork.
-Acceptance criteria: **3 / 40 core criteria verified**; AUTO-AC-30 remains conditionally deferred, tracked independently below as `AUTO-AC-NN`.
+Acceptance criteria: **4 / 40 core criteria verified**; AUTO-AC-30 remains conditionally deferred, tracked independently below as `AUTO-AC-NN`.
 
 Local revision: based on the complete fetched draft at `c76938360352909c6157aae359bf811fa8b7405e`. Preserve all original sections and AUTO-AC-01 through AUTO-AC-36. This revision adds local-only telemetry and AUTO-AC-37 through AUTO-AC-41; condensed chat drafts do not replace the full RFC. The owner has requested a draft PR once implementation and verification are complete. Until then, drafting and implementation stay local.
 
@@ -224,7 +224,7 @@ These are implementation requirements, not claims about this documentation revis
 - [ ] **AUTO-AC-15 — Reproducible decision trace.** Record work-unit requirements, observations, inference output, estimator version, selected model/effort, and explanation. **Verify:** Replay identical recorded inputs, including any inference result, to reproduce a decision; do not claim new model calls are deterministic; inspect exclusions and uncertainty without secrets.
 - [ ] **AUTO-AC-16 — No suitable route.** No eligible capable route within the task bounds means no launch. **Verify:** All unavailable, exhausted, incapable, or credibly unaffordable cases pause with reasons and refresh/manual actions; no repeated inference or unapproved spending.
 - [ ] **AUTO-AC-17 — Concurrent admission.** In-flight allowance commitments and workspace ownership are atomic across parent/children. **Verify:** Concurrent requests cannot over-admit known budget or share a writer; a competing manual run and pre-launch identity change are handled; failed launches release commitments and external usage remains uncertain.
-- [ ] **AUTO-AC-18 — Bounded collectors.** Collection obeys timeout, concurrency, deduplication, and no-paid-probe defaults. **Verify:** 100 synthetic candidates with stalled collectors reach a decision/pause within the 10-second deadline plus 1-second test tolerance, no more than four collectors run, and duplicate pool reads coalesce; measure UI responsiveness.
+- [x] **AUTO-AC-18 — Bounded collectors.** Collection obeys timeout, concurrency, deduplication, and no-paid-probe defaults. **Verify:** 100 synthetic candidates with stalled collectors reach a decision/pause within the 10-second deadline plus 1-second test tolerance, no more than four collectors run, and duplicate pool reads coalesce; measure UI responsiveness.
 
 ### Fallback and continuity
 
