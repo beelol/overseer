@@ -517,10 +517,12 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_broker.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "fixtures/swarm/atlas-v1/probe.test.mjs",
         "daemon/src/swarm/coverage.rs",
         "docs/verification/swarm/SWARM-55.md"
       ],
-      "blocker": "Fixture result messages retain distinct negative, environment-failure and defect states; environment failures cannot be passed or hidden, defect acceptance requires reproduction evidence, and later results invalidate prior review. Versioned S1/S2 backend replays, independent reproduction, a complete coverage matrix and live director/harness paths remain unverified."
+      "blocker": "Fixture results retain distinct negative, environment-failure and defect states; the versioned S1 backend now proves a missing export queue stays blocked through Swarm coverage and completion. Defect acceptance requires reproduction evidence and later results invalidate prior review. A complete endpoint/permission coverage matrix, S2 backend replay, autonomous director decisions and live harness paths remain unverified."
     },
     "SWARM-56": {
       "status": "partial",
@@ -611,7 +613,7 @@
         "docs/verification/swarm/S1.md",
         "docs/verification/swarm/SWARM-64.md"
       ],
-      "blocker": "S3 and S1 have versioned backends and joined scripted runs. S1 covers seven isolated database probes, D1/overlap messages, slot refill, J7 reproduction and evidence-gated completion; separate fault replays cover missing artifact, stale J4 output and contradictory J7 with scripted retractions. Autonomous decisions, remaining S1/S3 fault and report traces, live communication and S0/S2/S4/S5 remain unverified."
+      "blocker": "S3 and S1 have versioned backends and joined scripted runs. S1 covers seven isolated database probes, D1/overlap messages, slot refill, J7 reproduction and evidence-gated completion; separate fault replays cover missing artifact, stale J4 output, contradictory J7 with scripted retractions, and unavailable J5 export queue. Autonomous decisions, remaining S1/S3 fault and report traces, live communication and S0/S2/S4/S5 remain unverified."
     }
   },
   "scenarios": {
@@ -629,7 +631,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S1.md"
       ],
-      "blocker": "Versioned Express/PostgreSQL probes feed a joined scripted Swarm run with four initial workers, D1/overlap coordination, slot refill, J7 reproduction and seven accepted checks. Separate fault runs reject missing/stale evidence and hold contradictory J7 with scripted retractions. Profile/director choices, detailed report, missing-queue and source-text variants, contradiction resolution, and live communication remain open."
+      "blocker": "Versioned Express/PostgreSQL probes feed a joined scripted Swarm run with four initial workers, D1/overlap coordination, slot refill, J7 reproduction and seven accepted checks. Separate fault runs reject missing/stale evidence, hold contradictory J7 with scripted retractions, and classify a missing export queue as blocked coverage. Profile/director choices, detailed report, source-text injection, contradiction resolution, and live communication remain open."
     },
     "S2": {
       "status": "unverified",

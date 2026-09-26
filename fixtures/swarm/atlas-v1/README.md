@@ -8,4 +8,6 @@ Run `npm ci --ignore-scripts` once, then `./run-local.sh` with Docker and Node.j
 
 `node probe.mjs j7 task-guarded` uses the manifest's guarded J7 variant. It denies the foreign task mutation and leaves Bob's row unchanged, contradicting J2's seeded result. The joined fault replay holds the task claim for environment review and sends retraction messages to prior recipients; another replay refuses stale J4 output after an assignment change and a J2 result whose referenced artifact has been removed.
 
-The passing acceptance and joined replay tests describe the **seeded backend's actual responses**, including the two vulnerabilities. They are not a security fix, a model-agent audit, or a full S1 pass. Autonomous director choices, live harness communication, the stated report detail, missing-queue variant, source-text injection, and full fault recovery remain open. See `docs/rfcs/swarm-mode-scenarios.md`.
+`node probe.mjs j5 export-queue-missing` removes J5's local PostgreSQL queue table. The authorized export returns 503; the Swarm fault replay records `exports_queue` as unavailable, leaves J5 blocked in the coverage readout, and refuses a passed decision or completed run.
+
+The passing acceptance and joined replay tests describe the **seeded backend's actual responses**, including the two vulnerabilities. They are not a security fix, a model-agent audit, or a full S1 pass. Autonomous director choices, live harness communication, the stated report detail, source-text injection, and full fault recovery remain open. See `docs/rfcs/swarm-mode-scenarios.md`.
