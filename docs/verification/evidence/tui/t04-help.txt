@@ -14,28 +14,28 @@
 ┃                                                          ┃│                                                          ││                                                          │
 ┃                                                          ┃│                                                          ││                                                          │
 ┃                                                          ┃│                                                          ││                                                          │
-┃                                                          ┃│                                                          ││                                                          │
-┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰╭ keys ──────────────────────────────────────────────────╮╯╰ completed ───────────────────────────────────────────────╯
-╭ 4 ✓ agent 09 ────────────────────────────── generic · 0s ╮╭│                                                        │╮╭ 6 ✓ agent 07 ────────────────────────────── generic · 0s ╮
-│ hi                                                       │││  ←↓↑→  h j k l     move between agents                 │││ hi                                                       │
-│                                                          │││  1 – 9             focus agent n on this page          │││                                                          │
+┃                                                          ┃│╭ keys ──────────────────────────────────────────────────╮││                                                          │
+┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰│                                                        │╯╰ completed ───────────────────────────────────────────────╯
+╭ 4 ✓ agent 09 ────────────────────────────── generic · 0s ╮╭│  ←↓↑→  h j k l     move between agents                 │╮╭ 6 ✓ agent 07 ────────────────────────────── generic · 0s ╮
+│ hi                                                       │││  1 – 9             focus agent n on this page          │││ hi                                                       │
 │                                                          │││  tab / shift+tab   next / previous agent               │││                                                          │
 │                                                          │││  ] [   pgdn pgup   next / previous page                │││                                                          │
 │                                                          │││  i  enter          message the focused agent           │││                                                          │
 │                                                          │││  z                 zoom: full screen with scrollback   │││                                                          │
 │                                                          │││  v                 changes: files and diffs            │││                                                          │
+│                                                          │││  e  (in zoom)      expand tool inputs and results      │││                                                          │
 │                                                          │││  a / d             allow / deny its permission request │││                                                          │
 │                                                          │││  w                 next agent waiting for you          │││                                                          │
 │                                                          │││  x                 interrupt the focused agent         │││                                                          │
 │                                                          │││  n                 start a new agent                   │││                                                          │
+│                                                          │││  M                 merge back (asks before each step)  │││                                                          │
 │                                                          │││  f                 filter: all → active → needs you    │││                                                          │
 │                                                          │││  /                 search agents (esc clears)          │││                                                          │
+│                                                          │││  A                 accounts and sign-in                │││                                                          │
 │                                                          │││  r                 reload from the daemon              │││                                                          │
-│                                                          │││  q                 quit (agents keep running)          │││                                                          │
-│                                                          │││                                                        │││                                                          │
-╰ completed ───────────────────────────────────────────────╯╰╰──────────────────────────────────────── any key closes ╯╯╰ completed ───────────────────────────────────────────────╯
-╭ 7 ✓ agent 06 ────────────────────────────── generic · 0s ╮╭ 8 ✓ agent 05 ────────────────────────────── generic · 0s ╮╭ 9 ✓ agent 04 ────────────────────────────── generic · 0s ╮
-│ hi                                                       ││ hi                                                       ││ hi                                                       │
+╰ completed ───────────────────────────────────────────────╯╰│  q                 quit (agents keep running)          │╯╰ completed ───────────────────────────────────────────────╯
+╭ 7 ✓ agent 06 ────────────────────────────── generic · 0s ╮╭│                                                        │╮╭ 9 ✓ agent 04 ────────────────────────────── generic · 0s ╮
+│ hi                                                       ││╰──────────────────────────────────────── any key closes ╯││ hi                                                       │
 │                                                          ││                                                          ││                                                          │
 │                                                          ││                                                          ││                                                          │
 │                                                          ││                                                          ││                                                          │

@@ -18,7 +18,7 @@
 ┃                                                                 ┃│                                                                ││                                                                 │
 ┃                                                                 ┃│                                                                ││                                                                 │
 ┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ─────────────────────────────────────────────────────╯╰ completed ──────────────────────────────────────────────────────╯
-╭ 4 ◆ Add a changelog entry ───────────────────────── claude · 2s ╮╭ 5 ● Watch the build ───────────────────────────── generic · 3s ╮╭ 6 ● Refactor the payment service so every provid…  generic · 3s ╮
+╭ 4 ◆ Add a changelog entry ───────────────────────── claude · 3s ╮╭ 5 ● Watch the build ───────────────────────────── generic · 3s ╮╭ 6 ● Refactor the payment service so every provid…  generic · 4s ╮
 │ › Add a changelog entry for the session refresh change          ││ watching the build…                                            ││ Reading                                                         │
 │ ✎ perm.txt                                                      ││                                                                ││ web-app/src/payments/providers/stripe/adapters/refund-reconcilia│
 │ ⚙ Write perm.txt …                                              ││                                                                ││ tion-worker.ts                                                  │
@@ -39,8 +39,8 @@
 │                                                                 ││                                                                ││                                                                 │
 ╰ ◆ Write perm.txt  a allow d deny ───────────────────────────────╯╰────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────────────────╯
 ╭ 7 ■ Long soak test ─────────────────────────────── generic · 0s ╮╭ 8 ✗ Migration dry-run ─────────────────────────── generic · 0s ╮╭ 9 ✓ Refresh sessions once ──────────────────────── generic · 0s ╮
-│ soaking                                                         ││ migration dry-run: 3 pending                                   ││ Sessions now refresh once.                                      │
-│ · interrupted: interrupted by user (exit signal 2)              ││ error: relation users_v2 missing                               ││ 2 tests passing                                                 │
+│ soaking                                                         ││ error: relation users_v2 missing                               ││ Sessions now refresh once.                                      │
+│ · interrupted: interrupted by user (exit signal 2)              ││ migration dry-run: 3 pending                                   ││ 2 tests passing                                                 │
 │                                                                 ││ · failed: exit code 1                                          ││                                                                 │
 │                                                                 ││                                                                ││                                                                 │
 │                                                                 ││                                                                ││                                                                 │
@@ -57,4 +57,4 @@
 │                                                                 ││                                                                ││                                                                 │
 │                                                                 ││                                                                ││                                                                 │
 ╰ interrupted · by user (exit signal 2) ──────────────────────────╯╰ failed · exit code 1 ──────────────────────────────────────────╯╰ completed ──────────────────────────────────────────────────────╯
- ←↑↓→ move   i message   z zoom   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                                                       
+ ←↑↓→ move   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                                           

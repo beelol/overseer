@@ -89,6 +89,10 @@ pub struct AccountRow {
 pub enum Confirm {
     Interrupt(String),
     Quit,
+    /// Merge back, step 1: commit the worktree and merge the target into the agent's branch.
+    MergePrepare { run: String, text: String },
+    /// Merge back, step 2: merge the agent's branch into the target in the source checkout.
+    MergeComplete { run: String, text: String },
 }
 
 /// What a pending request was for.
@@ -108,6 +112,12 @@ enum Pending {
     AccountList,
     AccountStatus(String),
     Login(String),
+    MergePlan { run: String },
+    MergeResolved { run: String },
+    MergePrepare { run: String },
+    MergeLanding { run: String, branch: String, target: String, repo: String },
+    MergeFiles { run: String, text: String },
+    MergeComplete,
 }
 
 /// The New Agent form.
@@ -719,6 +729,43 @@ impl App {
                     env,
                 });
             }
+            (Pending::MergePlan { run }, Ok(plan)) => self.on_merge_plan(run, plan),
+            (Pending::MergeResolved { run }, Ok(v)) => {
+                if v["state"] == "ready" {
+                    self.merge_plan(&run);
+                } else {
+                    let left: Vec<String> = v["remaining"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                    self.say(format!("Conflict markers remain in {}. Resolve them (or ask the agent), then press M again.", left.join(", ")), true);
+                }
+            }
+            (Pending::MergePrepare { run }, Ok(v)) => {
+                if v["state"] == "conflicts" {
+                    let files: Vec<String> = v["files"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                    let how = if v["handoff"]["sent"] == true { "sent to the agent as a follow-up; press M again when it finishes".to_string() } else { format!("resolve them in the worktree ({}), then press M again", v["handoff"]["why"].as_str().unwrap_or("no follow-up possible")) };
+                    self.say(format!("Merge back: conflicts in {} — {how}", files.join(", ")), true);
+                    self.request_state();
+                } else {
+                    self.merge_plan(&run);
+                }
+            }
+            (Pending::MergeLanding { run, branch, target, repo }, Ok(v)) => {
+                let landing = v["options"].as_array().and_then(|a| a.iter().find(|o| o["mode"] == "branch_merge_base" && o["branch"] == target.as_str() && o["available"] == true).cloned());
+                let ws = self.state.run(&run).map(|r| r.workspace_id.clone()).unwrap_or_default();
+                let repo_name = repo.rsplit('/').next().unwrap_or_default().to_string();
+                let text = format!("Merge {branch} into {target} in {repo_name}?");
+                match landing.and_then(|o| o["base"].as_str().map(str::to_string)) {
+                    Some(base) => self.request("workspace.diff", json!({ "workspace_id": ws, "base": base, "status": false }), Pending::MergeFiles { run, text }),
+                    None => self.mode = Mode::Confirm(Confirm::MergeComplete { run, text }),
+                }
+            }
+            (Pending::MergeFiles { run, text }, Ok(v)) => {
+                let n = v["changes"].as_array().map(|a| a.len()).unwrap_or(0);
+                self.mode = Mode::Confirm(Confirm::MergeComplete { run, text: format!("{text} {n} file{} land{}. The worktree and branch are kept.", if n == 1 { "" } else { "s" }, if n == 1 { "s" } else { "" }) });
+            }
+            (Pending::MergeComplete, Ok(v)) => {
+                self.say(format!("Merged {} into {} ({}). The worktree and branch are kept.", v["branch"].as_str().unwrap_or("the branch"), v["target"].as_str().unwrap_or("the target"), v["commit"].as_str().unwrap_or_default().chars().take(10).collect::<String>()), false);
+                self.request_state();
+            }
             (Pending::Comparisons { .. } | Pending::Diff { .. }, Err(e)) => {
                 self.changes.loading = false;
                 self.changes.error = Some(e);
@@ -889,6 +936,42 @@ impl App {
         }
     }
 
+    fn merge_plan(&mut self, run: &str) {
+        let Some(ws) = self.state.run(run).map(|r| r.workspace_id.clone()) else { return };
+        self.request("workspace.merge_plan", json!({ "workspace_id": ws }), Pending::MergePlan { run: run.to_string() });
+    }
+
+    /// Merge back, like VS Code's: never automatic; each step is confirmed.
+    fn on_merge_plan(&mut self, run: String, plan: Value) {
+        if plan["ok"] != true {
+            self.say(format!("Merge back is unavailable: {}", plan["reason"].as_str().unwrap_or("unknown reason")), true);
+            return;
+        }
+        let branch = plan["branch"].as_str().unwrap_or_default().to_string();
+        let target = plan["target"].as_str().unwrap_or_default().to_string();
+        let repo = plan["repo"].as_str().unwrap_or_default().to_string();
+        match plan["state"].as_str().unwrap_or_default() {
+            "idle" => {
+                let n = plan["worktree_uncommitted"].as_array().map(|a| a.len()).unwrap_or(0);
+                let commit = if n > 0 { format!("commit {n} worktree file{} and ", if n == 1 { "" } else { "s" }) } else { String::new() };
+                self.mode = Mode::Confirm(Confirm::MergePrepare { run, text: format!("Merge back {branch} → {target}: {commit}merge {target} into {branch} in the worktree (conflicts go back to the agent)?") });
+            }
+            "resolving" | "resolved" => {
+                let ws = self.state.run(&run).map(|r| r.workspace_id.clone()).unwrap_or_default();
+                self.request("workspace.merge_resolved", json!({ "workspace_id": ws }), Pending::MergeResolved { run });
+            }
+            "ready" => {
+                let blockers: Vec<String> = plan["blockers"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                if !blockers.is_empty() {
+                    self.say(format!("Merge back is ready but blocked: {}", blockers.join(" ")), true);
+                    return;
+                }
+                self.request("comparison.options", json!({ "run_id": run, "branch": target }), Pending::MergeLanding { run, branch, target, repo });
+            }
+            other => self.say(format!("Merge back: unexpected state {other}"), true),
+        }
+    }
+
     fn open_accounts(&mut self) {
         self.mode = Mode::Accounts;
         self.request("account.list", json!({}), Pending::AccountList);
@@ -991,6 +1074,17 @@ impl App {
                     match c {
                         Confirm::Interrupt(run) => self.request("run.interrupt", json!({ "run_id": run }), Pending::Interrupt),
                         Confirm::Quit => self.quit = true,
+                        Confirm::MergePrepare { run, .. } => {
+                            if let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) {
+                                self.say("Preparing merge back…", false);
+                                self.request("workspace.merge_prepare", json!({ "workspace_id": ws, "handoff": true }), Pending::MergePrepare { run });
+                            }
+                        }
+                        Confirm::MergeComplete { run, .. } => {
+                            if let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) {
+                                self.request("workspace.merge_complete", json!({ "workspace_id": ws }), Pending::MergeComplete);
+                            }
+                        }
                     }
                 }
                 _ => self.mode = Mode::Grid,
@@ -1043,6 +1137,15 @@ impl App {
             KeyCode::Char('n') => self.open_new_agent(),
             KeyCode::Char('v') => self.open_changes(),
             KeyCode::Char('A') => self.open_accounts(),
+            KeyCode::Char('M') => {
+                if let Some(run) = self.focused().cloned() {
+                    if run.active() {
+                        self.say("Merge back waits until the agent is done (x interrupts it)", false);
+                    } else {
+                        self.merge_plan(&run.id);
+                    }
+                }
+            }
             KeyCode::Char('/') => {
                 self.mode = Mode::Search;
                 self.page = 0;

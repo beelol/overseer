@@ -49,6 +49,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | a / d | Allow / deny the focused agent's pending permission |
 | w | Jump to the next agent waiting for you |
 | x | Interrupt the focused agent (asks y/n) |
+| M | Merge back: commit the worktree and merge the target in (y/n), then merge into the target (y/n) |
 | n | New agent (repository, harness, account, model, prompt) |
 | f | Filter: All → Active → Needs you |
 | / | Search agents by title, repository, harness, model, account or prompt (Esc clears) |
@@ -155,3 +156,10 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   result under the call; `e` folds them again. Paths are shortened as elsewhere. **Verify:**
   a Claude fixture Write call shows its path, size and result when expanded, and nothing extra
   when folded.
+- [x] **T-18 — Merge back from the terminal.** `M` on a finished agent runs VS Code's merge back,
+  never automatically: it explains when it is unavailable (still running, nothing to merge,
+  blocked source checkout); step 1 (y/n) commits the worktree and merges the target into the
+  agent's branch, with conflicts sent back to the agent; step 2 (y/n) says how many files land
+  and merges into the target branch in the source checkout, keeping the worktree and branch.
+  **Verify:** `M` on a running agent explains; on a finished one, nothing reaches the target
+  before the second yes, and after it the change is on the target branch.

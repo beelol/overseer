@@ -37,4 +37,4 @@
 ┃ row 1998                                                                                                                                 ┃
 ┃ row 1999                                                                                                                                 ┃
 ┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
- j/k scroll   g/G top/bottom   i message   a/d allow/deny   x interrupt   z grid   ? help                                                   
+ e expand tools   j/k scroll   g/G top/bottom   i message   a/d allow/deny   x interrupt   z grid   ? help                                  

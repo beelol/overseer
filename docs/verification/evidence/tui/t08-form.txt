@@ -18,7 +18,7 @@
 ┃                                                                                                                                                              ┃
 ┃                                     ╭ new agent ───────────────────────────────────────────────────────────────────────╮                                     ┃
 ┃                                     │                                                                                  │                                     ┃
-┃                                     │   Repository  /private/var/folders/mk/vz_j1tqn0rz6w6f4ztwfv0gr0000gn/T/.tmpF9Ye… │                                     ┃
+┃                                     │   Repository  /private/var/folders/mk/vz_j1tqn0rz6w6f4ztwfv0gr0000gn/T/.tmp2BIk… │                                     ┃
 ┃                                     │   Harness     ‹ claude claude-fixture 0.0.0 (synthetic) ›  (1/5)                 │                                     ┃
 ┃                                     │                                                                                  │                                     ┃
 ┃                                     │   Account     claude (existing login)  ✗ not signed in                           │                                     ┃

@@ -1,10 +1,6 @@
- ◆ Overseer  page 1/1 · 2 agents · ● 2 active                                                                                                       ● connected 
-╭ 1 ● Started elsewhere ───────────────────────────────────────── generic · 0s ╮┏ 2 ● Echo agent ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 2s ┓
-│ made outside the tui                                                         │┃ ready                                                                        ┃
-│                                                                              │┃ › hello from the tui                                                         ┃
-│                                                                              │┃ echo: hello from the tui                                                     ┃
-│                                                                              │┃ › from vscode                                                                ┃
-│                                                                              │┃ echo: from vscode                                                            ┃
+ ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                       ● connected 
+╭ 1 ● Still running ───────────────────────────────────────────── generic · 1s ╮┏ 2 ✓ Document sessions ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓
+│ working…                                                                     │┃ documented                                                                   ┃
 │                                                                              │┃                                                                              ┃
 │                                                                              │┃                                                                              ┃
 │                                                                              │┃                                                                              ┃
@@ -42,7 +38,7 @@
 │                                                                              │┃                                                                              ┃
 │                                                                              │┃                                                                              ┃
 │                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-╰──────────────────────────────────────────────────────────────────────────────╯┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
- Sent to Echo agent                                                                                                                                             
+╰──────────────────────────────────────────────────────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ Merge back overseer/document-sessions → main: commit 1 worktree file and merge main into overseer/document-sessions in the worktree (conflicts go back to the  
+agent)? y / n                                                                                                                                                   
+ Merge back waits until the agent is done (x interrupts it)                                                                                                     

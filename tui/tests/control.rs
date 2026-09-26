@@ -246,3 +246,41 @@ fn t17_zoom_expands_tool_inputs_and_results() {
     tui.key(KeyCode::Char('e'));
     assert!(!tui.screen().contains("│ perm.txt"), "e folds them again");
 }
+
+#[test]
+fn t18_merge_back_from_the_terminal_asks_before_each_step() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("merge"));
+    let git = |args: &[&str]| String::from_utf8_lossy(&std::process::Command::new("git").args(args).current_dir(&repo).output().unwrap().stdout).trim().to_string();
+    let main_before = git(&["rev-parse", "main"]);
+    let run = d.sh(&repo, "Document sessions", "printf '\\n## Sessions\\nThey refresh once.\\n' >> README.md; echo documented");
+    d.wait_status(&run, |s| s == "completed", 20);
+    let busy = d.sh(&repo, "Still running", "sleep 30");
+    let mut tui = Tui::attach(&d, 160, 44);
+    tui.until(10, |a| a.visible().len() == 2);
+    // Not while the agent runs.
+    tui.key(KeyCode::Char('1'));
+    assert_eq!(tui.app.focus.as_deref(), Some(busy.as_str()));
+    tui.key(KeyCode::Char('M'));
+    assert!(tui.screen().contains("Merge back waits until the agent is done"));
+    // Step 1: commit the worktree and merge main into the agent's branch.
+    tui.key(KeyCode::Char('2'));
+    tui.key(KeyCode::Char('M'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(Confirm::MergePrepare { .. })));
+    let s = tui.screen();
+    assert!(s.contains("Merge back overseer/document-sessions → main: commit 1 worktree file and merge main into overseer/document-sessions"), "{s}");
+    tui.snapshot("t18-merge-step-1");
+    tui.key(KeyCode::Char('y'));
+    // Step 2: exactly what lands, then merge into main in the source checkout.
+    tui.until(15, |a| matches!(a.mode, Mode::Confirm(Confirm::MergeComplete { .. })));
+    let s = tui.screen();
+    assert!(s.contains("Merge overseer/document-sessions into main in merge? 1 file lands. The worktree and branch are kept."), "{s}");
+    assert_eq!(git(&["rev-parse", "main"]), main_before, "nothing reaches main before the second yes");
+    tui.snapshot("t18-merge-step-2");
+    tui.key(KeyCode::Char('y'));
+    tui.until_screen(15, "Merged overseer/document-sessions into main");
+    assert_ne!(git(&["rev-parse", "main"]), main_before);
+    assert!(std::fs::read_to_string(repo.join("README.md")).unwrap().contains("They refresh once."), "the change is on main in the source checkout");
+    d.ctl("run.interrupt", json!({ "run_id": busy }));
+}

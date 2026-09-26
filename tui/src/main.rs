@@ -33,6 +33,9 @@ KEYS:
     i / enter       message the focused agent  z     zoom (full screen, scrollback)
     a / d           allow / deny a permission  w     next agent waiting for you
     x               interrupt                  n     new agent
+    v               changes (files, diffs)     M     merge back (asks each step)
+    /               search agents              A     accounts and sign-in
+    e               in zoom: expand tool calls
     f               filter all/active/needs you ?     all keys
     q               quit (agents keep running)
 

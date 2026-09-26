@@ -80,7 +80,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
     app.size = (area.width, area.height);
     let composing = matches!(app.mode, Mode::Compose) || matches!(app.mode, Mode::Confirm(_));
-    let composer_h = if matches!(app.mode, Mode::Compose) { composer_height(app, area.width) } else if composing { 1 } else { 0 };
+    let composer_h = if matches!(app.mode, Mode::Compose) { composer_height(app, area.width) } else if composing { 2 } else { 0 };
     let [head, body, comp, foot] = Layout::vertical([Constraint::Length(1), Constraint::Min(3), Constraint::Length(composer_h), Constraint::Length(1)]).areas(area);
     header(f, app, head);
     match app.mode {
@@ -96,8 +96,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         let text = match c {
             Confirm::Interrupt(id) => format!(" Interrupt {}? y / n", short(&app.state.run(id).map(|r| r.title.clone()).unwrap_or_default(), 50)),
             Confirm::Quit => " Unsent drafts will be lost. Quit? y / n".to_string(),
+            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } => format!(" {text} y / n"),
         };
-        f.render_widget(Paragraph::new(Line::from(Span::styled(text, Style::new().fg(waiting()).add_modifier(Modifier::BOLD)))), comp);
+        f.render_widget(Paragraph::new(Line::from(Span::styled(text, Style::new().fg(waiting()).add_modifier(Modifier::BOLD)))).wrap(Wrap { trim: false }), comp);
     }
     footer(f, app, foot);
     match app.mode {
@@ -415,6 +416,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("w", "next agent waiting for you"),
         ("x", "interrupt the focused agent"),
         ("n", "start a new agent"),
+        ("M", "merge back (asks before each step)"),
         ("f", "filter: all → active → needs you"),
         ("/", "search agents (esc clears)"),
         ("A", "accounts and sign-in"),
