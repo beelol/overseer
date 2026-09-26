@@ -216,3 +216,25 @@ fn uncertain_director_stalls_and_confirmed_replacement_replays_unapplied_batch()
     assert_eq!(replay["messages"][0]["message_id"],"discovery");
     assert_eq!(replay["messages"][1]["message_id"],"late-result");
 }
+
+#[test]
+fn confirmed_director_replacement_preserves_a_paused_run() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Paused director", "objective":"Audit",
+        "allowed_targets":["system-codex"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    assert_eq!(d.call("swarm.pause", json!({"run_id":id,"generation":1,"revision":1}))["status"], "paused");
+    assert_eq!(d.call("swarm.director.recover", json!({"run_id":id,"generation":1,
+        "revision":1,"termination":"unknown"}))["status"], "stalled");
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.director.recover", json!({"run_id":id,"generation":1,
+        "revision":1,"termination":"unknown"}))["status"], "stalled");
+    let replaced = d.call("swarm.director.recover", json!({"run_id":id,"generation":1,
+        "revision":1,"termination":"confirmed_dead"}));
+    assert_eq!(replaced["status"], "paused");
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "paused");
+}

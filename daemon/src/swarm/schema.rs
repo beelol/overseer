@@ -11,6 +11,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           objective TEXT NOT NULL,
           status TEXT NOT NULL,
           stop_reason TEXT,
+          stalled_from TEXT,
           generation INTEGER NOT NULL,
           revision INTEGER NOT NULL,
           allowed_targets TEXT NOT NULL,
@@ -174,6 +175,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         .exists([])?;
     if !has_stop_reason {
         conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN stop_reason TEXT;")?;
+    }
+    let has_stalled_from = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='stalled_from'")?
+        .exists([])?;
+    if !has_stalled_from {
+        conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN stalled_from TEXT;")?;
     }
     Ok(())
 }

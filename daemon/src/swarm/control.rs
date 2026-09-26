@@ -70,7 +70,7 @@ pub fn off(store: &mut Store, p: &Value) -> Result<Value> {
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
     tx.execute(
-        "UPDATE swarm_runs SET status='draining',updated_ms=?2 WHERE id=?1",
+        "UPDATE swarm_runs SET status='draining',stalled_from=NULL,updated_ms=?2 WHERE id=?1",
         params![id, now],
     )?;
     tx.execute("UPDATE swarm_jobs SET status='cancelled',updated_ms=?2 WHERE run_id=?1 AND status IN ('planned','ready')",params![id,now])?;

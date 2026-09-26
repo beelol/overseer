@@ -1,6 +1,6 @@
 # SWARM-30 — director replacement
 
-Status: partial. Revision: `0fc1446`.
+Status: partial. Revision: `0fc1446`, follow-up `3d7bc31` and the paused-state recovery change.
 
 Input: a fixture-admitted worker with a reserved quota window reports a discovery. The director claims it, and the daemon restarts before the batch is applied. The worker sends a late terminal result while director termination is uncertain. The fixture then reports confirmed director death.
 
@@ -8,6 +8,8 @@ Expected: uncertainty holds new coordination and keeps usage reserved; confirmat
 
 Actual: the run enters `stalled` on unknown termination. Claiming another director batch and sending an old directive fail; the worker result remains durable and its reservation stays active. Confirmed death increments generation from 1 to 2. The replacement claims both the original discovery and the late result, while the original completion token/directive is rejected. The focused test first failed because recovery did not exist, then passed after the transition was added. The workspace suite passed with 68 tests at revision `0fc1446`.
 
-Evidence: `daemon/tests/swarm_director.rs`, `docs/verification/swarm/milestone-11.md`.
+Follow-up: Pause and Resume cannot bypass an uncertain director stall. A separate crash-and-restart fixture starts paused, receives repeated unknown-termination reports, then confirms death; replacement restores `paused` rather than silently resuming admission. The previous implementation returned `planning` in the red test. An additive schema migration persists the pre-stall state; the workspace suite passed 76 tests after the fix.
+
+Evidence: `daemon/tests/swarm_director.rs`, `daemon/tests/swarm_state.rs`, `docs/verification/swarm/milestone-11.md`.
 
 Remaining: the fixture supplies termination evidence; no live process identity/liveness proof, replacement target selection, model turn, or unavailable-replacement recovery is implemented. This is not proof that a real director can be safely killed or resumed.

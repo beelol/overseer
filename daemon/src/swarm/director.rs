@@ -140,7 +140,8 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
     let tx = store.conn.transaction()?;
     if termination == "unknown" {
         tx.execute(
-            "UPDATE swarm_runs SET status='stalled',updated_ms=?2 WHERE id=?1",
+            "UPDATE swarm_runs SET stalled_from=CASE WHEN status='stalled' THEN stalled_from ELSE status END,
+             status='stalled',updated_ms=?2 WHERE id=?1",
             params![run, now],
         )?;
         tx.commit()?;
@@ -169,9 +170,14 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
         params![run],
         |r| r.get(0),
     )?;
-    let next_status = if current["status"] == "draining" {
+    let prior_status = if current["status"] == "stalled" {
+        current["stalled_from"].as_str().unwrap_or("")
+    } else {
+        current["status"].as_str().unwrap_or("")
+    };
+    let next_status = if prior_status == "draining" {
         "draining"
-    } else if current["status"] == "paused" {
+    } else if prior_status == "paused" {
         "paused"
     } else if workers > 0 {
         "running"
@@ -179,7 +185,7 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
         "planning"
     };
     tx.execute(
-        "UPDATE swarm_runs SET generation=generation+1,status=?2,updated_ms=?3 WHERE id=?1",
+        "UPDATE swarm_runs SET generation=generation+1,status=?2,stalled_from=NULL,updated_ms=?3 WHERE id=?1",
         params![run, next_status, now],
     )?;
     tx.commit()?;

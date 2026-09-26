@@ -229,7 +229,7 @@
         "docs/verification/swarm/SWARM-30.md",
         "docs/verification/swarm/milestone-11.md"
       ],
-      "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result, and requeues an unapplied batch after confirmed replacement with generation fencing; live process liveness, replacement availability and actual director execution are unverified."
+      "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result and prior Pause state, and requeues an unapplied batch after confirmed replacement with generation fencing; live process liveness, replacement availability and actual director execution are unverified."
     },
     "SWARM-31": {
       "status": "unverified",

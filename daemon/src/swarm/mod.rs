@@ -38,6 +38,7 @@ fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
         "objective": row.get::<_, String>("objective")?,
         "status": row.get::<_, String>("status")?,
         "stop_reason": row.get::<_, Option<String>>("stop_reason")?,
+        "stalled_from": row.get::<_, Option<String>>("stalled_from")?,
         "generation": row.get::<_, i64>("generation")?,
         "revision": row.get::<_, i64>("revision")?,
         "allowed_targets": serde_json::from_str::<Value>(&targets).unwrap_or(Value::Null),
