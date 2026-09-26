@@ -5,9 +5,9 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **76 / 97** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-81, AC-82, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
-with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), offline mode and local models (Gate L, AC-83 to AC-97, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), fixed Claude accounts (AC-53, partial;
+criteria: **76 / 98** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-81, AC-82, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97, AC-98. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
@@ -103,19 +103,20 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-82** Gate K design review (owner-confirmed) — ◐ partial: the review page shows every view in Gate J and Gate K in both Overseer themes (and High Contrast where captured), with a Looks right / Needs work mark and a note per view saved for the owner: https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv / deferred: the owner's marks, the changes they ask for, and the owner's dated confirmation — [evidence](docs/verification/AC-82.md)
 - [ ] **AC-83** Offline is not an outage — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-83.md)
 - [ ] **AC-84** Fail over to the best working provider — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-84.md)
-- [ ] **AC-85** Local inventory — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-85.md)
+- [ ] **AC-85** Local inventory read from the machine — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-85.md)
 - [ ] **AC-86** Memory budget and fit — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-86.md)
-- [ ] **AC-87** Verified local catalogue — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-87.md)
+- [ ] **AC-87** Verified local catalogue, Qwen coders first — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-87.md)
 - [ ] **AC-88** Settings the daemon enforces — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-88.md)
 - [ ] **AC-89** Download models only when allowed — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-89.md)
 - [ ] **AC-90** Install and run Ollama only when allowed — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-90.md)
 - [ ] **AC-91** Transition to local when offline — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-91.md)
-- [ ] **AC-92** Wait and retry, never fail — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-92.md)
+- [ ] **AC-92** Wait and retry, never fail (for 36 hours) — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-92.md)
 - [ ] **AC-93** Back online — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-93.md)
 - [ ] **AC-94** Local models as a first-class choice — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-94.md)
 - [ ] **AC-95** Honest offline UI — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-95.md)
 - [ ] **AC-96** Several local agents — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-96.md)
 - [ ] **AC-97** Offline session (owner-confirmed) — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-97.md)
+- [ ] **AC-98** On by default, explained once — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-98.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -248,21 +249,22 @@ the owner action or decision each one needs.
 - [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.
 - [ ] [AC-81](docs/verification/AC-81.md) (Gate J still holds): Next: rerun scenario-live-gatej.js on the Gate K build when paid turns on both ChatGPT accounts are wanted.
 - [ ] [AC-82](docs/verification/AC-82.md) (Gate K design review (owner-confirmed)): Owner review. Next: the owner marks each view; each Needs work is changed and shown again until the owner confirms.
-- [ ] [AC-83](docs/verification/AC-83.md) (Offline is not an outage): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-84](docs/verification/AC-84.md) (Fail over to the best working provider): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-85](docs/verification/AC-85.md) (Local inventory): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-86](docs/verification/AC-86.md) (Memory budget and fit): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-87](docs/verification/AC-87.md) (Verified local catalogue): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-88](docs/verification/AC-88.md) (Settings the daemon enforces): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-89](docs/verification/AC-89.md) (Download models only when allowed): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-90](docs/verification/AC-90.md) (Install and run Ollama only when allowed): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-91](docs/verification/AC-91.md) (Transition to local when offline): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-92](docs/verification/AC-92.md) (Wait and retry, never fail): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-93](docs/verification/AC-93.md) (Back online): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-94](docs/verification/AC-94.md) (Local models as a first-class choice): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-95](docs/verification/AC-95.md) (Honest offline UI): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-96](docs/verification/AC-96.md) (Several local agents): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
-- [ ] [AC-97](docs/verification/AC-97.md) (Offline session (owner-confirmed)): Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).
+- [ ] [AC-83](docs/verification/AC-83.md) (Offline is not an outage): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-84](docs/verification/AC-84.md) (Fail over to the best working provider): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-85](docs/verification/AC-85.md) (Local inventory read from the machine): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-86](docs/verification/AC-86.md) (Memory budget and fit): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-87](docs/verification/AC-87.md) (Verified local catalogue, Qwen coders first): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-88](docs/verification/AC-88.md) (Settings the daemon enforces): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-89](docs/verification/AC-89.md) (Download models only when allowed): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-90](docs/verification/AC-90.md) (Install and run Ollama only when allowed): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-91](docs/verification/AC-91.md) (Transition to local when offline): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-92](docs/verification/AC-92.md) (Wait and retry, never fail (for 36 hours)): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-93](docs/verification/AC-93.md) (Back online): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-94](docs/verification/AC-94.md) (Local models as a first-class choice): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-95](docs/verification/AC-95.md) (Honest offline UI): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-96](docs/verification/AC-96.md) (Several local agents): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-97](docs/verification/AC-97.md) (Offline session (owner-confirmed)): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
+- [ ] [AC-98](docs/verification/AC-98.md) (On by default, explained once): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
@@ -277,7 +279,7 @@ the owner action or decision each one needs.
 - [Side RFC: native Overseer notifications on macOS](docs/rfcs/native-notifications.md)
 - [Side RFC: Overseer-managed Claude credentials](docs/rfcs/claude-credentials.md)
 - [Side RFC: daily-driver orchestrator UI](docs/rfcs/orchestrator-ui.md)
-- [Side RFC: offline mode and local models](docs/rfcs/offline-mode.md)
+- [Side RFC: Continuity — offline mode and local models](docs/rfcs/offline-mode.md)
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 
 Design targets macOS and Linux; only macOS is verified. Auto routing beyond the offline fallback ([Gate L](docs/rfcs/offline-mode.md)), a TUI, VSCodium,

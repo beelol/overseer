@@ -992,52 +992,55 @@ rec(82, "Gate K design review (owner-confirmed)", "partial", commit=GK, date="20
     evidence="https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv", live="—",
     blocker="Owner review. Next: the owner marks each view; each Needs work is changed and shown again until the owner confirms.")
 
-# Gate L (added by the owner on 2026-09-26; docs/rfcs/offline-mode.md). Not started.
+# Gate L, Continuity (added by the owner on 2026-09-26; docs/rfcs/offline-mode.md). Not started; built in its own worktree.
 rec(83, "Offline is not an outage", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 rec(84, "Fail over to the best working provider", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
-rec(85, "Local inventory", "not started", date="—", commit="—",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
+rec(85, "Local inventory read from the machine", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 rec(86, "Memory budget and fit", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
-rec(87, "Verified local catalogue", "not started", date="—", commit="—",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
+rec(87, "Verified local catalogue, Qwen coders first", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 rec(88, "Settings the daemon enforces", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 rec(89, "Download models only when allowed", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 rec(90, "Install and run Ollama only when allowed", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 rec(91, "Transition to local when offline", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
-rec(92, "Wait and retry, never fail", "not started", date="—", commit="—",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
+rec(92, "Wait and retry, never fail (for 36 hours)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 rec(93, "Back online", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 rec(94, "Local models as a first-class choice", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 rec(95, "Honest offline UI", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 rec(96, "Several local agents", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 rec(97, "Offline session (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
+rec(98, "On by default, explained once", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree).")
 
 SHORT_BLOCKERS = {
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
@@ -1079,6 +1082,7 @@ SHORT_BLOCKERS = {
     95: "not started (Gate L, added by the owner on 2026-09-26)",
     96: "not started (Gate L, added by the owner on 2026-09-26)",
     97: "not started (Gate L, added by the owner on 2026-09-26)",
+    98: "not started (Gate L, added by the owner on 2026-09-26)",
 }
 TOTAL = 53
 
