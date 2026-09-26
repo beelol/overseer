@@ -478,13 +478,7 @@ impl Daemon {
         {
             // Task and run appear together: a state snapshot never shows a task without its run.
             let store = self.store.lock().unwrap();
-            store.insert_task(&task)?;
-            if let Some(identity) = swarm_identity {
-                store.insert_run_for_swarm(&run, &identity.attempt_id)?;
-            } else {
-                store.insert_run(&run)?;
-            }
-            store.set_workspace_owner(&ws.id, Some(&run.id))?;
+            store.insert_task_and_run(&task,&run,swarm_identity.map(|identity|identity.attempt_id.as_str()))?;
         }
         let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "extra_args": p["extra_args"].clone()});
         let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };

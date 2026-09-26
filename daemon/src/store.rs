@@ -243,8 +243,8 @@ impl Store {
     }
 
     // ---- tasks
-    pub fn insert_task(&self, t: &Task) -> Result<()> {
-        self.conn.execute(
+    fn insert_task_row(conn: &Connection, t: &Task) -> Result<()> {
+        conn.execute(
             "INSERT INTO tasks(id,title,prompt,repo_root,target_ref,workspace_id,start_snapshot,fork_commit,fork_provenance,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
             params![t.id, t.title, t.prompt, t.repo_root, t.target_ref, t.workspace_id, t.start_snapshot, t.fork_commit, t.fork_provenance, t.created_ms],
         )?;
@@ -320,16 +320,20 @@ impl Store {
         Ok(())
     }
 
-    pub fn insert_run_for_swarm(&self, r: &Run, attempt_id: &str) -> Result<()> {
+    pub fn insert_task_and_run(&self, t: &Task, r: &Run, attempt_id: Option<&str>) -> Result<()> {
         let tx = self.conn.unchecked_transaction()?;
+        Self::insert_task_row(&tx, t)?;
         Self::insert_run_row(&tx, r)?;
-        let linked = tx.execute(
-            "UPDATE swarm_worker_launches SET overseer_run_id=?2 WHERE attempt_id=?1 AND overseer_run_id IS NULL",
-            params![attempt_id, r.id],
-        )?;
-        if linked != 1 {
-            anyhow::bail!("swarm launch intent is missing or already linked");
+        if let Some(attempt_id) = attempt_id {
+            let linked = tx.execute(
+                "UPDATE swarm_worker_launches SET overseer_run_id=?2 WHERE attempt_id=?1 AND overseer_run_id IS NULL",
+                params![attempt_id, r.id],
+            )?;
+            if linked != 1 {
+                anyhow::bail!("swarm launch intent is missing or already linked");
+            }
         }
+        tx.execute("UPDATE workspaces SET owner_run_id=?2 WHERE id=?1",params![r.workspace_id,r.id])?;
         tx.commit()?;
         Ok(())
     }
@@ -594,5 +598,41 @@ impl Store {
         )?;
         self.conn.execute("DELETE FROM events WHERE run_id=?1 AND seq<=?2 AND kind<>'retention'", params![run, cutoff])?;
         Ok(Some(cutoff))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn failed_swarm_link_rolls_back_task() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
+        let workspace = Workspace {
+            id: "w-test".into(), path: "/tmp/test".into(), repo_root: "/tmp/test".into(),
+            common_dir: "/tmp/test/.git".into(), kind: "worktree".into(), branch: None,
+            owner_run_id: None, initial_dirty: json!({"clean":true}), created_ms: 1,
+            removed_ms: None,
+        };
+        store.insert_workspace(&workspace).unwrap();
+        let task = Task {
+            id: "t-test".into(), title: "Test".into(), prompt: "Check".into(),
+            repo_root: workspace.repo_root.clone(), target_ref: None,
+            workspace_id: workspace.id.clone(), start_snapshot: None,
+            fork_commit: None, fork_provenance: None, created_ms: 1, archived_ms: None,
+        };
+        let run = Run {
+            id: "r-test".into(), task_id: task.id.clone(), parent_run_id: None,
+            harness: "generic".into(), harness_version: None, profile_id: None, model: None,
+            workspace_id: workspace.id.clone(), native_id: None, status: "queued".into(),
+            exit_reason: None, created_ms: 1, ended_ms: None, title: task.title.clone(),
+            relation_source: None, relation_confidence: None, capabilities: json!({}),
+            process_generation: 0, attention: None,
+        };
+        assert!(store.insert_task_and_run(&task, &run, Some("missing-attempt")).is_err());
+        assert!(store.task(&task.id).unwrap().is_none());
+        assert!(store.run(&run.id).unwrap().is_none());
     }
 }
