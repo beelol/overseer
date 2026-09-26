@@ -439,7 +439,7 @@
         "daemon/src/swarm/runtime.rs",
         "docs/verification/swarm/SWARM-51.md"
       ],
-      "blocker": "The daemon now samples bounded local worker reachability and preserves a durable 60-second suspect-to-unknown transition without treating output silence as death. A real prolonged transport outage/recovery, confirmed dead-process reconciliation, full progress-spam deadline checks and live harness qualification remain unverified."
+      "blocker": "Local supervised fixtures now distinguish output silence, interrupted transport, disconnected/unconfirmed exit, progress spam, crash between job-timeout persistence and interrupt, and a worker ignoring the first signal. A 60-second wall-clock outage, late launch/review race, worker ignoring all escalation, shared usage settlement, and qualified live harness behavior remain unverified."
     },
     "SWARM-52": {
       "status": "unverified",
