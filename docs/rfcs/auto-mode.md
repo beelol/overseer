@@ -2,7 +2,7 @@
 
 Status: **draft; local implementation and verification in progress under the owner’s later goal**.
 Requested by the owner on 2026-09-25. Baseline: `2c2c7cf`. Revised after owner feedback: continuously assign the right model/effort to each work unit; no user-maintained routing policy; prefer evaluating XCB reuse or a pinned fork.
-Acceptance criteria: **7 / 40 core criteria verified**; AUTO-AC-30 remains conditionally deferred, tracked independently below as `AUTO-AC-NN`.
+Acceptance criteria: **8 / 40 core criteria verified**; AUTO-AC-30 remains conditionally deferred, tracked independently below as `AUTO-AC-NN`.
 
 Local revision: based on the complete fetched draft at `c76938360352909c6157aae359bf811fa8b7405e`. Preserve all original sections and AUTO-AC-01 through AUTO-AC-36. This revision adds local-only telemetry and AUTO-AC-37 through AUTO-AC-41; condensed chat drafts do not replace the full RFC. The owner has requested a draft PR once implementation and verification are complete. Until then, drafting and implementation stay local.
 
@@ -208,7 +208,7 @@ These are implementation requirements, not claims about this documentation revis
 
 - [ ] **AUTO-AC-01 — Isolated delivery.** Auto ships disabled by default and manual routing remains unchanged. **Verify:** diff review plus manual create/follow-up/interrupt regression with Auto disabled; confirm release AC IDs and account-governance work are untouched by routing-only changes.
 - [x] **AUTO-AC-02 — Capability and metering survey.** Record versions, account APIs/harness sources, supported models/efforts/tools, and whether each exposes remaining allowance, actual charges, or only activity. **Verify:** Read-only versioned probes for supported harnesses/accounts; record authentication method and freshness; missing per-model multipliers remain unknown, not a claimed integration.
-- [ ] **AUTO-AC-03 — Provider-neutral eligibility.** Common eligibility checks accept provider/harness/model data independently of routing preferences. **Verify:** Synthetic providers pass the same eligibility path; no provider-specific fallback chain; separate adapter knowledge from measured estimates and bounded task inference.
+- [x] **AUTO-AC-03 — Provider-neutral eligibility.** Common eligibility checks accept provider/harness/model data independently of routing preferences. **Verify:** Synthetic providers pass the same eligibility path; no provider-specific fallback chain; separate adapter knowledge from measured estimates and bounded task inference.
 - [ ] **AUTO-AC-04 — Distinct routes and shared pools.** Account/model/endpoint scopes and shared quota are preserved. **Verify:** exhaust one account across two harnesses; both are excluded while an independent allowed account remains eligible; test unresolved identity conservatism.
 - [ ] **AUTO-AC-05 — Codex remaining allowance.** Structured account-scoped reads/updates expose all applicable limits independently of consumed tokens. **Verify:** tiny live isolated-account read plus fixtures for multiple buckets/windows, absent fields, exhausted secondary window, and unsupported schema; no fabricated total token allowance.
 - [ ] **AUTO-AC-06 — Claude structured acquisition.** Collect supported native events/status data or explicit unknown without a hidden inference probe. **Verify:** Live available-account observation during an authorized tiny task plus versioned fixtures; test pre-response absence, missing windows, original cache age, and preservation of existing status-line settings.
