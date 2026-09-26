@@ -132,13 +132,21 @@ pub fn select_valid(raw: &Value) -> Result<(Vec<JobSpec>, Vec<Value>)> {
         .filter_map(|(index, item)| {
             errors[index]
                 .as_ref()
-                .map(|reason| json!({"index":index,"id":item["id"].as_str(),"reason":reason}))
+                .map(|reason| json!({"index":index,
+                    "id":item["id"].as_str().map(crate::redact::redact),"reason":reason}))
         })
         .collect();
     Ok((jobs, rejected))
 }
 
 fn basic_error(job: &JobSpec) -> Option<String> {
+    if [job.id.as_str(), job.title.as_str(), job.acceptance.as_str()]
+        .into_iter()
+        .chain(job.resource_claims.iter().map(|claim| claim.resource.as_str()))
+        .any(|text| crate::redact::redact(text) != text)
+    {
+        return Some("job contains sensitive text".to_string());
+    }
     if job.id.is_empty()
         || job.id.len() > 100
         || !job
@@ -221,4 +229,23 @@ pub fn validate(jobs: &[JobSpec]) -> Result<()> {
         visit(&job.id, &by_id, &mut visited, &mut active)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::select_valid;
+    use serde_json::json;
+
+    #[test]
+    fn partial_plan_rejects_secret_job_and_redacts_its_reported_id() {
+        let secret = "sk-abcdefghijklmnopqrstuv";
+        let (jobs, rejected) = select_valid(&json!([
+            {"id":secret,"title":"Hidden","acceptance":"evidence"},
+            {"id":"safe","title":"Inspect","acceptance":"evidence"}
+        ])).unwrap();
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].id, "safe");
+        assert_eq!(rejected[0]["id"], "[redacted]");
+        assert_eq!(rejected[0]["reason"], "job contains sensitive text");
+    }
 }

@@ -25,6 +25,23 @@ fn swarm_create_rejects_secret_shaped_category_and_objective_without_persisting_
 }
 
 #[test]
+fn swarm_plan_rejects_secret_shaped_job_text_before_persistence() {
+    let d = Daemon::start(&[]);
+    let made = d.call("swarm.create", json!({"category":"Safe plan",
+        "objective":"Inspect routes","allowed_targets":["system-codex"]}));
+    let run = made["id"].as_str().unwrap();
+    let secret = "sk-abcdefghijklmnopqrstuv";
+    let error = d.try_call("swarm.plan", json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"inspect","title":format!("Inspect {secret}"),
+            "acceptance":"evidence","deps":[]}]})).unwrap_err();
+    assert!(error.contains("sensitive text"), "{error}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let count: i64 = db.query_row("SELECT COUNT(*) FROM swarm_jobs WHERE run_id=?1", [run],
+        |r| r.get(0)).unwrap();
+    assert_eq!(count, 0);
+}
+
+#[test]
 fn one_active_category_run_survives_restart() {
     let mut d = Daemon::start(&[]);
     let made = d.call(
