@@ -1904,6 +1904,23 @@ fn auto_dispatch_selects_reachable_local_opencode_provider_after_another_fails()
     let child_id = run_id(&selected);
     assert_eq!(d.wait_done(&child_id, 60)["status"], "completed");
     assert!(std::fs::read_to_string(&mock_log).unwrap().contains("/v1/chat/completions"));
+    let isolated_home = Path::new(local["home"].as_str().unwrap());
+    let stats = std::process::Command::new(&program).args(["stats", "--pure", "--models", "5"])
+        .current_dir(&repo)
+        .env("XDG_DATA_HOME", isolated_home.join("data"))
+        .env("XDG_CONFIG_HOME", isolated_home.join("config"))
+        .env("XDG_STATE_HOME", isolated_home.join("state"))
+        .env("XDG_CACHE_HOME", isolated_home.join("cache"))
+        .env("OPENCODE_DISABLE_AUTOUPDATE", "1")
+        .env("OPENCODE_DISABLE_MODELS_FETCH", "1")
+        .output().unwrap();
+    assert!(stats.status.success(), "OpenCode stats failed: {}", String::from_utf8_lossy(&stats.stderr));
+    let stats_text = String::from_utf8_lossy(&stats.stdout);
+    assert!(stats_text.contains("gpt-oss-120b"), "controlled task did not appear in OpenCode stats: {stats_text}");
+    let after_stats = d.call("auto.opencode.local.inspect", json!({"profile_id":local["id"],
+        "workspace_id":d.run(&parent)["workspace_id"]}));
+    assert_eq!(after_stats["allowance"], "unknown",
+        "token/cost statistics cannot become an invented subscription balance");
     let decision_event = d.events(&parent).into_iter()
         .find(|event| event["kind"] == "auto_decision").unwrap();
     assert_eq!(decision_event["payload"]["candidates"].as_array().unwrap().iter()
