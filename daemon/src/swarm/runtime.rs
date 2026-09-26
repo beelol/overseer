@@ -36,6 +36,7 @@ pub fn launch_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         bail!("invalid scripted worker launch");
     }
     let digest = format!("{:x}", Sha256::digest(p.to_string().as_bytes()));
+    let assigned_prompt;
     {
         let store = d.store.lock().unwrap();
         let attempt_revision = broker::check_attempt(&store, run, job, attempt, token)?;
@@ -67,6 +68,11 @@ pub fn launch_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         if !eligible {
             bail!("attempt has no current admitted job");
         }
+        let brief = super::worker_brief(&store, p)?;
+        assigned_prompt = format!("{prompt}\n\nSwarm assignment and evidence references:\n{brief}");
+        if assigned_prompt.len() > 32 * 1024 {
+            bail!("scripted worker prompt exceeds inline context limit");
+        }
         if new_intent {
             store.conn.execute(
                 "INSERT INTO swarm_worker_launches(attempt_id,run_id,job_id,request_sha256,created_ms)
@@ -78,7 +84,7 @@ pub fn launch_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let task = d.create_task_for_swarm(
         &json!({
             "repo":repo,"harness":"generic","workspace_mode":"worktree",
-            "program":program,"args":args,"prompt":prompt,"title":title,
+            "program":program,"args":args,"prompt":assigned_prompt,"title":title,
         }),
         attempt,
     )?;

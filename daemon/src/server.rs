@@ -323,6 +323,18 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             crate::swarm::launch_worker(d, p)?
         }
+        "swarm.worker.brief" => {
+            fixture_only()?;
+            crate::swarm::worker_brief(&d.store.lock().unwrap(), p)?
+        }
+        "swarm.context.get" => {
+            fixture_only()?;
+            crate::swarm::artifact_chunk(&d.store.lock().unwrap(), p)?
+        }
+        "swarm.director.summary" => {
+            fixture_only()?;
+            crate::swarm::director_summary(&d.store.lock().unwrap(), p)?
+        }
         "swarm.worker.reconcile" => {
             fixture_only()?;
             crate::swarm::reconcile_worker(d, p)?
