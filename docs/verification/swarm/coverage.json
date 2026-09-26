@@ -213,9 +213,10 @@
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
         "daemon/tests/swarm_dispatch.rs",
+        "daemon/src/swarm/completion.rs",
         "docs/verification/swarm/SWARM-27.md"
       ],
-      "blocker": "Supervised scripted workers now submit evidence/results into the director inbox and accepted contract work unlocks a dependent job without per-worker user launches. A live director still cannot decompose, route, review, synthesize or complete the objective by its checks."
+      "blocker": "Supervised scripted workers submit evidence/results into the director inbox, accepted contract work unlocks a dependent job, and fixture completion requires passed checks for every accepted job plus confirmed exits and an applied inbox. A live director still cannot decompose, route, review or synthesize the objective."
     },
     "SWARM-28": {
       "status": "unverified",
@@ -454,11 +455,13 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_dispatch.rs",
+        "daemon/src/swarm/completion.rs",
         "docs/verification/swarm/milestone-2.md",
         "docs/verification/swarm/milestone-12.md",
         "docs/verification/swarm/SWARM-54.md"
       ],
-      "blocker": "Acceptance rejects removed, stale-revision and hash-mismatched stored evidence before retrying after restoration; filesystem artifacts, final-report revalidation and permission-scoped replacement retrieval remain unimplemented."
+      "blocker": "Acceptance and fixture final completion revalidate stored evidence provenance and integrity, including tampering after review. Live filesystem provenance and permission-scoped replacement retrieval remain unimplemented."
     },
     "SWARM-55": {
       "status": "unverified",
