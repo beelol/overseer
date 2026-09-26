@@ -171,6 +171,12 @@ pub fn reconcile_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let Some(worker_status) = worker_status else {
         bail!("linked worker run is missing");
     };
+    // Overseer records a lost supervisor as `disconnected` even when the harness
+    // child may still be alive. Its ended timestamp is not process-exit evidence.
+    if worker_status == "disconnected" {
+        return Ok(json!({"status":"unknown","overseer_run_id":overseer_run_id,
+            "worker_status":worker_status}));
+    }
     if crate::daemon::ACTIVE.contains(&worker_status.as_str()) || ended.is_none() {
         return Ok(json!({"status":"active","overseer_run_id":overseer_run_id}));
     }
@@ -214,6 +220,7 @@ pub fn reconcile_terminal_workers(d: &Arc<Daemon>) -> Result<usize> {
              JOIN swarm_attempts a ON a.id=l.attempt_id AND a.status='registered'
              JOIN swarm_runs s ON s.id=l.run_id
              JOIN runs r ON r.id=l.overseer_run_id AND r.ended_ms IS NOT NULL
+                AND r.status!='disconnected'
              ORDER BY r.ended_ms LIMIT 100",
         )?;
         let rows = stmt

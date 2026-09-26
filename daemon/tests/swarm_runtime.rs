@@ -117,6 +117,24 @@ fn admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart() {
         )["status"],
         "active"
     );
+    // A lost supervisor/transport is not proof that its child process exited.
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute("UPDATE runs SET status='disconnected',ended_ms=?2 WHERE id=?1",
+        rusqlite::params![worker_run, now()]).unwrap();
+    let unknown = d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}));
+    assert_eq!(unknown["status"], "unknown", "{unknown}");
+    std::thread::sleep(std::time::Duration::from_millis(1200));
+    assert_eq!(d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}))["status"], "unknown");
+    let attempt_status: String = db.query_row("SELECT status FROM swarm_attempts WHERE id=?1",
+        rusqlite::params![admitted["attempt_id"].as_str().unwrap()], |r|r.get(0)).unwrap();
+    assert_eq!(attempt_status, "registered");
+    let reservations: i64 = db.query_row("SELECT COUNT(*) FROM swarm_reservations WHERE attempt_id=?1 AND status='active'",
+        rusqlite::params![admitted["attempt_id"].as_str().unwrap()], |r|r.get(0)).unwrap();
+    assert!(reservations > 0);
+    db.execute("UPDATE runs SET status='running',ended_ms=NULL WHERE id=?1",
+        rusqlite::params![worker_run]).unwrap();
     let jobs = d.call("swarm.jobs", json!({"id":id}))["jobs"]
         .as_array()
         .unwrap()
