@@ -58,6 +58,12 @@ pub fn is_verified_loopback_endpoint(url: &str) -> bool {
     loopback_port(url).is_some()
 }
 
+/// The numeric socket identity shared by endpoint URL aliases. Different
+/// paths on one local listener conservatively share one unknown-draw pool.
+pub(crate) fn verified_loopback_port(url: &str) -> Option<u16> {
+    loopback_port(url)
+}
+
 /// A loopback TCP check is metadata-only; reachability is not a model-turn
 /// success or evidence about the provider's quality, permissions, or quota.
 pub fn probe_local_endpoint(url: &str) -> EndpointProbe {

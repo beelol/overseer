@@ -4,6 +4,7 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 use crate::auto_quota::QuotaSnapshot;
@@ -69,7 +70,7 @@ pub fn codex_auto_routes(
             quota: auto_select::observed_allowance(quota, &model.model, now_ms),
             quota_blocks: quota.map(|value| value.blocking_scopes(&model.model, now_ms)).unwrap_or_default(),
             fit: Fit::Unknown, health: Health::Unknown,
-            unresolved_quota_pool_identity:false,
+            unresolved_quota_pool_identity:false, in_flight_pool_claim:false,
         });
     }
     routes
@@ -100,7 +101,7 @@ pub fn claude_auto_routes(
             quota:auto_select::observed_allowance(quota, model, now_ms),
             quota_blocks:quota.map(|value| value.blocking_scopes(model, now_ms)).unwrap_or_default(),
             fit:Fit::Unknown, health:Health::Unknown,
-            unresolved_quota_pool_identity:false,
+            unresolved_quota_pool_identity:false, in_flight_pool_claim:false,
         }).collect()
 }
 
@@ -113,12 +114,16 @@ pub fn opencode_local_routes(catalog: &crate::auto_opencode::LocalCatalog,
     profile_id: &str, now_ms: i64) -> Vec<Route> {
     if now_ms < catalog.observed_ms || now_ms >= catalog.expires_ms { return Vec::new(); }
     catalog.models.iter().filter_map(|model| {
+        let port = crate::auto_opencode::verified_loopback_port(&model.endpoint)?;
         let model_id = model.model.strip_prefix(&format!("{}/", model.provider_id))?;
         if model_id != "gpt-oss-120b" || !model.toolcall || !model.reasoning { return None; }
+        let mut pool = Sha256::new();
+        pool.update(b"overseer:auto:opencode-local-socket:v2\0");
+        pool.update(port.to_be_bytes());
         Some(Route {
             id:format!("{profile_id}/{}/default", model.model), harness:"opencode".into(),
             provider:model.provider_id.clone(), endpoint:model.endpoint.clone(),
-            profile_id:profile_id.into(), pool_id:format!("{profile_id}/{}", model.endpoint),
+            profile_id:profile_id.into(), pool_id:format!("local-endpoint/{:x}", pool.finalize()),
             model:model.model.clone(), effort:"default".into(), tier:CapabilityTier::General,
             tools:BTreeSet::new(), context_limit:model.context_limit,
             // The guarded inline config exposes read-only agent tools. This
@@ -127,7 +132,7 @@ pub fn opencode_local_routes(catalog: &crate::auto_opencode::LocalCatalog,
             recommended_default:model.is_default, quota:Allowance::Unknown,
             quota_blocks:Vec::new(),
             fit:Fit::Unknown, health:Health::Unknown,
-            unresolved_quota_pool_identity:false,
+            unresolved_quota_pool_identity:false, in_flight_pool_claim:false,
         })
     }).collect()
 }
@@ -331,6 +336,31 @@ mod tests {
         assert_eq!(routes[0].tier, CapabilityTier::General);
         assert_eq!(routes[0].effort, "default");
         assert!(opencode_local_routes(&catalog, "p-local", now + 60_000).is_empty());
+    }
+
+    #[test]
+    fn local_opencode_profiles_share_only_the_same_verified_endpoint_pool() {
+        let now = 1_800_000_000_000_i64;
+        let model = |endpoint: &str| crate::auto_opencode::LocalModel {
+            provider_id:"local".into(), model:"local/gpt-oss-120b".into(),
+            endpoint:endpoint.into(), context_limit:Some(32_000), toolcall:true,
+            reasoning:true, variants:vec![], is_default:true,
+        };
+        let catalog = |endpoint: &str| crate::auto_opencode::LocalCatalog {
+            observed_ms:now, expires_ms:now + 60_000, models:vec![model(endpoint)],
+        };
+        let a = opencode_local_routes(&catalog("http://127.0.0.1:47811/v1"), "profile-a", now);
+        let b = opencode_local_routes(&catalog("http://127.0.0.1:47811/v1"), "profile-b", now);
+        let alias = opencode_local_routes(&catalog("http://127.0.0.1:47811/other"), "profile-c", now);
+        let numeric = opencode_local_routes(&catalog("http://127.0.0.1:8080/v1"), "profile-d", now);
+        let padded = opencode_local_routes(&catalog("http://127.0.0.1:08080/v1"), "profile-e", now);
+        let c = opencode_local_routes(&catalog("http://127.0.0.1:47812/v1"), "profile-b", now);
+        assert_eq!(a[0].pool_id, b[0].pool_id);
+        assert_eq!(a[0].pool_id, alias[0].pool_id);
+        assert_eq!(numeric[0].pool_id, padded[0].pool_id,
+            "equivalent numeric ports must share one unknown-draw pool");
+        assert_ne!(a[0].pool_id, c[0].pool_id);
+        assert!(!a[0].pool_id.contains("127.0.0.1"), "durable pool keys should not copy endpoint URLs");
     }
 
     #[test]

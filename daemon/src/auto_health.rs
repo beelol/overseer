@@ -445,6 +445,7 @@ mod tests {
             fit: Fit::Unknown,
             health: Health::Unknown,
             unresolved_quota_pool_identity: false,
+            in_flight_pool_claim: false,
         }
     }
 

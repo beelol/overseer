@@ -3024,6 +3024,109 @@ fn auto_dispatch_blocks_two_profiles_on_one_codex_account_but_uses_an_independen
 }
 
 #[test]
+fn auto_unknown_draw_claim_blocks_another_profile_on_the_same_account_until_settlement() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let quota = r.path().join("quota-mode.txt");
+    let accounts = r.path().join("account-ids");
+    std::fs::create_dir_all(&accounts).unwrap();
+    std::fs::write(&quota, "unknown").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_QUOTA_MODE_FILE,FIXTURE_TURN_DELAY_MS,FIXTURE_ACCOUNT_IDS_DIR"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_QUOTA_MODE_FILE", quota.to_str().unwrap()),
+        ("FIXTURE_TURN_DELAY_MS", "8000"), ("FIXTURE_ACCOUNT_IDS_DIR", accounts.to_str().unwrap())]);
+    let profiles: Vec<_> = ["First", "Same account", "Independent account"].into_iter().map(|name|
+        d.call("profile.create", json!({"name":name,"harness":"codex"}))["id"]
+            .as_str().unwrap().to_string()).collect();
+    for (index, profile) in profiles.iter().enumerate() {
+        std::fs::write(accounts.join(profile), if index < 2 { "shared-account" } else { "independent-account" }).unwrap();
+    }
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+
+    let first = d.call("auto.dispatch", json!({"work_unit_id":"unknown-claim-first",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[profiles[0]],"prompt":"browser check"}));
+    assert_eq!(first["state"], "dispatched", "{first}");
+    let first_child = run_id(&first);
+    d.wait_status(&first_child, |status| status == "running", 10);
+    let second = d.call("auto.dispatch", json!({"work_unit_id":"unknown-claim-second",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[profiles[1]],"prompt":"second bounded unit"}));
+    assert_eq!(second["state"], "paused", "{second}");
+    assert!(second["decision"]["exclusions"].as_array().unwrap().iter().any(|entry|
+        entry["reason"] == "pool_in_flight_unknown_draw"), "{second}");
+    assert_eq!(d.runs().len(), 2, "one unknown-draw account may have only one admitted child");
+    let event = d.events(&parent).into_iter().find(|event|
+        event["kind"] == "auto_decision" && event["payload"]["decision"]["work_unit_id"] == "unknown-claim-second").unwrap();
+    assert_eq!(d.call("auto.decision.replay", json!({"event_seq":event["seq"]}))["matches_recorded"], true);
+
+    let independent = d.call("auto.dispatch", json!({"work_unit_id":"unknown-claim-independent",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[profiles[2]],"prompt":"independent bounded unit"}));
+    assert_eq!(independent["state"], "dispatched", "{independent}");
+    assert_eq!(independent["run"]["profile_id"], profiles[2]);
+    assert_eq!(d.run(&first_child)["status"], "running",
+        "the independent pool must be admitted while the first account is still active");
+    assert_eq!(d.wait_done(&run_id(&independent), 15)["status"], "completed");
+
+    assert_eq!(d.wait_done(&first_child, 15)["status"], "completed");
+    let after = d.call("auto.dispatch", json!({"work_unit_id":"unknown-claim-after-settlement",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[profiles[1]],"prompt":"next bounded unit"}));
+    assert_eq!(after["state"], "dispatched", "{after}");
+    assert_eq!(after["run"]["profile_id"], profiles[1]);
+    assert_eq!(d.wait_done(&run_id(&after), 15)["status"], "completed");
+}
+
+#[test]
+fn auto_simultaneous_unknown_draw_units_admit_only_one_shared_account_child() {
+    use std::sync::{Arc, Barrier};
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let quota = r.path().join("quota-mode.txt");
+    std::fs::write(&quota, "unknown").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_QUOTA_MODE_FILE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_QUOTA_MODE_FILE", quota.to_str().unwrap()),
+        ("FIXTURE_TURN_DELAY_MS", "6000")]);
+    let profiles: Vec<_> = ["First concurrent", "Second concurrent"].into_iter().map(|name|
+        d.call("profile.create", json!({"name":name,"harness":"codex"}))["id"]
+            .as_str().unwrap().to_string()).collect();
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let gate = Arc::new(Barrier::new(3));
+    let results = std::thread::scope(|scope| {
+        let handles = (0..2).map(|index| {
+            let gate = gate.clone();
+            let profile = profiles[index].clone();
+            let parent = parent.clone();
+            let d = &d;
+            scope.spawn(move || {
+                gate.wait();
+                d.call("auto.dispatch", json!({"work_unit_id":format!("simultaneous-unknown-{index}"),
+                    "parent_run_id":parent,"min_tier":"general","required_tools":[],
+                    "allowed_profiles":[profile],"prompt":"browser check"}))
+            })
+        }).collect::<Vec<_>>();
+        gate.wait();
+        handles.into_iter().map(|handle| handle.join().unwrap()).collect::<Vec<_>>()
+    });
+    assert_eq!(results.iter().filter(|result| result["state"] == "dispatched").count(), 1,
+        "exactly one shared account child may be admitted: {results:?}");
+    assert_eq!(results.iter().filter(|result| result["state"] == "paused").count(), 1,
+        "the contending unit must pause with an explicit reason: {results:?}");
+    assert!(results.iter().find(|result| result["state"] == "paused").unwrap()
+        ["decision"]["exclusions"].as_array().unwrap().iter().any(|entry|
+            entry["reason"] == "pool_in_flight_unknown_draw"));
+    assert_eq!(d.runs().len(), 2);
+    let launched = results.iter().find(|result| result["state"] == "dispatched").unwrap();
+    assert_eq!(d.wait_done(&run_id(launched), 15)["status"], "completed");
+}
+
+#[test]
 fn auto_recent_429_excludes_only_its_route_without_inventing_quota_exhaustion() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
@@ -3729,6 +3832,10 @@ fn auto_running_child_survives_lost_dispatch_response_and_two_client_reconnect()
     d.kill9();
     drop(lost_client);
     d.spawn();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let claim_state = || db.query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id='auto-post-spawn-1'",
+        [], |row| row.get::<_, String>(0)).unwrap();
+    assert_eq!(claim_state(), "active", "restart must keep the claim for a live child");
     let first = d.call("auto.dispatch", request.clone());
     let second = d.call("auto.dispatch", request);
     for replay in [&first, &second] {
@@ -3736,6 +3843,7 @@ fn auto_running_child_survives_lost_dispatch_response_and_two_client_reconnect()
         assert_eq!(replay["replayed"], true);
     }
     assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert_eq!(claim_state(), "released", "confirmed child settlement releases the claim once");
     assert_eq!(d.run(&child)["process_generation"], 1);
     assert_eq!(d.runs().len(), 2);
     assert_eq!(d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count(), 1);
@@ -3768,23 +3876,33 @@ fn auto_replay_does_not_claim_a_committed_but_unstarted_child_was_dispatched() {
         .collect::<Vec<_>>();
     assert_eq!(children.len(), 1, "child identity was committed before the notice failed");
     let child = children[0]["id"].as_str().unwrap().to_string();
-    assert_eq!(children[0]["status"], "queued");
+    assert_eq!(children[0]["status"], "failed",
+        "the stopped pre-turn child must settle without entering profile activity checks");
     assert_eq!(children[0]["process_generation"], 0);
     let before_restart = d.call("auto.dispatch", request.clone());
     assert_eq!(before_restart["state"], "paused",
         "unstarted child cannot be reported as dispatched: {before_restart}");
     assert_eq!(before_restart["pause_reason"], "launch_effects_uncertain");
     assert_eq!(before_restart["run"]["id"], child);
-    d.kill9();
+    let claim: String = db.query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id='unstarted-auto-child-1'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(claim, "released", "a stopped worker before the child turn cannot hold subscription allowance");
     db.execute_batch("DROP TRIGGER reject_child_created_notice;").unwrap();
+    let second = d.call("auto.dispatch", json!({"work_unit_id":"unstarted-auto-child-2",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "prompt":"second bounded child task"}));
+    assert_eq!(second["state"], "dispatched", "a separate unit should use the released allowance: {second}");
+    let second_child = second["run"]["id"].as_str().unwrap().to_string();
+    assert_eq!(d.wait_done(&second_child, 15)["status"], "completed");
+    d.kill9();
     d.spawn();
     let replay = d.call("auto.dispatch", request);
     assert_eq!(replay["state"], "paused", "unstarted child cannot be reported as dispatched: {replay}");
     assert_eq!(replay["pause_reason"], "launch_effects_uncertain");
     assert_eq!(replay["run"]["id"], child);
-    assert_eq!(d.runs().len(), 2);
-    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 0,
-        "replay must not start an unstarted child automatically");
+    assert_eq!(d.runs().len(), 3);
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 1,
+        "replay must not start the first, unstarted child automatically");
 }
 
 #[test]
@@ -3972,6 +4090,10 @@ fn auto_crash_after_git_worktree_effect_reports_planned_resource_without_retry()
     assert_eq!(replay["pause_reason"], "launch_effects_uncertain");
     assert_eq!(replay["launch_resources"]["branch"], branch);
     assert_eq!(replay["launch_resources"]["path"], worktree);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let claim: String = db.query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id='git-effect-crash-1'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(claim, "released", "no committed child can have spent model allowance; uncertain Git resources remain separately journaled");
     assert_eq!(std::fs::read_to_string(&attempts).unwrap().lines().count(), 1,
         "a crash after the Git effect must not attempt another worktree add");
     assert_eq!(d.runs().len(), 1, "no child was committed before the crash");

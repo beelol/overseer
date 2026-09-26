@@ -791,7 +791,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 }
                 let unstarted = child.process_generation == 0
                     && (ACTIVE.contains(&child.status.as_str())
-                        || child.exit_reason.as_deref() == Some("daemon stopped before the run was launched"));
+                        || matches!(child.exit_reason.as_deref(),
+                            Some("daemon stopped before the run was launched" |
+                                "delegated launch stopped before model turn")));
                 let replay_state = if (!ACTIVE.contains(&child.status.as_str())
                     && child.status != "completed") || unstarted {
                     "paused"
@@ -899,6 +901,15 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         route.unresolved_quota_pool_identity = true;
                     }
                 }
+                // Selection sees active/uncertain unknown-draw claims. The
+                // decision insert checks again in one SQLite transaction so
+                // two clients collecting concurrently cannot both admit.
+                {
+                    let store = d.store.lock().unwrap();
+                    for route in &mut routes {
+                        route.in_flight_pool_claim = store.auto_pool_claimed(&route.pool_id)?;
+                    }
+                }
                 let work = WorkUnit { id:work_unit_id.into(), min_tier, required_tools:required_tools.clone(),
                     context_needed, requires_approvals, min_sandbox:sandbox,
                     max_sandbox:sandbox,
@@ -974,7 +985,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         "profile_id":route.profile_id,"model":route.model,"effort":route.effort,
                         "quota":route.quota,"fit":route.fit,"health":route.health,
                     }));
-                let trace = json!({"selector_version":"multi-harness-preflight-v4","decision":decision,
+                let trace = json!({"selector_version":"multi-harness-preflight-v5","decision":decision,
                     "selected_route":selected_route,
                     "estimator":{"state":"unavailable","version":null},
                     "inference":{"state":"not_used","output":null},
@@ -996,8 +1007,27 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                             .ok_or_else(|| anyhow!("selected account generation unavailable"))?)
                     };
                     let required = required_tools.iter().cloned().collect::<Vec<_>>();
-                    d.record_auto_selected_decision(work_unit_id, &parent,
-                        &requirements_hash, selected, generation.copied(), trace)?;
+                    let admitted = d.record_auto_selected_decision(work_unit_id, &parent,
+                        &requirements_hash, selected, &route.pool_id, generation.copied(), trace.clone())?;
+                    if admitted.is_none() {
+                        // The pool was claimed after selection. This is an
+                        // admission race, not evidence of provider failure or
+                        // exhausted quota. No child or launch intent exists.
+                        let mut paused = decision.clone();
+                        paused.selected = None;
+                        paused.reason = "pool_in_flight_unknown_draw".into();
+                        paused.exclusions.push(crate::auto_select::Exclusion {
+                            route_id: selected.into(), reason: "pool_in_flight_unknown_draw".into(),
+                        });
+                        let mut pause_trace = trace;
+                        pause_trace["decision"] = json!(paused);
+                        pause_trace["selected_route"] = Value::Null;
+                        pause_trace["selection_input"]["admission_pool_conflict"] = json!(selected);
+                        d.emit(Some(&parent.task_id), Some(&parent.id), "auto_decision",
+                            "daemon", "exact", pause_trace)?;
+                        return Ok(json!({"state":"paused","work_unit_id":work_unit_id,
+                            "decision":paused,"actions":["refresh","choose_manual_route"]}));
+                    }
                     let launch_request = json!({"work_unit_id":work_unit_id,
                         "parent_run_id":parent.id,"harness":route.harness,"profile_id":route.profile_id,
                         "model":route.model,"effort":route.effort,"prompt":prompt,"title":title,
@@ -1030,7 +1060,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                                     Ok(delegated)
                                 }
                                 Err(_) => {
-                                    worker_daemon.store.lock().unwrap().set_auto_launch_intent_phase(&launch_id, "paused")?;
+                                    let store = worker_daemon.store.lock().unwrap();
+                                    store.set_auto_launch_intent_phase(&launch_id, "paused")?;
+                                    store.release_unstarted_auto_pool_claim(&launch_id)?;
+                                    drop(store);
                                     Ok(json!({"state":"paused","work_unit_id":launch_id,
                                         "pause_reason":"launch_effects_uncertain",
                                         "launch_resources":auto_launch_resources(&worker_daemon, &launch_id)?,
@@ -1044,7 +1077,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     });
                     if let Err(error) = spawn {
                         auto_launches().lock().unwrap().remove(work_unit_id);
-                        d.store.lock().unwrap().set_auto_launch_intent_phase(work_unit_id, "paused")?;
+                        let store = d.store.lock().unwrap();
+                        store.set_auto_launch_intent_phase(work_unit_id, "paused")?;
+                        if !store.release_unstarted_auto_pool_claim(work_unit_id)? {
+                            return Err(anyhow!("unstarted launch retained an uncertain pool claim: {error}"));
+                        }
                         return Err(error.into());
                     }
                     // The persisted intent and active-worker set now identify
@@ -1084,10 +1121,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "codex-cold-start-v1" => crate::auto_select::select_legacy_v1(&work, &routes),
                 "codex-cold-start-v2" | "multi-harness-cold-start-v1" =>
                     crate::auto_select::select_pre_status_v1(&work, &routes),
-                "multi-harness-preflight-v1" | "multi-harness-preflight-v2" | "multi-harness-preflight-v3" | "multi-harness-preflight-v4" => {
+                "multi-harness-preflight-v1" | "multi-harness-preflight-v2" | "multi-harness-preflight-v3" | "multi-harness-preflight-v4" | "multi-harness-preflight-v5" => {
                     let mut decision = if selector_version == "multi-harness-preflight-v1" {
                         crate::auto_select::select_pre_status_v1(&work, &routes)
-                    } else if selector_version == "multi-harness-preflight-v4" {
+                    } else if matches!(selector_version, "multi-harness-preflight-v4" | "multi-harness-preflight-v5") {
                         crate::auto_select::select(&work, &routes)
                     } else { crate::auto_select::select_pre_scoped_pool_v1(&work, &routes) };
                     if input["attempt_limit_reached"] == true {
@@ -1097,6 +1134,15 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     if input["deadline_exhausted"] == true {
                         decision.selected = None;
                         decision.reason = "collection_deadline_elapsed".into();
+                    }
+                    if selector_version == "multi-harness-preflight-v5" {
+                        if let Some(route_id) = input["admission_pool_conflict"].as_str() {
+                            decision.selected = None;
+                            decision.reason = "pool_in_flight_unknown_draw".into();
+                            decision.exclusions.push(crate::auto_select::Exclusion {
+                                route_id: route_id.into(), reason: "pool_in_flight_unknown_draw".into(),
+                            });
+                        }
                     }
                     decision
                 }

@@ -108,16 +108,16 @@ impl Daemon {
     }
 
     pub fn record_auto_selected_decision(&self, work_unit_id: &str, parent: &Run,
-        requirements_hash: &str, route_id: &str, account_generation: Option<i64>,
-        trace: Value) -> Result<Event> {
+        requirements_hash: &str, route_id: &str, pool_id: &str,
+        account_generation: Option<i64>, trace: Value) -> Result<Option<Event>> {
         let store = self.store.lock().unwrap();
         if !store.auto_mode_enabled()? {
             return Err(anyhow!("Auto Mode was disabled before admission"));
         }
         let event = store.insert_auto_selected_decision(work_unit_id,
-            parent, requirements_hash, route_id, account_generation, &redact_value(trace))?;
+            parent, requirements_hash, route_id, pool_id, account_generation, &redact_value(trace))?;
         drop(store);
-        let _ = self.events.send(event.clone());
+        if let Some(event) = &event { let _ = self.events.send(event.clone()); }
         Ok(event)
     }
 
@@ -718,8 +718,14 @@ impl Daemon {
             return Err(error);
         }
         drop(parent_guard);
-        self.emit(Some(&run.task_id), Some(&run.id), "managed_child_created", "daemon", "exact",
-            json!({"parent_run_id":parent.id,"run":run,"workspace":ws,"snapshot_id":snapshot.id}))?;
+        if let Err(error) = self.emit(Some(&run.task_id), Some(&run.id), "managed_child_created", "daemon", "exact",
+            json!({"parent_run_id":parent.id,"run":run,"workspace":ws,"snapshot_id":snapshot.id})) {
+            // start_turn has not been called. The child and its Git resource
+            // remain inspectable. Settling it also releases the pool claim
+            // and keeps this unstarted run out of profile activity checks.
+            self.mark_ended(&run, "failed", "delegated launch stopped before model turn")?;
+            return Err(error);
+        }
         if let Err(error) = self.start_turn(&run.id, prompt, false) {
             self.mark_ended(&run, "failed", &format!("delegated launch failed: {error}"))?;
             return Ok(json!({"work_unit_id":work_unit_id,"run":self.run(&run.id)?,"workspace":ws,"launch_error":error.to_string()}));
@@ -1927,6 +1933,7 @@ impl Daemon {
                 store.set_run_attention(&run.id, None)?;
                 let turn_status = if status == "completed" { "completed" } else { status };
                 store.finish_open_turns(&run.id, turn_status, ended)?;
+                store.release_settled_auto_pool_claim(&run.id)?;
                 emitted.push(store.insert_event(ended, Some(&run.task_id), Some(&run.id), "status", "daemon", "exact", &json!({"status": status, "reason": reason}))?);
                 if status == "completed" && run.relation_source.as_deref() == Some("managed-delegation") {
                     if let Some(notice) = store.publish_managed_result_notice(run, ended)? {
@@ -1974,6 +1981,7 @@ impl Daemon {
     /// Called once at startup: reattach to surviving supervisors, finalize exited
     /// ones, and report lost sessions. Never relaunches work.
     pub fn reconcile(self: &Arc<Self>) -> Result<Value> {
+        self.store.lock().unwrap().release_stale_unstarted_auto_pool_claims()?;
         let runs = self.store.lock().unwrap().runs()?;
         let mut report = Vec::new();
         for run in runs.iter().filter(|r| (r.parent_run_id.is_none() || matches!(r.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation"))) && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {

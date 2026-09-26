@@ -191,6 +191,10 @@ pub struct Route {
     /// conservative admission block, not a claim that this route is exhausted.
     #[serde(default)]
     pub unresolved_quota_pool_identity: bool,
+    /// An admitted work unit with unknown draw is already using this pool.
+    /// This is local admission evidence, not provider exhaustion.
+    #[serde(default)]
+    pub in_flight_pool_claim: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -249,6 +253,9 @@ fn excluded(work: &WorkUnit, route: &Route, blocks: &PoolBlocks<'_>) -> Option<&
         || blocks.models.contains(&(route.pool_id.as_str(), route.model.as_str()))
         || route.model.split('-').any(|part| blocks.families.contains(&(route.pool_id.as_str(), part))) {
         return Some("quota_exhausted");
+    }
+    if route.in_flight_pool_claim {
+        return Some("pool_in_flight_unknown_draw");
     }
     if route.fit == Fit::Unaffordable {
         return Some("estimated_draw_exceeds_allowance");
@@ -391,6 +398,7 @@ mod tests {
             fit: Fit::Unknown,
             health: Health::Healthy,
             unresolved_quota_pool_identity: false,
+            in_flight_pool_claim: false,
         }
     }
 
@@ -490,6 +498,20 @@ mod tests {
                 "unknown allowance stays a disclosed cold-start candidate for {harness}");
             assert_eq!(cold_start.reason, "cold_start_allowance_unknown", "{harness}");
         }
+    }
+
+    #[test]
+    fn an_unknown_in_flight_pool_excludes_aliases_but_not_an_independent_pool() {
+        let work = unit(CapabilityTier::General, &[]);
+        let mut first = route("same-account-a", "codex", "pool-a", CapabilityTier::General, "medium", &[]);
+        let mut alias = route("same-account-b", "claude", "pool-a", CapabilityTier::General, "medium", &[]);
+        let independent = route("independent", "codex", "pool-b", CapabilityTier::General, "medium", &[]);
+        first.in_flight_pool_claim = true;
+        alias.in_flight_pool_claim = true;
+        let decision = select(&work, &[first, alias, independent]);
+        assert_eq!(decision.selected.as_deref(), Some("independent"));
+        assert_eq!(decision.exclusions.iter().filter(|entry|
+            entry.reason == "pool_in_flight_unknown_draw").count(), 2);
     }
 
     #[test]

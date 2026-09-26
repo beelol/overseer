@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 14;
+pub const SCHEMA_VERSION: i64 = 15;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -281,6 +281,13 @@ impl Store {
               requirements_hash TEXT NOT NULL, route_id TEXT NOT NULL,
               account_generation INTEGER, phase TEXT NOT NULL, created_ms INTEGER NOT NULL,
               planned_branch TEXT, planned_path TEXT, snapshot_id TEXT, snapshot_commit TEXT);
+            CREATE TABLE IF NOT EXISTS auto_pool_claims(
+              work_unit_id TEXT PRIMARY KEY REFERENCES auto_launch_intents(work_unit_id),
+              pool_id TEXT NOT NULL, account_generation INTEGER,
+              state TEXT NOT NULL CHECK(state IN ('active','uncertain','released')),
+              created_ms INTEGER NOT NULL, released_ms INTEGER);
+            CREATE INDEX IF NOT EXISTS auto_pool_claims_active
+              ON auto_pool_claims(pool_id,state);
             "#,
         )?;
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;
@@ -336,6 +343,20 @@ impl Store {
                 CREATE INDEX auto_daily_last_observed ON auto_daily_aggregates(last_observed_ms);")?;
             tx.commit()?;
         }
+        // A pre-v15 daemon may have admitted a child without a pool claim.
+        // Its old route/account evidence cannot prove a shared pool after
+        // restart, so occupy a single conservative legacy pool until every
+        // such child settles. This is idempotent across interrupted upgrades.
+        self.conn.execute(
+            "INSERT OR IGNORE INTO auto_pool_claims
+                (work_unit_id,pool_id,account_generation,state,created_ms)
+             SELECT i.work_unit_id,'legacy/unresolved',i.account_generation,'uncertain',i.created_ms
+             FROM auto_launch_intents i
+             JOIN managed_work_units m ON m.work_unit_id=i.work_unit_id
+             JOIN runs r ON r.id=m.child_run_id
+             WHERE NOT (r.status IN ('completed','failed','interrupted') AND r.ended_ms IS NOT NULL)",
+            [],
+        )?;
         self.conn.execute("INSERT INTO meta(key, value) VALUES('schema_version', ?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
     }
@@ -627,22 +648,86 @@ impl Store {
     }
 
     pub fn insert_auto_selected_decision(&self, work_unit_id: &str, parent: &Run,
-        requirements_hash: &str, route_id: &str, account_generation: Option<i64>,
-        payload: &Value) -> Result<Event> {
+        requirements_hash: &str, route_id: &str, pool_id: &str,
+        account_generation: Option<i64>, payload: &Value) -> Result<Option<Event>> {
+        if pool_id.is_empty() || pool_id.len() > 256 {
+            return Err(anyhow!("automatic quota pool identity is invalid"));
+        }
         let tx = self.conn.unchecked_transaction()?;
+        if self.auto_pool_claimed(pool_id)? {
+            return Ok(None);
+        }
         self.insert_auto_launch_intent(work_unit_id, &parent.id, requirements_hash,
             route_id, account_generation)?;
+        self.conn.execute(
+            "INSERT INTO auto_pool_claims(work_unit_id,pool_id,account_generation,state,created_ms)
+             VALUES(?1,?2,?3,'active',?4)",
+            params![work_unit_id, pool_id, account_generation, crate::daemon::now()],
+        )?;
         let event = self.insert_event(crate::daemon::now(), Some(&parent.task_id), Some(&parent.id),
             "auto_decision", "daemon", "exact", payload)?;
         tx.commit()?;
-        Ok(event)
+        Ok(Some(event))
+    }
+
+    /// An unknown subscription draw occupies its shared pool until a child
+    /// settles. A paused intent without a child remains effects-uncertain and
+    /// cannot be released merely because this daemon restarted.
+    pub fn auto_pool_claimed(&self, pool_id: &str) -> Result<bool> {
+        Ok(self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM auto_pool_claims WHERE (pool_id=?1 OR pool_id='legacy/unresolved')
+                AND state IN ('active','uncertain'))",
+            [pool_id], |row| row.get(0))?)
+    }
+
+    /// Called in the terminal run transaction. Unknown or still-running
+    /// children retain their claim; only a confirmed settled child releases it.
+    pub fn release_settled_auto_pool_claim(&self, child_run_id: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE auto_pool_claims SET state='released',released_ms=?2
+             WHERE work_unit_id=(SELECT m.work_unit_id FROM managed_work_units m
+                 JOIN runs r ON r.id=m.child_run_id WHERE m.child_run_id=?1
+                 AND r.status IN ('completed','failed','interrupted') AND r.ended_ms IS NOT NULL)
+               AND state IN ('active','uncertain')",
+            params![child_run_id, crate::daemon::now()],
+        )?;
+        Ok(())
+    }
+
+    /// Without a committed child row, no model turn can have started. Release
+    /// the *allowance* claim after a stopped worker or at startup, while the
+    /// launch intent and any uncertain Git resource remain untouched. A child
+    /// row, even with no observed process, keeps its claim until settlement.
+    pub fn release_unstarted_auto_pool_claim(&self, work_unit_id: &str) -> Result<bool> {
+        Ok(self.conn.execute(
+            "UPDATE auto_pool_claims SET state='released',released_ms=?2
+             WHERE work_unit_id=?1 AND state IN ('active','uncertain')
+               AND NOT EXISTS(SELECT 1 FROM managed_work_units m WHERE m.work_unit_id=?1)",
+            params![work_unit_id, crate::daemon::now()],
+        )? == 1)
+    }
+
+    /// Startup reconciliation runs after the old daemon's workers are gone.
+    /// A persisted intent with no child may own an uncertain Git worktree,
+    /// but it cannot have spent model allowance through this launch path.
+    pub fn release_stale_unstarted_auto_pool_claims(&self) -> Result<usize> {
+        Ok(self.conn.execute(
+            "UPDATE auto_pool_claims SET state='released',released_ms=?1
+             WHERE state IN ('active','uncertain')
+               AND NOT EXISTS(SELECT 1 FROM managed_work_units m
+                   WHERE m.work_unit_id=auto_pool_claims.work_unit_id)",
+            [crate::daemon::now()],
+        )?)
     }
 
     pub fn set_auto_launch_intent_phase(&self, id: &str, phase: &str) -> Result<()> {
         if phase != "paused" {
             return Err(anyhow!("unsupported automatic launch phase"));
         }
+        let tx = self.conn.unchecked_transaction()?;
         self.conn.execute("UPDATE auto_launch_intents SET phase=?2 WHERE work_unit_id=?1", params![id, phase])?;
+        self.conn.execute("UPDATE auto_pool_claims SET state='uncertain' WHERE work_unit_id=?1 AND state='active'", [id])?;
+        tx.commit()?;
         Ok(())
     }
 
@@ -1596,24 +1681,75 @@ mod schema_migration_tests {
         store.insert_auto_launch_intent("probe", "parent", "hash", "route", None).unwrap();
         store.conn.execute_batch("ROLLBACK TO admission_probe; RELEASE admission_probe").unwrap();
         let oversized_trace = serde_json::json!({"selection_input":"x".repeat(1024 * 1024)});
-        let error = store.insert_auto_selected_decision("unit", &parent, "hash", "route", None,
+        let error = store.insert_auto_selected_decision("unit", &parent, "hash", "route", "pool", None,
             &oversized_trace).unwrap_err();
         assert!(matches!(error.downcast_ref::<rusqlite::Error>(),
             Some(rusqlite::Error::SqliteFailure(code, _)) if code.code == rusqlite::ErrorCode::DiskFull),
             "physical main-store pressure must return SQLITE_FULL: {error:#}");
         assert!(store.auto_launch_intent("unit").unwrap().is_none(),
             "a failed decision write cannot leave a launch claim");
+        assert!(!store.auto_pool_claimed("pool").unwrap(),
+            "a failed decision write cannot reserve allowance");
         let decisions: i64 = store.conn.query_row(
             "SELECT COUNT(*) FROM events WHERE kind='auto_decision'", [], |row| row.get(0)).unwrap();
         assert_eq!(decisions, 0);
 
         store.conn.pragma_update(None, "max_page_count", original_pages + 1024).unwrap();
-        store.insert_auto_selected_decision("unit", &parent, "hash", "route", None,
+        store.insert_auto_selected_decision("unit", &parent, "hash", "route", "pool", None,
             &serde_json::json!({"selected":"route"})).unwrap();
         assert!(store.auto_launch_intent("unit").unwrap().is_some());
         let decisions: i64 = store.conn.query_row(
             "SELECT COUNT(*) FROM events WHERE kind='auto_decision'", [], |row| row.get(0)).unwrap();
         assert_eq!(decisions, 1, "recovery must not replay a failed admission");
+    }
+
+    #[test]
+    fn unknown_pool_claim_is_atomic_persistent_and_released_only_after_settlement() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let store = Store::open(&path).unwrap();
+        store.conn.execute_batch("INSERT INTO workspaces
+            (id,path,repo_root,common_dir,kind,initial_dirty,created_ms)
+            VALUES('w','/tmp','/tmp','/tmp','current','{}',0);
+            INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms)
+            VALUES('t','task','prompt','/tmp','w',0);
+            INSERT INTO runs(id,task_id,harness,workspace_id,status,created_ms,title,capabilities)
+            VALUES('parent','t','codex-app','w','completed',0,'parent','{}');").unwrap();
+        let parent = store.run("parent").unwrap().unwrap();
+        assert!(store.insert_auto_selected_decision("one", &parent, "hash", "route-a",
+            "account/shared", None, &serde_json::json!({"unit":"one"})).unwrap().is_some());
+        assert!(store.auto_pool_claimed("account/shared").unwrap());
+        assert!(store.insert_auto_selected_decision("two", &parent, "hash", "route-b",
+            "account/shared", None, &serde_json::json!({"unit":"two"})).unwrap().is_none());
+        assert!(store.auto_launch_intent("two").unwrap().is_none());
+        assert!(store.insert_auto_selected_decision("three", &parent, "hash", "route-c",
+            "account/independent", None, &serde_json::json!({"unit":"three"})).unwrap().is_some());
+        store.set_auto_launch_intent_phase("one", "paused").unwrap();
+        drop(store);
+
+        let reopened = Store::open(&path).unwrap();
+        assert!(reopened.auto_pool_claimed("account/shared").unwrap(),
+            "a launch with uncertain effects must continue blocking after restart");
+        assert!(reopened.insert_auto_selected_decision("two", &parent, "hash", "route-b",
+            "account/shared", None, &serde_json::json!({"unit":"two"})).unwrap().is_none());
+        reopened.journal_auto_launch_worktree("three", "overseer/test", "/tmp/test",
+            "snapshot", "commit").unwrap();
+        assert!(reopened.release_unstarted_auto_pool_claim("three").unwrap(),
+            "uncertain Git state without a child cannot have consumed model allowance");
+        assert!(!reopened.auto_pool_claimed("account/independent").unwrap());
+        assert!(reopened.auto_launch_resources("three").unwrap().is_some(),
+            "releasing allowance must retain the uncertain Git resource for inspection");
+        reopened.conn.execute_batch("INSERT INTO runs(id,task_id,parent_run_id,harness,workspace_id,
+            status,created_ms,ended_ms,title,capabilities)
+            VALUES('child','t','parent','codex-app','w','completed',1,2,'child','{}');
+            INSERT INTO managed_work_units(work_unit_id,parent_run_id,child_run_id,request_hash,created_ms)
+            VALUES('one','parent','child','request-hash',1);").unwrap();
+        reopened.release_settled_auto_pool_claim("child").unwrap();
+        assert!(!reopened.auto_pool_claimed("account/shared").unwrap());
+        assert!(reopened.insert_auto_selected_decision("two", &parent, "hash", "route-b",
+            "account/shared", None, &serde_json::json!({"unit":"two"})).unwrap().is_some());
+        assert!(reopened.release_unstarted_auto_pool_claim("two").unwrap(),
+            "a worker proven never spawned may release its claim");
     }
 
     #[test]
@@ -1674,6 +1810,42 @@ mod schema_migration_tests {
         assert_eq!(store.auto_launch_resources("browser-1").unwrap(),
             Some(("overseer/browser-1".into(), "/tmp/browser-1".into(),
                 "snapshot-1".into(), "commit-1".into())));
+    }
+
+    #[test]
+    fn upgrade_conservatively_claims_active_legacy_auto_children_until_settlement() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let store = Store::open(&path).unwrap();
+        store.conn.execute_batch("INSERT INTO workspaces
+            (id,path,repo_root,common_dir,kind,initial_dirty,created_ms)
+            VALUES('w','/tmp','/tmp','/tmp','current','{}',0);
+            INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms)
+            VALUES('t','task','prompt','/tmp','w',0);
+            INSERT INTO runs(id,task_id,harness,workspace_id,status,created_ms,title,capabilities)
+            VALUES('parent','t','codex-app','w','completed',0,'parent','{}');
+            INSERT INTO runs(id,task_id,parent_run_id,harness,profile_id,workspace_id,status,
+                created_ms,title,capabilities,process_generation)
+            VALUES('child','t','parent','codex-app','profile-a','w','running',1,'child','{}',1);
+            INSERT INTO auto_launch_intents(work_unit_id,parent_run_id,requirements_hash,route_id,
+                account_generation,phase,created_ms)
+            VALUES('legacy-unit','parent','hash','profile-a/gpt-6-sol/medium',1,'child_created',1);
+            INSERT INTO managed_work_units(work_unit_id,parent_run_id,child_run_id,request_hash,created_ms)
+            VALUES('legacy-unit','parent','child','request-hash',1);
+            DROP TABLE auto_pool_claims;
+            UPDATE meta SET value='14' WHERE key='schema_version';").unwrap();
+        drop(store);
+
+        let upgraded = Store::open(&path).unwrap();
+        assert!(upgraded.auto_pool_claimed("account/shared").unwrap(),
+            "a pre-upgrade active child must block new unknown-draw admissions");
+        upgraded.migrate().unwrap();
+        let claims: i64 = upgraded.conn.query_row("SELECT COUNT(*) FROM auto_pool_claims",
+            [], |row| row.get(0)).unwrap();
+        assert_eq!(claims, 1, "backfill must be idempotent");
+        upgraded.conn.execute("UPDATE runs SET status='completed',ended_ms=2 WHERE id='child'", []).unwrap();
+        upgraded.release_settled_auto_pool_claim("child").unwrap();
+        assert!(!upgraded.auto_pool_claimed("account/shared").unwrap());
     }
 
     #[test]
