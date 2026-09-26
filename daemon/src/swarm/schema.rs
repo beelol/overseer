@@ -244,6 +244,15 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           completed_ms INTEGER
         );
+        CREATE TABLE IF NOT EXISTS swarm_director_owners(
+          run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          generation INTEGER NOT NULL,
+          token_sha256 TEXT NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('active','released')),
+          created_ms INTEGER NOT NULL,
+          renewed_ms INTEGER NOT NULL,
+          lease_expires_ms INTEGER NOT NULL
+        );
         CREATE UNIQUE INDEX IF NOT EXISTS swarm_one_director_turn
           ON swarm_director_turns(run_id) WHERE status='active';
         CREATE TABLE IF NOT EXISTS swarm_director_turn_messages(

@@ -42,6 +42,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
             let daemon = deadline_daemon.clone();
             match tokio::task::spawn_blocking(move || {
                 crate::swarm::reconcile_control_verifications(&mut daemon.store.lock().unwrap())?;
+                crate::swarm::expire_director_owners(&mut daemon.store.lock().unwrap())?;
                 let (expired, timed_out_workers) = {
                     let _serial = daemon.swarm_launch_lock.lock().unwrap();
                     let mut store = daemon.store.lock().unwrap();
@@ -284,6 +285,18 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "profile.list" => json!(d.store.lock().unwrap().profiles()?),
         "swarm.create" => crate::swarm::create(&mut d.store.lock().unwrap(), p)?,
+        "swarm.director.owner.begin" => {
+            fixture_only()?;
+            crate::swarm::begin_director_owner(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.director.owner.renew" => {
+            fixture_only()?;
+            crate::swarm::renew_director_owner(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.director.owner.expire_due" => {
+            fixture_only()?;
+            json!({"stalled":crate::swarm::expire_director_owners(&mut d.store.lock().unwrap())?})
+        }
         "swarm.get" => crate::swarm::get(&d.store.lock().unwrap(), s(p, "id")?)?,
         "swarm.plan" => {
             fixture_only()?;

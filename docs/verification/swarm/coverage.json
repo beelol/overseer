@@ -283,10 +283,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_director.rs",
+        "daemon/tests/swarm_director_owner.rs",
         "docs/verification/swarm/SWARM-30.md",
         "docs/verification/swarm/milestone-11.md"
       ],
-      "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result and prior Pause state, and requeues an unapplied batch after confirmed replacement with generation fencing; live process liveness, replacement availability and actual director execution are unverified."
+      "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result and prior Pause state, and requeues an unapplied batch after confirmed replacement. Durable owner-token and lease tests fence plan, directive, review and inbox actions across restart; timeout retains ownership and blocks admission, active unowned turns cannot be taken over, and confirmed replacement waits for a newly bound generation. Supervised director identity, live process death proof, replacement target availability and actual director execution remain unverified."
     },
     "SWARM-31": {
       "status": "partial",

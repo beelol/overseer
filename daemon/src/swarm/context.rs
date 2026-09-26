@@ -44,6 +44,7 @@ pub fn grant_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         .as_i64()
         .ok_or_else(|| anyhow!("missing revision"))?;
     let store = d.store.lock().unwrap();
+    super::owner::require(&store,run,p)?;
     let current = get(&store, run)?;
     if current["generation"] != generation || current["revision"] != revision {
         bail!("stale director generation or plan revision");
@@ -154,6 +155,7 @@ pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         .ok_or_else(|| anyhow!("missing revision"))?;
     let (duplicate, workers, affected_jobs) = {
         let mut store = d.store.lock().unwrap();
+        super::owner::require(&store,run,p)?;
         let current = get(&store, run)?;
         if current["generation"] != generation || current["revision"] != revision {
             bail!("stale director generation or plan revision");
@@ -491,6 +493,7 @@ pub fn artifact_chunk(store: &Store, p: &Value) -> Result<Value> {
 pub fn director_summary(store: &Store, p: &Value) -> Result<Value> {
     let limit = inline_limit(p)?;
     let run = required(p, "run_id")?;
+    super::owner::require(store,run,p)?;
     let current = get(store, run)?;
     if p["generation"] != current["generation"] || p["revision"] != current["revision"] {
         bail!("stale director generation or plan revision");

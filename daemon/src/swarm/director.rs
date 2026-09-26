@@ -15,6 +15,7 @@ fn hash(token: &str) -> String {
 
 pub fn claim_batch(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
+    super::owner::require(store,run,p)?;
     let generation = p["generation"]
         .as_i64()
         .ok_or_else(|| anyhow!("missing generation"))?;
@@ -198,17 +199,30 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
     } else {
         "planning"
     };
-    tx.execute(
-        "UPDATE swarm_runs SET generation=generation+1,status=?2,stalled_from=NULL,stall_reason=NULL,updated_ms=?3 WHERE id=?1",
-        params![run, next_status, now],
-    )?;
+    let owner_bound: bool = tx.prepare(
+        "SELECT 1 FROM swarm_director_owners WHERE run_id=?1 AND generation=?2 AND status='active'"
+    )?.exists(params![run,generation])?;
+    if owner_bound {
+        tx.execute("UPDATE swarm_runs SET generation=generation+1,status='stalled',
+            stalled_from=?2,stall_reason='director_replacement_pending',updated_ms=?3 WHERE id=?1",
+            params![run,next_status,now])?;
+        tx.execute("UPDATE swarm_director_owners SET status='released' WHERE run_id=?1 AND generation=?2",
+            params![run,generation])?;
+    } else {
+        tx.execute(
+            "UPDATE swarm_runs SET generation=generation+1,status=?2,stalled_from=NULL,stall_reason=NULL,updated_ms=?3 WHERE id=?1",
+            params![run, next_status, now],
+        )?;
+    }
     tx.commit()?;
-    Ok(json!({"status":next_status,"generation":generation+1,
+    Ok(json!({"status":if owner_bound { "stalled" } else { next_status },
+        "generation":generation+1,"replacement_pending":owner_bound,
         "replayed_turn":turn,"workers_preserved":workers}))
 }
 
 pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
+    super::owner::require(store,run,p)?;
     let id = required(p, "turn_id")?;
     let token = required(p, "token")?;
     let generation = p["generation"]

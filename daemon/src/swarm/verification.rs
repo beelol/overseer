@@ -134,6 +134,7 @@ pub fn reconcile_control_verifications(store: &mut Store) -> Result<()> {
 
 pub fn prepare(store: &mut Store, p: &Value) -> Result<PreparedVerification> {
     let run = required(p, "run_id")?;
+    super::owner::require(store,run,p)?;
     let request_id = required(p, "request_id")?;
     if request_id.is_empty() || request_id.len() > 128 {
         bail!("invalid verification request id");

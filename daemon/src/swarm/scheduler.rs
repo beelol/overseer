@@ -45,13 +45,17 @@ pub fn next(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
     let mut stmt = store.conn.prepare(
         "SELECT id,category_key,generation,revision,allowed_targets FROM swarm_runs
          WHERE status IN ('planning','running')
+         AND NOT EXISTS(SELECT 1 FROM swarm_director_owners o
+                        WHERE o.run_id=swarm_runs.id AND
+                        (o.status!='active' OR o.generation!=swarm_runs.generation
+                         OR o.lease_expires_ms<=?1))
          AND NOT EXISTS(SELECT 1 FROM swarm_availability v
                         WHERE v.run_id=swarm_runs.id AND v.state='blocked')
          AND EXISTS(SELECT 1 FROM swarm_jobs WHERE run_id=swarm_runs.id AND status='ready')
          ORDER BY category_key,id",
     )?;
     let runs = stmt
-        .query_map([], |r| {
+        .query_map([crate::daemon::now()], |r| {
             Ok((
                 r.get::<_, String>(0)?,
                 r.get::<_, String>(1)?,

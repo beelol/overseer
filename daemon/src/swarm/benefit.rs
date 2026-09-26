@@ -259,6 +259,7 @@ pub fn get_state(store: &Store, run_id: &str, revision: i64) -> Result<Value> {
 
 pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
     let run_id = required(p, "run_id")?;
+    super::owner::require(store,run_id,p)?;
     let generation = p["generation"]
         .as_i64()
         .ok_or_else(|| anyhow!("missing generation"))?;

@@ -59,6 +59,7 @@ pub fn put(store: &mut Store, p: &Value) -> Result<Value> {
 
 pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
+    super::owner::require(store,run,p)?;
     let job = required(p, "job_id")?;
     let decision = required(p, "decision")?;
     let generation = p["generation"]

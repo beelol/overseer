@@ -125,6 +125,7 @@ fn ensure_current(store: &Store, run: &str, generation: i64, revision: i64) -> R
 
 pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
+    super::owner::require(store,run,p)?;
     let job = required(p, "job_id")?;
     let artifact = required(p, "artifact_id")?;
     let repo = Path::new(required(p, "repo")?);

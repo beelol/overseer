@@ -32,6 +32,7 @@ pub(super) fn check_attempt(
 
 pub fn register(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
+    super::owner::require(store,run,p)?;
     let job = required(p, "job_id")?;
     let generation = p["generation"]
         .as_i64()
@@ -266,6 +267,7 @@ pub fn report(store: &mut Store, p: &Value) -> Result<Value> {
 
 pub fn direct(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
+    super::owner::require(store,run,p)?;
     let job = required(p, "job_id")?;
     let attempt = required(p, "attempt_id")?;
     let current = get(store, run)?;
@@ -303,6 +305,9 @@ pub fn messages(store: &Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
     get(store, run)?;
     let recipient = required(p, "recipient")?;
+    if recipient == "director" {
+        super::owner::require(store,run,p)?;
+    }
     if recipient != "director" {
         let exists: bool = store
             .conn
@@ -340,6 +345,9 @@ pub fn ack(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
     let id = required(p, "message_id")?;
     let recipient = required(p, "recipient")?;
+    if recipient == "director" {
+        super::owner::require(store,run,p)?;
+    }
     let phase = required(p, "phase")?;
     let revision = p["revision"]
         .as_i64()

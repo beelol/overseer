@@ -27,6 +27,7 @@ pub fn get(store: &Store, run: &str) -> Result<Value> {
 
 pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
+    super::owner::require(store,run,p)?;
     let request_id = required(p, "request_id")?;
     let generation = p["generation"]
         .as_i64()

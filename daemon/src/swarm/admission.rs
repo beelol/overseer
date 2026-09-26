@@ -23,6 +23,8 @@ pub(super) struct ScheduledCommit<'a> {
 }
 
 pub fn admit(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
+    let run = required(p,"run_id")?;
+    super::owner::require(store,run,p)?;
     admit_inner(store, p, None, pending_slots)
 }
 

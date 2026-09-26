@@ -30,6 +30,7 @@ fn deps_satisfied(
 
 pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     let id = required(p, "id")?;
+    super::owner::require(store,id,p)?;
     let generation = p["generation"]
         .as_i64()
         .ok_or_else(|| anyhow!("missing generation"))?;

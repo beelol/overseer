@@ -8,6 +8,7 @@ mod coverage;
 mod control;
 mod context;
 mod director;
+mod owner;
 mod dispatch;
 mod effects;
 mod integration;
@@ -31,6 +32,8 @@ pub use control::{expire_due, expire_jobs_due, off, pause, resume};
 pub use context::{artifact_chunk, director_summary, worker_brief};
 pub use context::{grant_artifact, retry_revoked_interrupts, revoke_artifact};
 pub use director::{claim_batch, complete_batch, recover};
+pub use owner::{begin as begin_director_owner, renew as renew_director_owner};
+pub use owner::expire_due as expire_director_owners;
 pub use dispatch::next as dispatch_next;
 pub use dispatch::recover_pending as recover_pending_dispatches;
 pub use effects::{begin as begin_effect, reconcile as reconcile_effect};
@@ -268,6 +271,7 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
 
 pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
     let id = required(p, "id")?;
+    owner::require(store,id,p)?;
     let generation = p["generation"]
         .as_i64()
         .ok_or_else(|| anyhow!("missing generation"))?;
@@ -462,6 +466,7 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
 
 pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
+    owner::require(store,run,p)?;
     let job = required(p, "job_id")?;
     let resource = required(p, "resource")?.trim();
     let mode = required(p, "mode")?;
