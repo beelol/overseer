@@ -96,6 +96,34 @@ impl Daemon {
     /// Interrupts every active run, waits for their processes, forces stragglers, and reports.
     /// The caller exits the daemon afterwards.
     pub fn stop_all(self: &Arc<Self>) -> Result<Value> {
+        // Commit the Swarm control transition before interrupting processes. A category
+        // may have queued work but no Overseer run yet, so active_roots alone misses it.
+        // Keep the launch lock through this transition so an admitted worker cannot
+        // start between the snapshot and Stop.
+        let swarms = {
+            let _serial = self.swarm_launch_lock.lock().unwrap();
+            let rows = {
+                let store = self.store.lock().unwrap();
+                let mut stmt = store.conn.prepare(
+                    "SELECT id,generation,revision FROM swarm_runs
+                     WHERE status IN ('planning','running','paused','stalled','draining','stopping')
+                     ORDER BY id",
+                )?;
+                let rows = stmt.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?)))?
+                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                rows
+            };
+            for (id, generation, revision) in &rows {
+                crate::swarm::stop(&mut self.store.lock().unwrap(),
+                    &json!({"run_id":id,"generation":generation,"revision":revision}))?;
+            }
+            rows.into_iter().map(|(id, _, _)| id).collect::<Vec<_>>()
+        };
+        for run in &swarms {
+            if let Err(error) = crate::swarm::interrupt_workers(self, run) {
+                crate::log(&format!("stop_all: swarm interrupt {run} failed: {error}"));
+            }
+        }
         let runs = self.active_roots()?;
         let mut interrupted = Vec::new();
         for run in &runs {
@@ -137,7 +165,7 @@ impl Daemon {
                 store.conn.execute("UPDATE runs SET status='interrupted', exit_reason=COALESCE(exit_reason, 'stopped with the daemon'), ended_ms=COALESCE(ended_ms, ?2) WHERE id=?1", rusqlite::params![run.id, now()])?;
             }
         }
-        let result = json!({"stopped": runs.iter().map(|r| r.id.clone()).collect::<Vec<_>>(), "interrupted": interrupted, "forced": forced, "remaining": remaining});
+        let result = json!({"stopped": runs.iter().map(|r| r.id.clone()).collect::<Vec<_>>(), "swarms": swarms, "interrupted": interrupted, "forced": forced, "remaining": remaining});
         self.emit(None, None, "daemon_stopping", "user", "exact", result.clone())?;
         crate::log(&format!("stop_all: {result}"));
         Ok(result)

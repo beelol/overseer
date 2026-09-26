@@ -4,6 +4,69 @@ use common::*;
 use serde_json::json;
 
 #[test]
+fn daemon_stop_all_cancels_swarm_without_a_supervised_worker() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Global stop","objective":"Audit backend",
+        "allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"queued","title":"Queued audit","acceptance":"evidence","deps":[]}
+    ]}));
+
+    let stopped = d.call("daemon.stop_all", json!({}));
+    assert_eq!(stopped["swarms"], json!([id]));
+    assert!(d.child.as_mut().unwrap().wait().unwrap().success());
+    d.child = None;
+    d.spawn();
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopped");
+    assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["status"], "cancelled");
+    assert!(d.try_call("swarm.attempt.register", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"queued"})).is_err());
+}
+
+#[test]
+fn daemon_stop_all_interrupts_linked_swarm_worker_and_preserves_attempt() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("global-stop-source"));
+    let run = d.call("swarm.create", json!({"category":"Global active stop",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"active","title":"Inspect","acceptance":"evidence","deps":[]},
+        {"id":"queued","title":"Queued","acceptance":"evidence","deps":[]}
+    ]}));
+    let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"active","target_id":"fixture-local","request_id":"global-stop-worker",
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    let launched = d.call("swarm.worker.launch", json!({"run_id":id,"job_id":"active",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],"repo":checkout,
+        "program":"/bin/sleep","args":["30"],"prompt":"Inspect","title":"Global stop worker"}));
+    let worker = launched["overseer_run_id"].as_str().unwrap();
+    d.wait_status(worker, |status| status == "running", 10);
+
+    let stopped = d.call("daemon.stop_all", json!({}));
+    assert_eq!(stopped["swarms"], json!([id]));
+    assert_eq!(stopped["remaining"], json!([]));
+    assert!(d.child.as_mut().unwrap().wait().unwrap().success());
+    d.child = None;
+    d.spawn();
+    assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][1]["status"], "cancelled");
+    assert_ne!(d.run(worker)["status"], "running");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let attempts: i64 = db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND job_id='active'",
+        [id], |row| row.get(0)).unwrap();
+    assert_eq!(attempts, 1);
+}
+
+#[test]
 fn pause_resume_and_off_keep_active_evidence_but_stop_new_delegation() {
     let d = Daemon::start(&[]);
     let run = d.call(
