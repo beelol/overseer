@@ -1,6 +1,7 @@
 mod artifacts;
 mod admission;
 mod availability;
+mod benefit;
 mod broker;
 mod completion;
 mod coverage;
@@ -19,6 +20,7 @@ pub mod schema;
 pub use artifacts::{confirm_exit, decide, put};
 pub use admission::admit;
 pub use availability::observe as observe_availability;
+pub use benefit::preview as preview_benefit;
 pub use broker::{ack, direct, messages, register, report};
 pub use completion::complete;
 pub use coverage::report as coverage_report;
