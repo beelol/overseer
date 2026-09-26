@@ -318,9 +318,11 @@
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/milestone-15.md",
+        "docs/verification/swarm/SWARM-42.md"
       ],
-      "blocker": "Stable-ID dedupe, restart replay and stale generation checks work; dispatch/accounting and delayed ordering remain untested."
+      "blocker": "Stable-ID dedupe, restart replay, stale generation checks and late finished-attempt result isolation pass; live dispatch/accounting and broader delayed/reordered message traces remain untested."
     },
     "SWARM-43": {
       "status": "partial",
