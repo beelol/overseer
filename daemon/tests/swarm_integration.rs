@@ -339,3 +339,143 @@ fn active_repository_commit_hook_blocks_integration_without_running() {
         "a\n"
     );
 }
+
+#[test]
+fn interrupted_integration_recovers_without_a_second_commit() {
+    for fault in ["after_apply", "after_commit"] {
+        let mut d = Daemon::start(&[]);
+        let t = tmp();
+        let checkout = repo(&t.path().join("source"));
+        let base = git(&checkout, &["rev-parse", "HEAD"]);
+        std::fs::write(checkout.join("a.txt"), "recovered\n").unwrap();
+        let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+        std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+        let made = d.call(
+            "swarm.create",
+            json!({
+                "category":"Recovery fixture", "objective":"Change a.txt",
+                "allowed_targets":["system-codex"]
+            }),
+        );
+        let run = made["id"].as_str().unwrap();
+        d.call(
+            "swarm.plan",
+            json!({"id":run,"generation":1,"revision":0,
+                "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]
+            }),
+        );
+        accepted_patch(&d, run, "writer", "writer-patch", &patch);
+        let request = json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":"writer","artifact_id":"writer-patch","repo":checkout,
+            "base_revision":base});
+        let mut interrupted = request.clone();
+        interrupted["fixture_fault"] = json!(fault);
+        let error = d.try_call("swarm.integrate", interrupted).unwrap_err();
+        assert!(error.contains("fixture interruption"), "{fault}: {error}");
+        let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let workspace: String = db
+            .query_row(
+                "SELECT workspace_path FROM swarm_integrations WHERE run_id=?1",
+                [run],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let workspace = std::path::PathBuf::from(workspace);
+        let commit_before = git(&workspace, &["rev-parse", "HEAD"]);
+        if fault == "after_commit" {
+            std::fs::write(checkout.join("a.txt"), "upstream after integration\n").unwrap();
+            git(&checkout, &["add", "a.txt"]);
+            git(
+                &checkout,
+                &["commit", "-q", "-m", "upstream after integration"],
+            );
+        }
+        let source_before_replay = fingerprint(&checkout);
+        d.kill9();
+        d.spawn();
+        let integrated = d.call("swarm.integrate", request.clone());
+        assert_eq!(integrated["status"], "integrated", "{fault}: {integrated}");
+        let commit_after = git(&workspace, &["rev-parse", "HEAD"]);
+        if fault == "after_commit" {
+            assert_eq!(commit_before, commit_after);
+        } else {
+            assert_ne!(commit_before, commit_after);
+        }
+        assert_eq!(integrated["commit"], commit_after);
+        assert_eq!(
+            git(
+                &workspace,
+                &["rev-list", "--count", &format!("{base}..HEAD")]
+            ),
+            "1"
+        );
+        assert_eq!(fingerprint(&checkout), source_before_replay);
+        let duplicate = d.call("swarm.integrate", request);
+        assert_eq!(duplicate["duplicate"], true);
+        let count: i64 = db
+            .query_row(
+                "SELECT COUNT(*) FROM swarm_integrated_artifacts WHERE run_id=?1",
+                [run],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+}
+
+#[test]
+fn interrupted_integration_rejects_unexpected_workspace_edits() {
+    let mut d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "reviewed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call(
+        "swarm.create",
+        json!({"category":"Tamper fixture",
+        "objective":"Change a.txt","allowed_targets":["system-codex"]}),
+    );
+    let run = made["id"].as_str().unwrap();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"writer","title":"Change a.txt","acceptance":"patch","deps":[]}]}),
+    );
+    accepted_patch(&d, run, "writer", "writer-patch", &patch);
+    let request = json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"writer","artifact_id":"writer-patch","repo":checkout,
+        "base_revision":base});
+    let mut interrupted = request.clone();
+    interrupted["fixture_fault"] = json!("after_apply");
+    assert!(d
+        .try_call("swarm.integrate", interrupted)
+        .unwrap_err()
+        .contains("fixture interruption"));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let workspace: String = db
+        .query_row(
+            "SELECT workspace_path FROM swarm_integrations WHERE run_id=?1",
+            [run],
+            |r| r.get(0),
+        )
+        .unwrap();
+    std::fs::write(std::path::Path::new(&workspace).join("a.txt"), "intruder\n").unwrap();
+    d.kill9();
+    d.spawn();
+    let error = d.try_call("swarm.integrate", request).unwrap_err();
+    assert!(error.contains("requires reconciliation"), "{error}");
+    assert_eq!(
+        git(std::path::Path::new(&workspace), &["rev-parse", "HEAD"]),
+        base
+    );
+    let count: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM swarm_integrated_artifacts WHERE run_id=?1",
+            [run],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(count, 0);
+}

@@ -166,6 +166,15 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           PRIMARY KEY(run_id,artifact_id),
           FOREIGN KEY(run_id,artifact_id) REFERENCES swarm_artifacts(run_id,id)
         );
+        CREATE TABLE IF NOT EXISTS swarm_integration_intents(
+          run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          artifact_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          prior_commit TEXT NOT NULL,
+          expected_tree TEXT NOT NULL,
+          artifact_sha256 TEXT NOT NULL,
+          created_ms INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS swarm_artifact_revocations(
           run_id TEXT NOT NULL,
           artifact_id TEXT NOT NULL,
