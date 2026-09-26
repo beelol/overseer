@@ -10,6 +10,8 @@ Actual: the red pending-intent fixture launched after Stop. The fixed path reche
 
 At `f9b3018`, a separate fixture commits artifact revocation while withholding the first external interrupt, restarts the daemon, and confirms the same dependent worker reaches `interrupted` through the periodic retry. An unrelated concurrently running worker remains active. The full offline Rust suite passed 158 tests.
 
-Evidence: `daemon/tests/swarm_runtime.rs`, `daemon/tests/swarm_plan.rs`, `daemon/src/swarm/runtime.rs`, `daemon/src/server.rs`, `daemon/src/swarm/artifacts.rs`.
+At `a91579c`, the `stop_revocation_result_and_acceptance_keep_one_durable_order` fixture executes four orderings of final-result submission, director acceptance, artifact revocation, and Stop. A shared SQLite operation sequence is written in the same transaction as each successful operation. The fixture verifies the recorded order, rejection of acceptance after Stop or revocation, preservation of late results in the director inbox, no launch or completion after Stop, and no duplicate sequence entries on replay. Revocation after acceptance blocks the dependent job. The full offline Rust suite passed 159 tests (`cargo test --workspace --offline -q`); `git diff --check` passed. Global `cargo fmt --all -- --check` fails on extensive pre-existing formatting differences outside this change.
 
-Remaining: the combined Stop/revocation/final-result/acceptance ordering, queued retry of initially unreachable processes, native descendants, and explicit user resume/extension are not covered. This criterion remains unchecked.
+Evidence: `daemon/tests/swarm_runtime.rs`, `daemon/tests/swarm_plan.rs`, `daemon/tests/swarm_context.rs`, `daemon/src/swarm/runtime.rs`, `daemon/src/server.rs`, `daemon/src/swarm/artifacts.rs`, `daemon/src/swarm/schema.rs`.
+
+Remaining: these are scripted local orderings, not simultaneous native-process races. Queued retry of initially unreachable processes, native descendants, and explicit user resume/extension are not covered. This criterion remains unchecked.
