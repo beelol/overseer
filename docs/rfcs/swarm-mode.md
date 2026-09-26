@@ -148,9 +148,9 @@ Proposed logical exchange:
 | --- | --- |
 | Target snapshot from automode | Stable target, harness, provider/model, account and shared quota-pool identities; scoped health/auth state; capabilities; observation time, expiry, provenance and confidence |
 | Quota windows | Remaining amount and native unit, reset time if known, scope, whether exact/estimated/unknown; every binding window, not just the most favorable one |
-| Job request to automode | Required capabilities/quality, allowed targets, estimated usage range, workspace constraints, exclusions after failure |
+| Job request to automode | Run/parent/job identity, plan revision, required capabilities/quality, allowed targets, estimated upper draw in native units, remaining category allocation per binding pool/window, workspace constraints, scoped exclusions after failure, and durable attempts remaining |
 | Routing response | Eligible ranked targets or explicit unavailable/unknown reasons; snapshot version used |
-| Admission by shared daemon authority | Atomic reservation of every applicable quota pool and concurrency slot, followed by launch; an expired or changed snapshot requires revalidation |
+| Admission by shared daemon authority | Revalidate identity, permissions, health and every binding window; atomically commit the tighter of account-window allowance and category allocation, an app-wide agent slot, workspace ownership and one durable launch intent. An expired or changed snapshot requires refresh before launch. |
 
 Reservation state must be shared across all Overseer tasks, including non-swarm launches.
 Automode and swarm must agree on a single admission authority; two independent reservation

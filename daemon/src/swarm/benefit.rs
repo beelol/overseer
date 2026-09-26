@@ -46,6 +46,7 @@ struct Request {
 fn total(
     plan: &Plan,
     parallel: bool,
+    worker_slots: usize,
     units: &[String],
 ) -> Result<(i64, BTreeMap<String, i64>, BTreeMap<String, i64>)> {
     let phases = [
@@ -57,6 +58,7 @@ fn total(
     ];
     let mut phase_elapsed = 0_i64;
     let mut worker_elapsed = 0_i64;
+    let mut slot_elapsed = vec![0_i64; worker_slots.min(plan.workers.len()).max(1)];
     let mut usage = units
         .iter()
         .map(|unit| (unit.clone(), 0_i64))
@@ -75,7 +77,13 @@ fn total(
                 .checked_add(cost.elapsed_ms)
                 .ok_or_else(|| anyhow!("elapsed estimate overflow"))?;
         } else if parallel {
-            worker_elapsed = worker_elapsed.max(cost.elapsed_ms);
+            let slot = slot_elapsed
+                .iter_mut()
+                .min_by_key(|elapsed| **elapsed)
+                .expect("at least one worker slot");
+            *slot = slot
+                .checked_add(cost.elapsed_ms)
+                .ok_or_else(|| anyhow!("elapsed estimate overflow"))?;
         } else {
             worker_elapsed = worker_elapsed
                 .checked_add(cost.elapsed_ms)
@@ -100,6 +108,9 @@ fn total(
                     .ok_or_else(|| anyhow!("finishing estimate overflow"))?;
             }
         }
+    }
+    if parallel {
+        worker_elapsed = slot_elapsed.into_iter().max().unwrap_or(0);
     }
     let elapsed = phase_elapsed
         .checked_add(worker_elapsed)
@@ -150,17 +161,16 @@ pub fn preview(p: &Value) -> Result<Value> {
     {
         bail!("paired plans must estimate distinct matching jobs");
     }
-    let (serial_ms, serial_usage, serial_finishing) = total(&request.serial, false, &units)?;
-    let (parallel_ms, parallel_usage, finishing_usage) = total(&request.parallel, true, &units)?;
+    let (serial_ms, serial_usage, serial_finishing) = total(&request.serial, false, 1, &units)?;
+    let (parallel_ms, parallel_usage, finishing_usage) =
+        total(&request.parallel, true, request.max_workers, &units)?;
     let serial_affordable = units.iter().all(|unit| {
         serial_usage[unit] <= request.allocation_milli[unit]
             && serial_finishing[unit] <= request.finishing_reserve_milli[unit]
     });
     let parallel_reason = if !request.independent {
         "dependent_jobs"
-    } else if request.parallel.workers.len() < 2
-        || request.parallel.workers.len() > request.max_workers
-    {
+    } else if request.parallel.workers.len() < 2 || request.max_workers < 2 {
         "worker_limit"
     } else if parallel_ms >= serial_ms {
         "no_time_benefit"
@@ -274,7 +284,7 @@ pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
         .get("max_workers")
         .and_then(Value::as_u64)
         .ok_or_else(|| anyhow!("missing benefit worker ceiling"))?;
-    object.insert("max_workers".into(), json!(proposed_cap.min(policy_cap)));
+    object.insert("max_workers".into(), json!(proposed_cap.min(concurrent_cap)));
     let initial = preview(&estimate)?;
     let jobs = initial["job_ids"].as_array().unwrap().clone();
     let mut claimed: BTreeMap<String, String> = BTreeMap::new();
@@ -309,8 +319,7 @@ pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
     if concurrent_cap == 0 {
         result["decision"] = json!("blocked");
         result["reason"] = json!("global_agent_limit");
-    } else if concurrent_cap == 1 && result["decision"] == "parallel" {
-        result["decision"] = json!("serial");
+    } else if concurrent_cap == 1 && result["reason"] == "worker_limit" {
         result["reason"] = json!("global_agent_limit");
     }
     if resource_conflict && result["reason"] == "dependent_jobs" {

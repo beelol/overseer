@@ -1,7 +1,7 @@
 {
   "base_commit": "19edf57ca4c30b0b4788b5416bb5d949a2cdff6c",
   "rfc_sha256": {
-    "swarm-mode.md": "d7e5acbc9dd9246f6e0ad33c7c784b5712a227daf36dd75517624d38a0b3d45c",
+    "swarm-mode.md": "45e0f177c081d24e236bb682c3f8662dcd8f7d063f819f85e248921cd76c629d",
     "swarm-mode-scenarios.md": "c937732f9053bd16ab92cd6968ed5b30837e7e01947f90e1f46d614b2c58a9cc",
     "swarm-mode-goal.md": "fb1bcf183e39e2edeb27b6d5f641eb8daf639bbaf271f5a4afbc15bcb01de08a"
   },
@@ -46,7 +46,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/SWARM-05.md"
       ],
-      "blocker": "Fixture benefit decisions now bound reported worker concurrency by the app cap, choose serial when only one worker can fit, and refill completed slots. The elapsed-time estimate can still assume more simultaneous jobs than capacity permits; actual native usage and phase costs, undeclared-resource independence, live calibrated estimates and shared Auto Mode quota input remain absent."
+      "blocker": "Fixture benefit decisions account for two worker waves when three jobs share two app slots, choose serial when the extra wave removes the gain, and refill completed slots. Current occupancy from other tasks, actual native usage and phase costs, undeclared-resource independence, live calibrated estimates and shared Auto Mode quota input remain absent."
     },
     "SWARM-06": {
       "status": "partial",
@@ -65,7 +65,7 @@
         "docs/verification/swarm/SWARM-08.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "The app setting is now the sole total-agent ceiling; fixture tests cover pending manual reservations, native-child exclusion, stopped-director release, lower-maximum drain, old saved-policy compatibility and app-bounded benefit worker counts. Separate reviewer execution, max=1 serial director work and real director activation remain unverified; estimated time gain can still assume full batch overlap."
+      "blocker": "The app setting is now the sole total-agent ceiling; fixture tests cover pending manual reservations, native-child exclusion, stopped-director release, lower-maximum drain, old saved-policy compatibility and app-bounded benefit worker counts and waves. Separate reviewer execution, max=1 serial director work and real director activation remain unverified."
     },
     "SWARM-08": {
       "status": "partial",
@@ -233,9 +233,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_admission.rs",
-        "docs/verification/swarm/milestone-7.md"
+        "docs/verification/swarm/milestone-7.md",
+        "docs/rfcs/swarm-auto-contract.md",
+        "docs/verification/swarm/SWARM-24.md"
       ],
-      "blocker": "The fixture admission revalidates a target snapshot transactionally and ordinary launches share the global slot lock; the actual Auto Mode producer and shared account-quota authority are not integrated."
+      "blocker": "The fixture admission revalidates a target snapshot and shares the app agent-slot lock; the proposed contract now specifies job identity, attempts, category allocation and common proofs. The actual Auto Mode producer and shared account-quota authority are not integrated."
     },
     "SWARM-25": {
       "status": "unverified",

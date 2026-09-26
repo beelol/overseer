@@ -12,4 +12,6 @@ Evidence: `daemon/tests/swarm_admission.rs`, `daemon/tests/swarm_settings.rs`, `
 
 Follow-up at `17be43e`: committed benefit decisions now bound the simultaneous worker count by `agents.max_active - 1`; at one available worker they record a serial decision. The full offline suite passed 199 tests with 11 ignored. Expected time gain can still be optimistic for multi-wave batches, and current occupancy from other tasks is checked at admission.
 
+Capacity-estimate follow-up: a committed three-job decision at `max_active=3` now accounts for two sequential worker waves rather than assuming all three overlap. The focused benefit suite and full serialized workspace suite passed (200 passed, 11 ignored). Existing unrelated app occupancy still affects admission rather than the prelaunch estimate.
+
 Remaining: a real director process does not yet consume and release its slot through normal launch/recovery, separately launched reviewer capacity is not qualified, and `max_active=1` serial director execution is not demonstrated. Keep SWARM-07 unchecked.

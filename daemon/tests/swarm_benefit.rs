@@ -164,6 +164,34 @@ fn app_limit_of_two_makes_a_two_job_benefit_decision_serial() {
 }
 
 #[test]
+fn three_jobs_under_two_worker_slots_use_two_elapsed_waves() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":3}));
+    let id = run(&d,"Two worker waves");
+    let mut estimate = pair();
+    for mode in ["serial", "parallel"] {
+        estimate[mode]["workers"].as_array_mut().unwrap().push(
+            json!({"id":"c","elapsed_ms":100,"usage_milli":{"points":10}}));
+    }
+    estimate["allocation_milli"]["points"] = json!(60);
+    let decision = d.call("swarm.benefit.commit",json!({"run_id":id,
+        "generation":1,"revision":1,"estimate":estimate.clone()}));
+    assert_eq!(decision["decision"],"parallel","{decision}");
+    assert_eq!(decision["max_parallel_workers"],2);
+    assert_eq!(decision["serial"]["elapsed_ms"],340);
+    assert_eq!(decision["parallel"]["elapsed_ms"],310,
+        "three 100-ms jobs on two slots need two waves plus 110-ms overhead");
+    assert_eq!(decision["expected_time_benefit_ms"],30);
+
+    estimate["parallel"]["context"]["elapsed_ms"] = json!(90);
+    let slower = d.call("swarm.benefit.commit",json!({"run_id":id,
+        "generation":1,"revision":1,"estimate":estimate}));
+    assert_eq!(slower["parallel"]["elapsed_ms"],350);
+    assert_eq!(slower["decision"],"serial");
+    assert_eq!(slower["reason"],"no_time_benefit");
+}
+
+#[test]
 fn committed_benefit_bounds_admission_and_survives_restart() {
     let mut d = Daemon::start(&[]);
     let unproven = run(&d, "Unproven fanout");
