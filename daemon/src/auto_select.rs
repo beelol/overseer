@@ -388,6 +388,24 @@ mod tests {
     }
 
     #[test]
+    fn three_provider_routes_use_one_eligibility_path_without_a_harness_chain() {
+        let codex = route("a", "codex", "pool-a", CapabilityTier::General, "medium", &[]);
+        let claude = route("b", "claude", "pool-a", CapabilityTier::General, "medium", &[]);
+        let opencode = route("c", "opencode", "pool-b", CapabilityTier::General, "medium", &[]);
+        let mut work = unit(CapabilityTier::General, &["browser"]);
+        let blocked = select(&work, &[opencode.clone(), codex.clone(), claude.clone()]);
+        assert!(blocked.selected.is_none());
+        assert_eq!(blocked.exclusions.len(), 3);
+        assert!(blocked.exclusions.iter().all(|entry| entry.reason == "missing_tool"));
+
+        work.required_tools.clear();
+        assert_eq!(select(&work, &[opencode.clone(), claude.clone(), codex.clone()])
+            .selected.as_deref(), Some("a"), "input order does not become provider policy");
+        work.preferred_harness = Some("opencode".into());
+        assert_eq!(select(&work, &[codex, opencode, claude]).selected.as_deref(), Some("c"));
+    }
+
+    #[test]
     fn hard_pin_and_missing_tools_override_harness_preference() {
         let preferred = route(
             "preferred",
