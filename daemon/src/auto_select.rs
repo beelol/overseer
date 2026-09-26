@@ -252,10 +252,20 @@ fn excluded(work: &WorkUnit, route: &Route, exhausted_pools: &BTreeSet<&str>) ->
 /// Deterministic eligibility comes before ranking. Unknown allowance remains
 /// eligible only as a disclosed cold-start possibility, never as free capacity.
 pub fn select(work: &WorkUnit, routes: &[Route]) -> Decision {
+    select_with_pool_blocks(work, routes, true)
+}
+
+/// Replay only: decisions recorded before shared-pool block propagation keep
+/// their original selector semantics rather than changing under a new build.
+pub fn select_legacy_v1(work: &WorkUnit, routes: &[Route]) -> Decision {
+    select_with_pool_blocks(work, routes, false)
+}
+
+fn select_with_pool_blocks(work: &WorkUnit, routes: &[Route], propagate_pool_blocks: bool) -> Decision {
     let mut exclusions = Vec::new();
     let mut eligible = Vec::new();
     let exhausted_pools: BTreeSet<&str> = routes.iter()
-        .filter(|route| route.quota == Allowance::Exhausted && !route.pool_id.is_empty())
+        .filter(|route| propagate_pool_blocks && route.quota == Allowance::Exhausted && !route.pool_id.is_empty())
         .map(|route| route.pool_id.as_str()).collect();
     for route in routes {
         if let Some(reason) = excluded(work, route, &exhausted_pools) {
@@ -466,9 +476,12 @@ mod tests {
             "medium", &["browser"]);
         exhausted.quota = Allowance::Exhausted;
         let choice = select(&unit(CapabilityTier::General, &["browser"]),
-            &[exhausted, alternate, independent]);
+            &[exhausted.clone(), alternate.clone(), independent.clone()]);
         assert_eq!(choice.selected.as_deref(), Some("local"));
         assert_eq!(choice.exclusions.iter().filter(|e| e.reason == "quota_exhausted").count(), 2);
+        assert_eq!(select_legacy_v1(&unit(CapabilityTier::General, &["browser"]),
+            &[exhausted, alternate, independent]).selected.as_deref(),
+            Some("codex-app"));
     }
 
     #[test]

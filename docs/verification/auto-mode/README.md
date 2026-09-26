@@ -64,7 +64,7 @@ Delivery instruction (2026-09-26): keep unfinished implementation local, then op
 
 ## Shared quota-pool block across harnesses (2026-09-26)
 
-- At local commit `7b27727`, a new test failed because a stale non-exhausted `codex-app` route on the same `pool-a` as an exhausted `codex` route was selected ahead of an independent eligible `pool-b` route. The selector now propagates an authoritative exhausted state across every route carrying the same nonempty pool ID. All nine selector tests and three affected daemon-dispatch protocol tests pass after the change. This is a synthetic route test: account-identity mapping across actual harnesses and conservative treatment of unresolved identity are still missing, so AUTO-AC-04 stays unchecked.
+- At local commit `7b27727`, a new test failed because a stale non-exhausted `codex-app` route on the same `pool-a` as an exhausted `codex` route was selected ahead of an independent eligible `pool-b` route. The selector now propagates an authoritative exhausted state across every route carrying the same nonempty pool ID. New traces use selector version `codex-cold-start-v2`; the replay endpoint still understands v1 with its original selection semantics. All nine selector tests and three affected daemon-dispatch protocol tests pass after the versioned change. This is a synthetic route test: account-identity mapping across actual harnesses and conservative treatment of unresolved identity are still missing, so AUTO-AC-04 stays unchecked.
 
 ## Baseline recorded before Auto implementation
 

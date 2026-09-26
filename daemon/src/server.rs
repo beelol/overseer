@@ -351,7 +351,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     allowed_profiles:BTreeSet::from([profile_id.to_string()]),
                     pinned_route, preferred_harness };
                 let decision = crate::auto_select::select(&work, &routes);
-                let trace = json!({"selector_version":"codex-cold-start-v1","decision":decision,
+                let trace = json!({"selector_version":"codex-cold-start-v2","decision":decision,
                     "selection_input":{"work":&work,"routes":&routes},
                     "requirements":{"min_tier":min_tier,"required_tools":required_tools,
                         "context_needed":context_needed,"requires_approvals":requires_approvals},
@@ -386,14 +386,17 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "SELECT payload FROM events WHERE seq=?1 AND kind='auto_decision'",
                 [event_seq], |row| row.get(0))?;
             let payload: Value = serde_json::from_str(&payload)?;
-            if payload["selector_version"] != "codex-cold-start-v1" {
-                return Err(anyhow!("unsupported automatic selector version"));
-            }
+            let selector_version = payload["selector_version"].as_str()
+                .ok_or_else(|| anyhow!("automatic selector version is missing"))?;
             let input = &payload["selection_input"];
             let work: crate::auto_select::WorkUnit = serde_json::from_value(input["work"].clone())?;
             let routes: Vec<crate::auto_select::Route> = serde_json::from_value(input["routes"].clone())?;
             if routes.len() > 128 { return Err(anyhow!("automatic decision replay exceeded its candidate bound")); }
-            let decision = crate::auto_select::select(&work, &routes);
+            let decision = match selector_version {
+                "codex-cold-start-v1" => crate::auto_select::select_legacy_v1(&work, &routes),
+                "codex-cold-start-v2" => crate::auto_select::select(&work, &routes),
+                _ => return Err(anyhow!("unsupported automatic selector version")),
+            };
             let matches_recorded = serde_json::to_value(&decision)? == payload["decision"];
             json!({"event_seq":event_seq,"matches_recorded":matches_recorded,"decision":decision})
         }
