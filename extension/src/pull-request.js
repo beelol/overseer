@@ -49,9 +49,22 @@ class PullRequests {
     return { status: res.status, json };
   }
 
+  /** Quick pick of finished top-level runs in worktrees, newest first. */
+  async pick() {
+    const runs = this.model.state.runs.filter(r => !r.parent_run_id && this.model.workspace(r.workspace_id)?.kind === 'worktree' && !this.model.workspace(r.workspace_id)?.removed_ms)
+      .sort((a, b) => b.created_ms - a.created_ms);
+    if (!runs.length) { vscode.window.showInformationMessage('Open PR works on a run in its own worktree, and there are none yet. Start a task in a new worktree first.'); return undefined; }
+    const choice = await vscode.window.showQuickPick(runs.map(r => {
+      const task = this.model.task(r.task_id), ws = this.model.workspace(r.workspace_id);
+      return { label: task?.title || r.title, description: `${path.basename(task?.repo_root || '')} · ${ws.branch}`, detail: `${r.harness}${r.model ? ' · ' + r.model : ''} · ${r.status}`, run: r };
+    }), { title: 'Open a pull request for which run?', matchOnDescription: true });
+    return choice?.run;
+  }
+
   async open(runId) {
     if (!vscode.workspace.isTrusted) throw new Error('Opening pull requests requires a trusted workspace.');
-    const picked = this.model.run(runId);
+    // From the Command Palette with no run selected: ask which run, never do nothing silently.
+    const picked = this.model.run(runId) || await this.pick();
     if (!picked) return;
     const run = this.model.rootRun(picked);
     const plan = await this.client.request('workspace.pr_plan', { workspace_id: run.workspace_id });
