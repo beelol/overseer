@@ -584,17 +584,20 @@ impl Daemon {
         let started = self.start_turn_internal(&run.id, &prompt, false, &opts, swarm_identity.as_ref());
         if let Err(e) = started {
             let current = self.run(&run.id)?;
+            let launch_uncertain = crate::swarm::mark_uncertain_director_spawn(
+                &self.store.lock().unwrap(), &run.id)?;
             // If no supervisor was recorded, a rejected initial turn must not
             // consume an active slot forever. A process with a recorded run
             // directory is left to normal exit/recovery reconciliation.
-            if current.status == "queued"
+            if !launch_uncertain && current.status == "queued"
                 && self.store.lock().unwrap().run_process(&run.id)?.is_none()
             {
                 self.mark_ended(&current, "failed", &format!("launch failed: {}", redact(&e.to_string())))?;
             }
             let run = self.run(&run.id)?;
             let task = self.task(&task.id)?;
-            return Ok(json!({"task": task, "run": run, "workspace": ws, "launch_error": e.to_string()}));
+            return Ok(json!({"task": task, "run": run, "workspace": ws,
+                "launch_error": e.to_string(),"launch_uncertain":launch_uncertain}));
         }
         let run = self.run(&run.id)?;
         let task = self.task(&task.id)?;
@@ -780,6 +783,7 @@ impl Daemon {
                 Ok(())
             });
         }
+        self.store.lock().unwrap().mark_director_spawn_requested(&run.id)?;
         let mut child = cmd.spawn().context("starting run supervisor")?;
         std::thread::spawn(move || {
             let _ = child.wait();
@@ -1396,8 +1400,13 @@ impl Daemon {
             let process = self.store.lock().unwrap().run_process(&run.id)?;
             let Some((dir, _, _)) = process else {
                 if ACTIVE.contains(&run.status.as_str()) {
-                    self.mark_ended(run, "failed", "daemon stopped before the run was launched")?;
-                    report.push(json!({"run": run.id, "result": "never launched"}));
+                    if crate::swarm::mark_uncertain_director_spawn(
+                        &self.store.lock().unwrap(), &run.id)? {
+                        report.push(json!({"run": run.id, "result": "director spawn uncertain"}));
+                    } else {
+                        self.mark_ended(run, "failed", "daemon stopped before the run was launched")?;
+                        report.push(json!({"run": run.id, "result": "never launched"}));
+                    }
                 }
                 continue;
             };

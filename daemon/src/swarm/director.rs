@@ -132,7 +132,8 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
         .as_i64()
         .ok_or_else(|| anyhow!("missing revision"))?;
     let termination = required(p, "termination")?;
-    if termination != "unknown" && termination != "confirmed_dead" {
+    if termination != "unknown" && termination != "confirmed_dead"
+        && termination != "confirmed_no_spawn" {
         bail!("invalid director termination evidence");
     }
     let current = get(store, run)?;
@@ -150,24 +151,39 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
     if current["status"] == "stalled" && current["stall_reason"] != "director_termination_unknown" {
         bail!("director is stalled by planning or no-progress policy; process recovery cannot clear it");
     }
-    if termination == "confirmed_dead" {
-        let linked: Option<(Option<String>,i64)> = store.conn.query_row(
-            "SELECT overseer_run_id,supervised_launch FROM swarm_director_owners
+    if termination != "unknown" {
+        let linked: Option<(Option<String>,i64,Option<String>)> = store.conn.query_row(
+            "SELECT overseer_run_id,supervised_launch,launch_phase FROM swarm_director_owners
              WHERE run_id=?1 AND generation=?2 AND status='active'",
-            params![run,generation], |r| Ok((r.get(0)?,r.get(1)?)),
+            params![run,generation], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
         ).optional()?;
-        if matches!(linked,Some((None,1))) {
-            bail!("supervised director launch has no linked process; reconciliation required");
-        }
-        if let Some((Some(process),_)) = linked {
-            let (status, ended, dir): (String,Option<i64>,Option<String>) = store.conn.query_row(
-                "SELECT status,ended_ms,run_dir FROM runs WHERE id=?1",
-                [&process], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
-            )?;
-            let exit_recorded = dir.as_deref().is_some_and(|path|
-                std::path::Path::new(path).join("exit.json").exists());
-            if ended.is_none() || status == "disconnected" || !exit_recorded {
-                bail!("linked director process has no confirmed exit");
+        if termination == "confirmed_no_spawn" {
+            match linked.as_ref() {
+                Some((None,1,Some(phase))) if phase == "reserved" => {}
+                Some((Some(process),1,Some(phase))) if phase == "linked" => {
+                    let dir: Option<String> = store.conn.query_row(
+                        "SELECT run_dir FROM runs WHERE id=?1",
+                        [process], |r| r.get(0))?;
+                    if dir.is_some() {
+                        bail!("director launch has a recorded process directory");
+                    }
+                }
+                _ => bail!("director launch may have spawned; termination remains uncertain"),
+            }
+        } else {
+            if matches!(linked.as_ref(),Some((None,1,_))) {
+                bail!("supervised director launch has no linked process; use no-spawn reconciliation");
+            }
+            if let Some((Some(process),_,_)) = linked {
+                let (status, ended, dir): (String,Option<i64>,Option<String>) = store.conn.query_row(
+                    "SELECT status,ended_ms,run_dir FROM runs WHERE id=?1",
+                    [&process], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+                )?;
+                let exit_recorded = dir.as_deref().is_some_and(|path|
+                    std::path::Path::new(path).join("exit.json").exists());
+                if ended.is_none() || status == "disconnected" || !exit_recorded {
+                    bail!("linked director process has no confirmed exit");
+                }
             }
         }
     }

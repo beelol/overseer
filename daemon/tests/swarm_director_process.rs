@@ -40,6 +40,8 @@ fn supervised_director_needs_confirmed_exit_before_replacement() {
     assert_eq!(std::fs::read_to_string(&ready).unwrap(),"True");
     assert!(d.try_call("swarm.director.recover",json!({"run_id":id,
         "generation":1,"revision":0,"termination":"confirmed_dead"})).is_err());
+    assert!(d.try_call("swarm.director.recover",json!({"run_id":id,
+        "generation":1,"revision":0,"termination":"confirmed_no_spawn"})).is_err());
     d.kill9();
     d.spawn();
     assert!(d.try_call("swarm.director.recover",json!({"run_id":id,
@@ -94,7 +96,7 @@ fn supervised_director_spawn_error_is_recorded_before_replacement() {
 
 #[test]
 fn director_identity_is_durable_before_supervisor_launch() {
-    let d = Daemon::start(&[]);
+    let mut d = Daemon::start(&[]);
     let temp = tmp();
     let checkout = repo(&temp.path().join("blocked-director-source"));
     let run = d.call("swarm.create", json!({"category":"Blocked director launch",
@@ -120,11 +122,17 @@ fn director_identity_is_durable_before_supervisor_launch() {
     assert!(d.try_call("swarm.director.recover",json!({"run_id":id,
         "generation":1,"revision":0,"termination":"confirmed_dead"})).is_err(),
         "caller assertion cannot replace a director with an unconfirmed launch");
+    d.kill9();
+    d.spawn();
+    let recovered = d.call("swarm.director.recover",json!({"run_id":id,
+        "generation":1,"revision":0,"termination":"confirmed_no_spawn"}));
+    assert_eq!(recovered["generation"],2);
+    assert_eq!(recovered["replacement_pending"],true);
 }
 
 #[test]
 fn failed_prelaunch_setup_cannot_be_confirmed_dead_by_caller() {
-    let d = Daemon::start(&[]);
+    let mut d = Daemon::start(&[]);
     let temp = tmp();
     let checkout = repo(&temp.path().join("prelaunch-failure-source"));
     let run = d.call("swarm.create", json!({"category":"Prelaunch failure",
@@ -145,4 +153,46 @@ fn failed_prelaunch_setup_cannot_be_confirmed_dead_by_caller() {
     assert!(d.try_call("swarm.director.recover",json!({"run_id":id,
         "generation":1,"revision":0,"termination":"confirmed_dead"})).is_err(),
         "an unlinked supervised launch must remain reserved until reconciled");
+    d.kill9();
+    d.spawn();
+    let recovered = d.call("swarm.director.recover",json!({"run_id":id,
+        "generation":1,"revision":0,"termination":"confirmed_no_spawn"}));
+    assert_eq!(recovered["generation"],2);
+    assert_eq!(recovered["replacement_pending"],true);
+}
+
+#[test]
+fn uncertain_spawn_remains_reserved_without_a_process_record() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("uncertain-spawn-source"));
+    let run = d.call("swarm.create", json!({"category":"Uncertain director spawn",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER abort_process_record BEFORE UPDATE OF run_dir ON runs
+        WHEN NEW.title='Uncertain director' BEGIN
+        SELECT RAISE(ABORT, 'fixture failure after spawn requested'); END;").unwrap();
+    let launched = d.call("swarm.director.launch", json!({"run_id":id,
+        "generation":1,"repo":checkout,"program":"/bin/sleep",
+        "args":["1"],"prompt":"Audit backend","title":"Uncertain director"}));
+    assert_eq!(launched["status"],"launch_uncertain");
+    assert!(launched["error"].as_str().unwrap().contains("fixture failure after spawn requested"));
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    assert_eq!(d.run(process)["status"],"queued");
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["stall_reason"],
+        "director_termination_unknown");
+    let (phase, linked): (String,Option<String>) = db.query_row(
+        "SELECT launch_phase,overseer_run_id FROM swarm_director_owners WHERE run_id=?1",
+        [id], |row| Ok((row.get(0)?,row.get(1)?))).unwrap();
+    assert_eq!(phase,"spawn_requested");
+    assert!(linked.is_some());
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.run(process)["status"],"queued");
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["stall_reason"],
+        "director_termination_unknown");
+    assert!(d.try_call("swarm.director.recover",json!({"run_id":id,
+        "generation":1,"revision":0,"termination":"confirmed_no_spawn"})).is_err(),
+        "a child may exist even when the run directory update was lost");
 }

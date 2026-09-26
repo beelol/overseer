@@ -412,9 +412,10 @@ impl Store {
         if let Some(link) = director {
             let token_hash = format!("{:x}", Sha256::digest(link.token.as_bytes()));
             let linked = tx.execute(
-                "UPDATE swarm_director_owners SET overseer_run_id=?4
+                "UPDATE swarm_director_owners SET overseer_run_id=?4,launch_phase='linked'
                  WHERE run_id=?1 AND generation=?2 AND token_sha256=?3
-                 AND status='active' AND overseer_run_id IS NULL",
+                 AND status='active' AND overseer_run_id IS NULL
+                 AND supervised_launch=1 AND launch_phase='reserved'",
                 params![link.swarm_run_id, link.generation, token_hash, r.id],
             )?;
             if linked != 1 {
@@ -423,6 +424,27 @@ impl Store {
         }
         tx.execute("UPDATE workspaces SET owner_run_id=?2 WHERE id=?1",params![r.workspace_id,r.id])?;
         tx.commit()?;
+        Ok(())
+    }
+
+    /// Persist the uncertainty boundary before a supervised director child can exist.
+    /// An owner left at reserved/linked can later prove that no spawn was requested.
+    pub fn mark_director_spawn_requested(&self, overseer_run_id: &str) -> Result<()> {
+        let owner_exists = self.conn.prepare(
+            "SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1"
+        )?.exists([overseer_run_id])?;
+        if !owner_exists {
+            return Ok(());
+        }
+        let updated = self.conn.execute(
+            "UPDATE swarm_director_owners SET launch_phase='spawn_requested'
+             WHERE overseer_run_id=?1 AND status='active'
+             AND supervised_launch=1 AND launch_phase='linked'",
+            [overseer_run_id],
+        )?;
+        if updated != 1 {
+            bail!("director process cannot start without active linked ownership");
+        }
         Ok(())
     }
 

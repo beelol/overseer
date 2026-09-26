@@ -34,6 +34,7 @@ pub use context::{grant_artifact, retry_revoked_interrupts, revoke_artifact};
 pub use director::{claim_batch, complete_batch, recover};
 pub use owner::{begin as begin_director_owner, renew as renew_director_owner};
 pub use owner::expire_due as expire_director_owners;
+pub use owner::mark_uncertain_spawn as mark_uncertain_director_spawn;
 pub use dispatch::next as dispatch_next;
 pub use dispatch::recover_pending as recover_pending_dispatches;
 pub use effects::{begin as begin_effect, reconcile as reconcile_effect};

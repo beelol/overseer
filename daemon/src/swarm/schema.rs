@@ -253,7 +253,8 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           renewed_ms INTEGER NOT NULL,
           lease_expires_ms INTEGER NOT NULL,
           overseer_run_id TEXT REFERENCES runs(id),
-          supervised_launch INTEGER NOT NULL DEFAULT 0 CHECK(supervised_launch IN (0,1))
+          supervised_launch INTEGER NOT NULL DEFAULT 0 CHECK(supervised_launch IN (0,1)),
+          launch_phase TEXT CHECK(launch_phase IN ('reserved','linked','spawn_requested'))
         );
         CREATE UNIQUE INDEX IF NOT EXISTS swarm_one_director_turn
           ON swarm_director_turns(run_id) WHERE status='active';
@@ -390,6 +391,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     if !has_supervised_launch {
         conn.execute_batch("ALTER TABLE swarm_director_owners ADD COLUMN supervised_launch INTEGER NOT NULL DEFAULT 0 CHECK(supervised_launch IN (0,1));")?;
     }
+    let has_launch_phase = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_director_owners') WHERE name='launch_phase'")?
+        .exists([])?;
+    if !has_launch_phase {
+        conn.execute_batch("ALTER TABLE swarm_director_owners ADD COLUMN launch_phase TEXT CHECK(launch_phase IN ('reserved','linked','spawn_requested'));")?;
+    }
     let has_source_change_permission = conn
         .prepare(
             "SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='source_change_permission'",
@@ -512,10 +519,10 @@ mod tests {
             lease_expires_ms INTEGER NOT NULL);
             INSERT INTO swarm_director_owners VALUES('old-run',1,'digest','active',1,2,30000);").unwrap();
         migrate(&conn).unwrap();
-        let owner: (i64,String,Option<String>,i64)=conn.query_row(
-            "SELECT generation,status,overseer_run_id,supervised_launch FROM swarm_director_owners WHERE run_id='old-run'",
-            [],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).unwrap();
-        assert_eq!(owner,(1,"active".into(),None,0));
+        let owner: (i64,String,Option<String>,i64,Option<String>)=conn.query_row(
+            "SELECT generation,status,overseer_run_id,supervised_launch,launch_phase FROM swarm_director_owners WHERE run_id='old-run'",
+            [],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))).unwrap();
+        assert_eq!(owner,(1,"active".into(),None,0,None));
         migrate(&conn).unwrap();
     }
 

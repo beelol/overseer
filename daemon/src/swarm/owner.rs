@@ -31,6 +31,7 @@ pub fn begin(store: &mut Store, p: &Value) -> Result<Value> {
     let now = crate::daemon::now();
     let token = uuid::Uuid::new_v4().simple().to_string();
     let supervised = i64::from(p["supervised_launch"].as_bool().unwrap_or(false));
+    let phase = if supervised == 1 { Some("reserved") } else { None };
     let tx = store.conn.transaction()?;
     let existing: Option<(i64,String)> = tx.query_row(
         "SELECT generation,status FROM swarm_director_owners WHERE run_id=?1",
@@ -46,13 +47,14 @@ pub fn begin(store: &mut Store, p: &Value) -> Result<Value> {
         bail!("active director turn requires reconciliation before owner binding");
     }
     tx.execute(
-        "INSERT INTO swarm_director_owners(run_id,generation,token_sha256,status,created_ms,renewed_ms,lease_expires_ms,supervised_launch)
-         VALUES(?1,?2,?3,'active',?4,?4,?5,?6)
+        "INSERT INTO swarm_director_owners(run_id,generation,token_sha256,status,created_ms,renewed_ms,lease_expires_ms,supervised_launch,launch_phase)
+         VALUES(?1,?2,?3,'active',?4,?4,?5,?6,?7)
          ON CONFLICT(run_id) DO UPDATE SET generation=excluded.generation,
              token_sha256=excluded.token_sha256,status='active',created_ms=excluded.created_ms,
              renewed_ms=excluded.renewed_ms,lease_expires_ms=excluded.lease_expires_ms,
-             overseer_run_id=NULL,supervised_launch=excluded.supervised_launch",
-        params![run,generation,hash(&token),now,now+LEASE_MS,supervised],
+             overseer_run_id=NULL,supervised_launch=excluded.supervised_launch,
+             launch_phase=excluded.launch_phase",
+        params![run,generation,hash(&token),now,now+LEASE_MS,supervised,phase],
     )?;
     if replacement_pending {
         let restored = current["stalled_from"].as_str().unwrap_or("planning");
@@ -105,6 +107,32 @@ pub fn renew(store: &mut Store, p: &Value) -> Result<Value> {
     }
     Ok(json!({"run_id":run,"generation":p["generation"],
         "lease_expires_ms":now+LEASE_MS}))
+}
+
+/// A supervisor was requested but its process record was not committed. The
+/// child may exist, so keep the run active and stall new Swarm admissions.
+pub fn mark_uncertain_spawn(store: &Store, overseer_run_id: &str) -> Result<bool> {
+    let tx = store.conn.unchecked_transaction()?;
+    let uncertain = tx.prepare(
+        "SELECT 1 FROM swarm_director_owners o JOIN runs r ON r.id=o.overseer_run_id
+         WHERE r.id=?1 AND r.run_dir IS NULL AND o.status='active'
+         AND o.supervised_launch=1 AND o.launch_phase='spawn_requested'",
+    )?.exists([overseer_run_id])?;
+    if !uncertain {
+        return Ok(false);
+    }
+    let now = crate::daemon::now();
+    tx.execute(
+        "UPDATE swarm_runs SET stalled_from=CASE WHEN status='stalled' THEN stalled_from ELSE status END,
+         status='stalled',stall_reason='director_termination_unknown',updated_ms=?2
+         WHERE id=(SELECT run_id FROM swarm_director_owners WHERE overseer_run_id=?1)
+         AND status IN ('planning','running','paused','draining','stalled')",
+        params![overseer_run_id,now],
+    )?;
+    tx.execute("UPDATE runs SET attention=?2 WHERE id=?1",params![overseer_run_id,
+        json!({"reason":"director_spawn_uncertain"}).to_string()])?;
+    tx.commit()?;
+    Ok(true)
 }
 
 /// A lease timeout only makes director termination uncertain. It never releases

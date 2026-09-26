@@ -44,7 +44,9 @@ pub fn launch_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let process = task["run"]["id"].as_str()
         .ok_or_else(|| anyhow!("director run was not recorded"))?;
     if !task["launch_error"].is_null() {
-        return Ok(json!({"status":"launch_failed","overseer_run_id":process,
+        let status = if task["launch_uncertain"] == true { "launch_uncertain" }
+            else { "launch_failed" };
+        return Ok(json!({"status":status,"overseer_run_id":process,
             "error":task["launch_error"]}));
     }
     Ok(json!({"status":"launched","overseer_run_id":process}))
