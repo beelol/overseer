@@ -455,9 +455,11 @@ fn atlas_s5_lost_result_receipt_replays_once_after_restart() {
     d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
         "revision":1,"job_id":"j2","attempt_id":attempt["attempt_id"]}));
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let admissions: i64 = db.query_row("SELECT COUNT(*) FROM swarm_admissions WHERE run_id=?1 AND job_id='j2'",[run],|r|r.get(0)).unwrap();
+    let artifacts: i64 = db.query_row("SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1 AND job_id='j2'",[run],|r|r.get(0)).unwrap();
     let results: i64 = db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND job_id='j2' AND kind='result'",[run],|r|r.get(0)).unwrap();
     let accepts: i64 = db.query_row("SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1 AND job_id='j2' AND decision='accept'",[run],|r|r.get(0)).unwrap();
-    assert_eq!((results,accepts),(1,1));
+    assert_eq!((admissions,artifacts,results,accepts),(1,1,1,1));
     assert_eq!(d.call("swarm.coverage",json!({"run_id":run}))["rows"][0]["coverage_state"],"confirmed_application_defect");
     let batch = d.call("swarm.director.claim_batch",json!({"run_id":run,
         "generation":1,"revision":1,"now_ms":at+6000}));

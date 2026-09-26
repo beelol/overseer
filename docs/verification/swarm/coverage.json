@@ -642,9 +642,11 @@
         "daemon/tests/swarm_dispatch_incident.rs",
         "docs/verification/swarm/S4.md",
         "daemon/tests/swarm_checkpoint.rs",
-        "docs/verification/swarm/SWARM-16.md"
+        "docs/verification/swarm/SWARM-16.md",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md"
       ],
-      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S4 links measured PostgreSQL pool starvation to three scoped findings, account-A worker failure, permission-gated durable account-B checkpoint and a cautious completed report; a focused replay covers restart and revocation. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0/S5 remain unverified."
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 now joins its lost-result-receipt fault to Atlas v1 with one durable result and acceptance after restart, but the other named S5 faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
     }
   },
   "scenarios": {
@@ -699,9 +701,13 @@
       "blocker": "Versioned Go/PostgreSQL fixture and joined scripted three-worker replay cover measured pool timeout, held transaction, queue redelivery, failed L2 worker, permission-gated attempt-2 checkpoint on another allowed target, cautious evidence-gated report and no-qualified-target block after restart. A focused fixture covers grant/revocation across restart. Live Auto Mode outage routing, automatic checkpoint assembly, live cross-account ACL and read-only harness enforcement remain unverified."
     },
     "S5": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "Individual fault fixtures exist, but the complete ordered Atlas replay and all injected faults have not been executed."
+      "status": "partial",
+      "evidence": [
+        "fixtures/swarm/atlas-v1/",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md"
+      ],
+      "blocker": "The Atlas v1 J2 lost-result-receipt replay survives daemon restart, deduplicates the retry, applies one acceptance and completes the one-job audit with database-backed evidence. The other named S5 faults and full S1-sized ordered replay remain unverified; live harness communication is absent."
     }
   }
 }

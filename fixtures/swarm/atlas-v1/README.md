@@ -10,4 +10,6 @@ Run `npm ci --ignore-scripts` once, then `./run-local.sh` with Docker and Node.j
 
 `node probe.mjs j5 export-queue-missing` removes J5's local PostgreSQL queue table. The authorized export returns 503; the Swarm fault replay records `exports_queue` as unavailable, leaves J5 blocked in the coverage readout, and refuses a passed decision or completed run.
 
+The opt-in S5 lost-receipt replay in `daemon/tests/swarm_atlas.rs` uses a real J2 probe. It discards the first result reply after persistence, restarts the daemon, replays the same message ID, and verifies one admission, artifact, result, acceptance and completed check. The remaining S5 faults are tracked in `docs/verification/swarm/S5.md`.
+
 The passing acceptance and joined replay tests describe the **seeded backend's actual responses**, including the two vulnerabilities. They are not a security fix, a model-agent audit, or a full S1 pass. Autonomous director choices, live harness communication, the stated report detail, source-text injection, and full fault recovery remain open. See `docs/rfcs/swarm-mode-scenarios.md`.
