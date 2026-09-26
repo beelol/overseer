@@ -1,10 +1,10 @@
-[2026-09-26T03:23:08.527Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-26T03:23:08.753Z] PASS the installed extension ships a signed Overseer Notifier.app (bundle id, name, universal, icon) that runs {"verify":0,"id":"com.beelol.overseer.notifier","name":"Overseer","archs":"x86_64 arm64","status":"denied","statusExit":0}
-[2026-09-26T03:23:12.568Z] PASS Test Notification is delivered by the Overseer helper with the Overseer-view link {"okToast":"Sent a test notification from Overseer. If no banner appeared, allow Overseer in System Settings → Notifications.","args":"--title\nOverseer notifications are on\n--body\nThis is how Overseer tells you agents are still running after VS Code closes.\n--open\nvscode://beelol.overseer/open-center\n"}
-[2026-09-26T03:23:12.630Z] screenshot docs/verification/evidence/ui/notify/01-test-notification-native.png
-[2026-09-26T03:23:14.516Z] PASS with notifications denied it falls back, delivers anyway and tells the user how to fix it {"deniedToast":"Sent a test notification, but not as Overseer: overseer-notifier (denied); fell back to /private/tmp/ovs-ui-jbU4cG/fallback.sh (ok). Allow Overseer in System Settings → Notifications to get Overseer-branded banners."}
-[2026-09-26T03:23:14.573Z] screenshot docs/verification/evidence/ui/notify/02-test-notification-denied.png
-[2026-09-26T03:23:17.113Z] screenshot docs/verification/evidence/ui/notify/03-vscode-uri-prompt.png
-[2026-09-26T03:23:17.893Z] PASS the notification link opens the Overseer view (after VS Code's one-time "Allow … to open this URI?") "Cancel\nOpen\nAllow 'Overseer' extension to open this URI?\nvscode://beelol.overseer/open-center\nDo not ask me again for this extension"
-[2026-09-26T03:23:21.206Z] PASS later links open the Overseer view without asking again {"again":true,"asked":false}
-[2026-09-26T03:23:21.263Z] screenshot docs/verification/evidence/ui/notify/04-link-opened-center.png
+[2026-09-26T09:46:10.421Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T09:46:10.697Z] PASS the installed extension ships a signed Overseer Notifier.app (bundle id, name, universal, icon) that runs {"verify":0,"id":"com.beelol.overseer.notifier","name":"Overseer","archs":"x86_64 arm64","status":"authorized","statusExit":0}
+[2026-09-26T09:46:14.327Z] PASS Test Notification is delivered by the Overseer helper with the Overseer-view link {"okToast":"Sent a test notification from Overseer. If no banner appeared, allow Overseer in System Settings → Notifications.","args":"--title\nOverseer notifications are on\n--body\nThis is how Overseer tells you agents are still running after VS Code closes.\n--open\nvscode://beelol.overseer/open-center\n"}
+[2026-09-26T09:46:14.395Z] screenshot docs/verification/evidence/ui/notify/01-test-notification-native.png
+[2026-09-26T09:46:16.282Z] PASS with notifications denied it falls back, delivers anyway and tells the user how to fix it {"deniedToast":"Sent a test notification, but not as Overseer: overseer-notifier (denied); fell back to /private/tmp/ovs-ui-htFJFF/fallback.sh (ok). Allow Overseer in System Settings → Notifications to get Overseer-branded banners."}
+[2026-09-26T09:46:16.353Z] screenshot docs/verification/evidence/ui/notify/02-test-notification-denied.png
+[2026-09-26T09:46:18.928Z] screenshot docs/verification/evidence/ui/notify/03-vscode-uri-prompt.png
+[2026-09-26T09:46:19.718Z] PASS the notification link opens the Overseer view (after VS Code's one-time "Allow … to open this URI?") "Cancel\nOpen\nAllow 'Overseer' extension to open this URI?\nvscode://beelol.overseer/open-center\nDo not ask me again for this extension"
+[2026-09-26T09:46:23.019Z] PASS later links open the Overseer view without asking again {"again":true,"asked":false}
+[2026-09-26T09:46:23.065Z] screenshot docs/verification/evidence/ui/notify/04-link-opened-center.png

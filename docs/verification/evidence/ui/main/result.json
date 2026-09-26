@@ -4,7 +4,7 @@
       "name": "profile created from UI",
       "ok": true,
       "detail": {
-        "id": "p-bbdb2270335b",
+        "id": "p-edfe0f8680ed",
         "harness": "opencode"
       }
     },
@@ -12,8 +12,8 @@
       "name": "run created in isolated worktree",
       "ok": true,
       "detail": {
-        "run": "r-769567b97b11",
-        "workspace": "/private/tmp/ovs-ui-rJx5WS/overseer-home/worktrees/repo-c4bc3fb3/sequence-8",
+        "run": "r-a76c6b5ea2d7",
+        "workspace": "/private/tmp/ovs-ui-c63beV/overseer-home/worktrees/repo-700d061a/sequence-8",
         "branch": "overseer/sequence-8"
       }
     },
@@ -44,7 +44,7 @@
     {
       "name": "output panel streams events",
       "ok": true,
-      "detail": "TURN 1\nYou\nsequence 8\n✎\nedit:\na.txt\n(tool-input)\n⚙\nedit\n{\"filePath\":\"/private/tmp/ovs-ui-rJx5WS/overseer-home/worktrees/repo-c4bc3fb3/sequence-8/a.txt\",\"newString\":\"L20: agent edit 1\",\"oldString\":\"L20: original\"} [completed]\ncompleted\n✎\nedit:\nb.txt\n(tool-input)\n⚙\nedit\n{\"filePath\":\"/private/tmp/ovs-ui-rJx5WS/overseer-home/worktrees/repo-c4bc3fb3/sequence-8/b.txt\",\"newString\":\"L280: agent edit 2\",\"o"
+      "detail": "sequence 8\na.txt\n6 steps\nedit 6×\nb.txt\na.txt\nb.txt\na.txt\nb.txt\n15 tokens\nedit…"
     },
     {
       "name": "scroll pauses follow with visible Resume",
@@ -52,7 +52,7 @@
       "detail": {
         "state": "Follow paused by your navigation",
         "resume": true,
-        "top": 323
+        "top": 307.5
       }
     },
     {
@@ -60,7 +60,7 @@
       "ok": true,
       "detail": {
         "state": "Follow paused by your navigation",
-        "top": 323
+        "top": 307.5
       }
     },
     {
@@ -82,7 +82,7 @@
     {
       "name": "base icon identifies snapshot and provenance",
       "ok": true,
-      "detail": "Latest run\nBase: e935d9122bed7e3de7e81dedc546f626214d1cf7\nrun-start snapshot s-0e6a5946b8c8 (turn 1 of r-769567b97b11, 1790383304813), captured including dirty and untracked files\nProvenance: recorded\nClick to choose another comparison."
+      "detail": "Latest run\nBase: 20ae2155007b7cdd65f7af2cfc0866fc5dec20b4\nrun-start snapshot s-fe504dbaeb84 (turn 1 of r-a76c6b5ea2d7, 1790416709033), captured including dirty and untracked files\nProvenance: recorded\nClick to choose another comparison.\nWorktree: …/repo-700d061a/sequence-8"
     },
     {
       "name": "follow off preserves position",
@@ -128,12 +128,12 @@
         {
           "n": 1,
           "status": "completed",
-          "snapshot": "s-0e6a5946b8c8"
+          "snapshot": "s-fe504dbaeb84"
         },
         {
           "n": 2,
           "status": "interrupted",
-          "snapshot": "s-31d44977d727"
+          "snapshot": "s-05ebf21416df"
         }
       ]
     },
@@ -143,14 +143,14 @@
       "detail": "grandchild hi (@general subagent)completed · native child"
     },
     {
-      "name": "child controls disabled with explanation",
+      "name": "child controls disabled with explanation (stop hidden, reply disabled: steered through the parent; same worktree as the parent)",
       "ok": true,
       "detail": {
-        "interrupt": true,
-        "why": "Native children are controlled through their parent run.",
+        "stopHidden": true,
         "send": true,
-        "sendWhy": "Follow-ups go to the top-level run.",
-        "ws": "Workspace: /private/tmp/ovs-ui-rJx5WS/overseer-home/worktrees/repo-c4bc3fb3/delegation (worktree, overseer/delegation) — shared with parent"
+        "why": "Sub-agents are steered through their parent",
+        "sendWhy": "Sub-agents are steered through their parent",
+        "worktree": "StatusDoneHarnessOpenCode 1.15.13AccountOpenCode mockBranchoverseer/delegationWorktree/private/tmp/ovs-ui-c63beV/overseer-home/worktrees/repo-700d061a/delegationRunr-52963bea4e38Sessionses_f22d873a1ffenPWD2CPECELuegCapabilitiescontrol: through parent harness only\nworkspace: shared with parent"
       }
     },
     {
@@ -158,12 +158,12 @@
       "ok": true,
       "detail": {
         "sawDisconnect": true,
-        "oldPid": 17429,
-        "newPid": 27258,
+        "oldPid": 6516,
+        "newPid": 33617,
         "tasks": 2
       }
     }
   ],
-  "run": "r-769567b97b11",
-  "workspace": "/private/tmp/ovs-ui-rJx5WS/overseer-home/worktrees/repo-c4bc3fb3/sequence-8"
+  "run": "r-a76c6b5ea2d7",
+  "workspace": "/private/tmp/ovs-ui-c63beV/overseer-home/worktrees/repo-700d061a/sequence-8"
 }

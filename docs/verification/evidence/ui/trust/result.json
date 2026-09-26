@@ -9,9 +9,9 @@
       "ok": true,
       "detail": [
         "Overseer: Open Overseer View, similar commands",
+        "Overseer: Open Dashboard in New Window",
         "Create New Terminal (With Profile)",
         "File: Compare New Untitled Text Files",
-        "Search Editor: New Search Editor",
         "Terminal: Create New Terminal Starting in a Custom Working Directory"
       ]
     },
@@ -22,9 +22,9 @@
         "title": " ",
         "rows": [
           "Overseer: Open Overseer View, similar commands",
+          "Overseer: Open Dashboard in New Window",
           "Create New Terminal (With Profile)",
           "File: Compare New Untitled Text Files",
-          "Search Editor: New Search Editor",
           "Terminal: Create New Terminal Starting in a Custom Working Directory"
         ],
         "value": ">Overseer: New Task"

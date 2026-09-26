@@ -12,12 +12,12 @@
       }
     },
     {
-      "name": "opens as three columns (agents | review | conversation)",
+      "name": "opens as the dashboard (agents rail and conversation) with the review column beside it",
       "ok": true,
-      "detail": 3
+      "detail": 2
     },
     {
-      "name": "agents column shows task → run → native child → grandchild",
+      "name": "agents rail shows repository → task → native child → grandchild",
       "ok": true,
       "detail": [
         [
@@ -26,11 +26,11 @@
         ],
         [
           "child task",
-          4
+          3
         ],
         [
           "grandchild task",
-          5
+          4
         ]
       ]
     },
@@ -45,87 +45,90 @@
       }
     },
     {
-      "name": "selecting a run in another repository switches the review column and the conversation column",
+      "name": "selecting a run in another repository switches the review column and the dashboard conversation",
       "ok": true,
       "detail": {
         "tabsX": [
           "Overseer, Editor Group 1",
-          "Review: X edits (1), Editor Group 2",
-          "generic: X edits, Editor Group 3"
+          "Review: X edits (1), Editor Group 2"
         ],
         "tabsY": [
           "Overseer, Editor Group 1",
-          "Review: Y live (1), Editor Group 2",
-          "generic: Y live, Editor Group 3"
+          "Review: Y live (1), Editor Group 2"
         ],
+        "chatX": {
+          "title": "X edits",
+          "turns": 1
+        },
         "reviewX": true,
         "reviewY": true,
         "convY": true
       }
     },
     {
-      "name": "live status shown in the agents column",
+      "name": "live status shown in the agents rail",
       "ok": true,
-      "detail": "dot status-running"
+      "detail": "status st-running"
     },
     {
       "name": "keyboard navigation: arrows move between labelled treeitems, Left collapses then goes to the parent, Right expands",
       "ok": true,
       "detail": {
         "start": {
-          "label": "generic",
+          "label": "X nested agents",
           "role": "treeitem",
-          "aria": "generic, running",
-          "level": "3"
+          "aria": "X nested agents, Done",
+          "level": "2",
+          "expanded": "true"
         },
-        "up": {
-          "label": "Y live",
+        "down": {
+          "label": "child task",
           "role": "treeitem",
-          "aria": "Y live, overseer/y-live, running",
-          "level": "2"
+          "aria": "child task, Done",
+          "level": "3",
+          "expanded": "true"
         },
         "collapsedTask": "false",
         "parent": {
-          "label": "repo-y",
+          "label": "repo-x",
           "role": "treeitem",
-          "aria": "repo-y, /private/tmp/ovs-ui-VuBHu9/repo-y, 1 active",
-          "level": "1"
+          "aria": "repo-x",
+          "level": "1",
+          "expanded": "true"
         },
         "reopened": "true"
       }
     },
     {
-      "name": "Overseer view restored after a window reload",
+      "name": "Overseer view restored after a window reload (same agent selected)",
       "ok": true,
       "detail": [
-        "generic"
+        "Y live"
       ]
     },
     {
-      "name": "narrow window: three columns remain usable and the agents column does not overflow",
+      "name": "narrow window: dashboard and review columns remain usable and the dashboard does not overflow",
       "ok": true,
       "detail": {
         "dims": {
           "w": 1024,
           "groups": [
-            220,
-            463,
-            283
+            599,
+            367
           ]
         },
         "fits": true
       }
     },
     {
-      "name": "wide window: three columns remain usable and the agents column does not overflow",
+      "name": "wide window: dashboard and review columns remain usable and the dashboard does not overflow",
       "ok": true,
       "detail": {
         "dims": {
           "w": 1900,
           "groups": [
-            405,
-            884,
-            553
+            1142,
+            700
           ]
         },
         "fits": true

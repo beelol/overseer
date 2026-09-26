@@ -23,21 +23,21 @@
           "globe  Sign in with ChatGPT in the browser, Opens the ChatGPT sign-in page on this Mac.",
           "device-mobile  Sign in with a device code, Shows a code to enter on another browser or device (needs device-code sign-in enabled in ChatGPT security settings)."
         ],
-        "work1": "signed in · team · c4a1579f",
+        "work1": "team · c4a1579f",
         "terminal": ""
       }
     },
     {
       "name": "Anthropic account added and signed in through its own flow",
       "ok": true,
-      "detail": "signed in · max · f03ab3f8"
+      "detail": "max · f03ab3f8"
     },
     {
       "name": "desktop logins are labeled as following the app; fixed accounts are not",
       "ok": true,
       "detail": {
-        "desk1": "signed in · pro · bc92d05b · follows app",
-        "work1": "signed in · team · c4a1579f"
+        "desk1": "pro · bc92d05b · desktop",
+        "work1": "team · c4a1579f"
       }
     },
     {
@@ -58,10 +58,10 @@
       "name": "switching the desktop app account changes only the desktop-linked account",
       "ok": true,
       "detail": {
-        "desk1": "signed in · pro · bc92d05b · follows app",
-        "desk2": "signed in · plus · d1dddc49 · follows app",
-        "work1": "signed in · team · c4a1579f",
-        "work2": "signed in · team · c4a1579f"
+        "desk1": "pro · bc92d05b · desktop",
+        "desk2": "plus · d1dddc49 · desktop",
+        "work1": "team · c4a1579f",
+        "work2": "team · c4a1579f"
       }
     },
     {
@@ -77,11 +77,11 @@
       "name": "sign-out and re-sign-in affect only that account",
       "ok": true,
       "detail": {
-        "signedOut": "not signed in",
-        "resigned": "signed in · plus · 5ac9196f",
+        "signedOut": "signed out",
+        "resigned": "plus · 5ac9196f",
         "othersAfterOut": [
-          "signed in · max · f03ab3f8",
-          "signed in · plus · d1dddc49 · follows app"
+          "max · f03ab3f8",
+          "plus · d1dddc49 · desktop"
         ]
       }
     },
@@ -92,15 +92,22 @@
         "removeText": "Cancel\nRemove Account\nRemove the account Claude fixed?\nIts own credential folder is deleted. Runs keep their history. No other account, and no desktop-app login, is affected.",
         "afterRemove": [
           "Select an agent run to see its workspace. ",
-          "Sign-in: ChatGPT sign-in in the browser, or a device code. Account login only; no API keys., has actions",
-          "codex (existing login) signed in · plus · d1dddc49 · follows app",
-          "Work ChatGPT signed in · plus · 5ac9196f",
-          "Sign-in: Claude account sign-in (claude auth login). Account login only; no API keys., has actions",
-          "claude (existing login) signed in · max · 49d8e90c · follows app",
-          "Sign-in: none: local providers and mocks (owner decision 2026-09-25). Account login only; no API keys.",
-          "opencode (existing login) not signed in · follows app, has actions",
-          "Devin has no account-login CLI yet (only API keys, which Overseer does not use)"
+          "OpenAI / ChatGPT\nSign-in: ChatGPT sign-in in the browser, or a device code. Account login only; no API keys., has actions",
+          "codex (existing login), signed in, plus · d1dddc49, follows the desktop app",
+          "Work ChatGPT, signed in, plus · 5ac9196f",
+          "Anthropic / Claude\nSign-in: Claude account sign-in (claude auth login). Account login only; no API keys., has actions",
+          "claude (existing login), signed in, max · 49d8e90c, follows the desktop app",
+          "OpenCode (local models)\nSign-in: none: local providers and mocks (owner decision 2026-09-25). Account login only; no API keys.",
+          "opencode (existing login), not signed in, follows the desktop app"
         ]
+      }
+    },
+    {
+      "name": "an account created or removed outside VS Code shows up or leaves the Accounts view within 5 seconds, without Refresh",
+      "ok": true,
+      "detail": {
+        "appeared": "status not checked",
+        "gone": true
       }
     }
   ]

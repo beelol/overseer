@@ -8,7 +8,7 @@
         "prompt": "spawn a child, then touch approved.txt",
         "spawn": true,
         "child": "child task",
-        "childText": "child output",
+        "childText": "child output\n",
         "grand": "grandchild task"
       }
     },
@@ -20,7 +20,7 @@
         "prompt": "spawn a child, then touch approved.txt",
         "spawn": true,
         "child": "child task",
-        "childText": "child output",
+        "childText": "child output\n",
         "grand": "grandchild task"
       }
     },
@@ -28,7 +28,7 @@
       "name": "permission request inline in the conversation with Allow/Deny",
       "ok": true,
       "detail": {
-        "head": "⚠ Waiting for your permission: command: touch approved.txt",
+        "head": "Allow command: touch approved.txt touch approved.txt?",
         "buttons": [
           "Allow once",
           "Deny"
@@ -40,10 +40,10 @@
       "ok": true,
       "detail": {
         "decision": [
-          "✔ Allowed: command: touch approved.txt"
+          "Allowed · command: touch approved.txt touch approved.txt"
         ],
-        "done": "■ Turn completed",
-        "usage": "∑ 1 in · 1 out",
+        "done": "Done",
+        "usage": "1 in · 1 out",
         "edits": [
           "approved.txt"
         ]
@@ -55,7 +55,7 @@
       "detail": {
         "open": {
           "open": true,
-          "input": "{\n  \"command\": \"touch approved.txt\",\n  \"cwd\": null\n}",
+          "input": "touch approved.txt",
           "status": "completed"
         },
         "closed": true
@@ -64,33 +64,38 @@
     {
       "name": "clicking a file edit opens that hunk in the run's worktree review",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-qVR5N4/overseer-home/worktrees/conv-demo-5fbd4033/app-tree"
+      "detail": "/private/tmp/ovs-ui-WixnPM/overseer-home/worktrees/conv-demo-8f022f76/app-tree"
     },
     {
       "name": "Claude Write tool call shown before its permission request",
       "ok": true,
       "detail": {
-        "summary": "{\"content\":\"allowed\\n\",\"file_path\":\"/private/tmp/ovs-ui-qVR5N4/overseer-home/worktrees/conv-demo-5fbd4033/claude-write/perm.txt\"}"
+        "summary": "perm.txt"
       }
     },
     {
-      "name": "Claude tool call shows input and result",
+      "name": "Claude tool call shows input (the written content, full path in the tooltip) and result",
       "ok": true,
       "detail": {
         "pres": [
-          "{\n  \"content\": \"allowed\\n\",\n  \"file_path\": \"/private/tmp/ovs-ui-qVR5N4/overseer-home/worktrees/conv-demo-5fbd4033/claude-write/perm.txt\"\n}",
-          "File created successfully at: /private/tmp/ovs-ui-qVR5N4/overseer-home/worktrees/conv-demo-5fbd4033/claude-write/perm.txt"
+          "allowed\n",
+          "File created successfully at: /private/tmp/ovs-ui-WixnPM/overseer-home/worktrees/conv-demo-8f022f76/claude-write/perm.txt"
         ],
+        "labels": [
+          "Content",
+          "Result"
+        ],
+        "title": "/private/tmp/ovs-ui-WixnPM/overseer-home/worktrees/conv-demo-8f022f76/claude-write/perm.txt (Write)",
         "status": "completed"
       }
     },
     {
       "name": "Claude file edit opens the Claude worktree review (not the codex-app one)",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-qVR5N4/overseer-home/worktrees/conv-demo-5fbd4033/claude-write"
+      "detail": "/private/tmp/ovs-ui-WixnPM/overseer-home/worktrees/conv-demo-8f022f76/claude-write"
     },
     {
-      "name": "Event log tab lists the raw events; conversation returns",
+      "name": "Event log (… menu) lists the raw events; conversation returns",
       "ok": true,
       "detail": 18
     },
@@ -99,9 +104,9 @@
       "ok": true,
       "detail": {
         "last": "burst line 5999",
-        "ms": 39,
+        "ms": 5,
         "events": 5002,
-        "banner": "Older history was truncated by the retention bound. The raw output keeps the full stream.",
+        "banner": "Older history was trimmed. Raw output keeps everything.",
         "msgs": 5000
       }
     },
@@ -111,8 +116,8 @@
       "detail": {
         "n": 97,
         "p95": 3,
-        "max": 30,
-        "msgs": 6000
+        "max": 18,
+        "msgs": 5064
       }
     }
   ]

@@ -1,18 +1,18 @@
-[2026-09-26T00:48:07.841Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-26T00:48:14.078Z] PASS review shows several hunks across two files {"a":{"hunks":3,"reviewed":0,"load":"rendered"},"b":{"hunks":2,"reviewed":0,"load":"rendered"}}
-[2026-09-26T00:48:14.193Z] screenshot docs/verification/evidence/ui/hunks/01-hunks-before.png
-[2026-09-26T00:48:15.092Z] PASS Reject restores only that hunk on disk (other hunks and files untouched) {"l10":"L10: agent edit","l100":"L100: original","l200":"L200: agent edit"}
-[2026-09-26T00:48:15.822Z] PASS Accept marks the hunk reviewed without writing or staging {"hunks":2,"reviewed":1,"load":"rendered"}
-[2026-09-26T00:48:15.936Z] screenshot docs/verification/evidence/ui/hunks/02-accepted-and-rejected.png
-[2026-09-26T00:48:19.279Z] PASS native undo brings the rejected hunk back (unsaved), redo removes it again; disk keeps the saved Reject {"afterUndo":true,"dirtyUndo":true,"afterRedo":true}
-[2026-09-26T00:48:22.994Z] PASS staged file: Reject restores the working tree hunk and leaves the index unchanged {"l50":"L50: original"}
-[2026-09-26T00:48:24.608Z] PASS untracked files: Accept marks reviewed; Reject restores the (empty) base content {"scratch":"\"\""}
-[2026-09-26T00:48:28.015Z] PASS concurrent agent edit during Reject is a conflict and is not overwritten {"note":"Reject was not applied: this file changed while the hunk was being rejected (conflict). Nothing was overwritten; review the current content.","disk":"L200: agent edit v2"}
-[2026-09-26T00:48:31.215Z] PASS concurrent agent edit during Accept is a conflict (not marked reviewed) {"acceptConflict":"Not marked reviewed: a.txt changed while you were accepting this hunk (conflict). Review the current content.","aState":{"hunks":2,"reviewed":1,"load":"rendered"}}
-[2026-09-26T00:48:33.221Z] PASS reviewed state survives a refresh {"a":{"hunks":2,"reviewed":1,"load":"rendered"},"n":{"hunks":1,"reviewed":1,"load":"rendered"}}
-[2026-09-26T00:48:33.831Z] PASS a reviewed hunk that changes again is no longer reviewed {"hunks":2,"reviewed":0,"load":"rendered"}
-[2026-09-26T00:48:33.935Z] screenshot docs/verification/evidence/ui/hunks/03-after-conflicts.png
-[2026-09-26T00:48:44.521Z] PASS reviewed state survives a window reload {"hunks":1,"reviewed":1,"load":"rendered"}
-[2026-09-26T00:48:44.623Z] screenshot docs/verification/evidence/ui/hunks/04-after-reload.png
-[2026-09-26T00:48:47.831Z] PASS current-checkout mode: Reject writes the checkout, Accept marks reviewed {"l20":"L20: original","l30":"L30: agent edit"}
-[2026-09-26T00:48:47.908Z] screenshot docs/verification/evidence/ui/hunks/05-current-checkout.png
+[2026-09-26T09:13:44.318Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T09:13:50.617Z] PASS review shows several hunks across two files {"a":{"hunks":3,"reviewed":0,"load":"rendered"},"b":{"hunks":2,"reviewed":0,"load":"rendered"}}
+[2026-09-26T09:13:50.718Z] screenshot docs/verification/evidence/ui/hunks/01-hunks-before.png
+[2026-09-26T09:13:51.415Z] PASS Reject restores only that hunk on disk (other hunks and files untouched) {"l10":"L10: agent edit","l100":"L100: original","l200":"L200: agent edit"}
+[2026-09-26T09:13:52.127Z] PASS Accept marks the hunk reviewed without writing or staging {"hunks":2,"reviewed":1,"load":"rendered"}
+[2026-09-26T09:13:52.204Z] screenshot docs/verification/evidence/ui/hunks/02-accepted-and-rejected.png
+[2026-09-26T09:13:55.536Z] PASS native undo brings the rejected hunk back (unsaved), redo removes it again; disk keeps the saved Reject {"afterUndo":true,"dirtyUndo":true,"afterRedo":true}
+[2026-09-26T09:13:59.242Z] PASS staged file: Reject restores the working tree hunk and leaves the index unchanged {"l50":"L50: original"}
+[2026-09-26T09:14:00.843Z] PASS untracked files: Accept marks reviewed; Reject restores the (empty) base content {"scratch":"\"\""}
+[2026-09-26T09:14:04.244Z] PASS concurrent agent edit during Reject is a conflict and is not overwritten {"note":"Reject was not applied: this file changed while the hunk was being rejected (conflict). Nothing was overwritten; review the current content.","disk":"L200: agent edit v2"}
+[2026-09-26T09:14:07.444Z] PASS concurrent agent edit during Accept is a conflict (not marked reviewed) {"acceptConflict":"Not marked reviewed: a.txt changed while you were accepting this hunk (conflict). Review the current content.","aState":{"hunks":2,"reviewed":1,"load":"rendered"}}
+[2026-09-26T09:14:09.450Z] PASS reviewed state survives a refresh {"a":{"hunks":2,"reviewed":1,"load":"rendered"},"n":{"hunks":1,"reviewed":1,"load":"rendered"}}
+[2026-09-26T09:14:10.059Z] PASS a reviewed hunk that changes again is no longer reviewed {"hunks":2,"reviewed":0,"load":"rendered"}
+[2026-09-26T09:14:10.129Z] screenshot docs/verification/evidence/ui/hunks/03-after-conflicts.png
+[2026-09-26T09:14:20.700Z] PASS reviewed state survives a window reload {"hunks":1,"reviewed":1,"load":"rendered"}
+[2026-09-26T09:14:20.787Z] screenshot docs/verification/evidence/ui/hunks/04-after-reload.png
+[2026-09-26T09:14:23.798Z] PASS current-checkout mode: Reject writes the checkout, Accept marks reviewed {"l20":"L20: original","l30":"L30: agent edit"}
+[2026-09-26T09:14:23.876Z] screenshot docs/verification/evidence/ui/hunks/05-current-checkout.png

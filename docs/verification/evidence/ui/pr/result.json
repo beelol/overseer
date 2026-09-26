@@ -3,7 +3,7 @@
     {
       "name": "Open PR explains a missing remote",
       "ok": true,
-      "detail": "OK\nOpen PR is unavailable.\nThe repository /private/tmp/ovs-ui-UyEBED/pr-demo has no Git remote. Add a GitHub remote (git remote add origin https://github.com/OWNER/REPO.git) to open pull requests."
+      "detail": "OK\nOpen PR is unavailable.\nThe repository /private/tmp/ovs-ui-Yxd76n/pr-demo has no Git remote. Add a GitHub remote (git remote add origin https://github.com/OWNER/REPO.git) to open pull requests."
     },
     {
       "name": "Open PR explains a non-GitHub remote",
@@ -24,7 +24,7 @@
       "name": "Open PR commits the worktree, pushes the branch and creates the pull request with a generated description",
       "ok": true,
       "detail": {
-        "opened": "Cancel\nOpen on GitHub\nPull request #42 is open.\nhttp://127.0.0.1:55915/test-owner/pr-demo/pull/42\n\nNothing was merged.",
+        "opened": "Cancel\nOpen on GitHub\nPull request #42 is open.\nhttp://127.0.0.1:50826/test-owner/pr-demo/pull/42\n\nNothing was merged.",
         "dialog": "Cancel\nOpen PR\nOpen a pull request for overseer/pr-demo-change?\ntest-owner/pr-demo: overseer/pr-demo-change → main\nCommits 2 uncommitted worktree file(s) to overseer/pr-demo-change first.\nPushes overseer/pr-demo-change to origin with your VS Code GitHub sign-in and opens a pull request. Nothing is merged.",
         "create": {
           "method": "POST",
@@ -35,12 +35,12 @@
             "title": "PR demo change",
             "head": "overseer/pr-demo-change",
             "base": "main",
-            "body": "Opened by Overseer from run `r-4680cc7312e0` (generic).\n\n**Task**\n\n> Change L4 and add NOTES.md\n\n**Commits**\n\n- Overseer: PR demo change\n\n**Files changed** (2)\n\n- `A` NOTES.md\n- `M` a.txt\n\n_Review before merging. Overseer never merges automatically._",
+            "body": "Opened by Overseer from run `r-c1a7c05ff6e0` (generic).\n\n**Task**\n\n> Change L4 and add NOTES.md\n\n**Commits**\n\n- Overseer: PR demo change\n\n**Files changed** (2)\n\n- `A` NOTES.md\n- `M` a.txt\n\n_Review before merging. Overseer never merges automatically._",
             "draft": false
           }
         },
-        "pushed": "b6d14c10ef4b58a1534a2ae52f2d17b110646c5c",
-        "worktreeHead": "b6d14c10ef4b58a1534a2ae52f2d17b110646c5c"
+        "pushed": "cfc796d3abaefbc63af2a832ff3d6c8abac54c45",
+        "worktreeHead": "cfc796d3abaefbc63af2a832ff3d6c8abac54c45"
       }
     },
     {
@@ -49,19 +49,19 @@
       "detail": {
         "branch": "overseer/pr-demo-change",
         "number": 42,
-        "url": "http://127.0.0.1:55915/test-owner/pr-demo/pull/42"
+        "url": "http://127.0.0.1:50826/test-owner/pr-demo/pull/42"
       }
     },
     {
       "name": "opening again reuses the existing pull request",
       "ok": true,
-      "detail": "Cancel\nOpen on GitHub\nPull request #42 is open.\nhttp://127.0.0.1:55915/test-owner/pr-demo/pull/42\n\nNothing was merged."
+      "detail": "Cancel\nOpen on GitHub\nPull request #42 is open.\nhttp://127.0.0.1:50826/test-owner/pr-demo/pull/42\n\nNothing was merged."
     },
     {
       "name": "no automatic merge; the token is not stored in Overseer, the logs or git config",
       "ok": true,
       "detail": {
-        "mainBefore": "1e9731e5ca5e54fd8a536e0597fdbd10821bcf55",
+        "mainBefore": "61a8fbd90cfaabeed0cc2ae95d10342730dd0542",
         "tokenLeak": false
       }
     }
