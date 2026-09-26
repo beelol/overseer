@@ -1,13 +1,27 @@
 // Overseer Notifier (AC-52): posts Overseer's macOS notifications under Overseer's own name
 // and icon, and opens VS Code at the Overseer view when a notification is clicked.
 //
-//   notifier --title T --body B [--open URL]   post; exit 0 posted, 3 denied, 4 error, 5 no answer yet
+//   notifier --title T --body B [--open URL] [--result FILE]
+//                                               post; exit 0 posted, 3 denied, 4 error, 5 no answer yet.
+//                                               The daemon launches it through LaunchServices (`open -W`),
+//                                               which hides the exit code, so the outcome is also written
+//                                               to FILE as "<code> <message>".
 //   notifier --status                           print notDetermined|denied|authorized|provisional
 //   (no arguments)                              launched by macOS for a click: open the URL, then quit
 //
 // Built by extension/scripts/package.js into bin/Overseer Notifier.app (LSUIElement, ad-hoc signed).
 import AppKit
 import UserNotifications
+
+/// Where to report the outcome when launched with `open` (set from --result).
+var resultFile: String?
+
+/// Records the outcome for the daemon, then exits with the same code.
+func finish(_ code: Int32, _ message: String) -> Never {
+    if let path = resultFile { try? "\(code) \(message)\n".write(toFile: path, atomically: true, encoding: .utf8) }
+    if code == 0 { print(message) } else { FileHandle.standardError.write("\(message)\n".data(using: .utf8)!) }
+    exit(code)
+}
 
 enum Mode {
     case post(title: String, body: String, open: String?)
@@ -21,6 +35,7 @@ func parse(_ args: [String]) -> Mode {
         guard let i = args.firstIndex(of: flag), i + 1 < args.count else { return nil }
         return args[i + 1]
     }
+    resultFile = value("--result")
     if let title = value("--title") { return .post(title: title, body: value("--body") ?? "", open: value("--open")) }
     return .click
 }
@@ -48,24 +63,17 @@ final class Notifier: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
             }
         case let .post(title, body, open):
             // Never wait forever for the first-time permission prompt; the daemon falls back.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 20) { FileHandle.standardError.write("no answer to the permission prompt yet\n".data(using: .utf8)!); exit(5) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 20) { finish(5, "no answer to the permission prompt yet") }
             center.requestAuthorization(options: [.alert, .sound]) { granted, error in
-                guard granted else {
-                    FileHandle.standardError.write("notifications denied\(error.map { ": \($0.localizedDescription)" } ?? "")\n".data(using: .utf8)!)
-                    exit(3)
-                }
+                guard granted else { finish(3, "notifications denied\(error.map { ": \($0.localizedDescription)" } ?? "")") }
                 let content = UNMutableNotificationContent()
                 content.title = title
                 content.body = body
                 if let open { content.userInfo = ["open": open] }
                 let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
                 self.center.add(request) { error in
-                    if let error {
-                        FileHandle.standardError.write("could not post: \(error.localizedDescription)\n".data(using: .utf8)!)
-                        exit(4)
-                    }
-                    print("posted")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exit(0) }
+                    if let error { finish(4, "could not post: \(error.localizedDescription)") }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { finish(0, "posted") }
                 }
             }
         case .click:

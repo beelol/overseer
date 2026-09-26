@@ -121,14 +121,33 @@ impl Daemon {
 /// Where a notification click takes the user: VS Code's Overseer view (extension URI handler).
 pub const OPEN_URL: &str = "vscode://beelol.overseer/open-center";
 
-/// The bundled notifier app's executable (AC-52): `OVERSEER_NOTIFIER_APP` (a `.app` path), else
+/// The bundled notifier app (a `.app` directory): `OVERSEER_NOTIFIER_APP`, else
 /// `Overseer Notifier.app` next to this daemon binary (the extension's `bin/`).
-fn notifier_executable() -> Option<std::path::PathBuf> {
+fn notifier_app() -> Option<std::path::PathBuf> {
     let app = std::env::var_os("OVERSEER_NOTIFIER_APP").map(std::path::PathBuf::from).or_else(|| {
         std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join("Overseer Notifier.app")))
     })?;
-    let exe = app.join("Contents/MacOS/notifier");
-    exe.is_file().then_some(exe)
+    app.join("Contents/MacOS/notifier").is_file().then_some(app)
+}
+
+/// Runs the notifier and returns its outcome code (0 posted, 3 denied, 5 no answer, other: failed).
+/// macOS only lets an app use notifications when LaunchServices launched it, so it is started
+/// with `open -n -W` and reports through a result file. Tests with fake helpers set
+/// `OVERSEER_TEST_NOTIFIER_DIRECT` to execute the fake directly instead.
+fn run_notifier(app: &std::path::Path, title: &str, body: &str) -> Result<i32, String> {
+    let args = ["--title", title, "--body", body, "--open", OPEN_URL];
+    if std::env::var_os("OVERSEER_TEST_NOTIFIER_DIRECT").is_some() {
+        return std::process::Command::new(app.join("Contents/MacOS/notifier")).args(args).output().map(|o| o.status.code().unwrap_or(-1)).map_err(|e| e.to_string());
+    }
+    let result = crate::paths::runtime_dir().join(format!("notify-{}.result", std::process::id()));
+    let _ = std::fs::remove_file(&result);
+    let status = std::process::Command::new("/usr/bin/open").arg("-n").arg("-W").arg(app).arg("--args").args(args).arg("--result").arg(&result).status().map_err(|e| e.to_string())?;
+    let text = std::fs::read_to_string(&result).unwrap_or_default();
+    let _ = std::fs::remove_file(&result);
+    if !status.success() {
+        return Err(format!("open exited {:?}", status.code()));
+    }
+    text.split_whitespace().next().and_then(|c| c.parse().ok()).ok_or_else(|| "no result reported".to_string())
 }
 
 /// Sends the OS notification and says how it was delivered.
@@ -144,17 +163,14 @@ pub fn notify(title: &str, body: &str) -> String {
     #[cfg(target_os = "macos")]
     {
         let mut note = String::new();
-        match notifier_executable() {
-            Some(exe) => {
-                let out = std::process::Command::new(&exe).args(["--title", title, "--body", body, "--open", OPEN_URL]).output();
-                match out.as_ref().map(|o| o.status.code()) {
-                    Ok(Some(0)) => return "overseer-notifier (ok)".into(),
-                    Ok(Some(3)) => note = "overseer-notifier (denied); ".into(),
-                    Ok(Some(5)) => note = "overseer-notifier (permission not answered yet); ".into(),
-                    Ok(code) => note = format!("overseer-notifier (failed, exit {code:?}); "),
-                    Err(e) => note = format!("overseer-notifier (could not start: {e}); "),
-                }
-            }
+        match notifier_app() {
+            Some(app) => match run_notifier(&app, title, body) {
+                Ok(0) => return "overseer-notifier (ok)".into(),
+                Ok(3) => note = "overseer-notifier (denied); ".into(),
+                Ok(5) => note = "overseer-notifier (permission not answered yet); ".into(),
+                Ok(code) => note = format!("overseer-notifier (failed, exit {code}); "),
+                Err(e) => note = format!("overseer-notifier (could not start: {e}); "),
+            },
             None => note = "overseer-notifier (not installed); ".into(),
         }
         if let Ok(cmd) = std::env::var("OVERSEER_NOTIFY_FALLBACK") {

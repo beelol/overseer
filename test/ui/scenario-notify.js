@@ -36,7 +36,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     check('the installed extension ships a signed Overseer Notifier.app (bundle id, name, universal, icon) that runs', verify.status === 0 && id === 'com.beelol.overseer.notifier' && name === 'Overseer' && /arm64/.test(archs) && /x86_64/.test(archs) && fs.existsSync(path.join(app, 'Contents/Resources/AppIcon.icns')) && /^(notDetermined|denied|authorized|provisional|ephemeral)$/.test(status.stdout.trim()),
       { verify: verify.status, id, name, archs, status: status.stdout.trim(), statusExit: status.status });
 
-    s.launch(repo, { OVERSEER_NOTIFIER_APP: fake, OVERSEER_NOTIFY_FALLBACK: fallback });
+    s.launch(repo, { OVERSEER_NOTIFIER_APP: fake, OVERSEER_TEST_NOTIFIER_DIRECT: '1', OVERSEER_NOTIFY_FALLBACK: fallback });
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     const toast = pattern => cdp.waitFor(`[...document.querySelectorAll('.notification-toast')].map(t => t.innerText).find(t => ${pattern}.test(t)) || null`, 20000).catch(() => null);
