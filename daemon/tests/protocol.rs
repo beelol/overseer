@@ -1518,6 +1518,25 @@ fn ac60_turn_options_reach_claude_and_unsupported_ones_are_refused() {
 }
 
 #[test]
+fn rejected_initial_turn_does_not_leave_a_queued_run() {
+    let t=tmp();
+    let checkout=repo(&t.path().join("repo"));
+    let d=Daemon::start(&[]);
+    let created=d.call("task.create",json!({"repo":checkout,"harness":"generic",
+        "program":"/bin/echo","args":[],"prompt":"inspect","effort":"high",
+        "title":"Invalid launch option"}));
+    assert!(created["launch_error"].as_str().unwrap().contains("does not take reasoning effort"));
+    let id=created["run"]["id"].as_str().unwrap();
+    let run=d.run(id);
+    assert_eq!(run["status"],"failed","{run}");
+    assert!(run["ended_ms"].as_i64().is_some(),"{run}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let open:i64=db.query_row("SELECT COUNT(*) FROM turns WHERE run_id=?1 AND ended_ms IS NULL",
+        [id],|r|r.get(0)).unwrap();
+    assert_eq!(open,0);
+}
+
+#[test]
 fn ac60_repo_files_lists_mentionable_files_best_first() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

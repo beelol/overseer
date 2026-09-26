@@ -215,7 +215,7 @@
         "daemon/tests/swarm_dispatch.rs",
         "daemon/tests/swarm_integration.rs"
       ],
-      "blocker": "Fixture startup automatically drains already-admitted unlinked intents only while their snapshots and target permission remain valid; it retains stale or revoked reservations without launching. Exact spawn-record crash windows, result receipt replay, VS Code restart, live Auto Mode refresh and live harness recovery remain unverified."
+      "blocker": "Fixture startup automatically drains already-admitted unlinked intents only while their snapshots and target permission remain valid; it retains stale or revoked reservations without launching. Local launch-failure fixtures now close an unstarted queued run and reconcile an asynchronously failed worker attempt. Exact spawn-record crash windows, full result receipt replay, VS Code restart, live Auto Mode refresh and live harness recovery remain unverified."
     },
     "SWARM-23": {
       "status": "unverified",

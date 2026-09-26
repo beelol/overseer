@@ -494,11 +494,22 @@ impl Daemon {
         }
         self.emit(Some(&task.id), Some(&run.id), "task_created", "daemon", "exact", json!({"task": task, "workspace": ws, "run": run}))?;
         let started = self.start_turn_internal(&run.id, &prompt, false, &opts, swarm_identity);
-        let run = self.run(&run.id)?;
-        let task = self.task(&task.id)?;
         if let Err(e) = started {
+            let current = self.run(&run.id)?;
+            // If no supervisor was recorded, a rejected initial turn must not
+            // consume an active slot forever. A process with a recorded run
+            // directory is left to normal exit/recovery reconciliation.
+            if current.status == "queued"
+                && self.store.lock().unwrap().run_process(&run.id)?.is_none()
+            {
+                self.mark_ended(&current, "failed", &format!("launch failed: {}", redact(&e.to_string())))?;
+            }
+            let run = self.run(&run.id)?;
+            let task = self.task(&task.id)?;
             return Ok(json!({"task": task, "run": run, "workspace": ws, "launch_error": e.to_string()}));
         }
+        let run = self.run(&run.id)?;
+        let task = self.task(&task.id)?;
         Ok(json!({"task": task, "run": run, "workspace": ws}))
     }
 
