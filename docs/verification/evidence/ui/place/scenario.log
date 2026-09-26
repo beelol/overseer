@@ -1,0 +1,13 @@
+[2026-09-26T20:13:00.912Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T20:13:17.312Z] before {"layout":[{"share":0.66,"active":"Review"},{"share":0.34,"active":"Overseer"}],"agent":"Place demo","scope":"unstaged","follow":"following","reviewTop":700,"chatTop":1606}
+[2026-09-26T20:13:17.556Z] screenshot docs/verification/evidence/ui/place/01-before.png
+[2026-09-26T20:13:29.874Z] screenshot docs/verification/evidence/ui/place/02-after-reload.png
+[2026-09-26T20:13:29.875Z] PASS after a reload: the same agent and arrangement (review left, chat right) {"before":[{"share":0.66,"active":"Review"},{"share":0.34,"active":"Overseer"}],"after":[{"share":0.66,"active":"Review"},{"share":0.34,"active":"Overseer"}]}
+[2026-09-26T20:13:29.875Z] PASS after a reload: the same review scope {"before":"unstaged","after":"unstaged"}
+[2026-09-26T20:13:29.875Z] PASS after a reload: still in follow mode (paused until resumed, as AC-49 requires) {"before":"following","after":"paused"}
+[2026-09-26T20:13:29.875Z] PASS after a reload: review and chat scroll positions restored {"review":[700,700],"chat":[1606,1606]}
+[2026-09-26T20:13:40.274Z] screenshot docs/verification/evidence/ui/place/03-after-restart.png
+[2026-09-26T20:13:40.274Z] PASS after quitting and starting VS Code again: the same agent and arrangement (review left, chat right) {"before":[{"share":0.66,"active":"Review"},{"share":0.34,"active":"Overseer"}],"after":[{"share":0.66,"active":"Review"},{"share":0.34,"active":"Overseer"}]}
+[2026-09-26T20:13:40.274Z] PASS after quitting and starting VS Code again: the same review scope {"before":"unstaged","after":"unstaged"}
+[2026-09-26T20:13:40.274Z] PASS after quitting and starting VS Code again: still in follow mode (paused until resumed, as AC-49 requires) {"before":"following","after":"paused"}
+[2026-09-26T20:13:40.274Z] PASS after quitting and starting VS Code again: review and chat scroll positions restored {"review":[700,700],"chat":[1606,1606]}

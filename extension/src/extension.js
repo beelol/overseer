@@ -16,6 +16,7 @@ const { Steering } = require('./run-actions');
 const { Dashboard } = require('./dashboard-mode');
 
 let client;
+let centerRef;
 
 function gitRoot(dir) {
   return new Promise(resolve => execFile('git', ['rev-parse', '--show-toplevel'], { cwd: dir }, (err, out) => resolve(err ? undefined : out.trim())));
@@ -75,6 +76,7 @@ async function activate(context) {
   const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, opts), selected: () => selectedRun, client, model, launcher, attention, pinned, setPinned, archived: archivedTasks, search, steering,
     // The grid takes the editor area and gives it back as it was (AC-79).
     onMode: async (mode, was) => { if (mode === 'grid') await arrangement.enterGrid(); else if (was === 'grid') await arrangement.leaveGrid(); } });
+  centerRef = center;
   const arrangement = new Arrangement({ context, center, review, model, client, log: say });
   outputs.column = () => vscode.ViewColumn.Beside;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
@@ -634,6 +636,10 @@ async function activate(context) {
     announceBackgroundAgents().catch(error => say('background notice check: ' + error.message));
     dashboard.startup().catch(error => say('dashboard startup: ' + error.message));
     const remembered = context.workspaceState.get('overseer.selectedRun');
+    // Reopen where the user left off (AC-80) when VS Code did not restore the Overseer editor itself.
+    if (remembered && model.run(remembered) && context.workspaceState.get('overseer.editorOpen', false)) {
+      setTimeout(() => { if (!center.active && !dashboard.inDashboard) selectRun(remembered).catch(error => say('reopen: ' + error.message)); }, 2500);
+    }
     if (remembered && model.run(remembered)) {
       selectedRun = remembered;
       // Show the remembered run as selected in the Agents view without stealing focus.
@@ -648,6 +654,6 @@ async function activate(context) {
   return { client, model, review, outputs, selectRun, agents, agentsView, center, dashboard, arrangement, attention, selectedRun: () => selectedRun }; // exported for UI tests
 }
 
-function deactivate() { client?.dispose(); }
+function deactivate() { if (centerRef) centerRef.shuttingDown = true; client?.dispose(); }
 
 module.exports = { activate, deactivate };

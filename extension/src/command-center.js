@@ -42,8 +42,12 @@ class CommandCenter {
     const post = m => panel.webview.postMessage(m);
     this.chatFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'chat' }));
     this.gridFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'grid' }));
+    // Remembered for the next start (AC-80): was the Overseer editor open when VS Code closed?
+    this.context.workspaceState.update('overseer.editorOpen', true);
     panel.onDidDispose(() => {
       this.chatFeed.dispose(); this.gridFeed.dispose();
+      // Closing the window also disposes panels; only a user's close (window still running) counts.
+      setTimeout(() => { if (!this.shuttingDown && !this.panel) this.context.workspaceState.update('overseer.editorOpen', false); }, 1500);
       if (this.panel === panel) { this.panel = undefined; this.chatRun = undefined; }
       vscode.commands.executeCommand('setContext', 'overseer.dashboardOpen', false);
     });

@@ -1,0 +1,116 @@
+{
+  "checks": [
+    {
+      "name": "after a reload: the same agent and arrangement (review left, chat right)",
+      "ok": true,
+      "detail": {
+        "before": [
+          {
+            "share": 0.66,
+            "active": "Review"
+          },
+          {
+            "share": 0.34,
+            "active": "Overseer"
+          }
+        ],
+        "after": [
+          {
+            "share": 0.66,
+            "active": "Review"
+          },
+          {
+            "share": 0.34,
+            "active": "Overseer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "after a reload: the same review scope",
+      "ok": true,
+      "detail": {
+        "before": "unstaged",
+        "after": "unstaged"
+      }
+    },
+    {
+      "name": "after a reload: still in follow mode (paused until resumed, as AC-49 requires)",
+      "ok": true,
+      "detail": {
+        "before": "following",
+        "after": "paused"
+      }
+    },
+    {
+      "name": "after a reload: review and chat scroll positions restored",
+      "ok": true,
+      "detail": {
+        "review": [
+          700,
+          700
+        ],
+        "chat": [
+          1606,
+          1606
+        ]
+      }
+    },
+    {
+      "name": "after quitting and starting VS Code again: the same agent and arrangement (review left, chat right)",
+      "ok": true,
+      "detail": {
+        "before": [
+          {
+            "share": 0.66,
+            "active": "Review"
+          },
+          {
+            "share": 0.34,
+            "active": "Overseer"
+          }
+        ],
+        "after": [
+          {
+            "share": 0.66,
+            "active": "Review"
+          },
+          {
+            "share": 0.34,
+            "active": "Overseer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "after quitting and starting VS Code again: the same review scope",
+      "ok": true,
+      "detail": {
+        "before": "unstaged",
+        "after": "unstaged"
+      }
+    },
+    {
+      "name": "after quitting and starting VS Code again: still in follow mode (paused until resumed, as AC-49 requires)",
+      "ok": true,
+      "detail": {
+        "before": "following",
+        "after": "paused"
+      }
+    },
+    {
+      "name": "after quitting and starting VS Code again: review and chat scroll positions restored",
+      "ok": true,
+      "detail": {
+        "review": [
+          700,
+          700
+        ],
+        "chat": [
+          1606,
+          1606
+        ]
+      }
+    }
+  ]
+}
