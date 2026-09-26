@@ -1810,9 +1810,10 @@ fn auto_claude_account_change_before_child_turn_pauses_without_a_model_call() {
     let counter = r.path().join("claude-auth-count");
     let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
         ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
-        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_AUTH_COUNTER_FILE"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_AUTH_COUNTER_FILE,CLAUDE_FIXTURE_AUTH_SWITCH_AFTER"),
         ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "prose"),
-        ("CLAUDE_FIXTURE_AUTH_COUNTER_FILE", counter.to_str().unwrap())]);
+        ("CLAUDE_FIXTURE_AUTH_COUNTER_FILE", counter.to_str().unwrap()),
+        ("CLAUDE_FIXTURE_AUTH_SWITCH_AFTER", "2")]);
     let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
         "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
@@ -1822,7 +1823,7 @@ fn auto_claude_account_change_before_child_turn_pauses_without_a_model_call() {
     let outcome = d.call("auto.dispatch", request.clone());
     assert_eq!(outcome["state"], "paused", "{outcome}");
     assert_eq!(outcome["run"]["status"], "failed");
-    assert_eq!(std::fs::read_to_string(&counter).unwrap(), "2");
+    assert_eq!(std::fs::read_to_string(&counter).unwrap(), "3");
     let child_id = run_id(&outcome);
     assert!(!d.events(&child_id).iter().any(|event| event["kind"] == "turn_started"),
         "a changed account must be caught before Claude starts a model turn");
@@ -1833,6 +1834,108 @@ fn auto_claude_account_change_before_child_turn_pauses_without_a_model_call() {
     assert_eq!(replay["run"]["id"], child_id);
     assert!(replay["actions"].as_array().is_some_and(|actions| actions.contains(&json!("refresh"))));
     assert_eq!(d.runs().len(), 2, "reconnecting must not create a second child");
+}
+
+#[test]
+fn auto_pre_effect_account_rejection_selects_an_allowed_independent_route() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let counter = r.path().join("claude-auth-count");
+    let quota = r.path().join("codex-quota-mode");
+    std::fs::write(&quota, "unknown").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_AUTH_COUNTER_FILE,FIXTURE_QUOTA_MODE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "prose"),
+        ("CLAUDE_FIXTURE_AUTH_COUNTER_FILE", counter.to_str().unwrap()),
+        ("FIXTURE_QUOTA_MODE_FILE", quota.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"pre-effect-account-reject-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-claude","system-codex"],"preferred_harness":"claude",
+        "prompt":"safe bounded result"});
+    let outcome = d.call("auto.dispatch", request.clone());
+    assert_eq!(outcome["state"], "dispatched", "{outcome}");
+    assert_eq!(outcome["run"]["harness"], "codex-app", "{outcome}");
+    assert_eq!(d.wait_done(&run_id(&outcome), 15)["status"], "completed");
+    assert_eq!(std::fs::read_to_string(&counter).unwrap(), "2",
+        "Claude must be rechecked once before its model turn, then excluded");
+    assert_eq!(outcome["pre_effect_failures"].as_array().unwrap().len(), 1);
+    assert_eq!(outcome["decision"]["exclusions"].as_array().unwrap().iter()
+        .filter(|entry| entry["reason"] == "route_unavailable").count(), 2);
+    assert_eq!(d.runs().len(), 2, "the rejected route must not create a child");
+    assert_eq!(d.call("auto.dispatch", request)["run"]["id"], outcome["run"]["id"],
+        "the same work unit must replay its successful alternate");
+    let decisions = d.events(&parent).into_iter().filter(|e| e["kind"] == "auto_decision")
+        .collect::<Vec<_>>();
+    assert_eq!(decisions.len(), 1, "one durable decision per work unit");
+    assert_eq!(d.call("auto.decision.replay", json!({"event_seq":decisions[0]["seq"]}))["matches_recorded"], true);
+}
+
+#[test]
+fn auto_pre_effect_rejections_stop_after_three_distinct_routes_without_a_child() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let quota = r.path().join("codex-quota-mode");
+    std::fs::write(&quota, "unknown").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_AUTH_PER_PROFILE,FIXTURE_QUOTA_MODE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "prose"),
+        ("CLAUDE_FIXTURE_AUTH_PER_PROFILE", "1"),
+        ("FIXTURE_QUOTA_MODE_FILE", quota.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let claude_profiles = (0..3).map(|n| d.call("profile.create", json!({"name":format!("Reject {n}"),
+        "harness":"claude"}))["id"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let mut allowed = claude_profiles;
+    allowed.push("system-codex".into());
+    let outcome = d.call("auto.dispatch", json!({"work_unit_id":"pre-effect-three-limit-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":allowed,"preferred_harness":"claude","prompt":"bounded result"}));
+    assert_eq!(outcome["state"], "paused", "{outcome}");
+    assert_eq!(outcome["decision"]["reason"], "pre_effect_attempt_limit");
+    assert_eq!(outcome["pre_effect_failures"].as_array().unwrap().len(), 3);
+    assert_eq!(d.runs().len(), 1, "no child may be created after three rejected preflights");
+    let decision = d.events(&parent).into_iter().find(|e| e["kind"] == "auto_decision").unwrap();
+    assert_eq!(d.call("auto.decision.replay", json!({"event_seq":decision["seq"]}))["matches_recorded"], true);
+}
+
+#[test]
+fn auto_slow_preflights_share_the_ten_second_decision_deadline() {
+    use std::time::Instant;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let quota = r.path().join("codex-quota-mode");
+    std::fs::write(&quota, "unknown").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_AUTH_PER_PROFILE,CLAUDE_FIXTURE_AUTH_INITIAL_DELAY_MS,CLAUDE_FIXTURE_AUTH_PREFLIGHT_DELAY_MS,FIXTURE_QUOTA_MODE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "prose"),
+        ("CLAUDE_FIXTURE_AUTH_PER_PROFILE", "1"),
+        ("CLAUDE_FIXTURE_AUTH_INITIAL_DELAY_MS", "3500"),
+        ("CLAUDE_FIXTURE_AUTH_PREFLIGHT_DELAY_MS", "4000"),
+        ("FIXTURE_QUOTA_MODE_FILE", quota.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let mut allowed = (0..7).map(|n| d.call("profile.create", json!({"name":format!("Slow {n}"),
+        "harness":"claude"}))["id"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    allowed.push("system-codex".into());
+    let started = Instant::now();
+    let outcome = d.call("auto.dispatch", json!({"work_unit_id":"slow-preflights-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":allowed,"preferred_harness":"claude","prompt":"bounded result"}));
+    let elapsed = started.elapsed();
+    assert_eq!(outcome["state"], "paused", "{outcome}");
+    assert_eq!(outcome["decision"]["reason"], "collection_deadline_elapsed");
+    assert!(elapsed <= Duration::from_secs(11), "discovery and preflight took {elapsed:?}");
+    assert_eq!(d.runs().len(), 1, "no child starts after the decision deadline");
+    let event = d.events(&parent).into_iter().find(|e| e["kind"] == "auto_decision").unwrap();
+    assert_eq!(d.call("auto.decision.replay", json!({"event_seq":event["seq"]}))["matches_recorded"], true);
 }
 
 #[test]

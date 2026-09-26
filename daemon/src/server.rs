@@ -373,6 +373,28 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
     }
 }
 
+/// A metadata-only rejection here is known to precede child creation. A
+/// rejection after `delegate_run` has made a run is not retryable by this path.
+fn recheck_claude_account_before_child(d: &Arc<Daemon>, profile_id: &str,
+    expected_generation: i64, decision_deadline: Instant) -> Result<()> {
+    let deadline = decision_deadline.min(Instant::now() + Duration::from_secs(2));
+    let gate = d.profile_gate(profile_id);
+    let _guard = lock_gate_until(&gate, deadline)?;
+    let profile = d.profile(profile_id)?;
+    if profile.harness != "claude" { return Err(anyhow!("account profile changed harness")); }
+    let program = crate::adapters::resolve_program("claude")
+        .ok_or_else(|| anyhow!("Claude executable unavailable"))?;
+    let auth = crate::auto_collect::claude_auth_status(&program,
+        &crate::daemon::Daemon::profile_env(&profile),
+        Duration::from_millis(remaining_metadata_ms(deadline)?), crate::daemon::now())?;
+    let store = d.store.lock().unwrap();
+    store.record_auto_account_identity(profile_id, &auth.fingerprint)?;
+    if store.auto_account_generation(profile_id)? != Some(expected_generation) {
+        return Err(anyhow!("Claude account changed before child creation"));
+    }
+    Ok(())
+}
+
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
@@ -526,9 +548,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let mut evidence = Vec::new();
                 let mut discovery_failures = Vec::new();
                 let mut account_generations = BTreeMap::new();
+                let decision_deadline = Instant::now() + Duration::from_secs(10);
                 let candidate_ids = allowed_profiles.iter().cloned().collect::<Vec<_>>();
                 for (candidate_id, discovered) in collect_unique_bounded(&candidate_ids,
-                    Duration::from_secs(8), |id, budget|
+                    Duration::from_secs(8).min(decision_deadline.saturating_duration_since(Instant::now())), |id, budget|
                         discover_auto_profile(d, id, &parent.workspace_id, budget)) {
                     match discovered {
                         Ok(discovered) => {
@@ -555,12 +578,54 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     max_sandbox:Sandbox::WorkspaceWrite,
                     allowed_profiles:allowed_profiles.clone(),
                     pinned_route, preferred_harness };
-                let decision = crate::auto_select::select(&work, &routes);
-                let trace = json!({"selector_version":"multi-harness-cold-start-v1","decision":decision,
-                    "selection_input":{"work":&work,"routes":&routes},
+                let mut decision = crate::auto_select::select(&work, &routes);
+                let mut pre_effect_failures = Vec::new();
+                let mut attempt_limit_reached = false;
+                let mut deadline_exhausted = false;
+                for attempt in 0..3 {
+                    let Some(selected) = decision.selected.as_deref() else { break; };
+                    if remaining_metadata_ms(decision_deadline).is_err() {
+                        deadline_exhausted = true;
+                        decision.selected = None;
+                        decision.reason = "collection_deadline_elapsed".into();
+                        break;
+                    }
+                    let route = routes.iter().find(|route| route.id == selected)
+                        .ok_or_else(|| anyhow!("selected route disappeared"))?;
+                    if route.harness != "claude" { break; }
+                    let rejected_profile = route.profile_id.clone();
+                    let rejected_route = route.id.clone();
+                    let generation = account_generations.get(&rejected_profile)
+                        .ok_or_else(|| anyhow!("selected account generation unavailable"))?;
+                    if recheck_claude_account_before_child(d, &rejected_profile, *generation,
+                        decision_deadline).is_ok() {
+                        break;
+                    }
+                    pre_effect_failures.push(json!({"profile_id":rejected_profile,
+                        "route_id":rejected_route,"reason":"account_or_metadata_rejected_before_child"}));
+                    for route in routes.iter_mut().filter(|route| route.profile_id == rejected_profile) {
+                        route.health = crate::auto_select::Health::Unavailable;
+                    }
+                    decision = crate::auto_select::select(&work, &routes);
+                    if attempt == 2 && decision.selected.is_some() {
+                        attempt_limit_reached = true;
+                        decision.selected = None;
+                        decision.reason = "pre_effect_attempt_limit".into();
+                    }
+                }
+                if decision.selected.is_some() && remaining_metadata_ms(decision_deadline).is_err() {
+                    deadline_exhausted = true;
+                    decision.selected = None;
+                    decision.reason = "collection_deadline_elapsed".into();
+                }
+                let trace = json!({"selector_version":"multi-harness-preflight-v1","decision":decision,
+                    "selection_input":{"work":&work,"routes":&routes,
+                        "attempt_limit_reached":attempt_limit_reached,
+                        "deadline_exhausted":deadline_exhausted},
                     "requirements":{"min_tier":min_tier,"required_tools":required_tools,
                         "context_needed":context_needed,"requires_approvals":requires_approvals},
                     "evidence":evidence,"discovery_failures":discovery_failures,
+                    "pre_effect_failures":pre_effect_failures,
                     "candidates":routes.iter().map(|route| json!({"id":route.id,"quota":route.quota,
                         "fit":route.fit,"health":route.health})).collect::<Vec<_>>()});
                 d.emit(Some(&parent.task_id), Some(&parent.id), "auto_decision", "daemon", "exact", trace)?;
@@ -583,10 +648,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     }
                     delegated["decision"] = json!(decision);
                     delegated["discovery_failures"] = json!(discovery_failures);
+                    delegated["pre_effect_failures"] = json!(pre_effect_failures);
                     delegated
                 } else {
                     json!({"state":"paused","work_unit_id":work_unit_id,"decision":decision,
-                        "discovery_failures":discovery_failures,
+                        "discovery_failures":discovery_failures,"pre_effect_failures":pre_effect_failures,
                         "actions":["refresh","choose_manual_route"]})
                 }
             }
@@ -607,6 +673,18 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let decision = match selector_version {
                 "codex-cold-start-v1" => crate::auto_select::select_legacy_v1(&work, &routes),
                 "codex-cold-start-v2" | "multi-harness-cold-start-v1" => crate::auto_select::select(&work, &routes),
+                "multi-harness-preflight-v1" => {
+                    let mut decision = crate::auto_select::select(&work, &routes);
+                    if input["attempt_limit_reached"] == true {
+                        decision.selected = None;
+                        decision.reason = "pre_effect_attempt_limit".into();
+                    }
+                    if input["deadline_exhausted"] == true {
+                        decision.selected = None;
+                        decision.reason = "collection_deadline_elapsed".into();
+                    }
+                    decision
+                }
                 _ => return Err(anyhow!("unsupported automatic selector version")),
             };
             let matches_recorded = serde_json::to_value(&decision)? == payload["decision"];

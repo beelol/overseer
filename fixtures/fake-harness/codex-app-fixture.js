@@ -31,13 +31,14 @@ rl.on('line', line => {
       return;
     }
     const accountId = process.env.FIXTURE_ACCOUNT_ID_FILE ? fs.readFileSync(process.env.FIXTURE_ACCOUNT_ID_FILE, 'utf8').trim() : 'private-account-id';
-    const quotaUsed = process.env.FIXTURE_QUOTA_MODE_FILE && fs.readFileSync(process.env.FIXTURE_QUOTA_MODE_FILE, 'utf8').trim() === 'exhausted' ? 100 : 35;
+    const quotaMode = process.env.FIXTURE_QUOTA_MODE_FILE ? fs.readFileSync(process.env.FIXTURE_QUOTA_MODE_FILE, 'utf8').trim() : '';
+    const quotaUsed = quotaMode === 'exhausted' ? 100 : 35;
     mark('metadata_started');
     const reply = () => {
       mark('metadata_done');
       out({ id: m.id, result: { accountId, ordinaryUsageAllowed: true,
         rateLimitsByLimitId: { codex: { limitId: 'codex', normalModelSlug: null,
-          primary: { usedPercent: quotaUsed, windowDurationMins: 300, resetsAt: 1800003600 }, secondary: null,
+          primary: quotaMode === 'unknown' ? null : { usedPercent: quotaUsed, windowDurationMins: 300, resetsAt: 1800003600 }, secondary: null,
           credits: { balance: 'secret-credit-sentinel' } } } } });
     };
     if (process.env.FIXTURE_MODE === 'metadata-delay') setTimeout(reply, 700); else reply();

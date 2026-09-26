@@ -17,11 +17,17 @@ const path = require('path');
 const readline = require('readline');
 if (process.argv.includes('auth') && process.argv.includes('status')) {
   let email = 'fixture@example.test';
-  if (process.env.CLAUDE_FIXTURE_AUTH_COUNTER_FILE) {
-    const marker = process.env.CLAUDE_FIXTURE_AUTH_COUNTER_FILE;
+  if (process.env.CLAUDE_FIXTURE_AUTH_COUNTER_FILE || process.env.CLAUDE_FIXTURE_AUTH_PER_PROFILE === '1') {
+    const marker = process.env.CLAUDE_FIXTURE_AUTH_PER_PROFILE === '1'
+      ? path.join(process.env.CLAUDE_CONFIG_DIR, 'fixture-auth-count')
+      : process.env.CLAUDE_FIXTURE_AUTH_COUNTER_FILE;
     const count = Number(fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8') : '0');
     fs.writeFileSync(marker, String(count + 1));
-    if (count > 0) email = 'switched@example.test';
+    const switchAfter = Number(process.env.CLAUDE_FIXTURE_AUTH_SWITCH_AFTER || '1');
+    if (count >= switchAfter) email = 'switched@example.test';
+    const delay = Number(count === 0 ? process.env.CLAUDE_FIXTURE_AUTH_INITIAL_DELAY_MS || 0
+      : process.env.CLAUDE_FIXTURE_AUTH_PREFLIGHT_DELAY_MS || 0);
+    if (delay > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delay);
   }
   console.log(JSON.stringify({ loggedIn: true,
     authMethod: process.env.CLAUDE_FIXTURE_AUTH_MODE === 'api-key' ? 'api-key' : 'claude.ai',
