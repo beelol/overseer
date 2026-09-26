@@ -106,6 +106,17 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
     check('Enter in the chat composer sends a follow-up', n === 2, { turns: n });
     await s.screenshot('keyboard-done');
 
+    // Gate K (AC-81): the shortcuts also work with keyboard focus in the side bar's Agents list.
+    await cdp.command('Focus on Agents View'); await delay(500);
+    const inList = await cdp.evalWorkbench(`!!document.activeElement?.closest('.part.sidebar')`);
+    await cdp.key('a', { meta: true, alt: true }); await delay(700);
+    const switcher = await cdp.waitQuickTitle('Switch to agent').then(() => true, () => false);
+    await cdp.key('Escape'); await delay(300);
+    await cdp.command('Focus on Agents View'); await delay(500);
+    await cdp.key('n', { meta: true, alt: true }); await delay(900);
+    const composer = await dash.waitFor(`document.body.dataset.mode === 'composer'`, 8000).then(() => true, () => false);
+    check('the shortcuts also work from the side bar (⌥⌘A opens the agent switcher, ⌥⌘N the composer)', inList && switcher && composer, { inList, switcher, composer });
+
     const audit = await dash.eval(AUDIT);
     check('every control in the dashboard has a screen-reader label', audit.bad.length === 0 && audit.checked > 10, audit);
   } catch (error) {
