@@ -1,0 +1,5 @@
+$ code --user-data-dir <profile> --extensions-dir <ext> --install-extension overseer-baseline-ce56432.vsix --force
+Installing extensions...
+Extension 'overseer-baseline-ce56432.vsix' was successfully installed.
+
+beelol.overseer@0.1.0
