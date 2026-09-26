@@ -173,8 +173,9 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
             "SELECT 1 FROM swarm_admissions a JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
              JOIN swarm_attempts t ON t.id=a.attempt_id AND t.status='registered'
              WHERE a.attempt_id=?1 AND a.run_id=?2 AND a.job_id=?3
-             AND j.status='reserved' AND j.plan_revision=?4"
-        )?.exists(params![attempt,run,job,attempt_revision])?;
+             AND j.status='reserved' AND j.plan_revision=?4
+             AND j.deadline_at_ms>?5"
+        )?.exists(params![attempt,run,job,attempt_revision,crate::daemon::now()])?;
         if !eligible {
             bail!("attempt has no current admitted job");
         }

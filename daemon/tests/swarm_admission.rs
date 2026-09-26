@@ -59,6 +59,7 @@ fn one_run_freezes_allocation_and_dedupes_replayed_admission() {
     let at = now();
     let first = admit(&d, &id, "j0", "codex-a", "req-0", at, 60000, 4000).unwrap();
     assert_eq!(first["status"], "admitted");
+    assert_eq!(d.call("swarm.jobs",json!({"id":id}))["jobs"][0]["deadline_at_ms"],at+900_000);
     assert_eq!(first["allocation_milli"], 6000);
     let replay = admit(&d, &id, "j0", "codex-a", "req-0", at, 60000, 4000).unwrap();
     assert_eq!(replay["status"], "already_admitted");

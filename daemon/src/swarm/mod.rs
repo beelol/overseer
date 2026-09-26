@@ -19,7 +19,7 @@ pub use admission::admit;
 pub use broker::{ack, direct, messages, register, report};
 pub use completion::complete;
 pub use coverage::report as coverage_report;
-pub use control::{expire_due, off, pause, resume};
+pub use control::{expire_due, expire_jobs_due, off, pause, resume};
 pub use context::{artifact_chunk, director_summary, worker_brief};
 pub use director::{claim_batch, complete_batch, recover};
 pub use dispatch::next as dispatch_next;
@@ -225,6 +225,8 @@ pub fn jobs(store: &Store, p: &Value) -> Result<Value> {
             "title":r.get::<_,String>("title")?,"acceptance":r.get::<_,String>("acceptance")?,
             "deps":serde_json::from_str::<Value>(&deps).unwrap_or(Value::Null),
             "status":r.get::<_,String>("status")?,"attempt_count":r.get::<_,i64>("attempt_count")?,
+            "deadline_at_ms":r.get::<_,Option<i64>>("deadline_at_ms")?,
+            "stop_reason":r.get::<_,Option<String>>("stop_reason")?,
         }))
     })?.collect::<rusqlite::Result<Vec<_>>>()?;
     let has_more = rows.len() as i64 > limit;

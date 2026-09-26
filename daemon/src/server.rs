@@ -49,6 +49,15 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
                 for run in expired {
                     crate::swarm::interrupt_workers(&daemon, &run)?;
                 }
+                let timed_out_workers = crate::swarm::expire_jobs_due(
+                    &mut daemon.store.lock().unwrap(),
+                    crate::daemon::now(),
+                )?;
+                for worker in timed_out_workers {
+                    if let Err(error) = daemon.interrupt(&worker) {
+                        crate::log(&format!("swarm job deadline interrupt {worker} failed: {error}"));
+                    }
+                }
                 crate::swarm::reconcile_terminal_workers(&daemon)?;
                 crate::swarm::sample_due_workers(&daemon, crate::daemon::now())?;
                 Ok::<(), anyhow::Error>(())

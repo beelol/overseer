@@ -13,6 +13,76 @@ fn now() -> i64 {
 }
 
 #[test]
+fn job_deadline_interrupts_only_its_worker_despite_progress() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("job-deadline-source"));
+    let run = d.call("swarm.create",json!({"category":"Job deadline",
+        "objective":"Inspect two paths","allowed_targets":["fixture-local"],
+        "policy":{"deadline_ms":10000}}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]},
+        {"id":"followup","title":"Follow up","acceptance":"evidence","deps":[]}
+    ]}));
+    let at=now();
+    let admission_request=json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"inspect","target_id":"fixture-local","request_id":"job-deadline-worker",
+        "job_deadline_ms":1500,"now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"});
+    let admitted=d.call("swarm.admit",admission_request.clone());
+    assert_eq!(admitted["status"],"admitted","{admitted}");
+    let mut other_request=admission_request;
+    other_request["job_id"]=json!("followup");
+    other_request["request_id"]=json!("job-deadline-other-worker");
+    other_request["job_deadline_ms"]=json!(5000);
+    let other=d.call("swarm.admit",other_request);
+    assert_eq!(other["status"],"admitted","{other}");
+    let launched=d.call("swarm.worker.launch",json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],"repo":checkout,
+        "program":"/bin/sleep","args":["30"],"prompt":"Inspect",
+        "title":"Job deadline worker"}));
+    let worker=launched["overseer_run_id"].as_str().unwrap();
+    let other_launched=d.call("swarm.worker.launch",json!({"run_id":id,"job_id":"followup",
+        "attempt_id":other["attempt_id"],"token":other["token"],"repo":checkout,
+        "program":"/bin/sleep","args":["30"],"prompt":"Follow up",
+        "title":"Other job worker"}));
+    let other_worker=other_launched["overseer_run_id"].as_str().unwrap();
+    let original_deadline=d.call("swarm.jobs",json!({"id":id}))["jobs"]
+        .as_array().unwrap().iter().find(|j|j["id"]=="inspect").unwrap()["deadline_at_ms"].as_i64().unwrap();
+    for seq in 0..5 {
+        d.call("swarm.report",json!({"run_id":id,"job_id":"inspect",
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "message_id":format!("job-deadline-progress-{seq}"),"type":"progress",
+            "revision":1,"payload":{"note":"working"}}));
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(5);
+    loop {
+        let jobs=d.call("swarm.jobs",json!({"id":id}))["jobs"].as_array().unwrap().clone();
+        let inspect=jobs.iter().find(|j|j["id"]=="inspect").unwrap();
+        assert_eq!(inspect["deadline_at_ms"],original_deadline);
+        if inspect["status"]=="failed" { break; }
+        assert!(std::time::Instant::now()<until,"job deadline did not fail job: {inspect}");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert_ne!(d.wait_done(worker,5)["status"],"completed");
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["status"],"running");
+    let jobs=d.call("swarm.jobs",json!({"id":id}))["jobs"].as_array().unwrap().clone();
+    assert_eq!(jobs.iter().find(|j|j["id"]=="followup").unwrap()["status"],"reserved");
+    assert!(["queued","starting","running"].contains(&d.run(other_worker)["status"].as_str().unwrap()));
+    assert_eq!(jobs.iter().find(|j|j["id"]=="inspect").unwrap()["attempt_count"],1);
+    d.call("swarm.stop",json!({"run_id":id,"generation":1,"revision":1}));
+    d.wait_done(other_worker,5);
+}
+
+#[test]
 fn deadline_interrupts_a_linked_worker_without_another_admission() {
     let d = Daemon::start(&[]);
     let temp = tmp();

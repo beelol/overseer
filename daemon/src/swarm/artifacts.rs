@@ -151,15 +151,18 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
     if !linked {
         bail!("artifact evidence was not submitted by this attempt");
     }
-    let state: String = store
+    let (state, deadline_at): (String, Option<i64>) = store
         .conn
         .query_row(
-            "SELECT status FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            "SELECT status,deadline_at_ms FROM swarm_jobs WHERE run_id=?1 AND id=?2",
             params![run, job],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?,r.get(1)?)),
         )
         .optional()?
         .ok_or_else(|| anyhow!("unknown job"))?;
+    if deadline_at.is_some_and(|deadline| crate::daemon::now() >= deadline) {
+        bail!("job deadline expired before decision");
+    }
     if ["cancelled", "cancel_requested", "superseded", "failed"].contains(&state.as_str()) {
         bail!("job cannot be decided in this state");
     }
@@ -304,10 +307,10 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
         "UPDATE swarm_attempts SET status='finished' WHERE id=?1",
         params![attempt],
     )?;
-    let (job_status, count, job_revision): (String, i64, i64) = tx.query_row(
-        "SELECT status,attempt_count,plan_revision FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+    let (job_status, count, job_revision, job_stop_reason, job_deadline): (String, i64, i64, Option<String>, Option<i64>) = tx.query_row(
+        "SELECT status,attempt_count,plan_revision,stop_reason,deadline_at_ms FROM swarm_jobs WHERE run_id=?1 AND id=?2",
         params![run, job],
-        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
     )?;
     if job_status == "accepted" {
         release_and_unlock(&tx, run, job, now)?;
@@ -317,8 +320,18 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
             params![run, job, now],
         )?;
         tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
+    } else if job_status == "cancel_requested" && job_stop_reason.as_deref() == Some("job_deadline") {
+        tx.execute(
+            "UPDATE swarm_jobs SET status='failed',updated_ms=?3 WHERE run_id=?1 AND id=?2",
+            params![run,job,now],
+        )?;
+        tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
     } else if job_status == "rejected" {
-        let next = if count < 2 { "ready" } else { "failed" };
+        let next = if count < 2 && job_deadline.is_none_or(|deadline| now < deadline) {
+            "ready"
+        } else {
+            "failed"
+        };
         tx.execute(
             "UPDATE swarm_jobs SET status=?3,updated_ms=?4 WHERE run_id=?1 AND id=?2",
             params![run, job, next, now],

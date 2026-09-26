@@ -35,6 +35,8 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           deps TEXT NOT NULL,
           status TEXT NOT NULL,
           attempt_count INTEGER NOT NULL DEFAULT 0,
+          deadline_at_ms INTEGER,
+          stop_reason TEXT,
           created_ms INTEGER NOT NULL,
           updated_ms INTEGER NOT NULL,
           PRIMARY KEY(run_id,id)
@@ -262,6 +264,18 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         .exists([])?;
     if !has_reviewed_message_seq {
         conn.execute_batch("ALTER TABLE swarm_decisions ADD COLUMN reviewed_message_seq INTEGER NOT NULL DEFAULT 0;")?;
+    }
+    let has_job_deadline = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_jobs') WHERE name='deadline_at_ms'")?
+        .exists([])?;
+    if !has_job_deadline {
+        conn.execute_batch("ALTER TABLE swarm_jobs ADD COLUMN deadline_at_ms INTEGER;")?;
+    }
+    let has_job_stop_reason = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_jobs') WHERE name='stop_reason'")?
+        .exists([])?;
+    if !has_job_stop_reason {
+        conn.execute_batch("ALTER TABLE swarm_jobs ADD COLUMN stop_reason TEXT;")?;
     }
     Ok(())
 }

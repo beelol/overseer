@@ -47,6 +47,13 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
     let now = p["now_ms"]
         .as_i64()
         .ok_or_else(|| anyhow!("missing admission time"))?;
+    let job_duration = match p.get("job_deadline_ms") {
+        Some(value) => value.as_i64().ok_or_else(|| anyhow!("invalid job deadline"))?,
+        None => 900_000,
+    };
+    if !(1..=86_400_000).contains(&job_duration) {
+        bail!("invalid job deadline");
+    }
     let mut resource_claims = Vec::new();
     let mut seen_resources = HashSet::new();
     if let Some(value) = p.get("resource_claims") {
@@ -145,16 +152,21 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
             candidate["reason"].as_str().unwrap_or("ineligible_target"),
         ));
     }
-    let job_info: Option<(String, i64, i64)> = tx
+    let job_info: Option<(String, i64, i64, Option<i64>)> = tx
         .query_row(
-            "SELECT status,plan_revision,attempt_count FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            "SELECT status,plan_revision,attempt_count,deadline_at_ms FROM swarm_jobs WHERE run_id=?1 AND id=?2",
             params![run, job],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )
         .optional()?;
-    let Some((job_status, job_revision, attempts)) = job_info else {
+    let Some((job_status, job_revision, attempts, old_job_deadline)) = job_info else {
         return Ok(blocked("unknown_job"));
     };
+    let job_deadline = old_job_deadline.unwrap_or_else(||
+        now.saturating_add(job_duration).min(created.saturating_add(deadline)));
+    if now >= job_deadline {
+        return Ok(blocked("job_deadline"));
+    }
     if job_status != "ready" {
         return Ok(blocked("job_not_ready"));
     }
@@ -374,7 +386,9 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
             ON CONFLICT(id) DO UPDATE SET last_category_key=excluded.last_category_key",
             params![commit.category_key])?;
     }
-    tx.execute("UPDATE swarm_jobs SET attempt_count=attempt_count+1,status='reserved',updated_ms=?3 WHERE run_id=?1 AND id=?2",params![run,job,now])?;
+    tx.execute("UPDATE swarm_jobs SET attempt_count=attempt_count+1,status='reserved',
+        deadline_at_ms=COALESCE(deadline_at_ms,?4),updated_ms=?3 WHERE run_id=?1 AND id=?2",
+        params![run,job,now,job_deadline])?;
     tx.execute(
         "UPDATE swarm_runs SET status='running',updated_ms=?2 WHERE id=?1 AND status='planning'",
         params![run, now],
