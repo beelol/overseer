@@ -23,6 +23,67 @@ pub(super) fn revoked_dependency(conn: &Connection, run: &str, job: &str, target
     )?.exists(params![run,job,target])?)
 }
 
+pub fn grant_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
+    let _serial = d.swarm_launch_lock.lock().unwrap();
+    let run = required(p, "run_id")?;
+    let artifact = required(p, "artifact_id")?;
+    let target = required(p, "target_id")?;
+    let generation = p["generation"].as_i64().ok_or_else(|| anyhow!("missing generation"))?;
+    let revision = p["revision"].as_i64().ok_or_else(|| anyhow!("missing revision"))?;
+    let store = d.store.lock().unwrap();
+    let current = get(&store, run)?;
+    if current["generation"] != generation || current["revision"] != revision {
+        bail!("stale director generation or plan revision");
+    }
+    if current["status"] != "running" {
+        bail!("swarm run is not granting artifact access");
+    }
+    if !current["allowed_targets"].as_array()
+        .is_some_and(|allowed| allowed.iter().any(|value| value == target)) {
+        bail!("unknown or disallowed destination");
+    }
+    let revoked = store.conn.prepare(
+        "SELECT 1 FROM swarm_artifact_revocations WHERE run_id=?1 AND artifact_id=?2 AND target_id=?3",
+    )?.exists(params![run,artifact,target])?;
+    if revoked {
+        bail!("artifact destination access was revoked");
+    }
+    let row: Option<(String,String)> = store.conn.query_row(
+        "SELECT a.content,a.sha256 FROM swarm_artifacts a
+         JOIN swarm_jobs source ON source.run_id=a.run_id AND source.id=a.job_id
+         WHERE a.run_id=?1 AND a.id=?2
+           AND source.status='accepted' AND source.plan_revision=a.source_revision
+           AND EXISTS (SELECT 1 FROM swarm_decisions d, json_each(d.evidence) accepted
+                       WHERE d.run_id=a.run_id AND d.job_id=a.job_id
+                         AND d.attempt_id=a.attempt_id AND d.revision=a.source_revision
+                         AND d.decision='accept' AND accepted.value=a.id
+                         AND NOT EXISTS (SELECT 1 FROM swarm_messages later
+                                         WHERE later.run_id=d.run_id AND later.job_id=d.job_id
+                                           AND later.attempt_id=d.attempt_id
+                                           AND later.kind IN ('result','submit')
+                                           AND later.seq>d.reviewed_message_seq))
+           AND EXISTS (SELECT 1 FROM swarm_admissions s
+                       JOIN swarm_jobs consumer ON consumer.run_id=s.run_id AND consumer.id=s.job_id
+                       JOIN swarm_attempts t ON t.id=s.attempt_id AND t.status='registered'
+                       JOIN json_each(consumer.deps) dep ON dep.value=a.job_id
+                       WHERE s.run_id=a.run_id AND s.target_id=?3
+                         AND consumer.plan_revision=t.revision
+                         AND consumer.status IN ('reserved','launching','running','submitted'))",
+        params![run,artifact,target], |r| Ok((r.get(0)?,r.get(1)?)),
+    ).optional()?;
+    let (content,digest) = row.ok_or_else(|| anyhow!("no current dependent assignment for destination"))?;
+    if format!("{:x}", Sha256::digest(content.as_bytes())) != digest {
+        bail!("artifact integrity check failed");
+    }
+    let inserted = store.conn.execute(
+        "INSERT OR IGNORE INTO swarm_artifact_grants(run_id,artifact_id,target_id,created_ms)
+         VALUES(?1,?2,?3,?4)",
+        params![run,artifact,target,crate::daemon::now()],
+    )?;
+    Ok(json!({"status":"granted","artifact_id":artifact,"target_id":target,
+        "duplicate":inserted==0}))
+}
+
 pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let _serial = d.swarm_launch_lock.lock().unwrap();
     let run = required(p, "run_id")?;
@@ -157,10 +218,22 @@ fn visible_artifact(
          FROM swarm_artifacts a
          JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
          JOIN swarm_admissions s ON s.run_id=a.run_id AND s.attempt_id=a.attempt_id
-         WHERE a.run_id=?1 AND a.id=?2 AND s.target_id=?3
+         WHERE a.run_id=?1 AND a.id=?2
+         AND (s.target_id=?3 OR EXISTS
+              (SELECT 1 FROM swarm_artifact_grants g WHERE g.run_id=a.run_id
+               AND g.artifact_id=a.id AND g.target_id=?3))
          AND NOT EXISTS (SELECT 1 FROM swarm_artifact_revocations v
                          WHERE v.run_id=a.run_id AND v.artifact_id=a.id AND v.target_id=?3)
          AND (a.job_id=?4 OR (j.status='accepted' AND j.plan_revision=a.source_revision
+             AND EXISTS (SELECT 1 FROM swarm_decisions d, json_each(d.evidence) accepted
+                         WHERE d.run_id=a.run_id AND d.job_id=a.job_id
+                           AND d.attempt_id=a.attempt_id AND d.revision=a.source_revision
+                           AND d.decision='accept' AND accepted.value=a.id
+                           AND NOT EXISTS (SELECT 1 FROM swarm_messages later
+                                           WHERE later.run_id=d.run_id AND later.job_id=d.job_id
+                                             AND later.attempt_id=d.attempt_id
+                                             AND later.kind IN ('result','submit')
+                                             AND later.seq>d.reviewed_message_seq))
              AND EXISTS (SELECT 1 FROM swarm_jobs consumer, json_each(consumer.deps) dep
                          WHERE consumer.run_id=a.run_id AND consumer.id=?4
                            AND dep.value=a.job_id)))",
@@ -208,10 +281,22 @@ pub fn worker_brief(store: &Store, p: &Value) -> Result<Value> {
         "SELECT a.id FROM swarm_artifacts a
          JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
          JOIN swarm_admissions s ON s.run_id=a.run_id AND s.attempt_id=a.attempt_id
-         WHERE a.run_id=?1 AND s.target_id=?2
+         WHERE a.run_id=?1
+         AND (s.target_id=?2 OR EXISTS
+              (SELECT 1 FROM swarm_artifact_grants g WHERE g.run_id=a.run_id
+               AND g.artifact_id=a.id AND g.target_id=?2))
          AND NOT EXISTS (SELECT 1 FROM swarm_artifact_revocations v
                          WHERE v.run_id=a.run_id AND v.artifact_id=a.id AND v.target_id=?2)
          AND (a.job_id=?3 OR (j.status='accepted' AND j.plan_revision=a.source_revision
+             AND EXISTS (SELECT 1 FROM swarm_decisions d, json_each(d.evidence) accepted
+                         WHERE d.run_id=a.run_id AND d.job_id=a.job_id
+                           AND d.attempt_id=a.attempt_id AND d.revision=a.source_revision
+                           AND d.decision='accept' AND accepted.value=a.id
+                           AND NOT EXISTS (SELECT 1 FROM swarm_messages later
+                                           WHERE later.run_id=d.run_id AND later.job_id=d.job_id
+                                             AND later.attempt_id=d.attempt_id
+                                             AND later.kind IN ('result','submit')
+                                             AND later.seq>d.reviewed_message_seq))
              AND EXISTS (SELECT 1 FROM swarm_jobs consumer, json_each(consumer.deps) dep
                          WHERE consumer.run_id=a.run_id AND consumer.id=?3
                            AND dep.value=a.job_id))) ORDER BY a.id",

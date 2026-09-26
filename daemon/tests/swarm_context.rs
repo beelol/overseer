@@ -29,7 +29,7 @@ fn admit(d: &Daemon, run: &str, job: &str, target: &str) -> Value {
 
 #[test]
 fn hundred_job_summary_and_scoped_large_artifact_context() {
-    let d = Daemon::start(&[]);
+    let mut d = Daemon::start(&[]);
     let run = d.call(
         "swarm.create",
         json!({"category":"Context fixture", "objective":"Audit backend",
@@ -74,6 +74,9 @@ fn hundred_job_summary_and_scoped_large_artifact_context() {
         json!({"run_id":id,"generation":1,"revision":1,
         "job_id":"parent","attempt_id":aid}),
     );
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"parent",
+        "attempt_id":aid,"token":token,"artifact_id":"unreviewed",
+        "source_revision":1,"kind":"contract","content":"unreviewed note"}));
     commit_beneficial_batch(&d, id, &["child-a".into(), "child-b".into()]);
     let same = admit(&d, id, "child-a", "account-a");
     let other = admit(&d, id, "child-b", "account-b");
@@ -85,6 +88,7 @@ fn hundred_job_summary_and_scoped_large_artifact_context() {
     assert!(brief.to_string().len() <= 4096, "{brief}");
     assert_eq!(brief["job"]["acceptance"], "Verify parent contract");
     assert_eq!(brief["artifacts"][0]["id"], "contract-v1");
+    assert_eq!(brief["artifacts"].as_array().unwrap().len(), 1);
     assert!(!brief.to_string().contains("Independent 42"));
     let denied = d.call(
         "swarm.worker.brief",
@@ -114,6 +118,39 @@ fn hundred_job_summary_and_scoped_large_artifact_context() {
         "attempt_id":other["attempt_id"],"token":other["token"],"artifact_id":"contract-v1"})
         )
         .is_err());
+    assert!(d.try_call("swarm.context.get", json!({"run_id":id,"job_id":"child-a",
+        "attempt_id":same["attempt_id"],"token":same["token"],
+        "artifact_id":"unreviewed"})).is_err());
+    assert!(d.try_call("swarm.context.grant", json!({"run_id":id,
+        "generation":1,"revision":1,"artifact_id":"unreviewed",
+        "target_id":"account-b"})).is_err());
+    let grant = json!({"run_id":id,"generation":1,"revision":1,
+        "artifact_id":"contract-v1","target_id":"account-b"});
+    assert!(d.try_call("swarm.context.grant", json!({"run_id":id,
+        "generation":0,"revision":1,"artifact_id":"contract-v1",
+        "target_id":"account-b"})).is_err());
+    assert!(d.try_call("swarm.context.grant", json!({"run_id":id,
+        "generation":1,"revision":1,"artifact_id":"contract-v1",
+        "target_id":"account-c"})).is_err());
+    assert_eq!(d.call("swarm.context.grant", grant.clone())["status"], "granted");
+    assert_eq!(d.call("swarm.context.grant", grant.clone())["duplicate"], true);
+    d.kill9();
+    d.spawn();
+    let transferred = d.call("swarm.context.get", json!({"run_id":id,"job_id":"child-b",
+        "attempt_id":other["attempt_id"],"token":other["token"],
+        "artifact_id":"contract-v1","max_bytes":4096}));
+    assert_eq!(transferred["content"].as_str().unwrap().len(), 4096);
+    let other_brief = d.call("swarm.worker.brief", json!({"run_id":id,"job_id":"child-b",
+        "attempt_id":other["attempt_id"],"token":other["token"],"max_inline_bytes":4096}));
+    assert_eq!(other_brief["artifacts"][0]["id"], "contract-v1");
+    d.call("swarm.context.revoke", grant.clone());
+    assert!(d.try_call("swarm.context.get", json!({"run_id":id,"job_id":"child-b",
+        "attempt_id":other["attempt_id"],"token":other["token"],
+        "artifact_id":"contract-v1"})).is_err());
+    assert!(d.try_call("swarm.context.grant", grant).is_err());
+    assert_eq!(d.call("swarm.context.get", json!({"run_id":id,"job_id":"child-a",
+        "attempt_id":same["attempt_id"],"token":same["token"],
+        "artifact_id":"contract-v1","max_bytes":4096}))["content"].as_str().unwrap().len(),4096);
     assert!(d
         .try_call(
             "swarm.context.get",
@@ -144,6 +181,13 @@ fn hundred_job_summary_and_scoped_large_artifact_context() {
     assert!(saved_prompt.contains("Verify parent contract"));
     assert!(!saved_prompt.contains(&evidence));
     assert!(saved_prompt.len() <= 32 * 1024);
+    d.call("swarm.report", json!({"run_id":id,"job_id":"parent",
+        "attempt_id":aid,"token":token,"message_id":"late-source-result",
+        "type":"result","revision":1,
+        "payload":{"artifact_ids":["unreviewed"]}}));
+    assert!(d.try_call("swarm.context.get", json!({"run_id":id,"job_id":"child-a",
+        "attempt_id":same["attempt_id"],"token":same["token"],
+        "artifact_id":"contract-v1"})).is_err());
 }
 
 #[test]

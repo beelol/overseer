@@ -148,6 +148,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           PRIMARY KEY(run_id,artifact_id,target_id),
           FOREIGN KEY(run_id,artifact_id) REFERENCES swarm_artifacts(run_id,id)
         );
+        CREATE TABLE IF NOT EXISTS swarm_artifact_grants(
+          run_id TEXT NOT NULL,
+          artifact_id TEXT NOT NULL,
+          target_id TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,artifact_id,target_id),
+          FOREIGN KEY(run_id,artifact_id) REFERENCES swarm_artifacts(run_id,id)
+        );
         CREATE TABLE IF NOT EXISTS swarm_decisions(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           run_id TEXT NOT NULL,
