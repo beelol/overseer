@@ -1151,10 +1151,15 @@ impl Store {
             "DELETE FROM auto_measurements WHERE observed_ms < ?1",
             params![now_ms.saturating_sub(THIRTY_DAYS_MS)],
         )?;
-        let over_cap = self.learning_conn.execute(
-            "DELETE FROM auto_measurements WHERE event_seq NOT IN (SELECT event_seq FROM auto_measurements ORDER BY event_seq DESC LIMIT ?1)",
-            params![cap.clamp(1, 50_000)],
-        )?;
+        let cutoff: Option<i64> = self.learning_conn.query_row(
+            "SELECT event_seq FROM auto_measurements ORDER BY event_seq DESC LIMIT 1 OFFSET ?1",
+            params![cap.clamp(1, 50_000)], |row| row.get(0),
+        ).optional()?;
+        let over_cap = match cutoff {
+            Some(event_seq) => self.learning_conn.execute(
+                "DELETE FROM auto_measurements WHERE event_seq<=?1", params![event_seq])?,
+            None => 0,
+        };
         Ok(expired + over_cap)
     }
 
@@ -1191,10 +1196,19 @@ impl Store {
             "DELETE FROM auto_daily_aggregates WHERE last_observed_ms < ?1",
             params![now_ms.saturating_sub(NINETY_DAYS_MS)],
         )?;
-        let over_cap = self.learning_conn.execute(
-            "DELETE FROM auto_daily_aggregates WHERE rowid NOT IN (SELECT rowid FROM auto_daily_aggregates ORDER BY last_observed_ms DESC LIMIT ?1)",
-            params![cap.clamp(1, 10_000)],
-        )?;
+        // Rowid breaks equal-timestamp ties, so the cutoff always leaves
+        // exactly the newest `cap` scoped summaries.
+        let cutoff: Option<(i64, i64)> = self.learning_conn.query_row(
+            "SELECT last_observed_ms,rowid FROM auto_daily_aggregates
+             ORDER BY last_observed_ms DESC,rowid DESC LIMIT 1 OFFSET ?1",
+            params![cap.clamp(1, 10_000)], |row| Ok((row.get(0)?, row.get(1)?)),
+        ).optional()?;
+        let over_cap = match cutoff {
+            Some((observed_ms, rowid)) => self.learning_conn.execute(
+                "DELETE FROM auto_daily_aggregates WHERE last_observed_ms < ?1
+                 OR (last_observed_ms=?1 AND rowid<=?2)", params![observed_ms, rowid])?,
+            None => 0,
+        };
         Ok(expired + over_cap)
     }
 
@@ -1418,6 +1432,46 @@ mod schema_migration_tests {
         let reopened = Store::open(&path).unwrap();
         assert!(reopened.auto_measurements(10).unwrap().is_empty());
         assert!(reopened.auto_daily_aggregates(10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn full_execution_store_rolls_back_auto_admission_before_any_launch() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
+        store.conn.execute_batch("INSERT INTO workspaces
+            (id,path,repo_root,common_dir,kind,initial_dirty,created_ms)
+            VALUES('w','/tmp','/tmp','/tmp','current','{}',0);
+            INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms)
+            VALUES('t','task','prompt','/tmp','w',0);
+            INSERT INTO runs(id,task_id,harness,workspace_id,status,created_ms,title,capabilities)
+            VALUES('parent','t','codex-app','w','completed',0,'parent','{}');").unwrap();
+        let parent = store.run("parent").unwrap().unwrap();
+        let original_pages: i64 = store.conn.pragma_query_value(None, "page_count", |row| row.get(0)).unwrap();
+        store.conn.pragma_update(None, "max_page_count", original_pages).unwrap();
+        // Prove the first admission write still fits: the full error must
+        // occur after an intent was inserted into the selected transaction.
+        store.conn.execute_batch("SAVEPOINT admission_probe").unwrap();
+        store.insert_auto_launch_intent("probe", "parent", "hash", "route", None).unwrap();
+        store.conn.execute_batch("ROLLBACK TO admission_probe; RELEASE admission_probe").unwrap();
+        let oversized_trace = serde_json::json!({"selection_input":"x".repeat(1024 * 1024)});
+        let error = store.insert_auto_selected_decision("unit", &parent, "hash", "route", None,
+            &oversized_trace).unwrap_err();
+        assert!(matches!(error.downcast_ref::<rusqlite::Error>(),
+            Some(rusqlite::Error::SqliteFailure(code, _)) if code.code == rusqlite::ErrorCode::DiskFull),
+            "physical main-store pressure must return SQLITE_FULL: {error:#}");
+        assert!(store.auto_launch_intent("unit").unwrap().is_none(),
+            "a failed decision write cannot leave a launch claim");
+        let decisions: i64 = store.conn.query_row(
+            "SELECT COUNT(*) FROM events WHERE kind='auto_decision'", [], |row| row.get(0)).unwrap();
+        assert_eq!(decisions, 0);
+
+        store.conn.pragma_update(None, "max_page_count", original_pages + 1024).unwrap();
+        store.insert_auto_selected_decision("unit", &parent, "hash", "route", None,
+            &serde_json::json!({"selected":"route"})).unwrap();
+        assert!(store.auto_launch_intent("unit").unwrap().is_some());
+        let decisions: i64 = store.conn.query_row(
+            "SELECT COUNT(*) FROM events WHERE kind='auto_decision'", [], |row| row.get(0)).unwrap();
+        assert_eq!(decisions, 1, "recovery must not replay a failed admission");
     }
 
     #[test]
@@ -1712,7 +1766,9 @@ mod auto_measurement_tests {
         ).unwrap();
         let measurement = from_usage(now, "task", "run", "codex", None, Some("new-model"),
             &json!({"input_tokens": 1})).unwrap();
+        let maintenance_start = std::time::Instant::now();
         assert!(store.insert_auto_measurement(50_001, &measurement).unwrap());
+        eprintln!("at-cap Auto learning write: {:?}", maintenance_start.elapsed());
         let details: i64 = store.learning_conn.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get(0)).unwrap();
         let summaries: i64 = store.learning_conn.query_row("SELECT COUNT(*) FROM auto_daily_aggregates", [], |row| row.get(0)).unwrap();
         assert_eq!(details, 50_000);
