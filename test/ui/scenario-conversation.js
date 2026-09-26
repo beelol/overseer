@@ -30,13 +30,9 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     for (let i = 0; i < 60 && runState(burst.run.id).status !== 'completed'; i++) await delay(500);
 
     await s.openOverseerView();
-    const selectRun = async (title, harness) => {
-      const pt = await cdp.waitFor(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-        const i = rows.findIndex(r => r.textContent.includes(${JSON.stringify(title)})); const r = rows[i + 1]; if (!r || !r.textContent.includes(${JSON.stringify(harness)})) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 20000, 'run row ' + title);
-      await cdp.click(pt.x, pt.y);
-      await delay(1500);
-    };
-    const panel = runId => cdp.webview(`document.body.dataset.runId === ${JSON.stringify(runId)} && !!document.querySelector('#conv .turn')`, 30000);
+    // Gate K: agents are selected in the side bar; the chat shows in the editor area.
+    const selectRun = title => s.selectAgent(title, { settle: 1500 });
+    const panel = runId => cdp.webview(`(document.body.dataset.runId === ${JSON.stringify(runId)} || window.__overseer?.selected?.() === ${JSON.stringify(runId)}) && !!document.querySelector('#conv .turn')`, 30000);
     const clickIn = async (frame, selector) => { const p = await s.webviewPoint(frame, selector); await cdp.click(p.x, p.y); await delay(400); };
     const tag = (frame, expr, id) => frame.eval(`(() => { const e = ${expr}; if (!e) return false; e.id = ${JSON.stringify(id)}; e.scrollIntoView({ block: 'center' }); return true; })()`);
 
@@ -58,8 +54,13 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await a.waitFor(`!!document.querySelector('#conv .turn-foot .done.ok') && !!document.querySelector('#conv .edit-path')`, 20000);
     const after = await a.eval(`({ decision: [...document.querySelectorAll('#conv .perm-card .perm-head')].map(h => h.textContent), done: document.querySelector('#conv .turn-foot .done').textContent, usage: document.querySelector('#conv .turn-foot .usage').title, edits: [...document.querySelectorAll('#conv .edit-path')].map(b => b.textContent) })`);
     check('decision recorded inline, turn completed with usage, file edit listed', after.decision.some(d => /Allowed/.test(d)) && /Done/.test(after.done) && /1 in/.test(after.usage) && after.edits.includes('approved.txt'), after);
-    // Expand and collapse a tool call.
+    // Expand and collapse a tool call (first open the folded steps it sits in, as a user would).
+    if (await tag(a, `(() => { const t = [...document.querySelectorAll('#conv details.tool')].find(t => t.dataset.name === 'shell'); const f = t?.closest('details.steps-fold'); return f && !f.open ? f.querySelector('summary') : null; })()`, 'steps-summary')) await clickIn(a, '#steps-summary');
     await tag(a, `[...document.querySelectorAll('#conv details.tool')].find(t => t.dataset.name === 'shell')?.querySelector('summary')`, 'shell-summary');
+    // The approved edit brought the review in beside the chat (focus is there): focus the chat first
+    // with a click on an empty spot, as a user's first click into the other column does.
+    await a.eval(`(() => { const c = document.createElement('div'); c.id = 'focus-spot'; c.style.cssText = 'position:fixed;right:2px;bottom:2px;width:3px;height:3px;z-index:9'; document.body.append(c); return true; })()`);
+    await clickIn(a, '#focus-spot');
     await clickIn(a, '#shell-summary');
     const open = await a.eval(`(() => { const d = document.getElementById('shell-summary').parentElement; const r = d.querySelector('.tool-result'); return { open: d.open, input: d.querySelector('.tool-section pre')?.textContent, status: r.classList.contains('bad') ? 'failed' : r.classList.contains('run') ? 'running' : r.querySelector('.codicon-check') ? 'completed' : r.textContent }; })()`);
     await s.screenshot('tool-expanded');
@@ -99,12 +100,12 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
     // --- Retention-bound history and a live burst stay responsive; truncation is visible.
     await selectRun('burst history', 'generic');
-    const b = await panel(burst.run.id);
+    const b = await panel(burst.run.id).catch(async e => { const v = await s.editorView().catch(() => null); s.note('burst toasts', await cdp.evalWorkbench(`[...document.querySelectorAll('.notification-toast, .notifications-list-container .monaco-list-row')].map(t => t.innerText.slice(0, 300))`)); s.note('burst chat state', v && await v.eval(`({ selected: window.__overseer?.selected?.(), mode: document.body.dataset.mode, title: document.getElementById('title')?.textContent, turns: document.querySelectorAll('#conv .turn').length, msgs: document.querySelectorAll('#conv .msg').length, conv: document.getElementById('conv')?.innerText.slice(0, 200) })`)); throw e; });
     const hist = await b.eval(`({ last: [...document.querySelectorAll('#conv .msg .text')].pop()?.textContent, ms: Number(document.body.dataset.historyMs), events: Number(document.body.dataset.historyEvents), banner: document.querySelector('#conv .conv-banner:not([hidden])')?.textContent, msgs: document.querySelectorAll('#conv .msg').length })`);
     check('history at the retention bound renders within 1.5 s with truncation visible', hist.ms < 1500 && hist.events >= 4900 && /trimmed|truncated/.test(hist.banner || '') && hist.last === 'burst line 5999', hist);
     const live = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'sleep 4; i=0; while [ $i -lt 6000 ]; do echo "live line $i"; i=$((i+1)); done; sleep 1'], prompt: '', title: 'burst live' });
     await selectRun('burst live', 'generic');
-    const l = await panel(live.run.id).catch(async () => { await delay(3000); return cdp.webview(`document.body.dataset.runId === ${JSON.stringify(live.run.id)}`, 30000); });
+    const l = await panel(live.run.id).catch(async () => { await delay(3000); return cdp.webview(`window.__overseer?.selected?.() === ${JSON.stringify(live.run.id)}`, 30000); });
     await l.eval(`window.__lag = []; (function tick() { const t0 = performance.now(); if (window.__lag.length < 600) setTimeout(() => { window.__lag.push(performance.now() - t0 - 50); tick(); }, 50); })()`);
     for (let i = 0; i < 60 && runState(live.run.id).status !== 'completed'; i++) await delay(500);
     await delay(1500);

@@ -49,23 +49,34 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
     await cdp.command('Overseer: Refresh Account Status'); await delay(2000);
     await cdp.command('Overseer: Open Overseer View');
-    const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list .row[data-run]')`, 30000);
+    const dash = await s.editorView();
     await delay(1000);
-    await dash.eval(`document.querySelector('.rail-accounts').click()`); await delay(400);
-    const menu = await dash.eval(`[...document.querySelectorAll('.menu .menu-item')].map(b => ({ label: b.querySelector('.menu-label')?.textContent, hint: b.querySelector('.menu-hint')?.textContent || '', title: b.title }))`);
-    await s.screenshot('accounts-menu');
-    await cdp.key('Escape');
-    const claudeRow = menu.find(m => m.label === 'claude (existing login)') || {};
-    check('the dashboard accounts menu shows reported usage per account, with reset times in the tooltip',
-      /5 hours 95%/.test(claudeRow.hint) && /resets/.test(claudeRow.title) && menu.some(m => m.label === 'codex (existing login)' && /5 hours 20%/.test(m.hint)), menu);
+    // Gate K: accounts are in the side bar's Accounts view; usage and reset times are in each row's hover.
+    await s.openOverseerView();
+    const hoverOf = async label => {
+      const pt = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(label)}).pop(); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 10000, label);
+      // Rest on the row (VS Code shows a tree hover only after the pointer settles); retry once.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await cdp.move(pt.x + 400, pt.y + 300); await delay(600);
+        await cdp.move(pt.x, pt.y); await delay(200); await cdp.move(pt.x + 2, pt.y); await delay(1600);
+        const text = await cdp.waitFor(`(() => { const h = [...document.querySelectorAll('.monaco-hover, .workbench-hover')].find(h => h.offsetParent && h.innerText.includes(${JSON.stringify(label.split(' ')[0])})); return h && h.innerText; })()`, 5000).catch(() => '');
+        if (text) { await cdp.move(pt.x + 400, pt.y + 300); await delay(300); return text; }
+      }
+      return '';
+    };
+    const claudeHover = await hoverOf('claude (existing login)');
+    const codexHover = await hoverOf('codex (existing login)');
+    await s.screenshot('accounts-usage');
+    check('the Accounts view shows reported usage per account, with reset times, on hover',
+      /5 hours 95%/.test(claudeHover) && /resets/.test(claudeHover) && /5 hours 20%/.test(codexHover), { claudeHover, codexHover });
 
     // Per-run tokens and cost in the chat.
-    await dash.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(cost.run.id)}]').click()`);
+    await s.selectRun(cost.run.id);
     const foot = await dash.waitFor(`(() => { const u = document.querySelector('#conv .turn-foot .usage'); return u && u.textContent && { text: u.textContent, title: u.title }; })()`, 20000);
     check('per-run tokens and cost as the harness reported them (chat turn footer)', /tokens/.test(foot.text) && /\$0\.04/.test(foot.text) && /18,423 in/.test(foot.title), foot);
 
     // Composer: the near-limit account warns and suggests another compatible account.
-    await dash.eval(`document.querySelector('[data-action="new-agent"]').click()`);
+    await cdp.command('Overseer: New Agent'); await delay(800);
     await dash.waitFor(`!document.querySelector('[data-chip="agent"]').textContent.includes('Loading')`, 20000);
     await dash.eval(`document.querySelector('[data-chip="agent"]').click()`); await delay(300);
     const agentMenu = await dash.eval(`[...document.querySelectorAll('.menu .menu-item')].map(b => (b.querySelector('.menu-label')?.textContent || '') + ' | ' + (b.querySelector('.menu-hint')?.textContent || ''))`);

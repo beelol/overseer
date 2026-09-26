@@ -61,9 +61,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const failed = await waitDone(created.run.id);
     await s.openOverseerView();
     await cdp.command('Overseer: Open Overseer View');
-    const center = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list')`, 30000);
-    await center.waitFor(`!!document.querySelector('.rail-list .row[data-run=${JSON.stringify(created.run.id)}]')`, 20000);
-    await center.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(created.run.id)}]').click()`);
+    await s.selectRun(created.run.id);
+    const center = await s.editorView();
     // The conversation is in the dashboard itself.
     const conv = center;
     await conv.waitFor(`document.getElementById('title')?.textContent && !!document.querySelector('#conv .sign-in-again')`, 30000);

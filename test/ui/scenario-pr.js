@@ -27,11 +27,9 @@ const { Session, makeRepo, latestVsix, delay, git, repoRoot } = require('./harne
     const t = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', `sed -i '' 's/^L4: original$/L4: agent change for the PR/' a.txt; printf 'notes\\n' > NOTES.md`], prompt: 'Change L4 and add NOTES.md', title: 'PR demo change' });
     for (let i = 0; i < 40 && s.ctl('state').runs.find(r => r.id === t.run.id).status !== 'completed'; i++) await delay(300);
     const mainBefore = git(repo, 'rev-parse', 'main');
-    await s.openOverseerView();
-    const pt = await cdp.waitFor(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-      const i = rows.findIndex(r => r.textContent.includes('PR demo change')); const r = rows[i + 1]; if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 20000);
-    await cdp.click(pt.x, pt.y); await delay(1500);
-    const panel = await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(t.run.id)} && !!document.getElementById('more')`, 30000);
+    // Gate K: select the agent in the side bar; its chat (with the … menu) is in the editor area.
+    await s.selectAgent('PR demo change', { settle: 2000 });
+    const panel = await cdp.webview(`(document.body.dataset.runId === ${JSON.stringify(t.run.id)} || window.__overseer?.selected?.() === ${JSON.stringify(t.run.id)}) && !!document.getElementById('more')`, 30000);
     // Open pull request lives in the chat's … menu.
     const clickPr = async () => {
       for (let i = 0; i < 20; i++) {

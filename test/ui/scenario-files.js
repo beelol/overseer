@@ -35,13 +35,13 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     await cdp.command('Overseer: Open Overseer View');
     const view = await cdp.webview(`document.body.dataset.ready === '1' && !!document.getElementById('files')`, 30000);
     const pick = async label => {
-      const runId = await view.waitFor(`(() => { const r = [...document.querySelectorAll('.rail-list .row[data-run]')].find(r => r.querySelector('.title').textContent === ${JSON.stringify(label)}); if (!r) return false; document.querySelectorAll('#target').forEach(e => e.removeAttribute('id')); r.querySelector('.title').id = 'target'; return r.dataset.run; })()`, 20000).catch(() => { throw new Error('run row not found for ' + label); });
-      const p = await s.webviewPoint(view, '#target'); await cdp.click(p.x, p.y);
+      const runId = (() => { const st = s.ctl('state'); const t = st.tasks.find(t => t.title === label); return st.runs.find(r => r.task_id === t.id && !r.parent_run_id).id; })();
+      await s.selectAgent(label);
       await view.waitFor(`document.getElementById('title')?.textContent === ${JSON.stringify(label)}`, 20000);
       if (await view.eval(`document.querySelector('.files-panel').hidden`)) await view.eval(`document.getElementById('files-toggle').click()`);
       await view.waitFor(`document.getElementById('files').dataset.run === ${JSON.stringify(runId)} && document.body.dataset.filesReady === '1'`, 20000);
-      // Selecting a run also opens its review in the column on the right; let that settle first.
-      await cdp.waitFor(`(() => { const g = [...document.querySelectorAll('.editor-group-container')][1]; return (g?.querySelector('.tab.active')?.getAttribute('aria-label') || '').startsWith(${JSON.stringify('Review: ' + label)}); })()`, 20000, 'review for ' + label);
+      // An agent with changes also brings its review forward (Gate K: review left, chat right); let that settle first.
+      await cdp.waitFor(`[...document.querySelectorAll('.editor-group-container .tab.active')].some(t => (t.getAttribute('aria-label') || '').startsWith(${JSON.stringify('Review: ' + label)}))`, 20000, 'review for ' + label);
       await delay(500);
     };
     const entries = () => view.eval(`[...document.querySelectorAll('#files .row[role=treeitem]')].map(r => ({ path: r.dataset.path, level: Number(r.dataset.level), status: r.querySelector('.fstatus')?.textContent || '', inside: r.querySelector('.fcount')?.textContent || '', deleted: r.classList.contains('deleted'), dir: !!r.dataset.dir }))`);
@@ -51,7 +51,7 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
       await cdp.click(pt.x, pt.y); await delay(900);
     };
     // The tab label has no path; the editor's breadcrumbs show the folder chain of the open file.
-    const activeTab = () => cdp.evalWorkbench(`(() => { const g = [...document.querySelectorAll('.editor-group-container')][1]; const t = g?.querySelector('.tab.active'); const crumbs = [...(g?.querySelectorAll('.breadcrumbs-control .monaco-breadcrumb-item') || [])].map(i => i.textContent.trim()).join('/'); return t ? { label: t.getAttribute('aria-label'), path: crumbs } : null; })()`);
+    const activeTab = () => cdp.evalWorkbench(`(() => { const g = document.querySelector('.editor-group-container.active'); const groups = document.querySelectorAll('.editor-group-container').length; const t = g?.querySelector('.tab.active'); const crumbs = [...(g?.querySelectorAll('.breadcrumbs-control .monaco-breadcrumb-item') || [])].map(i => i.textContent.trim()).join('/'); return t ? { label: t.getAttribute('aria-label'), path: crumbs, groups } : null; })()`);
 
     // Repository X.
     await pick('X files');
@@ -66,7 +66,7 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     check('folders expand lazily and show their changed files', get(ex, 'sub/new.txt').status === 'A' && get(ex, 'sub/new.txt').level === 2, get(ex, 'sub/new.txt'));
     await clickEntry('a.txt');
     const tabX = await activeTab();
-    check('clicking a file opens it in the editor from the X worktree', /a\.txt/.test(tabX?.label || '') && (tabX?.path || '').includes('repo-x'), tabX);
+    check('clicking a file opens it in the editor from the X worktree (in the review\'s group, no third column)', /a\.txt/.test(tabX?.label || '') && (tabX?.path || '').includes('repo-x') && tabX.groups <= 2, tabX);
     await s.screenshot('files-x');
 
     // Repository Y.

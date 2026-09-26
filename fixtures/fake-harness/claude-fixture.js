@@ -173,6 +173,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   } else if (mode === 'auth') {
     out({ type: 'assistant', session_id: sid, error: 'authentication_failed', message: { role: 'assistant', content: [{ type: 'text', text: 'Failed to authenticate: OAuth session expired and could not be refreshed' }] } });
     result(true, 'Failed to authenticate: OAuth session expired and could not be refreshed');
+  } else if (mode === 'stop-live') {
+    // Shaped like Claude Code 2.1.x when stopped mid-turn: an error result with no text.
+    assistant([{ type: 'text', text: 'Writing a long list…' }]);
+    const stop = next(m => m.type === 'control_request' && m.request?.subtype === 'interrupt').then(() => 'interrupt');
+    const done = sleep(Number(process.env.FIXTURE_SLOW_MS || 8000)).then(() => 'done');
+    if ((await Promise.race([stop, done])) === 'interrupt') { out({ type: 'result', subtype: 'error_during_execution', is_error: true, session_id: sid, usage: { input_tokens: 3, output_tokens: 0 }, num_turns: 1 }); await sleep(50); process.exit(130); }
+    result(false, 'finished');
+  } else if (mode === 'unparsed') {
+    // A line the parser does not understand, between normal events.
+    process.stdout.write('Warning: telemetry flush skipped (fixture)\n');
+    assistant([{ type: 'text', text: 'done' }]);
+    result(false, 'done');
+  } else if (mode === 'failed-reason') {
+    // A failed turn whose reason arrives once, as the result text.
+    assistant([{ type: 'text', text: 'Trying the migration…' }]);
+    result(true, 'Migration failed: relation users_v2 does not exist');
   } else if (mode === 'prose') {
     assistant([{ type: 'text', text: 'I delegated this to a sub-agent and it finished.' }]);
     result(false, 'I delegated this to a sub-agent and it finished.');

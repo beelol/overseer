@@ -39,9 +39,12 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
     await waitFor(long.run.id, /running/);
 
     await cdp.command('Overseer: Open Overseer View');
-    const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list .row')`, 30000);
-    const needs = () => dash.eval(`[...document.querySelectorAll('.rail-list .row.needs-row')].map(r => ({ run: r.dataset.run, why: r.querySelector('.why-chip')?.textContent }))`);
-    const badge = () => dash.eval(`document.querySelector('.rail-list .row.section.needs .badge')?.textContent`);
+    const dash = await s.editorView();
+    await s.openOverseerView(); await delay(800);
+    // Gate K: Needs you is the first section of the side bar's agents list.
+    const needs = () => cdp.evalWorkbench(`(() => { const rows = [...document.querySelectorAll('.part.sidebar .monaco-list-row')].filter(r => r.offsetParent); const i = rows.findIndex(r => r.querySelector('.label-name')?.textContent.trim() === 'Needs you'); if (i < 0) return [];
+      const out = []; for (const r of rows.slice(i + 1)) { if (r.getAttribute('aria-level') === '1') break; out.push({ title: r.querySelector('.label-name')?.textContent.trim(), why: r.querySelector('.label-description')?.textContent.trim() }); } return out; })()`);
+    const badge = () => cdp.evalWorkbench(`[...document.querySelectorAll('.part.sidebar .monaco-list-row')].find(r => r.querySelector('.label-name')?.textContent.trim() === 'Needs you')?.querySelector('.label-description')?.textContent.trim()`);
     const status = () => cdp.evalWorkbench(`[...document.querySelectorAll('.statusbar-item')].map(e => e.getAttribute('aria-label') || e.textContent).find(t => /Overseer/.test(t)) || ''`);
     let list = []; for (let i = 0; i < 20; i++) { list = await needs(); if (list.length >= 4) break; await delay(500); }
     const st = await status();
@@ -50,7 +53,7 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
       list.length === 4 && list.filter(x => x.why === 'Approve').length === 2 && list.some(x => x.why === 'Failed') && list.some(x => x.why === 'Review') && (await badge()) === '4' && /4/.test(st),
       { list, badge: await badge(), status: st });
 
-    const selected = () => dash.eval(`document.querySelector('.rail-list .row[aria-selected="true"]')?.dataset.run`);
+    const selected = () => dash.eval(`window.__overseer.selected()`);
     const key = async (k, o = {}) => { await cdp.focusWorkbench(); await cdp.key(k, o); await delay(900); };
     // Next waiting agent, allow.
     await key('j', { meta: true, alt: true });
@@ -91,12 +94,28 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
 
     // Follow-up with Enter in the chat (focus lands in the composer after switching).
     fs.writeFileSync(modeFile, 'echo');
-    await dash.eval(`document.getElementById('prompt').focus()`);
-    await cdp.type('And add a test'); await delay(200); await cdp.key('Enter');
+    // The agent's edits brought the review in beside the chat: click into the chat, then its prompt.
+    await dash.eval(`(() => { if (!document.getElementById('focus-spot')) { const c = document.createElement('div'); c.id = 'focus-spot'; c.style.cssText = 'position:fixed;right:2px;top:60px;width:3px;height:3px;z-index:9'; document.body.append(c); } return true; })()`);
+    { const f = await s.webviewPoint(dash, '#focus-spot'); await cdp.click(f.x, f.y); await delay(200); }
+    { const at = await s.webviewPoint(dash, '#prompt'); await cdp.click(at.x, at.y); await delay(200); }
+    await cdp.type('And add a test'); await delay(200);
+    s.note('prompt before Enter', await dash.eval(`({ value: document.getElementById('prompt').value, focused: document.activeElement?.id })`));
+    await cdp.key('Enter');
     const turns = async () => s.ctl('run.turns', { run_id: created.id }).length;
     let n = 0; for (let i = 0; i < 30 && n < 2; i++) { n = await turns(); await delay(300); }
     check('Enter in the chat composer sends a follow-up', n === 2, { turns: n });
     await s.screenshot('keyboard-done');
+
+    // Gate K (AC-81): the shortcuts also work with keyboard focus in the side bar's Agents list.
+    await cdp.command('Focus on Agents View'); await delay(500);
+    const inList = await cdp.evalWorkbench(`!!document.activeElement?.closest('.part.sidebar')`);
+    await cdp.key('a', { meta: true, alt: true }); await delay(700);
+    const switcher = await cdp.waitQuickTitle('Switch to agent').then(() => true, () => false);
+    await cdp.key('Escape'); await delay(300);
+    await cdp.command('Focus on Agents View'); await delay(500);
+    await cdp.key('n', { meta: true, alt: true }); await delay(900);
+    const composer = await dash.waitFor(`document.body.dataset.mode === 'composer'`, 8000).then(() => true, () => false);
+    check('the shortcuts also work from the side bar (⌥⌘A opens the agent switcher, ⌥⌘N the composer)', inList && switcher && composer, { inList, switcher, composer });
 
     const audit = await dash.eval(AUDIT);
     check('every control in the dashboard has a screen-reader label', audit.bad.length === 0 && audit.checked > 10, audit);
