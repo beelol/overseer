@@ -485,4 +485,57 @@ mod tests {
             parse_codex_rate_limits(&json!({"rateLimitsByLimitId":[]}), "pool-1", now).is_err()
         );
     }
+
+    #[test]
+    fn ambiguous_cli_text_and_percentage_labels_never_become_allowance() {
+        let now = 1_800_000_000_000_i64;
+        for text in [
+            "\u{1b}[32m5-hour remaining: 80%\u{1b}[0m",
+            "5 heures restantes : 80 %",
+            "used: 20; remaining: 80",
+        ] {
+            assert!(parse_codex_rate_limits(&json!(text), "pool", now).is_err());
+            assert!(parse_claude_rate_limit_event(&json!(text), "pool", now).is_err());
+        }
+        for ambiguous in [
+            json!({"remainingPercent":80}),
+            json!({"used":20}),
+            json!({"usedPercent":"20%"}),
+            json!({"usedPercent":-1}),
+            json!({"usedPercent":101}),
+        ] {
+            let result = parse_codex_rate_limits(
+                &json!({"rateLimits":{"primary":ambiguous}}), "pool", now,
+            );
+            assert!(result.is_err(), "ambiguous or invalid meter must not become capacity");
+        }
+        assert!(parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+            "rate_limit_info":{"status":"autorisé","rateLimitType":"five_hour",
+                "utilization":0.2}}), "pool", now).is_err());
+    }
+
+    #[test]
+    fn reset_time_zone_and_missing_units_need_structured_source_contract() {
+        let now = 1_800_000_000_000_i64;
+        for reset in [json!("2027-01-15T12:00:00Z"), json!("2027-01-15T04:00:00-08:00"),
+            json!(-1), json!(null)] {
+            let codex = json!({"rateLimits":{"primary":{"usedPercent":40,
+                "resetsAt":reset,"windowDurationMins":300}}});
+            if reset.is_null() {
+                let snapshot = parse_codex_rate_limits(&codex, "pool", now).unwrap();
+                assert_eq!(snapshot.windows[0].reset_ms, None);
+            } else {
+                assert!(parse_codex_rate_limits(&codex, "pool", now).is_err());
+            }
+        }
+        for reset in ["2027-01-15T12:00:00Z", "2027-01-15T04:00:00-08:00"] {
+            assert!(parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+                "rate_limit_info":{"status":"allowed","rateLimitType":"five_hour",
+                    "utilization":0.2,"resetsAt":reset}}), "pool", now).is_err());
+        }
+        let missing_units = parse_codex_rate_limits(
+            &json!({"rateLimits":{"primary":{"remaining":80}}}), "pool", now,
+        );
+        assert!(missing_units.is_err(), "a bare number has no known percentage semantics");
+    }
 }
