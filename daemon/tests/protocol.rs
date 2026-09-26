@@ -1444,6 +1444,57 @@ fn auto_usage_is_local_bounded_and_clear_does_not_erase_run_history() {
     assert!(d.events(&run).iter().any(|e| e["kind"] == "usage"));
 }
 
+#[test]
+fn auto_clearing_learning_during_an_active_child_preserves_its_execution() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("learning-clear-trace.txt");
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH",
+            "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_EMIT_USAGE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
+        ("FIXTURE_EMIT_USAGE", "1"), ("FIXTURE_TURN_DELAY_MS", "6000")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    assert_eq!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().len(), 1);
+
+    let selected = d.call("auto.dispatch", json!({"work_unit_id":"clear-while-child-runs",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "prompt":"browser check"}));
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    let child = run_id(&selected);
+    d.wait_status(&child, |status| status == "running", 10);
+    let workspace_id = selected["workspace"]["id"].as_str().unwrap();
+    let before = d.call("state", json!({}));
+    assert_eq!(before["workspaces"].as_array().unwrap().iter()
+        .find(|workspace| workspace["id"] == workspace_id).unwrap()["owner_run_id"], child);
+
+    assert_eq!(d.call("auto.usage.clear", json!({}))["deleted"], 1);
+    assert!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().is_empty());
+    assert!(d.call("auto.usage.summary", json!({}))["aggregates"].as_array().unwrap().is_empty());
+    assert_eq!(d.run(&child)["status"], "running");
+    let during = d.call("state", json!({}));
+    assert_eq!(during["workspaces"].as_array().unwrap().iter()
+        .find(|workspace| workspace["id"] == workspace_id).unwrap()["owner_run_id"], child);
+
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert_eq!(d.call("run.result", json!({"run_id":child}))["state"], "ready");
+    let new_samples = d.call("auto.usage.list", json!({}));
+    assert_eq!(new_samples["measurements"].as_array().unwrap().len(), 1, "{new_samples}");
+    assert_eq!(new_samples["measurements"][0]["run_id"], child);
+    assert_eq!(d.call("auto.usage.summary", json!({}))["aggregates"][0]["samples"], 1);
+    assert_eq!(d.events(&parent).into_iter().filter(|event|
+        event["kind"] == "managed_child_result_available").count(), 1);
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 1);
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().len(), 1,
+        "reopening must not regenerate the cleared parent sample from old events");
+    assert_eq!(d.run(&parent)["status"], "completed");
+    assert_eq!(d.run(&child)["status"], "completed");
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn auto_local_usage_records_and_aggregates_with_egress_denied() {
