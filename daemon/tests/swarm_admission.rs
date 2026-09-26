@@ -487,3 +487,83 @@ fn planned_write_claim_cannot_be_omitted_at_admission() {
     assert_eq!(held["status"],"blocked");
     assert_eq!(held["reason"],"resource_conflict");
 }
+
+#[test]
+fn hundred_jobs_cycle_through_thirty_two_slots_and_accept_once() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Hundred job qualification",
+        "objective":"Audit one hundred independent paths","allowed_targets":["codex-a"],
+        "policy":{"max_workers":32,"max_executing":33}}));
+    let id = run["id"].as_str().unwrap();
+    let jobs: Vec<_> = (0..100).map(|n| json!({"id":format!("j{n:03}"),
+        "title":format!("Inspect path {n}"),"acceptance":"evidence","deps":[]})).collect();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":jobs}));
+    let at=now();
+    for start in (0..100).step_by(32) {
+        let end=(start+32).min(100);
+        let batch:Vec<String>=(start..end).map(|n|format!("j{n:03}")).collect();
+        let benefit=commit_beneficial_batch(&d,id,&batch);
+        assert_eq!(benefit["max_parallel_workers"],(end-start) as i64);
+        let mut admitted=Vec::new();
+        for n in start..end {
+            let job=format!("j{n:03}");
+            let result=admit(&d,id,&job,"codex-a",&format!("hundred-{n}"),
+                at+(n/4) as i64*5000,1_000_000,100).unwrap();
+            assert_eq!(result["status"],"admitted","{job}: {result}");
+            admitted.push((job,result));
+        }
+        if start==0 {
+            let held=admit(&d,id,"j032","codex-a","overflow-32",
+                at+40_000,1_000_000,100).unwrap();
+            assert_eq!(held["reason"],"worker_limit");
+            let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+            let active:i64=db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND status='registered'",[id],|r|r.get(0)).unwrap();
+            assert_eq!(active,32);
+            assert_eq!(d.call("swarm.get",json!({"id":id}))["status"],"running");
+        }
+        for (job,result) in admitted {
+            let artifact=format!("checked-{job}");
+            d.call("swarm.artifact.put",json!({"run_id":id,"job_id":job,
+                "attempt_id":result["attempt_id"],"token":result["token"],
+                "artifact_id":artifact,"source_revision":1,"kind":"finding","content":"checked"}));
+            d.call("swarm.report",json!({"run_id":id,"job_id":job,
+                "attempt_id":result["attempt_id"],"token":result["token"],
+                "message_id":format!("result-{job}"),"type":"result","revision":1,
+                "payload":{"artifact_ids":[artifact]}}));
+            d.call("swarm.decide",json!({"run_id":id,"generation":1,"revision":1,
+                "job_id":job,"decision":"accept","evidence":[artifact]}));
+            d.call("swarm.attempt.confirm_exit",json!({"run_id":id,"generation":1,
+                "revision":1,"job_id":job,"attempt_id":result["attempt_id"]}));
+        }
+    }
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let counts:(i64,i64,i64)=db.query_row("SELECT COUNT(*),
+        SUM(CASE WHEN status='accepted' AND attempt_count=1 THEN 1 ELSE 0 END),
+        COUNT(DISTINCT id) FROM swarm_jobs WHERE run_id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+    assert_eq!(counts,(100,100,100));
+    let accepted:i64=db.query_row("SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1 AND decision='accept'",[id],|r|r.get(0)).unwrap();
+    assert_eq!(accepted,100);
+    assert_eq!(admit(&d,id,"j000","codex-a","hundred-0",at,1_000_000,100)
+        .unwrap()["status"],"already_admitted");
+}
+
+#[test]
+fn quota_headroom_explains_smaller_pool_than_worker_ceiling() {
+    let d=Daemon::start(&[]);
+    let run=d.call("swarm.create",json!({"category":"Quota-constrained pool",
+        "objective":"Inspect three paths","allowed_targets":["codex-a"],
+        "policy":{"max_workers":32,"max_executing":33}}));
+    let id=run["id"].as_str().unwrap();
+    let jobs:Vec<_>=(0..3).map(|n|json!({"id":format!("j{n}"),
+        "title":format!("Inspect {n}"),"acceptance":"evidence","deps":[]})).collect();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":jobs}));
+    commit_beneficial_batch(&d,id,&["j0".into(),"j1".into(),"j2".into()]);
+    let at=now();
+    for n in 0..2 {
+        assert_eq!(admit(&d,id,&format!("j{n}"),"codex-a",
+            &format!("small-{n}"),at,3000,100).unwrap()["status"],"admitted");
+    }
+    let third=admit(&d,id,"j2","codex-a","small-2",at,3000,100).unwrap();
+    assert_eq!(third["status"],"blocked");
+    assert_eq!(third["reason"],"finishing_reserve");
+}
