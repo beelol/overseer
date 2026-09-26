@@ -4,6 +4,7 @@ use common::*;
 use serde_json::json;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn copy_tree(source: &Path, destination: &Path) {
     std::fs::create_dir_all(destination).unwrap();
@@ -268,4 +269,194 @@ fn catalog_s3_twenty_four_patches_need_a_combined_cursor_check() {
         ),
         "26"
     );
+}
+
+#[test]
+fn catalog_s3_starts_four_then_eight_and_waits_for_review() {
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(repo_root().join("fixtures/swarm/catalog-v1/manifest.json")).unwrap(),
+    )
+    .unwrap();
+    let names: Vec<String> = manifest["resource_modules"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|name| name.as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(names.len(), 24);
+    let d = Daemon::start(&[]);
+    let created = d.call(
+        "swarm.create",
+        json!({"category":"Catalog migration S3", "objective":"Migrate 24 resource modules",
+            "allowed_targets":["fixture-codex"]}),
+    );
+    let run = created["id"].as_str().unwrap();
+    let jobs = std::iter::once(json!({"id":"contract","title":"Cursor contract",
+        "acceptance":"stable tuple cursor","deps":[]}))
+    .chain(names.iter().map(|name| {
+        json!({"id":name,"title":format!("Migrate {name}"),
+            "acceptance":"cursor pagination and response shape","deps":["contract"]})
+    }))
+    .collect::<Vec<_>>();
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,"jobs":jobs}),
+    );
+    let contract = d.call(
+        "swarm.attempt.register",
+        json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"contract"}),
+    );
+    d.call(
+        "swarm.artifact.put",
+        json!({"run_id":run,"job_id":"contract",
+        "attempt_id":contract["id"],"token":contract["token"],"artifact_id":"tuple-contract",
+        "source_revision":1,"kind":"finding","content":"createdAt plus id"}),
+    );
+    d.call(
+        "swarm.report",
+        json!({"run_id":run,"job_id":"contract",
+        "attempt_id":contract["id"],"token":contract["token"],"message_id":"contract-result",
+        "type":"result","revision":1,"payload":{"artifact_ids":["tuple-contract"]}}),
+    );
+    d.call(
+        "swarm.decide",
+        json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"contract","decision":"accept","evidence":["tuple-contract"]}),
+    );
+    d.call(
+        "swarm.attempt.confirm_exit",
+        json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"contract","attempt_id":contract["id"]}),
+    );
+
+    let at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+    let snapshot = json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"fixture-codex","account_id":"fixture-account","pool_ids":["fixture-pool"],
+            "capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"fixture-pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+120000}]}]});
+    let commit_batch = |ids: &[String]| {
+        let workers = ids
+            .iter()
+            .map(|id| {
+                json!({"id":id,"elapsed_ms":100,
+            "usage_milli":{"points":10}})
+            })
+            .collect::<Vec<_>>();
+        let serial = json!({"planning":{"elapsed_ms":10,"usage_milli":{"points":1}},
+            "context":{"elapsed_ms":10,"usage_milli":{"points":1}},
+            "integration":{"elapsed_ms":10,"usage_milli":{"points":1}},
+            "review":{"elapsed_ms":10,"usage_milli":{"points":1}},
+            "retries":{"elapsed_ms":0,"usage_milli":{"points":1}},"workers":workers});
+        let mut parallel = serial.clone();
+        parallel["context"]["elapsed_ms"] = json!(20);
+        let decision = d.call(
+            "swarm.benefit.commit",
+            json!({"run_id":run,
+            "generation":1,"revision":1,"estimate":{"independent":true,
+            "max_workers":ids.len(),"allocation_milli":{"points":100000},
+            "finishing_reserve_milli":{"points":20000},
+            "serial":serial,"parallel":parallel}}),
+        );
+        assert_eq!(decision["decision"], "parallel", "{decision}");
+        assert_eq!(decision["max_parallel_workers"], ids.len());
+    };
+    let admit = |name: &str, offset: i64| {
+        d.call(
+            "swarm.admit",
+            json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":name,"target_id":"fixture-codex",
+        "request_id":format!("admit-{name}"),"snapshot":snapshot,"now_ms":at+offset,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}),
+        )
+    };
+    let submit = |name: &str, admitted: &serde_json::Value| {
+        let artifact = format!("result-{name}");
+        d.call("swarm.artifact.put", json!({"run_id":run,"job_id":name,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "artifact_id":artifact,"source_revision":1,"kind":"finding","content":"module checked"}));
+        d.call(
+            "swarm.report",
+            json!({"run_id":run,"job_id":name,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "message_id":format!("message-{name}"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[artifact]}}),
+        );
+    };
+    let finish = |name: &str, admitted: &serde_json::Value| {
+        let artifact = format!("result-{name}");
+        d.call(
+            "swarm.decide",
+            json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":name,"decision":"accept","evidence":[artifact]}),
+        );
+        d.call(
+            "swarm.attempt.confirm_exit",
+            json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":name,"attempt_id":admitted["attempt_id"]}),
+        );
+    };
+
+    commit_batch(&names[..4]);
+    let first = names[..4]
+        .iter()
+        .map(|name| {
+            let admitted = admit(name, 0);
+            assert_eq!(admitted["status"], "admitted", "{name}: {admitted}");
+            admitted
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(admit(&names[4], 0)["reason"], "growth_wave_full");
+    for (name, admitted) in names[..4].iter().zip(&first) {
+        submit(name, admitted);
+        finish(name, admitted);
+    }
+    commit_batch(&names[4..12]);
+    let second = names[4..12]
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            let admitted = admit(name, if index < 4 { 5000 } else { 10000 });
+            assert_eq!(admitted["status"], "admitted", "{name}: {admitted}");
+            admitted
+        })
+        .collect::<Vec<_>>();
+    for (name, admitted) in names[4..12].iter().zip(&second) {
+        submit(name, admitted);
+    }
+    assert_eq!(admit(&names[12], 15000)["reason"], "review_backlog");
+    for (name, admitted) in names[4..9].iter().zip(&second[..5]) {
+        finish(name, admitted);
+    }
+    assert_ne!(admit(&names[12], 15000)["reason"], "review_backlog");
+    for (name, admitted) in names[9..12].iter().zip(&second[5..]) {
+        finish(name, admitted);
+    }
+    commit_batch(&names[12..20]);
+    for (index, name) in names[12..20].iter().enumerate() {
+        let admitted = admit(name, if index < 4 { 15000 } else { 20000 });
+        assert_eq!(admitted["status"], "admitted", "{name}: {admitted}");
+        submit(name, &admitted);
+        finish(name, &admitted);
+    }
+    commit_batch(&names[20..24]);
+    for name in &names[20..24] {
+        let admitted = admit(name, 25000);
+        assert_eq!(admitted["status"], "admitted", "{name}: {admitted}");
+        submit(name, &admitted);
+        finish(name, &admitted);
+    }
+    let final_jobs = d.call("swarm.jobs", json!({"id":run,"limit":100}));
+    assert_eq!(final_jobs["jobs"].as_array().unwrap().len(), 25);
+    assert!(final_jobs["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|job| job["status"] == "accepted"));
 }
