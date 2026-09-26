@@ -25,9 +25,12 @@
       "blocker": "Dependencies and global read/write claims are stored; scheduler concurrency and overlapping worktree writers are not implemented."
     },
     "SWARM-04": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md"
+      ],
+      "blocker": "Read-only target preview is deterministic and provider-label agnostic; actual scheduling, reservations and replay are not implemented."
     },
     "SWARM-05": {
       "status": "unverified",
@@ -35,9 +38,12 @@
       "blocker": null
     },
     "SWARM-06": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md"
+      ],
+      "blocker": "Capability requirements reject a cheaper unqualified target in fixtures; real quality routing and launch gating are not implemented."
     },
     "SWARM-07": {
       "status": "unverified",
@@ -50,24 +56,36 @@
       "blocker": null
     },
     "SWARM-09": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md"
+      ],
+      "blocker": "Two fixture targets can reference one shared pool identity; atomic shared reservations and uncertain-identity handling are not implemented."
     },
     "SWARM-10": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md"
+      ],
+      "blocker": "Preview computes 10% allocation and 20% or larger finishing reserve; durable per-run reservation and actual usage reconciliation are not implemented."
     },
     "SWARM-11": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md"
+      ],
+      "blocker": "Every fixture window binds independently and unlike units need estimates; allocation freeze and reset behavior are not implemented."
     },
     "SWARM-12": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md"
+      ],
+      "blocker": "Unknown, stale and estimated quota get explicit preview reasons; live telemetry, permission revocation and actual admission are not implemented."
     },
     "SWARM-13": {
       "status": "unverified",
@@ -75,9 +93,12 @@
       "blocker": null
     },
     "SWARM-14": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md"
+      ],
+      "blocker": "Fixture outage/auth failures exclude only affected targets; rate limits, real adapters and running-job response are not implemented."
     },
     "SWARM-15": {
       "status": "unverified",
@@ -228,14 +249,20 @@
       "blocker": null
     },
     "SWARM-39": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md"
+      ],
+      "blocker": "Preview exposes the 8-worker/9-global built-in ceilings; saved-policy precedence, account selection and actual S0 launch are not implemented."
     },
     "SWARM-40": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_policy.rs",
+        "docs/verification/swarm/milestone-4.md"
+      ],
+      "blocker": "Fixture with 60 points computes a 6-point allocation and 1.2-point reserve, with binding short windows; allocations are not frozen or shared across work yet."
     },
     "SWARM-41": {
       "status": "partial",

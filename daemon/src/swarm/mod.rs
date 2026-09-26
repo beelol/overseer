@@ -1,10 +1,12 @@
 mod artifacts;
 mod broker;
 mod plan;
+mod policy;
 mod revision;
 pub mod schema;
 pub use artifacts::{confirm_exit, decide, put};
 pub use broker::{ack, direct, messages, register, report};
+pub use policy::preview;
 pub use revision::revise;
 
 use crate::store::Store;
