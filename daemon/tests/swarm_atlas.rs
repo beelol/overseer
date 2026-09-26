@@ -401,3 +401,74 @@ fn atlas_s1_missing_export_queue_remains_blocked_coverage() {
         "checks":[{"job_id":"j5","outcome":"passed","evidence":[artifact]}]}))
         .unwrap_err().contains("requires every planned job to be accepted"));
 }
+
+// S5: the daemon commits the result, but the sender never receives its reply.
+// A retry after restart must not add a second result or acceptance effect.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_lost_result_receipt_replays_once_after_restart() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let mut d = Daemon::start(&[]);
+    let created = d.call("swarm.create", json!({"category":"Atlas receipt fault",
+        "objective":"Audit foreign task mutation","allowed_targets":["fixture"]}));
+    let run = created["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Tasks","acceptance":"foreign patch and before-after rows",
+         "deps":[],"resource_claims":[{"resource":"atlas-db-j2","mode":"write"}]}
+    ]}));
+    let at = now();
+    let snapshot = json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"fixture","account_id":"account","pool_ids":["pool"],
+            "capabilities":["audit"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+120000}]}]});
+    let attempt = admit(&d,run,1,"j2","fixture",&snapshot,at);
+    assert_eq!(attempt["status"],"admitted","{attempt}");
+
+    let evidence = atlas_probe("j2");
+    assert_eq!(evidence["foreignPatchStatus"],200);
+    assert_eq!(evidence["taskBefore"],"Bob task");
+    assert_eq!(evidence["taskAfter"],"changed-by-alice");
+    let artifact = "atlas-s5-task-evidence";
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"j2",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "artifact_id":artifact,"source_revision":1,"kind":"reproduction",
+        "content":evidence.to_string()}));
+    let result = json!({"run_id":run,"job_id":"j2",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "message_id":"atlas-s5-j2-result","type":"result","revision":1,
+        "payload":{"audit_outcome":"confirmed_defect","artifact_ids":[artifact]}});
+    assert_eq!(d.call("swarm.report",result.clone())["duplicate"],false);
+    // Fault: the durable write committed but its response was lost.
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.report",result)["duplicate"],true);
+    let inbox = d.call("swarm.messages",json!({"run_id":run,"recipient":"director"}));
+    let copies = inbox["messages"].as_array().unwrap().iter()
+        .filter(|message| message["message_id"] == "atlas-s5-j2-result").count();
+    assert_eq!(copies,1);
+    let decision = json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"j2","decision":"accept","evidence":[artifact]});
+    assert_eq!(d.call("swarm.decide",decision.clone())["duplicate"],false);
+    assert_eq!(d.call("swarm.decide",decision)["duplicate"],true);
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j2","attempt_id":attempt["attempt_id"]}));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let results: i64 = db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND job_id='j2' AND kind='result'",[run],|r|r.get(0)).unwrap();
+    let accepts: i64 = db.query_row("SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1 AND job_id='j2' AND decision='accept'",[run],|r|r.get(0)).unwrap();
+    assert_eq!((results,accepts),(1,1));
+    assert_eq!(d.call("swarm.coverage",json!({"run_id":run}))["rows"][0]["coverage_state"],"confirmed_application_defect");
+    let batch = d.call("swarm.director.claim_batch",json!({"run_id":run,
+        "generation":1,"revision":1,"now_ms":at+6000}));
+    assert_eq!(batch["status"],"claimed","{batch}");
+    assert_eq!(batch["messages"].as_array().unwrap().iter()
+        .filter(|message| message["message_id"] == "atlas-s5-j2-result").count(),1);
+    d.call("swarm.director.complete_batch",json!({"run_id":run,"generation":1,
+        "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"progress"}));
+    let completed = d.call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"atlas-s5-lost-receipt-complete",
+        "summary":"Foreign task mutation reproduced","verification":"J2 Atlas PostgreSQL before-after probe",
+        "checks":[{"job_id":"j2","outcome":"passed","evidence":[artifact]}]}));
+    assert_eq!(completed["status"],"completed","{completed}");
+}
