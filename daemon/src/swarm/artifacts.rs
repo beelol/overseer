@@ -217,6 +217,7 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
     )?;
     if next == "accepted" {
         release_and_unlock(&tx, run, job, now)?;
+        super::record_operation(&tx, run, "accept")?;
     }
     tx.commit()?;
     Ok(json!({"job_id":job,"decision":decision,"status":next,"duplicate":false}))

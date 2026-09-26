@@ -51,6 +51,14 @@ fn required<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
         .ok_or_else(|| anyhow!("missing string parameter {key}"))
 }
 
+fn record_operation(conn: &rusqlite::Connection, run: &str, kind: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO swarm_operation_order(run_id,kind,created_ms) VALUES(?1,?2,?3)",
+        params![run, kind, crate::daemon::now()],
+    )?;
+    Ok(())
+}
+
 fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
     let targets: String = row.get("allowed_targets")?;
     let policy: String = row.get("policy")?;
@@ -293,6 +301,7 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str) -> Result<Value>
         "INSERT OR IGNORE INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms) SELECT a.run_id,'stop-'||a.id,a.job_id,a.id,'control',a.id,'stop',a.revision,'{}','queued',?2,?2 FROM swarm_attempts a WHERE a.run_id=?1 AND a.status='registered'",
         params![id,now],
     )?;
+    record_operation(&tx, id, "stop")?;
     tx.commit()?;
     Ok(json!({"id":id,"status":"stopping","stop_reason":reason,"duplicate":false}))
 }

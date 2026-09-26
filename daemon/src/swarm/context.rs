@@ -144,6 +144,9 @@ pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
                 params![run,job,crate::daemon::now()],
             )?;
         }
+        if inserted != 0 {
+            super::record_operation(&tx, run, "revoke")?;
+        }
         tx.commit()?;
         (inserted == 0, workers, affected_jobs)
     };

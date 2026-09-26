@@ -114,6 +114,13 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           UNIQUE(run_id,message_id)
         );
         CREATE INDEX IF NOT EXISTS swarm_inbox ON swarm_messages(run_id,recipient,seq);
+        CREATE TABLE IF NOT EXISTS swarm_operation_order(
+          seq INTEGER PRIMARY KEY AUTOINCREMENT,
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id),
+          kind TEXT NOT NULL CHECK(kind IN ('result','accept','revoke','stop')),
+          created_ms INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS swarm_operation_run ON swarm_operation_order(run_id,seq);
         CREATE TABLE IF NOT EXISTS swarm_claims(
           resource TEXT NOT NULL,
           run_id TEXT NOT NULL,

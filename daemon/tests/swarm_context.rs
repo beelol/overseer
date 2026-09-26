@@ -320,3 +320,101 @@ fn revoked_artifact_interrupt_retries_after_daemon_crash() {
     d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
     assert_eq!(d.wait_done(sibling_worker,10)["status"], "interrupted");
 }
+
+#[test]
+fn stop_revocation_result_and_acceptance_keep_one_durable_order() {
+    for steps in [
+        ["result","accept","revoke","stop"],
+        ["result","revoke","accept","stop"],
+        ["stop","result","revoke","accept"],
+        ["revoke","stop","result","accept"],
+    ] {
+        let d = Daemon::start(&[]);
+        let temp = tmp();
+        let checkout = repo(&temp.path().join("race-source"));
+        let run = d.call("swarm.create", json!({"category":format!("Race {steps:?}"),
+            "objective":"Inspect backend","allowed_targets":["account-a"]}));
+        let id = run["id"].as_str().unwrap();
+        d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+            {"id":"source","title":"Contract","acceptance":"evidence","deps":[]},
+            {"id":"child","title":"Dependent","acceptance":"evidence","deps":["source"]}
+        ]}));
+        let source = d.call("swarm.attempt.register", json!({"run_id":id,"job_id":"source",
+            "generation":1,"revision":1}));
+        d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"source",
+            "attempt_id":source["id"],"token":source["token"],
+            "artifact_id":"contract","source_revision":1,"kind":"contract",
+            "content":"checked contract"}));
+        d.call("swarm.report", json!({"run_id":id,"job_id":"source",
+            "attempt_id":source["id"],"token":source["token"],
+            "message_id":"source-result","type":"result","revision":1,
+            "payload":{"artifact_ids":["contract"]}}));
+        d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,
+            "job_id":"source","decision":"accept","evidence":["contract"]}));
+        d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,
+            "revision":1,"job_id":"source","attempt_id":source["id"]}));
+        let child = admit(&d,id,"child","account-a");
+        d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"child",
+            "attempt_id":child["attempt_id"],"token":child["token"],
+            "artifact_id":"child-proof","source_revision":1,"kind":"finding",
+            "content":"local reproduction"}));
+        let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let before: i64 = db.query_row("SELECT COALESCE(MAX(seq),0) FROM swarm_operation_order",
+            [], |r| r.get(0)).unwrap();
+        let mut accepted = false;
+        for step in steps {
+            match step {
+                "result" => { d.call("swarm.report", json!({"run_id":id,"job_id":"child",
+                    "attempt_id":child["attempt_id"],"token":child["token"],
+                    "message_id":"child-result","type":"result","revision":1,
+                    "payload":{"artifact_ids":["child-proof"]}})); }
+                "accept" => {
+                    accepted = d.try_call("swarm.decide", json!({"run_id":id,
+                        "generation":1,"revision":1,"job_id":"child",
+                        "decision":"accept","evidence":["child-proof"]})).is_ok();
+                }
+                "revoke" => { d.call("swarm.context.revoke", json!({"run_id":id,
+                    "generation":1,"revision":1,"artifact_id":"contract",
+                    "target_id":"account-a"})); }
+                "stop" => { d.call("swarm.stop", json!({"run_id":id,
+                    "generation":1,"revision":1})); }
+                _ => unreachable!(),
+            }
+        }
+        assert_eq!(accepted, steps == ["result","accept","revoke","stop"]);
+        let mut stmt = db.prepare("SELECT kind FROM swarm_operation_order WHERE run_id=?1 AND seq>?2 ORDER BY seq").unwrap();
+        let observed: Vec<String> = stmt.query_map(rusqlite::params![id,before], |r| r.get(0))
+            .unwrap().collect::<rusqlite::Result<_>>().unwrap();
+        let expected: Vec<String> = steps.iter().filter(|step| **step != "accept" || accepted)
+            .map(|step| step.to_string()).collect();
+        assert_eq!(observed, expected, "{steps:?}");
+        assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopping");
+        let jobs = d.call("swarm.jobs", json!({"id":id}));
+        assert_eq!(jobs["jobs"].as_array().unwrap().iter()
+            .find(|job| job["id"] == "child").unwrap()["status"],
+            if steps[0] == "stop" { "cancel_requested" } else { "blocked" });
+        let inbox = d.call("swarm.messages", json!({"run_id":id,"recipient":"director"}));
+        assert!(inbox["messages"].as_array().unwrap().iter()
+            .any(|m| m["message_id"] == "child-result"));
+        assert!(d.try_call("swarm.complete", json!({"run_id":id,
+            "generation":1,"revision":1,"summary":"finished",
+            "verification":"fixture","checks":[]})).is_err());
+        assert!(d.try_call("swarm.worker.launch", json!({"run_id":id,
+            "job_id":"child","attempt_id":child["attempt_id"],
+            "token":child["token"],"repo":checkout,
+            "program":"/bin/true","args":[],"prompt":"Inspect",
+            "title":"Late worker"})).is_err());
+        assert_eq!(d.call("swarm.stop", json!({"run_id":id,
+            "generation":1,"revision":1}))["duplicate"], true);
+        assert_eq!(d.call("swarm.context.revoke", json!({"run_id":id,
+            "generation":1,"revision":1,"artifact_id":"contract",
+            "target_id":"account-a"}))["duplicate"], true);
+        assert_eq!(d.call("swarm.report", json!({"run_id":id,"job_id":"child",
+            "attempt_id":child["attempt_id"],"token":child["token"],
+            "message_id":"child-result","type":"result","revision":1,
+            "payload":{"artifact_ids":["child-proof"]}}))["duplicate"], true);
+        let after: i64 = db.query_row("SELECT COALESCE(MAX(seq),0) FROM swarm_operation_order",
+            [], |r| r.get(0)).unwrap();
+        assert_eq!(after - before, observed.len() as i64);
+    }
+}

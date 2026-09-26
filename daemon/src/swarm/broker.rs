@@ -193,6 +193,7 @@ fn insert_message(
             WHERE run_id=?1 AND id=?2 AND status IN ('reserved','running')
             AND EXISTS (SELECT 1 FROM swarm_attempts a WHERE a.id=?4 AND a.run_id=?1
                 AND a.job_id=?2 AND a.status='registered')",params![run,job,now,attempt])?;
+        super::record_operation(&tx, run, "result")?;
     }
     tx.commit()?;
     Ok(json!({"message_id":id,"seq":seq,"phase":"queued","duplicate":false}))
