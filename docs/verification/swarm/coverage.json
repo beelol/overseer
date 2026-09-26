@@ -100,9 +100,10 @@
         "daemon/tests/swarm_policy.rs",
         "docs/verification/swarm/milestone-4.md",
         "daemon/tests/swarm_admission.rs",
-        "docs/verification/swarm/milestone-7.md"
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-11.md"
       ],
-      "blocker": "Each fixture quota window is reserved separately and a larger later snapshot cannot expand an existing allocation; reset and unlike-unit end-to-end admission remain incomplete."
+      "blocker": "Each fixture quota window is reserved separately, and a new window ID no longer grants an ongoing run a second allocation or forgets prior attempts in the same pool/unit. Live reset detection, native usage reconciliation, unlike-unit end-to-end admission and a full short/long-window run remain unverified."
     },
     "SWARM-12": {
       "status": "partial",
