@@ -74,6 +74,7 @@ fn hundred_job_summary_and_scoped_large_artifact_context() {
         json!({"run_id":id,"generation":1,"revision":1,
         "job_id":"parent","attempt_id":aid}),
     );
+    commit_beneficial_batch(&d, id, &["child-a".into(), "child-b".into()]);
     let same = admit(&d, id, "child-a", "account-a");
     let other = admit(&d, id, "child-b", "account-b");
     let brief = d.call(

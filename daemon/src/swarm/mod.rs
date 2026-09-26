@@ -21,6 +21,7 @@ pub use artifacts::{confirm_exit, decide, put};
 pub use admission::admit;
 pub use availability::observe as observe_availability;
 pub use benefit::preview as preview_benefit;
+pub use benefit::commit as commit_benefit;
 pub use broker::{ack, direct, messages, register, report};
 pub use completion::complete;
 pub use coverage::report as coverage_report;
@@ -105,6 +106,7 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
         .ok_or_else(|| anyhow!("unknown swarm run {id}"))?;
     run["completion"] = completion::get(store, id)?;
     run["availability"] = availability::get(store, id)?;
+    run["benefit"] = benefit::get_state(store, id, run["revision"].as_i64().unwrap_or(0))?;
     Ok(run)
 }
 

@@ -1,9 +1,13 @@
 //! Deterministic fixture preview for choosing a serial or independent parallel batch.
 //! Estimates are supplied by the caller; this is not an authoritative admission decision.
 
+use super::{get, required};
+use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
+use rusqlite::{params, OptionalExtension};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 #[derive(Deserialize)]
@@ -187,6 +191,119 @@ pub fn preview(p: &Value) -> Result<Value> {
             "finishing_usage_milli":serial_finishing,"affordable":serial_affordable},
         "parallel":{"elapsed_ms":parallel_ms,"usage_milli":parallel_usage,
             "finishing_usage_milli":finishing_usage},
+        "job_ids":serial_ids,
         "authoritative_admission":false,
     }))
+}
+
+pub fn get_state(store: &Store, run_id: &str, revision: i64) -> Result<Value> {
+    let raw: Option<String> = store
+        .conn
+        .query_row(
+            "SELECT result_json FROM swarm_benefit_decisions WHERE run_id=?1 AND revision=?2
+         ORDER BY wave DESC LIMIT 1",
+            params![run_id, revision],
+            |r| r.get(0),
+        )
+        .optional()?;
+    raw.map(|text| serde_json::from_str(&text).map_err(Into::into))
+        .transpose()
+        .map(|value| value.unwrap_or(Value::Null))
+}
+
+pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
+    let run_id = required(p, "run_id")?;
+    let generation = p["generation"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing generation"))?;
+    let revision = p["revision"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing revision"))?;
+    let current = get(store, run_id)?;
+    if current["generation"] != generation || current["revision"] != revision {
+        bail!("stale Swarm benefit decision");
+    }
+    if !["planning", "running"].contains(&current["status"].as_str().unwrap_or("")) {
+        bail!("run cannot commit benefit decision in this state");
+    }
+    let mut estimate = p["estimate"].clone();
+    let object = estimate
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("missing benefit estimate"))?;
+    let policy_cap = current["policy"]["effective"]["max_workers"]
+        .as_u64()
+        .unwrap_or(8)
+        .min(
+            current["policy"]["effective"]["max_executing"]
+                .as_u64()
+                .unwrap_or(9)
+                .saturating_sub(1),
+        );
+    let proposed_cap = object
+        .get("max_workers")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| anyhow!("missing benefit worker ceiling"))?;
+    object.insert("max_workers".into(), json!(proposed_cap.min(policy_cap)));
+    let result = preview(&estimate)?;
+    let jobs = result["job_ids"].as_array().unwrap().clone();
+    let request_sha256 = format!("{:x}", Sha256::digest(estimate.to_string().as_bytes()));
+    let old: Option<(i64, String, String)> = store
+        .conn
+        .query_row(
+            "SELECT wave,request_sha256,result_json FROM swarm_benefit_decisions
+         WHERE run_id=?1 AND revision=?2 ORDER BY wave DESC LIMIT 1",
+            params![run_id, revision],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .optional()?;
+    if let Some((_, old_hash, old_result)) = &old {
+        if old_hash == &request_sha256 {
+            let mut value: Value = serde_json::from_str(&old_result)?;
+            value["replay"] = json!(true);
+            return Ok(value);
+        }
+    }
+    let active: i64 = store.conn.query_row(
+        "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND status='registered'",
+        params![run_id],
+        |r| r.get(0),
+    )?;
+    if active > 0 {
+        bail!("commit benefit decision before admitting a batch");
+    }
+    for job in &jobs {
+        let id = job.as_str().unwrap();
+        let status: Option<String> = store
+            .conn
+            .query_row(
+                "SELECT status FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+                params![run_id, id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if status.as_deref() != Some("ready") {
+            bail!("benefit job is not ready");
+        }
+    }
+    let wave = old.map(|(wave, _, _)| wave + 1).unwrap_or(1);
+    let mut value = result;
+    let decision = value["decision"].as_str().unwrap().to_string();
+    let max_parallel_workers = if decision == "parallel" {
+        jobs.len() as i64
+    } else {
+        1
+    };
+    value["run_id"] = json!(run_id);
+    value["revision"] = json!(revision);
+    value["wave"] = json!(wave);
+    value["max_parallel_workers"] = json!(max_parallel_workers);
+    value["replay"] = json!(false);
+    store.conn.execute(
+        "INSERT INTO swarm_benefit_decisions(run_id,revision,wave,request_sha256,decision,reason,max_parallel_workers,job_ids,estimate_json,result_json,created_ms)
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+        params![run_id,revision,wave,request_sha256,decision,value["reason"].as_str().unwrap(),
+            max_parallel_workers,value["job_ids"].to_string(),estimate.to_string(),
+            value.to_string(),crate::daemon::now()],
+    )?;
+    Ok(value)
 }

@@ -30,6 +30,7 @@ fn dispatch_recovers_admitted_but_unlaunched_worker_without_duplicate_attempt() 
             {"id":"verify","title":"Verify backend","acceptance":"Verification evidence","deps":[]}
         ]}),
     );
+    commit_beneficial_batch(&d, run_id, &["db".into(), "routes".into(), "verify".into()]);
     let at = now();
     let base = json!({"request_id":"dispatch-one","target_id":"fixture","repo":checkout,
         "program":"/bin/sleep","args":["30"],"now_ms":at,

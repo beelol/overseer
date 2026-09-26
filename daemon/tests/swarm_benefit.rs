@@ -2,6 +2,52 @@ mod common;
 
 use common::*;
 use serde_json::{json, Value};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+fn now() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64
+}
+
+fn snapshot(at: i64) -> Value {
+    json!({"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+        "targets":[{"id":"fixture","account_id":"account","pool_ids":["pool"],
+            "capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+60000}]}]})
+}
+
+fn run(d: &Daemon, category: &str) -> String {
+    let created = d.call(
+        "swarm.create",
+        json!({"category":category,
+        "objective":"Audit backend","allowed_targets":["fixture"]}),
+    );
+    let id = created["id"].as_str().unwrap().to_string();
+    d.call(
+        "swarm.plan",
+        json!({"id":id,"generation":1,"revision":0,
+        "jobs":[{"id":"a","title":"A","acceptance":"evidence","deps":[]},
+                {"id":"b","title":"B","acceptance":"evidence","deps":[]},
+                {"id":"c","title":"C","acceptance":"evidence","deps":[]},
+                {"id":"d","title":"D","acceptance":"evidence","deps":[]}]}),
+    );
+    id
+}
+
+fn admit(d: &Daemon, run_id: &str, job: &str, at: i64) -> Value {
+    d.call(
+        "swarm.admit",
+        json!({"run_id":run_id,"generation":1,"revision":1,
+        "job_id":job,"target_id":"fixture","request_id":format!("{run_id}-{job}"),
+        "snapshot":snapshot(at),"now_ms":at,"required_capabilities":["code"],
+        "estimate_milli":{"points":10},"finishing_estimate_milli":{"points":10},
+        "purpose":"worker"}),
+    )
+}
 
 fn cost(elapsed: i64, points: i64) -> Value {
     json!({"elapsed_ms":elapsed,"usage_milli":{"points":points}})
@@ -103,4 +149,100 @@ fn uncalibrated_or_mismatched_paired_estimates_are_rejected() {
         .try_call("swarm.benefit.preview", zero)
         .unwrap_err()
         .contains("uncalibrated"));
+}
+
+#[test]
+fn committed_benefit_bounds_admission_and_survives_restart() {
+    let mut d = Daemon::start(&[]);
+    let unproven = run(&d, "Unproven fanout");
+    let at = now();
+    assert_eq!(admit(&d, &unproven, "a", at)["status"], "admitted");
+    assert_eq!(admit(&d, &unproven, "b", at)["reason"], "benefit_unproven");
+
+    let id = run(&d, "Proven fanout");
+    let committed = d.call(
+        "swarm.benefit.commit",
+        json!({"run_id":id,
+        "generation":1,"revision":1,"estimate":pair()}),
+    );
+    assert_eq!(committed["decision"], "parallel");
+    assert_eq!(committed["max_parallel_workers"], 2);
+    d.kill9();
+    d.spawn();
+    assert_eq!(
+        d.call("swarm.get", json!({"id":id}))["benefit"]["decision"],
+        "parallel"
+    );
+    let first = admit(&d, &id, "a", at);
+    let second = admit(&d, &id, "b", at);
+    assert_eq!(first["status"], "admitted");
+    assert_eq!(second["status"], "admitted");
+    assert_eq!(
+        admit(&d, &id, "c", at)["reason"],
+        "benefit_job_not_estimated"
+    );
+    let replay = d.call(
+        "swarm.benefit.commit",
+        json!({"run_id":id,
+        "generation":1,"revision":1,"estimate":pair()}),
+    );
+    assert_eq!(replay["replay"], true);
+    let mut changed = pair();
+    changed["parallel"]["context"]["elapsed_ms"] = json!(80);
+    assert!(d
+        .try_call(
+            "swarm.benefit.commit",
+            json!({"run_id":id,
+        "generation":1,"revision":1,"estimate":changed})
+        )
+        .unwrap_err()
+        .contains("before admitting a batch"));
+    for (job, admitted) in [("a", first), ("b", second)] {
+        let artifact = format!("evidence-{job}");
+        d.call(
+            "swarm.artifact.put",
+            json!({"run_id":id,"job_id":job,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "artifact_id":artifact,"source_revision":1,"kind":"finding","content":"checked"}),
+        );
+        d.call(
+            "swarm.report",
+            json!({"run_id":id,"job_id":job,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "message_id":format!("result-{job}"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[artifact]}}),
+        );
+        d.call(
+            "swarm.decide",
+            json!({"run_id":id,"generation":1,"revision":1,
+            "job_id":job,"decision":"accept","evidence":[artifact]}),
+        );
+        d.call(
+            "swarm.attempt.confirm_exit",
+            json!({"run_id":id,"generation":1,
+            "revision":1,"job_id":job,"attempt_id":admitted["attempt_id"]}),
+        );
+    }
+    let next_wave = commit_beneficial_batch(&d, &id, &["c".into(), "d".into()]);
+    assert_eq!(next_wave["wave"], 2);
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["benefit"]["wave"], 2);
+    assert_eq!(admit(&d, &id, "c", at + 5000)["status"], "admitted");
+    assert_eq!(admit(&d, &id, "d", at + 5000)["status"], "admitted");
+}
+
+#[test]
+fn committed_serial_choice_holds_second_worker() {
+    let d = Daemon::start(&[]);
+    let id = run(&d, "No parallel gain");
+    let mut estimate = pair();
+    estimate["parallel"]["context"]["elapsed_ms"] = json!(80);
+    let committed = d.call(
+        "swarm.benefit.commit",
+        json!({"run_id":id,
+        "generation":1,"revision":1,"estimate":estimate}),
+    );
+    assert_eq!(committed["decision"], "serial");
+    let at = now();
+    assert_eq!(admit(&d, &id, "a", at)["status"], "admitted");
+    assert_eq!(admit(&d, &id, "b", at)["reason"], "benefit_serial");
 }

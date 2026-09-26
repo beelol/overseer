@@ -54,6 +54,8 @@ fn round_robin_admission_is_durable_and_replay_safe_across_unequal_categories() 
     let mut d = Daemon::start(&[]);
     let long = make_run(&d, "A very long backlog", 100);
     let short = make_run(&d, "B two jobs", 2);
+    commit_beneficial_batch(&d, &long, &["j000".into(), "j001".into()]);
+    commit_beneficial_batch(&d, &short, &["j000".into(), "j001".into()]);
     let at = now();
     let one = next(&d, "step-1", at);
     let two = next(&d, "step-2", at);

@@ -38,6 +38,20 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           wake_count INTEGER NOT NULL DEFAULT 0,
           updated_ms INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS swarm_benefit_decisions(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          revision INTEGER NOT NULL,
+          wave INTEGER NOT NULL,
+          request_sha256 TEXT NOT NULL,
+          decision TEXT NOT NULL CHECK(decision IN ('serial','parallel','blocked')),
+          reason TEXT NOT NULL,
+          max_parallel_workers INTEGER NOT NULL,
+          job_ids TEXT NOT NULL,
+          estimate_json TEXT NOT NULL,
+          result_json TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,revision,wave)
+        );
         CREATE TABLE IF NOT EXISTS swarm_jobs(
           run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
           id TEXT NOT NULL,

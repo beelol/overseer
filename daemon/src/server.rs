@@ -333,6 +333,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             crate::swarm::preview_benefit(p)?
         }
+        "swarm.benefit.commit" => {
+            fixture_only()?;
+            crate::swarm::commit_benefit(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.availability.observe" => {
             fixture_only()?;
             crate::swarm::observe_availability(&mut d.store.lock().unwrap(), p)?

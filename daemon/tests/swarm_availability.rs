@@ -125,6 +125,7 @@ fn midrun_target_loss_preserves_worker_evidence_and_blocks_new_admission() {
             {"id":"next","title":"Inspect next worker","acceptance":"evidence","deps":[]}
         ]}),
     );
+    commit_beneficial_batch(&d, id, &["active".into(), "next".into()]);
     let at = now();
     let observe = |when: i64, healthy: bool| {
         d.call(

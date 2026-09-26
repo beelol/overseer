@@ -368,6 +368,26 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
             estimate,
         ));
     }
+    let benefit: Option<(String, i64, String)> = tx.query_row(
+        "SELECT decision,max_parallel_workers,job_ids FROM swarm_benefit_decisions
+         WHERE run_id=?1 AND revision=?2 ORDER BY wave DESC LIMIT 1",
+        params![run,revision],
+        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+    ).optional()?;
+    if let Some((decision, cap, jobs)) = benefit {
+        let jobs: Vec<String> = serde_json::from_str(&jobs)?;
+        if !jobs.iter().any(|id| id == job) {
+            return Ok(blocked("benefit_job_not_estimated"));
+        }
+        if decision == "blocked" {
+            return Ok(blocked("benefit_no_affordable_plan"));
+        }
+        if workers >= cap {
+            return Ok(blocked(if decision == "serial" { "benefit_serial" } else { "benefit_batch_full" }));
+        }
+    } else if workers > 0 {
+        return Ok(blocked("benefit_unproven"));
+    }
     let attempt_id = format!("att-{}", &uuid::Uuid::new_v4().simple().to_string()[..16]);
     let token = uuid::Uuid::new_v4().simple().to_string();
     tx.execute("INSERT INTO swarm_attempts(id,run_id,job_id,revision,token_sha256,status,created_ms) VALUES(?1,?2,?3,?4,?5,'registered',?6)",

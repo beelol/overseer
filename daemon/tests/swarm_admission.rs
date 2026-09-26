@@ -211,6 +211,7 @@ fn run_percentage_overrides_change_frozen_allocation_and_finishing_reserve() {
 fn default_worker_ceiling_and_four_per_wave_are_admission_bounds() {
     let d = Daemon::start(&[]);
     let id = setup(&d, "Scale admission", 9);
+    commit_beneficial_batch(&d, &id, &(0..8).map(|n| format!("j{n}")).collect::<Vec<_>>());
     let at = now();
     for n in 0..4 {
         assert_eq!(
@@ -310,6 +311,7 @@ fn review_backlog_holds_admissions_until_it_drains_below_four() {
         "swarm.plan",
         json!({"id":id,"generation":1,"revision":0,"jobs":jobs}),
     );
+    commit_beneficial_batch(&d, id, &(0..10).map(|n| format!("j{n}")).collect::<Vec<_>>());
     let at = now();
     let mut attempts = Vec::new();
     for n in 0..8 {
@@ -379,6 +381,7 @@ fn already_admitted_results_can_overflow_review_threshold_without_loss() {
     let jobs: Vec<_> = (0..11).map(|n| json!({"id":format!("j{n}"),
         "title":format!("J{n}"),"acceptance":"evidence","deps":[]})).collect();
     d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":jobs}));
+    commit_beneficial_batch(&d, id, &(0..10).map(|n| format!("j{n}")).collect::<Vec<_>>());
     let at = now();
     let mut attempts = Vec::new();
     for n in 0..10 {
@@ -425,6 +428,7 @@ fn explicit_ceiling_admits_thirty_two_fixture_workers_without_hidden_eight_cap()
         "swarm.plan",
         json!({"id":id,"generation":1,"revision":0,"jobs":jobs}),
     );
+    commit_beneficial_batch(&d, id, &(0..32).map(|n| format!("j{n}")).collect::<Vec<_>>());
     let at = now();
     for n in 0..32 {
         let result = admit(

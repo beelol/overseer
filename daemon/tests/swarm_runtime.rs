@@ -143,6 +143,7 @@ fn explicit_ceiling_runs_thirty_two_supervised_workers() {
     let jobs: Vec<_> = (0..33).map(|n| json!({"id":format!("j{n}"),
         "title":format!("Inspect {n}"),"acceptance":"evidence","deps":[]})).collect();
     d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":jobs}));
+    commit_beneficial_batch(&d, id, &(0..32).map(|n| format!("j{n}")).collect::<Vec<_>>());
     let at = now();
     let admit = |n: usize| d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
         "job_id":format!("j{n}"),"target_id":"fixture-local",
@@ -206,6 +207,7 @@ fn job_deadline_interrupts_only_its_worker_despite_progress() {
         {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]},
         {"id":"followup","title":"Follow up","acceptance":"evidence","deps":[]}
     ]}));
+    commit_beneficial_batch(&d, id, &["inspect".into(), "followup".into()]);
     let at=now();
     let admission_request=json!({"run_id":id,"generation":1,"revision":1,
         "job_id":"inspect","target_id":"fixture-local","request_id":"job-deadline-worker",
@@ -342,6 +344,7 @@ fn admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart() {
             {"id":"followup","title":"Follow up","acceptance":"report evidence","deps":[]}
         ]}),
     );
+    commit_beneficial_batch(&d, id, &["inspect".into(), "followup".into()]);
     let at = now();
     let admitted = d.call(
         "swarm.admit",
