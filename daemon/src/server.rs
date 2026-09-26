@@ -317,37 +317,50 @@ struct AutoProfileDiscovery {
     generation: Option<i64>,
 }
 
-struct AutoDiscoveryFlight {
-    result: Mutex<Option<std::result::Result<AutoProfileDiscovery, String>>>,
+struct AutoFlight<T> {
+    result: Mutex<Option<std::result::Result<T, String>>>,
     ready: Condvar,
 }
 
 static AUTO_DISCOVERY_FLIGHTS: OnceLock<Mutex<std::collections::BTreeMap<
-    (usize, String, String), Arc<AutoDiscoveryFlight>>>> = OnceLock::new();
+    (usize, String, String), Arc<AutoFlight<AutoProfileDiscovery>>>>> = OnceLock::new();
 
-/// Concurrent work units in one daemon/workspace share an in-flight profile
-/// read, including its source timestamps and account generation. A completed
-/// read is removed immediately; later decisions must collect fresh evidence.
-fn discover_auto_profile_shared(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
-    budget: Duration) -> Result<AutoProfileDiscovery> {
+#[derive(Clone)]
+struct CodexModelRead {
+    models: Value,
+    generation: Option<i64>,
+}
+
+static AUTO_CODEX_MODEL_FLIGHTS: OnceLock<Mutex<std::collections::BTreeMap<
+    (usize, String), Arc<AutoFlight<CodexModelRead>>>>> = OnceLock::new();
+
+#[derive(Clone)]
+struct ClaudeAuthRead {
+    auth: crate::auto_collect::ClaudeAuth,
+    generation: i64,
+}
+
+static AUTO_CLAUDE_AUTH_FLIGHTS: OnceLock<Mutex<std::collections::BTreeMap<
+    (usize, String), Arc<AutoFlight<ClaudeAuthRead>>>>> = OnceLock::new();
+
+fn collect_shared<K, T, F>(flights: &Mutex<std::collections::BTreeMap<K, Arc<AutoFlight<T>>>>,
+    key: K, budget: Duration, collect: F) -> Result<T>
+where K: Ord + Clone, T: Clone, F: FnOnce() -> Result<T> {
     let deadline = Instant::now() + budget;
-    let key = (Arc::as_ptr(d) as usize, profile_id.to_string(), workspace_id.to_string());
-    let flights = AUTO_DISCOVERY_FLIGHTS.get_or_init(|| Mutex::new(std::collections::BTreeMap::new()));
     let (flight, owner) = {
         let mut active = flights.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         match active.get(&key) {
             Some(existing) => (existing.clone(), false),
             None => {
-                let new = Arc::new(AutoDiscoveryFlight { result:Mutex::new(None), ready:Condvar::new() });
+                let new = Arc::new(AutoFlight { result:Mutex::new(None), ready:Condvar::new() });
                 active.insert(key.clone(), new.clone());
                 (new, true)
             }
         }
     };
     if owner {
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(||
-            discover_auto_profile(d, profile_id, workspace_id, budget)))
-            .unwrap_or_else(|_| Err(anyhow!("automatic profile collector stopped unexpectedly")))
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(collect))
+            .unwrap_or_else(|_| Err(anyhow!("automatic collector stopped unexpectedly")))
             .map_err(|error| error.to_string());
         *flight.result.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(result.clone());
         flight.ready.notify_all();
@@ -361,12 +374,23 @@ fn discover_auto_profile_shared(d: &Arc<Daemon>, profile_id: &str, workspace_id:
         }
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining < Duration::from_millis(20) {
-            return Err(anyhow!("shared automatic profile collection deadline elapsed"));
+            return Err(anyhow!("shared automatic collection deadline elapsed"));
         }
         let (next, _) = flight.ready.wait_timeout(shared, remaining)
-            .map_err(|_| anyhow!("automatic profile collector gate is poisoned"))?;
+            .map_err(|_| anyhow!("automatic collector gate is poisoned"))?;
         shared = next;
     }
+}
+
+/// Concurrent work units in one daemon/workspace share an in-flight profile
+/// read, including its source timestamps and account generation. A completed
+/// read is removed immediately; later decisions must collect fresh evidence.
+fn discover_auto_profile_shared(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
+    budget: Duration) -> Result<AutoProfileDiscovery> {
+    let key = (Arc::as_ptr(d) as usize, profile_id.to_string(), workspace_id.to_string());
+    let flights = AUTO_DISCOVERY_FLIGHTS.get_or_init(|| Mutex::new(std::collections::BTreeMap::new()));
+    collect_shared(flights, key, budget,
+        || discover_auto_profile(d, profile_id, workspace_id, budget))
 }
 
 fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
@@ -375,18 +399,32 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
     let profile = d.profile(profile_id)?;
     match profile.harness.as_str() {
         "codex" => {
-            let models = dispatch(d, "auto.models.refresh", &json!({"profile_id":profile_id,
-                "timeout_ms":remaining_metadata_ms(deadline)?}))?;
-            let first_generation = d.store.lock().unwrap().auto_account_generation(profile_id)?;
+            let flights = AUTO_CODEX_MODEL_FLIGHTS.get_or_init(||
+                Mutex::new(std::collections::BTreeMap::new()));
+            let read = collect_shared(flights, (Arc::as_ptr(d) as usize, profile_id.to_string()),
+                deadline.saturating_duration_since(Instant::now()), || {
+                    let models = dispatch(d, "auto.models.refresh", &json!({"profile_id":profile_id,
+                        "timeout_ms":remaining_metadata_ms(deadline)?}))?;
+                    let generation = d.store.lock().unwrap().auto_account_generation(profile_id)?;
+                    Ok(CodexModelRead { models, generation })
+                })?;
+            let models = read.models;
+            let first_generation = read.generation;
             let tools = dispatch(d, "auto.tools.inspect", &json!({"profile_id":profile_id,
                 "workspace_id":workspace_id,"timeout_ms":remaining_metadata_ms(deadline)?}))?;
-            let generation = d.store.lock().unwrap().auto_account_generation(profile_id)?;
+            let store = d.store.lock().unwrap();
+            let generation = store.auto_account_generation(profile_id)?;
             if generation.is_none() || generation != first_generation {
                 return Err(anyhow!("account changed during automatic route discovery"));
             }
+            if store.runs()?.iter().any(|run| run.profile_id.as_deref() == Some(profile_id)
+                && ACTIVE.contains(&run.status.as_str())) {
+                return Err(anyhow!("account profile became active during automatic route discovery"));
+            }
             let catalog: crate::auto_route::ModelCatalog = serde_json::from_value(models["catalog"].clone())?;
             let tool_catalog: crate::auto_route::ToolCatalog = serde_json::from_value(tools["catalog"].clone())?;
-            let observation = d.store.lock().unwrap().latest_auto_quota(profile_id)?;
+            let observation = store.latest_auto_quota(profile_id)?;
+            drop(store);
             let now_ms = crate::daemon::now();
             Ok(AutoProfileDiscovery {
                 routes:crate::auto_route::codex_auto_routes(&catalog, &tool_catalog,
@@ -399,27 +437,37 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
             })
         }
         "claude" => {
-            let gate = d.profile_gate(profile_id);
-            let _guard = lock_gate_until(&gate, deadline)?;
-            let program = crate::adapters::resolve_program("claude")
-                .ok_or_else(|| anyhow!("Claude executable unavailable"))?;
-            let auth = crate::auto_collect::claude_auth_status(&program,
-                &crate::daemon::Daemon::profile_env(&profile),
-                Duration::from_millis(remaining_metadata_ms(deadline)?), crate::daemon::now())?;
+            let flights = AUTO_CLAUDE_AUTH_FLIGHTS.get_or_init(||
+                Mutex::new(std::collections::BTreeMap::new()));
+            let read = collect_shared(flights, (Arc::as_ptr(d) as usize, profile_id.to_string()),
+                deadline.saturating_duration_since(Instant::now()), || {
+                    let gate = d.profile_gate(profile_id);
+                    let _guard = lock_gate_until(&gate, deadline)?;
+                    let program = crate::adapters::resolve_program("claude")
+                        .ok_or_else(|| anyhow!("Claude executable unavailable"))?;
+                    let auth = crate::auto_collect::claude_auth_status(&program,
+                        &crate::daemon::Daemon::profile_env(&profile),
+                        Duration::from_millis(remaining_metadata_ms(deadline)?), crate::daemon::now())?;
+                    let store = d.store.lock().unwrap();
+                    store.record_auto_account_identity(profile_id, &auth.fingerprint)?;
+                    let generation = store.auto_account_generation(profile_id)?
+                        .ok_or_else(|| anyhow!("Claude account generation unavailable"))?;
+                    Ok(ClaudeAuthRead { auth, generation })
+                })?;
             let store = d.store.lock().unwrap();
-            store.record_auto_account_identity(profile_id, &auth.fingerprint)?;
-            let generation = store.auto_account_generation(profile_id)?
-                .ok_or_else(|| anyhow!("Claude account generation unavailable"))?;
+            if store.auto_account_generation(profile_id)? != Some(read.generation) {
+                return Err(anyhow!("Claude account changed during shared discovery"));
+            }
             let observation = store.latest_auto_quota(profile_id)?;
             let now_ms = crate::daemon::now();
             Ok(AutoProfileDiscovery {
-                routes:crate::auto_route::claude_auto_routes(&auth,
+                routes:crate::auto_route::claude_auto_routes(&read.auth,
                     observation.as_ref().map(|value| &value.snapshot), profile_id, now_ms),
                 evidence:json!({"profile_id":profile_id,"source":"claude/auth-status-and-native-quota",
-                    "auth_observed_ms":auth.observed_ms,
+                    "auth_observed_ms":read.auth.observed_ms,
                     "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
-                    "account_generation":generation}),
-                generation:Some(generation),
+                    "account_generation":read.generation}),
+                generation:Some(read.generation),
             })
         }
         "opencode" => {

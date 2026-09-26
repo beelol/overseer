@@ -2548,6 +2548,119 @@ fn auto_distinct_concurrent_units_share_one_profile_metadata_read() {
 }
 
 #[test]
+fn auto_different_workspaces_share_account_read_but_check_tools_separately() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::sync::{Arc, Barrier};
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("shared-account-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_MODEL_DELAY_MS,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_MODEL_DELAY_MS", "750"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parents = (0..2).map(|n| {
+        let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+            "model":"gpt-6-astra","effort":"high","prompt":format!("seed context {n}")})));
+        assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+        parent
+    }).collect::<Vec<_>>();
+    std::fs::write(&trace, "").unwrap();
+    let barrier = Arc::new(Barrier::new(3));
+    let socket = d.socket();
+    let handles = parents.iter().enumerate().map(|(n, parent)| {
+        let barrier = barrier.clone();
+        let socket = socket.clone();
+        let params = json!({"work_unit_id":format!("cross-workspace-{n}"),
+            "parent_run_id":parent,"min_tier":"general","required_tools":["absent/tool"],
+            "prompt":"check unavailable tool"});
+        std::thread::spawn(move || -> Result<serde_json::Value, String> {
+            barrier.wait();
+            let mut conn = UnixStream::connect(socket).map_err(|error| error.to_string())?;
+            conn.set_read_timeout(Some(Duration::from_secs(15))).map_err(|error| error.to_string())?;
+            conn.write_all(format!("{}\n", json!({"id":1,"method":"auto.dispatch","params":params})).as_bytes())
+                .map_err(|error| error.to_string())?;
+            let mut line = String::new();
+            BufReader::new(conn).read_line(&mut line).map_err(|error| error.to_string())?;
+            let reply: serde_json::Value = serde_json::from_str(&line).map_err(|error| error.to_string())?;
+            if let Some(error) = reply.get("error") { return Err(error.to_string()); }
+            Ok(reply["result"].clone())
+        })
+    }).collect::<Vec<_>>();
+    barrier.wait();
+    let results = handles.into_iter().map(|handle| handle.join().unwrap().unwrap()).collect::<Vec<_>>();
+    assert!(results.iter().all(|result| result["state"] == "paused"), "{results:?}");
+    let trace_text = std::fs::read_to_string(&trace).unwrap();
+    assert_eq!(trace_text.matches("model_read").count(), 2,
+        "the shared account model catalog should be read once");
+    let tool_paths = trace_text.lines().filter_map(|line| line.strip_prefix("tool_cwd:"))
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(tool_paths.len(), 2, "tool availability must be checked in each workspace");
+    assert_eq!(d.runs().len(), 2, "neither unavailable-tool unit should start a child");
+    let later = d.call("auto.dispatch", json!({"work_unit_id":"cross-workspace-later",
+        "parent_run_id":parents[0],"min_tier":"general","required_tools":["absent/tool"],
+        "prompt":"check unavailable tool again"}));
+    assert_eq!(later["state"], "paused");
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("model_read").count(), 4,
+        "the shared account read must expire when the overlapping collection ends");
+}
+
+#[test]
+fn auto_claude_concurrent_workspaces_share_one_auth_read() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::sync::{Arc, Barrier};
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let count_file = r.path().join("claude-auth-count.txt");
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE,CLAUDE_FIXTURE_AUTH_COUNTER_FILE,CLAUDE_FIXTURE_AUTH_INITIAL_DELAY_MS,CLAUDE_FIXTURE_AUTH_SWITCH_AFTER"),
+        ("CLAUDE_FIXTURE_MODE", "prose"),
+        ("CLAUDE_FIXTURE_AUTH_COUNTER_FILE", count_file.to_str().unwrap()),
+        ("CLAUDE_FIXTURE_AUTH_INITIAL_DELAY_MS", "750"),
+        ("CLAUDE_FIXTURE_AUTH_SWITCH_AFTER", "99")]);
+    let parents = (0..2).map(|n| {
+        let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"claude",
+            "model":"sonnet","prompt":format!("seed context {n}")})));
+        assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+        parent
+    }).collect::<Vec<_>>();
+    let barrier = Arc::new(Barrier::new(3));
+    let socket = d.socket();
+    let handles = parents.iter().enumerate().map(|(n, parent)| {
+        let barrier = barrier.clone();
+        let socket = socket.clone();
+        let params = json!({"work_unit_id":format!("shared-claude-auth-{n}"),
+            "parent_run_id":parent,"min_tier":"general","required_tools":["browser/navigate"],
+            "prompt":"browser check"});
+        std::thread::spawn(move || -> Result<serde_json::Value, String> {
+            barrier.wait();
+            let mut conn = UnixStream::connect(socket).map_err(|error| error.to_string())?;
+            conn.set_read_timeout(Some(Duration::from_secs(15))).map_err(|error| error.to_string())?;
+            conn.write_all(format!("{}\n", json!({"id":1,"method":"auto.dispatch","params":params})).as_bytes())
+                .map_err(|error| error.to_string())?;
+            let mut line = String::new();
+            BufReader::new(conn).read_line(&mut line).map_err(|error| error.to_string())?;
+            let reply: serde_json::Value = serde_json::from_str(&line).map_err(|error| error.to_string())?;
+            if let Some(error) = reply.get("error") { return Err(error.to_string()); }
+            Ok(reply["result"].clone())
+        })
+    }).collect::<Vec<_>>();
+    barrier.wait();
+    let results = handles.into_iter().map(|handle| handle.join().unwrap().unwrap()).collect::<Vec<_>>();
+    assert!(results.iter().all(|result| result["state"] == "paused"), "{results:?}");
+    assert_eq!(std::fs::read_to_string(&count_file).unwrap(), "1",
+        "overlapping decisions should use one Claude auth process");
+    let later = d.call("auto.dispatch", json!({"work_unit_id":"shared-claude-auth-later",
+        "parent_run_id":parents[0],"min_tier":"general","required_tools":["browser/navigate"],
+        "prompt":"browser check again"}));
+    assert_eq!(later["state"], "paused");
+    assert_eq!(std::fs::read_to_string(&count_file).unwrap(), "2",
+        "later work must refresh Claude account identity");
+    assert_eq!(d.runs().len(), 2);
+}
+
+#[test]
 fn auto_managed_child_checks_required_tools_before_starting_a_turn() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
