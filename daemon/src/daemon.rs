@@ -555,11 +555,17 @@ impl Daemon {
             let requirements_hash = p["requirements_hash"].as_str().filter(|value| value.len() == 64
                 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
                 .ok_or_else(|| anyhow!("automatic delegation requires a requirements hash"))?;
-            let expected_generation = p["expected_account_generation"].as_i64().filter(|generation| *generation > 0)
-                .ok_or_else(|| anyhow!("automatic delegation requires an account generation"))?;
             request["auto_selected"] = json!(true);
             request["requirements_hash"] = json!(requirements_hash);
-            request["expected_account_generation"] = json!(expected_generation);
+            if harness == "opencode" {
+                let endpoint = p["auto_local_endpoint"].as_str()
+                    .ok_or_else(|| anyhow!("automatic local OpenCode requires a selected endpoint"))?;
+                request["auto_local_endpoint"] = json!(endpoint);
+            } else {
+                let expected_generation = p["expected_account_generation"].as_i64().filter(|generation| *generation > 0)
+                    .ok_or_else(|| anyhow!("automatic delegation requires an account generation"))?;
+                request["expected_account_generation"] = json!(expected_generation);
+            }
         }
         let request_hash = {
             use sha2::{Digest, Sha256};
@@ -585,6 +591,15 @@ impl Daemon {
         let profile = self.profile(&profile_id)?;
         if profile.harness != profile_harness(harness) {
             bail!("delegation profile belongs to another harness");
+        }
+        if p["auto_selected"] == true && harness == "opencode" {
+            let endpoint = request["auto_local_endpoint"].as_str().unwrap();
+            crate::auto_opencode::auto_local_inline_config(&profile, Path::new(&parent_ws.path),
+                &model, endpoint)?;
+            if crate::auto_opencode::probe_local_endpoint(endpoint)
+                != crate::auto_opencode::EndpointProbe::Reachable {
+                bail!("selected local OpenCode endpoint is unavailable before child creation");
+            }
         }
         let parent_approval = {
             let store = self.store.lock().unwrap();
@@ -631,6 +646,7 @@ impl Daemon {
                 store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1",
                     rusqlite::params![run.id, json!({"approval":parent_approval,"extra_args":[],"required_tools":required_tools,
                         "auto_selected":p["auto_selected"] == true,"expected_account_generation":p["expected_account_generation"],
+                        "auto_local_endpoint":request["auto_local_endpoint"],
                         "requirements_hash":p["requirements_hash"]}).to_string()])?;
                 Ok(())
             })();
@@ -750,7 +766,7 @@ impl Daemon {
                 return Ok(turn);
             }
         }
-        let profile_env = match &run.profile_id {
+        let mut profile_env = match &run.profile_id {
             Some(id) => Self::profile_env(&self.profile(id)?),
             None => BTreeMap::new(),
         };
@@ -759,6 +775,23 @@ impl Daemon {
             store.conn.query_row("SELECT launch FROM runs WHERE id=?1", [run_id], |r| r.get::<_, Option<String>>(0))?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null)
         };
         let generic_meta = launch_meta.get("generic").cloned().unwrap_or(launch_meta.clone());
+        if run.harness == "opencode" && generic_meta["auto_selected"] == true {
+            let endpoint = generic_meta["auto_local_endpoint"].as_str()
+                .ok_or_else(|| anyhow!("automatic local OpenCode endpoint is unavailable"))?;
+            let profile = self.profile(run.profile_id.as_deref()
+                .ok_or_else(|| anyhow!("automatic local OpenCode profile is unavailable"))?)?;
+            let model = run.model.as_deref()
+                .ok_or_else(|| anyhow!("automatic local OpenCode model is unavailable"))?;
+            let inline = crate::auto_opencode::auto_local_inline_config(&profile,
+                Path::new(&ws.path), model, endpoint)?;
+            if crate::auto_opencode::probe_local_endpoint(endpoint)
+                != crate::auto_opencode::EndpointProbe::Reachable {
+                bail!("selected local OpenCode endpoint is unavailable before the model turn");
+            }
+            profile_env.insert("OPENCODE_CONFIG_CONTENT".into(), inline);
+            profile_env.insert("OPENCODE_DISABLE_MODELS_FETCH".into(), "true".into());
+            profile_env.insert("OPENCODE_DISABLE_DEFAULT_PLUGINS".into(), "true".into());
+        }
         let args: Option<Vec<String>> = generic_meta["args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
         let extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
         let resume = if follow_up { run.native_id.clone() } else { None };

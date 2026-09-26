@@ -295,7 +295,7 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             if let Some(m) = model {
                 args.extend(["-m".into(), m.into()]);
             }
-            if let Some(level) = effort {
+            if let Some(level) = effort.filter(|level| *level != "default") {
                 args.extend(["--variant".into(), level.into()]);
             }
             if let Some(session) = req.resume_session {

@@ -1727,6 +1727,80 @@ fn auto_opencode_isolated_local_provider_executes_real_harness_against_a_mock_en
 }
 
 #[test]
+fn auto_selected_opencode_child_uses_guarded_alternate_local_endpoint() {
+    let Some(program) = std::env::var_os("PATH").and_then(|path| std::env::split_paths(&path)
+        .map(|dir| dir.join("opencode")).find(|candidate| candidate.is_file())) else { return };
+    struct MockServer(std::process::Child);
+    impl Drop for MockServer {
+        fn drop(&mut self) { let _ = self.0.kill(); let _ = self.0.wait(); }
+    }
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let port_file = r.path().join("mock-port");
+    let mock_log = r.path().join("mock-log.jsonl");
+    let _mock = MockServer(std::process::Command::new("node")
+        .arg(fixture("mock-openai/server.js"))
+        .env("MOCK_PORT_FILE", &port_file).env("MOCK_LOG", &mock_log)
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+        .spawn().unwrap());
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while !port_file.exists() {
+        assert!(std::time::Instant::now() < deadline, "local mock provider did not start");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let alternate = format!("http://127.0.0.1:{}/v1", std::fs::read_to_string(&port_file).unwrap());
+    let config = json!({"$schema":"https://opencode.ai/config.json","provider":{
+        "local_a":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://127.0.0.1:1/v1"},
+            "models":{"fixture-a":{"name":"Fixture A","tool_call":true}}},
+        "local_b":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":alternate},
+            "models":{"fixture-b":{"name":"Fixture B","tool_call":true}}}
+    },"model":"local_a/fixture-a","small_model":"local_a/fixture-a",
+        "autoupdate":false,"share":"disabled"});
+    std::fs::write(repo.join("opencode.json"), config.to_string()).unwrap();
+    git(&repo, &["add", "opencode.json"]);
+    git(&repo, &["commit", "-q", "-m", "local providers"]);
+    let d = Daemon::start(&[("OVERSEER_OPENCODE_PATH", program.to_str().unwrap())]);
+    let profile = d.call("profile.create", json!({"name":"Isolated local","harness":"opencode"}));
+    let parent = run_id(&sh(&d, &repo, "current", "echo ready"));
+    assert_eq!(d.wait_done(&parent, 10)["status"], "completed");
+    let delegated = d.call("run.delegate", json!({"work_unit_id":"alternate-local-1",
+        "parent_run_id":parent,"harness":"opencode","profile_id":profile["id"],
+        "model":"local_b/fixture-b","effort":"default","prompt":"reply hello",
+        "title":"local child","auto_selected":true,
+        "requirements_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "auto_local_endpoint":alternate}));
+    assert!(delegated.get("launch_error").is_none(), "{delegated}");
+    let child_id = run_id(&delegated);
+    let done = d.wait_done(&child_id, 60);
+    assert_eq!(done["status"], "completed", "{done} events: {:?}", d.events(&child_id));
+    assert!(std::fs::read_to_string(&mock_log).unwrap().contains("/v1/chat/completions"));
+    assert!(!Path::new(delegated["workspace"]["path"].as_str().unwrap()).join("forbidden.txt").exists());
+    let child_config: serde_json::Value = serde_json::from_slice(&std::fs::read(
+        Path::new(delegated["workspace"]["path"].as_str().unwrap()).join("opencode.json")).unwrap()).unwrap();
+    assert_eq!(child_config, config, "Auto must not mutate the project provider configuration");
+    let refused = d.try_call("run.delegate", json!({"work_unit_id":"refused-local-2",
+        "parent_run_id":parent,"harness":"opencode","profile_id":profile["id"],
+        "model":"local_a/fixture-a","effort":"default","prompt":"reply hello",
+        "title":"unreachable local child","auto_selected":true,
+        "requirements_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "auto_local_endpoint":"http://127.0.0.1:1/v1"}));
+    assert!(refused.unwrap_err().contains("unavailable before child creation"));
+    let auth_file = Path::new(profile["home"].as_str().unwrap()).join("data/opencode/auth.json");
+    std::fs::create_dir_all(auth_file.parent().unwrap()).unwrap();
+    std::fs::write(&auth_file, "secret-auth-sentinel").unwrap();
+    let credentialed = d.try_call("run.delegate", json!({"work_unit_id":"credentialed-local-3",
+        "parent_run_id":parent,"harness":"opencode","profile_id":profile["id"],
+        "model":"local_b/fixture-b","effort":"default","prompt":"reply hello",
+        "title":"credentialed local child","auto_selected":true,
+        "requirements_hash":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "auto_local_endpoint":alternate}));
+    let credentialed = credentialed.unwrap_err();
+    assert!(credentialed.contains("contains credentials"), "{credentialed}");
+    assert!(!credentialed.contains("secret-auth-sentinel"));
+    assert_eq!(d.runs().len(), 2, "failed preflights must not create managed children");
+}
+
+#[test]
 fn auto_claude_native_quota_keeps_model_scope_and_drops_raw_provider_text() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
