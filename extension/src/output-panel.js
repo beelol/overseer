@@ -100,7 +100,7 @@ class OutputPanels {
 
   async receive(runId, message) {
     if (!message || typeof message !== 'object') return;
-    if (!vscode.workspace.isTrusted && ['followUp', 'interrupt', 'permission', 'mergeBack', 'signIn'].includes(message.type)) throw new Error('Controlling agents requires a trusted workspace.');
+    if (!vscode.workspace.isTrusted && ['followUp', 'interrupt', 'permission', 'mergeBack', 'signIn', 'openPullRequest'].includes(message.type)) throw new Error('Controlling agents requires a trusted workspace.');
     if (message.type === 'followUp') {
       const text = String(message.text || '').trim();
       if (!text) return;
@@ -119,6 +119,8 @@ class OutputPanels {
       const profile = run?.profile_id && this.model.profile(run.profile_id);
       if (!profile) throw new Error('This run has no account to sign in.');
       await vscode.commands.executeCommand('overseer.signIn', { profile });
+    } else if (message.type === 'openPullRequest') {
+      await vscode.commands.executeCommand('overseer.openPullRequest', runId);
     } else if (message.type === 'mergeBack') {
       await vscode.commands.executeCommand('overseer.mergeBack', runId);
     } else if (message.type === 'openReview') {
@@ -168,7 +170,7 @@ pre.raw{max-height:300px;overflow:auto;font-size:.85em}
 <header><h1 id="title">Run</h1><div class="meta"><span class="status" id="status"></span> <span id="meta"></span></div>
 <div class="meta" id="ws"></div><div class="meta" id="children"></div>
 <details class="caps"><summary>Capabilities (as reported by this adapter)</summary><div id="caps"></div></details>
-<div><button id="review" class="secondary">Open Review</button><button id="raw" class="secondary">Raw output</button><button id="interrupt">Interrupt</button><button id="merge" class="secondary" title="Merge this run's branch back into its target branch (you review and confirm first)">Merge back…</button><span class="why" id="interrupt-why"></span></div>
+<div><button id="review" class="secondary">Open Review</button><button id="raw" class="secondary">Raw output</button><button id="interrupt">Interrupt</button><button id="merge" class="secondary" title="Merge this run's branch back into its target branch (you review and confirm first)">Merge back…</button><button id="pr" class="secondary" title="Push this run's branch and open a GitHub pull request with your VS Code GitHub sign-in">Open PR…</button><span class="why" id="interrupt-why"></span></div>
 <div class="tabs" role="tablist" aria-label="Run view"><button id="tab-conv" class="secondary" role="tab" aria-selected="true" aria-controls="conv">Conversation</button><button id="tab-log" class="secondary" role="tab" aria-selected="false" aria-controls="log">Event log</button></div></header>
 <div id="perm"></div><div id="notice" class="why" role="status"></div><div id="conv" role="log" aria-live="polite" aria-label="Conversation"></div><div id="log" role="log" aria-label="Event log" hidden></div><pre class="raw" id="rawout" hidden></pre>
 <footer><textarea id="prompt" placeholder="Follow-up message to this run only" aria-label="Follow-up message"></textarea><button id="send">Send follow-up</button><span class="why" id="send-why"></span></footer>
@@ -236,6 +238,8 @@ function setRun(msg){ run = msg.run; conversation.setRun(msg);
   const merge = document.getElementById('merge'); const worktree = msg.workspace && msg.workspace.kind === 'worktree';
   merge.hidden = child; merge.disabled = !worktree || msg.active || !msg.trusted;
   merge.title = !worktree ? 'This task works in the current checkout; there is no branch to merge back.' : msg.active ? 'Wait for the run to finish or interrupt it before merging back.' : !msg.trusted ? 'Requires a trusted workspace.' : "Merge this run's branch back into its target branch (you review and confirm first)";
+  const pr = document.getElementById('pr');
+  pr.hidden = child; pr.disabled = merge.disabled; pr.title = !worktree ? 'This task works in the current checkout; there is no branch to open a pull request from.' : msg.active ? 'Wait for the run to finish or interrupt it before opening a pull request.' : !msg.trusted ? 'Requires a trusted workspace.' : 'Push the branch of this run and open a GitHub pull request with your VS Code GitHub sign-in';
   const send = document.getElementById('send'); const busy = msg.active && run.harness !== 'generic';
   send.disabled = child || !msg.followUpSupported || busy || !msg.trusted;
   document.getElementById('send-why').textContent = child ? 'Follow-ups go to the top-level run.' : !msg.followUpSupported ? 'This harness does not support follow-ups: ' + run.capabilities.follow_up : busy ? 'Wait for the current turn to finish or interrupt it.' : !msg.trusted ? 'Requires a trusted workspace.' : '';
@@ -265,6 +269,7 @@ document.getElementById('interrupt').onclick = () => vscode.postMessage({ type: 
 document.getElementById('raw').onclick = () => vscode.postMessage({ type: 'raw' });
 document.getElementById('review').onclick = () => vscode.postMessage({ type: 'openReview' });
 document.getElementById('merge').onclick = () => vscode.postMessage({ type: 'mergeBack' });
+document.getElementById('pr').onclick = () => vscode.postMessage({ type: 'openPullRequest' });
 document.getElementById('tab-conv').onclick = () => show('conv');
 document.getElementById('tab-log').onclick = () => show('log');
 show(view);

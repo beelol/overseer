@@ -1330,3 +1330,49 @@ fn ac52_the_daemon_finds_the_notifier_app_next_to_its_own_binary() {
     let _ = child.kill();
     let _ = child.wait();
 }
+
+// ---------------------------------------------------------------- AC-50 open a pull request
+
+#[test]
+fn ac50_pr_plan_explains_refusals_and_prepares_a_github_branch_without_merging() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &repo, "worktree", "printf 'agent line\\n' >> a.txt");
+    d.wait_done(&run_id(&created), 20);
+    let id = ws_id(&created);
+    // No remote.
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
+    assert_eq!(plan["ok"], false);
+    assert!(plan["reason"].as_str().unwrap().contains("has no Git remote"), "{plan}");
+    // A non-GitHub remote.
+    git(&repo, &["remote", "add", "origin", "https://gitlab.example.invalid/a/b.git"]);
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
+    assert!(plan["reason"].as_str().unwrap().contains("not on GitHub"), "{plan}");
+    // A GitHub remote whose pushes go to a local bare repository (insteadOf), as in the UI test.
+    let bare = r.path().join("remote.git");
+    std::process::Command::new("git").args(["init", "-q", "--bare", bare.to_str().unwrap()]).status().unwrap();
+    git(&repo, &["remote", "set-url", "origin", "https://github.com/test-owner/test-repo.git"]);
+    git(&repo, &["config", &format!("url.{}.insteadOf", bare.display()), "https://github.com/test-owner/test-repo.git"]);
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
+    assert_eq!(plan["ok"], true, "{plan}");
+    assert_eq!((plan["owner"].as_str(), plan["repo"].as_str(), plan["target"].as_str()), (Some("test-owner"), Some("test-repo"), Some("main")));
+    assert_eq!(plan["uncommitted"], json!(["a.txt"]));
+    let main_before = git(&repo, &["rev-parse", "main"]);
+    let prep = d.call("workspace.pr_prepare", json!({"workspace_id": id}));
+    assert_eq!(prep["committed"], true);
+    assert_eq!(prep["files"][0]["path"], "a.txt");
+    assert!(prep["commits"][0].as_str().unwrap().starts_with("Overseer: "), "{prep}");
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "nothing is merged");
+    d.call("workspace.pr_opened", json!({"workspace_id": id, "url": "https://github.com/test-owner/test-repo/pull/7", "number": 7}));
+    assert!(d.events(&run_id(&created)).iter().any(|e| e["kind"] == "pull_request" && e["payload"]["number"] == 7));
+    assert!(d.try_call("workspace.pr_opened", json!({"workspace_id": id, "url": "javascript:alert(1)", "number": 1})).is_err());
+    // Active run and current checkout: refused with an explanation.
+    let busy = sh(&d, &repo, "worktree", "sleep 30");
+    d.wait_status(&run_id(&busy), |s| s == "running", 20);
+    assert!(d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&busy)}))["reason"].as_str().unwrap().contains("still running"));
+    d.call("run.interrupt", json!({"run_id": run_id(&busy)}));
+    let cur = sh(&d, &repo, "current", "true");
+    d.wait_done(&run_id(&cur), 20);
+    assert!(d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&cur)}))["reason"].as_str().unwrap().contains("current checkout"));
+}

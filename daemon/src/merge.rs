@@ -116,9 +116,8 @@ impl Daemon {
         if plan["state"] == "idle" {
             let dirty = plan["worktree_uncommitted"].as_array().map(|a| !a.is_empty()).unwrap_or(false);
             if dirty {
-                git::git(path, &["add", "-A"])?;
                 let title = run_id.as_deref().and_then(|r| self.run(r).ok()).map(|r| r.title).unwrap_or_else(|| branch.clone());
-                git::git(path, &["commit", "--no-verify", "-q", "-m", &format!("Overseer: {title}")])?;
+                commit_worktree(path, &title)?;
             }
             // Bring the target's newer commits into the run's branch where the agent works.
             let merged = git::git(path, &["merge", "--no-ff", "--no-edit", &target]);
@@ -223,6 +222,17 @@ impl Daemon {
         }
         Ok(json!({"aborted": true}))
     }
+}
+
+/// Commits all of a worktree's uncommitted work to its branch (merge back and Open PR).
+pub fn commit_worktree(path: &Path, title: &str) -> Result<bool> {
+    let st = git::status(path)?;
+    if st.staged.is_empty() && st.unstaged.is_empty() && st.untracked.is_empty() {
+        return Ok(false);
+    }
+    git::git(path, &["add", "-A"])?;
+    git::git(path, &["commit", "--no-verify", "-q", "-m", &format!("Overseer: {title}")])?;
+    Ok(true)
 }
 
 fn blockers_empty(source_dirty: &[String], source_branch: &Option<String>, target: &str) -> bool {

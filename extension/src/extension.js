@@ -9,6 +9,7 @@ const { OutputPanels } = require('./output-panel');
 const { Review } = require('./review');
 const { CommandCenter, COLUMNS } = require('./command-center');
 const { NewTaskPanel } = require('./new-task');
+const { PullRequests } = require('./pull-request');
 
 let client;
 
@@ -37,6 +38,7 @@ async function activate(context) {
   review.reviewColumn = () => center.active ? COLUMNS.review : undefined;
   outputs.column = () => center.active ? COLUMNS.conversation : undefined;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
+  const pullRequests = new PullRequests(client, model, say);
   const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), refreshAccounts: () => refreshAccounts(), column: () => center.active ? COLUMNS.review : undefined });
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.output', outputs),
     agentsView.onDidExpandElement(e => agents.setCollapsed(e.element, false)),
@@ -380,6 +382,7 @@ async function activate(context) {
     vscode.window.registerUriHandler({ handleUri: uri => { if (uri.path === '/open-center') vscode.commands.executeCommand('overseer.openCenter'); } }),
     vscode.commands.registerCommand('overseer.openCenter', guard(async () => { await model.refresh(); await center.open(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); })),
     vscode.commands.registerCommand('overseer.mergeBack', guard(mergeBack)),
+    vscode.commands.registerCommand('overseer.openPullRequest', guard(arg => pullRequests.open(runArg(arg)))),
     vscode.commands.registerCommand('overseer.startDaemon', guard(async () => { client.disposed = false; await client.start(); await model.refresh(); updateStatus(); })),
     vscode.commands.registerCommand('overseer.showLog', () => log.show()),
     vscode.commands.registerCommand('overseer.restartDaemonConnection', guard(async () => { client.dispose(); client.disposed = false; await client.start(); })),

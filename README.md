@@ -146,6 +146,7 @@ Run the checks:
 
 ```bash
 cargo test
+node test/unit/webview-scripts.js
 ```
 
 Packaged-UI scenarios (open a real, isolated VS Code window; see [test/ui](test/ui)). The

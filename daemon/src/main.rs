@@ -6,6 +6,7 @@ mod files;
 mod git;
 mod merge;
 mod paths;
+mod pr;
 mod redact;
 mod server;
 mod shim;
