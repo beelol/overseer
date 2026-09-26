@@ -147,8 +147,10 @@ impl Tui {
     fn attach_with(d: &Daemon, w: u16, h: u16, spawn: bool) -> Tui {
         let (tx, rx) = channel();
         let daemon = spawn.then(|| overseer_tui::locate::Daemon { binary: d.bin.clone(), home: Some(d.home.path().to_path_buf()) });
+        let jobs = tx.clone();
         let client = Arc::new(Client::start(daemon, d.socket.clone(), tx));
-        let app = App::new(client.clone() as Arc<dyn Requests>);
+        let mut app = App::new(client.clone() as Arc<dyn Requests>);
+        app.set_jobs(jobs);
         let mut t = Tui { app, client, rx, term: Terminal::new(TestBackend::new(w, h)).unwrap() };
         t.until(10, |a| a.connected);
         t.pump(400);

@@ -18,7 +18,7 @@
 │ agent 9 line 118: compiling module 118 of 120                   │┃ agent 8 line 118: compiling module 118 of 120                  ┃│ agent 7 line 118: compiling module 118 of 120                   │
 │ agent 9 line 119: compiling module 119 of 120                   │┃ agent 8 line 119: compiling module 119 of 120                  ┃│ agent 7 line 119: compiling module 119 of 120                   │
 ╰─────────────────────────────────────────────────────────────────╯┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ completed ──────────────────────────────────────────────────────╯
-╭ 4 ✓ chatty 6 ───────────────────────────────────── generic · 4s ╮╭ 5 ✓ chatty 5 ──────────────────────────────────── generic · 4s ╮╭ 6 ✓ chatty 4 ───────────────────────────────────── generic · 4s ╮
+╭ 4 ✓ chatty 6 ───────────────────────────────────── generic · 4s ╮╭ 5 ✓ chatty 5 ──────────────────────────────────── generic · 4s ╮╭ 6 ✓ chatty 4 ───────────────────────────────────── generic · 3s ╮
 │ agent 6 line 102: compiling module 102 of 120                   ││ agent 5 line 102: compiling module 102 of 120                  ││ agent 4 line 102: compiling module 102 of 120                   │
 │ agent 6 line 103: compiling module 103 of 120                   ││ agent 5 line 103: compiling module 103 of 120                  ││ agent 4 line 103: compiling module 103 of 120                   │
 │ agent 6 line 104: compiling module 104 of 120                   ││ agent 5 line 104: compiling module 104 of 120                  ││ agent 4 line 104: compiling module 104 of 120                   │
@@ -38,7 +38,7 @@
 │ agent 6 line 118: compiling module 118 of 120                   ││ agent 5 line 118: compiling module 118 of 120                  ││ agent 4 line 118: compiling module 118 of 120                   │
 │ agent 6 line 119: compiling module 119 of 120                   ││ agent 5 line 119: compiling module 119 of 120                  ││ agent 4 line 119: compiling module 119 of 120                   │
 ╰ completed ──────────────────────────────────────────────────────╯╰ completed ─────────────────────────────────────────────────────╯╰ completed ──────────────────────────────────────────────────────╯
-╭ 7 ✓ chatty 3 ───────────────────────────────────── generic · 4s ╮╭ 8 ✓ chatty 2 ──────────────────────────────────── generic · 4s ╮╭ 9 ✓ chatty 1 ───────────────────────────────────── generic · 4s ╮
+╭ 7 ✓ chatty 3 ───────────────────────────────────── generic · 3s ╮╭ 8 ✓ chatty 2 ──────────────────────────────────── generic · 4s ╮╭ 9 ✓ chatty 1 ───────────────────────────────────── generic · 4s ╮
 │ agent 3 line 103: compiling module 103 of 120                   ││ agent 2 line 103: compiling module 103 of 120                  ││ agent 1 line 103: compiling module 103 of 120                   │
 │ agent 3 line 104: compiling module 104 of 120                   ││ agent 2 line 104: compiling module 104 of 120                  ││ agent 1 line 104: compiling module 104 of 120                   │
 │ agent 3 line 105: compiling module 105 of 120                   ││ agent 2 line 105: compiling module 105 of 120                  ││ agent 1 line 105: compiling module 105 of 120                   │

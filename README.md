@@ -209,7 +209,7 @@ leaves every agent running. Keys: arrows or `hjkl` move, `1`–`9` jump, `]`/`[`
 Enter messages the focused agent, `z` zooms with scrollback, `a`/`d` answer a permission, `w`
 jumps to the next agent waiting for you, `x` interrupts, `n` starts a new agent, `f` filters,
 `/` searches, `v` shows an agent's changes and diffs, `M` merges it back (one confirmation per
-step), `C` removes a finished worktree, `A` lists accounts and signs them in, `X` stops every
+step), `P` opens a GitHub pull request with your `gh`, `C` removes a finished worktree, `A` lists accounts and signs them in, `X` stops every
 agent and the daemon, `?` lists every key, `q` quits.
 
 ## Recovery

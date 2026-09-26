@@ -390,3 +390,52 @@ fn t21_stop_everything_and_start_the_daemon_again() {
     let s = tui.screen();
     assert!(s.contains("■ Long job one") && s.contains("■ Long job two") && s.contains("● connected"), "{s}");
 }
+
+#[test]
+fn t22_open_a_pull_request_with_the_users_git_and_gh() {
+    let t = tempfile::tempdir().unwrap();
+    let d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("pr-demo"));
+    let git = |dir: &Path, args: &[&str]| String::from_utf8_lossy(&std::process::Command::new("git").args(args).current_dir(dir).output().unwrap().stdout).trim().to_string();
+    // A local bare repository stands in for github.com (no network, no tokens).
+    let bare = t.path().join("github-standin.git");
+    assert!(std::process::Command::new("git").args(["init", "-q", "--bare"]).arg(&bare).status().unwrap().success());
+    git(&repo, &["remote", "add", "origin", "https://github.com/test-owner/pr-demo.git"]);
+    git(&repo, &["config", &format!("url.{}.insteadOf", bare.display()), "https://github.com/test-owner/pr-demo.git"]);
+    // A fake GitHub CLI that records its arguments and answers like `gh pr create`.
+    let log = t.path().join("gh-args.json");
+    let gh = t.path().join("gh");
+    std::fs::write(&gh, format!("#!/bin/sh\nnode -e 'require(\"fs\").writeFileSync(process.argv[1], JSON.stringify(process.argv.slice(2)))' '{}' \"$@\"\necho 'Creating pull request for overseer/add-notes into main in test-owner/pr-demo'\necho 'https://github.com/test-owner/pr-demo/pull/7'\n", log.display())).unwrap();
+    std::process::Command::new("chmod").arg("+x").arg(&gh).status().unwrap();
+    std::env::set_var("OVERSEER_GH", &gh);
+    let main_before = git(&repo, &["rev-parse", "main"]);
+    let run = d.ctl("task.create", json!({ "repo": repo, "harness": "generic", "program": "/bin/sh", "args": ["-c", "printf 'notes\\n' > NOTES.md; echo wrote notes"], "prompt": "Add notes", "title": "Add notes", "workspace_mode": "worktree" }))["run"]["id"].as_str().unwrap().to_string();
+    d.wait_status(&run, |s| s == "completed", 20);
+    let busy = d.sh(&repo, "Busy", "sleep 30");
+    let mut tui = Tui::attach(&d, 170, 44);
+    tui.until(10, |a| a.visible().len() == 2);
+    tui.key(KeyCode::Char('1'));
+    tui.key(KeyCode::Char('P'));
+    assert!(tui.screen().contains("Open PR waits until the agent is done"));
+    tui.key(KeyCode::Char('2'));
+    tui.key(KeyCode::Char('P'));
+    tui.until(10, |a| matches!(a.mode, Mode::Confirm(Confirm::OpenPr { .. })));
+    let Mode::Confirm(Confirm::OpenPr { text, .. }) = tui.app.mode.clone() else { unreachable!() };
+    assert_eq!(text, "Open a pull request on test-owner/pr-demo: overseer/add-notes → main? This will commit 1 worktree file, push overseer/add-notes to origin with your Git credentials and create it with gh. Nothing is merged.");
+    assert!(tui.screen().contains("Open a pull request on test-owner/pr-demo"), "shown in the confirmation bar");
+    tui.snapshot("t22-open-pr");
+    tui.key(KeyCode::Char('y'));
+    let s = tui.until_screen(20, "Pull request #7 is open");
+    assert!(s.contains("https://github.com/test-owner/pr-demo/pull/7"), "{s}");
+    // Pushed with git (the worktree's HEAD is on the remote), created with gh, recorded, not merged.
+    let ws = workspace_of(&d, &run);
+    assert_eq!(git(&bare, &["rev-parse", "refs/heads/overseer/add-notes"]), git(&ws, &["rev-parse", "HEAD"]));
+    let args: Vec<String> = serde_json::from_str(&std::fs::read_to_string(&log).unwrap()).unwrap();
+    let arg = |k: &str| args.iter().position(|a| a == k).map(|i| args[i + 1].clone()).unwrap_or_default();
+    assert_eq!((arg("--repo"), arg("--head"), arg("--base"), arg("--title")), ("test-owner/pr-demo".into(), "overseer/add-notes".into(), "main".into(), "Add notes".into()));
+    let body = arg("--body");
+    assert!(body.contains(&format!("Opened by Overseer from run `{run}` (generic)")) && body.contains("> Add notes") && body.contains("`A` NOTES.md") && body.contains("never merges automatically"), "{body}");
+    tui.until(10, |_| d.events(&run).iter().any(|e| e["kind"] == "pull_request" && e["payload"]["number"] == 7));
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "nothing merged");
+    d.ctl("run.interrupt", json!({ "run_id": busy }));
+}

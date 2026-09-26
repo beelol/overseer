@@ -96,7 +96,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         let text = match c {
             Confirm::Interrupt(id) => format!(" Interrupt {}? y / n", short(&app.state.run(id).map(|r| r.title.clone()).unwrap_or_default(), 50)),
             Confirm::Quit => " Unsent drafts will be lost. Quit? y / n".to_string(),
-            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } => format!(" {text} y / n"),
+            Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } => format!(" {text} y / n"),
         };
         f.render_widget(Paragraph::new(Line::from(Span::styled(text, Style::new().fg(waiting()).add_modifier(Modifier::BOLD)))).wrap(Wrap { trim: false }), comp);
     }
@@ -423,6 +423,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("x", "interrupt the focused agent"),
         ("n", "start a new agent"),
         ("M", "merge back (asks before each step)"),
+        ("P", "open a GitHub pull request (gh)"),
         ("C", "remove a finished agent's worktree"),
         ("f", "filter: all → active → needs you"),
         ("/", "search agents (esc clears)"),

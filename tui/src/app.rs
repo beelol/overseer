@@ -97,6 +97,8 @@ pub enum Confirm {
     Cleanup { run: String, text: String, discard: bool },
     /// Interrupt every agent and stop the daemon.
     StopAll { text: String },
+    /// Commit, push the agent's branch and open a GitHub pull request with `gh`.
+    OpenPr { run: String, text: String },
 }
 
 /// What a pending request was for.
@@ -125,6 +127,10 @@ enum Pending {
     CleanupPlan { run: String },
     Cleanup,
     StopAll,
+    PrPlan { run: String },
+    PrPrepare { run: String, plan: Value },
+    PrPublish { run: String },
+    PrOpened,
 }
 
 /// The New Agent form.
@@ -253,6 +259,11 @@ pub struct App {
     pub bell: bool,
     /// Agents and daemon were stopped on purpose; `r` starts the daemon again.
     pub stopped: bool,
+    /// Where background jobs (a push, `gh`) report back, as replies with their own ids.
+    jobs: Option<std::sync::mpsc::Sender<Msg>>,
+    next_job: u64,
+    /// The last Open PR plan (kept between the confirmation and the prepare step).
+    pr_plan: Option<Value>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -302,6 +313,33 @@ impl App {
             waiting: HashSet::new(),
             bell: false,
             stopped: false,
+            jobs: None,
+            next_job: 1 << 60,
+            pr_plan: None,
+        }
+    }
+
+    /// Lets background jobs report to the event loop (their replies arrive like daemon replies).
+    pub fn set_jobs(&mut self, tx: std::sync::mpsc::Sender<Msg>) {
+        self.jobs = Some(tx);
+    }
+
+    /// Runs slow work (network) off the event loop; its result arrives as a reply.
+    fn job(&mut self, why: Pending, work: impl FnOnce() -> Result<Value, String> + Send + 'static) {
+        self.next_job += 1;
+        let id = self.next_job;
+        self.pending.insert(id, why);
+        match self.jobs.clone() {
+            Some(tx) => {
+                std::thread::spawn(move || {
+                    let _ = tx.send(Msg::Reply { id, result: work() });
+                });
+            }
+            None => {
+                let result = work();
+                let why = self.pending.remove(&id).unwrap();
+                self.on_reply(why, result);
+            }
         }
     }
 
@@ -796,6 +834,35 @@ impl App {
                 };
                 self.mode = Mode::Confirm(Confirm::Cleanup { run, text, discard: !files.is_empty() });
             }
+            (Pending::PrPlan { run }, Ok(plan)) => {
+                if plan["ok"] != true {
+                    self.say(format!("Open PR is unavailable: {}", plan["reason"].as_str().unwrap_or("unknown reason")), true);
+                    return;
+                }
+                let n = plan["uncommitted"].as_array().map(|a| a.len()).unwrap_or(0);
+                let commit = if n > 0 { format!("commit {n} worktree file{}, ", if n == 1 { "" } else { "s" }) } else { String::new() };
+                let text = format!(
+                    "Open a pull request on {}/{}: {} → {}? This will {commit}push {} to {} with your Git credentials and create it with gh. Nothing is merged.",
+                    plan["owner"].as_str().unwrap_or_default(), plan["repo"].as_str().unwrap_or_default(), plan["branch"].as_str().unwrap_or_default(),
+                    plan["target"].as_str().unwrap_or_default(), plan["branch"].as_str().unwrap_or_default(), plan["remote"].as_str().unwrap_or("origin"));
+                self.pr_plan = Some(plan);
+                self.mode = Mode::Confirm(Confirm::OpenPr { run, text });
+            }
+            (Pending::PrPrepare { run, plan }, Ok(prep)) => {
+                let ws = self.state.run(&run).and_then(|r| self.state.workspace(&r.workspace_id)).map(|w| w.path.clone()).unwrap_or_default();
+                let body = pr_body(&plan, &prep);
+                self.say("Pushing and opening the pull request…", false);
+                self.job(Pending::PrPublish { run }, move || publish_pr(&ws, &plan, &body));
+            }
+            (Pending::PrPublish { run }, Ok(pr)) => {
+                let url = pr["url"].as_str().unwrap_or_default().to_string();
+                let number = pr["number"].as_i64().unwrap_or(0);
+                if let Some(ws) = self.state.run(&run).map(|r| r.workspace_id.clone()) {
+                    self.request("workspace.pr_opened", json!({ "workspace_id": ws, "url": url, "number": number }), Pending::PrOpened);
+                }
+                self.say(format!("Pull request #{number} is open: {url} (nothing was merged)"), false);
+            }
+            (Pending::PrOpened, Ok(_)) => {}
             (Pending::StopAll, Ok(v)) => {
                 let n = v["stopped"].as_array().map(|a| a.len()).unwrap_or(0);
                 let left = v["remaining"].as_array().map(|a| a.len()).unwrap_or(0);
@@ -1167,6 +1234,12 @@ impl App {
                                 self.request("workspace.merge_prepare", json!({ "workspace_id": ws, "handoff": true }), Pending::MergePrepare { run });
                             }
                         }
+                        Confirm::OpenPr { run, .. } => {
+                            if let (Some(ws), Some(plan)) = (self.state.run(&run).map(|r| r.workspace_id.clone()), self.pr_plan.take()) {
+                                self.say("Committing and pushing…", false);
+                                self.request("workspace.pr_prepare", json!({ "workspace_id": ws }), Pending::PrPrepare { run, plan });
+                            }
+                        }
                         Confirm::StopAll { .. } => {
                             self.stopped = true;
                             self.client.set_stopped(true);
@@ -1234,6 +1307,16 @@ impl App {
             KeyCode::Char('n') => self.open_new_agent(),
             KeyCode::Char('v') => self.open_changes(),
             KeyCode::Char('A') => self.open_accounts(),
+            KeyCode::Char('P') => {
+                if let Some(run) = self.focused().cloned() {
+                    if run.active() {
+                        self.say("Open PR waits until the agent is done (x interrupts it)", false);
+                    } else {
+                        let ws = run.workspace_id.clone();
+                        self.request("workspace.pr_plan", json!({ "workspace_id": ws }), Pending::PrPlan { run: run.id.clone() });
+                    }
+                }
+            }
             KeyCode::Char('C') => {
                 if let Some(run) = self.focused().cloned() {
                     if run.active() {
@@ -1448,6 +1531,67 @@ impl App {
             self.editing_repo = false;
         }
     }
+}
+
+/// The pull request description, like VS Code's Open PR: the run, the task, commits and files.
+pub fn pr_body(plan: &Value, prep: &Value) -> String {
+    let mut out = format!("Opened by Overseer from run `{}`", plan["run_id"].as_str().unwrap_or_default());
+    if let Some(h) = plan["harness"].as_str() {
+        out.push_str(&format!(" ({h}{})", plan["model"].as_str().map(|m| format!(", {m}")).unwrap_or_default()));
+    }
+    out.push_str(".\n\n");
+    if let Some(p) = plan["prompt"].as_str().filter(|p| !p.trim().is_empty()) {
+        out.push_str("**Task**\n\n");
+        for l in p.chars().take(1500).collect::<String>().lines() {
+            out.push_str(&format!("> {l}\n"));
+        }
+        out.push('\n');
+    }
+    let commits: Vec<&str> = prep["commits"].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).collect()).unwrap_or_default();
+    if !commits.is_empty() {
+        out.push_str("**Commits**\n\n");
+        for c in commits.iter().take(30) {
+            out.push_str(&format!("- {c}\n"));
+        }
+        out.push('\n');
+    }
+    let files = prep["files"].as_array().cloned().unwrap_or_default();
+    if !files.is_empty() {
+        out.push_str(&format!("**Files changed** ({})\n\n", files.len()));
+        for f in files.iter().take(50) {
+            out.push_str(&format!("- `{}` {}\n", f["status"].as_str().unwrap_or("M"), f["path"].as_str().unwrap_or_default()));
+        }
+        out.push('\n');
+    }
+    out.push_str("_Review before merging. Overseer never merges automatically._");
+    out
+}
+
+/// Pushes the branch with the user's own Git credentials and creates the pull request with
+/// their GitHub CLI. No token passes through Overseer. Reuses an existing pull request.
+fn publish_pr(ws: &str, plan: &Value, body: &str) -> Result<Value, String> {
+    let s = |k: &str| plan[k].as_str().unwrap_or_default().to_string();
+    let (remote, branch, target, repo) = (s("remote"), s("branch"), s("target"), format!("{}/{}", s("owner"), s("repo")));
+    let push = std::process::Command::new("git").args(["-C", ws, "push", "--no-verify", &remote, &format!("HEAD:refs/heads/{branch}")]).env("GIT_TERMINAL_PROMPT", "0").output().map_err(|e| e.to_string())?;
+    if !push.status.success() {
+        return Err(format!("git push failed: {}", String::from_utf8_lossy(&push.stderr).trim()));
+    }
+    let gh = std::env::var("OVERSEER_GH").unwrap_or_else(|_| "gh".into());
+    let created = std::process::Command::new(&gh).args(["pr", "create", "--repo", &repo, "--head", &branch, "--base", &target, "--title", &s("title"), "--body", body]).output()
+        .map_err(|e| format!("GitHub CLI (gh) not found ({e}); install it and run gh auth login, or use Open PR in VS Code"))?;
+    let out = String::from_utf8_lossy(&created.stdout).to_string();
+    let err = String::from_utf8_lossy(&created.stderr).to_string();
+    let url = if created.status.success() {
+        out.lines().rev().find(|l| l.starts_with("https://")).map(str::to_string)
+    } else if err.contains("already exists") {
+        // Reuse the open pull request for this branch.
+        err.lines().chain(out.lines()).find_map(|l| l.split_whitespace().find(|w| w.starts_with("https://")).map(str::to_string))
+    } else {
+        return Err(format!("gh pr create failed: {}", err.trim()));
+    };
+    let url = url.ok_or_else(|| "gh did not report the pull request URL".to_string())?;
+    let number = url.rsplit('/').next().and_then(|n| n.parse::<i64>().ok()).unwrap_or(0);
+    Ok(json!({ "url": url, "number": number }))
 }
 
 /// Grid shape (rows, columns) for `n` agents on a page: 1, 1×2, 1×3, 2×2, 2×3, 3×3.

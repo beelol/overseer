@@ -50,6 +50,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | w | Jump to the next agent waiting for you |
 | x | Interrupt the focused agent (asks y/n) |
 | M | Merge back: commit the worktree and merge the target in (y/n), then merge into the target (y/n) |
+| P | Open a GitHub pull request (y/n): commit, push with your Git credentials, create it with `gh` |
 | C | Remove a finished agent's worktree (its branch is kept; lists uncommitted files first) |
 | X | Stop all agents and the daemon (y/n); the TUI does not restart it until `r` |
 | n | New agent (repository, harness, account, model, prompt) |
@@ -181,3 +182,12 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   which starts the daemon in the same data directory. Worktrees and history are kept.
   **Verify:** two running agents: the prompt names them; after `y` the daemon exits and is not
   respawned; `r` brings it back and both agents show as interrupted.
+- [x] **T-22 — Open a pull request.** `P` on a finished agent uses the daemon's Open PR plan
+  (the same checks as VS Code: GitHub remote, not running, something to propose), says what will
+  happen, and after y/n commits the worktree (daemon), pushes the branch with the user's own Git
+  credentials and creates the pull request with the user's GitHub CLI (`gh`), with VS Code's
+  generated description (run, task, commits, files, never merges). No token passes through
+  Overseer; an existing pull request is reused; the URL and number are recorded on the run; the
+  push and `gh` run off the event loop. **Verify:** against a local stand-in for github.com and a
+  recording `gh`: the branch on the remote equals the worktree HEAD, `gh` got the repository,
+  head, base, title and body, the run has a `pull_request` event, and the target is unchanged.

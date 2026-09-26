@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                                 ● connected 
+╭ 1 ● Busy ─────────────────────────────────────────────────────────── generic · 0s ╮┏ 2 ✓ Add notes ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓
+│ working…                                                                          │┃ › Add notes                                                                       ┃
+│                                                                                   │┃ wrote notes                                                                       ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+│                                                                                   │┃                                                                                   ┃
+╰───────────────────────────────────────────────────────────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ Open a pull request on test-owner/pr-demo: overseer/add-notes → main? This will commit 1 worktree file, push overseer/add-notes to origin with your Git credentials and  
+create it with gh. Nothing is merged. y / n                                                                                                                               
+ Open PR waits until the agent is done (x interrupts it)                                                                                                                  

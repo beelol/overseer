@@ -12,13 +12,12 @@
 ┃                                                          ┃│                                                          ││                                                          │
 ┃                                                          ┃│                                                          ││                                                          │
 ┃                                                          ┃│                                                          ││                                                          │
-┃                                                          ┃│                                                          ││                                                          │
 ┃                                                          ┃│╭ keys ──────────────────────────────────────────────────╮││                                                          │
 ┃                                                          ┃││                                                        │││                                                          │
-┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰│  ←↓↑→  h j k l     move between agents                 │╯╰ completed ───────────────────────────────────────────────╯
-╭ 4 ✓ agent 09 ────────────────────────────── generic · 0s ╮╭│  1 – 9             focus agent n on this page          │╮╭ 6 ✓ agent 07 ────────────────────────────── generic · 0s ╮
-│ hi                                                       │││  tab / shift+tab   next / previous agent               │││ hi                                                       │
-│                                                          │││  ] [   pgdn pgup   next / previous page                │││                                                          │
+┃                                                          ┃││  ←↓↑→  h j k l     move between agents                 │││                                                          │
+┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰│  1 – 9             focus agent n on this page          │╯╰ completed ───────────────────────────────────────────────╯
+╭ 4 ✓ agent 09 ────────────────────────────── generic · 0s ╮╭│  tab / shift+tab   next / previous agent               │╮╭ 6 ✓ agent 07 ────────────────────────────── generic · 0s ╮
+│ hi                                                       │││  ] [   pgdn pgup   next / previous page                │││ hi                                                       │
 │                                                          │││  i  enter          message the focused agent           │││                                                          │
 │                                                          │││  z                 zoom: full screen with scrollback   │││                                                          │
 │                                                          │││  v                 changes: files and diffs            │││                                                          │
@@ -28,6 +27,7 @@
 │                                                          │││  x                 interrupt the focused agent         │││                                                          │
 │                                                          │││  n                 start a new agent                   │││                                                          │
 │                                                          │││  M                 merge back (asks before each step)  │││                                                          │
+│                                                          │││  P                 open a GitHub pull request (gh)     │││                                                          │
 │                                                          │││  C                 remove a finished agent's worktree  │││                                                          │
 │                                                          │││  f                 filter: all → active → needs you    │││                                                          │
 │                                                          │││  /                 search agents (esc clears)          │││                                                          │

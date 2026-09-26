@@ -35,6 +35,7 @@ KEYS:
     a / d           allow / deny a permission  w     next agent waiting for you
     x               interrupt                  n     new agent
     C               remove a finished agent's worktree (branch kept)
+    P               open a GitHub pull request (your git credentials and gh)
     X               stop all agents and the daemon (r starts it again)
     v               changes (files, diffs)     M     merge back (asks each step)
     /               search agents              A     accounts and sign-in
@@ -87,8 +88,10 @@ fn main() -> Result<()> {
             }
         }
     });
+    let jobs = dtx.clone();
     let client = Arc::new(Client::start(Some(daemon), socket, dtx));
     let mut app = App::new(client.clone());
+    app.set_jobs(jobs);
     app.cwd_repo = git_root();
     ui::set_truecolor(std::env::var("COLORTERM").map(|v| v.contains("truecolor") || v.contains("24bit")).unwrap_or(false));
 
