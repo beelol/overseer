@@ -31,6 +31,9 @@ impl Daemon {
                 env.push((key.to_string(), "/nonexistent/harness-disabled-in-tests".to_string()));
             }
         }
+        if !env.iter().any(|(k, _)| k == "OVERSEER_SWARM_FIXTURE_API") {
+            env.push(("OVERSEER_SWARM_FIXTURE_API".to_string(), "1".to_string()));
+        }
         let mut d = Daemon { home, child: None, env };
         d.spawn();
         d

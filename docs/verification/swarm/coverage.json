@@ -215,9 +215,12 @@
       "blocker": null
     },
     "SWARM-33": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_director.rs",
+        "docs/verification/swarm/milestone-5.md"
+      ],
+      "blocker": "A fixture batch claims at most 20 messages/32 KiB and Stop halts future claims; no model turn, reservation, or semantic review runs."
     },
     "SWARM-34": {
       "status": "unverified",
@@ -269,9 +272,11 @@
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_director.rs",
+        "docs/verification/swarm/milestone-5.md"
       ],
-      "blocker": "Discovery persists in the director inbox; bounded model turns and targeted peer advisories are not implemented."
+      "blocker": "Durable bounded batching and single active fixture turn pass; live notification, targeted advisories and actual director inference are unimplemented."
     },
     "SWARM-42": {
       "status": "partial",
@@ -337,9 +342,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_director.rs",
+        "docs/verification/swarm/milestone-5.md"
       ],
-      "blocker": "32 KiB payload limit, role rejection, 2,000 duplicate replays and 1,000-envelope high-water behavior pass; model-turn batching and Stop latency remain untested."
+      "blocker": "Payload and inbox bounds, dedupe, and director batch size pass; live inference/context controls, malformed permission cases and Stop latency remain unverified."
     },
     "SWARM-50": {
       "status": "partial",
@@ -414,9 +421,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "docs/verification/swarm/milestone-1.md",
+        "daemon/tests/swarm_director.rs",
+        "docs/verification/swarm/milestone-5.md"
       ],
-      "blocker": "Stop prevents new attempt registration and preserves late evidence; permission revocation, director acceptance race and live launch hold remain unimplemented."
+      "blocker": "Stop halts new attempt registration and director batch claims while preserving late evidence; live cancellation and permission-revocation races remain unimplemented."
     },
     "SWARM-62": {
       "status": "unverified",

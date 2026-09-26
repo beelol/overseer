@@ -1,11 +1,13 @@
 mod artifacts;
 mod broker;
+mod director;
 mod plan;
 mod policy;
 mod revision;
 pub mod schema;
 pub use artifacts::{confirm_exit, decide, put};
 pub use broker::{ack, direct, messages, register, report};
+pub use director::{claim_batch, complete_batch};
 pub use policy::preview;
 pub use revision::revise;
 

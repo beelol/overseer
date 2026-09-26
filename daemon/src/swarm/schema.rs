@@ -99,6 +99,23 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           UNIQUE(run_id,job_id,attempt_id,decision)
         );
+        CREATE TABLE IF NOT EXISTS swarm_director_turns(
+          id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id),
+          generation INTEGER NOT NULL,
+          revision INTEGER NOT NULL,
+          token_sha256 TEXT NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('active','complete')),
+          created_ms INTEGER NOT NULL,
+          completed_ms INTEGER
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS swarm_one_director_turn
+          ON swarm_director_turns(run_id) WHERE status='active';
+        CREATE TABLE IF NOT EXISTS swarm_director_turn_messages(
+          turn_id TEXT NOT NULL REFERENCES swarm_director_turns(id),
+          seq INTEGER NOT NULL REFERENCES swarm_messages(seq),
+          PRIMARY KEY(turn_id,seq)
+        );
         "#,
     )?;
     Ok(())

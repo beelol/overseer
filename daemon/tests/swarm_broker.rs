@@ -27,6 +27,18 @@ fn planned(d: &Daemon) -> (String, String, String) {
 }
 
 #[test]
+fn unfinished_runtime_transitions_are_disabled_without_fixture_opt_in() {
+    let d=Daemon::start(&[("OVERSEER_SWARM_FIXTURE_API","0")]);
+    let run=d.call("swarm.create",json!({"category":"Safe default","objective":"Audit","allowed_targets":["system-codex"]}));
+    let id=run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[{"id":"audit","title":"Audit","acceptance":"report","deps":[]}]}));
+    let error=d.try_call("swarm.attempt.register",json!({"run_id":id,"job_id":"audit","generation":1,"revision":1})).unwrap_err();
+    assert!(error.contains("fixture-only"));
+    let error=d.try_call("swarm.attempt.confirm_exit",json!({"run_id":id,"job_id":"audit","attempt_id":"fake","generation":1,"revision":1})).unwrap_err();
+    assert!(error.contains("fixture-only"));
+}
+
+#[test]
 fn report_is_durable_before_ack_and_replay_is_idempotent() {
     let mut d = Daemon::start(&[]);
     let (run_id, attempt_id, token) = planned(&d);

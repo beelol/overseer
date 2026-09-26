@@ -186,6 +186,14 @@ fn s<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
     p[key].as_str().ok_or_else(|| anyhow!("missing string parameter {key}"))
 }
 
+fn fixture_only() -> Result<()> {
+    if std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() == Ok("1") {
+        Ok(())
+    } else {
+        Err(anyhow!("fixture-only swarm transition; live runtime authority is not implemented"))
+    }
+}
+
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
@@ -206,7 +214,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.get" => crate::swarm::get(&d.store.lock().unwrap(), s(p, "id")?)?,
         "swarm.plan" => crate::swarm::plan(&mut d.store.lock().unwrap(), p)?,
         "swarm.jobs" => crate::swarm::jobs(&d.store.lock().unwrap(), p)?,
-        "swarm.attempt.register" => crate::swarm::register(&mut d.store.lock().unwrap(), p)?,
+        "swarm.attempt.register" => {
+            fixture_only()?;
+            crate::swarm::register(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.report" => crate::swarm::report(&mut d.store.lock().unwrap(), p)?,
         "swarm.direct" => crate::swarm::direct(&mut d.store.lock().unwrap(), p)?,
         "swarm.messages" => crate::swarm::messages(&d.store.lock().unwrap(), p)?,
@@ -215,9 +226,20 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.claim" => crate::swarm::claim(&mut d.store.lock().unwrap(), p)?,
         "swarm.artifact.put" => crate::swarm::put(&mut d.store.lock().unwrap(), p)?,
         "swarm.decide" => crate::swarm::decide(&mut d.store.lock().unwrap(), p)?,
-        "swarm.attempt.confirm_exit" => crate::swarm::confirm_exit(&mut d.store.lock().unwrap(), p)?,
+        "swarm.attempt.confirm_exit" => {
+            fixture_only()?;
+            crate::swarm::confirm_exit(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.revise" => crate::swarm::revise(&mut d.store.lock().unwrap(), p)?,
         "swarm.policy.preview" => crate::swarm::preview(p)?,
+        "swarm.director.claim_batch" => {
+            fixture_only()?;
+            crate::swarm::claim_batch(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.director.complete_batch" => {
+            fixture_only()?;
+            crate::swarm::complete_batch(&mut d.store.lock().unwrap(), p)?
+        }
         "profile.create" => json!(d.create_profile(s(p, "name")?, s(p, "harness")?)?),
         "profile.rename" => {
             let name = s(p, "name")?.trim();
