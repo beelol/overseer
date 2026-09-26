@@ -1,6 +1,6 @@
 # SWARM-49 — bounded inbox and admission backpressure
 
-Status: partial. Revision: `042b3e5`.
+Status: partial. Latest evidence revision: `ab29ff3`.
 
 Input: one planned run with two ready jobs, a registered first attempt and 1,000 distinct progress reports. A second admission uses a fresh, compatible fixture quota snapshot. The active attempt then submits a terminal result.
 
@@ -15,3 +15,5 @@ Follow-up revision `66238db`: `malformed_and_unauthorized_reports_return_bounded
 Evidence: `daemon/tests/swarm_admission.rs`, `daemon/tests/swarm_broker.rs`, `docs/verification/swarm/milestone-9.md`.
 
 Remaining: live director inference/context limits and broader permission paths remain unverified. Stop responsiveness under this local duplicate flood is covered; broader load behavior is not.
+
+At `ab29ff3`, `terminal_inbox_bypass_is_bounded_per_attempt_and_replays_stay_idempotent` first failed because a 17th result/submit/blocker report from one attempt was accepted with a fresh ID. The broker now permits at most 16 outstanding terminal reports per attempt. It withholds acknowledgement for overflow, preserves exact duplicate receipts, and admits a later correction after the director applies one report. The focused broker suite passed 17 tests; the full serialized offline workspace suite passed 205 tests with 11 ignored; `git diff --check` passed. This proves the local persistence and backpressure rule. Retry delivery from a real harness after an unacknowledged overflow and live director drain remain unqualified, so SWARM-49 is still partial.
