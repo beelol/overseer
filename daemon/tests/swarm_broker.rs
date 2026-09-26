@@ -481,6 +481,47 @@ fn stop_is_not_starved_by_two_thousand_duplicate_progress_replays() {
 }
 
 #[test]
+fn malformed_and_unauthorized_reports_return_bounded_errors_without_inbox_effects() {
+    let d = Daemon::start(&[]);
+    let (run, attempt, token) = planned(&d);
+    let base = json!({"run_id":run,"job_id":"routes","attempt_id":attempt,
+        "token":token,"message_id":"valid","type":"progress","revision":1,
+        "payload":{"note":"ordinary"}});
+    let secret = "DO-NOT-ECHO-THIS-PAYLOAD";
+    let mut invalid = Vec::new();
+    let mut wrong_token = base.clone();
+    wrong_token["token"] = json!("wrong-secret-token");
+    invalid.push(wrong_token);
+    let mut missing_id = base.clone();
+    missing_id.as_object_mut().unwrap().remove("message_id");
+    invalid.push(missing_id);
+    let mut long_id = base.clone();
+    long_id["message_id"] = json!("i".repeat(129));
+    invalid.push(long_id);
+    let mut spoofed_direction = base.clone();
+    spoofed_direction["type"] = json!("redirect");
+    invalid.push(spoofed_direction);
+    let mut wrong_revision = base.clone();
+    wrong_revision["revision"] = json!(0);
+    invalid.push(wrong_revision);
+    let mut non_object = base.clone();
+    non_object["payload"] = json!([secret]);
+    invalid.push(non_object);
+    let mut oversized = base.clone();
+    oversized["payload"] = json!({"note":format!("{}{}",secret,"x".repeat(33_000))});
+    invalid.push(oversized);
+    for report in invalid {
+        let error = d.try_call("swarm.report", report).unwrap_err();
+        assert!(error.len() <= 160, "unbounded diagnostic: {error}");
+        assert!(!error.contains(secret), "payload leaked in diagnostic");
+        assert!(!error.contains("wrong-secret-token"), "token leaked in diagnostic");
+    }
+    let inbox = d.call("swarm.messages", json!({"run_id":run,"recipient":"director"}));
+    assert!(inbox["messages"].as_array().unwrap().is_empty());
+    assert_eq!(d.call("swarm.report", base)["duplicate"], false);
+}
+
+#[test]
 fn terminal_run_replays_a_saved_result_receipt_without_accepting_new_work() {
     let mut d = Daemon::start(&[]);
     let (run, attempt, token) = planned(&d);
