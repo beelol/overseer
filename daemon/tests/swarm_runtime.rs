@@ -678,6 +678,56 @@ fn pending_worker_launch_cannot_resume_after_stop() {
 }
 
 #[test]
+fn stop_retries_an_initially_unreachable_worker_after_daemon_restart() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("stop-retry-source"));
+    let run = d.call("swarm.create", json!({"category":"Stop retry",
+        "objective":"Inspect backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let at = now();
+    let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"inspect","target_id":"fixture-local","request_id":"stop-retry-worker",
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    let launched = d.call("swarm.worker.launch", json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],"repo":checkout,
+        "program":"/bin/sleep","args":["30"],"prompt":"Inspect",
+        "title":"Stop retry worker"}));
+    let worker = launched["overseer_run_id"].as_str().unwrap();
+    d.wait_status(worker, |status| status == "running", 10);
+    let stopped = d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1,
+        "fault_interrupt_once":true}));
+    assert_eq!(stopped["workers"]["unconfirmed"], json!([worker]));
+    assert_eq!(d.run(worker)["status"], "running");
+    assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["status"],
+        "cancel_requested");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let first: (i64,String) = db.query_row(
+        "SELECT attempts,last_outcome FROM swarm_stop_signals WHERE run_id=?1 AND overseer_run_id=?2",
+        rusqlite::params![id,worker], |r| Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!(first, (1,"unconfirmed".into()));
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.wait_done(worker, 12)["status"], "interrupted");
+    let later: (i64,String) = db.query_row(
+        "SELECT attempts,last_outcome FROM swarm_stop_signals WHERE run_id=?1 AND overseer_run_id=?2",
+        rusqlite::params![id,worker], |r| Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert!(later.0 >= 2, "stop interrupt was not retried: {later:?}");
+    assert_eq!(later.1, "requested");
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "stopping");
+    assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["attempt_count"], 1);
+}
+
+#[test]
 fn finished_attempt_cannot_launch_a_worker() {
     let d = Daemon::start(&[]);
     let temp = tmp();

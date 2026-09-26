@@ -280,6 +280,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           overseer_run_id TEXT UNIQUE REFERENCES runs(id),
           created_ms INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS swarm_stop_signals(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id),
+          overseer_run_id TEXT NOT NULL REFERENCES runs(id),
+          attempts INTEGER NOT NULL,
+          last_attempt_ms INTEGER NOT NULL,
+          last_outcome TEXT NOT NULL CHECK(last_outcome IN ('requested','unconfirmed')),
+          PRIMARY KEY(run_id,overseer_run_id)
+        );
         CREATE TABLE IF NOT EXISTS swarm_worker_liveness(
           attempt_id TEXT PRIMARY KEY REFERENCES swarm_attempts(id),
           state TEXT NOT NULL CHECK(state IN ('reachable','suspect','unknown')),

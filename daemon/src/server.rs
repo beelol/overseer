@@ -59,6 +59,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
                     }
                 }
                 crate::swarm::retry_revoked_interrupts(&daemon)?;
+                crate::swarm::retry_stopping_interrupts(&daemon)?;
                 crate::swarm::reconcile_terminal_workers(&daemon)?;
                 crate::swarm::sample_due_workers(&daemon, crate::daemon::now())?;
                 Ok::<(), anyhow::Error>(())
@@ -300,9 +301,12 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             crate::swarm::ack(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.stop" => {
+            let fault_interrupt_once = p["fault_interrupt_once"] == true;
+            if fault_interrupt_once { fixture_only()?; }
             let _serial = d.swarm_launch_lock.lock().unwrap();
             let mut stopped = crate::swarm::stop(&mut d.store.lock().unwrap(), p)?;
-            stopped["workers"] = crate::swarm::interrupt_workers(d, s(p,"run_id")?)?;
+            stopped["workers"] = crate::swarm::interrupt_workers_with_fault(
+                d, s(p,"run_id")?, fault_interrupt_once)?;
             stopped
         }
         "swarm.pause" => crate::swarm::pause(&mut d.store.lock().unwrap(), p)?,

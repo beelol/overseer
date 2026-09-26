@@ -13,6 +13,7 @@ use std::time::Duration;
 
 const UNKNOWN_AFTER_MS: i64 = 60_000;
 const SAMPLE_INTERVAL_MS: i64 = 15_000;
+const STOP_RETRY_MS: i64 = 5_000;
 
 pub fn liveness(store: &Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
@@ -218,27 +219,75 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
 }
 
 pub fn interrupt_workers(d: &Arc<Daemon>, run: &str) -> Result<Value> {
+    interrupt_workers_with_fault(d, run, false)
+}
+
+pub fn interrupt_workers_with_fault(d: &Arc<Daemon>, run: &str, fail_first: bool) -> Result<Value> {
+    let now = crate::daemon::now();
     let linked = {
         let store = d.store.lock().unwrap();
         let mut stmt = store.conn.prepare(
             "SELECT r.id FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
-             WHERE l.run_id=?1 AND r.status IN ('queued','starting','running','waiting_for_user')",
+             LEFT JOIN swarm_stop_signals s ON s.run_id=l.run_id AND s.overseer_run_id=r.id
+             WHERE l.run_id=?1 AND r.status IN ('queued','starting','running','waiting_for_user')
+             AND (s.overseer_run_id IS NULL OR s.last_attempt_ms<=?2)
+             ORDER BY r.id",
         )?;
         let ids = stmt
-            .query_map(params![run], |row| row.get::<_, String>(0))?
+            .query_map(params![run,now-STOP_RETRY_MS], |row| row.get::<_, String>(0))?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         ids
     };
     let mut requested = Vec::new();
     let mut unconfirmed = Vec::new();
     for worker in linked {
-        if d.interrupt(&worker).is_ok() {
+        let result = if fail_first {
+            Err(anyhow!("fixture simulated unreachable worker control socket"))
+        } else {
+            d.interrupt(&worker).map(|_| ())
+        };
+        let outcome = if result.is_ok() { "requested" } else { "unconfirmed" };
+        d.store.lock().unwrap().conn.execute(
+            "INSERT INTO swarm_stop_signals(run_id,overseer_run_id,attempts,last_attempt_ms,last_outcome)
+             VALUES(?1,?2,1,?3,?4) ON CONFLICT(run_id,overseer_run_id) DO UPDATE SET
+             attempts=attempts+1,last_attempt_ms=excluded.last_attempt_ms,
+             last_outcome=excluded.last_outcome",
+            params![run,worker,now,outcome],
+        )?;
+        if result.is_ok() {
             requested.push(worker);
         } else {
             unconfirmed.push(worker);
         }
     }
     Ok(json!({"interrupt_requested":requested,"unconfirmed":unconfirmed}))
+}
+
+/// A committed Stop survives a failed first signal or daemon crash. Retry only linked,
+/// still-active workers; process exit is reconciled separately before releasing an attempt.
+pub fn retry_stopping_interrupts(d: &Arc<Daemon>) -> Result<usize> {
+    let due = {
+        let store = d.store.lock().unwrap();
+        let mut stmt = store.conn.prepare(
+            "SELECT DISTINCT l.run_id FROM swarm_worker_launches l
+             JOIN swarm_runs s ON s.id=l.run_id AND s.status='stopping'
+             JOIN runs r ON r.id=l.overseer_run_id
+               AND r.status IN ('queued','starting','running','waiting_for_user')
+             LEFT JOIN swarm_stop_signals i ON i.run_id=l.run_id AND i.overseer_run_id=r.id
+             WHERE i.overseer_run_id IS NULL OR i.last_attempt_ms<=?1
+             ORDER BY l.run_id LIMIT 100",
+        )?;
+        let rows = stmt.query_map(params![crate::daemon::now()-STOP_RETRY_MS], |row| row.get::<_,String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
+    };
+    let mut retried = 0;
+    for run in due {
+        let result = interrupt_workers(d, &run)?;
+        retried += result["interrupt_requested"].as_array().map_or(0, Vec::len)
+            + result["unconfirmed"].as_array().map_or(0, Vec::len);
+    }
+    Ok(retried)
 }
 
 /// Copy a supervised worker's terminal state into the durable director inbox.
