@@ -17,6 +17,7 @@ pub const PROTOCOL_VERSION: i64 = 1;
 pub const MAX_REQUEST_BYTES: u64 = 1024 * 1024;
 
 pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
+    crate::audio::start(daemon.clone())?;
     let path = paths::socket_path();
     if let Some(dir) = path.parent() {
         paths::ensure_private_dir(dir)?;
