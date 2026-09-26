@@ -900,6 +900,53 @@ rec(82, "Gate K design review (owner-confirmed)", "not started", date="—", com
     expected="See the RFC criterion (Gate K) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-k-layout).",
     actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; built in its own pull request).")
 
+# Gate L (added by the owner on 2026-09-26; docs/rfcs/offline-mode.md). Not started.
+rec(83, "Offline is not an outage", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(84, "Fail over to the best working provider", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(85, "Local inventory", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(86, "Memory budget and fit", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(87, "Verified local catalogue", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(88, "Settings the daemon enforces", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(89, "Download models only when allowed", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(90, "Install and run Ollama only when allowed", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(91, "Transition to local when offline", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(92, "Wait and retry, never fail", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(93, "Back online", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(94, "Local models as a first-class choice", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(95, "Honest offline UI", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(96, "Several local agents", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+rec(97, "Offline session (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md).")
+
 SHORT_BLOCKERS = {
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
@@ -943,6 +990,21 @@ SHORT_BLOCKERS = {
     80: "not started (Gate K, added by the owner on 2026-09-26)",
     81: "not started (Gate K, added by the owner on 2026-09-26)",
     82: "not started (Gate K, added by the owner on 2026-09-26)",
+    83: "not started (Gate L, added by the owner on 2026-09-26)",
+    84: "not started (Gate L, added by the owner on 2026-09-26)",
+    85: "not started (Gate L, added by the owner on 2026-09-26)",
+    86: "not started (Gate L, added by the owner on 2026-09-26)",
+    87: "not started (Gate L, added by the owner on 2026-09-26)",
+    88: "not started (Gate L, added by the owner on 2026-09-26)",
+    89: "not started (Gate L, added by the owner on 2026-09-26)",
+    90: "not started (Gate L, added by the owner on 2026-09-26)",
+    91: "not started (Gate L, added by the owner on 2026-09-26)",
+    92: "not started (Gate L, added by the owner on 2026-09-26)",
+    93: "not started (Gate L, added by the owner on 2026-09-26)",
+    94: "not started (Gate L, added by the owner on 2026-09-26)",
+    95: "not started (Gate L, added by the owner on 2026-09-26)",
+    96: "not started (Gate L, added by the owner on 2026-09-26)",
+    97: "not started (Gate L, added by the owner on 2026-09-26)",
 }
 TOTAL = 53
 
