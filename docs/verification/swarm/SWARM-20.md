@@ -16,7 +16,7 @@ Evidence: `daemon/tests/swarm_runtime.rs`, `daemon/src/swarm/runtime.rs`, `daemo
 
 Remaining: this fixture uses a scripted local worker and simulated first signal failure. Live Pause checkpoints, native descendants, reservation/exit display in VS Code, and full Swarm-off drain remain unverified. This criterion remains unchecked.
 
-At the next revision, local control fixtures establish terminalization and claim cleanup:
+At `be4dd73`, local control fixtures establish terminalization and claim cleanup:
 
 - Inputs: an empty run; a queued job with a write claim; an active supervised worker whose first stop signal fails; a submitted result awaiting review during Swarm off; and a combined checker still running when Stop arrives. Tests: `stopped_empty_swarm_is_terminal_and_releases_category`, `cancelled_jobs_release_claims_for_later_swarms`, `stop_retries_an_initially_unreachable_worker_after_daemon_restart`, `pause_resume_and_off_keep_active_evidence_but_stop_new_delegation`, and `stop_remains_responsive_while_combined_checker_is_running`.
 - Expected: an idle run reaches `stopped` and frees its category and queued-job claims; an active run stays `stopping` or `draining` until worker exit, review, and verification finish. Unresolved attempts and effects keep their claims.
