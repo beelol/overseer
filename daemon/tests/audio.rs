@@ -190,6 +190,82 @@ fn live_permission_and_waiting_status_share_one_attention_cue() {
 }
 
 #[test]
+fn child_completion_stays_silent_until_root_finishes() {
+    let root = tmp();
+    let repo = repo(&root.path().join("repo"));
+    let audio_log = root.path().join("audio.log");
+    let audio_log_str = audio_log.to_str().unwrap();
+    let fixture = repo_root()
+        .join("fixtures/fake-harness/codex-app-fixture.js")
+        .display()
+        .to_string();
+    let d = Daemon::start(&[
+        ("OVERSEER_TEST_AUDIO_LOG", audio_log_str),
+        ("OVERSEER_CODEX_PATH", &fixture),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "tree"),
+    ]);
+    d.call("audio.set", json!({"enabled": true}));
+    let created = d.call(
+        "task.create",
+        json!({
+            "repo": repo,
+            "harness": "codex-app",
+            "prompt": "delegate",
+            "title": "child cue",
+            "approval_policy": "untrusted",
+            "extra_args": ["-c", "agents.max_depth=2"]
+        }),
+    );
+    let run = run_id(&created);
+    let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
+    let runs = d.runs();
+    let child = runs
+        .iter()
+        .find(|r| r["native_id"] == "thr-child")
+        .expect("child run");
+    assert_eq!(child["parent_run_id"], run);
+    assert!(d
+        .events(child["id"].as_str().unwrap())
+        .iter()
+        .any(|e| e["kind"] == "status" && e["payload"]["status"] == "completed"));
+    wait_audio_lines(&audio_log, 2);
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    let before = std::fs::read_to_string(&audio_log).unwrap();
+    assert!(
+        !before.lines().any(|line| line == "reactor:agent_complete"),
+        "a child finishing must not sound like the root finished: {before}"
+    );
+
+    d.call(
+        "run.permission",
+        json!({
+            "run_id": run,
+            "request_id": waiting["attention"]["request_id"],
+            "allow": true
+        }),
+    );
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    wait_audio_lines(&audio_log, 3);
+    let lines = std::fs::read_to_string(&audio_log).unwrap();
+    for key in ["agent_started", "agent_needs_attention", "agent_complete"] {
+        assert_eq!(
+            lines
+                .lines()
+                .filter(|line| *line == format!("reactor:{key}"))
+                .count(),
+            1,
+            "{key} must play once for the root: {lines}"
+        );
+    }
+    assert_eq!(
+        lines.lines().count(),
+        3,
+        "children and tools must stay silent: {lines}"
+    );
+}
+
+#[test]
 fn system_and_private_commander_tracks_are_selectable_without_bundling_voice_files() {
     let root = tmp();
     let audio_log = root.path().join("audio.log");

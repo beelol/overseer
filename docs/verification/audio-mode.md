@@ -8,6 +8,7 @@ The source pack is `daemon/assets/reactor`: twelve original synthesized MP3 file
 | Off mode starts no player or cache | `disabled_audio_never_materializes_a_player_asset` | Verified |
 | Root start and completion sound once while VS Code is closed | `live_root_events_play_once_without_or_with_multiple_ui_clients` | Verified with fixture |
 | A second UI client does not duplicate playback | Same two-client protocol test | Verified with fixture |
+| Child and grandchild activity stays silent | `child_completion_stays_silent_until_root_finishes` runs a nested Codex fixture: the child completes before the waiting root, but only the root start, attention, and completion cues play | Verified with fixture |
 | Permission event and waiting status share one attention cue | `live_permission_and_waiting_status_share_one_attention_cue` | Verified with fixture |
 | Auth failure needs attention once | `authentication_failure_makes_one_attention_cue` | Verified with fixture |
 | Simultaneous needs coalesce, including interleaved starts | `simultaneous_attention_is_coalesced_even_when_starts_interleave` and `simultaneous_permissions_make_one_cue_and_two_visible_needs` | Verified with two live fixture agents |
