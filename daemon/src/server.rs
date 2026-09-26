@@ -643,6 +643,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "task.create" => d.create_task(p)?,
         "run.delegate" => d.delegate_run(p, false)?,
+        "run.handoff" => d.handoff_run(p)?,
         "auto.mode.get" => json!({"enabled":d.store.lock().unwrap().auto_mode_enabled()?}),
         "auto.mode.set" => {
             if p.as_object().is_none_or(|fields| fields.len() != 1)
@@ -674,7 +675,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let work_unit_gate = d.work_unit_gate(work_unit_id);
             let _work_unit_guard = work_unit_gate.lock().unwrap();
             let parent = d.run(s(p, "parent_run_id")?)?;
-            if parent.parent_run_id.is_some() {
+            if parent.parent_run_id.is_some() && parent.relation_source.as_deref() != Some("managed-continuation") {
                 return Err(anyhow!("automatic delegation requires a top-level parent"));
             }
             let profile_id = parent.profile_id.as_deref().ok_or_else(|| anyhow!("parent has no account profile"))?;

@@ -622,7 +622,7 @@ impl Daemon {
             return Ok(json!({"work_unit_id":work_unit_id,"run":child,"workspace":workspace,"replayed":true}));
         }
         let parent = self.run(parent_id)?;
-        if parent.parent_run_id.is_some() || parent.status != "completed" {
+        if (parent.parent_run_id.is_some() && parent.relation_source.as_deref() != Some("managed-continuation")) || parent.status != "completed" {
             bail!("delegation requires a completed top-level parent checkpoint");
         }
         let parent_ws = self.workspace(&parent.workspace_id)?;
@@ -751,6 +751,156 @@ impl Daemon {
             "event_seq":output.seq,"text":text,"workspace_id":run.workspace_id}))
     }
 
+    /// A user-requested, same-harness continuation from a confirmed completed
+    /// checkpoint. This is deliberately narrower than automatic outage handoff:
+    /// failed/uncertain work and cross-provider context require separate proof.
+    pub fn handoff_run(self: &Arc<Self>, p: &Value) -> Result<Value> {
+        use sha2::{Digest, Sha256};
+        let source_id = p["source_run_id"].as_str().ok_or_else(|| anyhow!("source_run_id is required"))?;
+        let initial = self.run(source_id)?;
+        let gate = self.workspace_gate(&initial.workspace_id);
+        let guard = gate.lock().unwrap();
+        let source = self.run(source_id)?;
+        if source.parent_run_id.is_some() && source.relation_source.as_deref() != Some("managed-continuation") {
+            bail!("only a task coordinator can be continued");
+        }
+        let harness = p["harness"].as_str().ok_or_else(|| anyhow!("handoff harness is required"))?;
+        if harness != source.harness || !["codex", "codex-app", "claude", "opencode"].contains(&harness) {
+            bail!("this handoff boundary supports only the source harness");
+        }
+        let profile_id = p["profile_id"].as_str().unwrap_or(source.profile_id.as_deref()
+            .ok_or_else(|| anyhow!("source account profile is unavailable"))?);
+        if Some(profile_id) != source.profile_id.as_deref() {
+            bail!("this handoff boundary requires the source account profile");
+        }
+        let profile = self.profile(profile_id)?;
+        if profile.harness != profile_harness(harness) {
+            bail!("handoff profile belongs to another harness");
+        }
+        let model = p["model"].as_str().filter(|value| !value.is_empty() && value.len() <= 120
+            && value.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'/')))
+            .ok_or_else(|| anyhow!("handoff requires a valid model"))?;
+        let effort = p["effort"].as_str().ok_or_else(|| anyhow!("handoff effort is required"))?;
+        adapters::validate_effort(harness, Some(effort))?;
+        let handoff = p["handoff"].as_object().ok_or_else(|| anyhow!("structured handoff is required"))?;
+        if handoff.len() != 6 || handoff.keys().any(|key| !matches!(key.as_str(),
+            "corrections" | "completed" | "remaining" | "tests" | "limitations" | "unresolved_actions")) {
+            bail!("handoff requires corrections, completed, remaining, tests, limitations, and unresolved_actions");
+        }
+        let mut sections = Vec::new();
+        for key in ["corrections", "completed", "remaining", "tests", "limitations", "unresolved_actions"] {
+            let entries = handoff[key].as_array().filter(|items| items.len() <= 32)
+                .ok_or_else(|| anyhow!("handoff {key} must be a bounded list"))?;
+            let mut lines = Vec::new();
+            for entry in entries {
+                let line = entry.as_str().filter(|line| !line.is_empty() && line.len() <= 1024)
+                    .ok_or_else(|| anyhow!("handoff {key} contains an invalid entry"))?;
+                lines.push(format!("- {line}"));
+            }
+            if key == "unresolved_actions" && !lines.is_empty() {
+                bail!("unresolved external actions require review before handoff");
+            }
+            sections.push(format!("{key}:\n{}", if lines.is_empty() { "- none".into() } else { lines.join("\n") }));
+        }
+        let task = self.task(&source.task_id)?;
+        let prompt = format!("Continue the same task in a fresh session.\nOriginal goal:\n{}\n\n{}\n\nUse the existing workspace files; do not assume the previous native session or tool messages are portable.",
+            task.prompt, sections.join("\n\n"));
+        if prompt.len() > 32_768 { bail!("handoff context is too large for a safe continuation"); }
+        let request = json!({"source_run_id":source_id,"harness":harness,"profile_id":profile_id,
+            "model":model,"effort":effort,"handoff":p["handoff"]});
+        let request_hash = Sha256::digest(serde_json::to_vec(&request)?).iter()
+            .map(|byte| format!("{byte:02x}")).collect::<String>();
+        let existing = { self.store.lock().unwrap().children(source_id)?.into_iter()
+            .find(|child| child.relation_source.as_deref() == Some("managed-continuation")) };
+        if let Some(existing) = existing {
+            let saved: Option<String> = self.store.lock().unwrap().conn.query_row(
+                "SELECT launch FROM runs WHERE id=?1", [&existing.id], |row| row.get(0))?;
+            let launch: Value = saved.as_deref().and_then(|text| serde_json::from_str(text).ok()).unwrap_or(Value::Null);
+            let generic = launch.get("generic").unwrap_or(&launch);
+            if generic["handoff_hash"].as_str() != Some(&request_hash) {
+                bail!("source run already has a different continuation");
+            }
+            let workspace = self.workspace(&existing.workspace_id)?;
+            return Ok(json!({"run":existing,"workspace":workspace,"replayed":true,
+                "state":if existing.status == "queued" { "launch_uncertain" } else { "existing" }}));
+        }
+        if source.status != "completed" || source.attention.is_some() || source.process_generation == 0 {
+            bail!("handoff needs a completed, attention-free source checkpoint");
+        }
+        let process = self.store.lock().unwrap().run_process(source_id)?
+            .ok_or_else(|| anyhow!("source supervisor outcome is unavailable"))?;
+        if !Path::new(&process.0).join("exit.json").exists() {
+            bail!("source supervisor exit is unconfirmed");
+        }
+        for child in self.store.lock().unwrap().children(source_id)? {
+            if ACTIVE.contains(&child.status.as_str()) || matches!(child.status.as_str(), "unknown" | "disconnected") {
+                bail!("source child {} has an unsettled outcome", child.id);
+            }
+        }
+        let turns = self.store.lock().unwrap().turns(source_id)?;
+        if turns.is_empty() || turns.iter().any(|turn| turn.ended_ms.is_none() || turn.status != "completed") {
+            bail!("source turn outcome is unconfirmed");
+        }
+        let workspace = self.workspace(&source.workspace_id)?;
+        if workspace.removed_ms.is_some() || workspace.owner_run_id.is_some()
+            || self.active_writer(&workspace.path)?.is_some() {
+            bail!("workspace ownership has not been released");
+        }
+        let approval = {
+            let saved: Option<String> = self.store.lock().unwrap().conn.query_row(
+                "SELECT launch FROM runs WHERE id=?1", [source_id], |row| row.get(0))?;
+            let launch: Value = saved.as_deref().and_then(|text| serde_json::from_str(text).ok()).unwrap_or(Value::Null);
+            let generic = launch.get("generic").unwrap_or(&launch);
+            if generic["extra_args"].as_array().is_some_and(|items| !items.is_empty())
+                || generic["required_tools"].as_array().is_some_and(|items| !items.is_empty()) {
+                bail!("source launch constraints cannot yet be transferred safely");
+            }
+            generic["approval"].as_str().ok_or_else(|| anyhow!("source approval policy is unavailable"))?.to_string()
+        };
+        let snapshot = self.take_snapshot(&workspace, "handoff-checkpoint")?;
+        let run = Run {
+            id: format!("r-{}", short_id()), task_id: source.task_id.clone(),
+            parent_run_id: Some(source.id.clone()), harness: harness.into(),
+            harness_version: adapters::resolve_program(harness).and_then(|program| adapters::version_of(&program)),
+            profile_id: Some(profile.id.clone()), model: Some(model.into()), effort: Some(effort.into()),
+            workspace_id: workspace.id.clone(), native_id: None, status: "queued".into(),
+            exit_reason: None, created_ms: now(), ended_ms: None, title: source.title.clone(),
+            relation_source: Some("managed-continuation".into()),
+            relation_confidence: Some("exact (completed checkpoint)".into()),
+            capabilities: adapters::capabilities(harness), process_generation: 0, attention: None,
+        };
+        {
+            let store = self.store.lock().unwrap();
+            store.conn.execute_batch("SAVEPOINT handoff_create")?;
+            let writes = (|| -> Result<()> {
+                store.insert_run(&run)?;
+                store.set_workspace_owner(&workspace.id, Some(&run.id))?;
+                store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1",
+                    rusqlite::params![run.id, json!({"approval":approval,"extra_args":[],
+                        "handoff_hash":request_hash,"source_run_id":source.id,"snapshot_id":snapshot.id,
+                        "handoff":p["handoff"]}).to_string()])?;
+                Ok(())
+            })();
+            match writes {
+                Ok(()) => store.conn.execute_batch("RELEASE handoff_create")?,
+                Err(error) => {
+                    let _ = store.conn.execute_batch("ROLLBACK TO handoff_create; RELEASE handoff_create");
+                    return Err(error);
+                }
+            }
+        }
+        drop(guard);
+        self.emit(Some(&run.task_id), Some(&run.id), "handoff_created", "user", "exact",
+            json!({"source_run_id":source.id,"checkpoint_snapshot_id":snapshot.id,
+                "context_loss":"native session and tool messages not transferred"}))?;
+        if let Err(error) = self.start_turn(&run.id, &prompt, false) {
+            self.mark_ended(&run, "failed", &format!("handoff launch failed: {error}"))?;
+            return Ok(json!({"run":self.run(&run.id)?,"workspace":workspace,
+                "snapshot_id":snapshot.id,"launch_error":error.to_string()}));
+        }
+        Ok(json!({"run":self.run(&run.id)?,"workspace":workspace,"snapshot_id":snapshot.id}))
+    }
+
     /// Start a work turn: fresh run-start snapshot, then launch (or stdin for live generic processes).
     pub fn start_turn(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool) -> Result<Turn> {
         let initial = self.run(run_id)?;
@@ -762,7 +912,7 @@ impl Daemon {
         if follow_up && run.relation_source.as_deref() == Some("managed-delegation") {
             bail!("a managed work unit has one result; delegate a new work unit instead");
         }
-        if run.parent_run_id.is_some() && run.relation_source.as_deref() != Some("managed-delegation") {
+        if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
             bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
         }
         let ws = self.workspace(&run.workspace_id)?;
@@ -991,14 +1141,14 @@ impl Daemon {
 
     fn interrupt_with_origin(self: &Arc<Self>, run_id: &str, auto_budget_ms: Option<u64>) -> Result<Value> {
         let run = self.run(run_id)?;
-        if run.parent_run_id.is_some() && run.relation_source.as_deref() != Some("managed-delegation") {
+        if run.parent_run_id.is_some() && !matches!(run.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
             bail!("native children are interrupted through their parent run");
         }
         if !ACTIVE.contains(&run.status.as_str()) {
             bail!("run is not active (status {})", run.status);
         }
         let mut child_interrupt_errors = Vec::new();
-        if run.parent_run_id.is_none() {
+        if run.parent_run_id.is_none() || run.relation_source.as_deref() == Some("managed-continuation") {
             let children = self.store.lock().unwrap().children(run_id)?;
             for child in children.into_iter().filter(|child| child.relation_source.as_deref() == Some("managed-delegation") && ACTIVE.contains(&child.status.as_str())) {
                 if let Err(error) = self.interrupt_with_origin(&child.id, None) {
@@ -1789,7 +1939,7 @@ impl Daemon {
                     for child in store.children(&parent)? {
                         // A managed child has its own supervisor and isolated workspace.
                         // The parent's process exit is not evidence that it stopped.
-                        if child.relation_source.as_deref() == Some("managed-delegation") {
+                        if matches!(child.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
                             continue;
                         }
                         stack.push(child.id.clone());
@@ -1826,7 +1976,7 @@ impl Daemon {
     pub fn reconcile(self: &Arc<Self>) -> Result<Value> {
         let runs = self.store.lock().unwrap().runs()?;
         let mut report = Vec::new();
-        for run in runs.iter().filter(|r| (r.parent_run_id.is_none() || r.relation_source.as_deref() == Some("managed-delegation")) && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {
+        for run in runs.iter().filter(|r| (r.parent_run_id.is_none() || matches!(r.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation"))) && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {
             let process = self.store.lock().unwrap().run_process(&run.id)?;
             let Some((dir, _, _)) = process else {
                 if ACTIVE.contains(&run.status.as_str()) {
@@ -1986,7 +2136,7 @@ impl Daemon {
         let store = self.store.lock().unwrap();
         let runs = store.runs()?;
         let mut turns = serde_json::Map::new();
-        for r in runs.iter().filter(|r| r.parent_run_id.is_none() || r.relation_source.as_deref() == Some("managed-delegation")) {
+        for r in runs.iter().filter(|r| r.parent_run_id.is_none() || matches!(r.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation"))) {
             turns.insert(r.id.clone(), serde_json::to_value(store.turns(&r.id)?)?);
         }
         Ok(json!({"cursor": store.max_seq()?, "tasks": store.tasks()?, "runs": runs, "workspaces": store.workspaces()?, "profiles": store.profiles()?, "turns": turns,
@@ -2073,7 +2223,7 @@ fn find_in_tree(store: &Store, root: &str, native: &str) -> Result<Option<Run>> 
         for child in store.children(&id)? {
             // Harness-native IDs are scoped to one supervisor. An independent
             // managed child may report the same native ID in another process.
-            if child.relation_source.as_deref() == Some("managed-delegation") {
+            if matches!(child.relation_source.as_deref(), Some("managed-delegation" | "managed-continuation")) {
                 continue;
             }
             if child.native_id.as_deref() == Some(native) {

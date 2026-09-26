@@ -20,7 +20,9 @@ fn grace() -> Duration {
 
 impl Daemon {
     pub fn active_roots(&self) -> Result<Vec<Run>> {
-        Ok(self.store.lock().unwrap().runs()?.into_iter().filter(|r| r.parent_run_id.is_none() && ACTIVE.contains(&r.status.as_str())).collect())
+        Ok(self.store.lock().unwrap().runs()?.into_iter().filter(|r|
+            (r.parent_run_id.is_none() || r.relation_source.as_deref() == Some("managed-continuation"))
+                && ACTIVE.contains(&r.status.as_str())).collect())
     }
 
     pub fn ui_connected(&self) {

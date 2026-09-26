@@ -1996,6 +1996,114 @@ fn auto_managed_child_has_an_isolated_parent_snapshot_and_returnable_result() {
 }
 
 #[test]
+fn completed_run_handoff_reuses_workspace_with_a_new_native_session() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("handoff-trace.txt");
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-delegation"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
+        ("FIXTURE_TURN_DELAY_MS", "1000")]);
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context",
+        "approval_policy":"never"}));
+    let source = run_id(&created);
+    assert_eq!(d.wait_done(&source, 15)["status"], "completed");
+    let request = json!({"source_run_id":source,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium",
+        "handoff":{"corrections":["keep the original file"],
+            "completed":["created parent-context.txt"],"remaining":["check the file"],
+            "tests":["seed step passed"],"limitations":["browser unavailable"],
+            "unresolved_actions":[]}});
+    let mut unresolved = request.clone();
+    unresolved["handoff"]["unresolved_actions"] = json!(["external action outcome unknown"]);
+    assert!(d.try_call("run.handoff", unresolved).is_err());
+    assert_eq!(d.runs().len(), 1);
+    let switched = d.call("run.handoff", request.clone());
+    let next = run_id(&switched);
+    assert_ne!(next, source);
+    assert_eq!(switched["run"]["parent_run_id"], source);
+    assert_eq!(switched["workspace"]["id"], created["workspace"]["id"]);
+    assert_eq!(switched["run"]["native_id"], serde_json::Value::Null);
+    let checkpoint = switched["snapshot_id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let snapshot_workspace: String = db.query_row("SELECT workspace_id FROM snapshots WHERE id=?1",
+        [checkpoint], |row| row.get(0)).unwrap();
+    assert_eq!(snapshot_workspace, created["workspace"]["id"],
+        "the handoff checkpoint must belong to the original workspace");
+    let saved_launch: String = db.query_row("SELECT launch FROM runs WHERE id=?1",
+        [&next], |row| row.get(0)).unwrap();
+    let saved_launch: serde_json::Value = serde_json::from_str(&saved_launch).unwrap();
+    let saved_handoff = saved_launch.get("generic").unwrap_or(&saved_launch);
+    assert_eq!(saved_handoff["snapshot_id"], checkpoint);
+    assert_eq!(saved_handoff["handoff"]["corrections"][0], "keep the original file");
+    assert!(d.try_call("task.create", json!({"repo":switched["workspace"]["path"],
+        "workspace_mode":"current","harness":"generic","program":"/bin/sh",
+        "args":["-c","exit 0"],"title":"competing writer"})).is_err());
+    let replay = d.call("run.handoff", request.clone());
+    assert_eq!(run_id(&replay), next);
+    assert_eq!(replay["replayed"], true);
+    let mut changed = request;
+    changed["model"] = json!("gpt-6-astra");
+    assert!(d.try_call("run.handoff", changed).is_err());
+    assert_eq!(d.wait_done(&next, 15)["status"], "completed");
+    assert_eq!(d.runs().len(), 2);
+    assert_ne!(d.run(&source)["native_id"], d.run(&next)["native_id"]);
+    assert!(ws_path(&d, &created).join("parent-context.txt").exists());
+    let turns = d.call("run.turns", json!({"run_id":next}));
+    let prompt = turns[0]["prompt"].as_str().unwrap();
+    for expected in ["seed context", "keep the original file", "created parent-context.txt",
+        "check the file", "seed step passed", "browser unavailable"] {
+        assert!(prompt.contains(expected), "missing {expected}: {prompt}");
+    }
+    let trace = std::fs::read_to_string(trace).unwrap();
+    assert_eq!(trace.matches("thread_started").count(), 2);
+    assert!(trace.lines().filter(|line| line.starts_with("thread_approval:")).all(|line| line == "thread_approval:never"));
+    d.kill9();
+    d.spawn();
+    let replay_after_restart = d.call("run.handoff", json!({"source_run_id":source,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium",
+        "handoff":{"corrections":["keep the original file"],
+            "completed":["created parent-context.txt"],"remaining":["check the file"],
+            "tests":["seed step passed"],"limitations":["browser unavailable"],
+            "unresolved_actions":[]}}));
+    assert_eq!(run_id(&replay_after_restart), next);
+    assert_eq!(replay_after_restart["replayed"], true);
+    assert_eq!(d.runs().len(), 2);
+    let delegated = d.call("run.delegate", json!({"work_unit_id":"after-handoff-unit",
+        "parent_run_id":next,"harness":"codex-app","model":"gpt-6-sol",
+        "effort":"medium","prompt":"browser check","title":"browser check"}));
+    let child = run_id(&delegated);
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert_eq!(d.call("run.result", json!({"run_id":child}))["state"], "ready");
+}
+
+#[test]
+fn handoff_refuses_a_failed_or_unresolved_source_without_starting_another_run() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-delegation")]);
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium","prompt":"edit then 503"}));
+    let source = run_id(&created);
+    assert_eq!(d.wait_done(&source, 15)["status"], "failed");
+    assert_eq!(std::fs::read_to_string(ws_path(&d, &created).join("partial-edit.txt")).unwrap(),
+        "written before failure\n");
+    let mut request = json!({"source_run_id":source,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium",
+        "handoff":{"corrections":[],"completed":[],"remaining":["retry"],
+            "tests":[],"limitations":[],"unresolved_actions":[]}});
+    assert!(d.try_call("run.handoff", request.clone()).is_err());
+    request["handoff"]["unresolved_actions"] = json!(["unknown external write"]);
+    assert!(d.try_call("run.handoff", request).is_err());
+    assert_eq!(d.runs().len(), 1);
+    assert_eq!(std::fs::read_to_string(ws_path(&d, &created).join("partial-edit.txt")).unwrap(),
+        "written before failure\n");
+}
+
+#[test]
 fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_routes() {
     let Some(program) = std::env::var_os("PATH").and_then(|path| std::env::split_paths(&path)
         .map(|dir| dir.join("opencode")).find(|candidate| candidate.is_file())) else { return };

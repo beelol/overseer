@@ -129,7 +129,10 @@ rl.on('line', line => {
     out({ method: 'turn/started', params: { threadId: thread, turn: { id: turn } } });
     if (process.env.FIXTURE_MODE?.startsWith('managed')) {
       const prompt = m.params.input?.[0]?.text ?? '';
-      if (prompt === 'simulate direct 429' || prompt === 'simulate direct 503') {
+      if (prompt === 'edit then 503') {
+        fs.writeFileSync(path.join(process.cwd(), 'partial-edit.txt'), 'written before failure\n');
+      }
+      if (prompt === 'simulate direct 429' || prompt === 'simulate direct 503' || prompt === 'edit then 503') {
         out({ method: 'turn/completed', params: { threadId: thread,
           turn: { id: turn, status: 'failed', error: { message: prompt === 'simulate direct 429'
             ? 'HTTP 429 Too Many Requests' : 'HTTP 503 Service Unavailable' } } } });
@@ -158,7 +161,8 @@ rl.on('line', line => {
       };
       const turnDelay = Number(process.env.FIXTURE_TURN_DELAY_MS ??
         (process.env.FIXTURE_MODE === 'managed-delay' ? 6000 : 0));
-      if (turnDelay > 0 && turnDelay <= 10000 && (prompt === 'browser check' || prompt === 'hold parent')) {
+      if (turnDelay > 0 && turnDelay <= 10000 &&
+          (prompt === 'browser check' || prompt === 'hold parent' || prompt.startsWith('Continue the same task'))) {
         pendingTurnTimer = setTimeout(finish, turnDelay);
       } else finish();
       return;
