@@ -1,6 +1,6 @@
 # SWARM-61 — Stop ordering around local launch
 
-Status: partial. Revision: `ae078e6`.
+Status: partial. Latest evidence revision: `dc1c880`.
 
 Input: a fixture-admitted attempt has a durable but unlinked launch intent. Stop commits before the request is replayed. Separately, Stop reaches a linked `/bin/sleep` worker after a daemon restart.
 
@@ -17,3 +17,5 @@ At `59d59ff`, `stop_retries_an_initially_unreachable_worker_after_daemon_restart
 Evidence: `daemon/tests/swarm_runtime.rs`, `daemon/tests/swarm_plan.rs`, `daemon/tests/swarm_context.rs`, `daemon/src/swarm/runtime.rs`, `daemon/src/server.rs`, `daemon/src/swarm/artifacts.rs`, `daemon/src/swarm/schema.rs`.
 
 Remaining: these are scripted local orderings and a simulated failed signal, not simultaneous native-process races or a qualified live harness. Native descendants and explicit user resume/extension are not covered. This criterion remains unchecked.
+
+At `dc1c880`, a user Stop no longer depends on a current director generation or plan revision: an ID-only Stop commits after a plan revision, and a repeated Stop from a stale view is idempotent. The launch lock still serializes the durable Stop transition against admission and launch checks, then is released before the external worker interrupt. A fixture pauses a responsive local worker control shim to show another admission request completes while that interrupt is waiting. The same lock boundary is applied to the periodic deadline timer before its interrupt and liveness I/O. The full serialized offline workspace suite passed 204 tests with 11 ignored. Simultaneous native races, descendants, and explicit user resume remain unqualified; SWARM-61 remains partial.

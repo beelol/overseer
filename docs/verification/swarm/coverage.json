@@ -191,7 +191,7 @@
         "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/SWARM-20.md"
       ],
-      "blocker": "Stop interrupts linked scripted local workers, blocks pending launch replay, and retries a simulated failed first signal after daemon restart. A fresh readout exposes unconfirmed linked workers. Local fixtures terminalize idle Stop/Off runs, wait for active worker exit, review and checker completion, release safe cancelled-job claims, and reconcile a checker orphaned by daemon death. Live Pause checkpoints, native descendants and VS Code display remain unverified."
+      "blocker": "Stop interrupts linked scripted local workers, blocks pending launch replay, and retries a simulated failed first signal after daemon restart. User Stop accepts a run ID without current director/plan versions. A paused local control shim proves a slow Stop signal does not hold the launch lock against another admission; the timer releases the same lock before worker I/O. A fresh readout exposes unconfirmed linked workers. Local fixtures terminalize idle Stop/Off runs, wait for active worker exit, review and checker completion, release safe cancelled-job claims, and reconcile a checker orphaned by daemon death. Live Pause checkpoints, native descendants and VS Code display remain unverified."
     },
     "SWARM-21": {
       "status": "partial",
@@ -614,7 +614,7 @@
         "daemon/tests/swarm_context.rs",
         "daemon/src/swarm/schema.rs"
       ],
-      "blocker": "Pending local launch replay is rejected after Stop, a linked scripted worker is interrupted, and rejected/superseded work does not requeue after cancellation. A crash fixture persists revocation, retries the dependent-worker interrupt after restart, and leaves an unrelated worker running. Four scripted Stop/revocation/result/acceptance orderings persist a shared sequence, preserve late results, and block new launches. A simulated failed Stop signal is retried after daemon restart. Simultaneous native races, native descendants, qualified live paths, and explicit user resume remain unverified."
+      "blocker": "Pending local launch replay is rejected after Stop, a linked scripted worker is interrupted, and rejected/superseded work does not requeue after cancellation. User Stop is ID-only and commits under the launch lock, which is released before slow worker control I/O; a local paused-shim fixture proves another admission stays responsive. A crash fixture persists revocation, retries the dependent-worker interrupt after restart, and leaves an unrelated worker running. Four scripted Stop/revocation/result/acceptance orderings persist a shared sequence, preserve late results, and block new launches. A simulated failed Stop signal is retried after daemon restart. Simultaneous native races, native descendants, qualified live paths, and explicit user resume remain unverified."
     },
     "SWARM-62": {
       "status": "partial",
