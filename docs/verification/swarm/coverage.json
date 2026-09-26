@@ -167,7 +167,7 @@
         "daemon/tests/swarm_scenarios.rs",
         "docs/verification/swarm/S3.md"
       ],
-      "blocker": "The versioned S3 fixture integrates a repaired contract and 24 module patches; a combined check fails after four and passes at the final commit. Live sandboxed verification, verifier crash recovery, director conflict resolution and normal adapter integration remain unqualified."
+      "blocker": "The versioned S3 fixture integrates a repaired contract and 24 module patches; a combined check fails after four and passes at the final commit. A local daemon-crash replay now holds an orphaned checker until exit and requires a fresh check. Live sandboxed verification, termination of a permanently hung orphan, director conflict resolution and normal adapter integration remain unqualified."
     },
     "SWARM-20": {
       "status": "partial",
@@ -202,7 +202,8 @@
         "docs/verification/swarm/milestone-10.md",
         "docs/verification/swarm/SWARM-22.md",
         "daemon/tests/swarm_runtime.rs",
-        "daemon/tests/swarm_dispatch.rs"
+        "daemon/tests/swarm_dispatch.rs",
+        "daemon/tests/swarm_integration.rs"
       ],
       "blocker": "Fixture startup automatically drains already-admitted unlinked intents only while their snapshots and target permission remain valid; it retains stale or revoked reservations without launching. Exact spawn-record crash windows, result receipt replay, VS Code restart, live Auto Mode refresh and live harness recovery remain unverified."
     },

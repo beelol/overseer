@@ -17,3 +17,5 @@ Additional fixture at `05be14b`: after ordinary daemon reconciliation, startup s
 Evidence: `daemon/tests/swarm_dispatch.rs` (`dispatch_recovers_admitted_but_unlaunched_worker_without_duplicate_attempt`, `startup_does_not_launch_an_admitted_worker_from_an_expired_snapshot`), `daemon/src/swarm/dispatch.rs`, `daemon/src/main.rs`.
 
 Remaining: recovery is fixture-only and requires the original snapshot to remain fresh; renewing a stale target and resolving a pending reservation require a live Auto Mode authority. It does not crash precisely between supervisor spawn and its process record, or between result persistence and acknowledgement. VS Code close/reopen, accepted-result replay and usage reconciliation remain unverified. This criterion stays unchecked.
+
+Related recovery at `ccb54c0`: a combined-check process surviving daemon death retains its lease. After restart, Overseer blocks overlapping verification until that process exits, then records the old unacknowledged result as interrupted and permits a new request. See [SWARM-19](SWARM-19.md). This does not verify the worker-launch and result-receipt crash windows required by SWARM-22.
