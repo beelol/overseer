@@ -458,11 +458,32 @@ impl Store {
         Ok(())
     }
 
+    pub fn insert_auto_selected_decision(&self, work_unit_id: &str, parent: &Run,
+        requirements_hash: &str, route_id: &str, account_generation: Option<i64>,
+        payload: &Value) -> Result<Event> {
+        let tx = self.conn.unchecked_transaction()?;
+        self.insert_auto_launch_intent(work_unit_id, &parent.id, requirements_hash,
+            route_id, account_generation)?;
+        let event = self.insert_event(crate::daemon::now(), Some(&parent.task_id), Some(&parent.id),
+            "auto_decision", "daemon", "exact", payload)?;
+        tx.commit()?;
+        Ok(event)
+    }
+
     pub fn set_auto_launch_intent_phase(&self, id: &str, phase: &str) -> Result<()> {
-        if !matches!(phase, "paused" | "child_created") {
+        if phase != "paused" {
             return Err(anyhow!("unsupported automatic launch phase"));
         }
         self.conn.execute("UPDATE auto_launch_intents SET phase=?2 WHERE work_unit_id=?1", params![id, phase])?;
+        Ok(())
+    }
+
+    pub fn mark_auto_child_created(&self, id: &str) -> Result<()> {
+        let updated = self.conn.execute(
+            "UPDATE auto_launch_intents SET phase='child_created' WHERE work_unit_id=?1 AND phase='preparing'",
+            [id],
+        )?;
+        if updated != 1 { return Err(anyhow!("automatic child launch intent is unavailable")); }
         Ok(())
     }
 

@@ -2458,6 +2458,7 @@ fn auto_dispatch_concurrent_clients_share_one_selection_and_one_child() {
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::net::UnixStream;
     use std::sync::{Arc, Barrier};
+    use std::time::Instant;
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
@@ -2488,12 +2489,96 @@ fn auto_dispatch_concurrent_clients_share_one_selection_and_one_child() {
     }).collect::<Vec<_>>();
     barrier.wait();
     let results = handles.into_iter().map(|handle| handle.join().unwrap().unwrap()).collect::<Vec<_>>();
-    assert_eq!(results[0]["run"]["id"], results[1]["run"]["id"]);
-    let child = run_id(&results[0]);
+    for result in &results {
+        assert_eq!(result["work_unit_id"], "same-auto-unit", "{result}");
+        assert!(result["state"] == "launch_pending" || result["state"] == "dispatched", "{result}");
+    }
+    let deadline = Instant::now() + Duration::from_secs(15);
+    let resolved = loop {
+        let replay = d.call("auto.dispatch", params.clone());
+        if replay["run"]["id"].is_string() { break replay; }
+        assert_eq!(replay["state"], "launch_pending", "{replay}");
+        assert!(Instant::now() < deadline, "one admitted launch never resolved");
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let child = run_id(&resolved);
+    for result in &results {
+        if let Some(initial_child) = result["run"]["id"].as_str() {
+            assert_eq!(initial_child, child, "clients cannot receive different children");
+        }
+    }
     assert_eq!(d.wait_done(&child, 15)["status"], "completed");
     let decisions = d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count();
     assert_eq!(decisions, 1, "concurrent requests should reuse one recorded selection");
     assert_eq!(d.runs().len(), 2);
+}
+
+#[test]
+fn auto_decision_and_launch_intent_commit_or_fail_together() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER reject_auto_intent BEFORE INSERT ON auto_launch_intents
+        BEGIN SELECT RAISE(FAIL, 'injected intent failure'); END;").unwrap();
+    let request = json!({"work_unit_id":"atomic-intent-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"prompt":"bounded child task"});
+    assert!(d.try_call("auto.dispatch", request.clone()).is_err());
+    let decisions = d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count();
+    assert_eq!(decisions, 0, "failed admission must not leave a selected decision without its intent");
+    assert_eq!(d.runs().len(), 1);
+    db.execute_batch("DROP TRIGGER reject_auto_intent;").unwrap();
+    db.execute_batch("CREATE TRIGGER reject_auto_decision BEFORE INSERT ON events
+        WHEN NEW.kind='auto_decision' BEGIN SELECT RAISE(FAIL, 'injected decision failure'); END;").unwrap();
+    assert!(d.try_call("auto.dispatch", request.clone()).is_err());
+    let intents: i64 = db.query_row("SELECT COUNT(*) FROM auto_launch_intents WHERE work_unit_id='atomic-intent-1'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(intents, 0, "failed decision persistence must roll back the launch intent");
+    db.execute_batch("DROP TRIGGER reject_auto_decision;").unwrap();
+    let dispatched = d.call("auto.dispatch", request);
+    assert_eq!(dispatched["state"], "dispatched", "{dispatched}");
+    assert_eq!(d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count(), 1);
+    assert_eq!(d.runs().len(), 2);
+}
+
+#[test]
+fn auto_child_rows_and_launch_phase_commit_or_fail_together() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("child-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER reject_child_phase BEFORE UPDATE OF phase ON auto_launch_intents
+        WHEN NEW.phase='child_created' BEGIN SELECT RAISE(FAIL, 'injected phase failure'); END;").unwrap();
+    let request = json!({"work_unit_id":"atomic-child-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"prompt":"bounded child task"});
+    let first = d.call("auto.dispatch", request.clone());
+    assert_eq!(first["state"], "paused", "{first}");
+    assert_eq!(first["pause_reason"], "launch_effects_uncertain");
+    assert_eq!(d.runs().len(), 1, "a rejected phase transition cannot leave a committed child");
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 0,
+        "a rejected phase transition cannot start the child's model turn");
+    let replay = d.call("auto.dispatch", request);
+    assert_eq!(replay["state"], "paused", "{replay}");
+    assert_eq!(d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count(), 1);
+    db.execute_batch("DROP TRIGGER reject_child_phase;").unwrap();
+    let next = d.call("auto.dispatch", json!({"work_unit_id":"atomic-child-2",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "prompt":"another bounded child task"}));
+    assert_eq!(next["state"], "dispatched", "{next}");
+    let phase: String = db.query_row("SELECT phase FROM auto_launch_intents WHERE work_unit_id='atomic-child-2'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(phase, "child_created");
 }
 
 #[test]
@@ -2972,13 +3057,19 @@ fn auto_crash_after_git_worktree_effect_reports_planned_resource_without_retry()
     let branch = parts.next().unwrap().to_string();
     let worktree = parts.next().unwrap().to_string();
     assert!(Path::new(&worktree).exists(), "the Git effect must have happened before the crash");
+    let second_started = Instant::now();
+    let during = d.call("auto.dispatch", request.clone());
+    let second_elapsed = second_started.elapsed();
     let first = pending.join().unwrap();
+    assert!(second_elapsed < Duration::from_secs(2),
+        "a second client must read the admitted pending launch without waiting for the first response");
     assert!(started.elapsed() < Duration::from_secs(11), "selected launch must respond before its deadline");
     assert_eq!(first["result"]["state"], "launch_pending", "{first}");
     assert_eq!(first["result"]["work_unit_id"], "git-effect-crash-1");
-    let during = d.call("auto.dispatch", request.clone());
     assert_eq!(during["state"], "launch_pending", "{during}");
     assert!(during["replayed"] == true);
+    let decisions = d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count();
+    assert_eq!(decisions, 1, "two clients must share one recorded decision");
     d.kill9();
     signal(wrapper_pid, 9);
     d.spawn();

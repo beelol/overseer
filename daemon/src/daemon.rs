@@ -106,6 +106,15 @@ impl Daemon {
         Ok(event)
     }
 
+    pub fn record_auto_selected_decision(&self, work_unit_id: &str, parent: &Run,
+        requirements_hash: &str, route_id: &str, account_generation: Option<i64>,
+        trace: Value) -> Result<Event> {
+        let event = self.store.lock().unwrap().insert_auto_selected_decision(work_unit_id,
+            parent, requirements_hash, route_id, account_generation, &redact_value(trace))?;
+        let _ = self.events.send(event.clone());
+        Ok(event)
+    }
+
     // ------------------------------------------------------------------ profiles
 
     fn ensure_system_profiles(&self) -> Result<()> {
@@ -684,6 +693,9 @@ impl Daemon {
                         "execution_budget_ms":request["execution_budget_ms"],
                         "auto_local_endpoint":request["auto_local_endpoint"],
                         "requirements_hash":p["requirements_hash"]}).to_string()])?;
+                if auto_launch_claimed {
+                    store.mark_auto_child_created(work_unit_id)?;
+                }
                 Ok(())
             })();
             match writes {

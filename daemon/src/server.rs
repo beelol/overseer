@@ -921,7 +921,6 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     "pre_effect_failures":pre_effect_failures,
                     "candidates":routes.iter().map(|route| json!({"id":route.id,"quota":route.quota,
                         "fit":route.fit,"health":route.health})).collect::<Vec<_>>()});
-                d.emit(Some(&parent.task_id), Some(&parent.id), "auto_decision", "daemon", "exact", trace)?;
                 if let Some(selected) = decision.selected.as_deref() {
                     let route = routes.iter().find(|route| route.id == selected)
                         .ok_or_else(|| anyhow!("selected route disappeared"))?;
@@ -930,8 +929,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                             .ok_or_else(|| anyhow!("selected account generation unavailable"))?)
                     };
                     let required = required_tools.iter().cloned().collect::<Vec<_>>();
-                    d.store.lock().unwrap().insert_auto_launch_intent(work_unit_id, &parent.id,
-                        &requirements_hash, selected, generation.copied())?;
+                    d.record_auto_selected_decision(work_unit_id, &parent,
+                        &requirements_hash, selected, generation.copied(), trace)?;
                     let launch_request = json!({"work_unit_id":work_unit_id,
                         "parent_run_id":parent.id,"harness":route.harness,"profile_id":route.profile_id,
                         "model":route.model,"effort":route.effort,"prompt":prompt,"title":title,
@@ -952,7 +951,6 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         let outcome = (|| -> Result<Value> {
                             match worker_daemon.delegate_run(&launch_request, true) {
                                 Ok(mut delegated) => {
-                                    worker_daemon.store.lock().unwrap().set_auto_launch_intent_phase(&launch_id, "child_created")?;
                                     if delegated.get("launch_error").is_some() {
                                         delegated["state"] = json!("paused");
                                         delegated["actions"] = json!(["refresh", "choose_manual_route"]);
@@ -982,6 +980,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         d.store.lock().unwrap().set_auto_launch_intent_phase(work_unit_id, "paused")?;
                         return Err(error.into());
                     }
+                    // The persisted intent and active-worker set now identify
+                    // this launch. Let another client replay it while the
+                    // first caller waits for a fast completion.
+                    drop(_work_unit_guard);
                     let wait = decision_deadline.saturating_duration_since(Instant::now());
                     match result_rx.recv_timeout(wait) {
                         Ok(result) => result?,
@@ -991,6 +993,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                             return Err(anyhow!("automatic launch worker stopped unexpectedly")),
                     }
                 } else {
+                    d.emit(Some(&parent.task_id), Some(&parent.id), "auto_decision", "daemon", "exact", trace)?;
                     json!({"state":"paused","work_unit_id":work_unit_id,"decision":decision,
                         "discovery_failures":discovery_failures,"pre_effect_failures":pre_effect_failures,
                         "actions":["refresh","choose_manual_route"]})
