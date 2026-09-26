@@ -19,7 +19,7 @@ fn deadline_interrupts_a_linked_worker_without_another_admission() {
     let checkout = repo(&temp.path().join("deadline-source"));
     let run = d.call("swarm.create", json!({"category":"Deadline worker",
         "objective":"Inspect backend","allowed_targets":["fixture-local"],
-        "policy":{"deadline_ms":1500}}));
+        "policy":{"deadline_ms":2500}}));
     let id = run["id"].as_str().unwrap();
     d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
         {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
@@ -40,6 +40,17 @@ fn deadline_interrupts_a_linked_worker_without_another_admission() {
         "title":"Deadline worker"}));
     assert_eq!(launched["status"],"launched");
     let worker = launched["overseer_run_id"].as_str().unwrap();
+    let created_ms = run["created_ms"].as_i64().unwrap();
+    for seq in 0..10 {
+        d.call("swarm.report",json!({"run_id":id,"job_id":"inspect",
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "message_id":format!("deadline-progress-{seq}"),"type":"progress",
+            "revision":1,"payload":{"note":"still working"}}));
+        std::thread::sleep(std::time::Duration::from_millis(120));
+    }
+    let after_progress = d.call("swarm.get",json!({"id":id}));
+    assert_eq!(after_progress["created_ms"],created_ms);
+    assert_eq!(after_progress["policy"]["effective"]["deadline_ms"],2500);
     let deadline = std::time::Instant::now()+std::time::Duration::from_secs(5);
     while d.call("swarm.get",json!({"id":id}))["status"]!="stopping" {
         assert!(std::time::Instant::now()<deadline,"deadline did not stop run");
@@ -58,6 +69,7 @@ fn deadline_interrupts_a_linked_worker_without_another_admission() {
     }
     let job=&d.call("swarm.jobs",json!({"id":id}))["jobs"][0];
     assert_eq!(job["status"],"cancelled");
+    assert_eq!(job["attempt_count"],1);
 }
 
 #[test]
@@ -185,6 +197,9 @@ fn admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart() {
     let unknown = d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
         "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}));
     assert_eq!(unknown["status"], "unknown", "{unknown}");
+    assert!(d.try_call("swarm.attempt.confirm_exit",json!({"run_id":id,
+        "generation":1,"revision":1,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"]})).is_err());
     std::thread::sleep(std::time::Duration::from_millis(1200));
     assert_eq!(d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
         "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}))["status"], "unknown");

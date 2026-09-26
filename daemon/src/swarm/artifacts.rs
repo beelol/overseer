@@ -292,7 +292,9 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
         params![attempt,run], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
     ).optional()?;
     if let Some((linked_run,status,ended)) = linked {
-        if linked_run.is_none() || status.as_deref().is_none_or(|s| crate::daemon::ACTIVE.contains(&s)) || ended.is_none() {
+        if linked_run.is_none()
+            || status.as_deref().is_none_or(|s| crate::daemon::ACTIVE.contains(&s) || s == "disconnected")
+            || ended.is_none() {
             bail!("linked worker exit is not confirmed");
         }
     }
