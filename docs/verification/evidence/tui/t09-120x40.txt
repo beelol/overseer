@@ -25,8 +25,8 @@
 │                                      ││                                      ││                                      │
 ╰ ◆ Write perm.txt  a allow d deny ────╯╰──────────────────────────────────────╯╰──────────────────────────────────────╯
 ╭ 7 ■ Long soak test ──── generic · 0s ╮╭ 8 ✗ Migration dry-run ─ generic · 0s ╮╭ 9 ✓ Refresh sessions …  generic · 0s ╮
-│ soaking                              ││ error: relation users_v2 missing     ││ Sessions now refresh once.           │
-│ · interrupted: interrupted by user   ││ migration dry-run: 3 pending         ││ 2 tests passing                      │
+│ soaking                              ││ migration dry-run: 3 pending         ││ Sessions now refresh once.           │
+│ · interrupted: interrupted by user   ││ error: relation users_v2 missing     ││ 2 tests passing                      │
 │   (exit signal 2)                    ││ · failed: exit code 1                ││                                      │
 │                                      ││                                      ││                                      │
 │                                      ││                                      ││                                      │

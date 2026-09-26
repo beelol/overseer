@@ -97,6 +97,10 @@ impl Feed {
         let push = |this: &mut Feed, kind: Kind, text: String| {
             this.items.insert(seq, Item { seq, kind, text, child: child.clone() });
         };
+        // Harness housekeeping lines that say nothing about the work.
+        if ev["kind"] == "output" && matches!(p["text"].as_str().map(str::trim), Some("Reading additional input from stdin...")) {
+            return self.bump();
+        }
         match ev["kind"].as_str().unwrap_or_default() {
             "turn_started" => {
                 if child.is_none() {

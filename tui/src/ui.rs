@@ -692,6 +692,15 @@ mod tests {
     }
 
     #[test]
+    fn truecolor_and_256_color_accents() {
+        set_truecolor(false);
+        assert_eq!(accent(), Color::Indexed(141));
+        set_truecolor(true);
+        assert_eq!(accent(), Color::Rgb(155, 123, 255));
+        set_truecolor(false);
+    }
+
+    #[test]
     fn fit_is_width_aware() {
         assert_eq!(fit("hello world", 8), "hello w…");
         assert_eq!(fit("short", 8), "short");

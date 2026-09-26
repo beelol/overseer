@@ -1,5 +1,5 @@
  ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                       ● connected 
-╭ 1 ✓ Ticker ──────────────────────────────────────────────────── generic · 2s ╮┏ 2 ● Latency probe ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 5s ┓
+╭ 1 ✓ Ticker ──────────────────────────────────────────────────── generic · 2s ╮┏ 2 ● Latency probe ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 6s ┓
 │ tick 16                                                                      │┃ › p0                                                                         ┃
 │ tick 17                                                                      │┃ got p0                                                                       ┃
 │ tick 18                                                                      │┃ › p1                                                                         ┃

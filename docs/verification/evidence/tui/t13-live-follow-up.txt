@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 2 agents                                                                                                                    ● connected 
+╭ 1 ✓ Live Codex hello ───────────────────────────── codex · gpt-5.6-luna · 4s ╮┏ 2 ✓ Live Claude hello ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ claude · haiku · 6s ┓
+│ › Reply with exactly: hi from codex                                          │┃ › Reply with exactly: hi from claude                                         ┃
+│ Reading additional input from stdin...                                       │┃ hi from claude                                                               ┃
+│ hi from codex                                                                │┃ ■ done · 10 in / 43 out / $0.02                                              ┃
+│ ■ done · 17.4k in / 8 out                                                    │┃ › Reply with exactly: follow-up received                                     ┃
+│                                                                              │┃ follow-up received                                                           ┃
+│                                                                              │┃ ■ done · 10 in / 45 out / $0.06                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+│                                                                              │┃                                                                              ┃
+╰ completed ───────────────────────────────────────────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ Sent to Live Claude hello                                                                                                                                      

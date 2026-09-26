@@ -1,0 +1,34 @@
+{
+  "claude": {
+    "model": "haiku",
+    "run": "r-f8558c8de899",
+    "status": "completed",
+    "turns": [
+      {
+        "ended_ms": 1790412948714,
+        "id": "u-0177f062507d",
+        "n": 1,
+        "prompt": "Reply with exactly: hi from claude",
+        "run_id": "r-f8558c8de899",
+        "snapshot_id": "s-f47fa6ce1d34",
+        "started_ms": 1790412946111,
+        "status": "completed"
+      },
+      {
+        "ended_ms": 1790412952428,
+        "id": "u-c65d9ab90ec2",
+        "n": 2,
+        "prompt": "Reply with exactly: follow-up received",
+        "run_id": "r-f8558c8de899",
+        "snapshot_id": "s-b14264ea8788",
+        "started_ms": 1790412949485,
+        "status": "completed"
+      }
+    ]
+  },
+  "codex": {
+    "model": "gpt-5.6-luna",
+    "run": "r-9c8dcfa92696",
+    "status": "completed"
+  }
+}

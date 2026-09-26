@@ -243,32 +243,42 @@ pub fn snapshot(buf: &Buffer, name: &str) {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("docs/verification/evidence/tui");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join(format!("{name}.txt")), buffer_text(buf)).unwrap();
-    std::fs::write(dir.join(format!("{name}.svg")), overseer_tui_svg(buf)).unwrap();
+    std::fs::write(dir.join(format!("{name}.svg")), overseer_tui_svg(buf, false)).unwrap();
+    // The same screen in a light terminal (terminal default colors flip; accents stay).
+    std::fs::write(dir.join(format!("{name}-light.svg")), overseer_tui_svg(buf, true)).unwrap();
 }
 
-fn overseer_tui_svg(buf: &Buffer) -> String {
+fn overseer_tui_svg(buf: &Buffer, light: bool) -> String {
     use ratatui::style::{Color, Modifier};
     let (cw, ch) = (8.4_f32, 17.0_f32);
     let w = buf.area.width as f32 * cw + 24.0;
     let h = buf.area.height as f32 * ch + 24.0;
-    let fg_default = "#e6e4ef";
-    let bg = "#15141b";
+    // Typical terminal palettes (dark: a graphite theme; light: a paper theme).
+    let fg_default = if light { "#1c1a26" } else { "#e6e4ef" };
+    let bg = if light { "#fbfaf7" } else { "#15141b" };
     let color = |c: Color, default: &str| -> String {
-        match c {
-            Color::Reset => default.to_string(),
-            Color::Black => "#1c1b24".into(),
-            Color::Red => "#e5677a".into(),
-            Color::Green => "#58c48d".into(),
-            Color::Yellow => "#e8c35a".into(),
-            Color::Blue => "#6ea8fe".into(),
-            Color::Magenta => "#c68cf2".into(),
-            Color::Cyan => "#5fd0e0".into(),
-            Color::Gray => "#c8c6d4".into(),
-            Color::DarkGray => "#7d7990".into(),
-            Color::White => "#ffffff".into(),
-            Color::Indexed(141) => "#9b7bff".into(),
-            Color::Indexed(214) => "#f2a83b".into(),
-            Color::Rgb(r, g, b) => format!("#{r:02x}{g:02x}{b:02x}"),
+        match (c, light) {
+            (Color::Reset, _) => default.to_string(),
+            (Color::Black, _) => "#1c1b24".into(),
+            (Color::Red, false) => "#e5677a".into(),
+            (Color::Red, true) => "#c4314b".into(),
+            (Color::Green, false) => "#58c48d".into(),
+            (Color::Green, true) => "#1f8a55".into(),
+            (Color::Yellow, false) => "#e8c35a".into(),
+            (Color::Yellow, true) => "#9a6a00".into(),
+            (Color::Blue, _) => "#3b73d9".into(),
+            (Color::Magenta, _) => "#a64fd8".into(),
+            (Color::Cyan, false) => "#5fd0e0".into(),
+            (Color::Cyan, true) => "#0b7f93".into(),
+            (Color::Gray, _) => "#8d89a0".into(),
+            (Color::DarkGray, false) => "#7d7990".into(),
+            (Color::DarkGray, true) => "#6b6780".into(),
+            (Color::White, _) => "#ffffff".into(),
+            (Color::Indexed(141), false) => "#9b7bff".into(),
+            (Color::Indexed(141), true) => "#7c5ce0".into(),
+            (Color::Indexed(214), false) => "#f2a83b".into(),
+            (Color::Indexed(214), true) => "#b86a00".into(),
+            (Color::Rgb(r, g, b), _) => format!("#{r:02x}{g:02x}{b:02x}"),
             _ => default.to_string(),
         }
     };
@@ -284,21 +294,26 @@ fn overseer_tui_svg(buf: &Buffer) -> String {
             // Group cells of the same style into one text run.
             let mut text = String::new();
             let start = x;
+            let mut cells = 0u16;
             while x < buf.area.width {
                 let c = &buf[(x, y)];
                 if color(c.fg, fg_default) != fg || c.modifier.contains(Modifier::BOLD) != bold || c.modifier.contains(Modifier::ITALIC) != italic {
                     break;
                 }
                 text.push_str(c.symbol());
-                x += unicode_width::UnicodeWidthStr::width(c.symbol()).max(1) as u16;
+                let w = unicode_width::UnicodeWidthStr::width(c.symbol()).max(1) as u16;
+                x += w;
+                cells += w;
             }
             if text.trim().is_empty() {
                 continue;
             }
+            // Pin the run to its cells so any monospace font lines up with the grid.
             out.push_str(&format!(
-                "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{fg}\"{}{} xml:space=\"preserve\">{}</text>",
+                "<text x=\"{:.1}\" y=\"{:.1}\" textLength=\"{:.1}\" lengthAdjust=\"spacingAndGlyphs\" fill=\"{fg}\"{}{} xml:space=\"preserve\">{}</text>",
                 12.0 + start as f32 * cw,
                 12.0 + (y as f32 + 0.78) * ch,
+                cells as f32 * cw,
                 if bold { " font-weight=\"700\"" } else { "" },
                 if italic { " font-style=\"italic\"" } else { "" },
                 esc(&text)

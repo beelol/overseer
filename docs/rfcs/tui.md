@@ -19,13 +19,15 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
   or inside the installed VS Code extension), asks it for the socket path, starts it if needed
   (detached, like VS Code), says `hello` as client `tui`, reads `state`, and subscribes to
   `events.subscribe` from the state cursor. Reconnects resume from the last cursor.
-- **Pages of nine.** Top-level agents (runs without a parent), newest first, 3×3 tiles per page.
+- **Pages of nine.** Top-level agents (runs without a parent), newest first, nine per page.
   Page 1 is the newest nine. Order is by creation time, so tiles do not jump when statuses change.
-  A filter cycles All → Active → Needs you.
+  A full page is 3×3; a page with fewer agents uses the space (1, 1×2, 1×3, 2×2, 2×3), and
+  arrow keys follow the same shape. A filter cycles All → Active → Needs you.
 - **Focus follows the agent, not the slot.** When a new agent arrives, the focused agent keeps
   focus even if it moves to another slot or page.
-- **Tiles are compact conversations.** Agent text, one-line tool rows ("⚙ Edit README.md"),
-  file edits, permission requests, errors and turn results, newest at the bottom.
+- **Tiles are compact conversations.** Agent text (light Markdown), one-line tool rows
+  ("⚙ Edit README.md ✓"), file edits, permission requests, errors and turn results with tokens,
+  newest at the bottom. Paths show relative to the agent's worktree or repository.
 - **Type to any agent.** `i` (or Enter) opens a composer on the focused tile; Enter sends a
   follow-up to that agent only; drafts are kept per agent.
 - **Keyboard first.** Every action has a key; `?` shows them. Mouse clicks focus tiles.
@@ -52,7 +54,10 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 
 ## Acceptance criteria
 
-- [ ] **T-01 — Same daemon, one source of truth.** `overseer-tui` connects to the same
+All thirteen are verified on the draft pull request; the evidence for each is listed in
+[evidence/tui](../verification/evidence/tui/README.md).
+
+- [x] **T-01 — Same daemon, one source of truth.** `overseer-tui` connects to the same
   `overseerd` socket VS Code uses (starting the daemon when it is not running), identifies as
   client `tui`, and keeps no state of its own: agents, statuses and conversations come from
   `state` and the live event stream. Anything done in the TUI (a message, an answer, an
@@ -60,66 +65,66 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
   **Verify:** an integration test drives a real `overseerd` (isolated `OVERSEER_HOME`) from
   the TUI's app loop and checks the daemon's records; a second client subscribed to the same
   daemon (as VS Code is) sees the TUI's actions as events.
-- [ ] **T-02 — Pages of nine.** Agents appear newest first as a 3×3 grid; page n shows agents
+- [x] **T-02 — Pages of nine.** Agents appear newest first as a 3×3 grid; page n shows agents
   9(n−1)+1 to 9n; the header shows the page ("2/3") and counts (total, active, needs you);
   `]`/`[` and PgDn/PgUp change pages; the filter cycles All → Active → Needs you; a new agent
   appears on page 1 while the focused agent keeps focus. **Verify:** with 20 fixture agents,
   snapshots of pages 1–3, the page indicator, and focus kept on the same agent when a new one
   starts.
-- [ ] **T-03 — Live tiles.** Each tile shows its agent's status, title, harness, account and
+- [x] **T-03 — Live tiles.** Each tile shows its agent's status, title, harness, account and
   model, elapsed time and a live tail of its conversation, updated from the event stream as it
   happens; statuses and turns refresh like VS Code's (state reloaded on status and turn events).
   A dropped connection resumes from its cursor with no lost or doubled lines. **Verify:** a
   fixture agent's lines appear in its tile within 250 ms of the event; after the connection is
   cut and restored mid-stream, the tile holds every line exactly once.
-- [ ] **T-04 — Keyboard navigation and help.** Arrows/hjkl move focus spatially, 1–9 jump,
+- [x] **T-04 — Keyboard navigation and help.** Arrows/hjkl move focus spatially, 1–9 jump,
   Tab/Shift-Tab walk agents across pages, `?` lists every key, mouse clicks focus a tile, and
   the focused tile is unmistakable (accent border and title). **Verify:** key-driven tests for
   each binding, including wrapping at page edges; a help-overlay snapshot.
-- [ ] **T-05 — Talk to any agent.** `i`/Enter opens a composer on the focused agent; Enter
+- [x] **T-05 — Talk to any agent.** `i`/Enter opens a composer on the focused agent; Enter
   sends a follow-up to that agent only; Esc closes it and keeps the draft for that agent;
   Alt-Enter adds a line. When the agent cannot take a message now (a turn is running, the
   harness has no follow-ups, it is a native child), the composer says why instead of failing.
   **Verify:** messages typed to two different agents reach only their own runs (daemon turn
   records); drafts survive switching tiles; the "busy" explanation shows for a running agent.
-- [ ] **T-06 — Answer and control.** A pending permission shows in its tile with a readable
+- [x] **T-06 — Answer and control.** A pending permission shows in its tile with a readable
   summary (tool and target, not raw JSON) and the keys to answer; `a`/`d` allow or deny it for
   that agent; `w` jumps to the next agent waiting for you; `x` interrupts after a y/n prompt.
   **Verify:** with the Claude fixture's permission mode, `a` on one agent and `d` on another
   produce the matching `permission_answered` events and outcomes; `x` interrupts only the
   focused agent.
-- [ ] **T-07 — Zoom with scrollback.** `z` shows the focused agent full screen with its whole
+- [x] **T-07 — Zoom with scrollback.** `z` shows the focused agent full screen with its whole
   conversation (history loaded from the daemon), follow-at-bottom while live, and scrolling
   with j/k, PgUp/PgDn, g/G; `z`/Esc returns to the grid on the same tile. **Verify:** zoom on
   a 2,000-event agent scrolls to the top and back; new events keep following at the bottom.
-- [ ] **T-08 — Start a new agent.** `n` opens a small form: repository (defaults to the current
+- [x] **T-08 — Start a new agent.** `n` opens a small form: repository (defaults to the current
   directory's Git root, else the last one used), harness (installed ones only), account
   (compatible ones, signed-in first), optional model, and the prompt; Enter launches it with
   `task.create`; it appears as tile 1 on page 1 and takes focus. **Verify:** a new fixture
   agent started from the form, with its task record matching the form.
-- [ ] **T-09 — Readable at a glance.** Status is a colored glyph (running, waiting for you,
+- [x] **T-09 — Readable at a glance.** Status is a colored glyph (running, waiting for you,
   done, failed, interrupted), titles and paths are shortened with `…` (home as `~`), tool calls
   are one line, and the layout works in dark and light terminals (terminal default colors plus
   a purple accent), with 256-color and truecolor. Below 100×30 the grid becomes one focused
   tile plus a compact list, and resizing re-lays out live. **Verify:** snapshots at 200×60,
   120×40 and 80×24; no rendered line wider than the terminal.
-- [ ] **T-10 — Responsive with nine busy agents.** Nine concurrent chatty fixture agents on one
+- [x] **T-10 — Responsive with nine busy agents.** Nine concurrent chatty fixture agents on one
   page: key handling stays under 50 ms p95, each tile updates within 250 ms of its event, the
   TUI redraws only when something changed (idle CPU near zero), and memory stays bounded (a
   per-agent history cap). **Verify:** a timed test with nine streaming agents reporting input
   latency, update lag and idle redraw count.
-- [ ] **T-11 — Safe to quit, counted as a watcher.** `q` quits (asking first when a draft is
+- [x] **T-11 — Safe to quit, counted as a watcher.** `q` quits (asking first when a draft is
   unsent); agents and the daemon keep running; the terminal is restored even after a panic;
   while the TUI is attached, the daemon counts it as a watching UI, so closing the last VS Code
   window does not report the agents as running unseen. **Verify:** daemon test for the `tui`
   client count; quitting leaves the runs and the daemon untouched; a forced panic leaves the
   terminal usable.
-- [ ] **T-12 — Built, documented and tested with the workspace.** `cargo build` builds
+- [x] **T-12 — Built, documented and tested with the workspace.** `cargo build` builds
   `overseer-tui` with the daemon; `overseer-tui --help` explains options and keys; the README
   documents it; `cargo test` covers the model, rendering, paging, key map and the integration
   tests. **Verify:** clean `cargo build`, `cargo test` and `cargo clippy` for the crate; help
   output and README section.
-- [ ] **T-13 — Live agents.** Tiny live runs with the real harnesses (Claude Code on its existing
+- [x] **T-13 — Live agents.** Tiny live runs with the real harnesses (Claude Code on its existing
   login with haiku, and Codex with gpt-5.6-luna) show up and stream in the TUI, and a follow-up
   typed in the TUI reaches the live Claude agent. **Verify:** snapshots from the live session
   and the daemon's records of the typed follow-up.
