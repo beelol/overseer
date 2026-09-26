@@ -8,7 +8,8 @@ use crate::paths;
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 use std::os::unix::io::AsRawFd;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, TryLockError};
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
@@ -210,6 +211,168 @@ fn s<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
     p[key].as_str().ok_or_else(|| anyhow!("missing string parameter {key}"))
 }
 
+fn metadata_deadline(p: &Value) -> Result<Instant> {
+    let ms = match p.get("timeout_ms") {
+        None => 5000,
+        Some(value) => value.as_u64().filter(|ms| (1..=5000).contains(ms))
+            .ok_or_else(|| anyhow!("timeout_ms must be between 1 and 5000"))?,
+    };
+    Ok(Instant::now() + Duration::from_millis(ms))
+}
+
+fn remaining_metadata_ms(deadline: Instant) -> Result<u64> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    let ms = remaining.as_millis().min(5000) as u64;
+    if ms < 20 { return Err(anyhow!("automatic metadata deadline elapsed")); }
+    Ok(ms)
+}
+
+fn lock_gate_until<'a>(gate: &'a Mutex<()>, deadline: Instant) -> Result<MutexGuard<'a, ()>> {
+    loop {
+        match gate.try_lock() {
+            Ok(guard) => return Ok(guard),
+            Err(TryLockError::Poisoned(_)) => return Err(anyhow!("account profile gate is poisoned")),
+            Err(TryLockError::WouldBlock) => {
+                if Instant::now() >= deadline { return Err(anyhow!("account profile metadata deadline elapsed")); }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        }
+    }
+}
+
+static AUTO_COLLECTOR_SLOTS: OnceLock<(Mutex<usize>, Condvar)> = OnceLock::new();
+
+struct AutoCollectorPermit;
+
+fn admit_auto_collector(deadline: Instant) -> Result<AutoCollectorPermit> {
+    let (lock, changed) = AUTO_COLLECTOR_SLOTS.get_or_init(|| (Mutex::new(0), Condvar::new()));
+    let mut active = lock.lock().map_err(|_| anyhow!("automatic collector gate is poisoned"))?;
+    while *active >= 4 {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining < Duration::from_millis(20) {
+            return Err(anyhow!("automatic collector admission deadline elapsed"));
+        }
+        let (next, _) = changed.wait_timeout(active, remaining)
+            .map_err(|_| anyhow!("automatic collector gate is poisoned"))?;
+        active = next;
+    }
+    *active += 1;
+    Ok(AutoCollectorPermit)
+}
+
+impl Drop for AutoCollectorPermit {
+    fn drop(&mut self) {
+        if let Some((lock, changed)) = AUTO_COLLECTOR_SLOTS.get() {
+            let mut active = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            *active = active.saturating_sub(1);
+            changed.notify_one();
+        }
+    }
+}
+
+/// Deduplicate collection keys and admit at most four collectors per wave.
+/// Every real collector must honor the supplied budget so scoped joins settle.
+fn collect_unique_bounded<T, F>(candidate_pools: &[String], budget: Duration, collect: F) -> Vec<(String, Result<T>)>
+where T: Send, F: Fn(&str, Duration) -> Result<T> + Sync {
+    let pools: Vec<String> = candidate_pools.iter().cloned().collect::<std::collections::BTreeSet<_>>()
+        .into_iter().collect();
+    let deadline = Instant::now() + budget;
+    let mut results = Vec::new();
+    for (wave, chunk) in pools.chunks(4).enumerate() {
+        let waves_left = pools.len().div_ceil(4) - wave;
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        let share = remaining / waves_left as u32;
+        if share < Duration::from_millis(20) {
+            results.extend(chunk.iter().cloned().map(|id| (id, Err(anyhow!("automatic collection deadline elapsed")))));
+            continue;
+        }
+        let wave_results = std::thread::scope(|scope| {
+            let handles = chunk.iter().map(|id| {
+                let id = id.clone();
+                let worker_id = id.clone();
+                let collector = &collect;
+                (id, scope.spawn(move || {
+                    let deadline = Instant::now() + share;
+                    let _permit = admit_auto_collector(deadline)?;
+                    let remaining = deadline.saturating_duration_since(Instant::now());
+                    if remaining < Duration::from_millis(20) {
+                        return Err(anyhow!("automatic collector deadline elapsed"));
+                    }
+                    collector(&worker_id, remaining)
+                }))
+            }).collect::<Vec<_>>();
+            handles.into_iter().map(|(id, handle)| (id,
+                handle.join().unwrap_or_else(|_| Err(anyhow!("automatic collector stopped unexpectedly")))))
+                .collect::<Vec<_>>()
+        });
+        results.extend(wave_results);
+    }
+    results
+}
+
+struct AutoProfileDiscovery {
+    routes: Vec<crate::auto_select::Route>,
+    evidence: Value,
+    generation: i64,
+}
+
+fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
+    budget: Duration) -> Result<AutoProfileDiscovery> {
+    let deadline = Instant::now() + budget;
+    let profile = d.profile(profile_id)?;
+    match profile.harness.as_str() {
+        "codex" => {
+            let models = dispatch(d, "auto.models.refresh", &json!({"profile_id":profile_id,
+                "timeout_ms":remaining_metadata_ms(deadline)?}))?;
+            let first_generation = d.store.lock().unwrap().auto_account_generation(profile_id)?;
+            let tools = dispatch(d, "auto.tools.inspect", &json!({"profile_id":profile_id,
+                "workspace_id":workspace_id,"timeout_ms":remaining_metadata_ms(deadline)?}))?;
+            let generation = d.store.lock().unwrap().auto_account_generation(profile_id)?;
+            if generation.is_none() || generation != first_generation {
+                return Err(anyhow!("account changed during automatic route discovery"));
+            }
+            let catalog: crate::auto_route::ModelCatalog = serde_json::from_value(models["catalog"].clone())?;
+            let tool_catalog: crate::auto_route::ToolCatalog = serde_json::from_value(tools["catalog"].clone())?;
+            let observation = d.store.lock().unwrap().latest_auto_quota(profile_id)?;
+            let now_ms = crate::daemon::now();
+            Ok(AutoProfileDiscovery {
+                routes:crate::auto_route::codex_auto_routes(&catalog, &tool_catalog,
+                    observation.as_ref().map(|value| &value.snapshot), profile_id, now_ms),
+                evidence:json!({"profile_id":profile_id,"source":"codex-app/model-and-tool-metadata",
+                    "model_observed_ms":catalog.observed_ms,"tool_observed_ms":tool_catalog.observed_ms,
+                    "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
+                    "account_generation":generation}),
+                generation:generation.unwrap(),
+            })
+        }
+        "claude" => {
+            let gate = d.profile_gate(profile_id);
+            let _guard = lock_gate_until(&gate, deadline)?;
+            let program = crate::adapters::resolve_program("claude")
+                .ok_or_else(|| anyhow!("Claude executable unavailable"))?;
+            let auth = crate::auto_collect::claude_auth_status(&program,
+                &crate::daemon::Daemon::profile_env(&profile),
+                Duration::from_millis(remaining_metadata_ms(deadline)?), crate::daemon::now())?;
+            let store = d.store.lock().unwrap();
+            store.record_auto_account_identity(profile_id, &auth.fingerprint)?;
+            let generation = store.auto_account_generation(profile_id)?
+                .ok_or_else(|| anyhow!("Claude account generation unavailable"))?;
+            let observation = store.latest_auto_quota(profile_id)?;
+            let now_ms = crate::daemon::now();
+            Ok(AutoProfileDiscovery {
+                routes:crate::auto_route::claude_auto_routes(&auth,
+                    observation.as_ref().map(|value| &value.snapshot), profile_id, now_ms),
+                evidence:json!({"profile_id":profile_id,"source":"claude/auth-status-and-native-quota",
+                    "auth_observed_ms":auth.observed_ms,
+                    "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
+                    "account_generation":generation}),
+                generation,
+            })
+        }
+        _ => Err(anyhow!("unsupported automatic harness")),
+    }
+}
+
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
@@ -363,58 +526,18 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let mut evidence = Vec::new();
                 let mut discovery_failures = Vec::new();
                 let mut account_generations = BTreeMap::new();
-                for candidate_id in &allowed_profiles {
-                    let candidate = d.profile(candidate_id)?;
-                    let discovered = (|| -> Result<()> {
-                        match candidate.harness.as_str() {
-                            "codex" => {
-                                let models = dispatch(d, "auto.models.refresh", &json!({"profile_id":candidate_id}))?;
-                                let first_generation = d.store.lock().unwrap().auto_account_generation(candidate_id)?;
-                                let tools = dispatch(d, "auto.tools.inspect", &json!({"profile_id":candidate_id,"workspace_id":parent.workspace_id}))?;
-                                let generation = d.store.lock().unwrap().auto_account_generation(candidate_id)?;
-                                if generation.is_none() || generation != first_generation {
-                                    return Err(anyhow!("account changed during automatic route discovery"));
-                                }
-                                let catalog: crate::auto_route::ModelCatalog = serde_json::from_value(models["catalog"].clone())?;
-                                let tool_catalog: crate::auto_route::ToolCatalog = serde_json::from_value(tools["catalog"].clone())?;
-                                let observation = d.store.lock().unwrap().latest_auto_quota(candidate_id)?;
-                                let now_ms = crate::daemon::now();
-                                routes.extend(crate::auto_route::codex_auto_routes(&catalog, &tool_catalog,
-                                    observation.as_ref().map(|value| &value.snapshot), candidate_id, now_ms));
-                                account_generations.insert(candidate_id.clone(), generation.unwrap());
-                                evidence.push(json!({"profile_id":candidate_id,"source":"codex-app/model-and-tool-metadata",
-                                    "model_observed_ms":catalog.observed_ms,"tool_observed_ms":tool_catalog.observed_ms,
-                                    "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
-                                    "account_generation":generation}));
-                            }
-                            "claude" => {
-                                let gate = d.profile_gate(candidate_id);
-                                let _guard = gate.lock().unwrap();
-                                let program = crate::adapters::resolve_program("claude")
-                                    .ok_or_else(|| anyhow!("Claude executable unavailable"))?;
-                                let auth = crate::auto_collect::claude_auth_status(&program,
-                                    &crate::daemon::Daemon::profile_env(&candidate),
-                                    std::time::Duration::from_secs(5), crate::daemon::now())?;
-                                let store = d.store.lock().unwrap();
-                                store.record_auto_account_identity(candidate_id, &auth.fingerprint)?;
-                                let generation = store.auto_account_generation(candidate_id)?
-                                    .ok_or_else(|| anyhow!("Claude account generation unavailable"))?;
-                                let observation = store.latest_auto_quota(candidate_id)?;
-                                let now_ms = crate::daemon::now();
-                                routes.extend(crate::auto_route::claude_auto_routes(&auth,
-                                    observation.as_ref().map(|value| &value.snapshot), candidate_id, now_ms));
-                                account_generations.insert(candidate_id.clone(), generation);
-                                evidence.push(json!({"profile_id":candidate_id,"source":"claude/auth-status-and-native-quota",
-                                    "auth_observed_ms":auth.observed_ms,
-                                    "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
-                                    "account_generation":generation}));
-                            }
-                            _ => return Err(anyhow!("unsupported automatic harness")),
+                let candidate_ids = allowed_profiles.iter().cloned().collect::<Vec<_>>();
+                for (candidate_id, discovered) in collect_unique_bounded(&candidate_ids,
+                    Duration::from_secs(8), |id, budget|
+                        discover_auto_profile(d, id, &parent.workspace_id, budget)) {
+                    match discovered {
+                        Ok(discovered) => {
+                            routes.extend(discovered.routes);
+                            account_generations.insert(candidate_id, discovered.generation);
+                            evidence.push(discovered.evidence);
                         }
-                        Ok(())
-                    })();
-                    if discovered.is_err() {
-                        discovery_failures.push(json!({"profile_id":candidate_id,"reason":"metadata_or_auth_unavailable"}));
+                        Err(_) => discovery_failures.push(json!({"profile_id":candidate_id,
+                            "reason":"metadata_or_auth_unavailable"})),
                     }
                 }
                 if routes.len() > 128 { return Err(anyhow!("automatic candidate catalog exceeded its bound")); }
@@ -511,12 +634,13 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             json!({"events": events, "oldest_retained": oldest})
         }
         "auto.models.refresh" => {
+            let deadline = metadata_deadline(p)?;
             let profile = d.profile(s(p, "profile_id")?)?;
             if profile.harness != "codex" {
                 return Err(anyhow!("structured model discovery is not supported for this profile"));
             }
             let gate = d.profile_gate(&profile.id);
-            let _profile_guard = gate.lock().unwrap();
+            let _profile_guard = lock_gate_until(&gate, deadline)?;
             let active = d.store.lock().unwrap().runs()?.iter().any(|run| run.profile_id.as_deref() == Some(profile.id.as_str()) && crate::daemon::ACTIVE.contains(&run.status.as_str()));
             if active {
                 return Err(anyhow!("account profile has an active run; use its native updates"));
@@ -525,7 +649,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let program = crate::adapters::resolve_program("codex-app").ok_or_else(|| anyhow!("Codex is not installed"))?;
                 let mut env = crate::adapters::base_env(&program.display().to_string());
                 env.extend(Daemon::profile_env(&profile));
-                let raw = crate::auto_collect::codex_model_list(&program, &env, &crate::adapters::neutral_dir(), std::time::Duration::from_secs(5))?;
+                let raw = crate::auto_collect::codex_model_list(&program, &env, &crate::adapters::neutral_dir(),
+                    Duration::from_millis(remaining_metadata_ms(deadline)?))?;
                 let observed_ms = crate::daemon::now();
                 let catalog = crate::auto_route::parse_codex_catalog(&raw.models, observed_ms)?;
                 let snapshot = crate::auto_quota::parse_codex_rate_limits(&raw.rate_limits, &profile.id, observed_ms)?;
@@ -590,6 +715,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "limitation":"loopback reachability and model metadata do not prove task capability or tool permissions"})
         }
         "auto.tools.inspect" => {
+            let deadline = metadata_deadline(p)?;
             let profile = d.profile(s(p, "profile_id")?)?;
             if profile.harness != "codex" {
                 return Err(anyhow!("structured tool discovery is not supported for this profile"));
@@ -599,13 +725,13 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 return Err(anyhow!("workspace was removed"));
             }
             let gate = d.profile_gate(&profile.id);
-            let _profile_guard = gate.lock().unwrap();
+            let _profile_guard = lock_gate_until(&gate, deadline)?;
             let read = (|| -> anyhow::Result<_> {
                 let program = crate::adapters::resolve_program("codex-app").ok_or_else(|| anyhow!("Codex is not installed"))?;
                 let mut env = crate::adapters::base_env(&program.display().to_string());
                 env.extend(Daemon::profile_env(&profile));
                 let raw = crate::auto_collect::codex_tool_inventory(&program, &env,
-                    std::path::Path::new(&workspace.path), std::time::Duration::from_secs(5))?;
+                    std::path::Path::new(&workspace.path), Duration::from_millis(remaining_metadata_ms(deadline)?))?;
                 let observed_ms = crate::daemon::now();
                 let catalog = crate::auto_route::parse_codex_tools(&raw.tools, observed_ms)?;
                 let fingerprint = crate::auto_quota::account_fingerprint(&raw.rate_limits)?;
@@ -810,4 +936,60 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "daemon.clients" => json!({"vscode": d.ui_clients.load(std::sync::atomic::Ordering::SeqCst)}),
         other => return Err(anyhow!("unknown method {other}")),
     })
+}
+
+#[cfg(test)]
+mod auto_collector_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Barrier;
+
+    #[test]
+    fn hundred_candidates_coalesce_duplicate_keys_with_four_collectors_and_a_deadline() {
+        let candidates = (0..100).map(|n| format!("pool-{}", n % 25)).collect::<Vec<_>>();
+        let calls = AtomicUsize::new(0);
+        let active = AtomicUsize::new(0);
+        let peak = AtomicUsize::new(0);
+        let start = Instant::now();
+        let results: Vec<(String, Result<()>)> = collect_unique_bounded(&candidates,
+            Duration::from_secs(8), |_, budget| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                let current = active.fetch_add(1, Ordering::SeqCst) + 1;
+                peak.fetch_max(current, Ordering::SeqCst);
+                std::thread::sleep(budget);
+                active.fetch_sub(1, Ordering::SeqCst);
+                Err(anyhow!("stalled fixture collector"))
+            });
+        assert_eq!(results.len(), 25);
+        assert_eq!(calls.load(Ordering::SeqCst), 25, "duplicate pool reads must coalesce");
+        assert!(peak.load(Ordering::SeqCst) <= 4);
+        assert!(start.elapsed() <= Duration::from_secs(11));
+    }
+
+    #[test]
+    fn simultaneous_auto_decisions_never_run_more_than_four_collectors_total() {
+        let barrier = Barrier::new(2);
+        let active = AtomicUsize::new(0);
+        let peak = AtomicUsize::new(0);
+        std::thread::scope(|scope| {
+            let launch = || {
+                barrier.wait();
+                let ids = (0..4).map(|n| format!("pool-{n}")).collect::<Vec<_>>();
+                let _: Vec<(String, Result<()>)> = collect_unique_bounded(&ids,
+                    Duration::from_secs(2), |_, _| {
+                        let current = active.fetch_add(1, Ordering::SeqCst) + 1;
+                        peak.fetch_max(current, Ordering::SeqCst);
+                        std::thread::sleep(Duration::from_millis(250));
+                        active.fetch_sub(1, Ordering::SeqCst);
+                        Ok(())
+                    });
+            };
+            let first = scope.spawn(launch);
+            let second = scope.spawn(launch);
+            first.join().unwrap();
+            second.join().unwrap();
+        });
+        assert!(peak.load(Ordering::SeqCst) <= 4,
+            "collector cap applies across concurrent decisions, not only each work unit");
+    }
 }

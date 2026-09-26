@@ -1923,6 +1923,44 @@ fn auto_recent_503_blocks_the_failed_endpoint_before_an_independent_child() {
 }
 
 #[test]
+fn auto_four_slow_profile_collectors_finish_within_the_decision_deadline() {
+    use std::time::Instant;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("slow-collectors-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_MODEL_DELAY_MS,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_MODEL_DELAY_MS", "3500"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let profiles = (0..4).map(|n| d.call("profile.create", json!({"name":format!("Collector {n}"),
+        "harness":"codex"}))["id"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let start = Instant::now();
+    let request = json!({"work_unit_id":"four-slow-collectors-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":["absent/tool"],
+        "allowed_profiles":profiles,"prompt":"bounded metadata only"});
+    let outcome = std::thread::scope(|scope| {
+        let pending = scope.spawn(|| d.call("auto.dispatch", request));
+        let probe_deadline = Instant::now() + Duration::from_secs(2);
+        while !std::fs::read_to_string(&trace).unwrap_or_default().contains("model_read") {
+            assert!(Instant::now() < probe_deadline, "slow metadata collection did not begin");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let ui_start = Instant::now();
+        assert!(d.call("hello", json!({}))["protocol"].is_number());
+        assert!(ui_start.elapsed() < Duration::from_secs(2),
+            "another client waited behind the slow Auto decision");
+        pending.join().unwrap()
+    });
+    let elapsed = start.elapsed();
+    assert_eq!(outcome["state"], "paused", "{outcome}");
+    assert!(elapsed <= Duration::from_secs(11), "Auto decision took {elapsed:?}, exceeding the 10+1 second bound");
+    assert_eq!(d.runs().len(), 1, "no model child should launch when the tool is absent");
+}
+
+#[test]
 fn auto_claude_api_key_auth_is_excluded_without_a_child() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
