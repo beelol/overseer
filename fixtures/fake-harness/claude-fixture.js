@@ -35,7 +35,9 @@ if (process.argv.includes('auth') && process.argv.includes('status')) {
   process.exit(0);
 }
 if (!process.argv.includes('-p')) { console.log('claude-fixture 0.0.0 (synthetic)'); process.exit(0); }
-const mode = process.env.CLAUDE_FIXTURE_MODE || process.env.FIXTURE_MODE || 'nested';
+const mode = process.env.CLAUDE_FIXTURE_MODE_FILE
+  ? fs.readFileSync(process.env.CLAUDE_FIXTURE_MODE_FILE, 'utf8').trim()
+  : process.env.CLAUDE_FIXTURE_MODE || process.env.FIXTURE_MODE || 'nested';
 const sid = 'fixture-session-1';
 const out = o => process.stdout.write(JSON.stringify(o) + '\n');
 const assistant = (content, parent = null) => out({ type: 'assistant', session_id: sid, parent_tool_use_id: parent, message: { role: 'assistant', content } });
@@ -105,6 +107,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     const decision = reply.response.response;
     if (decision.behavior === 'allow') fs.writeFileSync(file, decision.updatedInput.content);
     result(false, 'done');
+  } else if (mode === 'ordinary-failure') {
+    assistant([{ type: 'text', text: 'The requested check failed.' }]);
+    result(true, 'fixture assertion failed during requested work');
   } else if (mode === 'ratelimit') {
     out({ type: 'assistant', session_id: sid, error: 'rate_limit', message: { role: 'assistant', content: [{ type: 'text', text: 'API Error: Request rejected (429) · rate limited' }] } });
     result(true, 'API Error: Request rejected (429) · rate limited');

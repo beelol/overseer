@@ -2523,6 +2523,51 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
 }
 
 #[test]
+fn auto_ordinary_child_failure_stays_failed_until_the_user_requests_new_work() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let claude_mode = r.path().join("claude-mode.txt");
+    std::fs::write(&claude_mode, "prose").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE_FILE"),
+        ("FIXTURE_MODE", "managed-models"),
+        ("CLAUDE_FIXTURE_MODE_FILE", claude_mode.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let warmup = run_id(&d.call("task.create", json!({"repo":repo,"harness":"claude",
+        "model":"sonnet","effort":"medium","prompt":"independent completed work"})));
+    assert_eq!(d.wait_done(&warmup, 15)["status"], "completed");
+    std::fs::write(&claude_mode, "ordinary-failure").unwrap();
+    let request = json!({"work_unit_id":"ordinary-failure-child-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"allowed_profiles":["system-claude","system-codex"],
+        "preferred_harness":"claude","prompt":"perform a bounded check"});
+    let dispatched = d.call("auto.dispatch", request.clone());
+    assert_eq!(dispatched["state"], "dispatched", "{dispatched}");
+    assert_eq!(dispatched["run"]["harness"], "claude");
+    let child = run_id(&dispatched);
+    assert_eq!(d.wait_done(&child, 15)["status"], "failed");
+    assert_eq!(d.call("run.result", json!({"run_id":child}))["state"], "not_completed");
+    assert!(d.events(&child).iter().any(|event|
+        event["kind"] == "error" && event["payload"]["class"] == "other"));
+    let replay = d.call("auto.dispatch", request);
+    assert_eq!(replay["state"], "paused", "{replay}");
+    assert_eq!(replay["run"]["id"], child);
+    assert_eq!(d.runs().len(), 3, "an ordinary task failure must not launch the eligible alternate");
+    assert!(d.events(&parent).iter().all(|event|
+        event["kind"] != "managed_child_result_available" || event["payload"]["child_run_id"] != child));
+
+    let next = d.call("auto.dispatch", json!({"work_unit_id":"ordinary-failure-next-2",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-codex"],"prompt":"newly requested independent work"}));
+    assert_eq!(next["state"], "dispatched", "{next}");
+    let next_child = run_id(&next);
+    assert_eq!(d.wait_done(&next_child, 15)["status"], "completed");
+    assert_eq!(d.runs().len(), 4);
+}
+
+#[test]
 fn auto_dispatch_can_choose_an_explicitly_allowed_claude_child_and_reject_missing_browser_tools() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
