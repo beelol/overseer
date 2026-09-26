@@ -1,0 +1,128 @@
+{
+  "checks": [
+    {
+      "name": "search by title (\"History task 123\") shows History task 123 in the Agents view in under 200 ms",
+      "ok": true,
+      "detail": {
+        "label": "by title",
+        "expect": "History task 123",
+        "q": "History task 123",
+        "ms": 39,
+        "labels": [
+          "History task 123"
+        ],
+        "count": 1,
+        "message": "1 match for “History task 123”"
+      }
+    },
+    {
+      "name": "search by prompt (\"pw201\") shows History task 201 in the Agents view in under 200 ms",
+      "ok": true,
+      "detail": {
+        "label": "by prompt",
+        "expect": "History task 201",
+        "q": "pw201",
+        "ms": 40,
+        "labels": [
+          "History task 201"
+        ],
+        "count": 1,
+        "message": "1 match for “pw201”"
+      }
+    },
+    {
+      "name": "search by message text (agent output) (\"needle-237\") shows History task 237 in the Agents view in under 200 ms",
+      "ok": true,
+      "detail": {
+        "label": "by message text (agent output)",
+        "expect": "History task 237",
+        "q": "needle-237",
+        "ms": 32,
+        "labels": [
+          "History task 237"
+        ],
+        "count": 1,
+        "message": "1 match for “needle-237”"
+      }
+    },
+    {
+      "name": "search by file the agent edited (\"coordinator\") shows Refresh sessions once in the Agents view in under 200 ms",
+      "ok": true,
+      "detail": {
+        "label": "by file the agent edited",
+        "expect": "Refresh sessions once",
+        "q": "coordinator",
+        "ms": 35,
+        "labels": [
+          "Refresh sessions once"
+        ],
+        "count": 1,
+        "message": "1 match for “coordinator”"
+      }
+    },
+    {
+      "name": "search by repository (\"billing-service\") shows Broken migration in the Agents view in under 200 ms",
+      "ok": true,
+      "detail": {
+        "label": "by repository",
+        "expect": "Broken migration",
+        "q": "billing-service",
+        "ms": 37,
+        "labels": [
+          "Broken migration",
+          "Refresh sessions once"
+        ],
+        "count": 2,
+        "message": "2 matches for “billing-service”"
+      }
+    },
+    {
+      "name": "search by account (\"existing login\") shows Refresh sessions once in the Agents view in under 200 ms",
+      "ok": true,
+      "detail": {
+        "label": "by account",
+        "expect": "Refresh sessions once",
+        "q": "existing login",
+        "ms": 39,
+        "labels": [
+          "Refresh sessions once"
+        ],
+        "count": 1,
+        "message": "1 match for “existing login”"
+      }
+    },
+    {
+      "name": "search by status (\"failed\") shows Broken migration in the Agents view in under 200 ms",
+      "ok": true,
+      "detail": {
+        "label": "by status",
+        "expect": "Broken migration",
+        "q": "failed",
+        "ms": 34,
+        "labels": [
+          "Broken migration"
+        ],
+        "count": 1,
+        "message": "1 match for “failed”"
+      }
+    },
+    {
+      "name": "the filtered tree says what it shows (\"N matches for …\") and hides the rest",
+      "ok": true,
+      "detail": {
+        "count": 1,
+        "message": "1 match for “needle-237”"
+      }
+    },
+    {
+      "name": "Clear Search restores the tree and the selected agent",
+      "ok": true,
+      "detail": {
+        "before": 14,
+        "after": 14,
+        "selBefore": "Refresh sessions once",
+        "selAfter": "Refresh sessions once"
+      }
+    }
+  ]
+}

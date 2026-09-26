@@ -176,9 +176,14 @@ async function activate(context) {
   /** Filters the side bar's agents list (AC-69). */
   function setAgentFilter(filter) {
     agents.filter = filter;
-    agentsView.message = filter ? `${filter.taskIds.size} match${filter.taskIds.size === 1 ? '' : 'es'} for “${filter.query}”` : undefined;
-    vscode.commands.executeCommand('setContext', 'overseer.agentsFiltered', !!filter);
+    // VS Code sends the first tree change of each 200 ms window at once and holds the rest:
+    // refresh the rows first, then the message.
     agents.refresh();
+    // The match count sits beside the view title (not the debounced tree message).
+    agentsView.description = filter ? `${filter.taskIds.size} match${filter.taskIds.size === 1 ? '' : 'es'} for “${filter.query}”` : undefined;
+    vscode.commands.executeCommand('setContext', 'overseer.agentsFiltered', !!filter);
+    // Keep the selected agent in view (and selected) when the list changes shape.
+    if (selectedRun && (!filter || filter.taskIds.has(model.run(selectedRun)?.task_id))) setTimeout(() => revealInTree(selectedRun), 150);
   }
 
   /** Search agents by title, prompt, message text, file, repository, account or status (daemon search). */
@@ -192,17 +197,16 @@ async function activate(context) {
       const mine = ++seq;
       if (!q) { setAgentFilter(undefined); return; }
       const lower = q.toLowerCase();
-      // Titles match at once; the daemon adds matches in messages, files and the rest.
+      // One tree update with titles and the daemon's matches (messages, files, repository, account, status).
       const local = (model.state.tasks || []).filter(t => (t.title || '').toLowerCase().includes(lower)).map(t => t.id);
-      setAgentFilter({ query: q, taskIds: new Set(local) });
       const ids = await search(q);
       if (mine === seq) setAgentFilter({ query: q, taskIds: new Set([...local, ...ids]) });
     };
-    input.onDidChangeValue(q => { clearTimeout(timer); timer = setTimeout(() => run(q.trim()), 60); });
+    // Typing again right after clearing supersedes the clear, so the list updates once.
+    input.onDidChangeValue(q => { clearTimeout(timer); timer = setTimeout(() => run(q.trim()), q.trim() ? 25 : 200); });
     input.onDidAccept(() => { accepted = true; input.hide(); });
     input.onDidHide(() => { clearTimeout(timer); if (!accepted) setAgentFilter(undefined); input.dispose(); });
     input.show();
-    if (input.value) run(input.value.trim());
   }
 
   /** A virtual document for an agent's chat: dropping an agent in the editor opens it (AC-71). */

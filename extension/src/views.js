@@ -88,7 +88,7 @@ class AgentsProvider {
   }
   getTreeItem(node) { return node.item; }
   getParent(node) { return node.parent; }
-  refresh() { this.emitter.fire(); }
+  refresh() { if (this.indexed) this.indexed.visible.clear(); this.emitter.fire(); }
   setCollapsed(node, collapsed) {
     const id = node?.item?.id; if (!id) return;
     if (collapsed) this.collapsed.add(id); else this.collapsed.delete(id);
@@ -103,15 +103,32 @@ class AgentsProvider {
     if (!name || !this.extensionUri) return new vscode.ThemeIcon(harness === 'generic' ? 'terminal' : 'hubot');
     return { light: vscode.Uri.joinPath(this.extensionUri, 'media', 'logos', `${name}-light.svg`), dark: vscode.Uri.joinPath(this.extensionUri, 'media', 'logos', `${name}-dark.svg`) };
   }
-  /** The newest top-level run of a task: the agent a row stands for. */
-  rootOf(task) {
-    return this.model.state.runs.filter(r => r.task_id === task.id && !r.parent_run_id).sort((a, b) => b.created_ms - a.created_ms)[0];
+  /** One pass over the state per snapshot: each task's newest top-level run, each run's children. */
+  index() {
+    const st = this.model.state;
+    if (this.indexed?.state === st) return this.indexed;
+    const roots = new Map(), kids = new Map();
+    for (const r of st.runs) {
+      if (r.parent_run_id) { if (!kids.has(r.parent_run_id)) kids.set(r.parent_run_id, []); kids.get(r.parent_run_id).push(r); continue; }
+      const cur = roots.get(r.task_id);
+      if (!cur || r.created_ms > cur.created_ms) roots.set(r.task_id, r);
+    }
+    this.indexed = { state: st, roots, kids, visible: new Map() };
+    return this.indexed;
   }
+  /** The newest top-level run of a task: the agent a row stands for. */
+  rootOf(task) { return this.index().roots.get(task.id); }
+  kidsOf(runId) { return this.index().kids.get(runId) || []; }
   visibleTasks() {
+    const ix = this.index();
+    const key = `${this.showArchived}|${this.filter ? this.filter.query + ':' + this.filter.taskIds.size : ''}`;
+    if (ix.visible.has(key)) return ix.visible.get(key);
     const archived = t => !!t.archived_ms;
-    return [...this.model.state.tasks].filter(t => this.rootOf(t))
+    const list = this.model.state.tasks.filter(t => ix.roots.has(t.id))
       .filter(t => (this.filter ? this.filter.taskIds.has(t.id) : this.showArchived ? archived(t) : !archived(t)))
-      .sort((a, b) => (this.lastActivity(b) - this.lastActivity(a)));
+      .map(t => ({ t, at: this.lastActivity(t) })).sort((a, b) => b.at - a.at).map(x => x.t);
+    ix.visible.set(key, list);
+    return list;
   }
   lastActivity(task) {
     const r = this.rootOf(task);
@@ -140,7 +157,7 @@ class AgentsProvider {
     }
     if (node.section === 'needs') return node.list.map(a => this.needsRow(a, node)).filter(Boolean);
     if (node.repo) return this.visibleTasks().filter(t => t.repo_root === node.repo).map(t => this.agentNode(t, node));
-    if (node.run) return m.children(node.run.id).map(run => this.childNode(run, node));
+    if (node.run) return this.kidsOf(node.run.id).map(run => this.childNode(run, node));
     return [];
   }
   needsSection(list) {
@@ -181,7 +198,7 @@ class AgentsProvider {
   agentNode(task, parent) {
     const run = this.rootOf(task);
     const m = this.model;
-    const kids = m.children(run.id).length;
+    const kids = this.kidsOf(run.id).length;
     const item = new vscode.TreeItem(task.title, this.expansion('agent:' + task.id, kids > 0));
     item.id = 'agent:' + task.id;
     item.iconPath = this.logo(run.harness);
@@ -200,8 +217,7 @@ class AgentsProvider {
     return { item, run, task, parent };
   }
   childNode(run, parent) {
-    const m = this.model;
-    const kids = m.children(run.id).length;
+    const kids = this.kidsOf(run.id).length;
     const item = new vscode.TreeItem(run.title, this.expansion('run:' + run.id, kids > 0));
     item.id = 'run:' + run.id;
     item.iconPath = this.logo(run.harness);
