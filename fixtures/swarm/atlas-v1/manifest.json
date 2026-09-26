@@ -5,5 +5,8 @@
   "jobs": ["J1-projects", "J2-tasks", "J3-membership", "J4-attachments", "J5-exports", "J6-tokens", "J7-independent-reproduction"],
   "seeded_findings": ["foreign-task-mutation", "foreign-attachment-download"],
   "protected_paths": ["project-membership", "role-escalation", "export-workspace-binding", "read-only-and-revoked-tokens"],
+  "variants": {
+    "task-guarded": "J7 only: add project-membership guard before task mutation to produce a contradictory independent result"
+  },
   "isolation": "one PostgreSQL schema per scripted worker; every schema has independent seed rows"
 }

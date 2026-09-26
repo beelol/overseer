@@ -10,18 +10,26 @@ fn now() -> i64 {
 }
 
 fn atlas_probe(job: &str) -> Value {
+    atlas_probe_variant(job, None)
+}
+
+fn atlas_probe_variant(job: &str, variant: Option<&str>) -> Value {
     let fixture = repo_root().join("fixtures/swarm/atlas-v1");
-    let output = Command::new("node")
-        .arg("probe.mjs")
-        .arg(job)
-        .current_dir(fixture)
-        .output()
-        .unwrap();
+    let mut command = Command::new("node");
+    command.arg("probe.mjs").arg(job);
+    if let Some(variant) = variant { command.arg(variant); }
+    let output = command.current_dir(fixture).output().unwrap();
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
     let trace: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(trace["fixtureVersion"], 1);
     assert_eq!(trace["job"], job);
     trace["evidence"].clone()
+}
+
+fn register(d: &Daemon, run: &str, job: &str) -> Value {
+    let attempt = d.call("swarm.attempt.register", json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":job}));
+    json!({"attempt_id":attempt["id"],"token":attempt["token"]})
 }
 
 fn commit_wave(d: &Daemon, run: &str, revision: i64, jobs: &[&str]) {
@@ -228,4 +236,120 @@ fn atlas_s1_backend_evidence_flows_through_swarm_review() {
     let decisions:i64=db.query_row("SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1 AND decision='accept'",
         [run],|row|row.get(0)).unwrap();
     assert_eq!(decisions,7);
+}
+
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s1_faults_quarantine_stale_and_missing_evidence() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d = Daemon::start(&[]);
+    let created = d.call("swarm.create", json!({"category":"Atlas fault replay",
+        "objective":"Audit tenant isolation","allowed_targets":["fixture"]}));
+    let run = created["id"].as_str().unwrap();
+    let jobs = json!([
+        {"id":"j2","title":"Tasks","acceptance":"foreign mutation evidence","deps":[]},
+        {"id":"j4","title":"Attachments","acceptance":"original shared-helper trace","deps":[]}
+    ]);
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":jobs}));
+    let a2=register(&d,run,"j2");
+    let a4=register(&d,run,"j4");
+    let j2=atlas_probe("j2");
+    assert_eq!(j2["foreignPatchStatus"],200);
+    let j2_artifact=submit(&d,run,"j2",&a2,1,&j2,"confirmed_defect");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute("DELETE FROM swarm_artifacts WHERE run_id=?1 AND id=?2",
+        [run,j2_artifact.as_str()]).unwrap();
+    assert!(d.try_call("swarm.decide",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j2","decision":"accept","evidence":[j2_artifact]}))
+        .unwrap_err().contains("missing artifact"));
+    let j4=atlas_probe("j4");
+    assert_eq!(j4["objectStatus"],200);
+    let revised=json!([
+        {"id":"j2","title":"Tasks","acceptance":"foreign mutation evidence","deps":[]},
+        {"id":"j4","title":"Attachments","acceptance":"signed URL boundary only","deps":[]}
+    ]);
+    assert_eq!(d.call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"J2 owns the shared helper; J4 checks the URL boundary",
+        "jobs":revised}))["revision"],2);
+    let redirected=d.call("swarm.messages",json!({"run_id":run,
+        "recipient":a4["attempt_id"]}));
+    assert!(redirected["messages"].as_array().unwrap().iter()
+        .any(|message| message["type"] == "redirect"));
+    let j4_artifact=submit(&d,run,"j4",&a4,1,&j4,"confirmed_defect");
+    assert!(d.try_call("swarm.decide",json!({"run_id":run,"generation":1,
+        "revision":2,"job_id":"j4","decision":"accept","evidence":[j4_artifact]}))
+        .unwrap_err().contains("stale"));
+    let jobs=d.call("swarm.jobs",json!({"id":run}));
+    let j4_status=jobs["jobs"].as_array().unwrap().iter()
+        .find(|job| job["id"] == "j4").unwrap();
+    assert_ne!(j4_status["status"],"accepted");
+}
+
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s1_contradictory_j7_retracts_claim_pending_environment_review() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Atlas contradiction",
+        "objective":"Audit task isolation","allowed_targets":["fixture"]}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Task finding","acceptance":"foreign mutation evidence","deps":[]},
+        {"id":"j4","title":"Attachment boundary","acceptance":"independent path","deps":[]},
+        {"id":"j7","title":"Independent reproduction","acceptance":"reproduce J2","deps":[]}
+    ]}));
+    let at=now();
+    let snapshot=json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"fixture","account_id":"account","pool_ids":["pool"],
+            "capabilities":["audit"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+120000}]}]});
+    commit_wave(&d,run,1,&["j2","j4","j7"]);
+    let a2=admit(&d,run,1,"j2","fixture",&snapshot,at);
+    let a4=admit(&d,run,1,"j4","fixture",&snapshot,at);
+    let a7=admit(&d,run,1,"j7","fixture",&snapshot,at);
+    for attempt in [&a2,&a4,&a7] { assert_eq!(attempt["status"],"admitted","{attempt}"); }
+    let j2=atlas_probe("j2");
+    let j7=atlas_probe_variant("j7",Some("task-guarded"));
+    assert_eq!(j2["foreignPatchStatus"],200);
+    assert_eq!(j7["foreignPatchStatus"],403);
+    assert_eq!(j7["taskAfter"],"Bob task");
+    assert_ne!(j2["namespace"],j7["namespace"]);
+    let j2_artifact=submit(&d,run,"j2",&a2,1,&j2,"confirmed_defect");
+    let j7_artifact=submit(&d,run,"j7",&a7,1,&j7,"negative");
+    let j4=atlas_probe("j4");
+    let j4_artifact=submit(&d,run,"j4",&a4,1,&j4,"confirmed_defect");
+    let batch=d.call("swarm.director.claim_batch",json!({"run_id":run,
+        "generation":1,"revision":1,"now_ms":at+6000}));
+    assert_eq!(batch["status"],"claimed","{batch}");
+    let messages=batch["messages"].as_array().unwrap();
+    assert!(messages.iter().any(|message| message["message_id"] == "atlas-j2-result"));
+    assert!(messages.iter().any(|message| message["message_id"] == "atlas-j7-result"));
+    for (job,attempt) in [("j2",&a2),("j4",&a4)] {
+        let message_id=format!("retract-task-claim-{job}");
+        d.call("swarm.direct",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":job,"attempt_id":attempt["attempt_id"],"message_id":message_id,
+            "type":"retract","payload":{"candidate":j2_artifact,
+                "contradiction":j7_artifact,"reason":"J7 used a guarded task route; compare fixture middleware before accepting"}}));
+        for phase in ["delivered","applied"] {
+            assert_eq!(d.call("swarm.ack",json!({"run_id":run,"message_id":message_id,
+                "recipient":attempt["attempt_id"],"token":attempt["token"],
+                "phase":phase,"revision":1}))["phase"],phase);
+        }
+    }
+    d.call("swarm.director.complete_batch",json!({"run_id":run,"generation":1,
+        "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"progress"}));
+    let jobs=d.call("swarm.jobs",json!({"id":run}));
+    assert!(jobs["jobs"].as_array().unwrap().iter()
+        .all(|job| job["status"] != "accepted"));
+    let checks=json!([
+        {"job_id":"j2","outcome":"passed","evidence":[j2_artifact]},
+        {"job_id":"j4","outcome":"passed","evidence":[j4_artifact]},
+        {"job_id":"j7","outcome":"passed","evidence":[j7_artifact]}
+    ]);
+    let completion_error=d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"contradicted-atlas","summary":"Task finding",
+        "verification":"Contradictory fixture variants","checks":checks})).unwrap_err();
+    assert!(completion_error.contains("requires every planned job to be accepted"),"{completion_error}");
 }

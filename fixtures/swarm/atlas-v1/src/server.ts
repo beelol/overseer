@@ -44,7 +44,7 @@ export async function createWorkerNamespace(root, namespace: string) {
   }
 }
 
-export function createAtlasApp(pool) {
+export function createAtlasApp(pool, { taskOwnershipGuard = false } = {}) {
   const app = express();
   const signed = new Map();
   app.use(express.json());
@@ -68,7 +68,7 @@ export function createAtlasApp(pool) {
     } catch (error) { next(error); }
   });
   app.use('/projects', projectRoutes(pool));
-  app.use('/tasks', taskRoutes(pool));
+  app.use('/tasks', taskRoutes(pool, { taskOwnershipGuard }));
   app.use('/attachments', attachmentRoutes(pool, key => {
     const signature = randomUUID();
     signed.set(signature, key);

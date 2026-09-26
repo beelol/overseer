@@ -41,3 +41,19 @@ test('a job probe runs independently at the moment its Swarm job is admitted', a
     await root.end();
   }
 });
+
+test('the guarded J7 variant contradicts the seeded J2 finding without changing Bob\'s row', async () => {
+  const root = new pg.Pool({ connectionString: process.env.ATLAS_DATABASE_URL });
+  try {
+    const j2 = await probeJob(root, 'j2');
+    const j7 = await probeJob(root, 'j7', { variant: 'task-guarded' });
+    assert.equal(j2.foreignPatchStatus, 200);
+    assert.equal(j7.variant, 'task-guarded');
+    assert.equal(j7.foreignPatchStatus, 403);
+    assert.equal(j7.taskBefore, 'Bob task');
+    assert.equal(j7.taskAfter, 'Bob task');
+    assert.notEqual(j2.namespace, j7.namespace);
+  } finally {
+    await root.end();
+  }
+});

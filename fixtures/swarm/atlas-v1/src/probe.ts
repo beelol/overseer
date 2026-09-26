@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { createAtlasApp, createWorkerNamespace } from './server.ts';
 
-async function withWorker(root, databaseUrl: string, name: string, run) {
+async function withWorker(root, databaseUrl: string, name: string, run, options = {}) {
   const namespace = `atlas_${name}_${randomUUID().replaceAll('-', '')}`;
   await createWorkerNamespace(root, namespace);
   const pool = new Pool({ connectionString: databaseUrl, options: `-c search_path=${namespace}` });
-  const server = createAtlasApp(pool).listen(0, '127.0.0.1');
+  const server = createAtlasApp(pool, options).listen(0, '127.0.0.1');
   try {
     await new Promise(resolve => server.once('listening', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
@@ -91,11 +91,17 @@ const probes = {
   },
 };
 
-export async function probeJob(root, job: string) {
+export async function probeJob(root, job: string, { variant } = {}) {
   const databaseUrl = process.env.ATLAS_DATABASE_URL;
   if (!databaseUrl) throw new Error('ATLAS_DATABASE_URL is required');
   if (!Object.hasOwn(probes, job)) throw new Error(`unknown Atlas job ${job}`);
-  return withWorker(root, databaseUrl, job, probes[job]);
+  if (variant && (job !== 'j7' || variant !== 'task-guarded')) {
+    throw new Error(`unknown Atlas variant ${variant} for ${job}`);
+  }
+  const evidence = await withWorker(root, databaseUrl, job, probes[job], {
+    taskOwnershipGuard: variant === 'task-guarded',
+  });
+  return variant ? { variant, ...evidence } : evidence;
 }
 
 export async function probeAtlas(root) {
