@@ -101,10 +101,15 @@ class Cdp {
     await delay(80);
   }
 
-  async click(x, y) {
+  async click(x, y, { button = 'left' } = {}) {
     for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
-      await this.call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }, this.workbench);
+      await this.call('Input.dispatchMouseEvent', { type, x, y, button, clickCount: 1 }, this.workbench);
     }
+    await delay(80);
+  }
+
+  async move(x, y) {
+    await this.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'none' }, this.workbench);
     await delay(80);
   }
 

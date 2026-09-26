@@ -1,14 +1,13 @@
-// Overseer dashboard (AC-48, AC-54..AC-63): one webview with the agents rail, the selected agent's
-// chat (or the new-agent composer, or the agent grid) and the files panel; the selected run's live
-// review opens in the editor column to its right. Not tied to the folder open in the window.
-// Restored after reloads by a webview serializer.
+// Overseer editor view (AC-55, AC-58, AC-59; Gate K): one webview with the selected agent's chat,
+// the new-agent composer or the agent grid, plus the files panel. The agents list is the side bar;
+// arrangement.js places this view alone or beside the review. Not tied to the folder open in the
+// window. Restored after reloads by a webview serializer.
 const vscode = require('vscode');
 const { RunFeed, runMessage } = require('./run-feed');
 const { handleRunMessage, changesFetcher } = require('./run-actions');
 const { page, localRoots } = require('./webview-html');
 const { ACTIVE } = require('./views');
 
-const COLUMNS = { agents: vscode.ViewColumn.One, review: vscode.ViewColumn.Two, conversation: vscode.ViewColumn.Two };
 
 class CommandCenter {
   constructor(context, model, handlers) {
@@ -24,17 +23,15 @@ class CommandCenter {
 
   get active() { return !!this.panel; }
 
-  async open({ layout = true, reveal = true } = {}) {
-    if (this.panel) { if (reveal) this.panel.reveal(COLUMNS.agents); return this.panel; }
-    if (layout) await this.layout();
-    const panel = vscode.window.createWebviewPanel('overseer.center', 'Overseer', { viewColumn: COLUMNS.agents, preserveFocus: false }, { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: localRoots(this.context.extensionUri) });
+  /** Opens (or moves) the view into an editor column; the arrangement decides which (Gate K). */
+  async open({ column = vscode.ViewColumn.One, preserveFocus = false, reveal = true } = {}) {
+    if (this.panel) {
+      if (reveal && (this.panel.viewColumn !== column || !this.panel.visible)) this.panel.reveal(column, preserveFocus);
+      return this.panel;
+    }
+    const panel = vscode.window.createWebviewPanel('overseer.center', 'Overseer', { viewColumn: column, preserveFocus }, { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: localRoots(this.context.extensionUri) });
     this.attach(panel);
     return panel;
-  }
-
-  /** Two columns: the dashboard (wide) and the review. */
-  async layout() {
-    await vscode.commands.executeCommand('vscode.setEditorLayout', { orientation: 0, groups: [{ size: 0.62 }, { size: 0.38 }] });
   }
 
   attach(panel) {
@@ -64,8 +61,8 @@ class CommandCenter {
     switch (m.type) {
       case 'ready': await this.push(); if (this.inDashboard) post({ type: 'dashboard', on: true }); return;
       case 'measured': { const done = this.measuring?.get(m.id); if (done) { this.measuring.delete(m.id); done({ w: Number(m.w), h: Number(m.h) }); } return; }
-      case 'select': if (typeof m.runId === 'string') { await this.showChat(m.runId); if (!m.restore) await this.handlers.select(m.runId); } return;
-      case 'mode': this.mode = m.mode; if (m.mode !== 'chat') { /* keep the chat feed; it is cheap */ } return;
+      case 'select': if (typeof m.runId === 'string') { if (m.restore) await this.showChat(m.runId); else await this.handlers.select(m.runId); } return;
+      case 'mode': { const was = this.mode; this.mode = m.mode; if (was !== m.mode) await this.handlers.onMode?.(m.mode, was); return; }
       case 'focusComposer': post({ type: 'mode', mode: 'composer' }); return;
       case 'gridSubscribe': {
         const ids = (m.runIds || []).filter(id => this.model.run(id));
@@ -89,8 +86,7 @@ class CommandCenter {
         const runId = await this.handlers.launcher.start(m.form || {});
         if (!runId) { post({ type: 'notice', scope: 'composer', message: 'Not started.' }); return; }
         post({ type: 'notice', scope: 'composer', kind: 'started', runId });
-        await this.showChat(runId);
-        await this.handlers.select(runId, { follow: vscode.workspace.getConfiguration('overseer').get('followNewRuns', true), fromDashboard: true });
+        await this.handlers.select(runId, { follow: vscode.workspace.getConfiguration('overseer').get('followNewRuns', true) });
         return;
       }
       case 'mentionFiles': await handleRunMessage(this.handlers, this.chatRun, { ...m, scope: m.scope || 'composer' }, x => post(x)); return;
@@ -147,7 +143,7 @@ class CommandCenter {
     const uri = vscode.Uri.joinPath(vscode.Uri.file(ws.path), ...rel.split('/'));
     try { await vscode.workspace.fs.stat(uri); }
     catch { vscode.window.showInformationMessage(`${rel} was deleted in this worktree; open the review to see its change.`); return; }
-    await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: COLUMNS.review, preview: true });
+    await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: vscode.ViewColumn.Beside, preview: true });
   }
 
   async push() {
@@ -160,6 +156,12 @@ class CommandCenter {
     for (const id of this.gridFeed?.roots.keys() || []) { const msg = runMessage(this.model, id, this.handlers.steering); if (msg) this.panel.webview.postMessage({ type: 'run', channel: 'grid', ...msg }); }
   }
 
+  /** Shows an agent's chat (host-driven selection from the side bar, commands or keys). */
+  async select(runId) {
+    if (!this.panel) return;
+    this.panel.webview.postMessage({ type: 'selected', runId });
+    await this.showChat(runId);
+  }
   selected(runId) { this.panel?.webview.postMessage({ type: 'selected', runId }); }
   setDashboard(on) { this.inDashboard = on; this.panel?.webview.postMessage({ type: 'dashboard', on }); }
 
@@ -181,4 +183,4 @@ class CommandCenter {
   }
 }
 
-module.exports = { CommandCenter, COLUMNS, ACTIVE };
+module.exports = { CommandCenter, ACTIVE };

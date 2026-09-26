@@ -47,6 +47,7 @@ class Review {
       restore: state => this.restore(state),
       reviewedKeys: runId => Object.keys(this.reviewed()[runId] || {}),
       reviewHunk: (session, message) => this.reviewHunk(session, message),
+      closed: runId => this.onClosed?.(runId),
     });
     context.subscriptions.push(this.manager,
       vscode.window.registerWebviewPanelSerializer('overseer.review', this.manager),

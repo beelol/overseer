@@ -4,10 +4,11 @@ const vscode = require('vscode');
 const path = require('path');
 const { execFile } = require('child_process');
 const { DaemonClient, resolveBinary } = require('./daemon-client');
-const { Model, AgentsProvider, DirtyProvider, AccountsProvider, ACTIVE } = require('./views');
+const { Model, AgentsProvider, AccountsProvider, ACTIVE } = require('./views');
 const { OutputPanels } = require('./output-panel');
 const { Review } = require('./review');
-const { CommandCenter, COLUMNS } = require('./command-center');
+const { CommandCenter } = require('./command-center');
+const { Arrangement } = require('./arrangement');
 const { NewTaskPanel } = require('./new-task');
 const { PullRequests } = require('./pull-request');
 const { TaskLauncher } = require('./task-launcher');
@@ -27,12 +28,12 @@ async function activate(context) {
   const binary = resolveBinary(context, vscode.workspace.getConfiguration('overseer').get('daemonPath'));
   client = new DaemonClient(binary, say);
   const model = new Model(client);
-  const agents = new AgentsProvider(model, context.workspaceState);
-  const dirty = new DirtyProvider(model, client);
+  // The side bar's agents list (Gate K): Needs you, then agents by repository.
+  const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned() });
   const accounts = new AccountsProvider(model, context.extensionUri);
-  const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true });
-  const dirtyView = vscode.window.createTreeView('overseer.dirty', { treeDataProvider: dirty });
+  const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true, dragAndDropController: agentDrag() });
   const accountsView = vscode.window.createTreeView('overseer.accounts', { treeDataProvider: accounts });
+  context.subscriptions.push(vscode.window.registerFileDecorationProvider(agents.decorations));
   const outputs = new OutputPanels(context, client, model);
   const review = new Review(context, client, model, say);
   let selectedRun;
@@ -71,19 +72,23 @@ async function activate(context) {
   const setPinned = (runId, on) => context.workspaceState.update('overseer.pinned', [...new Set([...pinned().filter(id => id !== runId), ...(on ? [runId] : [])])]);
   const search = async q => { try { return (await client.request('search', { query: q, limit: 200 })).task_ids || []; } catch { return []; } };
   // With the dashboard open, the chat stays inside it and reviews go to the column on its right.
-  const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, { preserveFocus: true, ...opts }), selected: () => selectedRun, client, model, launcher, attention, pinned, setPinned, archived: archivedTasks, search, steering });
-  review.reviewColumn = () => center.active ? COLUMNS.review : undefined;
-  outputs.column = () => center.active ? COLUMNS.conversation : undefined;
+  const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, opts), selected: () => selectedRun, client, model, launcher, attention, pinned, setPinned, archived: archivedTasks, search, steering,
+    // The grid takes the editor area and gives it back as it was (AC-79).
+    onMode: async (mode, was) => { if (mode === 'grid') await arrangement.enterGrid(); else if (was === 'grid') await arrangement.leaveGrid(); } });
+  const arrangement = new Arrangement({ context, center, review, model, client, log: say });
+  outputs.column = () => vscode.ViewColumn.Beside;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
-  const dashboard = new Dashboard(context, center, say);
+  const dashboard = new Dashboard(context, center, say, {
+    arrange: () => (selectedRun && model.run(selectedRun) ? arrangement.show(selectedRun) : arrangement.chatOnly()),
+    agentsVisible: () => agentsView.visible });
   const pullRequests = new PullRequests(client, model, say);
-  const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => center.active ? COLUMNS.review : undefined });
+  const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => vscode.ViewColumn.Beside });
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.output', outputs),
     agentsView.onDidExpandElement(e => agents.setCollapsed(e.element, false)),
     agentsView.onDidCollapseElement(e => agents.setCollapsed(e.element, true)));
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
   status.command = 'overseer.refresh';
-  context.subscriptions.push(agentsView, dirtyView, accountsView, status, { dispose: () => client.dispose() });
+  context.subscriptions.push(agentsView, accountsView, status, { dispose: () => client.dispose() });
 
   const updateStatus = () => {
     const runs = model.state.runs || [];
@@ -96,6 +101,8 @@ async function activate(context) {
     vscode.commands.executeCommand('setContext', 'overseer.connected', client.connected);
   };
   model.onDidChange(updateStatus);
+  // The Needs-you count on the Overseer activity icon (AC-70).
+  model.onDidChange(() => { const n = client.connected ? attention().length : 0; agentsView.badge = n ? { value: n, tooltip: `${n} need${n === 1 ? 's' : ''} you` } : undefined; });
   model.onDidChange(() => { autoArchive().catch(() => {}); });
   client.on('connected', () => { model.refresh(); updateStatus(); });
   client.on('disconnected', () => { model.error = 'daemon connection lost; reconnecting'; model.emitter.fire(); updateStatus(); });
@@ -110,14 +117,11 @@ async function activate(context) {
   client.on('event', event => {
     if (!STREAM_ONLY.has(event.kind)) model.scheduleRefresh();
     if (event.kind === 'profile') accountsSoon();
-    if (selectedRun && ['file_activity', 'status', 'turn_done', 'workspace_removed'].includes(event.kind)) setTimeout(() => dirty.refresh(), 300);
     if (event.kind === 'permission') {
       if (center.panel?.visible) return; // the dashboard's Needs you shows it
       vscode.window.showWarningMessage(`An agent is waiting for permission to use ${event.payload.tool}.`, 'Show').then(choice => { if (!choice) return; if (center.active) { center.open(); selectRun(model.rootRun(model.run(event.run_id) || {})?.id || event.run_id); } else outputs.show(event.run_id, { preserveFocus: false }); });
     }
   });
-  const dirtyTimer = setInterval(() => { if (dirtyView.visible && selectedRun) dirty.refresh(); }, 1000);
-  context.subscriptions.push({ dispose: () => clearInterval(dirtyTimer) });
 
   const requireTrust = () => {
     if (!vscode.workspace.isTrusted) throw new Error('Overseer only launches or controls agents in a trusted workspace.');
@@ -127,18 +131,85 @@ async function activate(context) {
   };
   const runArg = arg => (typeof arg === 'string' ? arg : arg?.run?.id) || selectedRun;
 
-  async function selectRun(runId, { follow, preserveFocus = false } = {}) {
+  /** Shows an agent: its chat, and its review beside it when it has changes (Gate K). */
+  async function selectRun(runId, { follow, reveal = true } = {}) {
+    const picked = model.run(runId) || (await model.refresh(), model.run(runId));
+    if (!picked) return;
     selectedRun = runId;
-    const picked = model.run(runId);
     // Opening a failed or finished run counts as seeing it (it leaves Needs you).
-    if (picked && !ACTIVE.has(picked.status)) markReviewed(model.rootRun(picked)?.id || runId);
-    center.selected(runId);
+    if (!ACTIVE.has(picked.status)) markReviewed(model.rootRun(picked)?.id || runId);
     context.workspaceState.update('overseer.selectedRun', runId);
-    dirty.select(runId);
-    // From the Overseer view, keep keyboard focus in the agents column.
-    await review.open(runId, { follow, preserveFocus });
-    if (!center.active) await outputs.show(runId);
+    await arrangement.show(runId, { follow });
+    await center.select(runId);
+    if (reveal) revealInTree(runId);
     model.emitter.fire();
+  }
+
+  /** Marks the agent in the side bar without taking focus. */
+  function revealInTree(runId) {
+    const node = agents.nodeFor(runId);
+    if (node && agentsView.visible) agentsView.reveal(node, { select: true, focus: false, expand: false }).then(undefined, () => {});
+  }
+
+  /** Dragging an agent row into the editor area opens its chat there (AC-71). */
+  function agentDrag() {
+    return {
+      dragMimeTypes: ['text/uri-list', 'application/vnd.code.tree.overseer.agents'],
+      dropMimeTypes: [],
+      handleDrag(source, data) {
+        const runs = source.map(n => n.run?.id).filter(Boolean);
+        if (!runs.length) return;
+        data.set('text/uri-list', new vscode.DataTransferItem(runs.map(id => chatUri(id).toString()).join('\r\n')));
+      },
+    };
+  }
+
+  /** The task an agent row (or run id) stands for. */
+  function agentTask(arg) {
+    // From a key press in the side bar there is no argument: use the focused row.
+    const node = arg || agentsView.selection?.[0];
+    if (node?.task) return node.task;
+    const run = model.run(typeof node === 'string' ? node : node?.run?.id || runArg(node));
+    return run && model.task((model.rootRun(run) || run).task_id);
+  }
+
+  /** Filters the side bar's agents list (AC-69). */
+  function setAgentFilter(filter) {
+    agents.filter = filter;
+    agentsView.message = filter ? `${filter.taskIds.size} match${filter.taskIds.size === 1 ? '' : 'es'} for “${filter.query}”` : undefined;
+    vscode.commands.executeCommand('setContext', 'overseer.agentsFiltered', !!filter);
+    agents.refresh();
+  }
+
+  /** Search agents by title, prompt, message text, file, repository, account or status (daemon search). */
+  async function searchAgents() {
+    const input = vscode.window.createInputBox();
+    input.title = 'Search agents';
+    input.placeholder = 'Title, message, file, repository, account or status';
+    input.value = agents.filter?.query || '';
+    let seq = 0, accepted = false, timer;
+    const run = async q => {
+      const mine = ++seq;
+      if (!q) { setAgentFilter(undefined); return; }
+      const lower = q.toLowerCase();
+      // Titles match at once; the daemon adds matches in messages, files and the rest.
+      const local = (model.state.tasks || []).filter(t => (t.title || '').toLowerCase().includes(lower)).map(t => t.id);
+      setAgentFilter({ query: q, taskIds: new Set(local) });
+      const ids = await search(q);
+      if (mine === seq) setAgentFilter({ query: q, taskIds: new Set([...local, ...ids]) });
+    };
+    input.onDidChangeValue(q => { clearTimeout(timer); timer = setTimeout(() => run(q.trim()), 60); });
+    input.onDidAccept(() => { accepted = true; input.hide(); });
+    input.onDidHide(() => { clearTimeout(timer); if (!accepted) setAgentFilter(undefined); input.dispose(); });
+    input.show();
+    if (input.value) run(input.value.trim());
+  }
+
+  /** A virtual document for an agent's chat: dropping an agent in the editor opens it (AC-71). */
+  function chatUri(runId) {
+    const run = model.run(runId);
+    const title = (run?.title || 'agent').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 60);
+    return vscode.Uri.from({ scheme: 'overseer-chat', path: `/${runId}/${title}.overseer-chat` });
   }
 
   async function newTask() {
@@ -401,15 +472,16 @@ async function activate(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand('overseer.newTask', guard(async () => { requireTrust(); await model.refresh(); await newTaskPanel.open(); })),
     vscode.commands.registerCommand('overseer.newTaskQuick', guard(newTask)),
-    vscode.commands.registerCommand('overseer.refresh', guard(async () => { await model.refresh(); dirty.refresh(); })),
+    vscode.commands.registerCommand('overseer.refresh', guard(async () => { await model.refresh(); })),
     vscode.commands.registerCommand('overseer.selectRun', guard(runId => selectRun(runId))),
-    vscode.commands.registerCommand('overseer.openReview', guard(arg => review.open(runArg(arg)))),
+    vscode.commands.registerCommand('overseer.openReview', guard(async arg => { const id = runArg(arg); if (!id) return; selectedRun = id; await arrangement.openReview(id); await center.select(id); })),
     vscode.commands.registerCommand('overseer.openEdit', guard(async (runId, rel) => {
       const run = model.run(runId) || (await model.refresh(), model.run(runId));
       if (!run) return;
       return review.revealEdit(model.rootRun(run).id, rel);
     })),
     vscode.commands.registerCommand('overseer.showOutput', guard(arg => outputs.show(runArg(arg), { preserveFocus: false }))),
+    vscode.commands.registerCommand('overseer.openAgentToSide', guard(arg => outputs.show(runArg(arg), { preserveFocus: false }))),
     vscode.commands.registerCommand('overseer.followUp', guard(async arg => {
       requireTrust();
       const runId = runArg(arg);
@@ -492,27 +564,35 @@ async function activate(context) {
     })),
     // Notification clicks open vscode://beelol.overseer/open-center (AC-52).
     vscode.window.registerUriHandler({ handleUri: uri => { if (uri.path === '/open-center') vscode.commands.executeCommand('overseer.openCenter'); } }),
-    vscode.commands.registerCommand('overseer.openCenter', guard(async () => { await model.refresh(); await center.open(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); })),
+    vscode.commands.registerCommand('overseer.openCenter', guard(async () => { await model.refresh(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); else { await arrangement.chatOnly(); center.setMode('composer'); } })),
     vscode.commands.registerCommand('overseer.openDashboard', guard(async () => { await model.refresh(); await dashboard.enter(); if (selectedRun && model.run(selectedRun)) await selectRun(selectedRun); })),
     vscode.commands.registerCommand('overseer.exitDashboard', guard(() => dashboard.exit())),
     vscode.commands.registerCommand('overseer.toggleDashboard', guard(async () => { if (dashboard.inDashboard) await dashboard.exit(); else { await model.refresh(); await dashboard.enter(); } })),
     vscode.commands.registerCommand('overseer.openDashboardWindow', guard(() => dashboard.openWindow())),
-    vscode.commands.registerCommand('overseer.newAgent', guard(async () => { requireTrust(); await center.open({ layout: !center.active }); center.setMode('composer'); })),
-    vscode.commands.registerCommand('overseer.toggleGrid', guard(async () => { await center.open({ layout: !center.active }); center.setMode(center.mode === 'grid' ? 'chat' : 'grid'); })),
+    vscode.commands.registerCommand('overseer.newAgent', guard(async () => { requireTrust(); await arrangement.chatOnly(); center.setMode('composer'); center.focus('composer'); })),
+    vscode.commands.registerCommand('overseer.toggleGrid', guard(async () => { if (center.mode === 'grid') { center.setMode(selectedRun ? 'chat' : 'composer'); } else { await arrangement.enterGrid(); center.setMode('grid'); } })),
+    vscode.commands.registerCommand('overseer.searchAgents', guard(searchAgents)),
+    vscode.commands.registerCommand('overseer.clearAgentSearch', guard(async () => setAgentFilter(undefined))),
+    vscode.commands.registerCommand('overseer.showArchived', guard(async () => { agents.showArchived = true; setAgentFilter(undefined); vscode.commands.executeCommand('setContext', 'overseer.showArchived', true); })),
+    vscode.commands.registerCommand('overseer.hideArchived', guard(async () => { agents.showArchived = false; agents.refresh(); vscode.commands.executeCommand('setContext', 'overseer.showArchived', false); })),
+    vscode.commands.registerCommand('overseer.archiveAgent', guard(async arg => { const task = agentTask(arg); if (task) { await client.request('task.archive', { task_id: task.id, archived: true }); await model.refresh(); } })),
+    vscode.commands.registerCommand('overseer.restoreAgent', guard(async arg => { const task = agentTask(arg); if (task) { await client.request('task.archive', { task_id: task.id, archived: false }); await model.refresh(); } })),
+    vscode.commands.registerCommand('overseer.pinAgent', guard(async arg => { const id = runArg(arg); if (id) { await setPinned(id, true); agents.refresh(); center.push(); } })),
+    vscode.commands.registerCommand('overseer.unpinAgent', guard(async arg => { const id = runArg(arg); if (id) { await setPinned(id, false); agents.refresh(); center.push(); } })),
     vscode.commands.registerCommand('overseer.switchAgent', guard(async () => {
       await model.refresh();
       const roots = (model.state.runs || []).filter(r => !r.parent_run_id).sort((a, b) => (ACTIVE.has(b.status) - ACTIVE.has(a.status)) || b.created_ms - a.created_ms);
       const pick = await vscode.window.showQuickPick(roots.map(r => { const t = model.task(r.task_id); const p = r.profile_id && model.profile(r.profile_id);
         return { label: `$(${{ waiting_for_user: 'bell-dot', running: 'sync', starting: 'sync', queued: 'clock', completed: 'check', failed: 'error', interrupted: 'circle-slash' }[r.status] || 'circle'}) ${t?.title || r.title}`,
           description: [path.basename(t?.repo_root || ''), p?.name].filter(Boolean).join(' · '), detail: undefined, run: r }; }), { title: 'Switch to agent', matchOnDescription: true, placeHolder: 'Search agents' });
-      if (pick) { await center.open({ layout: !center.active }); await selectRun(pick.run.id); center.focus('chat'); }
+      if (pick) { await selectRun(pick.run.id); center.focus('chat'); }
     })),
     vscode.commands.registerCommand('overseer.nextNeedsYou', guard(async () => {
       const list = attention();
       if (!list.length) { vscode.window.setStatusBarMessage('$(check) Nothing needs you', 2500); return; }
       // The most urgent item that is not already open (approvals first, then failures, then reviews).
       const next = list.find(a => a.run_id !== selectedRun) || list[0];
-      await center.open({ layout: !center.active }); await selectRun(next.run_id); center.focus('chat');
+      await selectRun(next.run_id); center.focus('chat');
     })),
     vscode.commands.registerCommand('overseer.allowPermission', guard(async () => answerPermission(true))),
     vscode.commands.registerCommand('overseer.denyPermission', guard(async () => answerPermission(false))),
@@ -535,7 +615,7 @@ async function activate(context) {
     dashboard.startup().catch(error => say('dashboard startup: ' + error.message));
     const remembered = context.workspaceState.get('overseer.selectedRun');
     if (remembered && model.run(remembered)) {
-      selectedRun = remembered; dirty.select(remembered);
+      selectedRun = remembered;
       // Show the remembered run as selected in the Agents view without stealing focus.
       const reveal = () => { const node = agents.nodeFor(remembered); if (node) agentsView.reveal(node, { select: true, focus: false, expand: false }).then(undefined, () => {}); };
       if (agentsView.visible) reveal();
@@ -545,7 +625,7 @@ async function activate(context) {
     say('daemon start failed: ' + error.message);
     vscode.window.showErrorMessage(`Overseer could not start its daemon: ${error.message}`);
   }
-  return { client, model, review, outputs, selectRun, dirty, agents, agentsView, center, dashboard, attention, selectedRun: () => selectedRun }; // exported for UI tests
+  return { client, model, review, outputs, selectRun, agents, agentsView, center, dashboard, arrangement, attention, selectedRun: () => selectedRun }; // exported for UI tests
 }
 
 function deactivate() { client?.dispose(); }

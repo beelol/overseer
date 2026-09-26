@@ -1,0 +1,204 @@
+{
+  "checks": [
+    {
+      "name": "the side bar shows Needs you first, then agents by repository with native children nested",
+      "ok": true,
+      "detail": {
+        "needsIdx": 0,
+        "webIdx": 4,
+        "apiIdx": 7,
+        "needsItems": [
+          "Add a changelog entry",
+          "Migration dry-run"
+        ],
+        "child": {
+          "aria": "child task, done, native child",
+          "level": 3,
+          "label": "child task",
+          "description": "now",
+          "badge": "✓",
+          "logo": "claudecode-dark",
+          "codicon": "",
+          "expanded": "true"
+        },
+        "grandchild": {
+          "aria": "grandchild task, done, native child",
+          "level": 4,
+          "label": "grandchild task",
+          "description": "now",
+          "badge": "✓",
+          "logo": "claudecode-dark",
+          "codicon": "",
+          "expanded": null
+        }
+      }
+    },
+    {
+      "name": "the editor-area Overseer view has no agent rail of its own",
+      "ok": true
+    },
+    {
+      "name": "the Agents view's visible text stays within the Gate J agents budget (238 characters)",
+      "ok": true,
+      "detail": {
+        "chars": 226
+      }
+    },
+    {
+      "name": "rows carry provider logos (Claude Code) and codicons for programs; status shows as a row badge",
+      "ok": true,
+      "detail": {
+        "showcase": {
+          "aria": "Refresh sessions once, done, claude, claude (existing login)",
+          "level": 2,
+          "label": "Refresh sessions once",
+          "description": "now",
+          "badge": "✓",
+          "logo": "claudecode-dark",
+          "codicon": "",
+          "expanded": null
+        },
+        "watch": {
+          "aria": "Watch the build, working, generic",
+          "level": 2,
+          "label": "Watch the build",
+          "description": "",
+          "badge": "●",
+          "logo": "",
+          "codicon": "terminal",
+          "expanded": null
+        }
+      }
+    },
+    {
+      "name": "status badges: ✓ done, ! needs you, ✕ failed, ● working",
+      "ok": true,
+      "detail": [
+        [
+          "Refresh sessions once",
+          "✓"
+        ],
+        [
+          "Add a changelog entry",
+          "!"
+        ],
+        [
+          "Migration dry-run",
+          "✕"
+        ],
+        [
+          "Watch the build",
+          "●"
+        ]
+      ]
+    },
+    {
+      "name": "the VSIX ships light and dark variants of each logo and the notices",
+      "ok": true
+    },
+    {
+      "name": "logos switch variant with the theme (light theme uses the light variant; dark and high contrast the dark one)",
+      "ok": true,
+      "detail": [
+        {
+          "theme": "Overseer Dark",
+          "logo": "claudecode-dark"
+        },
+        {
+          "theme": "Overseer Light",
+          "logo": "claudecode-light"
+        },
+        {
+          "theme": "Default High Contrast",
+          "logo": "claudecode-dark"
+        }
+      ]
+    },
+    {
+      "name": "the Overseer activity icon badge matches Needs you",
+      "ok": true,
+      "detail": {
+        "badge": "3",
+        "needs": "3"
+      }
+    },
+    {
+      "name": "hover actions: Stop on a working agent; Archive and Pin to Grid on a finished one; each has a name",
+      "ok": true,
+      "detail": {
+        "onWatch": [
+          {
+            "name": "Stop",
+            "x": 279.5625,
+            "y": 281
+          },
+          {
+            "name": "Pin to Grid",
+            "x": 299.5625,
+            "y": 281
+          }
+        ],
+        "onDone": [
+          {
+            "name": "Archive (⌘Backspace)",
+            "x": 280.078125,
+            "y": 237
+          },
+          {
+            "name": "Pin to Grid",
+            "x": 300.078125,
+            "y": 237
+          }
+        ]
+      }
+    },
+    {
+      "name": "pin by mouse, archive by keyboard (⌘⌫ in the Agents view), and the context menu offers Open to the Side, Open Review, Merge Back and the rest",
+      "ok": true,
+      "detail": {
+        "pinnedAfter": true,
+        "archived": true,
+        "menu": [
+          "Open to the Side",
+          "Open Review",
+          "Send Follow-up…",
+          "Select Comparison…",
+          "Merge Back…",
+          "Open Pull Request…",
+          "Unpin from Grid",
+          "Archive",
+          "Clean Up Worktree…"
+        ]
+      }
+    },
+    {
+      "name": "archived agents leave the list and appear under Show Archived Agents",
+      "ok": true,
+      "detail": {
+        "hidden": true,
+        "inArchive": [
+          "api-server",
+          "Split the payment service",
+          "child task",
+          "grandchild task"
+        ]
+      }
+    },
+    {
+      "name": "every row in the Agents view has a screen-reader label",
+      "ok": true,
+      "detail": [
+        "Needs you, 3",
+        "Add a changelog entry, Approve: Wants to use Write",
+        "Migration dry-run, Failed: exit code 1",
+        "Refresh sessions once, Review: 2 files changed",
+        "web-app, 2 agents, 1 active",
+        "Add a changelog entry, needs you, claude, claude (existing login)",
+        "Refresh sessions once, done, claude, claude (existing login)",
+        "api-server, 2 agents, 1 active",
+        "Watch the build, working, generic",
+        "Migration dry-run, failed, generic"
+      ]
+    }
+  ]
+}

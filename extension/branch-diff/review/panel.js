@@ -165,7 +165,7 @@ class ReviewManager {
         }
       }),
     ];
-    panel.onDidDispose(() => { this.editing.close(session); this.panels.delete(session); subscriptions.forEach(s => s.dispose()); });
+    panel.onDidDispose(() => { this.editing.close(session); this.panels.delete(session); subscriptions.forEach(s => s.dispose()); this.host.closed?.(session.overseer?.runId); });
     const nonce = randomBytes(24).toString('base64');
     const asset = name => escapeAttribute(panel.webview.asWebviewUri(vscode.Uri.joinPath(assets, name)));
     const baseIcon = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v4M8 11v4" stroke="currentColor" stroke-width="1.5"/></svg>';

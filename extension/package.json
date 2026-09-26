@@ -28,7 +28,6 @@
     "views": {
       "overseer": [
         { "id": "overseer.agents", "name": "Agents" },
-        { "id": "overseer.dirty", "name": "Workspace Dirty" },
         { "id": "overseer.accounts", "name": "Accounts" }
       ]
     },
@@ -56,7 +55,16 @@
       { "command": "overseer.openReview", "title": "Open Review", "category": "Overseer", "icon": "$(diff-multiple)" },
       { "command": "overseer.showOutput", "title": "Show Output", "category": "Overseer", "icon": "$(output)" },
       { "command": "overseer.followUp", "title": "Send Follow-up…", "category": "Overseer", "icon": "$(comment)", "enablement": "isWorkspaceTrusted" },
-      { "command": "overseer.interrupt", "title": "Interrupt", "category": "Overseer", "icon": "$(debug-stop)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.interrupt", "title": "Stop", "category": "Overseer", "icon": "$(debug-stop)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.searchAgents", "title": "Search Agents", "category": "Overseer", "icon": "$(search)" },
+      { "command": "overseer.clearAgentSearch", "title": "Clear Search", "category": "Overseer", "icon": "$(search-stop)" },
+      { "command": "overseer.showArchived", "title": "Show Archived Agents", "category": "Overseer", "icon": "$(archive)" },
+      { "command": "overseer.hideArchived", "title": "Show Active Agents", "category": "Overseer", "icon": "$(list-unordered)" },
+      { "command": "overseer.archiveAgent", "title": "Archive", "category": "Overseer", "icon": "$(archive)" },
+      { "command": "overseer.restoreAgent", "title": "Restore", "category": "Overseer", "icon": "$(discard)" },
+      { "command": "overseer.pinAgent", "title": "Pin to Grid", "category": "Overseer", "icon": "$(pin)" },
+      { "command": "overseer.unpinAgent", "title": "Unpin from Grid", "category": "Overseer", "icon": "$(pinned)" },
+      { "command": "overseer.openAgentToSide", "title": "Open to the Side", "category": "Overseer", "icon": "$(split-horizontal)" },
       { "command": "overseer.selectComparison", "title": "Select Comparison…", "category": "Overseer", "icon": "$(git-compare)" },
       { "command": "overseer.cleanupWorkspace", "title": "Clean Up Worktree…", "category": "Overseer", "icon": "$(trash)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.addProfile", "title": "Add Account…", "category": "Overseer", "icon": "$(person-add)" },
@@ -65,7 +73,6 @@
       { "command": "overseer.signOut", "title": "Sign Out", "category": "Overseer", "icon": "$(sign-out)" },
       { "command": "overseer.renameProfile", "title": "Rename Account…", "category": "Overseer", "icon": "$(edit)" },
       { "command": "overseer.refreshAccounts", "title": "Refresh Account Status", "category": "Overseer", "icon": "$(refresh)" },
-      { "command": "overseer.openDirtyDiff", "title": "Open Diff", "category": "Overseer" },
       { "command": "overseer.openEdit", "title": "Open Edit in Review", "category": "Overseer" },
       { "command": "overseer.showCapabilities", "title": "Show Harness Capabilities", "category": "Overseer", "icon": "$(info)" },
       { "command": "overseer.openPullRequest", "title": "Open Pull Request…", "category": "Overseer", "icon": "$(git-pull-request)", "enablement": "isWorkspaceTrusted" },
@@ -77,6 +84,7 @@
       { "command": "overseer.restartDaemonConnection", "title": "Reconnect to Daemon", "category": "Overseer" }
     ],
     "keybindings": [
+      { "command": "overseer.archiveAgent", "key": "delete", "mac": "cmd+backspace", "when": "focusedView == overseer.agents" },
       { "command": "overseer.toggleDashboard", "key": "ctrl+alt+o", "mac": "cmd+alt+o" },
       { "command": "overseer.newAgent", "key": "ctrl+alt+n", "mac": "cmd+alt+n" },
       { "command": "overseer.toggleGrid", "key": "ctrl+alt+g", "mac": "cmd+alt+g" },
@@ -88,25 +96,39 @@
     ],
     "menus": {
       "view/title": [
-        { "command": "overseer.newTask", "when": "view == overseer.agents", "group": "navigation@1" },
-        { "command": "overseer.openDashboard", "when": "view == overseer.agents", "group": "navigation@0" },
-        { "command": "overseer.switchAgent", "when": "view == overseer.agents", "group": "navigation@4" },
-        { "command": "overseer.refresh", "when": "view == overseer.agents", "group": "navigation@2" },
-        { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "navigation@3" },
+        { "command": "overseer.newAgent", "when": "view == overseer.agents", "group": "navigation@1" },
+        { "command": "overseer.searchAgents", "when": "view == overseer.agents && !overseer.agentsFiltered", "group": "navigation@2" },
+        { "command": "overseer.clearAgentSearch", "when": "view == overseer.agents && overseer.agentsFiltered", "group": "navigation@2" },
+        { "command": "overseer.toggleGrid", "when": "view == overseer.agents", "group": "navigation@3" },
+        { "command": "overseer.showArchived", "when": "view == overseer.agents && !overseer.showArchived", "group": "1_view@1" },
+        { "command": "overseer.hideArchived", "when": "view == overseer.agents && overseer.showArchived", "group": "1_view@1" },
+        { "command": "overseer.openDashboard", "when": "view == overseer.agents", "group": "1_view@2" },
+        { "command": "overseer.switchAgent", "when": "view == overseer.agents", "group": "1_view@3" },
+        { "command": "overseer.newTask", "when": "view == overseer.agents", "group": "2_new@1" },
+        { "command": "overseer.cleanupArchived", "when": "view == overseer.agents", "group": "3_tidy@1" },
+        { "command": "overseer.refresh", "when": "view == overseer.agents", "group": "3_tidy@2" },
+        { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "4_info@1" },
         { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
-        { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
-        { "command": "overseer.selectComparison", "when": "view == overseer.dirty", "group": "navigation@1" }
+        { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" }
       ],
       "view/item/context": [
-        { "command": "overseer.openReview", "when": "view == overseer.agents && viewItem =~ /run/", "group": "inline@1" },
-        { "command": "overseer.showOutput", "when": "view == overseer.agents && viewItem =~ /run/", "group": "inline@2" },
-        { "command": "overseer.interrupt", "when": "view == overseer.agents && viewItem =~ /run-root-active/", "group": "inline@3" },
-        { "command": "overseer.followUp", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "1_control@1" },
-        { "command": "overseer.selectComparison", "when": "view == overseer.agents && viewItem =~ /run/", "group": "1_control@2" },
-        { "command": "overseer.mergeBack", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "1_control@3" },
-        { "command": "overseer.openPullRequest", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "1_control@4" },
-        { "command": "overseer.cleanupWorkspace", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "9_cleanup@1" },
+        { "command": "overseer.interrupt", "when": "view == overseer.agents && viewItem =~ /^agent-active/", "group": "inline@1" },
+        { "command": "overseer.archiveAgent", "when": "view == overseer.agents && viewItem =~ /^agent-done(?!-archived)/", "group": "inline@2" },
+        { "command": "overseer.restoreAgent", "when": "view == overseer.agents && viewItem =~ /^agent-done-archived/", "group": "inline@2" },
+        { "command": "overseer.pinAgent", "when": "view == overseer.agents && viewItem =~ /^agent-(active|done)(?!.*-pinned)/", "group": "inline@3" },
+        { "command": "overseer.unpinAgent", "when": "view == overseer.agents && viewItem =~ /-pinned$/", "group": "inline@3" },
+        { "command": "overseer.openAgentToSide", "when": "view == overseer.agents && viewItem =~ /^(agent|needs)/", "group": "1_open@1" },
+        { "command": "overseer.openReview", "when": "view == overseer.agents && viewItem =~ /^(agent-(active|done)|needs)/", "group": "1_open@2" },
+        { "command": "overseer.followUp", "when": "view == overseer.agents && viewItem =~ /^agent-(active|done)/", "group": "2_control@1" },
+        { "command": "overseer.selectComparison", "when": "view == overseer.agents && viewItem =~ /^agent-(active|done)/", "group": "2_control@2" },
+        { "command": "overseer.mergeBack", "when": "view == overseer.agents && viewItem =~ /^agent-(active|done)/", "group": "2_control@3" },
+        { "command": "overseer.openPullRequest", "when": "view == overseer.agents && viewItem =~ /^agent-(active|done)/", "group": "2_control@4" },
+        { "command": "overseer.pinAgent", "when": "view == overseer.agents && viewItem =~ /^agent-(active|done)(?!.*-pinned)/", "group": "8_organize@1" },
+        { "command": "overseer.unpinAgent", "when": "view == overseer.agents && viewItem =~ /-pinned$/", "group": "8_organize@1" },
+        { "command": "overseer.archiveAgent", "when": "view == overseer.agents && viewItem =~ /^agent-done(?!-archived)/", "group": "8_organize@2" },
+        { "command": "overseer.restoreAgent", "when": "view == overseer.agents && viewItem =~ /^agent-done-archived/", "group": "8_organize@2" },
+        { "command": "overseer.cleanupWorkspace", "when": "view == overseer.agents && viewItem =~ /^agent-done/", "group": "9_cleanup@1" },
         { "command": "overseer.signIn", "when": "view == overseer.accounts && viewItem =~ /^profile-.*-signedout$/", "group": "inline@1" },
         { "command": "overseer.signIn", "when": "view == overseer.accounts && viewItem =~ /^profile-/", "group": "1_edit@0" },
         { "command": "overseer.renameProfile", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@1" },
@@ -115,7 +137,6 @@
         { "command": "overseer.addProfile", "when": "view == overseer.accounts && viewItem == provider", "group": "inline@1" }
       ],
       "commandPalette": [
-        { "command": "overseer.openDirtyDiff", "when": "false" },
         { "command": "overseer.openEdit", "when": "false" }
       ]
     },

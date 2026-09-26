@@ -1,7 +1,7 @@
-// Dashboard mode (AC-57): one command turns this window into the Overseer dashboard (the dashboard
-// fills the editor area; side bar, panel and secondary side bar are hidden for this window only)
-// and Exit Dashboard puts the previous layout back: the editor-group layout and each part that was
-// open. Extensions cannot read part visibility, so the dashboard measures itself: a part was open
+// Dashboard mode (AC-57, AC-79): one command turns this window into the Overseer dashboard: the
+// panel and secondary side bar are hidden for this window only, the side bar shows the Overseer
+// agents list, and the editor area holds the agent (chat, or review and chat). Exit Dashboard puts
+// the previous layout back: the editor-group layout and each part that was open. Extensions cannot read part visibility, so the dashboard measures itself: a part was open
 // if closing it made the dashboard's webview larger. Reopening uses the focus commands, which open
 // a part without toggling it. Nothing is written to user or workspace settings. The dashboard can
 // also open in its own window with no folder, and optionally when VS Code starts.
@@ -15,8 +15,10 @@ const PARTS = [
 const settle = ms => new Promise(r => setTimeout(r, ms));
 
 class Dashboard {
-  constructor(context, center, log) {
+  constructor(context, center, log, { arrange, agentsVisible } = {}) {
     this.context = context; this.center = center; this.log = log;
+    this.arrange = arrange || (() => this.center.open());
+    this.agentsVisible = agentsVisible || (() => false);
   }
 
   get saved() { return this.context.workspaceState.get('overseer.dashboard.saved'); }
@@ -26,7 +28,8 @@ class Dashboard {
     if (!this.inDashboard) {
       let editors;
       try { editors = await vscode.commands.executeCommand('vscode.getEditorLayout'); } catch { editors = undefined; }
-      await this.center.open({ layout: true });
+      const overseerShown = this.agentsVisible();
+      await this.arrange();
       await settle(400);
       // Close each part and see whether the dashboard grew: then that part was open.
       const parts = {};
@@ -38,11 +41,14 @@ class Dashboard {
         parts[p.key] = !!(size && next && (next.w > size.w + 8 || next.h > size.h + 8));
         size = next || size;
       }
-      const saved = { editors, parts, at: Date.now() };
+      // The side bar stays, showing the Overseer agents list (Gate K).
+      await vscode.commands.executeCommand('workbench.view.extension.overseer').then(undefined, () => {});
+      await this.arrange();
+      const saved = { editors, parts, overseerShown, at: Date.now() };
       await this.context.workspaceState.update('overseer.dashboard.saved', saved);
       this.log(`dashboard: entered; saved layout ${JSON.stringify(saved)}`);
     } else {
-      await this.center.open({ layout: false });
+      await this.arrange();
     }
     await vscode.commands.executeCommand('setContext', 'overseer.inDashboard', true);
     this.center.setDashboard?.(true);
@@ -62,7 +68,15 @@ class Dashboard {
     if (ours.length) await vscode.window.tabGroups.close(ours).then(undefined, () => {});
     if (!saved) return;
     if (saved.editors) await vscode.commands.executeCommand('vscode.setEditorLayout', saved.editors).then(undefined, () => {});
-    for (const p of PARTS) if (saved.parts?.[p.key]) await vscode.commands.executeCommand(p.open).then(undefined, () => {});
+    for (const p of PARTS) {
+      if (p.key === 'sideBar') {
+        // Dashboard mode opened the side bar on Overseer; put back what was there as far as VS Code allows.
+        if (!saved.parts?.sideBar) await vscode.commands.executeCommand(p.close).then(undefined, () => {});
+        else if (!saved.overseerShown) await vscode.commands.executeCommand('workbench.view.explorer').then(undefined, () => {});
+        continue;
+      }
+      if (saved.parts?.[p.key]) await vscode.commands.executeCommand(p.open).then(undefined, () => {});
+    }
     await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup').then(undefined, () => {});
     this.log(`dashboard: exited; restored ${JSON.stringify(saved)}`);
   }
