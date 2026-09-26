@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -277,12 +277,30 @@ impl Store {
 
     // ---- runs
     pub fn insert_run(&self, r: &Run) -> Result<()> {
-        self.conn.execute(
+        Self::insert_run_row(&self.conn, r)
+    }
+
+    fn insert_run_row(conn: &Connection, r: &Run) -> Result<()> {
+        conn.execute(
             "INSERT INTO runs(id,task_id,parent_run_id,harness,harness_version,profile_id,model,workspace_id,native_id,status,exit_reason,created_ms,ended_ms,title,relation_source,relation_confidence,capabilities,process_generation)
              VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",
             params![r.id, r.task_id, r.parent_run_id, r.harness, r.harness_version, r.profile_id, r.model, r.workspace_id, r.native_id,
                 r.status, r.exit_reason, r.created_ms, r.ended_ms, r.title, r.relation_source, r.relation_confidence, r.capabilities.to_string(), r.process_generation],
         )?;
+        Ok(())
+    }
+
+    pub fn insert_run_for_swarm(&self, r: &Run, attempt_id: &str) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        Self::insert_run_row(&tx, r)?;
+        let linked = tx.execute(
+            "UPDATE swarm_worker_launches SET overseer_run_id=?2 WHERE attempt_id=?1 AND overseer_run_id IS NULL",
+            params![attempt_id, r.id],
+        )?;
+        if linked != 1 {
+            anyhow::bail!("swarm launch intent is missing or already linked");
+        }
+        tx.commit()?;
         Ok(())
     }
 

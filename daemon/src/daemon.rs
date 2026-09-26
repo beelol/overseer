@@ -30,6 +30,7 @@ pub struct Daemon {
     pub store: Mutex<Store>,
     pub events: broadcast::Sender<Event>,
     tails: Mutex<HashSet<String>>,
+    pub(crate) swarm_launch_lock: Mutex<()>,
     exe: PathBuf,
     pub started_ms: i64,
 }
@@ -54,7 +55,7 @@ impl Daemon {
         let store = Store::open(&paths::db_path())?;
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), exe, started_ms: now() });
+        let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), exe, started_ms: now() });
         daemon.ensure_system_profiles()?;
         Ok(daemon)
     }
@@ -272,6 +273,14 @@ impl Daemon {
     }
 
     pub fn create_task(self: &Arc<Self>, p: &Value) -> Result<Value> {
+        self.create_task_internal(p, None)
+    }
+
+    pub(crate) fn create_task_for_swarm(self: &Arc<Self>, p: &Value, attempt_id: &str) -> Result<Value> {
+        self.create_task_internal(p, Some(attempt_id))
+    }
+
+    fn create_task_internal(self: &Arc<Self>, p: &Value, swarm_attempt_id: Option<&str>) -> Result<Value> {
         let repo_in = p["repo"].as_str().ok_or_else(|| anyhow!("repo is required"))?;
         let harness = p["harness"].as_str().unwrap_or("codex");
         if !["codex", "codex-app", "claude", "opencode", "generic"].contains(&harness) {
@@ -399,7 +408,11 @@ impl Daemon {
             process_generation: 0,
             attention: None,
         };
-        self.store.lock().unwrap().insert_run(&run)?;
+        if let Some(attempt_id) = swarm_attempt_id {
+            self.store.lock().unwrap().insert_run_for_swarm(&run, attempt_id)?;
+        } else {
+            self.store.lock().unwrap().insert_run(&run)?;
+        }
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(&run.id))?;
         let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request")});
         {

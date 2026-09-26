@@ -271,6 +271,16 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
     if attempt_status != "registered" {
         bail!("attempt cannot finish in this state");
     }
+    let linked: Option<(Option<String>,Option<String>,Option<i64>)> = store.conn.query_row(
+        "SELECT l.overseer_run_id,r.status,r.ended_ms FROM swarm_worker_launches l
+         LEFT JOIN runs r ON r.id=l.overseer_run_id WHERE l.attempt_id=?1 AND l.run_id=?2",
+        params![attempt,run], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
+    ).optional()?;
+    if let Some((linked_run,status,ended)) = linked {
+        if linked_run.is_none() || status.as_deref().is_none_or(|s| crate::daemon::ACTIVE.contains(&s)) || ended.is_none() {
+            bail!("linked worker exit is not confirmed");
+        }
+    }
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
     tx.execute(

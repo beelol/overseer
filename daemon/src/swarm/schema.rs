@@ -168,6 +168,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id),
           held INTEGER NOT NULL CHECK(held IN (0,1))
         );
+        CREATE TABLE IF NOT EXISTS swarm_worker_launches(
+          attempt_id TEXT PRIMARY KEY REFERENCES swarm_attempts(id),
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id),
+          job_id TEXT NOT NULL,
+          request_sha256 TEXT NOT NULL,
+          overseer_run_id TEXT UNIQUE REFERENCES runs(id),
+          created_ms INTEGER NOT NULL
+        );
         "#,
     )?;
     let has_stop_reason = conn

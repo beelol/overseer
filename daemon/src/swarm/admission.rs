@@ -224,7 +224,11 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
         |r| r.get(0),
     )?;
     let ordinary_agents: i64 = tx.query_row(
-        "SELECT COUNT(*) FROM runs WHERE status IN ('queued','starting','running','waiting_for_user')",
+        "SELECT COUNT(*) FROM runs r WHERE r.status IN ('queued','starting','running','waiting_for_user')
+         AND NOT EXISTS (
+           SELECT 1 FROM swarm_worker_launches l JOIN swarm_attempts a ON a.id=l.attempt_id
+           WHERE l.overseer_run_id=r.id AND a.status='registered'
+         )",
         [],
         |r| r.get(0),
     )?;

@@ -6,6 +6,7 @@ mod director;
 mod plan;
 mod policy;
 mod revision;
+mod runtime;
 mod settings;
 pub mod schema;
 pub use artifacts::{confirm_exit, decide, put};
@@ -16,6 +17,7 @@ pub use director::{claim_batch, complete_batch, recover};
 pub use policy::preview;
 pub use settings::set_policy;
 pub use revision::revise;
+pub use runtime::{interrupt_workers, launch_worker};
 
 use crate::store::Store;
 use anyhow::{anyhow, bail, Result};

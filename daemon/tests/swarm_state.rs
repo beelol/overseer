@@ -47,7 +47,7 @@ fn earlier_swarm_database_gains_recovery_columns_without_losing_its_run() {
     assert!(d.call("swarm.get",json!({"id":id}))["stop_reason"].is_null());
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     let version: String = db.query_row("SELECT value FROM meta WHERE key='schema_version'",[],|row|row.get(0)).unwrap();
-    assert_eq!(version,"3");
+    assert_eq!(version,"4");
     d.call("swarm.stop",json!({"run_id":id,"generation":1,"revision":0}));
     assert_eq!(d.call("swarm.get",json!({"id":id}))["stop_reason"],"requested");
 }

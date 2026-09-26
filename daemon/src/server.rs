@@ -254,7 +254,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             }
             crate::swarm::ack(&mut d.store.lock().unwrap(), p)?
         }
-        "swarm.stop" => crate::swarm::stop(&mut d.store.lock().unwrap(), p)?,
+        "swarm.stop" => {
+            let mut stopped = crate::swarm::stop(&mut d.store.lock().unwrap(), p)?;
+            stopped["workers"] = crate::swarm::interrupt_workers(d, s(p,"run_id")?)?;
+            stopped
+        }
         "swarm.pause" => crate::swarm::pause(&mut d.store.lock().unwrap(), p)?,
         "swarm.resume" => crate::swarm::resume(&mut d.store.lock().unwrap(), p)?,
         "swarm.off" => crate::swarm::off(&mut d.store.lock().unwrap(), p)?,
@@ -280,6 +284,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.admit" => {
             fixture_only()?;
             crate::swarm::admit(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.worker.launch" => {
+            fixture_only()?;
+            crate::swarm::launch_worker(d, p)?
         }
         "swarm.director.claim_batch" => {
             fixture_only()?;
