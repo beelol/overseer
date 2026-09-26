@@ -1,0 +1,102 @@
+{
+  "checks": [
+    {
+      "name": "Files pane lists the selected run's worktree (repository not open in the window) with changes marked",
+      "ok": true,
+      "detail": [
+        "sub (1)",
+        "a.txt M",
+        "b.txt",
+        "README.md",
+        "c.txt D"
+      ]
+    },
+    {
+      "name": "folders expand lazily and show their changed files",
+      "ok": true,
+      "detail": {
+        "path": "sub/new.txt",
+        "level": 2,
+        "status": "A",
+        "inside": "",
+        "deleted": false,
+        "dir": false
+      }
+    },
+    {
+      "name": "clicking a file opens it in the editor from the X worktree",
+      "ok": true,
+      "detail": {
+        "label": "a.txt, preview, Editor Group 2",
+        "path": "private/tmp/ovs-ui-d00TTK/overseer-home/worktrees/repo-x-35864dfd/x-files/a.txt"
+      }
+    },
+    {
+      "name": "switching runs switches the Files pane; files open from the Y worktree too",
+      "ok": true,
+      "detail": {
+        "ey": [
+          "a.txt ",
+          "b.txt M",
+          "c.txt ",
+          "README.md "
+        ],
+        "tabY": {
+          "label": "b.txt, preview, Editor Group 2",
+          "path": "private/tmp/ovs-ui-d00TTK/overseer-home/worktrees/repo-y-7e0c2928/y-files/b.txt"
+        }
+      }
+    },
+    {
+      "name": "large repository: the deep change is visible from the root (folder counts)",
+      "ok": true,
+      "detail": [
+        "big ",
+        "pkg 1",
+        "a.txt ",
+        "b.txt ",
+        "c.txt ",
+        "README.md "
+      ]
+    },
+    {
+      "name": "a 6,000-entry folder opens within 2 s, is capped with a visible note, and scrolling stays responsive (p95 lag < 250 ms)",
+      "ok": true,
+      "detail": {
+        "openMs": 991,
+        "truncated": "… 1000 more entries not shown",
+        "lag": {
+          "n": 80,
+          "p95": 3,
+          "max": 3
+        }
+      }
+    },
+    {
+      "name": "nested change found and opened in the large repository",
+      "ok": true,
+      "detail": {
+        "deep": {
+          "path": "pkg/m39/x99.txt",
+          "level": 3,
+          "status": "M",
+          "inside": "",
+          "deleted": false,
+          "dir": false
+        },
+        "tabZ": {
+          "label": "x99.txt, preview, Editor Group 2",
+          "path": "private/tmp/ovs-ui-d00TTK/overseer-home/worktrees/repo-z-3bbf066e/z-large/pkg/m39/x99.txt"
+        }
+      }
+    },
+    {
+      "name": "Files pane is a keyboard tree with labelled items",
+      "ok": true,
+      "detail": [
+        "pkg, folder, 1 changed inside",
+        "m0, folder"
+      ]
+    }
+  ]
+}

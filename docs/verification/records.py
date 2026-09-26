@@ -533,11 +533,22 @@ rec(50, "Open a pull request from a run (coming soon)", "not started",
     evidence="—", live="—",
     blocker="Not blocked; deferred by the owner (coming soon). Next: use VS Code's `github` authentication session to push and create the PR.")
 
-rec(51, "Worktree file hierarchy", "not started",
-    expected="See the RFC criterion (added by the owner on 2026-09-25).",
-    actual="Not implemented. Worktrees are only browsable through the review's changed-file list or by opening the folder.",
-    evidence="—", live="—",
-    blocker="Not blocked; not started. Next: a file tree for the selected run's worktree inside the Overseer view (AC-48).")
+rec(51, "Worktree file hierarchy", "verified", commit="0496e0b", date="2026-09-25",
+    steps="""1. `cargo test` — `ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside` (directories first, `.git` hidden, A/M/D marks and per-folder counts against the task-start snapshot, `..`/absolute/`.git` paths refused, a 6,000-entry folder listed in under 2 s and capped at 5,000 with `truncated`).
+2. `node test/ui/scenario-files.js` (packaged UI, generic runs, no paid tokens). The window opens `open-folder`. The runs are in `repo-x` (modify a.txt, add sub/new.txt, delete c.txt), `repo-y` (modify b.txt) and `repo-z`, a 10,000-file repository (6,000 files in `big/`, 4,000 nested under `pkg/`) where the change is `pkg/m39/x99.txt`. Steps: **Open Overseer View**; select each run; expand folders; open files; scroll the 6,000-entry folder; keyboard.
+3. Reran `scenario-center.js`, `scenario-restore.js` and `scenario-theme.js`.""",
+    expected="Browse and open files in worktrees of two different repositories from one window; changed files marked; large repositories stay responsive.",
+    actual="""- **repo-x (not open in the window):** the Files pane lists `sub (1)`, `a.txt M`, `b.txt`, `README.md` and `c.txt D` (struck through), without `.git`. Expanding `sub` shows `sub/new.txt A` at level 2. Clicking `a.txt` opened it in the editor; its breadcrumbs point into `…/worktrees/repo-x-…/x-files/a.txt`.
+- **repo-y:** selecting Y switched the pane (`b.txt M`, no `sub`), and `b.txt` opened from `…/repo-y-…/y-files/`.
+- **Large repository:** from the root, `pkg (1)` points to the single deep change. Opening the 6,000-entry `big/` took 993 ms and shows "… 1000 more entries not shown". Scrolling it kept webview event-loop lag at p95 2 ms (max 5 ms). `pkg/m39/x99.txt M` was found and opened.
+- **Keyboard:** items are labelled treeitems ("pkg, folder, 1 changed inside"), and arrow keys move between them.
+- **Found on the way:**
+  - The Files pane at first squeezed the agents list to one or two rows; the agents list now keeps up to 45% of the height.
+  - The pane's ready flag was not reset when switching runs.
+  - Injected clicks right after focus moves between webviews are sometimes not delivered; the scenario retries that click (a test-input quirk).""",
+    evidence="[files scenario](evidence/ui/files/) (screenshots for X, Y and the large repository; result.json)",
+    live="Fixture runs; the tree reads the worktree and the daemon's task-start snapshot, independent of the harness.",
+    limits="Folders list at most 5,000 entries (the rest are counted). Deleted files cannot be opened (they are listed for context; the review shows their change).")
 
 rec(52, "Native Overseer notifications (macOS)", "not started",
     expected="See the RFC criterion and the [native notifications RFC](../rfcs/native-notifications.md) (added by the owner on 2026-09-25).",

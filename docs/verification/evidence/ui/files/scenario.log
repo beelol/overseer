@@ -1,0 +1,13 @@
+[2026-09-26T00:21:54.891Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T00:22:02.356Z] PASS Files pane lists the selected run's worktree (repository not open in the window) with changes marked ["sub (1)","a.txt M","b.txt","README.md","c.txt D"]
+[2026-09-26T00:22:03.355Z] PASS folders expand lazily and show their changed files {"path":"sub/new.txt","level":2,"status":"A","inside":"","deleted":false,"dir":false}
+[2026-09-26T00:22:04.350Z] PASS clicking a file opens it in the editor from the X worktree {"label":"a.txt, preview, Editor Group 2","path":"private/tmp/ovs-ui-d00TTK/overseer-home/worktrees/repo-x-35864dfd/x-files/a.txt"}
+[2026-09-26T00:22:04.443Z] screenshot docs/verification/evidence/ui/files/01-files-x.png
+[2026-09-26T00:22:06.450Z] b.txt click did not open the file yet; retrying {"label":"Review: Y files (1), Editor Group 2","path":""}
+[2026-09-26T00:22:07.451Z] PASS switching runs switches the Files pane; files open from the Y worktree too {"ey":["a.txt ","b.txt M","c.txt ","README.md "],"tabY":{"label":"b.txt, preview, Editor Group 2","path":"private/tmp/ovs-ui-d00TTK/overseer-home/worktrees/repo-y-7e0c2928/y-files/b.txt"}}
+[2026-09-26T00:22:07.556Z] screenshot docs/verification/evidence/ui/files/02-files-y.png
+[2026-09-26T00:22:09.367Z] PASS large repository: the deep change is visible from the root (folder counts) ["big ","pkg 1","a.txt ","b.txt ","c.txt ","README.md "]
+[2026-09-26T00:22:12.933Z] PASS a 6,000-entry folder opens within 2 s, is capped with a visible note, and scrolling stays responsive (p95 lag < 250 ms) {"openMs":991,"truncated":"… 1000 more entries not shown","lag":{"n":80,"p95":3,"max":3}}
+[2026-09-26T00:22:16.937Z] PASS nested change found and opened in the large repository {"deep":{"path":"pkg/m39/x99.txt","level":3,"status":"M","inside":"","deleted":false,"dir":false},"tabZ":{"label":"x99.txt, preview, Editor Group 2","path":"private/tmp/ovs-ui-d00TTK/overseer-home/worktrees/repo-z-3bbf066e/z-large/pkg/m39/x99.txt"}}
+[2026-09-26T00:22:17.046Z] screenshot docs/verification/evidence/ui/files/03-files-large.png
+[2026-09-26T00:22:17.049Z] PASS Files pane is a keyboard tree with labelled items ["pkg, folder, 1 changed inside","m0, folder"]

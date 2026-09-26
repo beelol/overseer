@@ -16,7 +16,7 @@
           {
             "id": "",
             "role": "radio",
-            "label": "theme-demo, /private/tmp/ovs-ui-fycZAT/theme-demo, on main, open folder",
+            "label": "theme-demo, /private/tmp/ovs-ui-Bh4fZw/theme-demo, on main, open folder",
             "group": "repos"
           },
           {
@@ -53,7 +53,7 @@
             "label": "Start task"
           }
         ],
-        "run": "r-95f0b415f9ba"
+        "run": "r-c00955dc3415"
       }
     },
     {
@@ -75,7 +75,7 @@
             "bad": []
           },
           "center": {
-            "checked": 10,
+            "checked": 16,
             "bad": []
           },
           "conversation": {
@@ -100,7 +100,7 @@
             "bad": []
           },
           "center": {
-            "checked": 10,
+            "checked": 16,
             "bad": []
           },
           "conversation": {
@@ -125,7 +125,7 @@
             "bad": []
           },
           "center": {
-            "checked": 10,
+            "checked": 16,
             "bad": []
           },
           "conversation": {
@@ -150,7 +150,7 @@
             "bad": []
           },
           "center": {
-            "checked": 10,
+            "checked": 16,
             "bad": []
           },
           "conversation": {
