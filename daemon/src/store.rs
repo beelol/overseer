@@ -721,7 +721,7 @@ impl Store {
             params![now_ms.saturating_sub(THIRTY_DAYS_MS)],
         )?;
         let over_cap = self.conn.execute(
-            "DELETE FROM auto_quota_observations WHERE event_seq NOT IN (SELECT event_seq FROM auto_quota_observations ORDER BY event_seq DESC LIMIT ?1)",
+            "DELETE FROM auto_quota_observations WHERE event_seq NOT IN (SELECT event_seq FROM auto_quota_observations ORDER BY observed_ms DESC,event_seq DESC LIMIT ?1)",
             params![cap.clamp(1, 5000)],
         )?;
         Ok(expired + over_cap)
@@ -729,7 +729,7 @@ impl Store {
 
     pub fn latest_auto_quota(&self, pool_id: &str) -> Result<Option<StoredQuotaObservation>> {
         let mut rows = self.conn.prepare(
-            "SELECT event_seq,pool_id,source,snapshot FROM auto_quota_observations WHERE pool_id=?1 ORDER BY event_seq DESC LIMIT 1"
+            "SELECT event_seq,pool_id,source,snapshot FROM auto_quota_observations WHERE pool_id=?1 ORDER BY observed_ms DESC,event_seq DESC LIMIT 1"
         )?;
         let found = rows.query_row(params![pool_id], |row| {
             let snapshot_text: String = row.get(3)?;
@@ -1062,6 +1062,38 @@ mod auto_measurement_tests {
         assert_eq!(store.prune_auto_quotas(100 * DAY, 2).unwrap(), 3);
         assert_eq!(store.auto_quotas(10).unwrap().len(), 2);
         assert_eq!(store.events_after(0, Some("r-1"), 10).unwrap().len(), 5);
+    }
+
+    #[test]
+    fn late_quota_event_cannot_replace_newer_account_evidence() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
+        let pool = "system-codex";
+        let newer_ms = 1_800_000_000_000_i64;
+        let newer = crate::auto_quota::parse_codex_rate_limits(&json!({
+            "ordinaryUsageAllowed":true,
+            "rateLimits":{"primary":{"usedPercent":20,"resetsAt":1800003600}}
+        }), pool, newer_ms).unwrap();
+        let newer_event = store.insert_event(newer_ms, None, None, "quota", "fixture", "reported", &json!({})).unwrap();
+        store.insert_auto_quota(newer_event.seq, pool, "fixture", &newer).unwrap();
+
+        let older_ms = newer_ms - 10_000;
+        let older = crate::auto_quota::parse_codex_rate_limits(&json!({
+            "ordinaryUsageAllowed":false,
+            "rateLimits":{"primary":{"usedPercent":100,"resetsAt":1800003600}}
+        }), pool, older_ms).unwrap();
+        let late_event = store.insert_event(newer_ms + 1, None, None, "quota", "fixture", "reported", &json!({})).unwrap();
+        store.insert_auto_quota(late_event.seq, pool, "fixture", &older).unwrap();
+
+        let current = store.latest_auto_quota(pool).unwrap().unwrap();
+        assert_eq!(current.event_seq, newer_event.seq);
+        assert_eq!(current.snapshot.state_for("gpt-6-sol", newer_ms),
+            crate::auto_quota::QuotaState::ObservedNonExhausted);
+        assert_eq!(store.auto_quotas(10).unwrap().len(), 2,
+            "late evidence remains inspectable without controlling admission");
+        assert_eq!(store.prune_auto_quotas(newer_ms + 1, 1).unwrap(), 1);
+        assert_eq!(store.latest_auto_quota(pool).unwrap().unwrap().event_seq, newer_event.seq,
+            "bounded retention must keep the latest observation time");
     }
 
     #[test]
