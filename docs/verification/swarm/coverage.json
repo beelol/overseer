@@ -120,9 +120,13 @@
       "blocker": "Fixture outage/auth failures exclude only affected targets; rate limits, real adapters and running-job response are not implemented."
     },
     "SWARM-15": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "A two-attempt job cap exists in fixtures, but routing failure transitions and unchanged-state inference suppression are absent."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_routing.rs",
+        "daemon/src/swarm/artifacts.rs",
+        "docs/verification/swarm/SWARM-15.md"
+      ],
+      "blocker": "Two fixture target routes now transition a failed supervised launch from ready to failed after the second attempt, retain the cap across revision, and block retry when an effect is unknown. Live routing and unchanged-state model-planning suppression remain unverified."
     },
     "SWARM-16": {
       "status": "unverified",
