@@ -370,6 +370,48 @@ fn review_backlog_holds_admissions_until_it_drains_below_four() {
 }
 
 #[test]
+fn already_admitted_results_can_overflow_review_threshold_without_loss() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Review overflow",
+        "objective":"Audit many checks","allowed_targets":["codex-a"],
+        "policy":{"max_workers":32,"max_executing":33}}));
+    let id = run["id"].as_str().unwrap();
+    let jobs: Vec<_> = (0..11).map(|n| json!({"id":format!("j{n}"),
+        "title":format!("J{n}"),"acceptance":"evidence","deps":[]})).collect();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":jobs}));
+    let at = now();
+    let mut attempts = Vec::new();
+    for n in 0..10 {
+        let admitted = admit(&d,id,&format!("j{n}"),"codex-a",
+            &format!("overflow-{n}"),at+(n/4) as i64*5000,1000000,100).unwrap();
+        assert_eq!(admitted["status"],"admitted","job {n}: {admitted}");
+        attempts.push(admitted);
+    }
+    for (n, admitted) in attempts.iter().enumerate() {
+        let artifact = format!("overflow-artifact-{n}");
+        d.call("swarm.artifact.put",json!({"run_id":id,"job_id":format!("j{n}"),
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "artifact_id":artifact,"source_revision":1,"kind":"finding","content":"checked"}));
+        let report = d.call("swarm.report",json!({"run_id":id,"job_id":format!("j{n}"),
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "message_id":format!("overflow-result-{n}"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[artifact]}}));
+        assert_eq!(report["duplicate"],false,"result {n}: {report}");
+    }
+    let jobs = d.call("swarm.jobs",json!({"id":id}))["jobs"].as_array().unwrap().clone();
+    assert_eq!(jobs.iter().filter(|job| job["status"]=="submitted").count(),10);
+    assert_eq!(admit(&d,id,"j10","codex-a","overflow-10",at+15000,1000000,100)
+        .unwrap()["reason"],"review_backlog");
+    d.kill9();
+    d.spawn();
+    let jobs = d.call("swarm.jobs",json!({"id":id}))["jobs"].as_array().unwrap().clone();
+    assert_eq!(jobs.iter().filter(|job| job["status"]=="submitted").count(),10);
+    let messages = d.call("swarm.messages",json!({"run_id":id,"recipient":"director","limit":100}));
+    assert_eq!(messages["messages"].as_array().unwrap().iter()
+        .filter(|message| message["type"]=="result").count(),10);
+}
+
+#[test]
 fn explicit_ceiling_admits_thirty_two_fixture_workers_without_hidden_eight_cap() {
     let d = Daemon::start(&[]);
     let run = d.call(
