@@ -38,7 +38,7 @@
         "daemon/tests/swarm_benefit.rs",
         "docs/verification/swarm/SWARM-05.md"
       ],
-      "blocker": "A fixture-only decision now persists cost estimates by revision and batch, gates second-worker admission, and preserves serial/parallel behavior over restart and refill. Actual elapsed/usage outcomes, validated independence, live calibrated estimates and shared Auto Mode quota input remain absent."
+      "blocker": "A fixture-only decision persists cost estimates by revision and batch, gates second-worker admission, and preserves behavior over restart and refill. Supervised worker wall time is measured and retained, but actual native usage and phase costs, validated independence, live calibrated estimates and shared Auto Mode quota input remain absent."
     },
     "SWARM-06": {
       "status": "partial",
