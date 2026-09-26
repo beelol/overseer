@@ -6,7 +6,8 @@
   "seeded_findings": ["foreign-task-mutation", "foreign-attachment-download"],
   "protected_paths": ["project-membership", "role-escalation", "export-workspace-binding", "read-only-and-revoked-tokens"],
   "variants": {
-    "task-guarded": "J7 only: add project-membership guard before task mutation to produce a contradictory independent result"
+    "task-guarded": "J7 only: add project-membership guard before task mutation to produce a contradictory independent result",
+    "export-queue-missing": "J5 only: remove the local PostgreSQL export queue relation so own-workspace enqueue returns 503 and coverage stays blocked"
   },
   "isolation": "one PostgreSQL schema per scripted worker; every schema has independent seed rows"
 }

@@ -57,3 +57,18 @@ test('the guarded J7 variant contradicts the seeded J2 finding without changing 
     await root.end();
   }
 });
+
+test('missing J5 queue is an environment blocker rather than a passing export check', async () => {
+  const root = new pg.Pool({ connectionString: process.env.ATLAS_DATABASE_URL });
+  try {
+    const j5 = await probeJob(root, 'j5', { variant: 'export-queue-missing' });
+    assert.equal(j5.variant, 'export-queue-missing');
+    assert.equal(j5.foreignExportStatus, 403);
+    assert.equal(j5.ownExportStatus, 503);
+    assert.equal(j5.queueAvailable, false);
+    assert.equal(j5.unavailableResource, 'exports_queue');
+    assert.equal(j5.queuedTaskIds, undefined);
+  } finally {
+    await root.end();
+  }
+});

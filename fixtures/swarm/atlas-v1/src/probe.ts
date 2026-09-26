@@ -6,8 +6,10 @@ async function withWorker(root, databaseUrl: string, name: string, run, options 
   const namespace = `atlas_${name}_${randomUUID().replaceAll('-', '')}`;
   await createWorkerNamespace(root, namespace);
   const pool = new Pool({ connectionString: databaseUrl, options: `-c search_path=${namespace}` });
-  const server = createAtlasApp(pool, options).listen(0, '127.0.0.1');
+  let server;
   try {
+    if (options.missingExportQueue) await pool.query('DROP TABLE exports');
+    server = createAtlasApp(pool, options).listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
     const request = (path, options = {}) => fetch(`${base}${path}`, {
@@ -16,9 +18,12 @@ async function withWorker(root, databaseUrl: string, name: string, run, options 
     });
     return { namespace, ...await run({ pool, base, request }) };
   } finally {
-    await new Promise(resolve => server.close(resolve));
-    await pool.end();
-    await root.query(`DROP SCHEMA ${namespace} CASCADE`);
+    try {
+      if (server) await new Promise(resolve => server.close(resolve));
+    } finally {
+      try { await pool.end(); }
+      finally { await root.query(`DROP SCHEMA ${namespace} CASCADE`); }
+    }
   }
 }
 
@@ -63,10 +68,15 @@ const probes = {
     const accepted = await request('/exports', {
       method: 'POST', body: JSON.stringify({ workspaceId: 'workspace-a' }),
     });
+    if (accepted.status === 503) {
+      const failure = await accepted.json();
+      return { foreignExportStatus, ownExportStatus: 503, queueAvailable: false,
+        unavailableResource: failure.unavailableResource };
+    }
     const { id } = await accepted.json();
     const queued = (await pool.query('SELECT workspace_id,actor_id FROM exports WHERE id=$1', [id])).rows[0];
     const processed = await request(`/__fixture/exports/${id}/run`, { method: 'POST' });
-    return { foreignExportStatus, ownExportStatus: accepted.status,
+    return { foreignExportStatus, ownExportStatus: accepted.status, queueAvailable: true,
       queuedWorkspace: queued.workspace_id, queuedActor: queued.actor_id,
       queuedTaskIds: (await processed.json()).taskIds };
   },
@@ -95,11 +105,13 @@ export async function probeJob(root, job: string, { variant } = {}) {
   const databaseUrl = process.env.ATLAS_DATABASE_URL;
   if (!databaseUrl) throw new Error('ATLAS_DATABASE_URL is required');
   if (!Object.hasOwn(probes, job)) throw new Error(`unknown Atlas job ${job}`);
-  if (variant && (job !== 'j7' || variant !== 'task-guarded')) {
+  const variants = { j7: 'task-guarded', j5: 'export-queue-missing' };
+  if (variant && variants[job] !== variant) {
     throw new Error(`unknown Atlas variant ${variant} for ${job}`);
   }
   const evidence = await withWorker(root, databaseUrl, job, probes[job], {
     taskOwnershipGuard: variant === 'task-guarded',
+    missingExportQueue: variant === 'export-queue-missing',
   });
   return variant ? { variant, ...evidence } : evidence;
 }

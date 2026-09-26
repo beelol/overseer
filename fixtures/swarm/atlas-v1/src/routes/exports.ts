@@ -11,8 +11,13 @@ export function exportRoutes(pool) {
       [req.auth.userId, workspaceId]);
     if (!allowed.rowCount) return res.sendStatus(403);
     const id = randomUUID();
-    await pool.query('INSERT INTO exports(id,workspace_id,actor_id) VALUES($1,$2,$3)',
-      [id, workspaceId, req.auth.userId]);
+    try {
+      await pool.query('INSERT INTO exports(id,workspace_id,actor_id) VALUES($1,$2,$3)',
+        [id, workspaceId, req.auth.userId]);
+    } catch (error) {
+      if (error.code === '42P01') return res.status(503).json({ unavailableResource: 'exports_queue' });
+      throw error;
+    }
     res.status(202).json({ id });
   });
   return router;

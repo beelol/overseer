@@ -353,3 +353,51 @@ fn atlas_s1_contradictory_j7_retracts_claim_pending_environment_review() {
         "verification":"Contradictory fixture variants","checks":checks})).unwrap_err();
     assert!(completion_error.contains("requires every planned job to be accepted"),"{completion_error}");
 }
+
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s1_missing_export_queue_remains_blocked_coverage() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Atlas missing queue",
+        "objective":"Audit export isolation","allowed_targets":["fixture"]}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j5","title":"Exports","acceptance":"workspace-bound queued export","deps":[]}
+    ]}));
+    let at=now();
+    let snapshot=json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"fixture","account_id":"account","pool_ids":["pool"],
+            "capabilities":["audit"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+120000}]}]});
+    let attempt=admit(&d,run,1,"j5","fixture",&snapshot,at);
+    assert_eq!(attempt["status"],"admitted","{attempt}");
+    let evidence=atlas_probe_variant("j5",Some("export-queue-missing"));
+    assert_eq!(evidence["foreignExportStatus"],403);
+    assert_eq!(evidence["ownExportStatus"],503);
+    assert_eq!(evidence["queueAvailable"],false);
+    let artifact="atlas-j5-missing-queue";
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"j5",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "artifact_id":artifact,"source_revision":1,"kind":"log",
+        "content":evidence.to_string()}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"j5",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "message_id":"atlas-j5-queue-unavailable","type":"result","revision":1,
+        "payload":{"audit_outcome":"environment_failure","artifact_ids":[artifact],
+            "unavailable_resource":"exports_queue"}}));
+    assert!(d.try_call("swarm.decide",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j5","decision":"accept","evidence":[artifact]}))
+        .unwrap_err().contains("environment"));
+    let coverage=d.call("swarm.coverage",json!({"run_id":run}));
+    assert_eq!(coverage["rows"][0]["coverage_state"],"environment_blocked");
+    assert_eq!(coverage["rows"][0]["unavailable_resource"],"exports_queue");
+    assert_ne!(coverage["rows"][0]["job_status"],"accepted");
+    assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"atlas-missing-queue-complete",
+        "summary":"Exports checked","verification":"Queue unavailable",
+        "checks":[{"job_id":"j5","outcome":"passed","evidence":[artifact]}]}))
+        .unwrap_err().contains("requires every planned job to be accepted"));
+}
