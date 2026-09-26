@@ -175,3 +175,32 @@ fn stop_blocks_new_attempts_without_discarding_late_evidence() {
     );
     assert_eq!(control["messages"][0]["type"], "stop");
 }
+
+#[test]
+fn finished_attempt_late_result_cannot_submit_a_newer_attempt() {
+    let d=Daemon::start(&[]);
+    let (run,first,first_token)=planned(&d);
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"routes",
+        "attempt_id":first,"token":first_token,"artifact_id":"first-proof",
+        "source_revision":1,"kind":"finding","content":"first attempt"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"routes",
+        "attempt_id":first,"token":first_token,"message_id":"first-result",
+        "type":"result","revision":1,"payload":{"artifact_ids":["first-proof"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"routes","decision":"reject","evidence":["first-proof"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"job_id":"routes",
+        "attempt_id":first,"generation":1,"revision":1}));
+    let second=d.call("swarm.attempt.register",json!({"run_id":run,"job_id":"routes",
+        "generation":1,"revision":1}));
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"reserved");
+    d.call("swarm.report",json!({"run_id":run,"job_id":"routes",
+        "attempt_id":first,"token":first_token,"message_id":"late-first-result",
+        "type":"result","revision":1,"payload":{"artifact_ids":["first-proof"]}}));
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"reserved");
+    assert_eq!(d.call("swarm.messages",json!({"run_id":run,"recipient":"director"}))["messages"]
+        .as_array().unwrap().iter().filter(|m|m["message_id"]=="late-first-result").count(),1);
+    d.call("swarm.report",json!({"run_id":run,"job_id":"routes",
+        "attempt_id":second["id"],"token":second["token"],"message_id":"second-result",
+        "type":"result","revision":1,"payload":{"artifact_ids":[]}}));
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"submitted");
+}

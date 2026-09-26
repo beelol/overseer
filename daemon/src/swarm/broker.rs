@@ -181,7 +181,10 @@ fn insert_message(
         params![run,id,job,attempt,sender,recipient,kind,revision,payload,now])?;
     let seq = tx.last_insert_rowid();
     if recipient == "director" && (kind == "result" || kind == "submit") {
-        tx.execute("UPDATE swarm_jobs SET status='submitted',updated_ms=?3 WHERE run_id=?1 AND id=?2 AND status IN ('reserved','running')",params![run,job,now])?;
+        tx.execute("UPDATE swarm_jobs SET status='submitted',updated_ms=?3
+            WHERE run_id=?1 AND id=?2 AND status IN ('reserved','running')
+            AND EXISTS (SELECT 1 FROM swarm_attempts a WHERE a.id=?4 AND a.run_id=?1
+                AND a.job_id=?2 AND a.status='registered')",params![run,job,now,attempt])?;
     }
     tx.commit()?;
     Ok(json!({"message_id":id,"seq":seq,"phase":"queued","duplicate":false}))
