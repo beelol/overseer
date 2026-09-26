@@ -9,12 +9,12 @@
     "SWARM-01": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "Normal Auto/Manual × Swarm launch paths and an opt-in UI are not wired; fixture planning cannot verify off-mode or one-agent fallback."
     },
     "SWARM-02": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "Saved allowlists are snapshotted, but live target discovery and permission-aware fallback or checkpoint transfer are absent."
     },
     "SWARM-03": {
       "status": "partial",
@@ -35,7 +35,7 @@
     "SWARM-05": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "No elapsed-time benefit estimator or accounting for planning, integration and review costs is connected to admission."
     },
     "SWARM-06": {
       "status": "partial",
@@ -105,7 +105,7 @@
     "SWARM-13": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "Live adapter enforcement and native usage reconciliation are absent; quota evidence remains injected fixture data."
     },
     "SWARM-14": {
       "status": "partial",
@@ -118,22 +118,22 @@
     "SWARM-15": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "A two-attempt job cap exists in fixtures, but routing failure transitions and unchanged-state inference suppression are absent."
     },
     "SWARM-16": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "No live worker checkpoint transfer or external side-effect reconciliation exists; artifact persistence alone is insufficient."
     },
     "SWARM-17": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "Native descendant admission/control or disablement has not been qualified per harness; observed children are not enforced limits."
     },
     "SWARM-18": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "Existing worktree behavior has protocol tests, but Swarm job-to-worktree writer assignment and conflict integration are not connected."
     },
     "SWARM-19": {
       "status": "partial",
@@ -177,7 +177,7 @@
     "SWARM-23": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "The extension has no Swarm status/usage/limiting-constraint view; daemon fixture output is not UI evidence."
     },
     "SWARM-24": {
       "status": "partial",
@@ -190,12 +190,12 @@
     "SWARM-25": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "No authorized version-pinned live two-worker, fallback, cancel and recovery matrix has been run."
     },
     "SWARM-26": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "No fixed end-to-end serial-versus-swarm evaluation suite or native usage/elapsed-time comparison exists."
     },
     "SWARM-27": {
       "status": "partial",
@@ -209,7 +209,7 @@
     "SWARM-28": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "Policy previews qualified targets, but no live Auto Mode route and worker launch connects capability decisions to jobs."
     },
     "SWARM-29": {
       "status": "partial",
@@ -234,7 +234,7 @@
     "SWARM-31": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "Existing adapter lifecycle tests are not wired to Swarm attempts, descendants, accounting and asynchronous launch receipts."
     },
     "SWARM-32": {
       "status": "partial",
@@ -255,7 +255,7 @@
     "SWARM-34": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "No worker-brief/context request service or 100-job director summary exists; broker byte caps do not prove context relevance."
     },
     "SWARM-35": {
       "status": "partial",
@@ -269,12 +269,12 @@
     "SWARM-36": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "Admission is atomic per request but no cross-category round-robin queue selects among eligible backlogs."
     },
     "SWARM-37": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "No 100-job/32-worker Swarm UI fixture, aggregate view or measured Pause/Stop acknowledgement latency exists."
     },
     "SWARM-38": {
       "status": "partial",
@@ -409,12 +409,12 @@
     "SWARM-51": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "No Swarm process/transport liveness sampler or 60-second reachability transition exists; fixture director recovery is not live worker liveness."
     },
     "SWARM-52": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "Audit-only permissions and source-write/live-mutation boundaries are not enforced by enabled harness adapters."
     },
     "SWARM-53": {
       "status": "partial",
@@ -440,7 +440,7 @@
     "SWARM-55": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "The broker stores result payloads but no typed coverage classification or negative/environment-failure/defect report is implemented."
     },
     "SWARM-56": {
       "status": "partial",
@@ -453,17 +453,17 @@
     "SWARM-57": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "No artifact destination ACL/revocation transition or supported interruption path exists."
     },
     "SWARM-58": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "No side-effect command journal or unknown-outcome reconciliation prevents a blind replay after lost acknowledgement."
     },
     "SWARM-59": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "Policy preview explains ineligible targets, but no durable blocked run state/change-triggered wakeup and finishing-capacity recovery exists."
     },
     "SWARM-60": {
       "status": "partial",
@@ -497,12 +497,12 @@
     "SWARM-63": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "No ordinary backend Swarm run can launch yet; its absence cannot verify that product self-tests/editor control are excluded."
     },
     "SWARM-64": {
       "status": "unverified",
       "evidence": [],
-      "blocker": null
+      "blocker": "S0–S5 are specified but their complete versioned replay fixtures and expected traces have not been built."
     }
   },
   "scenarios": {
