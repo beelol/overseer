@@ -1580,12 +1580,13 @@ impl Daemon {
                         state.sends.push(format!("{}\n", json!({"id":"ovs-auto-quota","method":"account/rateLimits/read","params":{}})));
                     }
                     "ovs-auto-quota" => {
+                        let observed_ms = now();
+                        let profile_id = run.profile_id.as_deref().ok_or_else(|| anyhow!("run account profile unavailable"))?;
+                        let quota = crate::auto_quota::parse_codex_rate_limits(&result, profile_id, observed_ms).ok();
                         let recorded = (|| -> Result<bool> {
                             let fingerprint = crate::auto_quota::account_fingerprint(&result)?;
-                            let profile_id = run.profile_id.as_deref().ok_or_else(|| anyhow!("run account profile unavailable"))?;
                             store.record_auto_account_identity(profile_id, &fingerprint)?;
                             let generation = store.auto_account_generation(profile_id)?.ok_or_else(|| anyhow!("account generation unavailable"))?;
-                            let quota = crate::auto_quota::parse_codex_rate_limits(&result, profile_id, now()).ok();
                             store.record_auto_run_account(&run.id, profile_id, generation,
                                 quota.as_ref().and_then(|snapshot| snapshot.reported_plan_type()))?;
                             if app["auto_selected"] == true {
@@ -1623,6 +1624,17 @@ impl Daemon {
                                 ev("auto_account_unknown", "daemon", "exact", json!({"reason":"run account evidence unavailable"}), None)?;
                             }
                             Ok(true) => {}
+                        }
+                        if let Some(snapshot) = quota {
+                            // A normalized, run-scoped pre-turn observation can be
+                            // paired with a later metadata read. It is not yet an
+                            // attributable subscription charge.
+                            let event = store.insert_event(observed_ms, task, rid, "auto_quota",
+                                "codex-app/managed-pre-turn", "reported",
+                                &json!({"pool_id":profile_id,"snapshot":snapshot}))?;
+                            store.insert_auto_quota(event.seq, profile_id,
+                                "codex-app/managed-pre-turn", &snapshot)?;
+                            out.push(event);
                         }
                         state.sends.push(format!("{}\n", codex_child_next_request(app)));
                     }

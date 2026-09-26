@@ -1355,7 +1355,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             };
             let store = d.store.lock().unwrap();
             store.record_auto_account_identity(profile_id, &fingerprint)?;
-            let event = store.insert_event(observed_ms, None, None, "quota", "codex-app/metadata-read", "reported", &json!({"profile_id":profile_id,"snapshot":snapshot}))?;
+            let event = store.insert_event(observed_ms, Some(&run.task_id), Some(&run.id), "quota",
+                "codex-app/metadata-read", "reported", &json!({"profile_id":profile_id,"snapshot":snapshot}))?;
             store.insert_auto_quota(event.seq, profile_id, "codex-app/metadata-read", &snapshot)?;
             let observation = if let Some(mut estimate) = estimate {
                 let generation = store.auto_account_generation(profile_id)?.ok_or_else(|| anyhow!("account generation is unavailable"))?;

@@ -1883,6 +1883,36 @@ fn auto_thread_credit_read_loses_plan_attribution_when_the_account_plan_changes(
 }
 
 #[test]
+fn auto_managed_codex_quota_reads_are_linked_to_the_child_without_raw_response() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-delegation")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let child = run_id(&d.call("run.delegate", json!({"work_unit_id":"quota-pair-child-1",
+        "parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol",
+        "effort":"medium","prompt":"bounded work"})));
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    d.call("auto.usage.thread.refresh", json!({"run_id":child}));
+    let observations = d.events(&child).into_iter().filter(|event|
+        event["kind"] == "auto_quota" || event["kind"] == "quota").collect::<Vec<_>>();
+    assert_eq!(observations.len(), 2, "before and after allowance reads must belong to the same child: {observations:?}");
+    assert_eq!(observations[0]["source"], "codex-app/managed-pre-turn");
+    assert_eq!(observations[1]["source"], "codex-app/metadata-read");
+    assert_eq!(observations[0]["payload"]["snapshot"]["windows"][0]["plan_type"], "pro");
+    assert_eq!(observations[1]["payload"]["snapshot"]["windows"][0]["plan_type"], "pro");
+    assert!(observations[0]["payload"]["snapshot"]["observed_ms"].as_i64().unwrap()
+        <= observations[1]["payload"]["snapshot"]["observed_ms"].as_i64().unwrap());
+    assert!(!serde_json::to_string(&observations).unwrap().contains("secret-credit-sentinel"));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let linked: i64 = db.query_row("SELECT COUNT(*) FROM auto_quota_observations q JOIN events e ON e.seq=q.event_seq WHERE e.run_id=?1", [&child], |row| row.get(0)).unwrap();
+    assert_eq!(linked, 2, "normalized quota snapshots must be durable and run-scoped");
+}
+
+#[test]
 fn auto_managed_child_has_an_isolated_parent_snapshot_and_returnable_result() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
