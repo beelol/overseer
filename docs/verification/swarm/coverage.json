@@ -181,7 +181,7 @@
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/swarm_dispatch.rs"
       ],
-      "blocker": "A fixture dispatch replays admission after a crash before launch, reissues only an unlinked token, returns a linked worker after a second restart, and Stop prevents delayed launch. Automatic pending-intent drain, exact spawn-record crash windows, result receipt replay, VS Code restart and live harness recovery remain unverified."
+      "blocker": "Fixture startup automatically drains already-admitted unlinked intents only while their snapshots and target permission remain valid; it retains stale or revoked reservations without launching. Exact spawn-record crash windows, result receipt replay, VS Code restart, live Auto Mode refresh and live harness recovery remain unverified."
     },
     "SWARM-23": {
       "status": "unverified",
