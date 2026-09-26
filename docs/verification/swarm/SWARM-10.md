@@ -10,4 +10,6 @@ Actual: before confirmed exit, the reservation is `active`; afterward it is `unc
 
 Evidence: `daemon/tests/swarm_runtime.rs` (`stop_retries_an_initially_unreachable_worker_after_daemon_restart`), `daemon/src/swarm/artifacts.rs` (`confirm_exit`), `daemon/src/swarm/admission.rs`.
 
+Follow-up at `28bbe73`: `daemon/tests/swarm_admission.rs` (`shared_pool_reservation_blocks_stale_capacity_across_categories`) admits an attempt in one category, uses the fixture exit-confirmation API, then retries admission from another category on the same quota pool. The second category remains blocked against a stale snapshot while the first reservation is `uncertain`. The separate runtime fixture above covers an actual supervised worker exit. Replay: `cargo test --offline -p overseerd --test swarm_admission shared_pool_reservation_blocks_stale_capacity_across_categories -- --nocapture` passed.
+
 Remaining: no authoritative native usage measurement or reconciliation transaction exists, so the uncertain hold cannot yet be released or charged to actual use. Finishing-work draw and live harness/account qualification are also unverified. This criterion remains unchecked.
