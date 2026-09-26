@@ -198,10 +198,12 @@
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
         "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_integration.rs",
         "docs/verification/swarm/milestone-1.md",
-        "docs/verification/swarm/milestone-3.md"
+        "docs/verification/swarm/milestone-3.md",
+        "docs/verification/swarm/SWARM-21.md"
       ],
-      "blocker": "Revision CAS, affected-job invalidation and stale result rejection pass; user-message intake, live delivery, and job removal remain unimplemented."
+      "blocker": "Revision CAS, affected-job invalidation and stale result rejection pass. An unchanged accepted patch integrates across an unrelated revision while a changed job's old patch cannot. User-message intake, live delivery, and safe job removal remain unimplemented."
     },
     "SWARM-22": {
       "status": "partial",
