@@ -25,7 +25,7 @@ fn daemon_stop_all_cancels_swarm_without_a_supervised_worker() {
 }
 
 #[test]
-fn daemon_stop_all_interrupts_linked_swarm_worker_and_preserves_attempt() {
+fn daemon_stop_all_preserves_unconfirmed_swarm_worker_after_control_loss() {
     let mut d = Daemon::start(&[]);
     let temp = tmp();
     let checkout = repo(&temp.path().join("global-stop-source"));
@@ -51,19 +51,33 @@ fn daemon_stop_all_interrupts_linked_swarm_worker_and_preserves_attempt() {
         "program":"/bin/sleep","args":["30"],"prompt":"Inspect","title":"Global stop worker"}));
     let worker = launched["overseer_run_id"].as_str().unwrap();
     d.wait_status(worker, |status| status == "running", 10);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let run_dir: String = db.query_row("SELECT run_dir FROM runs WHERE id=?1", [worker],
+        |row| row.get(0)).unwrap();
+    let launch: serde_json::Value = serde_json::from_slice(&std::fs::read(
+        std::path::Path::new(&run_dir).join("launch.json")).unwrap()).unwrap();
+    std::fs::remove_file(launch["control_socket"].as_str().unwrap()).unwrap();
+    let shim: serde_json::Value = serde_json::from_slice(&std::fs::read(
+        std::path::Path::new(&run_dir).join("shim.json")).unwrap()).unwrap();
 
     let stopped = d.call("daemon.stop_all", json!({}));
     assert_eq!(stopped["swarms"], json!([id]));
-    assert_eq!(stopped["remaining"], json!([]));
+    assert_eq!(stopped["remaining"], json!([worker]));
+    let ended: Option<i64> = db.query_row("SELECT ended_ms FROM runs WHERE id=?1", [worker],
+        |row| row.get(0)).unwrap();
+    assert_eq!(ended, None, "unreachable control socket is not a confirmed process exit");
+    assert!(pid_alive(shim["child_pid"].as_i64().unwrap()));
     assert!(d.child.as_mut().unwrap().wait().unwrap().success());
     d.child = None;
     d.spawn();
     assert_eq!(d.call("swarm.jobs", json!({"id":id}))["jobs"][1]["status"], "cancelled");
-    assert_ne!(d.run(worker)["status"], "running");
-    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["unconfirmed_exit_count"], 1);
+    assert_eq!(d.run(worker)["status"], "running");
     let attempts: i64 = db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND job_id='active'",
         [id], |row| row.get(0)).unwrap();
     assert_eq!(attempts, 1);
+    signal(shim["child_pid"].as_i64().unwrap(), 9);
+    d.wait_done(worker, 5);
 }
 
 #[test]

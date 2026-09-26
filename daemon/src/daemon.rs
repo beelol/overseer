@@ -78,7 +78,7 @@ pub struct Daemon {
     pub ui_session: Mutex<(Option<std::time::Instant>, Option<Vec<String>>)>,
 }
 
-fn pid_alive(pid: u32) -> bool {
+pub(crate) fn pid_alive(pid: u32) -> bool {
     if pid == 0 {
         return false;
     }

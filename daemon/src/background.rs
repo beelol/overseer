@@ -132,7 +132,19 @@ impl Daemon {
                 Err(e) => crate::log(&format!("stop_all: interrupt {} failed: {e}", run.id)),
             }
         }
-        let alive = |run: &Run| self.control_socket(run).ok().map(|s| shim::control(&s, &json!({"op": "ping"})).is_ok()).unwrap_or(false);
+        let alive = |run: &Run| {
+            if self.control_socket(run).ok().is_some_and(|s| shim::control(&s, &json!({"op": "ping"})).is_ok()) {
+                return true;
+            }
+            let dir = self.store.lock().unwrap().run_process(&run.id).ok().flatten()
+                .map(|(dir, _, _)| std::path::PathBuf::from(dir));
+            let Some(dir) = dir else { return false };
+            if dir.join("exit.json").exists() { return false }
+            std::fs::read(dir.join("shim.json")).ok()
+                .and_then(|bytes| serde_json::from_slice::<shim::ShimInfo>(&bytes).ok())
+                .is_some_and(|info| crate::daemon::pid_alive(info.shim_pid)
+                    || crate::daemon::pid_alive(info.child_pid))
+        };
         let wait = |secs: u64| {
             let end = Instant::now() + Duration::from_secs(secs);
             while Instant::now() < end && runs.iter().any(|r| alive(r)) {
@@ -158,10 +170,11 @@ impl Daemon {
         }
         let remaining: Vec<String> = runs.iter().filter(|r| alive(r)).map(|r| r.id.clone()).collect();
         for run in &runs {
-            // Anything that never got a process (queued) or whose tail has not finalized yet.
+            // A recorded process is reconciled from its exit record on restart. A
+            // missing or unreachable control socket is not proof that it exited.
             let store = self.store.lock().unwrap();
             let status = store.run(&run.id).ok().flatten().map(|r| r.status).unwrap_or_default();
-            if ACTIVE.contains(&status.as_str()) {
+            if ACTIVE.contains(&status.as_str()) && store.run_process(&run.id)?.is_none() {
                 store.conn.execute("UPDATE runs SET status='interrupted', exit_reason=COALESCE(exit_reason, 'stopped with the daemon'), ended_ms=COALESCE(ended_ms, ?2) WHERE id=?1", rusqlite::params![run.id, now()])?;
             }
         }
