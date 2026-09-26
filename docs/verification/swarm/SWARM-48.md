@@ -1,6 +1,6 @@
 # SWARM-48 — invalid planning subgraphs
 
-Status: partial. Revision: the partial-plan implementation commit in this branch.
+Status: partial. Revision: `77774af`.
 
 Input: a 10-job fixture containing a valid root and child, another independent valid job, a missing dependency and its dependent, a two-job cycle, a missing acceptance check, and two jobs with the same ID. The director explicitly sets `allow_partial: true`; the default remains strict validation.
 

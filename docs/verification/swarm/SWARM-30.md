@@ -1,6 +1,6 @@
 # SWARM-30 — director replacement
 
-Status: partial. Revision: `0fc1446`, follow-up `3d7bc31` and the paused-state recovery change.
+Status: partial. Revision: `0fc1446`, follow-ups `3d7bc31` and `e89bc7d`.
 
 Input: a fixture-admitted worker with a reserved quota window reports a discovery. The director claims it, and the daemon restarts before the batch is applied. The worker sends a late terminal result while director termination is uncertain. The fixture then reports confirmed director death.
 
