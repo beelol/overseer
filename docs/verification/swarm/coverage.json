@@ -478,12 +478,13 @@
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "daemon/tests/swarm_dispatch.rs",
+        "daemon/tests/swarm_context.rs",
         "daemon/src/swarm/completion.rs",
         "docs/verification/swarm/milestone-2.md",
         "docs/verification/swarm/milestone-12.md",
         "docs/verification/swarm/SWARM-54.md"
       ],
-      "blocker": "Acceptance and fixture final completion revalidate stored evidence provenance and integrity, including tampering after review. Live filesystem provenance and permission-scoped replacement retrieval remain unimplemented."
+      "blocker": "Acceptance and fixture final completion revalidate stored evidence provenance and integrity, including tampering after review. Dependent context now excludes unreviewed artifacts and becomes unavailable after a late source result. Live filesystem provenance and permission-scoped replacement retrieval remain unimplemented."
     },
     "SWARM-55": {
       "status": "partial",
@@ -511,7 +512,7 @@
         "daemon/src/swarm/context.rs",
         "docs/verification/swarm/SWARM-57.md"
       ],
-      "blocker": "Durable fixture destination revocation blocks context delivery, later dependent admission and a linked local worker while unrelated work continues. Live cross-target ACL/credential isolation, secret audits, peer bypass resistance, S4 replay and Stop/revocation/result races remain unverified."
+      "blocker": "Durable fixture destination grants transfer only accepted evidence to an admitted dependent target, survive restart, and yield to revocation; revocation blocks context delivery, later dependent admission and a linked local worker while unrelated work continues. Live cross-target ACL/credential isolation, secret audits, peer bypass resistance, S4 replay and Stop/revocation/result races remain unverified."
     },
     "SWARM-58": {
       "status": "partial",
