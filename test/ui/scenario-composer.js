@@ -68,6 +68,9 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const c = await start('Say hello from Claude', 'claude');
     check('Claude agent started keyboard-only from the composer; it becomes selected and streams in place', /Claude Code/.test(claudeChip) && c.run && c.shown, { claudeChip, run: c.run?.id, shown: c.shown });
     await s.screenshot('claude-started');
+    // AC-72: after starting an agent (no changes yet) the editor area is still one group with its chat, no review.
+    const groupsAfterStart = await cdp.evalWorkbench(`[...document.querySelectorAll('.editor-group-container')].filter(g => g.offsetParent).map(g => [...g.querySelectorAll('.tab')].map(t => (t.getAttribute('aria-label') || '').split(/[,:]/)[0]))`);
+    check('after starting an agent from the composer: one editor group with its chat, no review', groupsAfterStart.length === 1 && !groupsAfterStart.flat().some(t => /^Review/.test(t)), groupsAfterStart);
     // Codex.
     await cdp.command('Overseer: New Agent'); await delay(800);
     await dash.waitFor(`document.body.dataset.mode === 'composer'`, 5000);
