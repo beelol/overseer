@@ -293,8 +293,13 @@ fn handle_control(conn: UnixStream, stdin: Arc<Mutex<Option<std::process::ChildS
 
 /// Client helper used by the daemon.
 pub fn control(socket: &Path, msg: &serde_json::Value) -> anyhow::Result<serde_json::Value> {
+    control_with_timeout(socket, msg, Duration::from_secs(5))
+}
+
+pub fn control_with_timeout(socket: &Path, msg: &serde_json::Value, timeout: Duration) -> anyhow::Result<serde_json::Value> {
     let mut conn = UnixStream::connect(socket)?;
-    conn.set_read_timeout(Some(Duration::from_secs(5)))?;
+    conn.set_read_timeout(Some(timeout))?;
+    conn.set_write_timeout(Some(timeout))?;
     let mut text = msg.to_string();
     text.push('\n');
     conn.write_all(text.as_bytes())?;

@@ -211,6 +211,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           overseer_run_id TEXT UNIQUE REFERENCES runs(id),
           created_ms INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS swarm_worker_liveness(
+          attempt_id TEXT PRIMARY KEY REFERENCES swarm_attempts(id),
+          state TEXT NOT NULL CHECK(state IN ('reachable','suspect','unknown')),
+          unreachable_since_ms INTEGER,
+          last_sample_ms INTEGER NOT NULL
+        );
         "#,
     )?;
     let has_stop_reason = conn

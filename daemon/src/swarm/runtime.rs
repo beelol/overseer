@@ -3,11 +3,116 @@
 
 use super::{broker, get, required};
 use crate::daemon::{Daemon, SwarmWorkerIdentity};
+use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
+use std::time::Duration;
+
+const UNKNOWN_AFTER_MS: i64 = 60_000;
+const SAMPLE_INTERVAL_MS: i64 = 15_000;
+
+pub fn liveness(store: &Store, p: &Value) -> Result<Value> {
+    let run = required(p, "run_id")?;
+    let job = required(p, "job_id")?;
+    let attempt = required(p, "attempt_id")?;
+    let row: Option<(String, Option<i64>, i64)> = store.conn.query_row(
+        "SELECT l.state,l.unreachable_since_ms,l.last_sample_ms FROM swarm_worker_liveness l
+         JOIN swarm_attempts a ON a.id=l.attempt_id
+         WHERE l.attempt_id=?1 AND a.run_id=?2 AND a.job_id=?3",
+        params![attempt,run,job],
+        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+    ).optional()?;
+    Ok(match row {
+        Some((state,since,last)) => json!({"state":state,"unreachable_since_ms":since,
+            "last_sample_ms":last,"sample_interval_ms":SAMPLE_INTERVAL_MS,
+            "unknown_after_ms":UNKNOWN_AFTER_MS}),
+        None => json!({"state":"unobserved","unreachable_since_ms":null,
+            "last_sample_ms":null,"sample_interval_ms":SAMPLE_INTERVAL_MS,
+            "unknown_after_ms":UNKNOWN_AFTER_MS}),
+    })
+}
+
+/// One deterministic reachability observation. Only a daemon-owned sampler may call this
+/// in normal operation; the protocol exposes it solely behind fixture opt-in.
+pub fn sample_liveness(store: &mut Store, p: &Value) -> Result<Value> {
+    let run = required(p, "run_id")?;
+    let job = required(p, "job_id")?;
+    let attempt = required(p, "attempt_id")?;
+    let now = p["now_ms"].as_i64().ok_or_else(|| anyhow!("missing sample time"))?;
+    let reachable = p["reachable"].as_bool().ok_or_else(|| anyhow!("missing reachability"))?;
+    if now < 0 {
+        bail!("invalid sample time");
+    }
+    let linked = store.conn.prepare(
+        "SELECT 1 FROM swarm_attempts a JOIN swarm_worker_launches l ON l.attempt_id=a.id
+         WHERE a.id=?1 AND a.run_id=?2 AND a.job_id=?3 AND a.status='registered'
+         AND l.overseer_run_id IS NOT NULL"
+    )?.exists(params![attempt,run,job])?;
+    if !linked {
+        bail!("unknown or inactive linked worker attempt");
+    }
+    let prior: Option<(Option<i64>,i64)> = store.conn.query_row(
+        "SELECT unreachable_since_ms,last_sample_ms FROM swarm_worker_liveness WHERE attempt_id=?1",
+        params![attempt], |r| Ok((r.get(0)?,r.get(1)?)),
+    ).optional()?;
+    if prior.as_ref().is_some_and(|(_,last)| now <= *last) {
+        bail!("out-of-order liveness sample");
+    }
+    let since = if reachable { None } else { Some(prior.and_then(|(since,_)| since).unwrap_or(now)) };
+    let state = if reachable { "reachable" }
+        else if now.saturating_sub(since.unwrap()) >= UNKNOWN_AFTER_MS { "unknown" }
+        else { "suspect" };
+    store.conn.execute(
+        "INSERT INTO swarm_worker_liveness(attempt_id,state,unreachable_since_ms,last_sample_ms)
+         VALUES(?1,?2,?3,?4) ON CONFLICT(attempt_id) DO UPDATE SET
+         state=excluded.state,unreachable_since_ms=excluded.unreachable_since_ms,
+         last_sample_ms=excluded.last_sample_ms",
+        params![attempt,state,since,now],
+    )?;
+    Ok(json!({"state":state,"unreachable_since_ms":since,"last_sample_ms":now,
+        "sample_interval_ms":SAMPLE_INTERVAL_MS,"unknown_after_ms":UNKNOWN_AFTER_MS}))
+}
+
+/// Probe a bounded number of due local worker control sockets. This reads supervisor
+/// reachability only; it never interprets model output or confirms process exit.
+pub fn sample_due_workers(d: &Arc<Daemon>, now: i64) -> Result<usize> {
+    let due = {
+        let store = d.store.lock().unwrap();
+        let mut stmt = store.conn.prepare(
+            "SELECT l.run_id,l.job_id,l.attempt_id,l.overseer_run_id FROM swarm_worker_launches l
+             JOIN swarm_attempts a ON a.id=l.attempt_id AND a.status='registered'
+             JOIN runs r ON r.id=l.overseer_run_id
+             LEFT JOIN swarm_worker_liveness v ON v.attempt_id=l.attempt_id
+             WHERE r.status IN ('queued','starting','running','waiting_for_user','disconnected')
+             AND (v.last_sample_ms IS NULL OR v.last_sample_ms<=?1)
+             ORDER BY COALESCE(v.last_sample_ms,0),l.created_ms LIMIT 4",
+        )?;
+        let rows = stmt.query_map(params![now.saturating_sub(SAMPLE_INTERVAL_MS)], |r| {
+            Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,
+                r.get::<_,String>(2)?,r.get::<_,String>(3)?))
+        })?.collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
+    };
+    let mut sampled = 0;
+    for (run, job, attempt, overseer_run) in due {
+        let worker = d.run(&overseer_run)?;
+        if !crate::daemon::ACTIVE.contains(&worker.status.as_str()) && worker.status != "disconnected" {
+            continue;
+        }
+        let reachable = worker.status != "disconnected" && d.control_socket(&worker).ok()
+            .and_then(|socket| crate::shim::control_with_timeout(
+                &socket, &json!({"op":"ping"}), Duration::from_millis(250)).ok())
+            .is_some_and(|reply| reply["ok"] == true);
+        sample_liveness(&mut d.store.lock().unwrap(), &json!({
+            "run_id":run,"job_id":job,"attempt_id":attempt,
+            "now_ms":now,"reachable":reachable}))?;
+        sampled += 1;
+    }
+    Ok(sampled)
+}
 
 pub fn launch_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let _serial = d.swarm_launch_lock.lock().unwrap();
@@ -176,6 +281,16 @@ pub fn reconcile_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     if worker_status == "disconnected" {
         return Ok(json!({"status":"unknown","overseer_run_id":overseer_run_id,
             "worker_status":worker_status}));
+    }
+    let reachability: Option<String> = store.conn.query_row(
+        "SELECT state FROM swarm_worker_liveness WHERE attempt_id=?1",
+        params![attempt], |r| r.get(0),
+    ).optional()?;
+    if crate::daemon::ACTIVE.contains(&worker_status.as_str())
+        && matches!(reachability.as_deref(), Some("suspect" | "unknown"))
+    {
+        return Ok(json!({"status":reachability.unwrap(),
+            "overseer_run_id":overseer_run_id,"worker_status":worker_status}));
     }
     if crate::daemon::ACTIVE.contains(&worker_status.as_str()) || ended.is_none() {
         return Ok(json!({"status":"active","overseer_run_id":overseer_run_id}));

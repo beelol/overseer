@@ -117,6 +117,44 @@ fn admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart() {
         )["status"],
         "active"
     );
+    let sampled_by = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let observation = d.call("swarm.worker.liveness",json!({"run_id":id,
+            "job_id":"inspect","attempt_id":admitted["attempt_id"]}));
+        if observation["state"] == "reachable" {
+            break;
+        }
+        assert!(std::time::Instant::now() < sampled_by, "daemon did not sample worker reachability: {observation}");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    let probe_at = now() + 2_000;
+    let sample = |time, reachable| d.call("swarm.worker.liveness.sample", json!({
+        "run_id":id,"job_id":"inspect","attempt_id":admitted["attempt_id"],
+        "now_ms":time,"reachable":reachable}));
+    assert_eq!(sample(probe_at, true)["state"], "reachable");
+    assert_eq!(sample(probe_at + 1, false)["state"], "suspect");
+    d.call("swarm.report", json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "message_id":"progress-does-not-reset-liveness","type":"progress",
+        "revision":1,"payload":{"note":"still working"}}));
+    assert_eq!(sample(probe_at + 60_000, false)["state"], "suspect");
+    let unknown_after_threshold = sample(probe_at + 60_001, false);
+    assert_eq!(unknown_after_threshold["state"], "unknown");
+    assert_eq!(unknown_after_threshold["unreachable_since_ms"], probe_at + 1);
+    assert!(d.try_call("swarm.worker.liveness.sample",json!({"run_id":id,
+        "job_id":"inspect","attempt_id":admitted["attempt_id"],
+        "now_ms":probe_at + 60_000,"reachable":true})).is_err());
+    assert_eq!(d.call("swarm.worker.liveness",json!({"run_id":id,
+        "job_id":"inspect","attempt_id":admitted["attempt_id"]}))["state"], "unknown");
+    assert_eq!(d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}))["status"], "unknown");
+    assert_eq!(sample(probe_at + 60_002, true)["state"], "reachable");
+    assert_eq!(d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}))["status"], "active");
+    let attempts: i64 = rusqlite::Connection::open(d.home.path().join("overseer.sqlite"))
+        .unwrap().query_row("SELECT attempt_count FROM swarm_jobs WHERE run_id=?1 AND id='inspect'",
+        rusqlite::params![id], |r|r.get(0)).unwrap();
+    assert_eq!(attempts, 1);
     // A lost supervisor/transport is not proof that its child process exited.
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     db.execute("UPDATE runs SET status='disconnected',ended_ms=?2 WHERE id=?1",
@@ -158,6 +196,8 @@ fn admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart() {
     assert_eq!(second["status"], "admitted", "{second}");
     d.kill9();
     d.spawn();
+    assert_eq!(d.call("swarm.worker.liveness",json!({"run_id":id,
+        "job_id":"inspect","attempt_id":admitted["attempt_id"]}))["state"], "reachable");
     let replay = d.call("swarm.worker.launch", request.clone());
     assert_eq!(replay["overseer_run_id"], worker_run);
     assert_eq!(replay["duplicate"], true);

@@ -27,7 +27,8 @@ pub use dispatch::recover_pending as recover_pending_dispatches;
 pub use policy::preview;
 pub use settings::set_policy;
 pub use revision::revise;
-pub use runtime::{interrupt_workers, launch_worker, reconcile_terminal_workers, reconcile_worker};
+pub use runtime::{interrupt_workers, launch_worker, liveness, reconcile_terminal_workers,
+    reconcile_worker, sample_due_workers, sample_liveness};
 pub use scheduler::next as schedule_next;
 
 use crate::store::Store;

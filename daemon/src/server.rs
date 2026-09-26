@@ -50,6 +50,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
                     crate::swarm::interrupt_workers(&daemon, &run)?;
                 }
                 crate::swarm::reconcile_terminal_workers(&daemon)?;
+                crate::swarm::sample_due_workers(&daemon, crate::daemon::now())?;
                 Ok::<(), anyhow::Error>(())
             })
             .await
@@ -351,6 +352,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.worker.reconcile" => {
             fixture_only()?;
             crate::swarm::reconcile_worker(d, p)?
+        }
+        "swarm.worker.liveness" => crate::swarm::liveness(&d.store.lock().unwrap(), p)?,
+        "swarm.worker.liveness.sample" => {
+            fixture_only()?;
+            crate::swarm::sample_liveness(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.director.claim_batch" => {
             fixture_only()?;
