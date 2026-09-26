@@ -482,9 +482,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_admission.rs",
-        "docs/verification/swarm/milestone-7.md"
+        "daemon/tests/swarm_runtime.rs",
+        "docs/verification/swarm/milestone-7.md",
+        "docs/verification/swarm/SWARM-56.md"
       ],
-      "blocker": "A fixture admits 32 with explicit ceilings and holds new work at eight pending results until fewer than four remain; actual 32-worker execution and account use are unverified."
+      "blocker": "Local fixtures enforce review pressure and launch 32 live supervised workers with explicit ceilings, but in-flight submissions over the threshold, live account usage, director/reviewer operation at scale and versioned qualification remain unverified."
     },
     "SWARM-57": {
       "status": "unverified",
