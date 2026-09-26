@@ -6,14 +6,16 @@ use crate::auto_quota::{QuotaSnapshot, StoredQuotaObservation};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::Serialize;
 use serde_json::Value;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 12;
+pub const SCHEMA_VERSION: i64 = 13;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
 pub struct Store {
     pub conn: Connection,
+    pub learning_conn: Connection,
+    pub learning_persistent: bool,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -148,12 +150,50 @@ impl Store {
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
-        let store = Self { conn };
-        store.migrate()?;
+        let learning = (|| -> Result<Connection> {
+            let learning_conn = if path == Path::new(":memory:") {
+                Connection::open_in_memory()?
+            } else {
+                let mut name = path.as_os_str().to_os_string();
+                name.push(".learning");
+                let learning_path = PathBuf::from(name);
+                let learning = Connection::open(&learning_path)?;
+                #[cfg(unix)] {
+                    use std::os::unix::fs::PermissionsExt;
+                    std::fs::set_permissions(&learning_path,
+                        std::fs::Permissions::from_mode(0o600))?;
+                }
+                learning
+            };
+            learning_conn.pragma_update(None, "journal_mode", "DELETE")?;
+            learning_conn.pragma_update(None, "synchronous", "FULL")?;
+            learning_conn.busy_timeout(std::time::Duration::from_secs(5))?;
+            let page_size: i64 = learning_conn.pragma_query_value(None, "page_size", |row| row.get(0))?;
+            let max_pages = (128 * 1024 * 1024 / page_size).max(1);
+            learning_conn.pragma_update(None, "max_page_count", max_pages)?;
+            Ok(learning_conn)
+        })();
+        let (learning_conn, learning_persistent) = match learning {
+            Ok(conn) => (conn, true),
+            Err(_) => (Connection::open_in_memory()?, false),
+        };
+        let mut store = Self { conn, learning_conn, learning_persistent };
+        store.migrate_main()?;
+        if store.migrate_learning().is_err() {
+            store.learning_conn = Connection::open_in_memory()?;
+            store.learning_persistent = false;
+            store.migrate_learning()?;
+        }
         Ok(store)
     }
 
+    #[cfg(test)]
     fn migrate(&self) -> Result<()> {
+        self.migrate_main()?;
+        self.migrate_learning()
+    }
+
+    fn migrate_main(&self) -> Result<()> {
         self.conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
@@ -282,6 +322,100 @@ impl Store {
         }
         self.conn.execute("INSERT INTO meta(key, value) VALUES('schema_version', ?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
+    }
+
+    fn migrate_learning(&self) -> Result<()> {
+        self.learning_conn.execute_batch(r#"
+            CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+            CREATE TABLE IF NOT EXISTS auto_measurements(
+              event_seq INTEGER PRIMARY KEY, observed_ms INTEGER NOT NULL, task_id TEXT NOT NULL,
+              run_id TEXT NOT NULL, harness TEXT NOT NULL, profile_id TEXT, model TEXT, effort TEXT,
+              input_tokens INTEGER, output_tokens INTEGER, cached_input_tokens INTEGER,
+              reasoning_output_tokens INTEGER, cost_usd REAL);
+            CREATE INDEX IF NOT EXISTS auto_measurements_observed ON auto_measurements(observed_ms);
+            CREATE TABLE IF NOT EXISTS auto_daily_aggregates(
+              day_ms INTEGER NOT NULL, harness TEXT NOT NULL, profile_id TEXT NOT NULL,
+              model TEXT NOT NULL, effort TEXT NOT NULL, last_observed_ms INTEGER NOT NULL, samples INTEGER NOT NULL,
+              input_observations INTEGER NOT NULL, input_tokens INTEGER NOT NULL,
+              output_observations INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
+              cached_input_observations INTEGER NOT NULL, cached_input_tokens INTEGER NOT NULL,
+              reasoning_output_observations INTEGER NOT NULL, reasoning_output_tokens INTEGER NOT NULL,
+              cost_observations INTEGER NOT NULL, cost_usd REAL NOT NULL,
+              PRIMARY KEY(day_ms,harness,profile_id,model,effort));
+            CREATE INDEX IF NOT EXISTS auto_daily_last_observed ON auto_daily_aggregates(last_observed_ms);
+            CREATE TABLE IF NOT EXISTS auto_thread_usage_observations(
+              id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL,
+              profile_id TEXT NOT NULL, read_account_generation INTEGER NOT NULL,
+              attribution TEXT NOT NULL, observed_ms INTEGER NOT NULL,
+              source TEXT NOT NULL, estimate TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS auto_thread_usage_observed ON auto_thread_usage_observations(observed_ms);
+        "#)?;
+        if !self.learning_persistent { return Ok(()); }
+        if self.learning_reset_pending()? {
+            let tx = self.learning_conn.unchecked_transaction()?;
+            tx.execute("DELETE FROM auto_measurements", [])?;
+            tx.execute("DELETE FROM auto_daily_aggregates", [])?;
+            tx.execute("DELETE FROM auto_thread_usage_observations", [])?;
+            tx.execute("DELETE FROM meta WHERE key='auto_learning_samples_inserted'", [])?;
+            tx.commit()?;
+            let tx = self.conn.unchecked_transaction()?;
+            tx.execute("DELETE FROM auto_measurements", [])?;
+            tx.execute("DELETE FROM auto_daily_aggregates", [])?;
+            tx.execute("DELETE FROM auto_thread_usage_observations", [])?;
+            tx.execute("INSERT OR IGNORE INTO meta(key,value) VALUES('auto_learning_split_migrated','1')", [])?;
+            tx.execute("DELETE FROM meta WHERE key='auto_learning_reset_required'", [])?;
+            tx.commit()?;
+            return Ok(());
+        }
+        let migrated: bool = self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM meta WHERE key='auto_learning_split_migrated')",
+            [], |row| row.get(0))?;
+        if migrated { return Ok(()); }
+        self.learning_conn.execute_batch("SAVEPOINT auto_learning_migration")?;
+        let copy = (|| -> Result<()> {
+            for table in ["auto_measurements", "auto_daily_aggregates", "auto_thread_usage_observations"] {
+                let mut stmt = self.conn.prepare(&format!("SELECT * FROM {table}"))?;
+                let column_count = stmt.column_count();
+                let placeholders = (1..=column_count).map(|n| format!("?{n}"))
+                    .collect::<Vec<_>>().join(",");
+                let insert = format!("INSERT OR IGNORE INTO {table} VALUES({placeholders})");
+                let mut rows = stmt.query([])?;
+                while let Some(row) = rows.next()? {
+                    let values = (0..column_count).map(|index| row.get::<_, rusqlite::types::Value>(index))
+                        .collect::<rusqlite::Result<Vec<_>>>()?;
+                    self.learning_conn.execute(&insert, rusqlite::params_from_iter(values))?;
+                }
+            }
+            let count: Option<String> = self.conn.query_row(
+                "SELECT value FROM meta WHERE key='auto_learning_samples_inserted'", [], |row| row.get(0)).optional()?;
+            if let Some(count) = count {
+                self.learning_conn.execute("INSERT OR IGNORE INTO meta(key,value) VALUES('auto_learning_samples_inserted',?1)", [count])?;
+            }
+            Ok(())
+        })();
+        if let Err(error) = copy {
+            let _ = self.learning_conn.execute_batch("ROLLBACK TO auto_learning_migration; RELEASE auto_learning_migration");
+            return Err(error);
+        }
+        self.learning_conn.execute_batch("RELEASE auto_learning_migration")?;
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute("INSERT OR IGNORE INTO meta(key,value) VALUES('auto_learning_split_migrated','1')", [])?;
+        tx.execute("DELETE FROM auto_measurements", [])?;
+        tx.execute("DELETE FROM auto_daily_aggregates", [])?;
+        tx.execute("DELETE FROM auto_thread_usage_observations", [])?;
+        tx.execute("DELETE FROM meta WHERE key='auto_learning_samples_inserted'", [])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn learning_reset_pending(&self) -> Result<bool> {
+        Ok(self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM meta WHERE key='auto_learning_reset_required')",
+            [], |row| row.get(0))?)
+    }
+
+    pub fn auto_learning_is_paused(&self) -> Result<bool> {
+        Ok(!self.learning_persistent || self.learning_reset_pending()?)
     }
 
     // ---- workspaces
@@ -719,9 +853,22 @@ impl Store {
             ).optional()?;
             let changed = previous.as_ref().is_some_and(|(old, _)| old != fingerprint);
             if changed {
-                self.conn.execute("DELETE FROM auto_measurements WHERE profile_id=?1", params![profile_id])?;
-                self.conn.execute("DELETE FROM auto_daily_aggregates WHERE profile_id=?1", params![profile_id])?;
-                self.conn.execute("DELETE FROM auto_thread_usage_observations WHERE profile_id=?1", params![profile_id])?;
+                // If the learning file is unavailable, retain a durable reset
+                // marker. Recovery clears stale account data before exposing it.
+                self.conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('auto_learning_reset_required','1')", [])?;
+                if self.learning_persistent {
+                    let removed = (|| -> Result<()> {
+                        let tx = self.learning_conn.unchecked_transaction()?;
+                        tx.execute("DELETE FROM auto_measurements WHERE profile_id=?1", params![profile_id])?;
+                        tx.execute("DELETE FROM auto_daily_aggregates WHERE profile_id=?1", params![profile_id])?;
+                        tx.execute("DELETE FROM auto_thread_usage_observations WHERE profile_id=?1", params![profile_id])?;
+                        tx.commit()?;
+                        Ok(())
+                    })();
+                    if removed.is_ok() {
+                        self.conn.execute("DELETE FROM meta WHERE key='auto_learning_reset_required'", [])?;
+                    }
+                }
                 self.conn.execute("DELETE FROM auto_run_account_evidence WHERE profile_id=?1", params![profile_id])?;
                 self.conn.execute("DELETE FROM auto_quota_observations WHERE pool_id=?1", params![profile_id])?;
                 self.conn.execute("DELETE FROM auto_model_catalogs WHERE profile_id=?1", params![profile_id])?;
@@ -818,25 +965,27 @@ impl Store {
         &self, run_id: &str, profile_id: &str, generation: i64,
         source: &str, estimate: &crate::auto_consumption::ThreadUsageEstimate,
     ) -> Result<i64> {
+        if !self.learning_persistent || self.learning_reset_pending()? { return Err(anyhow!("Auto learning storage unavailable")); }
         let attribution = if self.auto_run_account_matches(run_id, profile_id, generation)? {
             "same_account_generation"
         } else {
             "unverified_run_account"
         };
-        self.conn.execute(
+        self.learning_conn.execute(
             "INSERT INTO auto_thread_usage_observations(run_id,profile_id,read_account_generation,attribution,observed_ms,source,estimate) VALUES(?1,?2,?3,?4,?5,?6,?7)",
             params![run_id, profile_id, generation, attribution, estimate.observed_ms, source, serde_json::to_string(estimate)?],
         )?;
-        let id = self.conn.last_insert_rowid();
+        let id = self.learning_conn.last_insert_rowid();
         const THIRTY_DAYS_MS: i64 = 30 * 86_400_000;
-        self.conn.execute("DELETE FROM auto_thread_usage_observations WHERE observed_ms < ?1", params![crate::daemon::now().saturating_sub(THIRTY_DAYS_MS)])?;
-        self.conn.execute("DELETE FROM auto_thread_usage_observations WHERE id NOT IN (SELECT id FROM auto_thread_usage_observations ORDER BY id DESC LIMIT 5000)", [])?;
+        self.learning_conn.execute("DELETE FROM auto_thread_usage_observations WHERE observed_ms < ?1", params![crate::daemon::now().saturating_sub(THIRTY_DAYS_MS)])?;
+        self.learning_conn.execute("DELETE FROM auto_thread_usage_observations WHERE id NOT IN (SELECT id FROM auto_thread_usage_observations ORDER BY id DESC LIMIT 5000)", [])?;
         Ok(id)
     }
 
     pub fn auto_thread_usage_observations(&self, limit: i64) -> Result<Vec<crate::auto_consumption::StoredThreadUsageObservation>> {
+        if self.learning_reset_pending()? { return Ok(Vec::new()); }
         use crate::auto_consumption::{StoredThreadUsageObservation, ThreadUsageEstimate};
-        let mut stmt = self.conn.prepare("SELECT id,run_id,profile_id,read_account_generation,attribution,source,estimate FROM auto_thread_usage_observations ORDER BY id DESC LIMIT ?1")?;
+        let mut stmt = self.learning_conn.prepare("SELECT id,run_id,profile_id,read_account_generation,attribution,source,estimate FROM auto_thread_usage_observations ORDER BY id DESC LIMIT ?1")?;
         let rows = stmt.query_map(params![limit.clamp(1, 5000)], |row| {
             let encoded: String = row.get(6)?;
             let estimate: ThreadUsageEstimate = serde_json::from_str(&encoded).map_err(|error| rusqlite::Error::FromSqlConversionFailure(6, rusqlite::types::Type::Text, Box::new(error)))?;
@@ -912,21 +1061,22 @@ impl Store {
     // ---- local Auto learning. This table never stores raw harness output.
     pub fn insert_auto_measurement(&self, event_seq: i64, m: &Measurement) -> Result<bool> {
         const DAY_MS: i64 = 86_400_000;
+        if !self.learning_persistent || self.learning_reset_pending()? { return Err(anyhow!("Auto learning storage unavailable")); }
         if !crate::auto_telemetry::valid_for_store(m) {
             return Err(anyhow!("invalid Auto measurement"));
         }
         // Keep detail and aggregate writes atomic on the learning connection.
         // Callers may invoke this after the execution event has committed.
-        self.conn.execute_batch("SAVEPOINT auto_measurement_write")?;
+        self.learning_conn.execute_batch("SAVEPOINT auto_measurement_write")?;
         let result = (|| -> Result<usize> {
-        let inserted = self.conn.execute(
+        let inserted = self.learning_conn.execute(
             "INSERT OR IGNORE INTO auto_measurements(event_seq,observed_ms,task_id,run_id,harness,profile_id,model,effort,input_tokens,output_tokens,cached_input_tokens,reasoning_output_tokens,cost_usd) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)",
             params![event_seq, m.observed_ms, m.task_id, m.run_id, m.harness, m.profile_id, m.model, m.effort,
                 m.input_tokens, m.output_tokens, m.cached_input_tokens, m.reasoning_output_tokens, m.cost_usd],
         )?;
         if inserted == 1 {
             let day_ms = m.observed_ms.div_euclid(DAY_MS) * DAY_MS;
-            self.conn.execute(
+            self.learning_conn.execute(
                 "INSERT INTO auto_daily_aggregates(day_ms,harness,profile_id,model,effort,last_observed_ms,samples,input_observations,input_tokens,output_observations,output_tokens,cached_input_observations,cached_input_tokens,reasoning_output_observations,reasoning_output_tokens,cost_observations,cost_usd) VALUES(?1,?2,?3,?4,?5,?6,1,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16) ON CONFLICT(day_ms,harness,profile_id,model,effort) DO UPDATE SET last_observed_ms=MAX(last_observed_ms,excluded.last_observed_ms),samples=samples+1,input_observations=input_observations+excluded.input_observations,input_tokens=input_tokens+excluded.input_tokens,output_observations=output_observations+excluded.output_observations,output_tokens=output_tokens+excluded.output_tokens,cached_input_observations=cached_input_observations+excluded.cached_input_observations,cached_input_tokens=cached_input_tokens+excluded.cached_input_tokens,reasoning_output_observations=reasoning_output_observations+excluded.reasoning_output_observations,reasoning_output_tokens=reasoning_output_tokens+excluded.reasoning_output_tokens,cost_observations=cost_observations+excluded.cost_observations,cost_usd=cost_usd+excluded.cost_usd",
                 params![day_ms, m.harness, m.profile_id.as_deref().unwrap_or(""), m.model.as_deref().unwrap_or(""), m.effort.as_deref().unwrap_or(""), m.observed_ms,
                     i64::from(m.input_tokens.is_some()), m.input_tokens.unwrap_or(0),
@@ -937,19 +1087,19 @@ impl Store {
             )?;
         }
         let count: i64 = if inserted == 1 {
-            self.conn.execute("INSERT INTO meta(key,value) VALUES('auto_learning_samples_inserted','1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1", [])?;
-            self.conn.query_row("SELECT CAST(value AS INTEGER) FROM meta WHERE key='auto_learning_samples_inserted'", [], |row| row.get(0))?
+            self.learning_conn.execute("INSERT INTO meta(key,value) VALUES('auto_learning_samples_inserted','1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1", [])?;
+            self.learning_conn.query_row("SELECT CAST(value AS INTEGER) FROM meta WHERE key='auto_learning_samples_inserted'", [], |row| row.get(0))?
         } else { 0 };
         if inserted == 1 {
             let now = crate::daemon::now();
             // Exact row caps are enforced in the same savepoint as the write.
             // A count query is cheap at these bounded table sizes and avoids
             // overshoot between periodic age-maintenance passes.
-            let details: i64 = self.conn.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get(0))?;
+            let details: i64 = self.learning_conn.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get(0))?;
             if details > 50_000 || count % 100 == 0 {
                 self.prune_auto_measurements(now, 50_000)?;
             }
-            let summaries: i64 = self.conn.query_row("SELECT COUNT(*) FROM auto_daily_aggregates", [], |row| row.get(0))?;
+            let summaries: i64 = self.learning_conn.query_row("SELECT COUNT(*) FROM auto_daily_aggregates", [], |row| row.get(0))?;
             if summaries > 10_000 || count % 100 == 0 {
                 self.prune_auto_daily_aggregates(now, 10_000)?;
             }
@@ -958,11 +1108,11 @@ impl Store {
         })();
         let inserted = match result {
             Ok(value) => {
-                self.conn.execute_batch("RELEASE auto_measurement_write")?;
+                self.learning_conn.execute_batch("RELEASE auto_measurement_write")?;
                 value
             }
             Err(error) => {
-                let _ = self.conn.execute_batch("ROLLBACK TO auto_measurement_write; RELEASE auto_measurement_write");
+                let _ = self.learning_conn.execute_batch("ROLLBACK TO auto_measurement_write; RELEASE auto_measurement_write");
                 return Err(error);
             }
         };
@@ -970,7 +1120,8 @@ impl Store {
     }
 
     pub fn auto_measurements(&self, limit: i64) -> Result<Vec<StoredMeasurement>> {
-        let mut stmt = self.conn.prepare("SELECT * FROM auto_measurements ORDER BY event_seq DESC LIMIT ?1")?;
+        if self.learning_reset_pending()? { return Ok(Vec::new()); }
+        let mut stmt = self.learning_conn.prepare("SELECT * FROM auto_measurements ORDER BY event_seq DESC LIMIT ?1")?;
         let rows = stmt.query_map(params![limit.clamp(1, 50_000)], |row| Ok(StoredMeasurement {
             event_seq: row.get("event_seq")?,
             measurement: Measurement {
@@ -989,11 +1140,11 @@ impl Store {
     /// may pass a lower cap for bounded fixture verification.
     pub fn prune_auto_measurements(&self, now_ms: i64, cap: i64) -> Result<usize> {
         const THIRTY_DAYS_MS: i64 = 30 * 86_400_000;
-        let expired = self.conn.execute(
+        let expired = self.learning_conn.execute(
             "DELETE FROM auto_measurements WHERE observed_ms < ?1",
             params![now_ms.saturating_sub(THIRTY_DAYS_MS)],
         )?;
-        let over_cap = self.conn.execute(
+        let over_cap = self.learning_conn.execute(
             "DELETE FROM auto_measurements WHERE event_seq NOT IN (SELECT event_seq FROM auto_measurements ORDER BY event_seq DESC LIMIT ?1)",
             params![cap.clamp(1, 50_000)],
         )?;
@@ -1001,7 +1152,8 @@ impl Store {
     }
 
     pub fn auto_daily_aggregates(&self, limit: i64) -> Result<Vec<AutoDailyAggregate>> {
-        let mut stmt = self.conn.prepare("SELECT * FROM auto_daily_aggregates ORDER BY day_ms DESC,harness,profile_id,model,effort LIMIT ?1")?;
+        if self.learning_reset_pending()? { return Ok(Vec::new()); }
+        let mut stmt = self.learning_conn.prepare("SELECT * FROM auto_daily_aggregates ORDER BY day_ms DESC,harness,profile_id,model,effort LIMIT ?1")?;
         let rows = stmt.query_map(params![limit.clamp(1, 10_000)], |row| {
             let profile: String = row.get("profile_id")?;
             let model: String = row.get("model")?;
@@ -1028,11 +1180,11 @@ impl Store {
     /// Keep compact summaries for 90 days and at most 10,000 scoped rows.
     pub fn prune_auto_daily_aggregates(&self, now_ms: i64, cap: i64) -> Result<usize> {
         const NINETY_DAYS_MS: i64 = 90 * 86_400_000;
-        let expired = self.conn.execute(
+        let expired = self.learning_conn.execute(
             "DELETE FROM auto_daily_aggregates WHERE last_observed_ms < ?1",
             params![now_ms.saturating_sub(NINETY_DAYS_MS)],
         )?;
-        let over_cap = self.conn.execute(
+        let over_cap = self.learning_conn.execute(
             "DELETE FROM auto_daily_aggregates WHERE rowid NOT IN (SELECT rowid FROM auto_daily_aggregates ORDER BY last_observed_ms DESC LIMIT ?1)",
             params![cap.clamp(1, 10_000)],
         )?;
@@ -1040,13 +1192,19 @@ impl Store {
     }
 
     pub fn clear_auto_learning(&self) -> Result<usize> {
-        let tx = self.conn.unchecked_transaction()?;
+        if !self.learning_persistent {
+            self.conn.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('auto_learning_reset_required','1')", [])?;
+            self.conn.execute("DELETE FROM auto_run_account_evidence", [])?;
+            return Err(anyhow!("Auto learning storage unavailable; deletion queued for recovery"));
+        }
+        let tx = self.learning_conn.unchecked_transaction()?;
         let deleted = tx.execute("DELETE FROM auto_measurements", [])?;
         tx.execute("DELETE FROM auto_daily_aggregates", [])?;
         tx.execute("DELETE FROM auto_thread_usage_observations", [])?;
-        tx.execute("DELETE FROM auto_run_account_evidence", [])?;
         tx.execute("DELETE FROM meta WHERE key='auto_learning_samples_inserted'", [])?;
         tx.commit()?;
+        self.conn.execute("DELETE FROM auto_run_account_evidence", [])?;
+        self.conn.execute("DELETE FROM meta WHERE key='auto_learning_reset_required'", [])?;
         Ok(deleted)
     }
 
@@ -1126,6 +1284,110 @@ mod schema_migration_tests {
     use super::*;
 
     #[test]
+    fn failed_account_cleanup_hides_learning_and_reports_pause_until_recovery() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let store = Store::open(&path).unwrap();
+        store.record_auto_account_identity("p", &"a".repeat(64)).unwrap();
+        let measurement = crate::auto_telemetry::from_usage(1000, "task", "run", "codex",
+            Some("p"), None, &serde_json::json!({"input_tokens":1})).unwrap();
+        store.insert_auto_measurement(1, &measurement).unwrap();
+        store.learning_conn.execute_batch("CREATE TRIGGER block_learning_delete BEFORE DELETE ON auto_measurements
+            BEGIN SELECT RAISE(FAIL,'learning cleanup blocked'); END;").unwrap();
+        assert!(store.record_auto_account_identity("p", &"b".repeat(64)).unwrap());
+        assert!(store.auto_learning_is_paused().unwrap());
+        assert!(store.auto_measurements(10).unwrap().is_empty(),
+            "old-account measurements must be hidden while cleanup is pending");
+        drop(store);
+        let learning = Connection::open(dir.path().join("state.sqlite.learning")).unwrap();
+        learning.execute_batch("DROP TRIGGER block_learning_delete").unwrap();
+        drop(learning);
+        let recovered = Store::open(&path).unwrap();
+        assert!(!recovered.auto_learning_is_paused().unwrap());
+        assert!(recovered.auto_measurements(10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn account_switch_while_learning_is_unavailable_cannot_restore_old_samples() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let learning_path = dir.path().join("state.sqlite.learning");
+        let saved_path = dir.path().join("saved-learning.sqlite");
+        let store = Store::open(&path).unwrap();
+        store.record_auto_account_identity("p", &"a".repeat(64)).unwrap();
+        let measurement = crate::auto_telemetry::from_usage(1000, "task", "run", "codex",
+            Some("p"), None, &serde_json::json!({"input_tokens":1})).unwrap();
+        store.insert_auto_measurement(1, &measurement).unwrap();
+        drop(store);
+        std::fs::rename(&learning_path, &saved_path).unwrap();
+        std::fs::create_dir(&learning_path).unwrap();
+        let unavailable = Store::open(&path).unwrap();
+        assert!(unavailable.record_auto_account_identity("p", &"b".repeat(64)).unwrap());
+        drop(unavailable);
+        std::fs::remove_dir(&learning_path).unwrap();
+        std::fs::rename(&saved_path, &learning_path).unwrap();
+        let recovered = Store::open(&path).unwrap();
+        assert!(recovered.auto_measurements(10).unwrap().is_empty(),
+            "the old account's learning must not return after storage recovers");
+    }
+
+    #[test]
+    fn unavailable_learning_file_does_not_stop_execution_storage() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        drop(Store::open(&path).unwrap());
+        let learning_path = dir.path().join("state.sqlite.learning");
+        std::fs::remove_file(&learning_path).unwrap();
+        std::fs::create_dir(&learning_path).unwrap();
+        let store = Store::open(&path).expect("learning storage failure must not block execution startup");
+        let event = store.insert_event(1000, None, None, "status", "test", "exact",
+            &serde_json::json!({"message":"execution survived"})).unwrap();
+        assert_eq!(event.seq, 1);
+        let measurement = crate::auto_telemetry::from_usage(1000, "task", "run", "codex",
+            None, None, &serde_json::json!({"input_tokens":1})).unwrap();
+        assert!(store.insert_auto_measurement(2, &measurement).is_err(),
+            "unavailable learning file must not silently become an ephemeral estimate");
+        assert!(store.auto_measurements(10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn legacy_learning_rows_move_once_and_clear_cannot_reimport_them() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let legacy = Connection::open(&path).unwrap();
+        legacy.execute_batch("CREATE TABLE auto_measurements(
+            event_seq INTEGER PRIMARY KEY, observed_ms INTEGER NOT NULL, task_id TEXT NOT NULL,
+            run_id TEXT NOT NULL, harness TEXT NOT NULL, profile_id TEXT, model TEXT,
+            input_tokens INTEGER, output_tokens INTEGER, cached_input_tokens INTEGER,
+            reasoning_output_tokens INTEGER, cost_usd REAL);
+            INSERT INTO auto_measurements VALUES(7,1000,'t','r','codex','p','model',42,1,NULL,NULL,NULL);
+            CREATE TABLE auto_daily_aggregates(
+            day_ms INTEGER NOT NULL, harness TEXT NOT NULL, profile_id TEXT NOT NULL,
+            model TEXT NOT NULL, last_observed_ms INTEGER NOT NULL, samples INTEGER NOT NULL,
+            input_observations INTEGER NOT NULL, input_tokens INTEGER NOT NULL,
+            output_observations INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
+            cached_input_observations INTEGER NOT NULL, cached_input_tokens INTEGER NOT NULL,
+            reasoning_output_observations INTEGER NOT NULL, reasoning_output_tokens INTEGER NOT NULL,
+            cost_observations INTEGER NOT NULL, cost_usd REAL NOT NULL,
+            PRIMARY KEY(day_ms,harness,profile_id,model));
+            INSERT INTO auto_daily_aggregates VALUES(0,'codex','p','model',1000,1,1,42,1,1,0,0,0,0,0,0);").unwrap();
+        drop(legacy);
+        let store = Store::open(&path).unwrap();
+        assert_eq!(store.auto_measurements(10).unwrap().len(), 1);
+        assert_eq!(store.auto_daily_aggregates(10).unwrap()[0].input_tokens, Some(42));
+        assert_eq!(store.conn.query_row("SELECT COUNT(*) FROM auto_measurements", [],
+            |row| row.get::<_, i64>(0)).unwrap(), 0);
+        drop(store);
+        let store = Store::open(&path).unwrap();
+        assert_eq!(store.auto_daily_aggregates(10).unwrap()[0].samples, 1);
+        assert_eq!(store.clear_auto_learning().unwrap(), 1);
+        drop(store);
+        let reopened = Store::open(&path).unwrap();
+        assert!(reopened.auto_measurements(10).unwrap().is_empty());
+        assert!(reopened.auto_daily_aggregates(10).unwrap().is_empty());
+    }
+
+    #[test]
     fn prior_auto_launch_intent_gains_a_journal_without_losing_the_claim() {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch("CREATE TABLE auto_launch_intents(
@@ -1134,7 +1396,7 @@ mod schema_migration_tests {
             account_generation INTEGER, phase TEXT NOT NULL, created_ms INTEGER NOT NULL);
             INSERT INTO auto_launch_intents VALUES('browser-1','parent-1','hash-1',
                 'system-codex/gpt-6-sol/medium',4,'preparing',1000);").unwrap();
-        let store = Store { conn };
+        let store = Store { conn, learning_conn: Connection::open_in_memory().unwrap(), learning_persistent: true };
         store.migrate().unwrap();
         store.migrate().unwrap();
         assert_eq!(store.auto_launch_intent("browser-1").unwrap().unwrap().3, Some(4));
@@ -1158,7 +1420,7 @@ mod schema_migration_tests {
             run_dir TEXT, segment INTEGER NOT NULL DEFAULT 0,
             seg_offset INTEGER NOT NULL DEFAULT 0, attention TEXT, launch TEXT,
             pending_parent_native TEXT);").unwrap();
-        let store = Store { conn };
+        let store = Store { conn, learning_conn: Connection::open_in_memory().unwrap(), learning_persistent: true };
         store.migrate().unwrap();
         store.migrate().unwrap();
         let has_effort = store.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='effort'")
@@ -1179,7 +1441,7 @@ mod schema_migration_tests {
             cost_observations INTEGER NOT NULL, cost_usd REAL NOT NULL,
             PRIMARY KEY(day_ms,harness,profile_id,model));
             INSERT INTO auto_daily_aggregates VALUES(0,'codex','system-codex','gpt-6-sol',1000,1,1,42,0,0,0,0,0,0,0,0);").unwrap();
-        let store = Store { conn };
+        let store = Store { conn, learning_conn: Connection::open_in_memory().unwrap(), learning_persistent: true };
         store.migrate().unwrap();
         store.migrate().unwrap();
         let rows = store.auto_daily_aggregates(10).unwrap();
@@ -1197,7 +1459,7 @@ mod schema_migration_tests {
             child_run_id TEXT NOT NULL UNIQUE, request_hash TEXT NOT NULL,
             created_ms INTEGER NOT NULL);
             INSERT INTO managed_work_units VALUES('browser-1','parent-1','child-1','hash-1',1000);").unwrap();
-        let store = Store { conn };
+        let store = Store { conn, learning_conn: Connection::open_in_memory().unwrap(), learning_persistent: true };
         store.migrate().unwrap();
         store.migrate().unwrap();
         let (child, marker): (String, Option<i64>) = store.conn.query_row(
@@ -1361,13 +1623,13 @@ mod auto_measurement_tests {
         let dir = tempfile::tempdir().unwrap();
         let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
         let now = crate::daemon::now();
-        store.conn.execute(
+        store.learning_conn.execute(
             "WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<50000)
              INSERT INTO auto_measurements(event_seq,observed_ms,task_id,run_id,harness,input_tokens)
              SELECT x,?1,'task','run','codex',1 FROM n",
             params![now],
         ).unwrap();
-        store.conn.execute(
+        store.learning_conn.execute(
             "WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<10000)
              INSERT INTO auto_daily_aggregates(day_ms,harness,profile_id,model,effort,last_observed_ms,samples,
                input_observations,input_tokens,output_observations,output_tokens,cached_input_observations,
@@ -1378,8 +1640,8 @@ mod auto_measurement_tests {
         let measurement = from_usage(now, "task", "run", "codex", None, Some("new-model"),
             &json!({"input_tokens": 1})).unwrap();
         assert!(store.insert_auto_measurement(50_001, &measurement).unwrap());
-        let details: i64 = store.conn.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get(0)).unwrap();
-        let summaries: i64 = store.conn.query_row("SELECT COUNT(*) FROM auto_daily_aggregates", [], |row| row.get(0)).unwrap();
+        let details: i64 = store.learning_conn.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get(0)).unwrap();
+        let summaries: i64 = store.learning_conn.query_row("SELECT COUNT(*) FROM auto_daily_aggregates", [], |row| row.get(0)).unwrap();
         assert_eq!(details, 50_000);
         assert_eq!(summaries, 10_000);
         assert!(store.auto_measurements(1).unwrap().iter().any(|row| row.event_seq == 50_001));

@@ -1570,13 +1570,64 @@ fn auto_local_usage_records_and_aggregates_with_egress_denied() {
     assert_eq!(usage["measurements"][0]["output_tokens"], 3, "{usage}");
     assert_eq!(summary["aggregates"][0]["samples"], 1, "{summary}");
     assert_eq!(summary["aggregates"][0]["input_tokens"], 21, "{summary}");
-    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
     let details: i64 = db.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get(0)).unwrap();
     let aggregates: i64 = db.query_row("SELECT COUNT(*) FROM auto_daily_aggregates", [], |row| row.get(0)).unwrap();
-    assert_eq!((details, aggregates), (1, 1), "usage must remain in the local execution database");
+    assert_eq!((details, aggregates), (1, 1), "usage must remain in the local learning database");
     let sockets_after = std::process::Command::new("/usr/sbin/lsof")
         .args(["-nP", "-a", "-p", &pid, "-i"]).output().unwrap();
     assert!(sockets_after.stdout.is_empty(), "unexpected daemon Internet socket after measurement");
+}
+
+#[test]
+fn auto_learning_samples_live_in_a_separate_capped_local_file() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let replay = r.path().join("separate-learning.jsonl");
+    std::fs::write(&replay, concat!(
+        "{\"type\":\"thread.started\",\"thread_id\":\"learning-thread\"}\n",
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":42}}\n"
+    )).unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"),
+        ("REPLAY_FILE", replay.to_str().unwrap()), ("REPLAY_DELAY_MS", "10")]);
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex","prompt":"x"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let main = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let learning_path = d.home.path().join("overseer.sqlite.learning");
+    assert!(learning_path.is_file(), "learning must not grow the execution database");
+    let learning = rusqlite::Connection::open(&learning_path).unwrap();
+    let samples: i64 = learning.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get(0)).unwrap();
+    let legacy: i64 = main.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get(0)).unwrap();
+    let events: i64 = main.query_row("SELECT COUNT(*) FROM events WHERE run_id=?1 AND kind='usage'",
+        [&run], |row| row.get(0)).unwrap();
+    assert_eq!((samples, legacy, events), (1, 0, 1));
+    let page_size: i64 = learning.pragma_query_value(None, "page_size", |row| row.get(0)).unwrap();
+    learning.pragma_update(None, "max_page_count", 128 * 1024 * 1024 / page_size).unwrap();
+    learning.execute_batch("CREATE TABLE pressure(payload BLOB);
+        CREATE TRIGGER pressure_learning BEFORE INSERT ON auto_measurements
+        BEGIN INSERT INTO pressure(payload) VALUES(zeroblob(1048576)); END;").unwrap();
+    let mut filled = 0;
+    while learning.execute("INSERT INTO pressure(payload) VALUES(zeroblob(1048576))", []).is_ok() {
+        filled += 1;
+        assert!(filled < 130, "learning file exceeded its page cap");
+    }
+    assert!(filled > 0);
+    let pressured = d.call("task.create", json!({"repo":repo,"harness":"codex","prompt":"pressure"}));
+    let pressured_run = run_id(&pressured);
+    assert_eq!(d.wait_done(&pressured_run, 15)["status"], "completed");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], true);
+    assert!(std::fs::metadata(&learning_path).unwrap().len() <= 128 * 1024 * 1024);
+    assert_eq!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().len(), 1);
+    assert_eq!(main.query_row("SELECT COUNT(*) FROM events WHERE run_id=?1 AND kind='usage'",
+        [&pressured_run], |row| row.get::<_, i64>(0)).unwrap(), 1);
+    learning.execute_batch("DROP TRIGGER pressure_learning; DELETE FROM pressure;").unwrap();
+    let recovered = d.call("task.create", json!({"repo":repo,"harness":"codex","prompt":"recovered"}));
+    assert_eq!(d.wait_done(&run_id(&recovered), 15)["status"], "completed");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], false);
+    assert_eq!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().len(), 2);
 }
 
 #[test]
@@ -1592,7 +1643,7 @@ fn auto_telemetry_failure_pauses_learning_without_restarting_or_replaying_work()
     let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
         ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"),
         ("REPLAY_FILE", replay.to_str().unwrap()), ("REPLAY_DELAY_MS", "10")]);
-    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
     db.execute_batch("CREATE TRIGGER auto_fail BEFORE INSERT ON auto_measurements BEGIN SELECT RAISE(FAIL, 'telemetry failure'); END;").unwrap();
     let first = d.call("task.create", json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "first"}));
     let first_run = run_id(&first);
@@ -1625,7 +1676,7 @@ fn auto_aggregate_failure_rolls_back_learning_without_replaying_the_task() {
     let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
         ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"),
         ("REPLAY_FILE", replay.to_str().unwrap()), ("REPLAY_DELAY_MS", "10")]);
-    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
     db.execute_batch("CREATE TRIGGER aggregate_fail BEFORE INSERT ON auto_daily_aggregates BEGIN SELECT RAISE(FAIL, 'aggregate failure'); END;").unwrap();
     let first = d.call("task.create", json!({"repo": repo, "harness": "codex", "prompt": "x", "title": "aggregate first"}));
     let first_run = run_id(&first);
@@ -1657,7 +1708,7 @@ fn auto_dispatch_continues_during_local_learning_write_pressure_and_recovers() {
         "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
     assert_eq!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().len(), 1);
-    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
     db.execute_batch("CREATE TRIGGER learning_capacity_full BEFORE INSERT ON auto_measurements
         BEGIN SELECT RAISE(FAIL, 'simulated local learning capacity full'); END;").unwrap();
     let first = d.call("auto.dispatch", json!({"work_unit_id":"learning-pressure-1",
@@ -1954,8 +2005,12 @@ fn auto_selected_opencode_child_uses_guarded_alternate_local_endpoint() {
     let child_config: serde_json::Value = serde_json::from_slice(&std::fs::read(
         Path::new(delegated["workspace"]["path"].as_str().unwrap()).join("opencode.json")).unwrap()).unwrap();
     assert_eq!(child_config, config, "Auto must not mutate the project provider configuration");
+    // The first real OpenCode run may create profile config asynchronously.
+    // Test endpoint refusal through a fresh profile so that the endpoint guard,
+    // rather than the independent profile-config guard, is the failing boundary.
+    let refused_profile = d.call("profile.create", json!({"name":"Unreachable local","harness":"opencode"}));
     let refused = d.try_call("run.delegate", json!({"work_unit_id":"refused-local-2",
-        "parent_run_id":parent,"harness":"opencode","profile_id":profile["id"],
+        "parent_run_id":parent,"harness":"opencode","profile_id":refused_profile["id"],
         "model":"local_a/fixture-a","effort":"default","prompt":"reply hello",
         "title":"unreachable local child","auto_selected":true,
         "requirements_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",

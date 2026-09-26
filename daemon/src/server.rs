@@ -1290,8 +1290,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             json!({"observations": rows})
         }
         "auto.usage.list" => {
-            let rows = d.store.lock().unwrap().auto_measurements(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;
-            json!({"measurements": rows, "learning_paused": d.learning_paused.load(std::sync::atomic::Ordering::Relaxed)})
+            let store = d.store.lock().unwrap();
+            let rows = store.auto_measurements(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;
+            let paused = d.learning_paused.load(std::sync::atomic::Ordering::Relaxed)
+                || store.auto_learning_is_paused()?;
+            json!({"measurements": rows, "learning_paused": paused})
         }
         "auto.usage.thread.refresh" => {
             let run = d.run(s(p, "run_id")?)?;

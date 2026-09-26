@@ -91,9 +91,10 @@ impl Daemon {
         paths::ensure_private_dir(&paths::runtime_dir())?;
         paths::ensure_private_dir(&paths::runs_dir())?;
         let store = Store::open(&paths::db_path())?;
+        let learning_paused = !store.learning_persistent;
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(false),
+        let daemon = Arc::new(Self { store: Mutex::new(store), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(learning_paused),
             ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0) });
         daemon.ensure_system_profiles()?;
         Ok(daemon)
