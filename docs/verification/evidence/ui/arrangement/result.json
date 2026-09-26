@@ -1,0 +1,136 @@
+{
+  "checks": [
+    {
+      "name": "no agent selected: one editor group with the new-agent composer and no review",
+      "ok": true,
+      "detail": [
+        {
+          "share": 1,
+          "active": "Overseer",
+          "tabs": [
+            "Overseer"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an agent with no changes: one editor group with its chat and no review",
+      "ok": true,
+      "detail": [
+        {
+          "share": 1,
+          "active": "Overseer",
+          "tabs": [
+            "Overseer"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the first file edit brings the review forward within 500 ms: review on the left (about two thirds) on the changed file, chat on the right",
+      "ok": true,
+      "detail": {
+        "lag": 376,
+        "waitedMs": 16,
+        "layout": [
+          {
+            "share": 0.66,
+            "active": "Review: Write perm.txt (1), Editor Group 1",
+            "tabs": [
+              "Review: Write perm.txt (1), Editor Group 1"
+            ]
+          },
+          {
+            "share": 0.34,
+            "active": "Overseer, preview, Editor Group 2",
+            "tabs": [
+              "Overseer, preview, Editor Group 2"
+            ]
+          }
+        ],
+        "reviewFiles": [
+          "perm.txt",
+          "A"
+        ]
+      }
+    },
+    {
+      "name": "the chat is a normal tab after moving (not a preview another file would replace)",
+      "ok": true,
+      "detail": {
+        "cls": "tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge",
+        "italic": "normal"
+      }
+    },
+    {
+      "name": "closing the review returns the chat to the middle (one group)",
+      "ok": true,
+      "detail": [
+        {
+          "share": 1,
+          "active": "Overseer, preview, Editor Group 2",
+          "tabs": [
+            "Overseer, preview, Editor Group 2"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "selecting another agent (with changes) keeps the chosen arrangement: chat alone",
+      "ok": true,
+      "detail": [
+        {
+          "share": 1,
+          "active": "Overseer, preview, Editor Group 2",
+          "tabs": [
+            "Overseer, preview, Editor Group 2"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Open Review brings the review back beside the chat",
+      "ok": true,
+      "detail": [
+        {
+          "share": 0.66,
+          "active": "Review: Refresh sessions once (2), Editor Group 1",
+          "tabs": [
+            "Review: Refresh sessions once (2), Editor Group 1"
+          ]
+        },
+        {
+          "share": 0.34,
+          "active": "Overseer, preview, Editor Group 2",
+          "tabs": [
+            "Overseer, preview, Editor Group 2"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the arrangement survives a window reload (review left, chat right)",
+      "ok": true,
+      "detail": [
+        {
+          "share": 0.66,
+          "active": "Review: Refresh sessions once (2), Editor Group 1",
+          "tabs": [
+            "Review: Refresh sessions once (2), Editor Group 1"
+          ]
+        },
+        {
+          "share": 0.34,
+          "active": "Overseer, Editor Group 2",
+          "tabs": [
+            "Overseer, Editor Group 2"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "no settings changed (apart from VS Code's own migration)",
+      "ok": true
+    }
+  ]
+}

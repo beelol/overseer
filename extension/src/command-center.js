@@ -143,7 +143,7 @@ class CommandCenter {
     const uri = vscode.Uri.joinPath(vscode.Uri.file(ws.path), ...rel.split('/'));
     try { await vscode.workspace.fs.stat(uri); }
     catch { vscode.window.showInformationMessage(`${rel} was deleted in this worktree; open the review to see its change.`); return; }
-    await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: vscode.ViewColumn.Beside, preview: true });
+    await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: vscode.ViewColumn.Beside, preview: false });
   }
 
   async push() {
