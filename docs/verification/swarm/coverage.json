@@ -33,9 +33,12 @@
       "blocker": "Read-only target preview is deterministic and provider-label agnostic; actual scheduling, reservations and replay are not implemented."
     },
     "SWARM-05": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "No elapsed-time benefit estimator or accounting for planning, integration and review costs is connected to admission."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_benefit.rs",
+        "docs/verification/swarm/SWARM-05.md"
+      ],
+      "blocker": "A fixture-only preview compares planning, context, worker, retry, integration and review estimates in elapsed time and native usage units, including finishing reserve. It is not connected to admission, does not persist estimates or actuals, and has no live calibration."
     },
     "SWARM-06": {
       "status": "partial",
