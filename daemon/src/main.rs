@@ -1,4 +1,5 @@
 mod accounts;
+mod audio;
 mod adapters;
 mod background;
 mod daemon;
@@ -74,6 +75,7 @@ fn main() {
                 log(&format!("overseerd {} starting, data dir {}", env!("CARGO_PKG_VERSION"), paths::data_dir().display()));
                 let report = d.reconcile()?;
                 log(&format!("reconcile: {report}"));
+                audio::start(d.clone())?;
                 server::serve(d).await
             });
             if let Err(e) = result {

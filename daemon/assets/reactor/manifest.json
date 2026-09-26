@@ -1,0 +1,134 @@
+[
+  {
+    "key": "agent_queued",
+    "label": "Queued",
+    "meaning": "A run is accepted and waiting.",
+    "default_auto": false,
+    "duration": 0.3,
+    "wav": "agent_queued.wav",
+    "mp3": "agent_queued.mp3",
+    "mp3_bytes": 2396,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  },
+  {
+    "key": "agent_started",
+    "label": "Started",
+    "meaning": "A top-level agent begins its first turn.",
+    "default_auto": true,
+    "duration": 0.39,
+    "wav": "agent_started.wav",
+    "mp3": "agent_started.mp3",
+    "mp3_bytes": 2972,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  },
+  {
+    "key": "agent_resumed",
+    "label": "Resumed",
+    "meaning": "An interrupted session continues.",
+    "default_auto": false,
+    "duration": 0.35,
+    "wav": "agent_resumed.wav",
+    "mp3": "agent_resumed.mp3",
+    "mp3_bytes": 2684,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  },
+  {
+    "key": "agent_progress",
+    "label": "Progress",
+    "meaning": "Work advances; normally silent.",
+    "default_auto": false,
+    "duration": 0.29,
+    "wav": "agent_progress.wav",
+    "mp3": "agent_progress.mp3",
+    "mp3_bytes": 2396,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  },
+  {
+    "key": "agent_complete",
+    "label": "Complete",
+    "meaning": "A top-level turn finishes.",
+    "default_auto": true,
+    "duration": 0.43,
+    "wav": "agent_complete.wav",
+    "mp3": "agent_complete.mp3",
+    "mp3_bytes": 3116,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  },
+  {
+    "key": "agent_stopped",
+    "label": "Stopped",
+    "meaning": "A run pauses or ends without completion.",
+    "default_auto": false,
+    "duration": 0.37,
+    "wav": "agent_stopped.wav",
+    "mp3": "agent_stopped.mp3",
+    "mp3_bytes": 2828,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  },
+  {
+    "key": "agent_needs_attention",
+    "label": "Needs attention",
+    "meaning": "A permission, login, or genuine blocker requires the user.",
+    "default_auto": true,
+    "duration": 0.48,
+    "wav": "agent_needs_attention.wav",
+    "mp3": "agent_needs_attention.mp3",
+    "mp3_bytes": 3404,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  },
+  {
+    "key": "agent_failed",
+    "label": "Failed",
+    "meaning": "An operation fails; only an actual user blocker is auto-alerted.",
+    "default_auto": false,
+    "duration": 0.44,
+    "wav": "agent_failed.wav",
+    "mp3": "agent_failed.mp3",
+    "mp3_bytes": 3260,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  },
+  {
+    "key": "agent_unblocked",
+    "label": "Unblocked",
+    "meaning": "Permission, account, or routing becomes available.",
+    "default_auto": false,
+    "duration": 0.34,
+    "wav": "agent_unblocked.wav",
+    "mp3": "agent_unblocked.mp3",
+    "mp3_bytes": 2684,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  },
+  {
+    "key": "review_ready",
+    "label": "Review ready",
+    "meaning": "Changes or results are available to inspect.",
+    "default_auto": false,
+    "duration": 0.38,
+    "wav": "review_ready.wav",
+    "mp3": "review_ready.mp3",
+    "mp3_bytes": 2828,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  },
+  {
+    "key": "delivery_ready",
+    "label": "Delivered",
+    "meaning": "A PR or merge result is ready.",
+    "default_auto": false,
+    "duration": 0.42,
+    "wav": "delivery_ready.wav",
+    "mp3": "delivery_ready.mp3",
+    "mp3_bytes": 3116,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  },
+  {
+    "key": "verification_passed",
+    "label": "Verified",
+    "meaning": "Checks or acceptance evidence pass.",
+    "default_auto": false,
+    "duration": 0.33,
+    "wav": "verification_passed.wav",
+    "mp3": "verification_passed.mp3",
+    "mp3_bytes": 2540,
+    "provenance": "original Reactor oscillator synthesis; no game audio or ML model"
+  }
+]

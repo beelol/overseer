@@ -483,6 +483,22 @@ async function activate(context) {
       await vscode.window.showTextDocument(doc, { preview: true });
     })),
     vscode.commands.registerCommand('overseer.stopAll', guard(stopAll)),
+    vscode.commands.registerCommand('overseer.audioMode', guard(async () => {
+      const audio = await client.request('audio.get');
+      const choices = [
+        { label: audio.enabled ? 'Turn Audio Mode off' : 'Turn Audio Mode on', action: 'toggle' },
+        { label: 'Preview Reactor cue…', action: 'preview' },
+      ];
+      const choice = await vscode.window.showQuickPick(choices, { title: 'Overseer Audio Mode', placeHolder: audio.available ? `Reactor · ${audio.enabled ? 'On' : 'Off'}` : 'Audio playback requires macOS' });
+      if (!choice) return;
+      if (choice.action === 'toggle') {
+        const result = await client.request('audio.set', { enabled: !audio.enabled });
+        vscode.window.showInformationMessage(`Overseer Audio Mode ${result.enabled ? 'on' : 'off'}.`);
+      } else {
+        const cue = await vscode.window.showQuickPick(audio.manifest.map(item => ({ label: item.label, description: `${item.duration.toFixed(2)}s`, detail: item.meaning, key: item.key })), { title: 'Preview Reactor cue' });
+        if (cue) await client.request('audio.preview', { key: cue.key });
+      }
+    })),
     vscode.commands.registerCommand('overseer.testNotification', guard(async () => {
       const { delivered_via: via } = await client.request('daemon.test_notice');
       const native = /^overseer-notifier \(ok\)/.test(via);
