@@ -2678,6 +2678,50 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
 }
 
 #[test]
+fn auto_cold_start_discloses_unknown_allowance_and_rejects_invented_inference() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let quota = r.path().join("quota-mode.txt");
+    let tools = r.path().join("tool-mode.txt");
+    std::fs::write(&quota, "unknown").unwrap();
+    std::fs::write(&tools, "available").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_QUOTA_MODE_FILE,FIXTURE_TOOL_MODE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_QUOTA_MODE_FILE", quota.to_str().unwrap()),
+        ("FIXTURE_TOOL_MODE_FILE", tools.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    assert!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().is_empty(),
+        "the cold-start decision must have no learned usage history");
+
+    let request = json!({"work_unit_id":"cold-start-browser","parent_run_id":parent,
+        "min_tier":"general","required_tools":["browser/navigate"],"prompt":"browser check"});
+    let mut invented = request.clone();
+    invented["inference_result"] = json!({"allowance":"free","model":"gpt-6-astra"});
+    assert!(d.try_call("auto.dispatch", invented).is_err(),
+        "caller-supplied inference cannot invent an account allowance");
+    assert_eq!(d.runs().len(), 1);
+
+    let selected = d.call("auto.dispatch", request);
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    assert_eq!(selected["decision"]["reason"], "cold_start_allowance_unknown", "{selected}");
+    let event = d.events(&parent).into_iter().find(|event| event["kind"] == "auto_decision").unwrap();
+    assert_eq!(event["payload"]["selected_route"]["quota"], "unknown");
+    assert_eq!(event["payload"]["selected_route"]["fit"], "unknown");
+    assert_eq!(event["payload"]["inference"]["state"], "not_used");
+    assert_eq!(d.wait_done(&run_id(&selected), 15)["status"], "completed");
+
+    std::fs::write(&tools, "missing").unwrap();
+    let paused = d.call("auto.dispatch", json!({"work_unit_id":"cold-start-no-browser",
+        "parent_run_id":parent,"min_tier":"general","required_tools":["browser/navigate"],
+        "prompt":"another browser check"}));
+    assert_eq!(paused["state"], "paused", "{paused}");
+    assert!(paused["decision"]["selected"].is_null());
+    assert_eq!(d.runs().len(), 2, "unsupported tools must not launch a second child");
+}
+
+#[test]
 fn auto_ordinary_child_failure_stays_failed_until_the_user_requests_new_work() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
