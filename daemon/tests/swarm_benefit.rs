@@ -231,6 +231,57 @@ fn committed_benefit_bounds_admission_and_survives_restart() {
 }
 
 #[test]
+fn a_completed_worker_slot_can_be_refilled_while_other_workers_remain_active() {
+    let d = Daemon::start(&[]);
+    let created = d.call("swarm.create", json!({"category":"Refill","objective":"Audit",
+        "allowed_targets":["fixture"],"policy":{"max_workers":4}}));
+    let id = created["id"].as_str().unwrap();
+    let jobs: Vec<Value> = ["a", "b", "c", "d", "e", "f"].iter()
+        .map(|job| json!({"id":job,"title":job,"acceptance":"evidence","deps":[]}))
+        .collect();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":jobs}));
+    let mut first = pair();
+    for mode in ["serial", "parallel"] {
+        first[mode]["workers"] = json!(["a", "b", "c", "d"].iter().map(|job|
+            json!({"id":job,"elapsed_ms":100,"usage_milli":{"points":10}}))
+            .collect::<Vec<_>>());
+    }
+    first["allocation_milli"]["points"] = json!(100);
+    let first_decision = d.call("swarm.benefit.commit", json!({"run_id":id,
+        "generation":1,"revision":1,"estimate":first}));
+    assert_eq!(first_decision["max_parallel_workers"], 4);
+    let at = now();
+    let admitted: Vec<Value> = ["a", "b", "c", "d"].iter()
+        .map(|job| admit(&d, id, job, at)).collect();
+    assert!(admitted.iter().all(|value| value["status"] == "admitted"));
+    let artifact = "a-evidence";
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"a",
+        "attempt_id":admitted[0]["attempt_id"],"token":admitted[0]["token"],
+        "artifact_id":artifact,"source_revision":1,"kind":"finding","content":"checked"}));
+    d.call("swarm.report", json!({"run_id":id,"job_id":"a",
+        "attempt_id":admitted[0]["attempt_id"],"token":admitted[0]["token"],
+        "message_id":"a-result","type":"result","revision":1,
+        "payload":{"artifact_ids":[artifact]}}));
+    d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"a","decision":"accept","evidence":[artifact]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"a","attempt_id":admitted[0]["attempt_id"]}));
+    let mut refill = pair();
+    for mode in ["serial", "parallel"] {
+        refill[mode]["workers"] = json!(["e", "f"].iter().map(|job|
+            json!({"id":job,"elapsed_ms":100,"usage_milli":{"points":10}}))
+            .collect::<Vec<_>>());
+    }
+    let second_decision = d.call("swarm.benefit.commit", json!({"run_id":id,
+        "generation":1,"revision":1,"estimate":refill}));
+    assert_eq!(second_decision["wave"], 2);
+    assert_eq!(second_decision["max_parallel_workers"], 4);
+    let refill_admission = admit(&d, id, "e", at + 6000);
+    assert_eq!(refill_admission["status"], "admitted", "{refill_admission}");
+    assert_eq!(admit(&d, id, "f", at + 6000)["status"], "blocked");
+}
+
+#[test]
 fn committed_serial_choice_holds_second_worker() {
     let d = Daemon::start(&[]);
     let id = run(&d, "No parallel gain");

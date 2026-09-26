@@ -336,7 +336,7 @@ pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
         params![run_id],
         |r| r.get(0),
     )?;
-    if active > 0 {
+    if active > 0 && job_statuses.iter().any(|status| status != "ready") {
         bail!("commit benefit decision before admitting a batch");
     }
     if job_statuses.iter().any(|status| status != "ready") {
@@ -345,11 +345,12 @@ pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
     let wave = old.map(|(wave, _, _)| wave + 1).unwrap_or(1);
     let mut value = result;
     let decision = value["decision"].as_str().unwrap().to_string();
-    let max_parallel_workers = if decision == "parallel" {
+    let new_slots = if decision == "parallel" {
         jobs.len() as i64
     } else {
         1
     };
+    let max_parallel_workers = active.saturating_add(new_slots).min(policy_cap as i64);
     value["run_id"] = json!(run_id);
     value["revision"] = json!(revision);
     value["wave"] = json!(wave);
