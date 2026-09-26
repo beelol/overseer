@@ -255,9 +255,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
-        "docs/verification/swarm/milestone-4.md"
+        "docs/verification/swarm/milestone-4.md",
+        "daemon/tests/swarm_settings.rs",
+        "docs/verification/swarm/milestone-6.md"
       ],
-      "blocker": "Preview exposes the 8-worker/9-global built-in ceilings; saved-policy precedence, account selection and actual S0 launch are not implemented."
+      "blocker": "Built-in defaults, saved precedence, approved-target inheritance and immutable run snapshots pass; actual S0 launch, one-time selection UI, immediate revocation and scheduler enforcement remain unimplemented."
     },
     "SWARM-40": {
       "status": "partial",

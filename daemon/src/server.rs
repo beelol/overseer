@@ -232,6 +232,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "swarm.revise" => crate::swarm::revise(&mut d.store.lock().unwrap(), p)?,
         "swarm.policy.preview" => crate::swarm::preview(p)?,
+        "swarm.policy.set" => crate::swarm::set_policy(&mut d.store.lock().unwrap(), p)?,
         "swarm.director.claim_batch" => {
             fixture_only()?;
             crate::swarm::claim_batch(&mut d.store.lock().unwrap(), p)?

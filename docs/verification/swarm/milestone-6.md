@@ -1,0 +1,7 @@
+# Swarm implementation milestone 6 — saved defaults and run snapshot
+
+Application and category policy settings are stored separately. A new run resolves built-in values, then application settings, category settings, and explicit run overrides in that order; it stores the effective values and a source for each one. The approved target pool follows run > category > application. If a category changes only a limit, it inherits the application's approved targets rather than clearing them. An explicit empty pool remains empty and the run reports that account selection is needed. Editing saved settings later leaves an existing run's policy and approved pool unchanged.
+
+Evidence: `daemon/tests/swarm_settings.rs` first failed for the missing setting transition and empty-pool flag. A separate red regression showed that a category limit without a target override incorrectly cleared the application approval; the inheritance fix made all 3 tests pass. `cargo test --workspace --offline` passed 4 unit, 25 protocol, 6 broker, 3 director, 5 plan, 4 policy, 3 settings and 3 state tests.
+
+This snapshot does not authorize launch on its own. The one-time account selection UI, immediate permission revocation, explicit active-run changes, target qualification and shared admission transaction remain unimplemented. Some saved numerical policy values are recorded but are not yet enforced by the scheduler, which has not been built.

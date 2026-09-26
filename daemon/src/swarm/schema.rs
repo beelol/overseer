@@ -116,6 +116,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           seq INTEGER NOT NULL REFERENCES swarm_messages(seq),
           PRIMARY KEY(turn_id,seq)
         );
+        CREATE TABLE IF NOT EXISTS swarm_policy_settings(
+          scope TEXT NOT NULL CHECK(scope IN ('application','category')),
+          scope_key TEXT NOT NULL,
+          policy TEXT NOT NULL,
+          allowed_targets TEXT NOT NULL,
+          updated_ms INTEGER NOT NULL,
+          PRIMARY KEY(scope,scope_key)
+        );
         "#,
     )?;
     Ok(())

@@ -4,11 +4,13 @@ mod director;
 mod plan;
 mod policy;
 mod revision;
+mod settings;
 pub mod schema;
 pub use artifacts::{confirm_exit, decide, put};
 pub use broker::{ack, direct, messages, register, report};
 pub use director::{claim_batch, complete_batch};
 pub use policy::preview;
+pub use settings::set_policy;
 pub use revision::revise;
 
 use crate::store::Store;
@@ -34,6 +36,7 @@ fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
         "generation": row.get::<_, i64>("generation")?,
         "revision": row.get::<_, i64>("revision")?,
         "allowed_targets": serde_json::from_str::<Value>(&targets).unwrap_or(Value::Null),
+        "needs_account_selection": serde_json::from_str::<Value>(&targets).ok().and_then(|v|v.as_array().map(|a|a.is_empty())).unwrap_or(true),
         "policy": serde_json::from_str::<Value>(&policy).unwrap_or(Value::Null),
         "created_ms": row.get::<_, i64>("created_ms")?,
         "updated_ms": row.get::<_, i64>("updated_ms")?,
@@ -55,14 +58,7 @@ pub fn create(store: &mut Store, p: &Value) -> Result<Value> {
     if occupied {
         bail!("category already has an active swarm run");
     }
-    let targets = p.get("allowed_targets").cloned().unwrap_or(json!([]));
-    if !targets.is_array() || targets.as_array().unwrap().iter().any(|v| !v.is_string()) {
-        bail!("allowed_targets must be a string array");
-    }
-    let policy = p.get("policy").cloned().unwrap_or(json!({}));
-    if !policy.is_object() {
-        bail!("policy must be an object");
-    }
+    let (policy,targets) = settings::resolve(store,category,p.get("policy"),p.get("allowed_targets"))?;
     let id = format!("sw-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
     let now = crate::daemon::now();
     store.conn.execute(
