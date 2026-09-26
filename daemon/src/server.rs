@@ -117,8 +117,9 @@ async fn connection_loop(
             subscribe(daemon.clone(), id, params, tx.clone());
             continue;
         }
-        if method == "hello" && params["client"] == "vscode" && !*ui {
-            // A VS Code window: counted so closing the last one can surface background agents.
+        if method == "hello" && (params["client"] == "vscode" || params["client"] == "tui") && !*ui {
+            // A VS Code window or an overseer-tui: counted so closing the last one can surface
+            // background agents.
             *ui = true;
             daemon.ui_connected();
         }
@@ -303,7 +304,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 .optional()?;
             json!({"notice": notice})
         }
-        "daemon.clients" => json!({"vscode": d.ui_clients.load(std::sync::atomic::Ordering::SeqCst)}),
+        // "vscode" is kept for older callers; it counts every watching UI (VS Code windows and TUIs).
+        "daemon.clients" => {
+            let n = d.ui_clients.load(std::sync::atomic::Ordering::SeqCst);
+            json!({"vscode": n, "ui": n})
+        }
         other => return Err(anyhow!("unknown method {other}")),
     })
 }
