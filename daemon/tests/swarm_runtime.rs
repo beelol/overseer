@@ -157,9 +157,13 @@ fn explicit_ceiling_runs_thirty_two_supervised_workers() {
                 "confidence":"exact","expires_ms":at+120000}]}]},
         "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
     let mut workers = Vec::new();
+    let mut first_attempt = None;
     for n in 0..32 {
         let admitted = admit(n);
         assert_eq!(admitted["status"], "admitted", "job {n}: {admitted}");
+        if n == 0 {
+            first_attempt = Some(admitted.clone());
+        }
         let launched = d.call("swarm.worker.launch", json!({"run_id":id,
             "job_id":format!("j{n}"),"attempt_id":admitted["attempt_id"],
             "token":admitted["token"],"repo":checkout,
@@ -186,7 +190,18 @@ fn explicit_ceiling_runs_thirty_two_supervised_workers() {
         assert!(pid_alive(shim["child_pid"].as_i64().unwrap()),
             "worker {worker} has no live supervised process");
     }
+    let first_attempt = first_attempt.unwrap();
+    d.call("swarm.report", json!({"run_id":id,"job_id":"j0",
+        "attempt_id":first_attempt["attempt_id"],"token":first_attempt["token"],
+        "message_id":"scale-discovery","type":"discovery","revision":1,
+        "payload":{"finding":"module zero checked"}}));
+    let director = d.call("swarm.director.claim_batch", json!({"run_id":id,
+        "generation":1,"revision":1,"now_ms":now()+6000}));
+    assert_eq!(director["status"], "claimed");
+    assert_eq!(director["messages"][0]["message_id"], "scale-discovery");
     assert_eq!(admit(32)["reason"], "worker_limit");
+    d.call("swarm.director.complete_batch", json!({"run_id":id,"generation":1,
+        "turn_id":director["turn_id"],"token":director["token"]}));
     assert_eq!(d.call("swarm.get", json!({"id":id}))["status"], "running");
     d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
     for worker in &workers {
