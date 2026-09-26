@@ -1,6 +1,6 @@
 //! Bounded metadata-only reads. This module never starts a model turn.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
@@ -13,11 +13,23 @@ use std::time::{Duration, Instant};
 const MAX_FRAME: usize = 1024 * 1024;
 const MAX_FRAMES: usize = 100;
 
+#[derive(Debug)]
+struct OpenCodeReadTimeout;
+
+impl std::fmt::Display for OpenCodeReadTimeout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("OpenCode metadata read timed out")
+    }
+}
+
+impl std::error::Error for OpenCodeReadTimeout {}
+
 fn opencode_bounded_read(stream: &mut TcpStream, chunk: &mut [u8], deadline: Instant) -> Result<usize> {
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() { return Err(anyhow!("OpenCode metadata read timed out")); }
-        stream.set_read_timeout(Some(remaining))?;
+        if remaining.is_zero() { return Err(OpenCodeReadTimeout.into()); }
+        stream.set_read_timeout(Some(remaining.max(Duration::from_millis(10))))
+            .context("setting OpenCode metadata read timeout")?;
         match stream.read(chunk) {
             Ok(count) => return Ok(count),
             Err(error) if matches!(error.kind(), std::io::ErrorKind::Interrupted
@@ -28,18 +40,41 @@ fn opencode_bounded_read(stream: &mut TcpStream, chunk: &mut [u8], deadline: Ins
 }
 
 fn opencode_metadata_response(port: u16, password: &str, deadline: Instant) -> Result<Value> {
+    // An OpenCode server can accept a connection before its first metadata
+    // request is ready. Retry only read timeouts, with one overall deadline.
+    for attempt in 0..3 {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() { return Err(OpenCodeReadTimeout.into()); }
+        let attempt_deadline = match attempt {
+            0 => Instant::now() + remaining.min(Duration::from_millis(750)),
+            1 => Instant::now() + remaining.min(Duration::from_millis(1500)),
+            _ => deadline,
+        };
+        match opencode_metadata_response_once(port, password, attempt_deadline) {
+            Err(error) if error.downcast_ref::<OpenCodeReadTimeout>().is_some() && attempt < 2 => continue,
+            outcome => return outcome,
+        }
+    }
+    Err(OpenCodeReadTimeout.into())
+}
+
+fn opencode_metadata_response_once(port: u16, password: &str, deadline: Instant) -> Result<Value> {
     use base64::Engine;
     let address = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
     let mut stream = loop {
-        if Instant::now() >= deadline { return Err(anyhow!("OpenCode metadata read timed out")); }
+        if Instant::now() >= deadline { return Err(OpenCodeReadTimeout.into()); }
         match TcpStream::connect_timeout(&address.into(), Duration::from_millis(100)) {
             Ok(stream) => break stream,
             Err(_) => std::thread::sleep(Duration::from_millis(20)),
         }
     };
-    stream.set_write_timeout(Some(deadline.saturating_duration_since(Instant::now())))?;
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() { return Err(OpenCodeReadTimeout.into()); }
+    stream.set_write_timeout(Some(remaining.max(Duration::from_millis(10))))
+        .context("setting OpenCode metadata write timeout")?;
     let basic = base64::engine::general_purpose::STANDARD.encode(format!("overseer:{password}"));
-    stream.write_all(format!("GET /config/providers HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Basic {basic}\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n").as_bytes())?;
+    stream.write_all(format!("GET /config/providers HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Basic {basic}\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n").as_bytes())
+        .context("writing OpenCode metadata request")?;
     let mut bytes = Vec::new();
     let mut chunk = [0u8; 8192];
     let header_end = loop {
@@ -102,6 +137,7 @@ pub fn opencode_local_catalog(
         .args(["serve", "--pure", "--hostname", "127.0.0.1", "--port", &port.to_string()])
         .current_dir(cwd).env_clear().envs(env)
         .env("OPENCODE_DISABLE_AUTOUPDATE", "1")
+        .env("OPENCODE_DISABLE_MODELS_FETCH", "1")
         .env("OPENCODE_SERVER_USERNAME", "overseer")
         .env("OPENCODE_SERVER_PASSWORD", &password)
         .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn()?;
@@ -117,6 +153,25 @@ pub fn opencode_local_catalog(
 #[cfg(test)]
 mod opencode_metadata_tests {
     use super::*;
+
+    #[test]
+    fn stalled_first_connection_retries_the_read_only_metadata_request() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (first, _) = listener.accept().unwrap();
+            std::thread::sleep(Duration::from_millis(900));
+            drop(first);
+            let (mut second, _) = listener.accept().unwrap();
+            let body = r#"{"providers":[]}"#;
+            write!(second, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
+            second.flush().unwrap();
+            std::thread::sleep(Duration::from_millis(100));
+        });
+        let result = opencode_metadata_response(port, "test-secret", Instant::now() + Duration::from_secs(3)).unwrap();
+        server.join().unwrap();
+        assert_eq!(result, json!({"providers":[]}));
+    }
 
     #[test]
     fn stalled_local_server_reports_a_bounded_timeout_without_a_secret() {

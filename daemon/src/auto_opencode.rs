@@ -206,7 +206,7 @@ mod tests {
             env.insert(key.into(), path.display().to_string());
         }
         let catalog = crate::auto_collect::opencode_local_catalog(&program, &env, &project,
-            Duration::from_secs(5), 1000).unwrap();
+            Duration::from_secs(8), 1000).unwrap();
         assert_eq!(catalog.models.iter().map(|m| m.model.as_str()).collect::<Vec<_>>(),
             ["local_a/fixture-a", "local_b/fixture-b"]);
     }
