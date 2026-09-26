@@ -451,14 +451,6 @@ fn admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart() {
         "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]})
         )
         .is_err());
-    assert_eq!(
-        d.call(
-            "swarm.worker.reconcile",
-            json!({"run_id":id,"generation":1,
-        "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]})
-        )["status"],
-        "active"
-    );
     let sampled_by = std::time::Instant::now() + std::time::Duration::from_secs(5);
     let first_sample = loop {
         let observation = d.call("swarm.worker.liveness",json!({"run_id":id,
@@ -469,6 +461,11 @@ fn admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart() {
         assert!(std::time::Instant::now() < sampled_by, "daemon did not sample worker reachability: {observation}");
         std::thread::sleep(std::time::Duration::from_millis(100));
     };
+    assert_eq!(
+        d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
+            "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}))["status"],
+        "active"
+    );
     let db_probe = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     let run_dir: String = db_probe.query_row("SELECT run_dir FROM runs WHERE id=?1",
         rusqlite::params![worker_run], |r|r.get(0)).unwrap();
