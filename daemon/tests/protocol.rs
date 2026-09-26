@@ -651,7 +651,8 @@ fn ac28_opposing_layers_remain_inspectable() {
 
 #[test]
 fn ac13_isolated_profiles_have_separate_homes_and_no_keys() {
-    let d = Daemon::start(&[]);
+    // Login commands need an installed program; a harmless stand-in (never run here).
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", "/usr/bin/true")]);
     let a = d.call("profile.create", json!({"name": "Codex A", "harness": "codex"}));
     let b = d.call("profile.create", json!({"name": "Codex B", "harness": "codex"}));
     assert_ne!(a["home"], b["home"]);
@@ -869,6 +870,32 @@ fn ac45_last_vscode_window_closing_with_active_runs_posts_a_notice_but_a_reload_
     assert_eq!(n[0]["payload"]["runs"][0]["id"], run.as_str());
     // The agent keeps running (unchanged behavior).
     assert_eq!(d.run(&run)["status"], "running");
+    d.call("run.interrupt", json!({"run_id": run}));
+    d.wait_done(&run, 20);
+}
+
+#[test]
+fn ac45_one_notice_per_quit_a_brief_reconnect_does_not_repeat_it() {
+    let t = tmp();
+    let (cmd, log) = notifier(t.path());
+    let d = Daemon::start(&[("OVERSEER_BACKGROUND_NOTICE_MS", "600"), ("OVERSEER_NOTIFY_COMMAND", &cmd)]);
+    let repo = repo(&t.path().join("r"));
+    let run = run_id(&sh(&d, &repo, "worktree", "sleep 30"));
+    d.wait_status(&run, |s| s == "running", 20);
+    let count = || std::fs::read_to_string(&log).map(|t| t.lines().count()).unwrap_or(0);
+    drop(vscode_window(&d));
+    std::thread::sleep(Duration::from_millis(1500));
+    assert_eq!(count(), 1, "the quit notifies once");
+    // Something connects as VS Code for a moment and leaves (shorter than the grace period).
+    drop(vscode_window(&d));
+    std::thread::sleep(Duration::from_millis(1500));
+    assert_eq!(count(), 1, "a brief reconnect must not repeat the notice");
+    // A real session (open longer than the grace period) then quitting notifies again.
+    let w = vscode_window(&d);
+    std::thread::sleep(Duration::from_millis(900));
+    drop(w);
+    std::thread::sleep(Duration::from_millis(1500));
+    assert_eq!(count(), 2, "a new VS Code session's quit notifies again");
     d.call("run.interrupt", json!({"run_id": run}));
     d.wait_done(&run, 20);
 }
@@ -1399,4 +1426,117 @@ fn ac50_pr_plan_targets_the_branch_name_in_a_fresh_clone() {
     let prep = d.call("workspace.pr_prepare", json!({"workspace_id": ws_id(&created)}));
     assert_eq!(prep["files"][0]["path"], "a.txt", "{prep}");
     assert_eq!(prep["commits"].as_array().map(Vec::len), Some(1), "only the run's commit, compared against main: {prep}");
+}
+
+// ---------------------------------------------------------------- AC-63 history that stays tidy
+
+#[test]
+fn ac63_search_finds_tasks_by_title_output_and_status_and_archive_hides_without_deleting() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let a = sh(&d, &repo, "current", "echo 'refactoring the payment ledger'");
+    d.wait_done(&run_id(&a), 20);
+    let b = sh(&d, &repo, "current", "echo 'unrelated'; exit 3");
+    d.wait_done(&run_id(&b), 20);
+    let task = |v: &serde_json::Value| v["task"]["id"].as_str().unwrap().to_string();
+    let ids = |q: &str| d.call("search", json!({"query": q}))["task_ids"].as_array().unwrap().iter().map(|x| x.as_str().unwrap().to_string()).collect::<Vec<_>>();
+    // Conversation text (the agent's output), status and a missing term.
+    assert_eq!(ids("payment ledger"), vec![task(&a)], "output text");
+    assert!(ids("failed").contains(&task(&b)), "status: {:?}", ids("failed"));
+    assert!(ids("nothing-matches-this").is_empty());
+    // LIKE wildcards are literal.
+    assert!(ids("%").is_empty());
+    // Archive hides (archived_ms set) and never deletes; restore clears it.
+    let res = d.call("task.archive", json!({"task_id": task(&a), "archived": true}));
+    assert!(res["archived_ms"].as_i64().is_some());
+    let state = d.call("state", json!({}));
+    let t = state["tasks"].as_array().unwrap().iter().find(|t| t["id"] == task(&a)).unwrap().clone();
+    assert!(t["archived_ms"].as_i64().is_some(), "{t}");
+    assert!(state["runs"].as_array().unwrap().iter().any(|r| r["task_id"] == task(&a)), "runs kept");
+    assert_eq!(ids("payment ledger"), vec![task(&a)], "archived tasks stay searchable");
+    d.call("task.archive", json!({"task_id": task(&a), "archived": false}));
+    let state = d.call("state", json!({}));
+    assert!(state["tasks"].as_array().unwrap().iter().find(|t| t["id"] == task(&a)).unwrap()["archived_ms"].is_null());
+    assert!(d.try_call("task.archive", json!({"task_id": "t-missing"})).is_err());
+}
+
+// ---------------------------------------------------------------- AC-60 native-CLI parity
+
+#[test]
+fn ac60_turn_options_reach_claude_and_unsupported_ones_are_refused() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("echo");
+    // A 1×1 PNG.
+    let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    let created = d.call("task.create", json!({"repo": repo.display().to_string(), "harness": "claude", "prompt": "describe the image", "title": "options",
+        "model": "haiku", "effort": "high", "permission_mode": "plan", "images": [{"mime": "image/png", "data": png}]}));
+    let run = created["run"]["id"].as_str().unwrap().to_string();
+    d.wait_done(&run, 20);
+    let echo = |d: &Daemon| d.events(&run).iter().filter_map(|e| e["payload"]["text"].as_str().filter(|t| t.starts_with("ECHO ")).map(|t| serde_json::from_str::<serde_json::Value>(&t[5..]).unwrap())).last().unwrap();
+    let first = echo(&d);
+    let argv: Vec<String> = first["argv"].as_array().unwrap().iter().map(|a| a.as_str().unwrap().to_string()).collect();
+    let after = |flag: &str| argv.iter().position(|a| a == flag).map(|i| argv[i + 1].clone());
+    assert_eq!((after("--model"), after("--effort"), after("--permission-mode")), (Some("haiku".into()), Some("high".into()), Some("plan".into())), "{argv:?}");
+    assert_eq!(first["kinds"][0], "text");
+    assert!(first["kinds"][1].as_str().unwrap().starts_with("image:image/png:"), "{first}");
+    assert_eq!(first["text"], "describe the image");
+    // The image is kept privately in the run folder.
+    // A follow-up changes the model for this and later turns; effort and mode carry over.
+    d.call("run.follow_up", json!({"run_id": run, "prompt": "again", "model": "opus"}));
+    d.wait_done(&run, 20);
+    let second = echo(&d);
+    let argv2: Vec<String> = second["argv"].as_array().unwrap().iter().map(|a| a.as_str().unwrap().to_string()).collect();
+    let after2 = |flag: &str| argv2.iter().position(|a| a == flag).map(|i| argv2[i + 1].clone());
+    assert_eq!((after2("--model"), after2("--effort"), after2("--permission-mode")), (Some("opus".into()), Some("high".into()), Some("plan".into())), "{argv2:?}");
+    assert!(argv2.contains(&"--resume".to_string()));
+    let state = d.call("state", json!({}));
+    assert_eq!(state["runs"].as_array().unwrap().iter().find(|x| x["id"] == run.as_str()).unwrap()["model"], "opus");
+    // Unsupported choices are refused with the harness's own options named.
+    let bad = d.try_call("run.follow_up", json!({"run_id": run, "prompt": "x", "effort": "ludicrous"})).unwrap_err();
+    assert!(bad.contains("low, medium, high"), "{bad}");
+    let bad = d.try_call("task.create", json!({"repo": repo.display().to_string(), "harness": "generic", "program": "/bin/echo", "args": [], "prompt": "", "title": "g", "workspace_mode": "worktree", "images": [{"mime": "image/png", "data": png}]}));
+    assert!(bad.is_err() || bad.unwrap()["launch_error"].as_str().unwrap_or_default().contains("image"), "generic refuses images");
+    let bad = d.try_call("run.follow_up", json!({"run_id": run, "prompt": "x", "images": [{"mime": "text/html", "data": "PGI+"}]})).unwrap_err();
+    assert!(bad.contains("PNG"), "{bad}");
+}
+
+#[test]
+fn ac60_repo_files_lists_mentionable_files_best_first() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::create_dir_all(repo.join("src/deep")).unwrap();
+    std::fs::write(repo.join("src/deep/readme-notes.txt"), "x").unwrap();
+    std::fs::write(repo.join("README.md"), "# r\n").unwrap();
+    std::fs::write(repo.join("build.log"), "x").unwrap();
+    let d = Daemon::start(&[]);
+    let files = d.call("repo.files", json!({"repo": repo.display().to_string(), "query": "readme"}));
+    let list: Vec<&str> = files["files"].as_array().unwrap().iter().map(|f| f.as_str().unwrap()).collect();
+    assert_eq!(list.first().copied(), Some("README.md"), "{list:?}");
+    assert!(list.contains(&"src/deep/readme-notes.txt"), "untracked files are offered: {list:?}");
+    let all = d.call("repo.files", json!({"repo": repo.display().to_string(), "query": ""}));
+    assert!(!all["files"].as_array().unwrap().iter().any(|f| f == "build.log"), "ignored files are not offered");
+    assert!(d.try_call("repo.files", json!({"query": "x"})).is_err());
+}
+
+// ---------------------------------------------------------------- AC-62 usage and limits
+
+#[test]
+fn ac62_account_usage_is_what_the_harness_reports() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("limits");
+    // Before any run, nothing is reported (never invented).
+    assert_eq!(d.call("account.usage", json!({"id": "system-claude"}))["reported"], false);
+    let created = d.call("task.create", json!({"repo": repo.display().to_string(), "harness": "claude", "profile_id": "system-claude", "prompt": "hi", "title": "limits"}));
+    d.wait_done(created["run"]["id"].as_str().unwrap(), 20);
+    let u = d.call("account.usage", json!({"id": "system-claude"}));
+    assert_eq!(u["reported"], true, "{u}");
+    let five = u["windows"].as_array().unwrap().iter().find(|w| w["label"] == "5 hours").unwrap().clone();
+    assert_eq!(five["used"], 0.95);
+    assert!(five["resets_at_ms"].as_i64().unwrap() > 0);
+    assert_eq!(u["source"], "Claude rate_limit_event");
+    // Accounts whose harness reports nothing say so.
+    assert_eq!(d.call("account.usage", json!({"id": "system-opencode"}))["reported"], false);
 }

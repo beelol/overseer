@@ -88,6 +88,8 @@ const HEIGHT = 860;
       await dash.eval(`(() => { const r = document.querySelector('[data-run=${JSON.stringify(id)}]'); r.scrollIntoView(); r.id = 'pick'; return true; })()`);
       const p = await s.webviewPoint(dash, '#pick'); await cdp.click(p.x, p.y); await delay(3000);
       await dash.waitFor(`!!document.querySelector('[data-audit-view="chat"] .msg')`, 20000);
+      await dash.eval(`document.getElementById('files-toggle').click()`);
+      await dash.waitFor(`document.body.dataset.filesReady === '1'`, 20000);
       views.dashboard = { frame: dash, opts: { root: 'body' } };
       views.agents = { frame: dash, opts: { root: '[data-audit-view="agents"]' } };
       views.chat = { frame: dash, opts: { root: '[data-audit-view="chat"]' } };

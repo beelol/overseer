@@ -65,13 +65,13 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     await s.screenshot('vscode-uri-prompt');
     if (prompt.cx) { await cdp.click(prompt.cx, prompt.cy); await delay(300); }
     await cdp.click(prompt.x, prompt.y);
-    const view = await cdp.webview(`document.body.dataset.ready === '1' && !!document.getElementById('tree')`, 30000).catch(() => null);
+    const view = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list')`, 30000).catch(() => null);
     check('the notification link opens the Overseer view (after VS Code\'s one-time "Allow … to open this URI?")', !!view && /Allow 'Overseer' extension to open this URI/.test(prompt.text), prompt.text);
     // Second time: no prompt; the view is revealed again.
     await cdp.command('View: Close All Editors'); await delay(800);
     await cdp.command('Developer: Open URL');
     await cdp.input('', 'vscode://beelol.overseer/open-center');
-    const again = await cdp.webview(`document.body.dataset.ready === '1' && !!document.getElementById('tree')`, 20000).then(() => true, () => false);
+    const again = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list')`, 20000).then(() => true, () => false);
     const asked = await cdp.evalWorkbench(`!!document.querySelector('.monaco-dialog-box')`);
     check('later links open the Overseer view without asking again', again && !asked, { again, asked });
     await s.screenshot('link-opened-center');

@@ -4,7 +4,7 @@
 //   root     CSS selector of the view's root (default: body)
 //   exclude  CSS selectors whose subtrees are not part of this view
 //
-// "Visible" follows checkVisibility(): text in closed <details>, [hidden] or display:none parts is
+// Text inside Monaco diff editors (code) is not counted. "Visible" follows checkVisibility(): text in closed <details>, [hidden] or display:none parts is
 // not counted; text scrolled out of view is (it is part of the view).
 function auditExpression({ root = 'body', exclude = [] } = {}) {
   return `(() => {
@@ -19,6 +19,8 @@ function auditExpression({ root = 'body', exclude = [] } = {}) {
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     const p = n.parentElement;
     if (!p || ['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(p.tagName) || outside(p) || !visible(p)) continue;
+    // Code shown in diff editors is the same content before and after; it is not UI text.
+    if (p.closest('.monaco-editor')) continue;
     const text = n.textContent.replace(/\\s+/g, ' ').trim();
     if (!text) continue;
     chars += text.length;

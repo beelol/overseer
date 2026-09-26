@@ -34,11 +34,13 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
 
     await cdp.command('Overseer: Open Overseer View');
     const view = await cdp.webview(`document.body.dataset.ready === '1' && !!document.getElementById('files')`, 30000);
-    const pick = async (label, runLabel = 'generic') => {
-      const found = await view.waitFor(`(() => { const rows = [...document.querySelectorAll('#tree .row')]; const i = rows.findIndex(r => r.querySelector('.label').textContent === ${JSON.stringify(label)}); const r = rows[i + 1]; if (i < 0 || !r?.dataset.run) return false; document.querySelectorAll('#target').forEach(e => e.removeAttribute('id')); r.querySelector('.label').id = 'target'; return true; })()`, 15000).catch(async () => { throw new Error('run row not found for ' + label + ': ' + JSON.stringify(await view.eval(`[...document.querySelectorAll('#tree .row')].map(r => r.dataset.level + ':' + r.querySelector('.label').textContent + ':' + r.getAttribute('aria-expanded'))`))); });
+    const pick = async label => {
+      const runId = await view.waitFor(`(() => { const r = [...document.querySelectorAll('.rail-list .row[data-run]')].find(r => r.querySelector('.title').textContent === ${JSON.stringify(label)}); if (!r) return false; document.querySelectorAll('#target').forEach(e => e.removeAttribute('id')); r.querySelector('.title').id = 'target'; return r.dataset.run; })()`, 20000).catch(() => { throw new Error('run row not found for ' + label); });
       const p = await s.webviewPoint(view, '#target'); await cdp.click(p.x, p.y);
-      await view.waitFor(`document.getElementById('files-for').textContent.startsWith(${JSON.stringify(label)}) && document.body.dataset.filesReady === '1'`, 20000);
-      // Selecting a run also opens its review in the same column; let that settle first.
+      await view.waitFor(`document.getElementById('title')?.textContent === ${JSON.stringify(label)}`, 20000);
+      if (await view.eval(`document.querySelector('.files-panel').hidden`)) await view.eval(`document.getElementById('files-toggle').click()`);
+      await view.waitFor(`document.getElementById('files').dataset.run === ${JSON.stringify(runId)} && document.body.dataset.filesReady === '1'`, 20000);
+      // Selecting a run also opens its review in the column on the right; let that settle first.
       await cdp.waitFor(`(() => { const g = [...document.querySelectorAll('.editor-group-container')][1]; return (g?.querySelector('.tab.active')?.getAttribute('aria-label') || '').startsWith(${JSON.stringify('Review: ' + label)}); })()`, 20000, 'review for ' + label);
       await delay(500);
     };
@@ -85,7 +87,7 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     await clickEntry('big');
     await view.waitFor(`document.querySelectorAll('#files .row[role=treeitem]').length > 5000`, 15000);
     const openMs = Date.now() - t0;
-    const truncated = await view.eval(`[...document.querySelectorAll('#files .row.muted')].map(r => r.textContent).find(t => /more entries/.test(t)) || ''`);
+    const truncated = await view.eval(`[...document.querySelectorAll('#files .row.muted')].map(r => r.textContent + ' (' + (r.title || '') + ')').find(t => /more entries/.test(t)) || ''`);
     await view.eval(`window.__lag = []; (function tick() { const t0 = performance.now(); if (window.__lag.length < 80) setTimeout(() => { window.__lag.push(performance.now() - t0 - 25); tick(); }, 25); })()`);
     const pane = await s.webviewPoint(view, '#files');
     for (let i = 0; i < 12; i++) { await cdp.wheel(pane.x, pane.y + 40, 800); await delay(60); }

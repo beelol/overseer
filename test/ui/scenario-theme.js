@@ -15,8 +15,9 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
   if (!label) bad.push(e.outerHTML.slice(0, 80)); } return { checked: document.querySelectorAll('button, [role=radio], [role=treeitem], input, select, textarea').length, bad }; })()`;
 
 function lint() {
-  const files = ['extension/media/center.css', 'extension/media/center.js', 'extension/media/conversation.css', 'extension/media/conversation.js', 'extension/media/new-task.css', 'extension/media/new-task.js',
-    'extension/src/output-panel.js', 'extension/src/command-center.js', 'extension/src/new-task.js', 'extension/branch-diff/review/browser.css', 'extension/branch-diff/review/panel.js'];
+  const files = ['tokens.css', 'base.css', 'chat.css', 'dashboard.css', 'new-task.css', 'run-panel.css', 'ui.js', 'chat.js', 'conversation.js', 'dashboard.js', 'composer.js', 'grid.js',
+    'prompt-tools.js', 'markdown.js', 'files.js', 'new-task.js', 'run-panel.js'].map(f => 'extension/media/' + f)
+    .concat(['extension/src/output-panel.js', 'extension/src/command-center.js', 'extension/src/new-task.js', 'extension/src/webview-html.js', 'extension/branch-diff/review/browser.css', 'extension/branch-diff/review/panel.js']);
   const hits = [];
   for (const f of files) {
     fs.readFileSync(path.join(repoRoot, f), 'utf8').split('\n').forEach((line, i) => {
@@ -51,7 +52,7 @@ function lint() {
 
     // Keyboard-only task creation in the New Task form.
     await cdp.command('Overseer: Open Overseer View');
-    await cdp.webview(`document.body.dataset.ready === '1' && !!document.getElementById('tree')`, 30000);
+    await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list')`, 30000);
     await cdp.command('Overseer: New Task');
     const form = await cdp.webview(`document.body.dataset.ready === '1' && !!document.getElementById('harnesses')`, 30000);
     await form.waitFor(`document.querySelectorAll('#harnesses .tile').length >= 4 && document.querySelectorAll('#repos .tile').length >= 2`, 20000);
@@ -62,8 +63,8 @@ function lint() {
     const first = await s.webviewPoint(form, '#repos .tile'); await cdp.click(first.x, first.y); await delay(300);
     const trail = [await focused()];                             // repository tile
     await key('Tab'); trail.push(await focused());               // harness group
-    for (let i = 0; i < 6 && !/Generic/.test((await focused()).label || ''); i++) { await key('ArrowRight'); }
-    trail.push(await focused());                                 // Generic program tile (selected by arrows)
+    for (let i = 0; i < 6 && !/^Program/.test((await focused()).label || ''); i++) { await key('ArrowRight'); }
+    trail.push(await focused());                                 // Program (generic) tile (selected by arrows)
     await key('Tab'); trail.push(await focused());               // program path
     await typeText('/bin/sh');
     await key('Tab'); trail.push(await focused());               // arguments
@@ -78,7 +79,7 @@ function lint() {
     for (let i = 0; i < 30 && !created; i++) { await delay(300); created = s.ctl('state').runs.find((r, j) => j >= beforeRuns && r.harness === 'generic'); }
     const kbWs = created && s.ctl('state').workspaces.find(w => w.id === created.workspace_id);
     for (let i = 0; i < 20 && kbWs && !fs.existsSync(path.join(kbWs.path, 'kb.txt')); i++) await delay(300);
-    check('keyboard-only task creation (tiles by arrow keys, Tab between groups, Enter to start)', !!created && fs.existsSync(path.join(kbWs.path, 'kb.txt')) && trail.some(t => t.group === 'harnesses' && /Generic/.test(t.label)) && trail.some(t => t.id === 'program') && trail.some(t => t.id === 'args') && trail.some(t => t.group === 'modes') && trail[trail.length - 1].id === 'start', { trail, run: created?.id });
+    check('keyboard-only task creation (tiles by arrow keys, Tab between groups, Enter to start)', !!created && fs.existsSync(path.join(kbWs.path, 'kb.txt')) && trail.some(t => t.group === 'harnesses' && /^Program/.test(t.label)) && trail.some(t => t.id === 'program') && trail.some(t => t.id === 'args') && trail.some(t => t.group === 'modes') && trail[trail.length - 1].id === 'start', { trail, run: created?.id });
 
     // Theme screenshots and accessibility audits.
     for (const theme of THEMES) {
@@ -97,18 +98,21 @@ function lint() {
       const bodyClass = await f.eval(`document.body.className`);
       await s.screenshot(`new-task-${slug}`);
       // Overseer view + review + conversation for the nested run.
-      const center = await cdp.webview(`document.body.dataset.ready === '1' && !!document.getElementById('tree')`, 30000);
-      await center.eval(`(() => { const r = [...document.querySelectorAll('#tree .row')].find(r => r.dataset.run && r.querySelector('.label').textContent === 'generic'); r?.click(); })()`);
+      const center = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list')`, 30000);
+      const rootOf = h => s.ctl('state').runs.find(r => !r.parent_run_id && r.harness === h)?.id;
+      await center.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(rootOf('generic'))}]')?.click()`);
       await delay(2500);
-      const conv = await cdp.webview(`document.body.dataset.runId && !!document.querySelector('#conv .turn')`, 20000);
+      // The conversation is part of the dashboard.
+      const conv = center;
+      await conv.waitFor(`!!document.querySelector('#conv .turn')`, 20000);
       const review = await cdp.webview(`!!document.getElementById('diffs') && document.querySelectorAll('.diff-file').length > 0`, 20000).catch(() => null);
       const audits = { form: formAudit, center: await center.eval(AUDIT), conversation: await conv.eval(AUDIT), review: review ? await review.eval(AUDIT) : null };
       await s.screenshot(`views-${slug}`);
-      await center.eval(`(() => { const r = [...document.querySelectorAll('#tree .row')].find(r => r.dataset.run && r.querySelector('.label').textContent === 'claude'); r?.click(); })()`);
+      await center.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(rootOf('claude'))}]')?.click()`);
       await delay(2000);
       await s.screenshot(`conversation-${slug}`);
       if (theme === THEMES[0]) {
-        const cv = await cdp.webview(`!!document.querySelector('#conv details.child')`, 20000);
+        const cv = center; await cv.waitFor(`!!document.querySelector('#conv details.child')`, 20000);
         const nest = await cv.eval(`(() => { const child = [...document.querySelectorAll('#conv details.child')].find(d => d.querySelector(':scope > summary .child-title').textContent === 'child task'); return { grandInsideChild: !!child && [...child.querySelectorAll('details.child .child-title')].some(t => t.textContent === 'grandchild task'), childUnderAgent: child?.parentElement?.classList.contains('tool-children') }; })()`);
         check('delayed parent (grandchild reported first) ends up nested inside its child in the conversation', nest.grandInsideChild && nest.childUnderAgent, nest);
       }

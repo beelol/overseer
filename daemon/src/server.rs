@@ -382,7 +382,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "branches": crate::git::branches(&root), "status": crate::git::status(&root)?})
         }
         "task.create" => d.create_task(p)?,
-        "run.follow_up" => json!(d.start_turn(s(p, "run_id")?, s(p, "prompt")?, true)?),
+        "run.follow_up" => json!(d.start_turn(s(p, "run_id")?, s(p, "prompt")?, true, &crate::daemon::TurnOpts::from_params(p)?)?),
         "run.interrupt" => d.interrupt(s(p, "run_id")?)?,
         "run.permission" => d.answer_permission(s(p, "run_id")?, s(p, "request_id")?, p["allow"].as_bool().unwrap_or(false), p["message"].as_str().unwrap_or(""))?,
         "run.raw_output" => d.raw_output(s(p, "run_id")?, p["max_bytes"].as_u64().unwrap_or(256 * 1024).min(4 * 1024 * 1024) as usize)?,
@@ -410,6 +410,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "workspace.cleanup_plan" => d.cleanup_plan(s(p, "workspace_id")?)?,
         "workspace.cleanup" => d.cleanup(s(p, "workspace_id")?, p["discard_dirty"].as_bool().unwrap_or(false))?,
+        "account.usage" => d.account_usage(s(p, "id")?)?,
+        "task.archive" => d.task_archive(s(p, "task_id")?, p["archived"].as_bool().unwrap_or(true))?,
+        "search" => d.search(p["query"].as_str().unwrap_or(""), p["limit"].as_i64().unwrap_or(200))?,
+        "repo.files" => d.repo_files(p["workspace_id"].as_str(), p["repo"].as_str(), p["query"].as_str().unwrap_or(""), p["limit"].as_u64().unwrap_or(30) as usize)?,
+        "workspace.changes" => d.workspace_changes(s(p, "workspace_id")?)?,
         "workspace.tree" => d.workspace_tree(s(p, "workspace_id")?, p["dir"].as_str().unwrap_or(""))?,
         "account.list" => d.account_list()?,
         "account.create" => d.account_create(s(p, "provider")?, s(p, "name")?)?,

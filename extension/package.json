@@ -18,6 +18,10 @@
     "virtualWorkspaces": false
   },
   "contributes": {
+    "themes": [
+      { "label": "Overseer Dark", "uiTheme": "vs-dark", "path": "./themes/overseer-dark-color-theme.json" },
+      { "label": "Overseer Light", "uiTheme": "vs", "path": "./themes/overseer-light-color-theme.json" }
+    ],
     "viewsContainers": {
       "activitybar": [{ "id": "overseer", "title": "Overseer", "icon": "media/overseer.svg" }]
     },
@@ -34,6 +38,18 @@
     ],
     "commands": [
       { "command": "overseer.openCenter", "title": "Open Overseer View", "category": "Overseer", "icon": "$(layout)" },
+      { "command": "overseer.openDashboard", "title": "Open Dashboard", "category": "Overseer", "icon": "$(screen-full)" },
+      { "command": "overseer.exitDashboard", "title": "Exit Dashboard", "category": "Overseer", "icon": "$(screen-normal)", "enablement": "overseer.inDashboard" },
+      { "command": "overseer.toggleDashboard", "title": "Toggle Dashboard", "category": "Overseer" },
+      { "command": "overseer.openDashboardWindow", "title": "Open Dashboard in New Window", "category": "Overseer", "icon": "$(empty-window)" },
+      { "command": "overseer.newAgent", "title": "New Agent", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.toggleGrid", "title": "Toggle Agent Grid", "category": "Overseer", "icon": "$(layout)" },
+      { "command": "overseer.switchAgent", "title": "Switch Agent…", "category": "Overseer", "icon": "$(list-selection)" },
+      { "command": "overseer.nextNeedsYou", "title": "Go to Next Agent That Needs You", "category": "Overseer", "icon": "$(bell-dot)" },
+      { "command": "overseer.allowPermission", "title": "Allow Pending Request", "category": "Overseer", "icon": "$(check)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.denyPermission", "title": "Deny Pending Request", "category": "Overseer", "icon": "$(circle-slash)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.stopSelected", "title": "Stop Selected Agent", "category": "Overseer", "icon": "$(debug-stop)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.cleanupArchived", "title": "Clean Up Archived Worktrees…", "category": "Overseer", "icon": "$(trash)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.newTask", "title": "New Task…", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.newTaskQuick", "title": "Start Task with Quick Picks…", "category": "Overseer", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.refresh", "title": "Refresh", "category": "Overseer", "icon": "$(refresh)" },
@@ -60,14 +76,24 @@
       { "command": "overseer.showLog", "title": "Show Daemon Log", "category": "Overseer" },
       { "command": "overseer.restartDaemonConnection", "title": "Reconnect to Daemon", "category": "Overseer" }
     ],
+    "keybindings": [
+      { "command": "overseer.toggleDashboard", "key": "ctrl+alt+o", "mac": "cmd+alt+o" },
+      { "command": "overseer.newAgent", "key": "ctrl+alt+n", "mac": "cmd+alt+n" },
+      { "command": "overseer.toggleGrid", "key": "ctrl+alt+g", "mac": "cmd+alt+g" },
+      { "command": "overseer.switchAgent", "key": "ctrl+alt+a", "mac": "cmd+alt+a" },
+      { "command": "overseer.nextNeedsYou", "key": "ctrl+alt+j", "mac": "cmd+alt+j" },
+      { "command": "overseer.allowPermission", "key": "ctrl+alt+y", "mac": "cmd+alt+y", "when": "overseer.connected" },
+      { "command": "overseer.denyPermission", "key": "ctrl+alt+x", "mac": "cmd+alt+backspace", "when": "overseer.connected" },
+      { "command": "overseer.stopSelected", "key": "ctrl+alt+.", "mac": "cmd+alt+.", "when": "overseer.connected" }
+    ],
     "menus": {
       "view/title": [
         { "command": "overseer.newTask", "when": "view == overseer.agents", "group": "navigation@1" },
-        { "command": "overseer.openCenter", "when": "view == overseer.agents", "group": "navigation@0" },
+        { "command": "overseer.openDashboard", "when": "view == overseer.agents", "group": "navigation@0" },
+        { "command": "overseer.switchAgent", "when": "view == overseer.agents", "group": "navigation@4" },
         { "command": "overseer.refresh", "when": "view == overseer.agents", "group": "navigation@2" },
         { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "navigation@3" },
-        { "command": "overseer.mergeBack", "title": "Merge Back…", "category": "Overseer", "icon": "$(git-merge)", "enablement": "isWorkspaceTrusted" },
-      { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
+        { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
         { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
         { "command": "overseer.selectComparison", "when": "view == overseer.dirty", "group": "navigation@1" }
@@ -96,6 +122,10 @@
     "configuration": {
       "title": "Overseer",
       "properties": {
+        "overseer.grid.maxTiles": { "type": "integer", "minimum": 1, "maximum": 9, "default": 6, "markdownDescription": "Most agents shown at once in the agent grid (1–9)." },
+        "overseer.dashboard.openOnStartup": { "type": "boolean", "default": false, "markdownDescription": "Open the Overseer dashboard when VS Code starts." },
+        "overseer.history.autoArchiveDays": { "type": "number", "minimum": 0, "default": 14, "markdownDescription": "Archive finished agents automatically after this many days (0 turns it off). Archived agents stay searchable and can be restored." },
+        "overseer.showCodexAppServer": { "type": "boolean", "default": false, "markdownDescription": "Offer the Codex app-server harness in the new-agent composer (the New Task form always lists it)." },
         "overseer.github.apiUrl": { "type": "string", "default": "https://api.github.com", "description": "GitHub API base URL used by Open Pull Request (GitHub Enterprise: https://HOST/api/v3). Pull requests use the GitHub account VS Code is signed in to." },
         "overseer.daemonPath": { "type": "string", "default": "", "markdownDescription": "Path to the `overseerd` binary. Empty uses the binary bundled with the extension.", "scope": "machine" },
         "overseer.review.enableEditing": { "type": "boolean", "default": true, "markdownDescription": "Edit working-tree text directly in the review. Undo/redo is available through Open in Native Diff." },

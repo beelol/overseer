@@ -26,6 +26,41 @@ fn short_id() -> String {
     uuid::Uuid::new_v4().simple().to_string()[..12].to_string()
 }
 
+/// Per-turn choices (AC-60): model, reasoning effort, permission mode and images.
+#[derive(Default, Clone, Debug)]
+pub struct TurnOpts {
+    pub model: Option<String>,
+    pub effort: Option<String>,
+    pub mode: Option<String>,
+    /// (media type, bytes)
+    pub images: Vec<(String, Vec<u8>)>,
+}
+
+impl TurnOpts {
+    pub fn from_params(p: &Value) -> Result<Self> {
+        let text = |k: &str| p[k].as_str().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
+        let mut images = Vec::new();
+        if let Some(list) = p["images"].as_array() {
+            if list.len() > 4 {
+                bail!("attach at most 4 images per message");
+            }
+            for img in list {
+                use base64::Engine;
+                let mime = img["mime"].as_str().unwrap_or_default().to_string();
+                if !["image/png", "image/jpeg", "image/gif", "image/webp"].contains(&mime.as_str()) {
+                    bail!("images must be PNG, JPEG, GIF or WebP");
+                }
+                let bytes = base64::engine::general_purpose::STANDARD.decode(img["data"].as_str().unwrap_or_default()).map_err(|_| anyhow!("image data is not base64"))?;
+                if bytes.len() > 5 * 1024 * 1024 {
+                    bail!("images must be 5 MB or smaller");
+                }
+                images.push((mime, bytes));
+            }
+        }
+        Ok(Self { model: text("model"), effort: text("effort"), mode: text("permission_mode"), images })
+    }
+}
+
 pub struct Daemon {
     pub store: Mutex<Store>,
     pub events: broadcast::Sender<Event>,
@@ -38,6 +73,9 @@ pub struct Daemon {
     /// Bumped on every UI connect/disconnect so a pending background notice can tell a reload
     /// (reconnect within the grace period) from VS Code really closing.
     pub ui_epoch: std::sync::atomic::AtomicU64,
+    /// When VS Code windows went from none to some, and the runs the last background notice named:
+    /// a brief reconnect after a notice (a probe, a crash-restart) does not repeat it.
+    pub ui_session: Mutex<(Option<std::time::Instant>, Option<Vec<String>>)>,
 }
 
 fn pid_alive(pid: u32) -> bool {
@@ -72,7 +110,7 @@ impl Daemon {
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
         let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), exe, started_ms: now(),
-            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0) });
+            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)) });
         daemon.ensure_system_profiles()?;
         Ok(daemon)
     }
@@ -407,6 +445,7 @@ impl Daemon {
             fork_commit,
             fork_provenance: fork_prov,
             created_ms: now(),
+            archived_ms: None,
         };
         let start = self.take_snapshot(&ws, "task-start")?;
         let task = Task { start_snapshot: Some(start.id.clone()), ..task };
@@ -448,12 +487,13 @@ impl Daemon {
             store.set_workspace_owner(&ws.id, Some(&run.id))?;
         }
         let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "extra_args": p["extra_args"].clone()});
+        let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };
         {
             let store = self.store.lock().unwrap();
             store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![run.id, generic.to_string()])?;
         }
         self.emit(Some(&task.id), Some(&run.id), "task_created", "daemon", "exact", json!({"task": task, "workspace": ws, "run": run}))?;
-        let started = self.start_turn_internal(&run.id, &prompt, false, swarm_identity);
+        let started = self.start_turn_internal(&run.id, &prompt, false, &opts, swarm_identity);
         let run = self.run(&run.id)?;
         let task = self.task(&task.id)?;
         if let Err(e) = started {
@@ -463,12 +503,12 @@ impl Daemon {
     }
 
     /// Start a work turn: fresh run-start snapshot, then launch (or stdin for live generic processes).
-    pub fn start_turn(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool) -> Result<Turn> {
-        self.start_turn_internal(run_id, prompt, follow_up, None)
+    pub fn start_turn(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts) -> Result<Turn> {
+        self.start_turn_internal(run_id, prompt, follow_up, opts, None)
     }
 
-    fn start_turn_internal(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, swarm_identity: Option<&SwarmWorkerIdentity>) -> Result<Turn> {
-        let run = self.run(run_id)?;
+    fn start_turn_internal(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts, swarm_identity: Option<&SwarmWorkerIdentity>) -> Result<Turn> {
+        let mut run = self.run(run_id)?;
         if run.parent_run_id.is_some() {
             bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
         }
@@ -488,6 +528,25 @@ impl Daemon {
                 }
             }
         }
+        let launch_meta: Value = {
+            let store = self.store.lock().unwrap();
+            store.conn.query_row("SELECT launch FROM runs WHERE id=?1", [run_id], |r| r.get::<_, Option<String>>(0))?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null)
+        };
+        let mut generic_meta = launch_meta.get("generic").cloned().unwrap_or(launch_meta.clone());
+        // Turn options: this turn's choices, else the run's last ones (a model change sticks).
+        let effort = opts.effort.clone().or_else(|| generic_meta["opts"]["effort"].as_str().map(str::to_string));
+        let mode = opts.mode.clone().or_else(|| generic_meta["opts"]["mode"].as_str().map(str::to_string));
+        adapters::check_turn_options(&run.harness, effort.as_deref(), mode.as_deref(), opts.images.len())?;
+        if let Some(m) = &opts.model {
+            if run.model.as_deref() != Some(m.as_str()) {
+                self.store.lock().unwrap().conn.execute("UPDATE runs SET model=?2 WHERE id=?1", rusqlite::params![run_id, m])?;
+                run.model = Some(m.clone());
+            }
+        }
+        if generic_meta.is_null() {
+            generic_meta = json!({});
+        }
+        generic_meta["opts"] = json!({"effort": effort, "mode": mode});
         let snap = self.take_snapshot(&ws, "run-start")?;
         let n = self.store.lock().unwrap().turns(run_id)?.len() as i64 + 1;
         let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt.into(), snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
@@ -503,11 +562,23 @@ impl Daemon {
             Some(id) => Self::profile_env(&self.profile(id)?),
             None => BTreeMap::new(),
         };
-        let launch_meta: Value = {
-            let store = self.store.lock().unwrap();
-            store.conn.query_row("SELECT launch FROM runs WHERE id=?1", [run_id], |r| r.get::<_, Option<String>>(0))?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null)
-        };
-        let generic_meta = launch_meta.get("generic").cloned().unwrap_or(launch_meta.clone());
+        // Attachments are private files in the run folder, named by content.
+        let mut images = Vec::new();
+        if !opts.images.is_empty() {
+            let dir = paths::runs_dir().join(run_id).join("attachments");
+            paths::ensure_private_dir(&dir)?;
+            for (mime, bytes) in &opts.images {
+                use sha2::Digest;
+                let ext = mime.trim_start_matches("image/").replace("jpeg", "jpg");
+                let path = dir.join(format!("{:x}.{ext}", sha2::Sha256::digest(bytes)));
+                std::fs::write(&path, bytes)?;
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+                }
+                images.push((mime.clone(), path));
+            }
+        }
         let args: Option<Vec<String>> = generic_meta["args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
         let extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
         let resume = if follow_up { run.native_id.clone() } else { None };
@@ -525,6 +596,9 @@ impl Daemon {
                 program_override: generic_meta["program"].as_str(),
                 args_override: args.as_deref(),
                 extra_args: &extra_args,
+                effort: effort.as_deref(),
+                permission_mode: mode.as_deref(),
+                images: &images,
             },
         )?;
         if let Some(identity) = swarm_identity {
@@ -1284,6 +1358,27 @@ impl Daemon {
             (_, None) => options.push(json!({"mode": "branch_merge_base", "label": "Target branch", "available": false, "detail": "workspace has no HEAD commit"})),
         }
         Ok(json!({"run_id": run_id, "workspace": ws, "head": head, "branch": git::head_branch(path), "options": options, "branches": git::branches(path)}))
+    }
+
+    /// Archives or restores a task (AC-63): hidden from the default list, never deleted.
+    pub fn task_archive(&self, task_id: &str, archived: bool) -> Result<Value> {
+        let when = if archived { Some(now()) } else { None };
+        if !self.store.lock().unwrap().set_task_archived(task_id, when)? {
+            bail!("unknown task {task_id}");
+        }
+        self.emit(Some(task_id), None, "task_archived", "user", "exact", json!({"archived": archived}))?;
+        Ok(json!({"task_id": task_id, "archived_ms": when}))
+    }
+
+    /// Task ids whose task, runs, accounts or conversation match `query` (AC-63).
+    pub fn search(&self, query: &str, limit: i64) -> Result<Value> {
+        let q = query.trim();
+        if q.is_empty() {
+            return Ok(json!({"task_ids": []}));
+        }
+        let started = std::time::Instant::now();
+        let ids = self.store.lock().unwrap().search(q, limit.clamp(1, 1000))?;
+        Ok(json!({"task_ids": ids, "ms": started.elapsed().as_millis() as u64}))
     }
 
     pub fn workspace_diff(&self, workspace_id: &str, base: &str) -> Result<Value> {

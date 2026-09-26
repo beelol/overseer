@@ -165,8 +165,8 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     check('three-level native tree visible in the UI', /native child/.test(childRow.text), childRow.text);
     await cdp.click(childRow.x, childRow.y);
     const childOut = await cdp.webview(`document.getElementById('title')?.textContent.includes('grandchild hi')`, 20000);
-    const ctl = await childOut.eval(`({ interrupt: document.getElementById('interrupt').disabled, why: document.getElementById('interrupt-why').textContent, send: document.getElementById('send').disabled, sendWhy: document.getElementById('send-why').textContent, ws: document.getElementById('ws').textContent })`);
-    check('child controls disabled with explanation', ctl.interrupt && ctl.send && /parent/.test(ctl.why) && /top-level/.test(ctl.sendWhy) && /shared with parent/.test(ctl.ws), ctl);
+    const ctl = await childOut.eval(`({ stopHidden: document.getElementById('interrupt').hidden, send: document.getElementById('send').disabled, why: document.getElementById('prompt').placeholder, sendWhy: document.getElementById('send').title, worktree: document.getElementById('details').textContent })`);
+    check('child controls disabled with explanation (stop hidden, reply disabled: steered through the parent; same worktree as the parent)', ctl.stopHidden && ctl.send && /parent/.test(ctl.why) && /parent/.test(ctl.sendWhy) && ctl.worktree.includes(deleg.workspace.path), ctl);
     await s.screenshot('native-child-selected');
 
     // Daemon crash while the UI is open: UI shows disconnected, restarts the daemon and reconnects.

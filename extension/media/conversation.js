@@ -1,71 +1,107 @@
-// Conversation renderer for Overseer run views (webview side, no dependencies).
-// Turns normalized daemon events into a conversation: prompts and agent messages as turns,
-// collapsible tool calls with inputs/results, file edits that open the review at the hunk,
-// inline permission requests with their decision, native children nested under the tool
-// call that spawned them, highlighted errors and per-turn usage. Used by the run panel and
-// the Overseer view. Everything is built with textContent (never innerHTML) for safety.
+// Conversation renderer for Overseer chats (AC-43, AC-55): normalized daemon events become a
+// calm chat. Your prompts are bubbles; agent replies are Markdown; tool calls are one-line rows
+// ("Read README.md ✓", "Ran npm test ✓") and consecutive ones fold into a single line; file edits
+// open the review at the hunk; permission requests are readable cards with Allow / Deny; native
+// children nest under the tool call that started them; each turn ends with a quiet footer.
+// Used by the Overseer dashboard, run panels and grid tiles. No innerHTML except sanitized Markdown.
 (function () {
-  const SPAWN_TOOLS = /^(Agent|Task|task|collab:spawn_agent)$/;
-  const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping']);
+  const ui = window.OverseerUI;
+  const el = ui.el;
+  const SPAWN_TOOLS = /^(Agent|Task|task|collab:spawn_agent|spawn_agent)$/;
+  const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage']);
 
-  function el(tag, cls, text) {
-    const e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text !== undefined && text !== null) e.textContent = text;
-    return e;
+  function parseInput(v) {
+    if (v && typeof v === 'object') return v;
+    const s = String(v || '');
+    try { const j = JSON.parse(s); if (j && typeof j === 'object') return j; } catch { /* truncated or not JSON */ }
+    const out = {};
+    for (const k of ['file_path', 'path', 'command', 'pattern', 'description', 'url', 'query', 'prompt', 'notebook_path']) {
+      const m = new RegExp(`"${k}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)`).exec(s);
+      if (m) out[k] = m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+    }
+    return out;
   }
-  function fmtTokens(p) {
-    const u = p.usage || p.total || p.tokens || p;
-    const pick = (...keys) => keys.map(k => u && u[k]).find(v => typeof v === 'number');
-    const input = pick('input_tokens', 'inputTokens', 'input'), output = pick('output_tokens', 'outputTokens', 'output');
-    const parts = [];
-    if (input !== undefined) parts.push(`${input.toLocaleString()} in`);
-    if (output !== undefined) parts.push(`${output.toLocaleString()} out`);
-    const cost = typeof p.total_cost_usd === 'number' ? p.total_cost_usd : typeof p.cost === 'number' ? p.cost : undefined;
-    if (cost !== undefined) parts.push(`$${cost.toFixed(4)}`);
-    if (p.rate_limits) parts.push('rate limits reported');
-    return parts.join(' · ') || JSON.stringify(p).slice(0, 160);
+  const lines = t => (t ? String(t).split('\n').length - (String(t).endsWith('\n') ? 1 : 0) : 0);
+  const host = u => { try { return new URL(u).host; } catch { return u; } };
+
+  /** Icon, verb and target for a tool call, from its name and input. */
+  function describe(name, input, summary) {
+    const i = parseInput(input !== undefined && input !== null ? input : summary);
+    const file = i.file_path || i.notebook_path || i.path;
+    const n = String(name || 'tool');
+    switch (n) {
+      case 'Read': return { icon: 'file', verb: 'Read', target: ui.basename(file), full: file };
+      case 'Write': return { icon: 'new-file', verb: 'Created', pending: 'Create', target: ui.basename(file), full: file, added: lines(i.content) };
+      case 'Edit': case 'MultiEdit': case 'NotebookEdit': {
+        const edits = Array.isArray(i.edits) ? i.edits : [i];
+        return { icon: 'edit', verb: 'Edited', pending: 'Edit', target: ui.basename(file), full: file, added: edits.reduce((a, e) => a + lines(e.new_string || e.new_source), 0), removed: edits.reduce((a, e) => a + lines(e.old_string), 0) };
+      }
+      case 'Grep': return { icon: 'search', verb: 'Searched', target: i.pattern ? `“${i.pattern}”` : '', full: i.pattern };
+      case 'Glob': return { icon: 'search', verb: 'Found files', target: i.pattern || '', full: i.pattern };
+      case 'LS': return { icon: 'folder', verb: 'Listed', target: ui.basename(i.path), full: i.path };
+      case 'Bash': case 'shell': case 'command': case 'commandExecution': {
+        const cmd = i.command || String(summary || '').replace(/\s*\[[^\]]*\]\s*$/, '');
+        return { icon: 'terminal', verb: 'Ran', pending: 'Run', target: ui.firstLine(cmd, 80), full: i.description ? `${i.description}\n${cmd}` : cmd, code: true };
+      }
+      case 'apply_patch': case 'fileChange': return { icon: 'edit', verb: 'Edited', target: String(summary || '').replace(/\s*\[[^\]]*\]\s*$/, '').split(', ').map(ui.basename).join(', '), full: summary };
+      case 'WebFetch': return { icon: 'globe', verb: 'Fetched', target: host(i.url), full: i.url };
+      case 'WebSearch': case 'web_search': case 'webSearch': return { icon: 'globe', verb: 'Searched the web', target: i.query ? `“${i.query}”` : '', full: i.query };
+      case 'TodoWrite': return { icon: 'checklist', verb: 'Updated the plan', target: Array.isArray(i.todos) ? `${i.todos.length} items` : '' };
+      case 'Agent': case 'Task': case 'task': return { icon: 'hubot', verb: 'Delegated', target: i.description || ui.firstLine(i.prompt, 80), full: i.prompt };
+      default:
+        if (/^collab:spawn_agent|^spawn_agent/.test(n)) return { icon: 'hubot', verb: 'Delegated', target: ui.firstLine(summary, 80), full: summary };
+        if (/^collab:/.test(n)) return { icon: 'watch', verb: n.replace('collab:', '').replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase()), target: '' };
+        if (/mcp/i.test(n)) return { icon: 'plug', verb: 'Used', target: n, full: summary };
+        return { icon: 'tools', verb: n, target: ui.firstLine(Object.values(i).find(v => typeof v === 'string') || '', 60), full: summary };
+    }
   }
 
   class Conversation {
-    /** opts: { post(msg), label(runId) } */
+    /** opts: { post(msg), compact?: bool (grid tiles: fewer details) } */
     constructor(root, opts) {
-      this.root = root; this.opts = opts;
+      this.root = root; this.opts = opts || {};
       this.seen = new Set(); this.turns = []; this.tools = new Map(); this.perms = new Map(); this.children = new Map();
-      this.childInfo = new Map(); this.rootId = undefined; this.attention = undefined;
+      this.childInfo = new Map(); this.rootId = undefined; this.attention = undefined; this.active = false;
       this.banner = el('div', 'conv-banner'); this.banner.hidden = true; this.banner.setAttribute('role', 'status');
       this.list = el('div', 'conv-turns');
-      root.replaceChildren(this.banner, this.list);
+      this.working = el('div', 'working'); this.working.hidden = true; this.working.setAttribute('aria-live', 'polite');
+      this.working.append(el('span', 'working-dot'), el('span', 'working-label', 'Working…'));
+      root.replaceChildren(this.banner, this.list, this.working);
     }
 
     setRun(msg) {
       this.rootId = msg.run.id;
+      this.status = msg.run.status;
+      this.active = ['queued', 'starting', 'running'].includes(msg.run.status);
       this.attention = msg.run.attention && msg.run.attention.kind === 'permission' ? msg.run.attention.request_id : undefined;
       for (const c of msg.children || []) this.childInfo.set(c.id, c);
       for (const [id, card] of this.perms) this.renderPermission(id, card);
       for (const [id, block] of this.children) this.renderChildHeader(id, block);
+      this.updateWorking();
     }
 
-    truncated(text) { this.banner.hidden = false; this.banner.textContent = text; }
+    truncated(text) { this.banner.hidden = false; this.banner.replaceChildren(ui.icon('history', 'sm'), el('span', null, text)); }
 
     turn() {
       if (!this.turns.length) this.newTurn({ n: 0, prompt: '' }, true);
       return this.turns[this.turns.length - 1];
     }
 
-    newTurn(t, implicit) {
+    newTurn(t, implicit, ev) {
       const box = el('section', 'turn'); box.dataset.turn = t.n;
-      const head = el('div', 'turn-head');
-      head.append(el('span', 'turn-n', implicit ? 'Before the first turn' : `Turn ${t.n}`));
+      box.setAttribute('aria-label', implicit ? 'Before the first turn' : `Turn ${t.n}`);
       const body = el('div', 'turn-body');
       const foot = el('div', 'turn-foot'); foot.hidden = true;
-      const usage = el('span', 'usage'); const done = el('span', 'done');
-      foot.append(done, usage);
-      box.append(head);
-      if (t.prompt) { const p = el('div', 'msg user'); p.append(el('div', 'who', 'You'), el('div', 'text', t.prompt)); box.append(p); }
+      const done = el('span', 'done'); const dur = el('span', 'dur'); const usage = el('span', 'usage');
+      foot.append(done, dur, usage);
+      if (t.prompt) {
+        const p = el('div', 'msg user'); p.setAttribute('aria-label', 'You');
+        const text = el('div', 'text', t.prompt);
+        p.append(text); box.append(p);
+      }
       box.append(body, foot);
       this.list.append(box);
-      const turn = { n: t.n, box, body, foot, usage, done };
+      const turn = { n: t.n, box, body, foot, usage, done, dur, started: ev && (ev.ts_ms || ev.ts) };
       this.turns.push(turn);
       return turn;
     }
@@ -76,33 +112,58 @@
       return this.childBlock(ev.run_id).body;
     }
 
+    /** The group of consecutive tool calls at the end of a container (created when needed). */
+    steps(host) {
+      const last = host.lastElementChild;
+      if (last && last.classList.contains('steps')) return last._steps;
+      const box = el('div', 'steps');
+      const fold = el('details', 'steps-fold'); const sum = el('summary', 'steps-head'); const list = el('div', 'steps-list');
+      fold.append(sum, list);
+      const edits = el('div', 'steps-edits');
+      box.append(list, edits);
+      const g = { box, fold, sum, list, edits, count: 0, verbs: new Map(), failed: 0 };
+      box._steps = g;
+      host.append(box);
+      return g;
+    }
+
+    /** Folds a group into one summary line once it has more than one call. */
+    regroup(g) {
+      if (g.count > 1 && g.list.parentElement !== g.fold) { g.box.insertBefore(g.fold, g.edits); g.fold.append(g.list); }
+      if (g.count > 1) {
+        const parts = [...g.verbs].map(([v, n]) => (n > 1 ? `${v} ${n}×` : v));
+        g.sum.replaceChildren(ui.icon('tools', 'sm'), el('span', 'steps-label', `${g.count} steps`), el('span', 'steps-verbs', parts.join(' · ')));
+        if (g.failed) g.sum.append(el('span', 'steps-failed', `${g.failed} failed`));
+        g.sum.title = parts.join(', ');
+      }
+    }
+
     childBlock(runId, hint) {
       let block = this.children.get(runId);
       if (block) return block;
-      const info = hint || this.childInfo.get(runId) || { id: runId, title: 'native child' };
+      const info = hint || this.childInfo.get(runId) || { id: runId, title: 'Sub-agent' };
       if (hint) this.childInfo.set(runId, { ...this.childInfo.get(runId), ...hint });
-      const details = el('details', 'child'); details.open = true; details.dataset.run = runId;
+      const details = el('details', 'child'); details.open = !this.opts.compact; details.dataset.run = runId;
       const summary = el('summary', 'child-head');
       const body = el('div', 'child-body');
       details.append(summary, body);
       block = { el: details, summary, body };
       this.children.set(runId, block);
       this.renderChildHeader(runId, block);
-      // Nest under the tool call that spawned it (same native id, or named in the evidence).
       const parent = info.parent || info.parent_run_id;
       const scope = parent && parent !== this.rootId ? parent : this.rootId;
       const evidence = String(info.evidence || info.relation_source || '');
-      let host;
+      let hostCard;
       for (const [key, card] of this.tools) {
         if (!key.startsWith(scope + '\u0000')) continue;
-        if (card.id && (card.id === info.native_id || evidence.includes(card.id))) host = card;
+        if (card.id && (card.id === info.native_id || evidence.includes(card.id))) hostCard = card;
       }
-      if (!host) {
+      if (!hostCard) {
         for (const card of [...this.tools.values()].reverse()) {
-          if (card.run === scope && SPAWN_TOOLS.test(card.name) && !card.kids.children.length) { host = card; break; }
+          if (card.run === scope && SPAWN_TOOLS.test(card.name) && !card.kids.children.length) { hostCard = card; break; }
         }
       }
-      if (host) { host.kids.append(details); block.nested = host.id || true; }
+      if (hostCard) { hostCard.kids.append(details); block.nested = hostCard.id || true; }
       else if (scope !== this.rootId && this.children.has(scope)) this.children.get(scope).body.append(details);
       else this.turn().body.append(details);
       return block;
@@ -110,9 +171,10 @@
 
     renderChildHeader(runId, block) {
       const info = this.childInfo.get(runId) || {};
-      block.summary.replaceChildren(el('span', 'child-mark', '↳'), el('span', 'child-title', info.title || 'native child'),
-        el('span', `badge status-${info.status || 'unknown'}`, (info.status || 'unknown').replace(/_/g, ' ')));
-      block.summary.title = [info.evidence || info.relation_source, info.confidence || info.relation_confidence].filter(Boolean).join('\n');
+      const st = info.status || 'unknown';
+      const title = el('span', 'child-title', info.title || 'Sub-agent');
+      block.summary.replaceChildren(ui.icon('type-hierarchy-sub', 'sm child-mark'), title, ui.status(st));
+      block.summary.title = [info.title, ui.statusText(st), info.evidence || info.relation_source].filter(Boolean).join('\n');
     }
 
     toolCard(ev, id, name) {
@@ -121,17 +183,21 @@
       if (card) return card;
       const details = el('details', 'tool'); details.dataset.tool = id || '';
       const summary = el('summary', 'tool-head');
-      const nameEl = el('span', 'tool-name', name || 'tool'); const sumEl = el('span', 'tool-summary'); const statusEl = el('span', 'badge');
-      summary.append(el('span', 'tool-icon', '⚙'), nameEl, sumEl, statusEl);
+      const iconEl = el('span', 'tool-icon'); const verbEl = el('span', 'tool-verb'); const sumEl = el('span', 'tool-summary'); const statusEl = el('span', 'tool-result');
+      summary.append(iconEl, verbEl, sumEl, statusEl);
       const input = el('div', 'tool-section'); const output = el('div', 'tool-section');
       const kids = el('div', 'tool-children');
       details.append(summary, input, output);
-      card = { el: details, id, name: name || '', run: ev.run_id || this.rootId, nameEl, sumEl, statusEl, input, output, kids, data: {} };
+      card = { el: details, id, name: name || '', run: ev.run_id || this.rootId, iconEl, verbEl, sumEl, statusEl, input, output, kids, data: {} };
       details.addEventListener('toggle', () => { if (details.open) this.fillTool(card); });
-      const host = this.container(ev);
-      host.append(details, kids);
+      const hostEl = this.container(ev);
+      if (SPAWN_TOOLS.test(card.name)) { hostEl.append(details, kids); }
+      else {
+        const g = this.steps(hostEl);
+        g.list.append(details, kids); g.count++; card.group = g;
+        this.regroup(g);
+      }
       this.tools.set(key, card);
-      // Some harnesses (Claude) report the child before the tool call that spawned it: adopt it.
       if (id) {
         for (const [runId, block] of this.children) {
           const info = this.childInfo.get(runId) || {};
@@ -139,16 +205,60 @@
           if (!block.nested && sameParent && (info.native_id === id || String(info.evidence || '').split(' inside ')[0].split(/[\s()]+/).includes(id))) { kids.append(block.el); block.nested = id; }
         }
       }
+      this.label(card);
       return card;
     }
+
+    label(card) {
+      const d = describe(card.name, card.data.input, card.summary);
+      card.desc = d;
+      card.el.dataset.name = card.name;
+      const done = card.status && !/running|started|inProgress|in_progress/.test(card.status);
+      card.iconEl.replaceChildren(ui.icon(d.icon, 'sm'));
+      card.verbEl.textContent = !done && d.pending && card.status !== undefined ? d.pending : d.verb;
+      card.sumEl.textContent = d.target || '';
+      card.sumEl.classList.toggle('mono', !!d.code);
+      card.el.title = [d.full, card.name !== d.verb ? `(${card.name})` : ''].filter(Boolean).join(' ');
+      if (card.group) {
+        const g = card.group; g.verbs = new Map();
+        for (const c of this.tools.values()) if (c.group === g) g.verbs.set(c.desc?.verb || c.name, (g.verbs.get(c.desc?.verb || c.name) || 0) + 1);
+        this.regroup(g);
+      }
+      this.renderResult(card);
+    }
+
+    renderResult(card) {
+      const st = card.data.status || card.status;
+      const failed = card.data.is_error || /failed|error|declined/.test(st || '');
+      const running = !st || /running|started|inProgress|in_progress/.test(st);
+      const exit = /exit (\d+)/.exec(card.summary || '');
+      const r = card.statusEl; r.className = 'tool-result'; r.replaceChildren();
+      if (failed) { r.classList.add('bad'); r.append(ui.icon('error', 'xs'), el('span', null, exit && exit[1] !== '0' ? `exit ${exit[1]}` : 'failed')); }
+      else if (running && !this.finishedTurn(card)) { r.classList.add('run'); r.append(el('span', 'mini-dot')); }
+      else if (card.desc && (card.desc.added || card.desc.removed)) { r.append(el('span', 'add', `+${card.desc.added || 0}`), el('span', 'del', `−${card.desc.removed || 0}`)); }
+      else r.append(ui.icon('check', 'xs ok'));
+      if (card.group && failed !== !!card.failedCounted) { card.group.failed += failed ? 1 : -1; card.failedCounted = failed; this.regroup(card.group); }
+    }
+
+    finishedTurn(card) { return !this.active && card.run === this.rootId; }
 
     fillTool(card) {
       const d = card.data;
       card.input.replaceChildren(); card.output.replaceChildren();
-      if (d.input !== undefined && d.input !== null) { card.input.append(el('div', 'label', 'Input'), el('pre', 'code', typeof d.input === 'string' ? d.input : JSON.stringify(d.input, null, 2))); }
-      else if (card.sumEl.textContent) card.input.append(el('div', 'label', 'Input'), el('pre', 'code', card.sumEl.textContent));
-      if (d.output) card.output.append(el('div', 'label', d.is_error ? 'Result (error)' : 'Result'), el('pre', 'code' + (d.is_error ? ' error' : ''), d.output));
-      else card.output.append(el('div', 'muted', d.status && d.status !== 'started' ? `No output reported (${d.status}).` : 'Waiting for the result…'));
+      const input = d.input !== undefined && d.input !== null ? d.input : card.summary;
+      if (input) {
+        const parsed = parseInput(input);
+        const text = parsed.command || parsed.content || parsed.new_string || (typeof input === 'string' ? input : JSON.stringify(input, null, 2));
+        card.input.append(el('div', 'label', parsed.command ? 'Command' : parsed.content ? 'Content' : parsed.new_string ? 'New text' : 'Input'), el('pre', 'code', String(text).slice(0, 20000)));
+      }
+      if (d.output) card.output.append(el('div', 'label', d.is_error ? 'Error' : 'Result'), el('pre', 'code' + (d.is_error ? ' error' : ''), String(d.output).slice(0, 20000)));
+      else card.output.append(el('div', 'muted small', d.status && d.status !== 'started' ? 'No output reported.' : 'Waiting for the result…'));
+    }
+
+    updateWorking(label) {
+      if (label) this.working.querySelector('.working-label').textContent = label;
+      this.working.hidden = !this.active;
+      if (this.active) this.list.after(this.working);
     }
 
     add(ev) {
@@ -157,45 +267,59 @@
       const p = ev.payload || {};
       const child = ev.run_id && ev.run_id !== this.rootId;
       switch (ev.kind) {
-        case 'turn_started': if (!child) this.newTurn(p.turn || { n: this.turns.length + 1, prompt: '' }); break;
+        case 'turn_started': if (!child) { this.newTurn(p.turn || { n: this.turns.length + 1, prompt: '' }, false, ev); this.active = true; this.updateWorking('Working…'); } break;
         case 'output': {
           const role = p.role || 'assistant';
+          if (role === 'system') break; // session notes stay in the event log
           if (role === 'reasoning' || role === 'plan') {
-            const d = el('details', 'thinking'); d.append(el('summary', null, role === 'plan' ? 'Plan' : 'Reasoning'), el('div', 'text', p.text || ''));
-            this.container(ev).append(d);
+            const d = el('details', 'thinking'); const s = el('summary');
+            s.append(ui.icon(role === 'plan' ? 'checklist' : 'lightbulb', 'sm'), el('span', null, role === 'plan' ? 'Plan' : 'Thinking'));
+            const t = el('div', 'text md'); window.OverseerMarkdown.render(t, p.text || '', this.opts);
+            d.append(s, t); this.container(ev).append(d);
           } else {
             const m = el('div', 'msg ' + (role === 'assistant' ? 'agent' : role));
-            m.append(el('div', 'who', role === 'assistant' ? (child ? 'Child agent' : 'Agent') : role), el('div', 'text', p.text || ''));
+            m.setAttribute('aria-label', role === 'assistant' ? (child ? 'Sub-agent' : 'Agent') : role);
+            const text = el('div', 'text md');
+            if (role === 'assistant') window.OverseerMarkdown.render(text, p.text || '', this.opts);
+            else text.textContent = p.text || '';
+            m.append(text);
             this.container(ev).append(m);
+            if (!child) this.updateWorking('Working…');
           }
           break;
         }
         case 'tool': {
           const card = this.toolCard(ev, p.id, p.name);
-          card.nameEl.textContent = p.name || card.name; card.name = p.name || card.name;
-          card.sumEl.textContent = p.summary || '';
+          if (p.name) card.name = p.name;
+          card.summary = p.summary || '';
           const st = /\[(completed|failed|declined|inProgress|in_progress|running|error)[^\]]*\]\s*$/.exec(p.summary || '');
-          if (st) this.toolStatus(card, st[1]);
+          card.status = st ? st[1] : card.status || 'running';
+          this.label(card);
           if (card.el.open) this.fillTool(card);
+          if (!child && card.desc) this.updateWorking(`${card.desc.pending || card.desc.verb} ${card.desc.target || ''}`.trim() + '…');
           break;
         }
         case 'tool_result': {
           const card = this.toolCard(ev, p.id, undefined);
           for (const k of ['input', 'output', 'status', 'is_error']) if (p[k] !== undefined && p[k] !== null) card.data[k] = p[k];
-          if (p.status) this.toolStatus(card, p.is_error ? 'failed' : p.status);
+          card.status = p.is_error ? 'failed' : p.status || 'completed';
+          this.label(card);
           if (card.el.open) this.fillTool(card);
           break;
         }
         case 'file_activity': {
+          const hostEl = this.container(ev);
+          const last = hostEl.lastElementChild;
+          const target = last && last.classList.contains('steps') ? last._steps.edits : hostEl;
           const row = el('div', 'edit');
-          row.append(el('span', 'edit-icon', '✎'), el('span', 'muted', p.kind ? `${p.kind}: ` : 'edited: '));
+          row.append(ui.icon('diff', 'sm edit-icon'));
           for (const path of p.paths || []) {
-            const b = el('button', 'link edit-path', path); b.title = `Open ${path} at the edited hunk in the review (${ev.confidence})`;
+            const b = el('button', 'link edit-path', ui.basename(path)); b.type = 'button';
+            b.title = `${path}\nOpen at the edited hunk in the review${ev.confidence && ev.confidence !== 'reported' ? ` (${ev.confidence})` : ''}`;
             b.addEventListener('click', () => this.opts.post({ type: 'openEdit', runId: ev.run_id || this.rootId, path }));
             row.append(b);
           }
-          row.append(el('span', 'muted conf', ev.confidence === 'reported' ? '' : ` (${ev.confidence})`));
-          this.container(ev).append(row);
+          target.append(row);
           break;
         }
         case 'permission': {
@@ -211,25 +335,18 @@
           break;
         }
         case 'error': {
+          const TITLES = { auth: 'Signed out', rate_limit: 'Rate limited', quota: 'Usage limit reached', network: 'Connection problem' };
           const e = el('div', 'error-block'); e.setAttribute('role', 'alert');
-          e.append(el('strong', null, `✖ ${p.class || 'error'}`), el('div', 'text', p.message || ''));
+          const head = el('div', 'error-head'); head.append(ui.icon('error', 'sm'), el('strong', null, TITLES[p.class] || 'Error'));
+          e.append(head, el('div', 'text', p.message || ''));
+          e.title = p.class || 'error';
           if (p.class === 'auth') {
-            // Expired or missing login: reauthenticate this run's account through its own flow.
-            const b = el('button', 'secondary sign-in-again', 'Sign in again');
+            const b = el('button', 'btn sm sign-in-again', 'Sign in again'); b.type = 'button';
             b.setAttribute('aria-label', 'Sign in again with this run\'s account');
             b.addEventListener('click', () => this.opts.post({ type: 'signIn' }));
             e.append(b);
           }
           this.container(ev).append(e);
-          break;
-        }
-        case 'status': {
-          if (child) {
-            const info = this.childInfo.get(ev.run_id) || {}; info.status = p.status; this.childInfo.set(ev.run_id, info);
-            const block = this.children.get(ev.run_id); if (block) this.renderChildHeader(ev.run_id, block);
-          } else if (['interrupted', 'failed', 'disconnected', 'unknown'].includes(p.status)) {
-            this.container(ev).append(el('div', `sys status-line status-${p.status}`, `${p.status.replace(/_/g, ' ')}${p.reason ? ': ' + p.reason : ''}`));
-          }
           break;
         }
         case 'child': {
@@ -238,7 +355,6 @@
           break;
         }
         case 'child_reparented': {
-          // A delayed parent was reported later: move the child's block under its real parent.
           const block = this.children.get(p.child_run_id);
           if (!block) break;
           const info = this.childInfo.get(p.child_run_id) || {};
@@ -250,51 +366,92 @@
         case 'turn_done': {
           if (child) break;
           const t = this.turn(); t.foot.hidden = false;
-          t.done.textContent = p.ok ? '■ Turn completed' : '■ Turn failed';
+          t.done.replaceChildren(ui.icon(p.ok ? 'check' : 'error', 'xs'), el('span', null, p.ok ? 'Done' : 'Failed'));
           t.done.className = 'done ' + (p.ok ? 'ok' : 'fail');
-          if (p.summary && !p.ok) t.done.textContent += ': ' + p.summary;
+          if (p.summary && !p.ok) t.done.title = p.summary;
+          const end = ev.ts_ms || ev.ts;
+          if (t.started && end && end > t.started) t.dur.textContent = ui.duration(end - t.started);
+          this.active = false; this.updateWorking();
+          for (const c of this.tools.values()) if (c.run === this.rootId) this.renderResult(c);
           break;
         }
-        case 'usage': {
-          if (child) break;
-          const t = this.turn(); t.foot.hidden = false;
-          const onlyLimits = p.rate_limits && Object.keys(p).length === 1;
-          if (onlyLimits) { t.limits = true; if (!t.tokens) t.usage.textContent = '∑ rate limits reported'; }
-          else { t.tokens = fmtTokens(p); t.usage.textContent = '∑ ' + t.tokens + (t.limits ? ' · rate limits reported' : ''); t.usage.title = JSON.stringify(p); }
-          break;
-        }
-        case 'retention': this.truncated(`Older history was truncated by the retention bound (${JSON.stringify(p)}). The raw output keeps the full stream.`); break;
+        case 'retention': this.truncated('Older history was trimmed. Raw output keeps everything.'); break;
         case 'raw_unparsed': {
-          const d = el('details', 'thinking unparsed'); d.append(el('summary', null, `Unparsed line (${p.parser_version || 'parser'})`), el('pre', 'code', p.text || ''));
+          const d = el('details', 'thinking unparsed'); const s = el('summary');
+          s.append(ui.icon('question', 'sm'), el('span', null, 'Unparsed output'));
+          d.append(s, el('pre', 'code', p.text || '')); d.title = p.parser_version || '';
           this.container(ev).append(d);
           break;
         }
-        default:
-          if (!QUIET.has(ev.kind)) this.container(ev).append(el('div', 'sys', `${ev.kind}`));
+        default: break;
+      }
+      if (ev.kind === 'status') this.status_(ev, p, child);
+      if (ev.kind === 'usage') this.usage_(ev, p, child);
+      if (!QUIET.has(ev.kind) && !Conversation.KNOWN.has(ev.kind)) this.container(ev).append(el('div', 'sys', ev.kind.replace(/_/g, ' ')));
+    }
+
+    status_(ev, p, child) {
+      if (child) {
+        const info = this.childInfo.get(ev.run_id) || {}; info.status = p.status; this.childInfo.set(ev.run_id, info);
+        const block = this.children.get(ev.run_id); if (block) this.renderChildHeader(ev.run_id, block);
+        return;
+      }
+      if (['interrupted', 'failed', 'disconnected', 'unknown', 'completed'].includes(p.status)) { this.active = false; this.updateWorking(); }
+      if (['running', 'starting'].includes(p.status)) { this.active = true; this.updateWorking(); }
+      if (p.status === 'waiting_for_user') { this.active = false; this.updateWorking(); }
+      if (['interrupted', 'failed', 'disconnected', 'unknown'].includes(p.status)) {
+        const line = el('div', `sys status-line status-${p.status}`);
+        line.append(ui.icon(p.status === 'interrupted' ? 'circle-slash' : 'error', 'xs'), el('span', null, ui.statusText(p.status)));
+        if (p.reason) line.title = p.reason;
+        this.container(ev).append(line);
       }
     }
 
-    toolStatus(card, status) {
-      const norm = /^(inProgress|in_progress|running|started)$/.test(status) ? 'running' : status === 'error' ? 'failed' : status;
-      card.statusEl.className = `badge status-${norm}`; card.statusEl.textContent = norm.replace(/_/g, ' ');
-      card.data.status = card.data.status || status;
+    usage_(ev, p, child) {
+      if (child) return;
+      const t = this.turn();
+      const u = p.usage || p.total || p.tokens || p;
+      const pick = (...keys) => keys.map(k => u && u[k]).find(v => typeof v === 'number');
+      const input = pick('input_tokens', 'inputTokens', 'input'), output = pick('output_tokens', 'outputTokens', 'output');
+      const cached = pick('cache_read_input_tokens', 'cached_input_tokens', 'cachedInputTokens');
+      const cost = typeof p.total_cost_usd === 'number' ? p.total_cost_usd : typeof p.cost === 'number' ? p.cost : undefined;
+      if (input === undefined && output === undefined && cost === undefined) { if (p.rate_limits) t.limits = p.rate_limits; return; }
+      const parts = [];
+      if (input !== undefined || output !== undefined) parts.push(`${ui.compact((input || 0) + (output || 0))} tokens`);
+      if (cost) parts.push(`$${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}`);
+      t.usage.textContent = parts.join(' · ');
+      t.usage.title = [input !== undefined && `${input.toLocaleString()} in`, output !== undefined && `${output.toLocaleString()} out`, cached !== undefined && `${cached.toLocaleString()} cached`, cost !== undefined && `$${cost.toFixed(4)}`].filter(Boolean).join(' · ');
+      t.foot.hidden = false;
     }
 
     renderPermission(id, card) {
       const pending = !card.answer && this.attention === id;
-      card.el.className = 'perm-card' + (pending ? ' pending' : '');
-      const head = el('div', 'perm-head', `${pending ? '⚠ Waiting for your permission' : card.answer === 'allowed' ? '✔ Allowed' : card.answer === 'denied' ? '✖ Denied' : '⚠ Permission requested'}: ${card.tool}`);
+      card.el.className = 'perm-card' + (pending ? ' pending' : ' ' + (card.answer || 'asked'));
+      const d = describe(card.tool, card.input);
+      const what = `${d.pending || d.verb} ${d.target || ''}`.trim();
+      const head = el('div', 'perm-head');
+      head.append(ui.icon(pending ? 'shield' : card.answer === 'allowed' ? 'check' : card.answer === 'denied' ? 'circle-slash' : 'shield', 'sm'),
+        el('span', null, pending ? `Allow ${what}?` : card.answer === 'allowed' ? `Allowed · ${what}` : card.answer === 'denied' ? `Denied · ${what}` : `Asked · ${what}`));
+      head.title = d.full || card.tool;
       const kids = [head];
       if (pending) {
-        const allow = el('button', 'primary', 'Allow once'); allow.addEventListener('click', () => this.opts.post({ type: 'permission', request_id: id, allow: true }));
-        const deny = el('button', 'secondary', 'Deny'); deny.addEventListener('click', () => this.opts.post({ type: 'permission', request_id: id, allow: false }));
+        const parsed = parseInput(card.input);
+        const preview = parsed.command || parsed.content || parsed.new_string;
+        if (preview) kids.push(el('pre', 'code perm-preview', String(preview).split('\n').slice(0, 8).join('\n')));
+        const allow = el('button', 'btn primary sm', 'Allow once'); allow.type = 'button'; allow.dataset.permission = 'allow';
+        allow.addEventListener('click', () => this.opts.post({ type: 'permission', request_id: id, allow: true }));
+        const deny = el('button', 'btn sm', 'Deny'); deny.type = 'button'; deny.dataset.permission = 'deny';
+        deny.addEventListener('click', () => this.opts.post({ type: 'permission', request_id: id, allow: false }));
         const row = el('div', 'perm-actions'); row.append(allow, deny); kids.push(row);
       }
-      const d = el('details', 'perm-input'); d.append(el('summary', null, 'Request'), el('pre', 'code', JSON.stringify(card.input, null, 2).slice(0, 4000)));
-      kids.push(d);
+      const det = el('details', 'perm-input'); const s = el('summary', null, 'Request'); s.title = 'The exact request the agent sent';
+      det.append(s, el('pre', 'code', JSON.stringify(card.input, null, 2).slice(0, 4000)));
+      if (!this.opts.compact) kids.push(det);
       card.el.replaceChildren(...kids);
     }
   }
+  Conversation.KNOWN = new Set(['turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed']);
+  Conversation.describe = describe;
 
   window.OverseerConversation = Conversation;
 })();

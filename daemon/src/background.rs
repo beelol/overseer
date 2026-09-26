@@ -24,7 +24,9 @@ impl Daemon {
     }
 
     pub fn ui_connected(&self) {
-        self.ui_clients.fetch_add(1, Ordering::SeqCst);
+        if self.ui_clients.fetch_add(1, Ordering::SeqCst) == 0 {
+            self.ui_session.lock().unwrap().0 = Some(Instant::now());
+        }
         self.ui_epoch.fetch_add(1, Ordering::SeqCst);
     }
 
@@ -35,16 +37,40 @@ impl Daemon {
         if left > 0 {
             return;
         }
+        {
+            // A window that stayed open past the grace period was a real session: its quit may
+            // notify again about the same agents. A shorter visit does not repeat the last notice.
+            let mut session = self.ui_session.lock().unwrap();
+            if session.0.take().is_some_and(|since| since.elapsed() >= grace()) {
+                session.1 = None;
+            }
+        }
         let daemon = self.clone();
         tokio::spawn(async move {
             tokio::time::sleep(grace()).await;
             if daemon.ui_clients.load(Ordering::SeqCst) > 0 || daemon.ui_epoch.load(Ordering::SeqCst) != epoch {
                 return;
             }
-            if let Err(e) = daemon.background_notice() {
+            if let Err(e) = daemon.background_notice_once() {
                 crate::log(&format!("background notice failed: {e}"));
             }
         });
+    }
+
+    /// One notice per quit: skipped when the previous notice named the same agents and no VS Code
+    /// session happened since.
+    fn background_notice_once(&self) -> Result<Option<Value>> {
+        let mut ids: Vec<String> = self.active_roots()?.into_iter().map(|r| r.id).collect();
+        ids.sort();
+        if !ids.is_empty() && self.ui_session.lock().unwrap().1.as_ref() == Some(&ids) {
+            crate::log("last VS Code window closed again; these agents were already announced, no notice");
+            return Ok(None);
+        }
+        let sent = self.background_notice()?;
+        if sent.is_some() {
+            self.ui_session.lock().unwrap().1 = Some(ids);
+        }
+        Ok(sent)
     }
 
     /// Posts the "agents still running" notification if anything is active. Returns what was sent.

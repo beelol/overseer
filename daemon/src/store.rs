@@ -26,6 +26,8 @@ pub struct Task {
     pub fork_commit: Option<String>,
     pub fork_provenance: Option<String>,
     pub created_ms: i64,
+    /// Hidden from the default agents list (AC-63); still searchable and restorable.
+    pub archived_ms: Option<i64>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -180,6 +182,10 @@ impl Store {
         if !has_pending {
             self.conn.execute_batch("ALTER TABLE runs ADD COLUMN pending_parent_native TEXT;")?;
         }
+        let has_archived: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('tasks') WHERE name='archived_ms'")?.exists([])?;
+        if !has_archived {
+            self.conn.execute_batch("ALTER TABLE tasks ADD COLUMN archived_ms INTEGER;")?;
+        }
         crate::swarm::schema::migrate(&self.conn)?;
         self.conn.execute("INSERT INTO meta(key, value) VALUES('schema_version', ?1)
             ON CONFLICT(key) DO UPDATE SET value=excluded.value", params![SCHEMA_VERSION.to_string()])?;
@@ -257,6 +263,7 @@ impl Store {
             fork_commit: row.get("fork_commit")?,
             fork_provenance: row.get("fork_provenance")?,
             created_ms: row.get("created_ms")?,
+            archived_ms: row.get("archived_ms")?,
         })
     }
 
@@ -267,6 +274,29 @@ impl Store {
     pub fn tasks(&self) -> Result<Vec<Task>> {
         let mut stmt = self.conn.prepare("SELECT * FROM tasks ORDER BY created_ms")?;
         let rows = stmt.query_map([], Self::map_task)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    pub fn set_task_archived(&self, id: &str, archived_ms: Option<i64>) -> Result<bool> {
+        Ok(self.conn.execute("UPDATE tasks SET archived_ms=?2 WHERE id=?1", params![id, archived_ms])? > 0)
+    }
+
+    /// Task ids matching `query` in titles, prompts, repositories, harness, model, status, account
+    /// names, agent messages, tool calls and edited file paths (AC-63). Case-insensitive substring.
+    pub fn search(&self, query: &str, limit: i64) -> Result<Vec<String>> {
+        let escaped = query.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+        let like = format!("%{escaped}%");
+        let mut stmt = self.conn.prepare(
+            r"SELECT id FROM (
+                SELECT t.id AS id, t.created_ms AS at FROM tasks t
+                  WHERE t.title LIKE ?1 ESCAPE '\' OR t.prompt LIKE ?1 ESCAPE '\' OR t.repo_root LIKE ?1 ESCAPE '\'
+                UNION SELECT r.task_id, r.created_ms FROM runs r LEFT JOIN profiles p ON p.id = r.profile_id
+                  WHERE r.title LIKE ?1 ESCAPE '\' OR r.harness LIKE ?1 ESCAPE '\' OR r.model LIKE ?1 ESCAPE '\' OR r.status LIKE ?1 ESCAPE '\' OR p.name LIKE ?1 ESCAPE '\'
+                UNION SELECT r.task_id, e.ts FROM events e JOIN runs r ON r.id = e.run_id
+                  WHERE e.kind IN ('output', 'tool', 'file_activity', 'turn_started') AND e.payload LIKE ?1 ESCAPE '\'
+              ) GROUP BY id ORDER BY MAX(at) DESC LIMIT ?2",
+        )?;
+        let rows = stmt.query_map(params![like, limit], |r| r.get::<_, String>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
