@@ -53,7 +53,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     let parsed: Result<Vec<plan::JobSpec>> = (|| {
         let jobs: Vec<plan::JobSpec> =
             serde_json::from_value(p["jobs"].clone()).map_err(|e| anyhow!("invalid jobs: {e}"))?;
-        plan::validate(&jobs)?;
+        plan::validate(&jobs, 10_000)?;
         Ok(jobs)
     })();
     let jobs = match parsed {
@@ -194,6 +194,17 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
                 params![id,message_id,job.id,attempt,revision,payload,now])?;
             redirected += 1;
         }
+    }
+    let backlog_limit = prior["policy"]["effective"]["backlog_max"]
+        .as_i64().unwrap_or(1000).min(10_000);
+    let nonterminal: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM swarm_jobs WHERE run_id=?1 AND status NOT IN ('accepted','failed','cancelled')",
+        [id], |r| r.get(0),
+    )?;
+    if nonterminal > backlog_limit {
+        drop(tx);
+        record_planning_failure(store, id)?;
+        bail!("job backlog exceeds configured backlog limit");
     }
     tx.execute(
         "UPDATE swarm_runs SET revision=?2,failed_planning_turns=0,no_progress_turns=0,updated_ms=?3 WHERE id=?1",

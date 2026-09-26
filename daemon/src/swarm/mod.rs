@@ -77,7 +77,8 @@ fn materialize_ready(conn: &rusqlite::Connection, run: &str, now: i64) -> Result
     }
     let policy: Value = serde_json::from_str(&raw_policy)?;
     let cap = policy["effective"]["ready_materialized_max"]
-        .as_i64().unwrap_or(100).clamp(1, 1000) as usize;
+        .as_i64().unwrap_or(100).min(policy["effective"]["backlog_max"]
+            .as_i64().unwrap_or(1000)).clamp(1, 10_000) as usize;
     let mut stmt = conn.prepare(
         "SELECT id FROM swarm_jobs WHERE run_id=?1 AND status='ready' ORDER BY id",
     )?;
@@ -283,14 +284,16 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
     if !["planning", "running", "paused"].contains(&prior["status"].as_str().unwrap_or("")) {
         bail!("swarm run is not plannable");
     }
+    let backlog_limit = prior["policy"]["effective"]["backlog_max"]
+        .as_u64().unwrap_or(1000).min(10_000) as usize;
     let parsed: Result<(Vec<JobSpec>, Vec<Value>)> = (|| {
         let (jobs, rejected): (Vec<JobSpec>, Vec<Value>) = if p["allow_partial"] == true {
-            plan::select_valid(&p["jobs"])?
+            plan::select_valid(&p["jobs"], backlog_limit)?
         } else {
             (serde_json::from_value(p["jobs"].clone())
                 .map_err(|e| anyhow!("invalid jobs: {e}"))?, Vec::new())
         };
-        plan::validate(&jobs)?;
+        plan::validate(&jobs, backlog_limit)?;
         Ok((jobs, rejected))
     })();
     let (jobs, rejected) = match parsed {

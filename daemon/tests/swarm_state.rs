@@ -342,3 +342,39 @@ fn ready_window_materializes_only_one_hundred_jobs_and_refills_after_admission()
         "reason":"Add another independent module","jobs":jobs}));
     assert_eq!(counts(), (100,30));
 }
+
+#[test]
+fn configured_backlog_cap_counts_nonterminal_jobs_across_plan_and_revision() {
+    let d = Daemon::start(&[]);
+    let made = d.call("swarm.create", json!({"category":"Small backlog",
+        "objective":"Inspect modules","allowed_targets":["system-codex"],
+        "policy":{"backlog_max":2}}));
+    let run = made["id"].as_str().unwrap();
+    let job = |id: &str| json!({"id":id,"title":format!("Inspect {id}"),
+        "acceptance":"evidence","deps":[]});
+    let over = d.try_call("swarm.plan", json!({"id":run,"generation":1,"revision":0,
+        "jobs":[job("j0"),job("j1"),job("j2")]})).unwrap_err();
+    assert!(over.contains("backlog limit"), "{over}");
+    assert_eq!(d.call("swarm.jobs", json!({"id":run}))["jobs"].as_array().unwrap().len(), 0);
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,
+        "jobs":[job("j0"),job("j1")]}));
+    let attempt = d.call("swarm.attempt.register", json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"j0"}));
+    d.call("swarm.artifact.put", json!({"run_id":run,"job_id":"j0",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "artifact_id":"j0-proof","source_revision":1,"kind":"finding","content":"checked"}));
+    d.call("swarm.report", json!({"run_id":run,"job_id":"j0",
+        "attempt_id":attempt["id"],"token":attempt["token"],"message_id":"j0-result",
+        "type":"result","revision":1,"payload":{"artifact_ids":["j0-proof"]}}));
+    d.call("swarm.decide", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"j0","decision":"accept","evidence":["j0-proof"]}));
+    d.call("swarm.attempt.confirm_exit", json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"j0","attempt_id":attempt["id"]}));
+    d.call("swarm.revise", json!({"id":run,"generation":1,"expected_revision":1,
+        "reason":"Add one module after acceptance","jobs":[job("j0"),job("j1"),job("j2")]}));
+    let over = d.try_call("swarm.revise", json!({"id":run,"generation":1,
+        "expected_revision":2,"reason":"Try one more module",
+        "jobs":[job("j0"),job("j1"),job("j2"),job("j3")]})).unwrap_err();
+    assert!(over.contains("backlog limit"), "{over}");
+    assert_eq!(d.call("swarm.jobs", json!({"id":run}))["jobs"].as_array().unwrap().len(), 3);
+}

@@ -46,6 +46,10 @@ fn validate_policy(v: &Value) -> Result<&Map<String, Value>> {
             if value.as_i64().is_none_or(|n| !(1..=100).contains(&n)) {
                 bail!("policy {key} must be an integer percentage from 1 to 100");
             }
+        } else if ["backlog_max", "ready_materialized_max"].contains(&key.as_str()) {
+            if value.as_i64().is_none_or(|n| !(1..=10_000).contains(&n)) {
+                bail!("policy {key} must be an integer from 1 to 10000");
+            }
         } else if value.as_i64().is_none_or(|n| n <= 0 || n > 86_400_000) {
             bail!("policy {key} must be a positive bounded integer");
         }

@@ -22,12 +22,12 @@ pub struct ResourceClaim {
 
 /// Keep only independent valid components when the director explicitly opts into a partial
 /// initial plan. Every omitted job is reported; no invalid dependency can be dispatched.
-pub fn select_valid(raw: &Value) -> Result<(Vec<JobSpec>, Vec<Value>)> {
+pub fn select_valid(raw: &Value, limit: usize) -> Result<(Vec<JobSpec>, Vec<Value>)> {
     let items = raw
         .as_array()
         .ok_or_else(|| anyhow::anyhow!("jobs must be an array"))?;
-    if items.len() > 1000 {
-        bail!("job backlog exceeds 1000 jobs");
+    if items.len() > limit {
+        bail!("job backlog exceeds configured backlog limit");
     }
     let mut candidates: Vec<Option<JobSpec>> = Vec::with_capacity(items.len());
     let mut errors: Vec<Option<String>> = Vec::with_capacity(items.len());
@@ -183,9 +183,9 @@ fn basic_error(job: &JobSpec) -> Option<String> {
     None
 }
 
-pub fn validate(jobs: &[JobSpec]) -> Result<()> {
-    if jobs.len() > 1000 {
-        bail!("job backlog exceeds 1000 jobs");
+pub fn validate(jobs: &[JobSpec], limit: usize) -> Result<()> {
+    if jobs.len() > limit {
+        bail!("job backlog exceeds configured backlog limit");
     }
     let mut ids = HashSet::new();
     for job in jobs {
@@ -242,7 +242,7 @@ mod tests {
         let (jobs, rejected) = select_valid(&json!([
             {"id":secret,"title":"Hidden","acceptance":"evidence"},
             {"id":"safe","title":"Inspect","acceptance":"evidence"}
-        ])).unwrap();
+        ]), 1000).unwrap();
         assert_eq!(jobs.len(), 1);
         assert_eq!(jobs[0].id, "safe");
         assert_eq!(rejected[0]["id"], "[redacted]");
