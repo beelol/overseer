@@ -2422,6 +2422,15 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
     let replay = d.call("auto.decision.replay", json!({"event_seq":decision_event["seq"]}));
     assert_eq!(replay["matches_recorded"], true, "{replay}");
     assert_eq!(replay["decision"]["selected"], browser["decision"]["selected"]);
+    let recorded = &decision_event["payload"];
+    assert_eq!(recorded["selected_route"]["harness"], "codex-app");
+    assert_eq!(recorded["selected_route"]["model"], "gpt-6-sol");
+    assert_eq!(recorded["selected_route"]["effort"], "medium");
+    assert_eq!(recorded["selected_route"]["fit"], "unknown");
+    assert_eq!(recorded["estimator"]["state"], "unavailable");
+    assert!(recorded["estimator"]["version"].is_null());
+    assert_eq!(recorded["inference"]["state"], "not_used");
+    assert!(recorded["inference"]["output"].is_null());
     assert!(!decision_event["payload"].to_string().contains("browser check"),
         "the decision trace must not store the work prompt or title");
     let browser_id = run_id(&browser);
@@ -2442,6 +2451,10 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
         "min_tier":"general","required_tools":[],"prompt":"next work","title":"next"}));
     assert_eq!(paused["state"], "paused", "{paused}");
     assert!(paused["decision"]["selected"].is_null());
+    let paused_event = d.events(&parent).into_iter().rev()
+        .find(|event| event["kind"] == "auto_decision").unwrap();
+    assert!(paused_event["payload"]["selected_route"].is_null(),
+        "a paused decision must not claim a chosen model");
     assert_eq!(d.runs().len(), 3, "exhaustion must not start another child");
     let trace = std::fs::read_to_string(trace).unwrap();
     assert_eq!(trace.matches("turn_model:gpt-6-sol").count(), 1);

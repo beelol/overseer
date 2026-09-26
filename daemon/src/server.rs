@@ -967,7 +967,16 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     decision.selected = None;
                     decision.reason = "collection_deadline_elapsed".into();
                 }
+                let selected_route = decision.selected.as_deref().and_then(|id|
+                    routes.iter().find(|route| route.id == id)).map(|route| json!({
+                        "harness":route.harness,"provider":route.provider,
+                        "profile_id":route.profile_id,"model":route.model,"effort":route.effort,
+                        "quota":route.quota,"fit":route.fit,"health":route.health,
+                    }));
                 let trace = json!({"selector_version":"multi-harness-preflight-v4","decision":decision,
+                    "selected_route":selected_route,
+                    "estimator":{"state":"unavailable","version":null},
+                    "inference":{"state":"not_used","output":null},
                     "selection_input":{"work":&work,"routes":&routes,
                         "attempt_limit_reached":attempt_limit_reached,
                         "deadline_exhausted":deadline_exhausted},
