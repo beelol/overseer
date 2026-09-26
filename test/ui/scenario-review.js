@@ -44,7 +44,7 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     await selectRun('A seq');
     let reviewA = await reviewFor(wsA);
     check('selecting run A opens A worktree review (outside the open folder)', await reviewA.eval(`document.getElementById('workspace-note').textContent`), wsA);
-    check('selecting an existing run does not turn Follow on', !(await reviewA.eval(`document.getElementById('follow').checked`)));
+    check('selecting an existing run does not turn Follow on', !(await reviewA.eval(`(document.getElementById('follow').dataset.state !== 'off')`)));
     const box = await s.webviewPoint(reviewA, '#follow');
     await cdp.click(box.x, box.y);
     await reviewA.waitFor(`document.getElementById('follow-state').textContent.startsWith('Following')`, 20000);
@@ -61,7 +61,7 @@ const { Session, makeRepo, startMock, openCodeConfig, latestVsix, delay, git } =
     await selectRun('B seq');
     const reviewB = await reviewFor(wsB);
     check('selecting run B shows B worktree', true, await reviewB.eval(`document.getElementById('workspace-note').textContent`));
-    check('agent switch does not inherit Follow', !(await reviewB.eval(`document.getElementById('follow').checked`)));
+    check('agent switch does not inherit Follow', !(await reviewB.eval(`(document.getElementById('follow').dataset.state !== 'off')`)));
     const topB1 = await reviewB.eval(`document.getElementById('diffs').scrollTop`);
     await delay(5000);
     const topB2 = await reviewB.eval(`document.getElementById('diffs').scrollTop`);

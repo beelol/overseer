@@ -574,10 +574,19 @@ async function reconcile() {
 }
 
 // ---- Overseer: comparison label, Follow state and reveal of agent edits.
-const followBox = document.getElementById('follow');
-const resumeButton = document.getElementById('resume');
+// One icon (AC-74): following, paused by your navigation (click resumes), or manual.
+const followButton = document.getElementById('follow');
 const followStatus = document.getElementById('follow-state');
-let followState = 'off', pendingReveal;
+let followState = 'off', followNote = '', pendingReveal;
+function renderFollow() {
+  const on = followState === 'following', paused = followState === 'paused';
+  followButton.setAttribute('aria-pressed', String(on));
+  followButton.dataset.state = followState;
+  const name = on ? 'Following the agent' : paused ? 'Resume Follow' : 'Follow the agent';
+  followButton.setAttribute('aria-label', name);
+  followButton.title = on ? `Following the agent's edits${followNote ? ' — ' + followNote : ''}\nClick to stay where you are` : paused ? 'Follow paused by your navigation\nClick to resume' : "Manual: your file and scroll stay put\nClick to follow the agent's edits";
+  followButton.firstElementChild.className = 'codicon codicon-' + (on ? 'eye' : paused ? 'debug-pause' : 'eye-closed');
+}
 function applyOverseer(o) {
   if (!o) return;
   if (Array.isArray(o.reviewed)) {
@@ -605,17 +614,19 @@ function applyOverseer(o) {
   document.getElementById('base').title += `\n${o.workspaceKind === 'current' ? 'Checkout' : 'Worktree'}: ${short}`;
   document.body.dataset.workspace = o.workspacePath || '';
   followState = o.follow || 'off';
-  followBox.checked = followState !== 'off';
-  resumeButton.hidden = followState !== 'paused';
+  followNote = o.followNote || '';
   followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
+  renderFollow();
 }
 function userNavigated(reason) {
   if (followState !== 'following') return;
-  followState = 'paused'; resumeButton.hidden = false; followStatus.textContent = 'Follow paused by your navigation';
+  followState = 'paused'; followStatus.textContent = 'Follow paused by your navigation'; renderFollow();
   vscode.postMessage({ type: 'followPause', reason });
 }
-followBox.addEventListener('change', () => vscode.postMessage({ type: 'follow', enabled: followBox.checked }));
-resumeButton.addEventListener('click', () => vscode.postMessage({ type: 'followResume' }));
+followButton.addEventListener('click', () => {
+  if (followState === 'paused') vscode.postMessage({ type: 'followResume' });
+  else vscode.postMessage({ type: 'follow', enabled: followState !== 'following' });
+});
 document.getElementById('base').addEventListener('click', () => vscode.postMessage({ type: 'pickComparison' }));
 diffs.addEventListener('wheel', () => userNavigated('scroll'), { passive: true });
 diffs.addEventListener('touchstart', () => userNavigated('scroll'), { passive: true });
@@ -642,6 +653,7 @@ function applyReveal(value) {
   if (value.user) { userNavigated('conversation'); jump(id); document.body.dataset.revealed = value.path + ':' + (value.line || ''); if (!revealLine(row, value.line)) row.pendingLine = value.line; return; }
   jump(id);
   followStatus.textContent = 'Following: ' + value.path + (value.line ? ':' + value.line : '') + (value.attribution ? ' (' + value.attribution + ')' : '');
+  followNote = followStatus.textContent; renderFollow();
   if (!revealLine(row, value.line)) row.pendingLine = value.line;
 }
 window.addEventListener('message', event => {

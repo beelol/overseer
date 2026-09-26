@@ -1,0 +1,62 @@
+{
+  "checks": [
+    {
+      "name": "follow mode (the default when the agent's edits bring the review in) moves with each edit across a.txt, b.txt and c.txt",
+      "ok": true,
+      "detail": {
+        "files": [
+          "a.txt",
+          "b.txt",
+          "c.txt"
+        ],
+        "seen": [
+          "Following: a.txt:20 (agent tool input (tool-input))",
+          "Following agent edits (agent tool input (tool-input))",
+          "Following: a.txt:240 (agent tool input (tool-input))",
+          "Following agent edits (agent tool input (tool-input))",
+          "Following: b.txt:150 (agent tool input (tool-input))",
+          "Following agent edits (agent tool input (tool-input))",
+          "Following: c.txt:200 (agent tool input (tool-input))"
+        ],
+        "icon": {
+          "state": "following",
+          "pressed": "true",
+          "name": "Following the agent",
+          "text": "Following: c.txt:200 (agent tool input (tool-input))",
+          "top": 356,
+          "active": "a.txtM"
+        }
+      }
+    },
+    {
+      "name": "one icon switches to manual; while the agent keeps editing, the scroll position does not move",
+      "ok": true,
+      "detail": {
+        "icon": {
+          "state": "off",
+          "pressed": "false",
+          "name": "Follow the agent",
+          "text": "",
+          "top": 356,
+          "active": "a.txtM"
+        },
+        "editsDuring": 3,
+        "scroll": [
+          356
+        ]
+      }
+    },
+    {
+      "name": "the mode is remembered per agent (the other agent keeps its own; this one is still manual)",
+      "ok": true,
+      "detail": {
+        "otherState": "off",
+        "backState": "off"
+      }
+    },
+    {
+      "name": "one click turns Follow back on",
+      "ok": true
+    }
+  ]
+}

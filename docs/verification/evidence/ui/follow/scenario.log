@@ -1,0 +1,7 @@
+[2026-09-26T19:47:44.595Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T19:48:04.770Z] screenshot docs/verification/evidence/ui/follow/01-following.png
+[2026-09-26T19:48:04.770Z] PASS follow mode (the default when the agent's edits bring the review in) moves with each edit across a.txt, b.txt and c.txt {"files":["a.txt","b.txt","c.txt"],"seen":["Following: a.txt:20 (agent tool input (tool-input))","Following agent edits (agent tool input (tool-input))","Following: a.txt:240 (agent tool input (tool-input))","Following agent edits (agent tool input (tool-input))","Following: b.txt:150 (agent tool input (tool-input))","Following agent edits (agent tool input (tool-input))","Following: c.txt:200 (agent tool input (tool-input))"],"icon":{"state":"following","pressed":"true","name":"Following the agent","text":"Following: c.txt:200 (agent tool input (tool-input))","top":356,"active":"a.txtM"}}
+[2026-09-26T19:48:11.700Z] screenshot docs/verification/evidence/ui/follow/02-manual.png
+[2026-09-26T19:48:11.700Z] PASS one icon switches to manual; while the agent keeps editing, the scroll position does not move {"icon":{"state":"off","pressed":"false","name":"Follow the agent","text":"","top":356,"active":"a.txtM"},"editsDuring":3,"scroll":[356]}
+[2026-09-26T19:48:18.338Z] PASS the mode is remembered per agent (the other agent keeps its own; this one is still manual) {"otherState":"off","backState":"off"}
+[2026-09-26T19:48:19.130Z] PASS one click turns Follow back on
