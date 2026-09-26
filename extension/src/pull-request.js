@@ -35,7 +35,8 @@ class PullRequests {
     if (isLoopback(api) && process.env.OVERSEER_TEST_GITHUB_TOKEN) return process.env.OVERSEER_TEST_GITHUB_TOKEN;
     let session = await vscode.authentication.getSession('github', ['repo'], { createIfNone: false });
     if (!session) {
-      const choice = await vscode.window.showWarningMessage('Open PR uses the GitHub sign-in VS Code already has, and VS Code is not signed in to GitHub. No personal access token is needed.', 'Sign in to GitHub');
+      this.log('open PR: VS Code has no GitHub session with repo access');
+      const choice = await vscode.window.showWarningMessage('VS Code is not signed in to GitHub.', { modal: true, detail: 'Open PR uses the GitHub sign-in VS Code already has. No personal access token is needed.' }, 'Sign in to GitHub');
       if (choice !== 'Sign in to GitHub') return undefined;
       session = await vscode.authentication.getSession('github', ['repo'], { createIfNone: true });
     }
@@ -53,7 +54,7 @@ class PullRequests {
   async pick() {
     const runs = this.model.state.runs.filter(r => !r.parent_run_id && this.model.workspace(r.workspace_id)?.kind === 'worktree' && !this.model.workspace(r.workspace_id)?.removed_ms)
       .sort((a, b) => b.created_ms - a.created_ms);
-    if (!runs.length) { vscode.window.showInformationMessage('Open PR works on a run in its own worktree, and there are none yet. Start a task in a new worktree first.'); return undefined; }
+    if (!runs.length) { vscode.window.showInformationMessage('No run to open a pull request from.', { modal: true, detail: 'Open PR works on a run in its own worktree, and there are none yet. Start a task in a new worktree first.' }); return undefined; }
     const choice = await vscode.window.showQuickPick(runs.map(r => {
       const task = this.model.task(r.task_id), ws = this.model.workspace(r.workspace_id);
       return { label: task?.title || r.title, description: `${path.basename(task?.repo_root || '')} · ${ws.branch}`, detail: `${r.harness}${r.model ? ' · ' + r.model : ''} · ${r.status}`, run: r };
@@ -68,7 +69,9 @@ class PullRequests {
     if (!picked) return;
     const run = this.model.rootRun(picked);
     const plan = await this.client.request('workspace.pr_plan', { workspace_id: run.workspace_id });
-    if (!plan.ok) { vscode.window.showWarningMessage(`Open PR is unavailable: ${plan.reason}`); return; }
+    this.log(`open PR for ${run.id}: ${plan.ok ? `${plan.owner}/${plan.repo} ${plan.branch} → ${plan.target}` : plan.reason}`);
+    // Dialogs, not toasts: this answers a click, and VS Code's Do Not Disturb hides warning and info toasts.
+    if (!plan.ok) { vscode.window.showWarningMessage('Open PR is unavailable.', { modal: true, detail: plan.reason }); return; }
     const token = await this.token();
     if (!token) return;
     const detail = [`${plan.owner}/${plan.repo}: ${plan.branch} → ${plan.target}`,
@@ -96,7 +99,7 @@ class PullRequests {
       }
       await this.client.request('workspace.pr_opened', { workspace_id: run.workspace_id, url: pr.html_url, number: pr.number || 0 });
       this.log(`pull request ${pr.html_url}`);
-      vscode.window.showInformationMessage(`Pull request #${pr.number} is open: ${pr.html_url}`, 'Open on GitHub').then(choice => { if (choice) vscode.env.openExternal(vscode.Uri.parse(pr.html_url)); });
+      vscode.window.showInformationMessage(`Pull request #${pr.number} is open.`, { modal: true, detail: `${pr.html_url}\n\nNothing was merged.` }, 'Open on GitHub').then(choice => { if (choice) vscode.env.openExternal(vscode.Uri.parse(pr.html_url)); });
       return pr;
     });
   }

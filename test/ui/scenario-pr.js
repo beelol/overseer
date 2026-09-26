@@ -33,9 +33,17 @@ const { Session, makeRepo, latestVsix, delay, git, repoRoot } = require('./harne
     await cdp.click(pt.x, pt.y); await delay(1500);
     const panel = await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(t.run.id)} && !!document.getElementById('pr')`, 30000);
     const clickPr = async () => { await panel.waitFor(`!document.getElementById('pr').disabled`, 10000); const p = await s.webviewPoint(panel, '#pr'); await cdp.click(p.x, p.y); await delay(1200); };
-    const toast = pattern => cdp.waitFor(`[...document.querySelectorAll('.notification-toast')].map(t => t.innerText).find(t => ${pattern}.test(t)) || null`, 20000).catch(() => null);
-    const clear = async () => { await cdp.command('Notifications: Clear All Notifications'); await delay(300); };
+    // Open PR answers with dialogs, not toasts (VS Code's Do Not Disturb hides toasts). Read one, then close it.
+    const dialogText = pattern => cdp.waitFor(`(() => { const d = document.querySelector('.monaco-dialog-box'); return d && ${pattern}.test(d.innerText) ? d.innerText : null; })()`, 20000).catch(() => null);
+    const closeDialog = async () => {
+      const b = await cdp.evalWorkbench(`(() => { const d = document.querySelector('.monaco-dialog-box'); const b = d && [...d.querySelectorAll('.monaco-button')].find(b => /^(Cancel|OK)$/.test(b.textContent.trim())); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+      if (b) await cdp.click(b.x, b.y); await delay(500);
+    };
+    const toast = async pattern => { const t = await dialogText(pattern); return t; };
+    const clear = closeDialog;
 
+    // Like the owner's VS Code: Do Not Disturb on, which hides info and warning toasts.
+    await cdp.command('Notifications: Toggle Do Not Disturb Mode'); await delay(500);
     // No remote.
     await clickPr();
     const noRemote = await toast('/no Git remote/');
