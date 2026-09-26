@@ -1,0 +1,748 @@
+{
+  "ui": "baseline",
+  "checks": [],
+  "views": {
+    "agents": {
+      "Default Dark Modern@1280": {
+        "chars": 531,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Agents | New Task | ⊟ | ↻ | ▾ | api-server | /private/tmp/ovs-ui-jcp2xH/api-server | 1 active | ▾ | Migration dry-run | overseer/migration-dry-run | generic | ▾ | Watch the build | overseer/watch-the-build | generic | ▾ | Split the payment service | overseer/split-the-payment-service | ▾ | claude | claude (existing login) | ▾ | child task | native child | grandchild task | native child | ▾ | web-a",
+        "width": 220
+      },
+      "Default Dark Modern@900": {
+        "chars": 531,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Agents | New Task | ⊟ | ↻ | ▾ | api-server | /private/tmp/ovs-ui-jcp2xH/api-server | 1 active | ▾ | Migration dry-run | overseer/migration-dry-run | generic | ▾ | Watch the build | overseer/watch-the-build | generic | ▾ | Split the payment service | overseer/split-the-payment-service | ▾ | claude | claude (existing login) | ▾ | child task | native child | grandchild task | native child | ▾ | web-a",
+        "width": 220
+      },
+      "Default Light Modern@1280": {
+        "chars": 531,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Agents | New Task | ⊟ | ↻ | ▾ | api-server | /private/tmp/ovs-ui-jcp2xH/api-server | 1 active | ▾ | Migration dry-run | overseer/migration-dry-run | generic | ▾ | Watch the build | overseer/watch-the-build | generic | ▾ | Split the payment service | overseer/split-the-payment-service | ▾ | claude | claude (existing login) | ▾ | child task | native child | grandchild task | native child | ▾ | web-a",
+        "width": 227
+      },
+      "Default Light Modern@900": {
+        "chars": 531,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Agents | New Task | ⊟ | ↻ | ▾ | api-server | /private/tmp/ovs-ui-jcp2xH/api-server | 1 active | ▾ | Migration dry-run | overseer/migration-dry-run | generic | ▾ | Watch the build | overseer/watch-the-build | generic | ▾ | Split the payment service | overseer/split-the-payment-service | ▾ | claude | claude (existing login) | ▾ | child task | native child | grandchild task | native child | ▾ | web-a",
+        "width": 220
+      }
+    },
+    "files": {
+      "Default Dark Modern@1280": {
+        "chars": 127,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Files | Refresh sessions once · overseer/refresh-sessions-once | ↻ | 2 changed since the task started | ▸ | ▣ | src | 1 | ▤ | a.txt | ▤ | b.txt | ▤ | c.txt | ▤ | README.md | M",
+        "width": 220
+      },
+      "Default Dark Modern@900": {
+        "chars": 127,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Files | Refresh sessions once · overseer/refresh-sessions-once | ↻ | 2 changed since the task started | ▸ | ▣ | src | 1 | ▤ | a.txt | ▤ | b.txt | ▤ | c.txt | ▤ | README.md | M",
+        "width": 220
+      },
+      "Default Light Modern@1280": {
+        "chars": 127,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Files | Refresh sessions once · overseer/refresh-sessions-once | ↻ | 2 changed since the task started | ▸ | ▣ | src | 1 | ▤ | a.txt | ▤ | b.txt | ▤ | c.txt | ▤ | README.md | M",
+        "width": 227
+      },
+      "Default Light Modern@900": {
+        "chars": 127,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Files | Refresh sessions once · overseer/refresh-sessions-once | ↻ | 2 changed since the task started | ▸ | ▣ | src | 1 | ▤ | a.txt | ▤ | b.txt | ▤ | c.txt | ▤ | README.md | M",
+        "width": 220
+      }
+    },
+    "chat": {
+      "Default Dark Modern@1280": {
+        "chars": 2795,
+        "longRuns": [
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once",
+          "{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\"}",
+          "{\"output_mode\":\"files_with_matches\",\"path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-",
+          "}\\n}\\n\",\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/",
+          "{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\",\"new_",
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/session-refresh-coord"
+        ],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | completed — turn completed; exit 0 | · claude claude-fixture 0.0.0 (synthetic) · account claude (existing login) · run r-58187d6b1919 · native fixture-session-1 | Workspace: /private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once (worktree, overseer/refresh-sessions-once) | Capabilities (as reported by this adapter) | Open Review | Raw outp",
+        "width": 260
+      },
+      "Default Dark Modern@900": {
+        "chars": 2795,
+        "longRuns": [
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once",
+          "{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\"}",
+          "{\"output_mode\":\"files_with_matches\",\"path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-",
+          "}\\n}\\n\",\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/",
+          "{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\",\"new_",
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/session-refresh-coord"
+        ],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | completed — turn completed; exit 0 | · claude claude-fixture 0.0.0 (synthetic) · account claude (existing login) · run r-58187d6b1919 · native fixture-session-1 | Workspace: /private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once (worktree, overseer/refresh-sessions-once) | Capabilities (as reported by this adapter) | Open Review | Raw outp",
+        "width": 220
+      },
+      "Default Light Modern@1280": {
+        "chars": 2795,
+        "longRuns": [
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once",
+          "{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\"}",
+          "{\"output_mode\":\"files_with_matches\",\"path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-",
+          "}\\n}\\n\",\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/",
+          "{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\",\"new_",
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/session-refresh-coord"
+        ],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | completed — turn completed; exit 0 | · claude claude-fixture 0.0.0 (synthetic) · account claude (existing login) · run r-58187d6b1919 · native fixture-session-1 | Workspace: /private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once (worktree, overseer/refresh-sessions-once) | Capabilities (as reported by this adapter) | Open Review | Raw outp",
+        "width": 309
+      },
+      "Default Light Modern@900": {
+        "chars": 2795,
+        "longRuns": [
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once",
+          "{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\"}",
+          "{\"output_mode\":\"files_with_matches\",\"path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-",
+          "}\\n}\\n\",\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/",
+          "{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\",\"new_",
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/session-refresh-coord"
+        ],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | completed — turn completed; exit 0 | · claude claude-fixture 0.0.0 (synthetic) · account claude (existing login) · run r-58187d6b1919 · native fixture-session-1 | Workspace: /private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once (worktree, overseer/refresh-sessions-once) | Capabilities (as reported by this adapter) | Open Review | Raw outp",
+        "width": 220
+      }
+    },
+    "review": {
+      "Default Dark Modern@1280": {
+        "chars": 685,
+        "longRuns": [
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once"
+        ],
+        "overflow": [],
+        "unnamed": [
+          {
+            "html": "<button class=\"fold\" aria-label=\"Collapse or expand README.md\" aria-expanded=\"true\">▾</button>",
+            "name": true,
+            "tip": false
+          },
+          {
+            "html": "<button class=\"fold\" aria-label=\"Collapse or expand src/auth/session-refresh-coordinator.ts\" aria-ex",
+            "name": true,
+            "tip": false
+          }
+        ],
+        "sample": "Files | Latest run | Refresh sessions once · claude | 2 changed files | Follow | Diff layout | Refresh | Worktree: /private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once | src | auth | session-refresh-coordinator.ts | A | README.md | M | ▾ | M | README.md | +4 | −0 | Save | Open in Native Diff | 1 | 2 | # fixture | 1 | 2 | 3 | 4 | 5 | 6 | # fixture | ## Sessions ",
+        "width": 442
+      },
+      "Default Dark Modern@900": {
+        "chars": 685,
+        "longRuns": [
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once"
+        ],
+        "overflow": [],
+        "unnamed": [
+          {
+            "html": "<button class=\"fold\" aria-label=\"Collapse or expand README.md\" aria-expanded=\"true\">▾</button>",
+            "name": true,
+            "tip": false
+          },
+          {
+            "html": "<button class=\"fold\" aria-label=\"Collapse or expand src/auth/session-refresh-coordinator.ts\" aria-ex",
+            "name": true,
+            "tip": false
+          }
+        ],
+        "sample": "Files | Latest run | Refresh sessions once · claude | 2 changed files | Follow | Diff layout | Refresh | Worktree: /private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once | src | auth | session-refresh-coordinator.ts | A | README.md | M | ▾ | M | README.md | +4 | −0 | Save | Open in Native Diff | 1 | 2 | # fixture | 1 | 2 | 3 | 4 | 5 | 6 | # fixture | ## Sessions ",
+        "width": 220
+      },
+      "Default Light Modern@1280": {
+        "chars": 685,
+        "longRuns": [
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once"
+        ],
+        "overflow": [],
+        "unnamed": [
+          {
+            "html": "<button class=\"fold\" aria-label=\"Collapse or expand README.md\" aria-expanded=\"true\">▾</button>",
+            "name": true,
+            "tip": false
+          },
+          {
+            "html": "<button class=\"fold\" aria-label=\"Collapse or expand src/auth/session-refresh-coordinator.ts\" aria-ex",
+            "name": true,
+            "tip": false
+          }
+        ],
+        "sample": "Files | Latest run | Refresh sessions once · claude | 2 changed files | Follow | Diff layout | Refresh | Worktree: /private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once | src | auth | session-refresh-coordinator.ts | A | README.md | M | ▾ | M | README.md | +4 | −0 | Save | Open in Native Diff | 1 | 2 | # fixture | 1 | 2 | 3 | 4 | 5 | 6 | # fixture | ## Sessions ",
+        "width": 494
+      },
+      "Default Light Modern@900": {
+        "chars": 685,
+        "longRuns": [
+          "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once"
+        ],
+        "overflow": [],
+        "unnamed": [
+          {
+            "html": "<button class=\"fold\" aria-label=\"Collapse or expand README.md\" aria-expanded=\"true\">▾</button>",
+            "name": true,
+            "tip": false
+          },
+          {
+            "html": "<button class=\"fold\" aria-label=\"Collapse or expand src/auth/session-refresh-coordinator.ts\" aria-ex",
+            "name": true,
+            "tip": false
+          }
+        ],
+        "sample": "Files | Latest run | Refresh sessions once · claude | 2 changed files | Follow | Diff layout | Refresh | Worktree: /private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once | src | auth | session-refresh-coordinator.ts | A | README.md | M | ▾ | M | README.md | +4 | −0 | Save | Open in Native Diff | 1 | 2 | # fixture | 1 | 2 | 3 | 4 | 5 | 6 | # fixture | ## Sessions ",
+        "width": 220
+      }
+    },
+    "new-agent": {
+      "Default Dark Modern@1280": {
+        "chars": 1037,
+        "longRuns": [],
+        "overflow": [
+          {
+            "page": true,
+            "scrollWidth": 264,
+            "innerWidth": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile selected",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile selected",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "label",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "select",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "label",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "input",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          }
+        ],
+        "unnamed": [],
+        "sample": "New task | Start an agent in a repository with an account you are signed in to. Agents keep running when VS Code closes. | Repository | ⎇ | web-app | /private/tmp/ovs-ui-jcp2xH/web-app | on main | open folder | ⎇ | api-server | /private/tmp/ovs-ui-jcp2xH/api-server | on main | recent | ＋ | Choose repository… | Any Git repository on this Mac | Harness | ◎ | Codex | ready | account-fixture 0.0.0 (sy",
+        "width": 220
+      },
+      "Default Dark Modern@900": {
+        "chars": 1037,
+        "longRuns": [],
+        "overflow": [
+          {
+            "page": true,
+            "scrollWidth": 264,
+            "innerWidth": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile selected",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile selected",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "label",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "select",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "label",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "input",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          }
+        ],
+        "unnamed": [],
+        "sample": "New task | Start an agent in a repository with an account you are signed in to. Agents keep running when VS Code closes. | Repository | ⎇ | web-app | /private/tmp/ovs-ui-jcp2xH/web-app | on main | open folder | ⎇ | api-server | /private/tmp/ovs-ui-jcp2xH/api-server | on main | recent | ＋ | Choose repository… | Any Git repository on this Mac | Harness | ◎ | Codex | ready | account-fixture 0.0.0 (sy",
+        "width": 220
+      },
+      "Default Light Modern@1280": {
+        "chars": 1037,
+        "longRuns": [],
+        "overflow": [
+          {
+            "page": true,
+            "scrollWidth": 264,
+            "innerWidth": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile selected",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile selected",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "label",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "select",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "label",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "input",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          }
+        ],
+        "unnamed": [],
+        "sample": "New task | Start an agent in a repository with an account you are signed in to. Agents keep running when VS Code closes. | Repository | ⎇ | web-app | /private/tmp/ovs-ui-jcp2xH/web-app | on main | open folder | ⎇ | api-server | /private/tmp/ovs-ui-jcp2xH/api-server | on main | recent | ＋ | Choose repository… | Any Git repository on this Mac | Harness | ◎ | Codex | ready | account-fixture 0.0.0 (sy",
+        "width": 220
+      },
+      "Default Light Modern@900": {
+        "chars": 1037,
+        "longRuns": [],
+        "overflow": [
+          {
+            "page": true,
+            "scrollWidth": 264,
+            "innerWidth": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile selected",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile selected",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "tile",
+            "right": 234,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "label",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "select",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "div",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "label",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          },
+          {
+            "tag": "input",
+            "cls": "",
+            "right": 264,
+            "W": 220
+          }
+        ],
+        "unnamed": [],
+        "sample": "New task | Start an agent in a repository with an account you are signed in to. Agents keep running when VS Code closes. | Repository | ⎇ | web-app | /private/tmp/ovs-ui-jcp2xH/web-app | on main | open folder | ⎇ | api-server | /private/tmp/ovs-ui-jcp2xH/api-server | on main | recent | ＋ | Choose repository… | Any Git repository on this Mac | Harness | ◎ | Codex | ready | account-fixture 0.0.0 (sy",
+        "width": 220
+      }
+    },
+    "accounts": {
+      "Default Dark Modern@1280": {
+        "chars": 381,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Accounts | OpenAI / ChatGPT | codex, codex-app | codex (existing login) | signed in · pro · 55b9da0f · follows app | ChatGPT Work | not signed in | Anthropic / Claude | claude | claude (existing login) | not signed in · follows app | OpenCode (local models) | opencode | opencode (existing login) | not signed in · follows app | Devin | unavailable: Devin has no account-login CLI yet (only API keys,",
+        "width": 1280
+      },
+      "Default Dark Modern@900": {
+        "chars": 381,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Accounts | OpenAI / ChatGPT | codex, codex-app | codex (existing login) | signed in · pro · 55b9da0f · follows app | ChatGPT Work | not signed in | Anthropic / Claude | claude | claude (existing login) | not signed in · follows app | OpenCode (local models) | opencode | opencode (existing login) | not signed in · follows app | Devin | unavailable: Devin has no account-login CLI yet (only API keys,",
+        "width": 900
+      },
+      "Default Light Modern@1280": {
+        "chars": 381,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Accounts | OpenAI / ChatGPT | codex, codex-app | codex (existing login) | signed in · pro · 55b9da0f · follows app | ChatGPT Work | not signed in | Anthropic / Claude | claude | claude (existing login) | not signed in · follows app | OpenCode (local models) | opencode | opencode (existing login) | not signed in · follows app | Devin | unavailable: Devin has no account-login CLI yet (only API keys,",
+        "width": 1280
+      },
+      "Default Light Modern@900": {
+        "chars": 381,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Accounts | OpenAI / ChatGPT | codex, codex-app | codex (existing login) | signed in · pro · 55b9da0f · follows app | ChatGPT Work | not signed in | Anthropic / Claude | claude | claude (existing login) | not signed in · follows app | OpenCode (local models) | opencode | opencode (existing login) | not signed in · follows app | Devin | unavailable: Devin has no account-login CLI yet (only API keys,",
+        "width": 900
+      }
+    }
+  },
+  "summary": {
+    "agents": {
+      "chars": 531,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "files": {
+      "chars": 127,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "chat": {
+      "chars": 2795,
+      "longRuns": [
+        "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once",
+        "{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\"}",
+        "{\"output_mode\":\"files_with_matches\",\"path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-",
+        "}\\n}\\n\",\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/",
+        "{\"file_path\":\"/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/README.md\",\"new_",
+        "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once/src/auth/session-refresh-coord"
+      ],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "review": {
+      "chars": 685,
+      "longRuns": [
+        "/private/tmp/ovs-ui-jcp2xH/overseer-home/worktrees/web-app-5266db29/refresh-sessions-once"
+      ],
+      "overflow": 0,
+      "unnamed": [
+        "<button class=\"fold\" aria-label=\"Collapse or expand README.md\" aria-expanded=\"true\">▾</button>",
+        "<button class=\"fold\" aria-label=\"Collapse or expand src/auth/session-refresh-coordinator.ts\" aria-ex"
+      ]
+    },
+    "new-agent": {
+      "chars": 1037,
+      "longRuns": [],
+      "overflow": 68,
+      "unnamed": []
+    },
+    "accounts": {
+      "chars": 381,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    }
+  }
+}

@@ -1,0 +1,17 @@
+# AC-52 agent checks on the owner's daemon (OVERSEER_HOME=~/Library/Application Support/Overseer), 2026-09-26 UTC
+$ overseerd ctl daemon.test_notice '{}'     # 03:34:48Z and 03:39:10Z
+{"id":1,"result":{"delivered_via":"overseer-notifier (ok)"}}
+$ notifier --status
+authorized
+$ overseerd ctl task.create '{"repo":"/tmp/ovs-ac52-bg","harness":"generic","program":"/bin/sleep","args":["1800"],"title":"AC-52 sleep",...}'
+r-08c861bff9f0 starting -> running (only active run)
+$ overseerd.log (daemon pid 71891)
+1790393689585 test notice (overseer-notifier (ok))
+1790393950099 test notice (overseer-notifier (ok))
+1790395269146 background notice (overseer-notifier (ok)): Overseer: 1 agent still running — generic: AC-52 sleep. They keep running with VS Code closed. Reopen VS Code to watch them, or run “Overseer: Stop Agents and Daemon”.
+1790395290876 background notice (overseer-notifier (ok)): Overseer: 1 agent still running — generic: AC-52 sleep. ...
+$ overseerd ctl events.list  (kind == background_notice)
+1790395269146 {"title": "Overseer: 1 agent still running", "delivered_via": "overseer-notifier (ok)"} ['r-08c861bff9f0']
+1790395290876 {"title": "Overseer: 1 agent still running", "delivered_via": "overseer-notifier (ok)"} ['r-08c861bff9f0']
+$ overseerd ctl run.interrupt '{"run_id":"r-08c861bff9f0"}'
+{"id":1,"result":{"ok":true}}  -> status interrupted; no sleep process; no active runs

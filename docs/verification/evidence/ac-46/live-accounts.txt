@@ -1,0 +1,11 @@
+system-claude | claude (existing login) | anthropic | follows-app | claude
+system-codex | codex (existing login) | openai | follows-app | codex,codex-app
+system-opencode | opencode (existing login) | local | follows-app | opencode
+p-b78b53a65453 | OpenCode Ollama (local) | local | fixed | opencode
+p-f262c1bc4958 | ChatGPT A | openai | fixed | codex,codex-app
+p-52fb6421edd2 | ChatGPT B | openai | fixed | codex,codex-app
+providers: [('openai', True), ('anthropic', True), ('local', True), ('devin', False)]
+p-f262c1bc4958 logged_in= True method= chatgpt-account plan= team account_fp= 2bb3fae1 api_key= False
+p-52fb6421edd2 logged_in= True method= chatgpt-account plan= plus account_fp= 27e64e3a api_key= False
+system-codex logged_in= True method= chatgpt-account plan= pro account_fp= 2e1fa921 api_key= False
+system-claude logged_in= True method= claude.ai plan= max account_fp= e303c709 api_key= None

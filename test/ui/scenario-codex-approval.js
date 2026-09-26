@@ -23,10 +23,10 @@ const PROMPT = 'Run exactly this shell command in the workspace: touch approved.
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     // Task 1 entirely through the UI.
-    await cdp.command('Overseer: New Task');
+    await cdp.command('Overseer: Start Task with Quick Picks');
     await cdp.pick('New task: repository');
     await cdp.pick('New task: harness', 'codex-app');
-    await cdp.pick('New task: account profile', 'codex (existing login)');
+    await cdp.pick('New task: account for', 'codex (existing login)');
     if (dry) {
       const b = await cdp.waitFor(`(() => { const b = [...document.querySelectorAll('.notification-toast .monaco-button')].find(b => b.textContent.includes('Launch anyway')); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`, 10000);
       await cdp.click(b.x, b.y);

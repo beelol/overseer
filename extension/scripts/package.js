@@ -16,6 +16,7 @@ const installed = JSON.parse(fs.readFileSync(path.join(tool, 'package.json'), 'u
 const required = JSON.parse(fs.readFileSync(path.join(toolRoot, 'package.json'), 'utf8')).devDependencies['@vscode/vsce'];
 if (installed.version !== required) { console.error(`Expected vsce ${required}; run npm ci --prefix extension/tooling/vsce --ignore-scripts.`); process.exit(1); }
 run(process.execPath, [path.join(root, 'branch-diff/scripts/build-review.js')], root);
+run(process.execPath, [path.join(root, 'notifier/build.js')], root);
 run('cargo', ['build', '--release', '-p', 'overseerd'], repo);
 fs.mkdirSync(path.join(root, 'bin'), { recursive: true });
 const target = path.join(root, 'bin', `overseerd-${process.platform}-${process.arch}`);

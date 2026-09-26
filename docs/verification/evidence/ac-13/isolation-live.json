@@ -1,0 +1,164 @@
+[
+  {
+    "t": 1790367501759,
+    "k": "before",
+    "v": {
+      "A": {
+        "logged_in": true,
+        "method": "chatgpt-account",
+        "plan": "team",
+        "account": "2bb3fae1",
+        "api_key": false
+      },
+      "B": {
+        "logged_in": true,
+        "method": "chatgpt-account",
+        "plan": "plus",
+        "account": "27e64e3a",
+        "api_key": false
+      },
+      "desktop": {
+        "logged_in": true,
+        "method": "chatgpt-account",
+        "plan": "pro",
+        "account": "2e1fa921",
+        "api_key": false
+      }
+    }
+  },
+  {
+    "t": 1790367502756,
+    "k": "B running",
+    "v": {
+      "run": "r-53d79f5a9418",
+      "status": "running"
+    }
+  },
+  {
+    "t": 1790367502781,
+    "k": "C created",
+    "v": {
+      "id": "p-021ff43ea7a0",
+      "codex_dir_exists": true,
+      "mode": "700",
+      "status": {
+        "logged_in": false,
+        "method": "none",
+        "account": "",
+        "api_key": false
+      }
+    }
+  },
+  {
+    "t": 1790367502783,
+    "k": "C login command targets only C",
+    "v": {
+      "program": "codex",
+      "args": [
+        "login",
+        "--device-auth"
+      ],
+      "codex_home_is_c": true
+    }
+  },
+  {
+    "t": 1790367504973,
+    "k": "C logout during B work",
+    "v": {
+      "result": 0,
+      "C": {
+        "logged_in": false,
+        "method": "none",
+        "account": "",
+        "api_key": false
+      },
+      "B_mid": {
+        "logged_in": true,
+        "method": "chatgpt-account",
+        "plan": "plus",
+        "account": "27e64e3a",
+        "api_key": false
+      },
+      "A_mid": {
+        "logged_in": true,
+        "method": "chatgpt-account",
+        "plan": "team",
+        "account": "2bb3fae1",
+        "api_key": false
+      }
+    }
+  },
+  {
+    "t": 1790367505017,
+    "k": "C removed",
+    "v": {
+      "folder_gone": true,
+      "B": {
+        "logged_in": true,
+        "method": "chatgpt-account",
+        "plan": "plus",
+        "account": "27e64e3a",
+        "api_key": false
+      },
+      "A": {
+        "logged_in": true,
+        "method": "chatgpt-account",
+        "plan": "team",
+        "account": "2bb3fae1",
+        "api_key": false
+      }
+    }
+  },
+  {
+    "t": 1790367538221,
+    "k": "B finished",
+    "v": {
+      "status": "completed",
+      "reason": "turn completed; exit 0",
+      "b_txt": "B still works."
+    }
+  },
+  {
+    "t": 1790367539823,
+    "k": "daemon restarted",
+    "v": {
+      "old_pid": 63741,
+      "new_pid": 21639,
+      "after": {
+        "A": {
+          "logged_in": true,
+          "method": "chatgpt-account",
+          "plan": "team",
+          "account": "2bb3fae1",
+          "api_key": false
+        },
+        "B": {
+          "logged_in": true,
+          "method": "chatgpt-account",
+          "plan": "plus",
+          "account": "27e64e3a",
+          "api_key": false
+        },
+        "desktop": {
+          "logged_in": true,
+          "method": "chatgpt-account",
+          "plan": "pro",
+          "account": "2e1fa921",
+          "api_key": false
+        }
+      },
+      "B_run_after_restart": "completed"
+    }
+  },
+  {
+    "t": 1790367539863,
+    "k": "leak scan",
+    "v": {
+      "secrets_checked": 9,
+      "files_scanned": 99,
+      "token_hits": 0,
+      "jwt_like_files": [],
+      "scope": "Overseer database, WAL, logs, run launch files and raw output segments (credential homes and worktrees excluded)"
+    }
+  }
+]

@@ -1,0 +1,301 @@
+{
+  "checks": [
+    {
+      "name": "Claude profile signed in with a claude.ai account",
+      "ok": true,
+      "detail": {
+        "version": "2.1.246 (Claude Code)",
+        "plan": "max",
+        "id": "e303c70977c6348f"
+      }
+    },
+    {
+      "name": "turn 1 reaches a permission request (not auto-approved)",
+      "ok": true,
+      "detail": {
+        "status": "waiting_for_user",
+        "attention": "Write",
+        "reason": null
+      }
+    },
+    {
+      "name": "turn 1 completed",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reason": "turn completed; exit 0",
+        "native": "979c7ba2-9f90-448d-aaca-b277286d359e"
+      }
+    },
+    {
+      "name": "native Claude child captured",
+      "ok": true,
+      "detail": [
+        {
+          "id": "r-5f284a2c23f5",
+          "parent": null,
+          "native": "979c7ba2-9f90-448d-aaca-b277286d359e",
+          "status": "completed",
+          "title": "Use the Agent tool to launch one general-purpose subagent wi",
+          "confidence": null
+        },
+        {
+          "id": "r-767f51a2a346",
+          "parent": "r-5f284a2c23f5",
+          "native": "toolu_017uhc9bkDB9MUjtCgFYzXm1",
+          "status": "completed",
+          "title": "Test nested agent call",
+          "confidence": "exact (structured harness event)"
+        },
+        {
+          "id": "r-1ee6a38fb26f",
+          "parent": "r-767f51a2a346",
+          "native": "toolu_01HjFv81VipBqJ6fDWv6q4HJ",
+          "status": "completed",
+          "title": "Simple task to reply with hi",
+          "confidence": "exact (structured harness event)"
+        }
+      ]
+    },
+    {
+      "name": "native Claude grandchild captured",
+      "ok": true,
+      "detail": [
+        {
+          "title": "Simple task to reply with hi",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "name": "allowed Write landed in the worktree",
+      "ok": true,
+      "detail": "Hello from Claude via Overseer\n"
+    },
+    {
+      "name": "follow-up turn completed",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reason": "turn completed; exit 0"
+      }
+    },
+    {
+      "name": "latest-run comparison shows only turn-2 changes",
+      "ok": true,
+      "detail": [
+        {
+          "path": "hello.md",
+          "status": "M"
+        }
+      ]
+    },
+    {
+      "name": "interrupt from UI stops the Claude run",
+      "ok": true,
+      "detail": {
+        "status": "interrupted",
+        "reason": "interrupted by user (exit code 1)"
+      }
+    }
+  ],
+  "model": "haiku",
+  "sharedDaemon": true,
+  "perm1": "The agent is waiting for permission to use Write:",
+  "tree": [
+    {
+      "id": "r-5f284a2c23f5",
+      "parent": null,
+      "native": "979c7ba2-9f90-448d-aaca-b277286d359e",
+      "status": "completed",
+      "title": "Use the Agent tool to launch one general-purpose subagent wi",
+      "confidence": null
+    },
+    {
+      "id": "r-767f51a2a346",
+      "parent": "r-5f284a2c23f5",
+      "native": "toolu_017uhc9bkDB9MUjtCgFYzXm1",
+      "status": "completed",
+      "title": "Test nested agent call",
+      "confidence": "exact (structured harness event)"
+    },
+    {
+      "id": "r-1ee6a38fb26f",
+      "parent": "r-767f51a2a346",
+      "native": "toolu_01HjFv81VipBqJ6fDWv6q4HJ",
+      "status": "completed",
+      "title": "Simple task to reply with hi",
+      "confidence": "exact (structured harness event)"
+    }
+  ],
+  "turn3Seq": 222,
+  "turns": [
+    {
+      "n": 1,
+      "status": "completed",
+      "snapshot": "s-7a169149b11b"
+    },
+    {
+      "n": 2,
+      "status": "completed",
+      "snapshot": "s-c72b4847c937"
+    },
+    {
+      "n": 3,
+      "status": "failed",
+      "snapshot": "s-713665a9f4fa"
+    }
+  ],
+  "usage": [
+    {
+      "num_turns": 2,
+      "total_cost_usd": 0.06436454999999999,
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 12575,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 12575,
+        "cache_read_input_tokens": 49839,
+        "inference_geo": "not_available",
+        "input_tokens": 20,
+        "iterations": [
+          {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 2118,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "cache_creation_input_tokens": 2118,
+            "cache_read_input_tokens": 30148,
+            "input_tokens": 10,
+            "output_tokens": 198,
+            "type": "message"
+          }
+        ],
+        "output_tokens": 854,
+        "output_tokens_details": {
+          "thinking_tokens": 703
+        },
+        "server_tool_use": {
+          "web_fetch_requests": 0,
+          "web_search_requests": 0
+        },
+        "service_tier": "standard",
+        "speed": "standard"
+      }
+    },
+    {
+      "num_turns": 2,
+      "total_cost_usd": 0.07767639999999998,
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 943,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 943,
+        "cache_read_input_tokens": 65172,
+        "inference_geo": "not_available",
+        "input_tokens": 18,
+        "iterations": [
+          {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 303,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "cache_creation_input_tokens": 303,
+            "cache_read_input_tokens": 32906,
+            "input_tokens": 8,
+            "output_tokens": 31,
+            "type": "message"
+          }
+        ],
+        "output_tokens": 217,
+        "output_tokens_details": {
+          "thinking_tokens": 85
+        },
+        "server_tool_use": {
+          "web_fetch_requests": 0,
+          "web_search_requests": 0
+        },
+        "service_tier": "standard",
+        "speed": "standard"
+      }
+    },
+    {
+      "num_turns": 3,
+      "total_cost_usd": 0.039778,
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 14286,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 14286,
+        "cache_read_input_tokens": 86550,
+        "inference_geo": "not_available",
+        "input_tokens": 26,
+        "iterations": [
+          {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 429,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "cache_creation_input_tokens": 429,
+            "cache_read_input_tokens": 33548,
+            "input_tokens": 8,
+            "output_tokens": 35,
+            "type": "message"
+          }
+        ],
+        "output_tokens": 505,
+        "output_tokens_details": {
+          "thinking_tokens": 235
+        },
+        "server_tool_use": {
+          "web_fetch_requests": 0,
+          "web_search_requests": 0
+        },
+        "service_tier": "standard",
+        "speed": "standard"
+      }
+    },
+    {
+      "num_turns": 3,
+      "total_cost_usd": 0.0321435,
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 14654,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 14654,
+        "cache_read_input_tokens": 19155,
+        "inference_geo": "not_available",
+        "input_tokens": 10,
+        "iterations": [
+          {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 14654,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "cache_creation_input_tokens": 14654,
+            "cache_read_input_tokens": 19155,
+            "input_tokens": 10,
+            "output_tokens": 182,
+            "type": "message"
+          }
+        ],
+        "output_tokens": 182,
+        "output_tokens_details": {
+          "thinking_tokens": 65
+        },
+        "server_tool_use": {
+          "web_fetch_requests": 0,
+          "web_search_requests": 0
+        },
+        "service_tier": "standard",
+        "speed": "standard"
+      }
+    }
+  ],
+  "run": "r-5f284a2c23f5",
+  "workspace": "/Users/bilal/Library/Application Support/Overseer/worktrees/claude-demo-d1297561/use-the-agent-tool-to-launch-one-general"
+}

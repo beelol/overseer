@@ -33,6 +33,11 @@ pub struct Daemon {
     pub(crate) swarm_launch_lock: Mutex<()>,
     exe: PathBuf,
     pub started_ms: i64,
+    /// Connected VS Code windows (connections that said hello as `client: "vscode"`).
+    pub ui_clients: std::sync::atomic::AtomicUsize,
+    /// Bumped on every UI connect/disconnect so a pending background notice can tell a reload
+    /// (reconnect within the grace period) from VS Code really closing.
+    pub ui_epoch: std::sync::atomic::AtomicU64,
 }
 
 fn pid_alive(pid: u32) -> bool {
@@ -55,7 +60,8 @@ impl Daemon {
         let store = Store::open(&paths::db_path())?;
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), exe, started_ms: now() });
+        let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), exe, started_ms: now(),
+            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0) });
         daemon.ensure_system_profiles()?;
         Ok(daemon)
     }
@@ -99,6 +105,8 @@ impl Daemon {
         let home = paths::profiles_dir().join(&id);
         paths::ensure_private_dir(&home)?;
         let profile = Profile { id, name: name.into(), harness: harness.into(), home: Some(home.display().to_string()), is_system: false, created_ms: now() };
+        // Create the harness credential folder now (0700), so a sign-in never starts without it.
+        let _ = Self::profile_env(&profile);
         self.store.lock().unwrap().insert_profile(&profile)?;
         self.emit(None, None, "profile", "daemon", "exact", json!({"profile": profile}))?;
         Ok(profile)
@@ -106,6 +114,16 @@ impl Daemon {
 
     pub fn profile_env(profile: &Profile) -> BTreeMap<String, String> {
         let mut env = BTreeMap::new();
+        if profile.is_system {
+            // Test-only: point the desktop-linked logins at a fixture home instead of ~/.codex, ~/.claude.
+            if let Some(sys) = std::env::var_os("OVERSEER_TEST_SYSTEM_HOME").map(std::path::PathBuf::from) {
+                match profile.harness.as_str() {
+                    "codex" => { env.insert("CODEX_HOME".into(), sys.join(".codex").display().to_string()); }
+                    "claude" => { env.insert("CLAUDE_CONFIG_DIR".into(), sys.join(".claude").display().to_string()); }
+                    _ => {}
+                }
+            }
+        }
         if let Some(home) = &profile.home {
             let home = Path::new(home);
             match profile.harness.as_str() {
@@ -379,9 +397,8 @@ impl Daemon {
             fork_provenance: fork_prov,
             created_ms: now(),
         };
-        self.store.lock().unwrap().insert_task(&task)?;
         let start = self.take_snapshot(&ws, "task-start")?;
-        self.store.lock().unwrap().set_task_start_snapshot(&task.id, &start.id)?;
+        let task = Task { start_snapshot: Some(start.id.clone()), ..task };
         let program = p["program"].as_str().map(str::to_string);
         let version = match harness {
             "generic" => None,
@@ -408,13 +425,18 @@ impl Daemon {
             process_generation: 0,
             attention: None,
         };
-        if let Some(attempt_id) = swarm_attempt_id {
-            self.store.lock().unwrap().insert_run_for_swarm(&run, attempt_id)?;
-        } else {
-            self.store.lock().unwrap().insert_run(&run)?;
+        {
+            // Task and run appear together: a state snapshot never shows a task without its run.
+            let store = self.store.lock().unwrap();
+            store.insert_task(&task)?;
+            if let Some(attempt_id) = swarm_attempt_id {
+                store.insert_run_for_swarm(&run, attempt_id)?;
+            } else {
+                store.insert_run(&run)?;
+            }
+            store.set_workspace_owner(&ws.id, Some(&run.id))?;
         }
-        self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(&run.id))?;
-        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request")});
+        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "extra_args": p["extra_args"].clone()});
         {
             let store = self.store.lock().unwrap();
             store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![run.id, generic.to_string()])?;
@@ -472,6 +494,7 @@ impl Daemon {
         };
         let generic_meta = launch_meta.get("generic").cloned().unwrap_or(launch_meta.clone());
         let args: Option<Vec<String>> = generic_meta["args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
+        let extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
         let resume = if follow_up { run.native_id.clone() } else { None };
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
@@ -486,6 +509,7 @@ impl Daemon {
                 resume_session: resume.as_deref(),
                 program_override: generic_meta["program"].as_str(),
                 args_override: args.as_deref(),
+                extra_args: &extra_args,
             },
         )?;
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(run_id))?;
@@ -541,7 +565,7 @@ impl Daemon {
         Ok(())
     }
 
-    fn control_socket(&self, run: &Run) -> Result<PathBuf> {
+    pub(crate) fn control_socket(&self, run: &Run) -> Result<PathBuf> {
         let (dir, _, _) = self.store.lock().unwrap().run_process(&run.id)?.ok_or_else(|| anyhow!("run has no process"))?;
         let launch: LaunchFile = serde_json::from_slice(&std::fs::read(Path::new(&dir).join("launch.json"))?)?;
         Ok(PathBuf::from(launch.control_socket))
@@ -762,10 +786,20 @@ impl Daemon {
         {
             let store = self.store.lock().unwrap();
             let tx = store.conn.unchecked_transaction()?;
+            let root_native = if run.harness == "codex-app" { store.run(&run.id)?.and_then(|r| r.native_id) } else { None };
             for rec in lines {
                 let stream = rec["s"].as_str().unwrap_or("o");
                 let data = rec["d"].as_str().unwrap_or_default();
-                for norm in adapters::parse(&run.harness, stream, data) {
+                let mut norms = adapters::parse(&run.harness, stream, data);
+                if run.harness == "codex-app" && stream == "o" {
+                    let thread = serde_json::from_str::<Value>(data).ok().and_then(|v| v["params"]["threadId"].as_str().map(str::to_string));
+                    if let (Some(t), Some(root)) = (thread, &root_native) {
+                        if &t != root {
+                            norms = adapters::scope_codex_app_child(&t, norms);
+                        }
+                    }
+                }
+                for norm in norms {
                     self.apply_norm(&store, run, norm, state, &mut emitted)?;
                 }
             }
@@ -831,6 +865,9 @@ impl Daemon {
                     ev("status", "harness", "inferred", json!({"status": "running", "why": "tool activity"}), None)?;
                 }
                 ev("tool", "harness", "exact", json!({"name": name, "id": id, "summary": summary}), None)?
+            }
+            Norm::ToolDetail { id, input, output, status, is_error } => {
+                ev("tool_result", "harness", "exact", json!({"id": id, "input": input, "output": output, "status": status, "is_error": is_error}), None)?
             }
             Norm::FileChange { paths, kind, confidence } => {
                 let ws = store.workspace(&run.workspace_id)?;
@@ -933,7 +970,29 @@ impl Daemon {
                 state.last_error = Some((class.clone(), message.clone()));
                 ev("error", "harness", "exact", json!({"class": class, "message": message}), None)?
             }
+            Norm::BackgroundTasks(n) => state.background = n,
+            Norm::BackgroundLaunched(id) => {
+                state.backgrounded.insert(id);
+            }
+            Norm::BackgroundNotified(id) => {
+                if state.backgrounded.remove(&id) {
+                    state.expected_turns += 1;
+                }
+            }
             Norm::TurnDone { ok, summary } => {
+                if run.harness == "claude" {
+                    state.expected_turns = state.expected_turns.saturating_sub(1);
+                    let interrupted = store.run_process(&run.id)?.map(|(dir, _, _)| Path::new(&dir).join("interrupt.requested").exists()).unwrap_or(false);
+                    if !interrupted && (state.background > 0 || state.expected_turns > 0) {
+                        // Claude reports an interim result while background subagents run, and
+                        // continues with another turn for each finished one (even one that
+                        // finished before this result). The session must stay open so those
+                        // turns' permission requests can be answered.
+                        let why = if state.background > 0 { format!("{} background task(s) still running", state.background) } else { "Claude continues after a background task finished".to_string() };
+                        ev("output", "harness", "exact", json!({"role": "system", "text": format!("interim result; {why}: {}", summary.unwrap_or_default())}), None)?;
+                        return Ok(());
+                    }
+                }
                 state.turn_done = Some(ok);
                 store.finish_open_turns(&run.id, if ok { "completed" } else { "failed" }, now())?;
                 ev("turn_done", "harness", "exact", json!({"ok": ok, "summary": summary}), None)?;
@@ -1301,11 +1360,16 @@ struct TailState {
     store_seen: std::collections::HashMap<String, String>,
     close_stdin: bool,
     sends: Vec<String>,
+    background: usize,
+    /// Claude turns still expected from this process: the user's turn plus one continuation per
+    /// reported backgrounded task. The session closes only when all have produced a result.
+    expected_turns: usize,
+    backgrounded: std::collections::HashSet<String>,
 }
 
 impl Default for TailState {
     fn default() -> Self {
-        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new() }
+        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new(), background: 0, expected_turns: 1, backgrounded: Default::default() }
     }
 }
 

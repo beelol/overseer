@@ -1,3 +1,6 @@
+// Modified for Overseer from Branch Diff (Local) review/editing-client.js
+// (https://github.com/beelol/branch-diff @ fbc6eb807fd41d8fd1a004977e1aa637a4f7c900, MIT).
+// Changes: hunk Reject operations; a rejected hunk operation is discarded, never kept as a draft.
 const LIMIT = 2 * 1024 * 1024;
 const byteLength = text => new TextEncoder().encode(text).length;
 
@@ -94,6 +97,9 @@ export class EditingClient {
     this.api.vscode.postMessage(payload);
   }
 
+  /** The next edit+save on this row is an Overseer hunk Reject (not typed text). */
+  hunkOperation(row, key) { this.stream(row).hunk = key; }
+
   save(row) {
     if (!this.enabled(row) || row.edit?.saving) return;
     const edit = this.stream(row); edit.sequence++; edit.saving = true; edit.saveError = undefined;
@@ -142,6 +148,14 @@ export class EditingClient {
         if (value.saved || value.type === 'saveFailed') edit.saving = false;
         if (value.type === 'saveFailed') { edit.saveError = value.message; this.api.notice(value.message); }
         if (edit.ack === edit.sequence) { this.drafts.delete(value.id); row.renderedRevision = undefined; this.api.changed(row); }
+      } else if (edit.hunk) {
+        // A rejected hunk never becomes a draft: the file changed underneath (for example the
+        // agent edited it), so nothing was written. Drop the local change and show the file again.
+        this.api.vscode.postMessage({ type: 'endEdit', repository: this.api.repository, id: value.id, stream: edit.stream, sequence: edit.sequence + 1 });
+        row.edit = undefined; this.drafts.delete(value.id); row.renderedRevision = undefined;
+        this.api.notice('Reject was not applied: this file changed while the hunk was being rejected (conflict). Nothing was overwritten; review the current content.');
+        document.body.dataset.hunkConflict = String(Date.now());
+        this.api.changed(row);
       } else {
         edit.failed = value.message; edit.saving = false;
         this.api.notice(value.message); this.renderRecovery();

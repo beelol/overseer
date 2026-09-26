@@ -5,10 +5,11 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **34 / 41** (see [ledger](docs/verification/README.md)). Unverified:
-AC-08, AC-11, AC-12, AC-13, AC-14, AC-19, AC-41. The biggest gaps are live Claude Code (its login on the test machine is
-expired), two simultaneous ChatGPT accounts (needs the owner to sign in a second profile),
-a foreign-user socket rejection test (needs a second macOS account), and Linux (no environment). The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
+criteria: **51 / 66** · **1** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-54, AC-55, AC-56, AC-57, AC-58, AC-59, AC-60, AC-61, AC-62, AC-63, AC-64, AC-65, AC-66. The biggest gaps are the daily-driver UI (Gate J, AC-54 to AC-66, added by the
+owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md)), fixed Claude accounts (AC-53, partial;
+[design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
+which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
 
 ## Acceptance criteria
 
@@ -25,18 +26,18 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-05** Independent durable state — [evidence](docs/verification/AC-05.md)
 - [x] **AC-06** Honest process lifecycle — [evidence](docs/verification/AC-06.md)
 - [x] **AC-07** Persistent sessions — [evidence](docs/verification/AC-07.md)
-- [ ] **AC-08** Local access boundary — blocked: rejecting a different local user was never exercised (needs a second macOS account) — [evidence](docs/verification/AC-08.md)
+- [x] **AC-08** Local access boundary — [evidence](docs/verification/AC-08.md)
 - [x] **AC-09** Complete task controls — [evidence](docs/verification/AC-09.md)
 - [x] **AC-10** Event replay and bounded output — [evidence](docs/verification/AC-10.md)
-- [ ] **AC-11** Account profiles — blocked: sign-in and reauthentication flows need the owner's logins — [evidence](docs/verification/AC-11.md)
-- [ ] **AC-12** Two simultaneous ChatGPT subscriptions — blocked: the second ChatGPT account is not signed in to an Overseer profile — [evidence](docs/verification/AC-12.md)
-- [ ] **AC-13** Credential isolation on macOS — blocked: needs two dedicated, signed-in test profiles — [evidence](docs/verification/AC-13.md)
-- [ ] **AC-14** Initial adapters — blocked: Claude Code's login is expired on this Mac (Codex and OpenCode parts pass) — [evidence](docs/verification/AC-14.md)
+- [x] **AC-11** Account profiles — [evidence](docs/verification/AC-11.md)
+- [x] **AC-12** Two simultaneous ChatGPT subscriptions — [evidence](docs/verification/AC-12.md)
+- [x] **AC-13** Credential isolation on macOS — [evidence](docs/verification/AC-13.md)
+- [x] **AC-14** Initial adapters — [evidence](docs/verification/AC-14.md)
 - [x] **AC-15** Generic harness fallback — [evidence](docs/verification/AC-15.md)
 - [x] **AC-16** Permissions and limits — [evidence](docs/verification/AC-16.md)
 - [x] **AC-17** Compatibility truthfulness — [evidence](docs/verification/AC-17.md)
 - [x] **AC-18** Recursive run tree — [evidence](docs/verification/AC-18.md)
-- [ ] **AC-19** Actual native children — blocked: Claude Code's login is expired (Codex and OpenCode children captured) — [evidence](docs/verification/AC-19.md)
+- [x] **AC-19** Actual native children — [evidence](docs/verification/AC-19.md)
 - [x] **AC-20** Evidence-backed inference — [evidence](docs/verification/AC-20.md)
 - [x] **AC-21** Worktrees by default — [evidence](docs/verification/AC-21.md)
 - [x] **AC-22** Current dirty checkout — [evidence](docs/verification/AC-22.md)
@@ -59,6 +60,31 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-39** Minimal dogfood flow — [evidence](docs/verification/AC-39.md)
 - [x] **AC-40** Repository handoff — [evidence](docs/verification/AC-40.md)
 - [ ] **AC-41** Linux verification (deferred by owner) — deferred: no Linux environment — [evidence](docs/verification/AC-41.md)
+- [x] **AC-42** Hunk accept and reject — [evidence](docs/verification/AC-42.md)
+- [x] **AC-43** Structured run conversation view — [evidence](docs/verification/AC-43.md)
+- [x] **AC-44** Merge back — [evidence](docs/verification/AC-44.md)
+- [x] **AC-45** Visible background agents — [evidence](docs/verification/AC-45.md)
+- [x] **AC-46** Simple account governance — [evidence](docs/verification/AC-46.md)
+- [x] **AC-47** Polished, theme-compatible UI — [evidence](docs/verification/AC-47.md)
+- [x] **AC-48** Overseer view (command center) — [evidence](docs/verification/AC-48.md)
+- [x] **AC-49** Restore the open session — [evidence](docs/verification/AC-49.md)
+- [x] **AC-50** Open a pull request from a run — [evidence](docs/verification/AC-50.md)
+- [x] **AC-51** Worktree file hierarchy — [evidence](docs/verification/AC-51.md)
+- [x] **AC-52** Native Overseer notifications (macOS) — [evidence](docs/verification/AC-52.md)
+- [ ] **AC-53** Fixed Claude accounts — ◐ partial: the design for keeping each Claude account's credentials separate is written (docs/rfcs/claude-credentials.md: check per-folder Keychain entries first, otherwise Overseer-managed credentials); the account flows it builds on (Add Account → Anthropic → Sign In with its own CLAUDE_CONFIG_DIR, sign-out, expiry and Sign in again) pass with the synthetic account CLI / deferred: a live test with a second Claude account (the owner asked not to test Claude yet, and has one Claude account) — [evidence](docs/verification/AC-53.md)
+- [ ] **AC-54** Clean, calm presentation with less text — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-54.md)
+- [ ] **AC-55** A chat that feels great — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-55.md)
+- [ ] **AC-56** Overseer themes, light and dark — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-56.md)
+- [ ] **AC-57** Overseer dashboard — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-57.md)
+- [ ] **AC-58** Agent grid — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-58.md)
+- [ ] **AC-59** Start a new agent from the chat — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-59.md)
+- [ ] **AC-60** Native-CLI parity for everyday use — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-60.md)
+- [ ] **AC-61** Needs-you inbox and keyboard control — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-61.md)
+- [ ] **AC-62** Usage and limits — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-62.md)
+- [ ] **AC-63** History that stays tidy — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-63.md)
+- [ ] **AC-64** Default-to-Overseer session (owner-confirmed) — owner session after the rest of Gate J — [evidence](docs/verification/AC-64.md)
+- [ ] **AC-65** Provider logos — not started (added by the owner on 2026-09-26) — [evidence](docs/verification/AC-65.md)
+- [ ] **AC-66** Design review against references (owner-confirmed) — owner design review after the Gate J build — [evidence](docs/verification/AC-66.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -67,14 +93,14 @@ and Verify clauses. Both lists are generated from the records by
   supervisor process per harness run so work survives VS Code closing and daemon crashes;
   on restart the daemon reattaches or reports the session as lost, never relaunching work.
 - **Harnesses** — Codex via `exec` and via the app-server transport (`codex-app`, with
-  permission requests you Allow/Deny in the run panel), both live-verified with a ChatGPT
-  login; OpenCode (verified through the
-  real OpenCode runtime with a local mock model), any executable (generic), and a Claude Code
-  adapter that is implemented and fixture-tested but not yet live-verified. API keys are
-  never forwarded to harnesses. See the [compatibility matrix](docs/compatibility.md).
-- **Native children** — Codex sub-agents (live), OpenCode children and grandchildren
-  (mock model), Claude Agent/Task nesting (fixtures), shown as a recursive tree with
-  evidence and confidence; missing telemetry is shown as unknown.
+  permission requests you Allow/Deny in the run panel) on a ChatGPT login; Claude Code on a
+  claude.ai login (permission requests, nested subagents, follow-ups, interrupt); OpenCode
+  through its real runtime (verified with a mock provider and local Ollama models); and any
+  executable (generic). All live-verified on macOS except OpenCode account login. API keys
+  are never forwarded to harnesses. See the [compatibility matrix](docs/compatibility.md).
+- **Native children** — live child and grandchild capture for Claude Code, Codex
+  (`codex-app` with `-c agents.max_depth=2`; default depth 1) and OpenCode, shown as a
+  recursive tree with evidence and confidence; missing telemetry is shown as unknown.
 - **Workspaces** — a new worktree per task by default, or the current checkout with its
   staged/unstaged/untracked/unsaved work recorded and preserved. Single writer per checkout;
   cleanup reports dirty files and active runs and never removes the current checkout.
@@ -84,14 +110,37 @@ and Verify clauses. Both lists are generated from the records by
   earlier turns, **Since task start**, **Original fork**, and any branch (merge-base or tip).
   A separate **Workspace Dirty** view always shows staged, unstaged, untracked, conflicted
   and unsaved work. **Follow** jumps to agent-reported edits across and within files and
-  pauses when you scroll or select a file until you press **Resume**.
+  pauses when you scroll or select a file until you press **Resume**. Each hunk has
+  **Accept** (marks it reviewed, no Git staging) and **Reject** (restores the comparison
+  base through a native edit you can undo in the editor); concurrent agent edits are
+  conflicts, never overwritten.
+- **Conversation** — each run panel reads as a conversation: turns, collapsible tool calls
+  with inputs and results, file edits that open the review at the hunk, inline permission
+  requests, native children nested under the tool call that spawned them, errors (with
+  **Sign in again** for expired logins) and per-turn usage; the raw event log is one tab away.
+- **Overseer view** — **Open Overseer View** lays out an agents column (every repository,
+  not just the open folder) and the selected run's worktree files beside its review and
+  conversation; it works with the native sidebar closed.
+- **Merge back** — never automatic: Overseer commits the worktree, merges the target into
+  the run's branch in the worktree (conflicts go back to the same agent session), shows you
+  exactly what lands, and merges into the target only after you confirm; a dirty target
+  checkout is refused and left untouched. **Open PR…** instead pushes the branch and opens a
+  GitHub pull request with the GitHub account VS Code is signed in to (no tokens to paste).
+- **Accounts** — accounts by provider (OpenAI/ChatGPT, Anthropic/Claude, OpenCode local);
+  desktop-app logins are labeled as following the app; New Task offers only compatible
+  accounts. Account login only, never API keys.
+- **Session restore and background agents** — reviews, run panels, comparisons, Follow
+  (paused), scroll positions and the Agents tree return after reloads and restarts. Closing
+  VS Code with agents running posts a macOS notification naming them (from the bundled
+  Overseer notifier app; clicking it opens the Overseer view; **Test Notification** checks it);
+  **Stop Agents and Daemon** stops everything on request.
 
 ## Build and install (macOS)
 
-Requirements: Rust 1.89+ (`cargo`), Node 24, Git, and the VS Code `code` CLI.
+Requirements: Rust 1.89+ (`cargo`), Node 24, Git, the VS Code `code` CLI, and on macOS the Xcode command-line tools (`swiftc`, for the bundled Overseer notifier app).
 
 ```bash
-git clone https://github.com/beelol/overseer.git && cd overseer   # until PR #1 merges: add --branch claude/overseer-macos-app-2d3d20
+git clone https://github.com/beelol/overseer.git && cd overseer
 npm ci --prefix extension/branch-diff/tooling/review --ignore-scripts
 npm ci --prefix extension/tooling/vsce --ignore-scripts
 node extension/scripts/package.js
@@ -108,9 +157,13 @@ Run the checks:
 
 ```bash
 cargo test
+node test/unit/webview-scripts.js
 ```
 
-Packaged-UI scenarios (open a real, isolated VS Code window; see [test/ui](test/ui)):
+Packaged-UI scenarios (open a real, isolated VS Code window; see [test/ui](test/ui)). The
+free ones use fixtures and mocks: `trust`, `main`, `review`, `restore`, `conversation`,
+`hunks`, `accounts`, `signin`, `center`, `theme` and `perf` (10 minutes). Scenarios whose
+header says LIVE spend a few tiny paid prompts.
 
 ```bash
 node test/ui/scenario-main.js
@@ -118,21 +171,25 @@ node test/ui/scenario-main.js
 
 ## Using it
 
-1. **Accounts**: the Accounts view lists *existing login* profiles per harness and any
-   isolated profiles you add (**Add Account Profile…**, then **Sign In…**, which runs the
-   harness's own login in a terminal with that profile's credential home). Overseer never
-   asks for API keys and never logs out an existing login.
-2. **New Task** (+ in the Agents view): pick the repository, harness, account profile,
-   *New worktree* or *Current checkout*, the start ref, an optional model, and the prompt.
-3. The run opens its **Review** (Follow on for runs you launch) and an **output panel** with
-   the event stream, capabilities, **Send follow-up**, **Interrupt**, and permission
-   **Allow/Deny** when a harness asks. Controls a harness cannot support are disabled with
-   the reason.
-4. Click the comparison label (base icon) in the review to switch comparisons; hover it to
-   see the snapshot id or SHAs and their provenance.
-5. Edit in the review's working-tree side and press **Save**, or **Open in Native Diff** for
-   full editor features including undo/redo. Unsaved drafts are labeled and survive reloads
-   and external writes.
+1. **Accounts**: **Add Account…** picks a provider and a name, then **Sign In** runs that
+   provider's own login in a terminal (ChatGPT in the browser or with a device code). Existing
+   desktop logins appear as accounts that follow the app. Overseer never asks for API keys
+   and never signs out a desktop login; **Remove Account…** deletes only that account's folder.
+2. **New Task…**: a form of tiles: repository (any repository, not only the open folder),
+   harness with capability hints, a compatible signed-in account, *New worktree* or *Current
+   checkout*, start branch, optional model and approval policy, and the prompt (⌘Enter
+   starts). **Start Task with Quick Picks…** does the same with pickers.
+3. **Open Overseer View** for the full-page layout, or use the Agents tree. Selecting a run
+   opens its **Review** and its **conversation** with **Send follow-up**, **Interrupt**,
+   permission **Allow/Deny**, **Raw output** and **Merge back…**. Controls a harness cannot
+   support are disabled with the reason.
+4. In the review, click the comparison label (base icon) to switch comparisons; use each
+   hunk's **✓ Accept** / **↶ Reject**, or edit the working-tree side and **Save**. **Open in
+   Native Diff** gives full editor features including undo/redo.
+5. **Merge back…** when a run is done: prepare, review exactly what lands, confirm. Or
+   **Open PR…** to push the branch and open a GitHub pull request instead.
+6. Agents keep running when VS Code closes (you get a notification). **Stop Agents and
+   Daemon** (Agents view menu) stops them all after confirmation.
 
 ## Recovery
 
@@ -154,16 +211,23 @@ node test/ui/scenario-main.js
 Unchecked criteria keep their AC in the [RFC](docs/overseer-rfc.md); this list only tracks
 the owner action or decision each one needs.
 
-- [ ] [AC-08](docs/verification/AC-08.md) (Local access boundary): Needs a second local macOS user (owner creates a standard test account). Next: as that user, `nc -U <socket>` / `overseerd ctl hello` with the owner's `OVERSEER_HOME` must fail with a permission error, and a relaxed-permission socket must still be refused by the peer-uid check (log line `rejected connection from uid …`).
-- [ ] [AC-11](docs/verification/AC-11.md) (Account profiles): Owner must perform the sign-in flows (Codex profile A/B, Claude). Next: run Accounts → Add Account Profile → Sign In for each, then record status/identity fingerprints and a reauthentication after `Sign Out`.
-- [ ] [AC-12](docs/verification/AC-12.md) (Two simultaneous ChatGPT subscriptions): Owner signs in two isolated Codex profiles in Overseer (Accounts → Add Account Profile → Sign In, one per OpenAI account). Next: launch two tiny tasks concurrently and record `profile.status` identity fingerprints, overlapping run timestamps and both edits.
-- [ ] [AC-13](docs/verification/AC-13.md) (Credential isolation on macOS): Owner-provided dedicated test logins (A and B). Next: A logout/login while B runs a `sleep` turn; restart; compare fingerprints; inspect SQLite/events for token leakage (`grep` for token patterns).
-- [ ] [AC-14](docs/verification/AC-14.md) (Initial adapters): Claude Code login (owner). Next: after `claude auth login`, run a tiny stream-json task through Overseer: edit, follow-up, interrupt.
-- [ ] [AC-19](docs/verification/AC-19.md) (Actual native children): Claude login (owner); Codex grandchild needs a prompt that makes the child delegate (small extra paid run) and possibly the app-server transport's `subAgentActivity`. Next: after Claude login, run a Task-delegation prompt with a nested Agent.
 - [ ] [AC-41](docs/verification/AC-41.md) (Linux verification (deferred by owner)): Needs a Linux machine with VS Code and the harnesses. Next: run the README build, `cargo test`, and the UI scenarios there.
+- [ ] [AC-53](docs/verification/AC-53.md) (Fixed Claude accounts): Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.
+- [ ] [AC-54](docs/verification/AC-54.md) (Clean, calm presentation with less text): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-55](docs/verification/AC-55.md) (A chat that feels great): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-56](docs/verification/AC-56.md) (Overseer themes, light and dark): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-57](docs/verification/AC-57.md) (Overseer dashboard): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-58](docs/verification/AC-58.md) (Agent grid): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-59](docs/verification/AC-59.md) (Start a new agent from the chat): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-60](docs/verification/AC-60.md) (Native-CLI parity for everyday use): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-61](docs/verification/AC-61.md) (Needs-you inbox and keyboard control): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-62](docs/verification/AC-62.md) (Usage and limits): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-63](docs/verification/AC-63.md) (History that stays tidy): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-64](docs/verification/AC-64.md) (Default-to-Overseer session (owner-confirmed)): Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.
+- [ ] [AC-65](docs/verification/AC-65.md) (Provider logos): Not started (added by the owner on 2026-09-26; see docs/rfcs/orchestrator-ui.md).
+- [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Owner action after the Gate J build: review the published before/after page, mark what is not right, and confirm once it is.
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
-- [ ] Map the Codex app-server `subAgentActivity` / child-thread notifications so Codex grandchildren and child output stream live (would strengthen [AC-19](docs/verification/AC-19.md)); approvals already use the app-server transport.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
 - [ ] VS Code on this machine trusts `/` in its workspace-trust list, so folders never open in Restricted Mode; the trust test uses an empty window ([AC-08](docs/verification/AC-08.md)). Owner environment note.
 
@@ -172,7 +236,11 @@ the owner action or decision each one needs.
 - [RFC and authoritative acceptance checklist](docs/overseer-rfc.md)
 - [Verification ledger and evidence](docs/verification/README.md)
 - [Harness compatibility](docs/compatibility.md)
+- [Side RFC: simple account governance](docs/rfcs/account-governance.md)
+- [Side RFC: native Overseer notifications on macOS](docs/rfcs/native-notifications.md)
+- [Side RFC: Overseer-managed Claude credentials](docs/rfcs/claude-credentials.md)
+- [Side RFC: daily-driver orchestrator UI](docs/rfcs/orchestrator-ui.md)
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 
 Design targets macOS and Linux; only macOS is verified. Auto routing, a TUI, VSCodium,
-Windows/Remote SSH and hunk actions are later milestones.
+Windows/Remote SSH and review comments sent to agents are later milestones.

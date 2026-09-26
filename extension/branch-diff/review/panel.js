@@ -2,7 +2,8 @@
 // (https://github.com/beelol/branch-diff @ fbc6eb807fd41d8fd1a004977e1aa637a4f7c900, MIT).
 // Changes: sessions are opened for an Overseer-selected worktree and comparison base
 // (not the active editor's repository), the toolbar shows the comparison/base icon,
-// and a Follow checkbox with pause/resume is wired to the host FollowController.
+// and a Follow checkbox with pause/resume is wired to the host FollowController; panels can
+// open in a given editor column (the Overseer view's review column).
 const vscode = require('vscode');
 const { randomBytes } = require('crypto');
 const { Comparison, contains } = require('./comparison');
@@ -69,7 +70,7 @@ class ReviewManager {
   overseerInfo(session) {
     const o = session.overseer || {};
     return { runId: o.runId, runTitle: o.runTitle, harness: o.harness, workspacePath: session.repo.rootUri.fsPath, workspaceKind: o.workspaceKind,
-      comparison: o.comparison, follow: this.host.followState(o.runId), followNote: this.host.followNote(o.runId) };
+      comparison: o.comparison, follow: this.host.followState(o.runId), followNote: this.host.followNote(o.runId), reviewed: this.host.reviewedKeys(o.runId) };
   }
 
   message(session, snapshot) {
@@ -84,16 +85,16 @@ class ReviewManager {
     this.panels.get(session)?.webview.postMessage({ type: 'overseer', overseer: this.overseerInfo(session) });
   }
 
-  async open(target, { reveal = true, preserveFocus = false } = {}) {
+  async open(target, { reveal = true, preserveFocus = false, viewColumn } = {}) {
     const session = this.sessionFor(target);
     let panel = this.panels.get(session);
     if (panel) {
-      if (reveal) panel.reveal(undefined, preserveFocus);
+      if (reveal) panel.reveal(viewColumn, preserveFocus);
       this.postOverseer(session);
       if (session.display) this.publish(session, session.display);
       return panel;
     }
-    panel = vscode.window.createWebviewPanel('overseer.review', 'Review', { viewColumn: vscode.ViewColumn.One, preserveFocus }, { retainContextWhenHidden: false });
+    panel = vscode.window.createWebviewPanel('overseer.review', 'Review', { viewColumn: viewColumn || vscode.ViewColumn.One, preserveFocus }, { retainContextWhenHidden: false });
     return this.attach(session, panel);
   }
 
@@ -120,6 +121,11 @@ class ReviewManager {
           if (message.type === 'pickComparison') { await this.host.pickComparison(session.overseer?.runId); return; }
           if (message.type === 'follow') { this.host.setFollow(session.overseer?.runId, message.enabled ? 'following' : 'off'); this.postOverseer(session); return; }
           if (message.type === 'followPause') { this.host.pauseFollow(session.overseer?.runId, String(message.reason || 'navigation')); this.postOverseer(session); return; }
+          if (message.type === 'hunkReview') {
+            await this.host.reviewHunk(session, message);
+            send({ type: 'hunkReviewed', key: message.key, reviewed: !!message.reviewed });
+            return;
+          }
           if (message.type === 'followResume') { this.host.setFollow(session.overseer?.runId, 'following'); this.postOverseer(session); return; }
           if (!['body', 'open', 'openFile'].includes(message.type) || typeof message.id !== 'string' || !Number.isSafeInteger(message.version)) return;
           if (message.type === 'open' || message.type === 'openFile') {
@@ -166,32 +172,34 @@ class ReviewManager {
     panel.webview.html = `<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${panel.webview.cspSource} 'unsafe-inline'; font-src ${panel.webview.cspSource}; img-src ${panel.webview.cspSource} data:; worker-src blob:; connect-src 'none';">
 <link rel="stylesheet" href="${asset('review.css')}"><title>Overseer Review</title></head>
-<body data-monaco="${asset('monaco.js')}" data-monaco-css="${asset('monaco.css')}" data-repository="${escapeAttribute(session.repo.rootUri.toString())}" data-mode="${escapeAttribute(session.mode)}" data-target="${escapeAttribute(session.target || '')}"><header id="toolbar"><button id="toggle-navigator" aria-label="Toggle file navigator" aria-expanded="true">Files</button><button id="base" class="base" title="Comparison base">${baseIcon}<span id="base-label">Comparison</span></button><strong id="comparison">Review</strong><span id="total"></span><span id="loading-stage" role="status"></span><span class="spacer"></span><label class="follow" title="Follow the agent's edits across and within files"><input type="checkbox" id="follow"> Follow</label><button id="resume" hidden>Resume Follow</button><span id="follow-state" role="status"></span><label>Diff layout <select id="layout"><option value="unified">Unified</option><option value="split">Split</option></select></label><button id="refresh">Refresh</button></header>
+<body data-run-id="${escapeAttribute(session.overseer?.runId || '')}" data-monaco="${asset('monaco.js')}" data-monaco-css="${asset('monaco.css')}" data-repository="${escapeAttribute(session.repo.rootUri.toString())}" data-mode="${escapeAttribute(session.mode)}" data-target="${escapeAttribute(session.target || '')}"><header id="toolbar"><button id="toggle-navigator" aria-label="Toggle file navigator" aria-expanded="true">Files</button><button id="base" class="base" title="Comparison base">${baseIcon}<span id="base-label">Comparison</span></button><strong id="comparison">Review</strong><span id="total"></span><span id="loading-stage" role="status"></span><span class="spacer"></span><label class="follow" title="Follow the agent's edits across and within files"><input type="checkbox" id="follow"> Follow</label><button id="resume" hidden>Resume Follow</button><span id="follow-state" role="status"></span><label>Diff layout <select id="layout"><option value="unified">Unified</option><option value="split">Split</option></select></label><button id="refresh">Refresh</button></header>
 <div id="notice" role="status" hidden></div><div id="workspace-note" role="note"></div><main id="review"><nav id="navigator" aria-label="Changed files"><input id="filter" placeholder="Filter files…" aria-label="Filter changed files"><div id="tree" role="tree" aria-label="Changed file tree"></div></nav><div id="resize" role="separator" tabindex="0" aria-label="Resize file navigator" aria-orientation="vertical"></div><section id="diffs" aria-label="All file diffs" tabindex="0"><p class="empty" role="status">Finding changed files…</p></section></main>
 <script type="module" nonce="${nonce}" src="${asset('review.js')}"></script></body></html>`;
     if (waitForComparison) await session.ready(); else session.ready().catch(() => {});
     return panel;
   }
 
-  /** Called by the follow controller. */
+  /** Called by the follow controller, or with `user: true` for an edit opened from the conversation. */
   reveal(runId, message) {
     const found = this.panelFor(runId);
     if (!found) return false;
     const entry = found.session.display?.entries.find(e => e.relPath === message.path);
-    found.panel.webview.postMessage({ type: 'reveal', id: entry?.id, path: message.path, line: message.line, attribution: message.attribution });
+    found.panel.webview.postMessage({ type: 'reveal', id: entry?.id, path: message.path, line: message.line, attribution: message.attribution, user: !!message.user });
     return true;
   }
 
   async deserializeWebviewPanel(panel, state) {
     try {
       const target = state && typeof state.repository === 'string' ? await this.host.restore(state) : undefined;
-      if (!target) throw new Error('The saved review has no matching Overseer run.');
+      if (!target) throw new Error('The saved review has no matching Overseer run. Select a run in the Overseer view to open its review.');
       const session = this.sessionFor(target);
       this.panels.get(session)?.dispose();
       await this.attach(session, panel);
     } catch (error) {
+      // Explain instead of failing (for example a worktree that was cleaned up since).
       panel.webview.options = { enableScripts: false, localResourceRoots: [] };
-      panel.webview.html = `<!doctype html><html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"></head><body><p>Cannot restore review: ${escapeAttribute(error.message)}</p><p>Select the run in the Overseer view to reopen it.</p></body></html>`;
+      if (error.runTitle) panel.title = `Review: ${error.runTitle} (unavailable)`;
+      panel.webview.html = `<!doctype html><html><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';"></head><body style="font-family:var(--vscode-font-family);color:var(--vscode-foreground);padding:16px"><h2 style="font-size:1.1em">Review unavailable</h2><p id="restore-error">${escapeAttribute(error.message)}</p></body></html>`;
     }
   }
 

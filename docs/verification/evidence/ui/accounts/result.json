@@ -1,0 +1,107 @@
+{
+  "checks": [
+    {
+      "name": "Add Account lists providers: OpenAI/ChatGPT, Anthropic/Claude, OpenCode (local), Devin (unavailable)",
+      "ok": true,
+      "detail": [
+        "OpenAI / ChatGPT, codex, codex-app, Sign-in: ChatGPT sign-in in the browser, or a device code",
+        "Anthropic / Claude, claude, Sign-in: Claude account sign-in (claude auth login)",
+        "OpenCode (local models), opencode, Sign-in: none: local providers and mocks (owner decision 2026-09-25)",
+        "Devin, unavailable, Devin has no account-login CLI yet (only API keys, which Overseer does not use)"
+      ]
+    },
+    {
+      "name": "Devin cannot be added (no account login; no API keys)",
+      "ok": true,
+      "detail": "Devin is not available: Devin has no account-login CLI yet (only API keys, which Overseer does not use)"
+    },
+    {
+      "name": "OpenAI account added and signed in via the device-code flow (browser flow also offered)",
+      "ok": true,
+      "detail": {
+        "methods": [
+          "globe  Sign in with ChatGPT in the browser, Opens the ChatGPT sign-in page on this Mac.",
+          "device-mobile  Sign in with a device code, Shows a code to enter on another browser or device (needs device-code sign-in enabled in ChatGPT security settings)."
+        ],
+        "work1": "signed in · team · c4a1579f",
+        "terminal": ""
+      }
+    },
+    {
+      "name": "Anthropic account added and signed in through its own flow",
+      "ok": true,
+      "detail": "signed in · max · f03ab3f8"
+    },
+    {
+      "name": "desktop logins are labeled as following the app; fixed accounts are not",
+      "ok": true,
+      "detail": {
+        "desk1": "signed in · pro · bc92d05b · follows app",
+        "work1": "signed in · team · c4a1579f"
+      }
+    },
+    {
+      "name": "New Task offers only compatible accounts per harness",
+      "ok": true,
+      "detail": {
+        "codexChoices": [
+          "codex (existing login), signed in · pro · follows the desktop app (can change), Logged in using ChatGPT",
+          "Work ChatGPT, signed in · team · fixed account, Logged in using ChatGPT"
+        ],
+        "claudeChoices": [
+          "claude (existing login), signed in · max · follows the desktop app (can change)",
+          "Claude fixed, signed in · max · fixed account"
+        ]
+      }
+    },
+    {
+      "name": "switching the desktop app account changes only the desktop-linked account",
+      "ok": true,
+      "detail": {
+        "desk1": "signed in · pro · bc92d05b · follows app",
+        "desk2": "signed in · plus · d1dddc49 · follows app",
+        "work1": "signed in · team · c4a1579f",
+        "work2": "signed in · team · c4a1579f"
+      }
+    },
+    {
+      "name": "a signed-out account offers Sign In, not Sign Out",
+      "ok": true,
+      "detail": [
+        "Sign In…",
+        "Rename Account…",
+        "Remove Account…"
+      ]
+    },
+    {
+      "name": "sign-out and re-sign-in affect only that account",
+      "ok": true,
+      "detail": {
+        "signedOut": "not signed in",
+        "resigned": "signed in · plus · 5ac9196f",
+        "othersAfterOut": [
+          "signed in · max · f03ab3f8",
+          "signed in · plus · d1dddc49 · follows app"
+        ]
+      }
+    },
+    {
+      "name": "removing an account deletes only it (desktop logins stay; others unchanged)",
+      "ok": true,
+      "detail": {
+        "removeText": "Cancel\nRemove Account\nRemove the account Claude fixed?\nIts own credential folder is deleted. Runs keep their history. No other account, and no desktop-app login, is affected.",
+        "afterRemove": [
+          "Select an agent run to see its workspace. ",
+          "Sign-in: ChatGPT sign-in in the browser, or a device code. Account login only; no API keys., has actions",
+          "codex (existing login) signed in · plus · d1dddc49 · follows app",
+          "Work ChatGPT signed in · plus · 5ac9196f",
+          "Sign-in: Claude account sign-in (claude auth login). Account login only; no API keys., has actions",
+          "claude (existing login) signed in · max · 49d8e90c · follows app",
+          "Sign-in: none: local providers and mocks (owner decision 2026-09-25). Account login only; no API keys.",
+          "opencode (existing login) not signed in · follows app, has actions",
+          "Devin has no account-login CLI yet (only API keys, which Overseer does not use)"
+        ]
+      }
+    }
+  ]
+}

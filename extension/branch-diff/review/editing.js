@@ -1,3 +1,7 @@
+// Modified for Overseer from Branch Diff (Local) review/editing.js
+// (https://github.com/beelol/branch-diff @ fbc6eb807fd41d8fd1a004977e1aa637a4f7c900, MIT).
+// Changes: a clean document is also checked against disk before an edit starts, so an agent's
+// write that VS Code has not reloaded yet is a conflict instead of being overwritten.
 const vscode = require('vscode');
 const fs = require('fs').promises;
 const path = require('path');
@@ -163,9 +167,13 @@ class Editing {
     const body = await session.body(entry.id, snapshot.version, entry.revision);
     if (!body || body.problem || body.modified !== message.before) throw new Error(body?.problem || 'The preview changed before editing began. Your draft has been retained.');
     const diskStamp = await this.writable(session, entry.uri);
-    const baseline = digest(await fs.readFile(entry.uri.fsPath));
+    const bytes = await fs.readFile(entry.uri.fsPath);
+    const baseline = digest(bytes);
     const doc = await vscode.workspace.openTextDocument(entry.uri);
-    if (doc.getText() !== message.before || !textValid(doc.getText()) || snapshot.inputs !== session.inputs() || diskStamp !== await this.writable(session, entry.uri)) throw new Error('The file changed before editing began. Your draft has been retained.');
+    // Overseer: a clean document can still hold the old text for a moment after an agent writes
+    // the file (VS Code reloads it asynchronously), so a clean document is checked against disk.
+    const disk = doc.isDirty ? undefined : new TextDecoder('utf-8').decode(bytes);
+    if (doc.getText() !== message.before || (disk !== undefined && disk !== message.before) || !textValid(doc.getText()) || snapshot.inputs !== session.inputs() || diskStamp !== await this.writable(session, entry.uri)) throw new Error('The file changed before editing began. Your draft has been retained.');
     return { token: message.stream, repository: message.repository, id: message.id, uri: entry.uri, doc,
       version: doc.version, sequence: 0, text: doc.getText(), before: doc.getText(), baseline, diskStamp, inputs: session.inputs(), session };
   }

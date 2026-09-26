@@ -1,3 +1,5 @@
+/* Modified for Overseer from Branch Diff (Local) review/browser.css (https://github.com/beelol/branch-diff, MIT):
+   per-hunk action toolbar; VS Code theme tokens only (no hard-coded color fallbacks). */
 :root { --nav-width: 260px; }
 * { box-sizing: border-box; }
 html, body { height: 100%; overflow: hidden; padding: 0; margin: 0; }
@@ -28,10 +30,10 @@ button:focus-visible, a:focus-visible, summary:focus-visible, #resize:focus-visi
 .file:hover { background: var(--vscode-list-hoverBackground); }
 .file.active { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
 .status { font-size: 11px; font-weight: 600; }
-.status-A, .status-U, .additions { color: var(--vscode-gitDecoration-addedResourceForeground, #73c991); }
-.status-D, .deletions { color: var(--vscode-gitDecoration-deletedResourceForeground, #f48771); }
-.status-M { color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d); }
-.status-R { color: var(--vscode-gitDecoration-renamedResourceForeground, #73c991); }
+.status-A, .status-U, .additions { color: var(--vscode-gitDecoration-addedResourceForeground); }
+.status-D, .deletions { color: var(--vscode-gitDecoration-deletedResourceForeground); }
+.status-M { color: var(--vscode-gitDecoration-modifiedResourceForeground); }
+.status-R { color: var(--vscode-gitDecoration-renamedResourceForeground); }
 #diffs { position: relative; overflow: auto; min-width: 0; scroll-behavior: auto; overflow-anchor: none; padding-bottom: 30px; }
 .diff-file { border-bottom: 1px solid var(--vscode-panel-border); }
 .file-header { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 7px 10px; background: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background)); border-bottom: 1px solid var(--vscode-panel-border); }
@@ -70,6 +72,19 @@ button.base { display: inline-flex; align-items: center; gap: 4px; }
 label.follow { display: inline-flex; align-items: center; gap: 3px; }
 #follow-state { opacity: .8; font-size: .9em; max-width: 30em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #workspace-note { font-size: .85em; opacity: .75; padding: 2px 8px; }
-.follow-line { background: rgba(255, 200, 0, .25); }
+.follow-line { background: var(--vscode-editor-rangeHighlightBackground); }
 #toolbar { flex-wrap: wrap; row-gap: 4px; }
 .file-header .file-path { min-width: 5em; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Overseer hunk actions */
+.hunk-actions { position: absolute; right: 14px; z-index: 5; display: flex; gap: 2px; align-items: center; padding: 0 2px; border-radius: 6px; height: 18px;
+  background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border, var(--vscode-contrastBorder, transparent)); box-shadow: 0 1px 4px var(--vscode-widget-shadow, transparent); font-size: 12px; }
+.hunk-actions button { font: inherit; line-height: 14px; min-width: 20px; padding: 0 4px; border-radius: 4px; border: 1px solid transparent; cursor: pointer;
+  background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+.hunk-actions button:hover:not(:disabled) { background: var(--vscode-button-secondaryHoverBackground); }
+.hunk-actions button:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
+.hunk-actions button:disabled { opacity: .5; cursor: default; }
+.hunk-actions .hunk-accept { color: var(--vscode-testing-iconPassed, var(--vscode-button-secondaryForeground)); }
+.hunk-actions.reviewed { opacity: .85; }
+.hunk-badge { color: var(--vscode-testing-iconPassed, var(--vscode-charts-green)); font-weight: 600; padding: 0 2px; }
+.hunk-reviewed-line { opacity: .55; }

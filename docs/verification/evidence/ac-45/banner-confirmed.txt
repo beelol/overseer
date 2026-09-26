@@ -1,0 +1,12 @@
+Real macOS notification from an isolated Overseer daemon (docs/verification/evidence/ac-45/fire-banner.js):
+a generic agent running, one VS Code client connects (hello client=vscode) and disconnects,
+grace period 1.5 s, real /usr/bin/osascript notifier.
+
+2026-09-25T22:33:22Z  background_notice delivered_via "osascript (ok)"
+  title: Overseer: 1 agent still running
+  body:  generic: banner demo agent. They keep running with VS Code closed. Reopen VS Code to watch them,
+         or run "Overseer: Stop Agents and Daemon".
+
+Owner confirmation (2026-09-25): "yes banner showed up."
+Screen capture was not available to the agent (macOS Screen Recording not granted to its helper),
+so the visual check is the owner's.

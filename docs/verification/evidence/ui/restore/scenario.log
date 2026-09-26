@@ -1,0 +1,26 @@
+[2026-09-26T01:16:53.245Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-26T01:16:57.062Z] runs {"r1":"r-a7cffe012488","r2":"r-8062fb1e31b0","r3":"r-c524a6d062c7","ws1":"/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoA-839c23f3/r1-long-review","ws2":"/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoB-8e99c157/r2-other-repo","ws3":"/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoA-839c23f3/r3-removed-later"}
+[2026-09-26T01:17:05.170Z] comparison pick {"title":"Compare the working tree with…","rows":["git-compare  Since task start, f18f5becfa, task-start snapshot s-3d1bf28cad59 (HEAD 40f0a8eb080e80db474335005c10fbc2743a5251 plus dirty contents at creation)"],"value":"task start"}
+[2026-09-26T01:17:07.959Z] before {"reviewTop":1200,"comparison":"Since task start","outputY":414,"tabs":["Review: R3 removed later (1), Editor Group 1","Review: R2 other repo (1), Editor Group 1","Review: R1 long review (2), Editor Group 1","generic: R3 removed later, Editor Group 2","generic: R2 other repo, Editor Group 2","generic: R1 long review, Editor Group 2"]}
+[2026-09-26T01:17:08.080Z] screenshot docs/verification/evidence/ui/restore/01-before-reload.png
+[2026-09-26T01:17:19.545Z] PASS after-reload: review and run panels reopened ["Review: R3 removed later (1), Editor Group 1","Review: R2 other repo (1), Editor Group 1","Review: R1 long review (2), Editor Group 1","generic: R3 removed later, Editor Group 2","generic: R2 other repo, Editor Group 2","generic: R1 long review, Editor Group 2"]
+[2026-09-26T01:17:19.547Z] PASS after-reload: selected run and collapsed task restored in the Agents view {"r1Selected":true,"r2Collapsed":true,"r2RunHidden":true}
+[2026-09-26T01:17:22.354Z] PASS after-reload: review comparison mode restored "Since task start"
+[2026-09-26T01:17:22.354Z] PASS after-reload: review scroll position restored {"before":1200,"after":1200,"restore":"reached","rows":[["a.txt",0,6013,"rendered"],["b.txt",6013,263,"reading"]]}
+[2026-09-26T01:17:22.354Z] PASS after-reload: Follow restored paused, not auto-resumed {"rows":[["a.txt",0,6013,"rendered"],["b.txt",6013,263,"reading"]],"restore":"reached","top":1200,"comparison":"Since task start","follow":true,"resume":true,"followState":"Follow was on before VS Code reloaded. It stays paused until you resume it."}
+[2026-09-26T01:17:24.865Z] PASS after-reload: run panel scroll position and unsent draft restored {"before":414,"after":{"y":414,"draft":"unsent follow-up draft"}}
+[2026-09-26T01:17:26.180Z] PASS after-reload: review for a run in another repository (not open in the window) restored "/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoB-8e99c157/r2-other-repo"
+[2026-09-26T01:17:26.190Z] PASS after-reload: active run kept running "running"
+[2026-09-26T01:17:26.294Z] screenshot docs/verification/evidence/ui/restore/02-after-reload.png
+[2026-09-26T01:17:26.344Z] PASS R3 worktree removed before restart "/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoA-839c23f3/r3-removed-later"
+[2026-09-26T01:17:36.557Z] PASS after-restart: review and run panels reopened ["Review: R3 removed later (1), Editor Group 1","Review: R2 other repo (1), Editor Group 1","Review: R1 long review (2), Editor Group 1","generic: R3 removed later, Editor Group 2","generic: R2 other repo, Editor Group 2","generic: R1 long review, Editor Group 2"]
+[2026-09-26T01:17:37.476Z] PASS after-restart: selected run and collapsed task restored in the Agents view {"r1Selected":true,"r2Collapsed":true,"r2RunHidden":true}
+[2026-09-26T01:17:40.290Z] PASS after-restart: review comparison mode restored "Since task start"
+[2026-09-26T01:17:40.290Z] PASS after-restart: review scroll position restored {"before":1200,"after":1200,"restore":"reached","rows":[["a.txt",0,6013,"rendered"],["b.txt",6013,263,"reading"]]}
+[2026-09-26T01:17:40.290Z] PASS after-restart: Follow restored paused, not auto-resumed {"rows":[["a.txt",0,6013,"rendered"],["b.txt",6013,263,"reading"]],"restore":"reached","top":1200,"comparison":"Since task start","follow":true,"resume":true,"followState":"Follow was on before VS Code reloaded. It stays paused until you resume it."}
+[2026-09-26T01:17:42.811Z] PASS after-restart: run panel scroll position and unsent draft restored {"before":414,"after":{"y":414,"draft":"unsent follow-up draft"}}
+[2026-09-26T01:17:44.143Z] PASS after-restart: review for a run in another repository (not open in the window) restored "/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoB-8e99c157/r2-other-repo"
+[2026-09-26T01:17:44.155Z] PASS after-restart: active run kept running "running"
+[2026-09-26T01:17:44.263Z] screenshot docs/verification/evidence/ui/restore/03-after-restart.png
+[2026-09-26T01:17:45.564Z] PASS removed worktree is explained instead of failing {"tab":"Review: R3 removed later (1), Editor Group 1","text":"The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoA-839c23f3/r3-removed-later) was removed on 9/25/2026, 6:17:26 PM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."}
+[2026-09-26T01:17:45.659Z] screenshot docs/verification/evidence/ui/restore/04-removed-worktree-explained.png

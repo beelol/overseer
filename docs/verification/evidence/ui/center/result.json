@@ -1,0 +1,135 @@
+{
+  "checks": [
+    {
+      "name": "Overseer view works with the native sidebar closed and lists repositories not open in the window",
+      "ok": true,
+      "detail": {
+        "sidebarHidden": true,
+        "repos": [
+          "repo-y",
+          "repo-x"
+        ]
+      }
+    },
+    {
+      "name": "opens as three columns (agents | review | conversation)",
+      "ok": true,
+      "detail": 3
+    },
+    {
+      "name": "agents column shows task → run → native child → grandchild",
+      "ok": true,
+      "detail": [
+        [
+          "X nested agents",
+          2
+        ],
+        [
+          "child task",
+          4
+        ],
+        [
+          "grandchild task",
+          5
+        ]
+      ]
+    },
+    {
+      "name": "expand/collapse at repository, task and native-child levels",
+      "ok": true,
+      "detail": {
+        "childCollapsed": true,
+        "childExpanded": true,
+        "taskCollapsed": true,
+        "repoCollapsed": true
+      }
+    },
+    {
+      "name": "selecting a run in another repository switches the review column and the conversation column",
+      "ok": true,
+      "detail": {
+        "tabsX": [
+          "Overseer, Editor Group 1",
+          "Review: X edits (1), Editor Group 2",
+          "generic: X edits, Editor Group 3"
+        ],
+        "tabsY": [
+          "Overseer, Editor Group 1",
+          "Review: Y live (1), Editor Group 2",
+          "generic: Y live, Editor Group 3"
+        ],
+        "reviewX": true,
+        "reviewY": true,
+        "convY": true
+      }
+    },
+    {
+      "name": "live status shown in the agents column",
+      "ok": true,
+      "detail": "dot status-running"
+    },
+    {
+      "name": "keyboard navigation: arrows move between labelled treeitems, Left collapses then goes to the parent, Right expands",
+      "ok": true,
+      "detail": {
+        "start": {
+          "label": "generic",
+          "role": "treeitem",
+          "aria": "generic, running",
+          "level": "3"
+        },
+        "up": {
+          "label": "Y live",
+          "role": "treeitem",
+          "aria": "Y live, overseer/y-live, running",
+          "level": "2"
+        },
+        "collapsedTask": "false",
+        "parent": {
+          "label": "repo-y",
+          "role": "treeitem",
+          "aria": "repo-y, /private/tmp/ovs-ui-VuBHu9/repo-y, 1 active",
+          "level": "1"
+        },
+        "reopened": "true"
+      }
+    },
+    {
+      "name": "Overseer view restored after a window reload",
+      "ok": true,
+      "detail": [
+        "generic"
+      ]
+    },
+    {
+      "name": "narrow window: three columns remain usable and the agents column does not overflow",
+      "ok": true,
+      "detail": {
+        "dims": {
+          "w": 1024,
+          "groups": [
+            220,
+            463,
+            283
+          ]
+        },
+        "fits": true
+      }
+    },
+    {
+      "name": "wide window: three columns remain usable and the agents column does not overflow",
+      "ok": true,
+      "detail": {
+        "dims": {
+          "w": 1900,
+          "groups": [
+            405,
+            884,
+            553
+          ]
+        },
+        "fits": true
+      }
+    }
+  ]
+}

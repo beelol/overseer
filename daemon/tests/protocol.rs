@@ -742,3 +742,661 @@ fn ac16_fixture_codex_app_server_approvals_interrupt_and_unsupported_requests() 
         assert_eq!(done["native_id"], "thr-fixture-1");
     }
 }
+
+#[test]
+fn ac14_fixture_claude_background_subagent_keeps_session_open_for_permissions() {
+    // Regression for a live Claude 2.1.246 run: an interim `result` arrives while a background
+    // subagent runs; closing stdin then made later permission requests fail ("Stream closed").
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("background");
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}));
+    let run = run_id(&created);
+    let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
+    d.call("run.permission", json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}));
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    assert!(ws_path(&d, &created).join("bg.txt").exists());
+    let kids: Vec<_> = d.runs().into_iter().filter(|x| x["parent_run_id"] == run.as_str()).collect();
+    assert_eq!(kids.len(), 1);
+    assert_eq!(kids[0]["status"], "completed");
+}
+
+#[test]
+fn ac14_fixture_claude_background_task_finishing_before_the_interim_result_still_keeps_the_session_open() {
+    // Regression for a live Claude run (2026-09-25, AC-43 live scenario): the background agent
+    // finished and was reported before the interim `result`, so no task was "still running";
+    // Claude then continued with another turn whose Write permission failed with "Stream closed".
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("background-early");
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}));
+    let run = run_id(&created);
+    let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
+    assert_eq!(waiting["attention"]["tool"], "Write");
+    d.call("run.permission", json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}));
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    assert!(ws_path(&d, &created).join("bg.txt").exists(), "the continuation turn's Write was allowed and ran");
+    let dones = d.events(&run).into_iter().filter(|e| e["kind"] == "turn_done").count();
+    assert_eq!(dones, 1, "the interim result is not a finished turn");
+}
+
+#[test]
+fn ac19_fixture_codex_app_child_threads_nest_and_do_not_end_the_parent() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "tree")]);
+    let created = d.call("task.create", json!({"repo": repo, "harness": "codex-app", "prompt": "tree", "title": "tree", "approval_policy": "untrusted", "extra_args": ["-c", "agents.max_depth=2"]}));
+    let root = run_id(&created);
+    // The child's turn/completed must not end the root turn: the root still reaches its approval.
+    let waiting = d.wait_status(&root, |s| s == "waiting_for_user", 15);
+    d.call("run.permission", json!({"run_id": root, "request_id": waiting["attention"]["request_id"], "allow": true}));
+    assert_eq!(d.wait_done(&root, 15)["status"], "completed");
+    let runs = d.runs();
+    let child = runs.iter().find(|x| x["native_id"] == "thr-child").expect("child");
+    let grand = runs.iter().find(|x| x["native_id"] == "thr-grand").expect("grandchild");
+    assert_eq!(child["parent_run_id"], root.as_str());
+    assert_eq!(grand["parent_run_id"], child["id"]);
+    assert_eq!(child["status"], "completed");
+    let child_out: Vec<_> = d.events(child["id"].as_str().unwrap()).into_iter().filter(|e| e["kind"] == "output").map(|e| e["payload"]["text"].as_str().unwrap_or_default().to_string()).collect();
+    assert!(child_out.contains(&"child output".to_string()), "{child_out:?}");
+    let root_out: Vec<_> = d.events(&root).into_iter().filter(|e| e["kind"] == "output").map(|e| e["payload"]["text"].as_str().unwrap_or_default().to_string()).collect();
+    assert!(!root_out.contains(&"child output".to_string()), "child text not attributed to the root");
+    let launch = std::fs::read_to_string(d.home.path().join("runs").join(&root).join("p1/launch.json")).unwrap();
+    assert!(launch.contains("agents.max_depth=2"), "extra args passed to the harness");
+}
+
+// ---------------------------------------------------------------- AC-45 visible background agents
+
+/// A persistent connection that identifies itself as a VS Code window.
+fn vscode_window(d: &Daemon) -> std::os::unix::net::UnixStream {
+    use std::io::{BufRead, BufReader, Write};
+    let mut conn = std::os::unix::net::UnixStream::connect(d.socket()).unwrap();
+    conn.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+    conn.write_all(format!("{}\n", json!({"id": 1, "method": "hello", "params": {"client": "vscode"}})).as_bytes()).unwrap();
+    let mut line = String::new();
+    BufReader::new(conn.try_clone().unwrap()).read_line(&mut line).unwrap();
+    assert!(line.contains("\"protocol\""), "{line}");
+    conn
+}
+
+fn notifier(dir: &Path) -> (String, std::path::PathBuf) {
+    let log = dir.join("notices.log");
+    let script = dir.join("notify.sh");
+    std::fs::write(&script, format!("#!/bin/sh\nprintf '%s|%s\\n' \"$1\" \"$2\" >> '{}'\n", log.display())).unwrap();
+    std::process::Command::new("chmod").arg("+x").arg(&script).status().unwrap();
+    (script.display().to_string(), log)
+}
+
+fn notices(d: &Daemon) -> Vec<serde_json::Value> {
+    d.call("events.list", json!({"after": 0, "limit": 5000}))["events"].as_array().unwrap().iter().filter(|e| e["kind"] == "background_notice").cloned().collect()
+}
+
+#[test]
+fn ac45_last_vscode_window_closing_with_active_runs_posts_a_notice_but_a_reload_does_not() {
+    let t = tmp();
+    let (cmd, log) = notifier(t.path());
+    let d = Daemon::start(&[("OVERSEER_BACKGROUND_NOTICE_MS", "600"), ("OVERSEER_NOTIFY_COMMAND", &cmd)]);
+    let repo = repo(&t.path().join("r"));
+    let created = sh(&d, &repo, "worktree", "sleep 30");
+    let run = run_id(&created);
+    d.wait_status(&run, |s| s == "running", 20);
+    let w1 = vscode_window(&d);
+    let w2 = vscode_window(&d);
+    assert_eq!(d.call("daemon.clients", json!({}))["vscode"], 2);
+    // One of two windows closes: not the last, no notice.
+    drop(w1);
+    std::thread::sleep(Duration::from_millis(1200));
+    assert!(!log.exists(), "closing one of two windows must not notify");
+    // Reload: the last window disconnects and reconnects within the grace period.
+    drop(w2);
+    std::thread::sleep(Duration::from_millis(150));
+    let w3 = vscode_window(&d);
+    std::thread::sleep(Duration::from_millis(1200));
+    assert!(!log.exists(), "a window reload must not notify");
+    // VS Code really closes: exactly one notice naming the running agent and how to stop it.
+    drop(w3);
+    for _ in 0..60 {
+        if log.exists() { break; }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    std::thread::sleep(Duration::from_millis(300));
+    let text = std::fs::read_to_string(&log).expect("notice sent");
+    assert_eq!(text.lines().count(), 1, "{text}");
+    assert!(text.starts_with("Overseer: 1 agent still running|generic: /bin/sh -c sleep 30"), "{text}");
+    assert!(text.contains("Stop Agents and Daemon"), "{text}");
+    let n = notices(&d);
+    assert_eq!(n.len(), 1);
+    assert_eq!(n[0]["payload"]["runs"][0]["id"], run.as_str());
+    // The agent keeps running (unchanged behavior).
+    assert_eq!(d.run(&run)["status"], "running");
+    d.call("run.interrupt", json!({"run_id": run}));
+    d.wait_done(&run, 20);
+}
+
+#[test]
+fn ac45_no_notice_when_nothing_is_running() {
+    let t = tmp();
+    let (cmd, log) = notifier(t.path());
+    let d = Daemon::start(&[("OVERSEER_BACKGROUND_NOTICE_MS", "300"), ("OVERSEER_NOTIFY_COMMAND", &cmd)]);
+    let repo = repo(&t.path().join("r"));
+    let done = run_id(&sh(&d, &repo, "worktree", "echo finished"));
+    d.wait_done(&done, 20);
+    drop(vscode_window(&d));
+    std::thread::sleep(Duration::from_millis(1200));
+    assert!(!log.exists(), "no notice when nothing is running");
+    assert!(notices(&d).is_empty());
+    assert!(std::fs::read_to_string(d.home.path().join("overseerd.log")).unwrap_or_default().contains("no active agents, no notice"));
+}
+
+#[test]
+fn ac45_stop_all_interrupts_runs_forces_stragglers_and_exits_the_daemon() {
+    use std::io::{BufRead, BufReader, Write};
+    let t = tmp();
+    let mut d = Daemon::start(&[]);
+    let repo = repo(&t.path().join("r"));
+    let polite = run_id(&sh(&d, &repo, "worktree", "sleep 60"));
+    // Ignores SIGINT, so interrupt alone cannot stop it.
+    let stubborn = run_id(&sh(&d, &repo, "worktree", "trap '' INT; while true; do sleep 1; done"));
+    for r in [&polite, &stubborn] {
+        d.wait_status(r, |s| s == "running", 20);
+    }
+    let pids: Vec<i64> = [&polite, &stubborn].iter().flat_map(|r| { let (s, _) = launch_info(&d, r); vec![s["shim_pid"].as_i64().unwrap(), s["child_pid"].as_i64().unwrap()] }).collect();
+    // Another window is subscribed; it must learn that the stop was deliberate (so it does not respawn).
+    let mut sub = std::os::unix::net::UnixStream::connect(d.socket()).unwrap();
+    sub.set_read_timeout(Some(Duration::from_secs(30))).unwrap();
+    sub.write_all(format!("{}\n", json!({"id": 1, "method": "events.subscribe", "params": {"after": 0}})).as_bytes()).unwrap();
+    let reader = std::thread::spawn(move || {
+        let mut seen = Vec::new();
+        for line in BufReader::new(sub).lines().map_while(Result::ok) {
+            if line.contains("daemon_stopping") { seen.push(line); break; }
+        }
+        seen
+    });
+    let result = d.call("daemon.stop_all", json!({}));
+    assert_eq!(result["stopped"].as_array().unwrap().len(), 2, "{result}");
+    assert!(result["forced"].as_array().unwrap().iter().any(|x| x == stubborn.as_str()), "{result}");
+    assert!(result["remaining"].as_array().unwrap().is_empty(), "{result}");
+    let exited = (0..50).any(|_| { std::thread::sleep(Duration::from_millis(100)); d.child.as_mut().unwrap().try_wait().unwrap().is_some() });
+    assert!(exited, "daemon exits after stop_all");
+    for pid in pids {
+        assert!(!pid_alive(pid), "process {pid} still alive");
+    }
+    assert_eq!(reader.join().unwrap().len(), 1, "subscribers get daemon_stopping");
+    // Restarting finds both runs stopped, not reattached.
+    d.child = None;
+    d.spawn();
+    for r in [&polite, &stubborn] {
+        let st = d.run(r)["status"].as_str().unwrap().to_string();
+        assert!(["interrupted", "failed"].contains(&st.as_str()), "{r} {st}");
+    }
+}
+
+// ---------------------------------------------------------------- AC-43 conversation data
+
+#[test]
+fn ac43_fixture_tool_calls_carry_inputs_and_results_for_the_conversation_view() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    // Claude: tool_use input and tool_result output, joined by the tool id; the Agent tool id is the child's native id.
+    let d = claude_daemon("nested");
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "delegate", "title": "nested"}));
+    let root = run_id(&created);
+    assert_eq!(d.wait_done(&root, 15)["status"], "completed");
+    let evs = d.events(&root);
+    let tool = evs.iter().find(|e| e["kind"] == "tool" && e["payload"]["id"] == "toolu_child").expect("Agent tool event");
+    assert_eq!(tool["payload"]["name"], "Agent");
+    let details: Vec<_> = evs.iter().filter(|e| e["kind"] == "tool_result" && e["payload"]["id"] == "toolu_child").collect();
+    assert!(details.iter().any(|e| e["payload"]["input"]["description"] == "child task"), "{details:?}");
+    assert!(details.iter().any(|e| e["payload"]["output"] == "done" && e["payload"]["status"] == "completed"), "{details:?}");
+    let child = d.runs().into_iter().find(|x| x["parent_run_id"] == root.as_str()).unwrap();
+    assert_eq!(child["native_id"], "toolu_child", "the conversation nests the child under the tool with this id");
+    // Codex app-server: the command's input and final status arrive as tool_result.
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js"))]);
+    let created = d.call("task.create", json!({"repo": repo, "harness": "codex-app", "prompt": "touch", "title": "app"}));
+    let run = run_id(&created);
+    let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 20);
+    d.call("run.permission", json!({"run_id": run, "request_id": waiting["attention"]["request_id"], "allow": true}));
+    d.wait_done(&run, 20);
+    let evs = d.events(&run);
+    let cmd: Vec<_> = evs.iter().filter(|e| e["kind"] == "tool_result" && e["payload"]["id"] == "cmd1").collect();
+    assert!(cmd.iter().any(|e| e["payload"]["input"]["command"] == "touch approved.txt"), "{cmd:?}");
+    assert!(cmd.iter().any(|e| e["payload"]["status"] == "completed"), "{cmd:?}");
+    assert!(evs.iter().any(|e| e["kind"] == "permission_answered"));
+}
+
+// ---------------------------------------------------------------- AC-44 merge back
+
+fn ws_id(created: &serde_json::Value) -> String {
+    created["workspace"]["id"].as_str().unwrap().to_string()
+}
+
+#[test]
+fn ac44_clean_merge_back_commits_the_worktree_and_merges_only_on_request() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &repo, "worktree", "printf 'a\\nagent line\\n' > a.txt; printf 'new\\n' > new.txt");
+    let run = run_id(&created);
+    d.wait_done(&run, 20);
+    let main_before = git(&repo, &["rev-parse", "main"]);
+    std::thread::sleep(Duration::from_millis(300));
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "never merges automatically");
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(plan["ok"], true, "{plan}");
+    assert_eq!(plan["state"], "idle");
+    assert_eq!(plan["target"], "main");
+    assert_eq!(plan["worktree_uncommitted"].as_array().unwrap().len(), 2, "{plan}");
+    let prep = d.call("workspace.merge_prepare", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(prep["state"], "ready", "{prep}");
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "prepare never touches the target");
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(plan["can_complete"], true, "{plan}");
+    let done = d.call("workspace.merge_complete", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(done["merged"], true);
+    assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "a\nagent line\n");
+    assert!(repo.join("new.txt").exists());
+    assert_eq!(git(&repo, &["status", "--porcelain"]), "");
+    assert!(git(&repo, &["log", "-1", "--format=%s"]).contains("Overseer merge back"));
+    assert!(d.events(&run).iter().any(|e| e["kind"] == "merge_back" && e["payload"]["state"] == "merged"));
+    // Afterwards there is nothing left to merge.
+    let again = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(again["ok"], false);
+    assert!(again["reason"].as_str().unwrap().contains("Nothing to merge"), "{again}");
+}
+
+#[test]
+fn ac44_conflicts_are_resolved_in_the_worktree_before_the_target_changes() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &repo, "worktree", "printf 'agent version\\n' > a.txt");
+    d.wait_done(&run_id(&created), 20);
+    // The target moved on meanwhile, touching the same line.
+    std::fs::write(repo.join("a.txt"), "main version\n").unwrap();
+    git(&repo, &["commit", "-qam", "main edit"]);
+    let main_before = git(&repo, &["rev-parse", "main"]);
+    let id = ws_id(&created);
+    let prep = d.call("workspace.merge_prepare", json!({"workspace_id": id, "handoff": true}));
+    assert_eq!(prep["state"], "conflicts", "{prep}");
+    assert_eq!(prep["files"], json!(["a.txt"]));
+    assert_eq!(prep["handoff"]["sent"], false, "generic runs cannot take follow-ups: {prep}");
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before);
+    assert_eq!(d.call("workspace.merge_plan", json!({"workspace_id": id}))["state"], "resolving");
+    // Still conflicted: refuses to finish.
+    let still = d.call("workspace.merge_resolved", json!({"workspace_id": id}));
+    assert_eq!(still["state"], "resolving");
+    assert!(d.try_call("workspace.merge_complete", json!({"workspace_id": id})).is_err());
+    // The agent (here: the test) resolves the file; Overseer stages it and finishes the worktree merge.
+    let ws = ws_path(&d, &created);
+    std::fs::write(ws.join("a.txt"), "main version\nagent version\n").unwrap();
+    assert_eq!(d.call("workspace.merge_resolved", json!({"workspace_id": id}))["state"], "ready");
+    let done = d.call("workspace.merge_complete", json!({"workspace_id": id}));
+    assert_eq!(done["merged"], true);
+    assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "main version\nagent version\n");
+    assert_eq!(git(&repo, &["status", "--porcelain"]), "");
+}
+
+#[test]
+fn ac44_refuses_dirty_target_active_runs_and_current_checkout_tasks() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &repo, "worktree", "printf 'agent\\n' > b.txt");
+    d.wait_done(&run_id(&created), 20);
+    let id = ws_id(&created);
+    // Dirty target checkout: refused, explained, untouched.
+    std::fs::write(repo.join("a.txt"), "user's unsaved work\n").unwrap();
+    std::fs::write(repo.join("scratch.txt"), "untracked\n").unwrap();
+    let before = fingerprint(&repo);
+    assert_eq!(d.call("workspace.merge_prepare", json!({"workspace_id": id}))["state"], "ready");
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": id}));
+    assert_eq!(plan["can_complete"], false);
+    assert!(plan["blockers"][0].as_str().unwrap().contains("uncommitted changes (a.txt)"), "{plan}");
+    let err = d.try_call("workspace.merge_complete", json!({"workspace_id": id})).unwrap_err();
+    assert!(err.contains("never disturbs"), "{err}");
+    assert_eq!(fingerprint(&repo), before, "dirty target left untouched");
+    // Target checkout on another branch: refused with an explanation.
+    git(&repo, &["checkout", "-q", "--", "a.txt"]);
+    git(&repo, &["switch", "-q", "-c", "elsewhere"]);
+    let err = d.try_call("workspace.merge_complete", json!({"workspace_id": id})).unwrap_err();
+    assert!(err.contains("switch it to main"), "{err}");
+    git(&repo, &["switch", "-q", "main"]);
+    // Active run: refused.
+    let busy = sh(&d, &repo, "worktree", "sleep 30");
+    d.wait_status(&run_id(&busy), |s| s == "running", 20);
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&busy)}));
+    assert_eq!(plan["ok"], false);
+    assert!(plan["reason"].as_str().unwrap().contains("still running"), "{plan}");
+    d.call("run.interrupt", json!({"run_id": run_id(&busy)}));
+    // Current-checkout task: nothing to merge back.
+    let cur = sh(&d, &repo, "current", "true");
+    d.wait_done(&run_id(&cur), 20);
+    let plan = d.call("workspace.merge_plan", json!({"workspace_id": ws_id(&cur)}));
+    assert_eq!(plan["ok"], false);
+    assert!(plan["reason"].as_str().unwrap().contains("current checkout"), "{plan}");
+}
+
+// ---------------------------------------------------------------- AC-46 / AC-11 accounts (fixture CLI)
+
+struct AccountLab { d: Daemon, _t: tempfile::TempDir, sys: std::path::PathBuf, next: std::path::PathBuf }
+
+fn account_lab() -> AccountLab {
+    let t = tmp();
+    let sys = t.path().join("desktop-home");
+    std::fs::create_dir_all(&sys).unwrap();
+    let next = t.path().join("next-login");
+    let cli = fixture("fake-harness/account-cli.js");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &cli), ("OVERSEER_CLAUDE_PATH", &cli), ("OVERSEER_TEST_SYSTEM_HOME", sys.to_str().unwrap()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_LOGIN_ACCOUNT_FILE,OVERSEER_TEST_SYSTEM_HOME"), ("FIXTURE_LOGIN_ACCOUNT_FILE", next.to_str().unwrap())]);
+    AccountLab { d, _t: t, sys, next }
+}
+
+impl AccountLab {
+    /// Runs the account's own sign-in command the way the UI's terminal does, as `who`.
+    fn sign_in(&self, id: &str, who: &str) {
+        std::fs::write(&self.next, who).unwrap();
+        let cmd = self.d.call("profile.login_command", json!({"id": id}));
+        let mut c = std::process::Command::new(cmd["program"].as_str().unwrap());
+        c.args(cmd["args"].as_array().unwrap().iter().map(|a| a.as_str().unwrap())).env("FIXTURE_LOGIN_ACCOUNT_FILE", &self.next);
+        for (k, v) in cmd["env"].as_object().unwrap() { c.env(k, v.as_str().unwrap()); }
+        assert!(c.status().unwrap().success());
+    }
+    fn fp(&self, id: &str) -> (bool, String, String) {
+        let st = self.d.call("profile.status", json!({"id": id}));
+        let idn = &st["identity"];
+        let fp = idn["account_fingerprint"].as_str().or(idn["fingerprint"].as_str()).unwrap_or("").to_string();
+        (st["logged_in"] == true, fp, idn["plan"].as_str().unwrap_or("").to_string())
+    }
+}
+
+#[test]
+fn ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_removal() {
+    let lab = account_lab();
+    let d = &lab.d;
+    let list = d.call("account.list", json!({}));
+    let providers: Vec<_> = list["providers"].as_array().unwrap().iter().map(|p| (p["id"].as_str().unwrap().to_string(), p["available"] == true)).collect();
+    assert_eq!(providers.iter().map(|p| p.0.as_str()).collect::<Vec<_>>(), ["openai", "anthropic", "local", "devin"]);
+    assert!(!providers[3].1, "Devin has no account login");
+    assert!(d.try_call("account.create", json!({"provider": "devin", "name": "x"})).is_err());
+    let sys_codex = list["accounts"].as_array().unwrap().iter().find(|a| a["id"] == "system-codex").unwrap().clone();
+    assert_eq!(sys_codex["kind"], "follows-app");
+    assert_eq!(sys_codex["harnesses"], json!(["codex", "codex-app"]));
+    // Add one fixed account per available provider; their folders exist immediately (AC-11).
+    let work = d.call("account.create", json!({"provider": "openai", "name": "Work ChatGPT"}))["account"].clone();
+    let claude = d.call("account.create", json!({"provider": "anthropic", "name": "Claude fixed"}))["account"].clone();
+    let (work_id, claude_id) = (work["id"].as_str().unwrap().to_string(), claude["id"].as_str().unwrap().to_string());
+    use std::os::unix::fs::PermissionsExt;
+    for (acct, sub) in [(&work, "codex"), (&claude, "claude")] {
+        let dir = std::path::Path::new(acct["home"].as_str().unwrap()).join(sub);
+        assert!(dir.is_dir(), "{} created at creation time", dir.display());
+        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+    }
+    assert_eq!(lab.fp(&work_id).0, false, "missing login reported");
+    lab.sign_in(&work_id, "work:team");
+    lab.sign_in(&claude_id, "claudia:max");
+    lab.sign_in("system-codex", "desk1:pro"); // the desktop app's own login
+    let (w_ok, w_fp, w_plan) = lab.fp(&work_id);
+    let (c_ok, c_fp, c_plan) = lab.fp(&claude_id);
+    let (_, d1, _) = lab.fp("system-codex");
+    assert!(w_ok && c_ok && w_plan == "team" && c_plan == "max" && !w_fp.is_empty() && !c_fp.is_empty());
+    assert_ne!(w_fp, d1);
+    // The desktop app switches accounts: the linked account follows, the fixed one does not.
+    lab.sign_in("system-codex", "desk2:plus");
+    let (_, d2, _) = lab.fp("system-codex");
+    assert_ne!(d1, d2, "desktop-linked account follows the app");
+    assert_eq!(lab.fp(&work_id).1, w_fp, "fixed account unchanged by the desktop switch");
+    // Re-sign-in affects only that account.
+    d.call("profile.logout", json!({"id": work_id}));
+    assert_eq!(lab.fp(&work_id).0, false);
+    assert_eq!(lab.fp(&claude_id), (true, c_fp.clone(), c_plan.clone()));
+    assert_eq!(lab.fp("system-codex").1, d2);
+    lab.sign_in(&work_id, "work2:plus");
+    let (_, w2, _) = lab.fp(&work_id);
+    assert_ne!(w2, w_fp);
+    assert_eq!(lab.fp("system-codex").1, d2);
+    // Removal affects only that account; desktop logins cannot be removed or signed out.
+    let claude_home = std::path::PathBuf::from(claude["home"].as_str().unwrap());
+    d.call("account.remove", json!({"id": claude_id}));
+    assert!(!claude_home.exists());
+    assert_eq!(lab.fp(&work_id).1, w2);
+    assert_eq!(lab.fp("system-codex").1, d2);
+    assert!(lab.sys.join(".codex/auth.json").exists());
+    assert!(d.try_call("account.remove", json!({"id": "system-codex"})).unwrap_err().contains("never removes"));
+    assert!(d.try_call("profile.logout", json!({"id": "system-codex"})).is_err());
+    let ids: Vec<String> = d.call("account.list", json!({}))["accounts"].as_array().unwrap().iter().map(|a| a["id"].as_str().unwrap().to_string()).collect();
+    assert!(!ids.contains(&claude_id) && ids.contains(&work_id));
+    // Credentials never enter the database or events.
+    let db = std::fs::read(d.home.path().join("overseer.sqlite")).unwrap();
+    assert!(!String::from_utf8_lossy(&db).contains("\"access_token\""));
+}
+
+// ---------------------------------------------------------------- AC-08 foreign peers
+
+#[test]
+fn ac08_connections_from_a_foreign_uid_are_rejected_and_logged() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::fs::PermissionsExt;
+    // Test-only override: the daemon treats uid 4242424 as its owner, so this test process
+    // (the real owner) is a foreign peer. The override can only reject more, never admit more.
+    let home = tempfile::Builder::new().prefix("ovs-t").tempdir_in("/tmp").unwrap();
+    let mut child = std::process::Command::new(BIN).arg("serve").env("OVERSEER_HOME", home.path()).env("OVERSEER_TEST_EXPECT_UID", "4242424")
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().unwrap();
+    let sock = std::path::PathBuf::from(String::from_utf8(std::process::Command::new(BIN).arg("socket-path").env("OVERSEER_HOME", home.path()).output().unwrap().stdout).unwrap().trim());
+    for _ in 0..100 { if sock.exists() { break; } std::thread::sleep(Duration::from_millis(50)); }
+    assert_eq!(std::fs::metadata(&sock).unwrap().permissions().mode() & 0o777, 0o600, "socket is owner-only");
+    assert_eq!(std::fs::metadata(sock.parent().unwrap()).unwrap().permissions().mode() & 0o777, 0o700, "socket directory is owner-only");
+    let mut conn = std::os::unix::net::UnixStream::connect(&sock).unwrap();
+    conn.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let _ = conn.write_all(format!("{}\n", json!({"id": 1, "method": "task.create", "params": {"repo": "/tmp", "harness": "generic", "program": "/usr/bin/touch", "args": ["/tmp/ovs-ac08-should-not-exist"]}})).as_bytes());
+    let mut line = String::new();
+    let n = BufReader::new(conn).read_line(&mut line).unwrap_or(0);
+    assert_eq!(n, 0, "no reply to a foreign peer: {line}");
+    assert!(!std::path::Path::new("/tmp/ovs-ac08-should-not-exist").exists(), "nothing executed");
+    let uid = unsafe { libc_getuid() };
+    let log = std::fs::read_to_string(home.path().join("overseerd.log")).unwrap_or_default();
+    assert!(log.contains(&format!("rejected connection from uid Some({uid})")), "{log}");
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+extern "C" {
+    #[link_name = "getuid"]
+    fn libc_getuid() -> u32;
+}
+
+// ---------------------------------------------------------------- AC-51 worktree file tree
+
+#[test]
+fn ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::create_dir_all(repo.join("src/deep")).unwrap();
+    std::fs::write(repo.join("src/deep/x.txt"), "x\n").unwrap();
+    std::fs::write(repo.join("src/keep.txt"), "k\n").unwrap();
+    std::fs::write(repo.join("gone.txt"), "g\n").unwrap();
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-qm", "more"]);
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &repo, "worktree", "printf 'changed\\n' > src/deep/x.txt; printf 'new\\n' > added.txt; rm gone.txt");
+    d.wait_done(&run_id(&created), 20);
+    let id = ws_id(&created);
+    let root = d.call("workspace.tree", json!({"workspace_id": id}));
+    let names: Vec<&str> = root["entries"].as_array().unwrap().iter().map(|e| e["name"].as_str().unwrap()).collect();
+    assert_eq!(names[0], "src", "directories first: {names:?}");
+    assert!(!names.contains(&".git"));
+    let find = |v: &serde_json::Value, n: &str| v["entries"].as_array().unwrap().iter().find(|e| e["name"] == n).cloned().unwrap();
+    assert_eq!(find(&root, "src")["changes_inside"], 1);
+    assert_eq!(find(&root, "added.txt")["status"], "A");
+    assert_eq!(find(&root, "gone.txt")["status"], "D");
+    assert_eq!(find(&root, "gone.txt")["deleted"], true);
+    assert!(find(&root, "a.txt")["status"].is_null());
+    let deep = d.call("workspace.tree", json!({"workspace_id": id, "dir": "src/deep"}));
+    assert_eq!(find(&deep, "x.txt")["status"], "M");
+    assert_eq!(find(&deep, "x.txt")["path"], "src/deep/x.txt");
+    for bad in ["..", "../..", "/etc", ".git", "src/../../x"] {
+        assert!(d.try_call("workspace.tree", json!({"workspace_id": id, "dir": bad})).is_err(), "{bad} must be refused");
+    }
+    // Large directory: capped, counted, and fast.
+    let big = ws_path(&d, &created).join("big");
+    std::fs::create_dir_all(&big).unwrap();
+    for i in 0..6000 { std::fs::write(big.join(format!("f{i:05}.txt")), "").unwrap(); }
+    let t0 = std::time::Instant::now();
+    let listing = d.call("workspace.tree", json!({"workspace_id": id, "dir": "big"}));
+    assert!(t0.elapsed() < Duration::from_secs(2), "{:?}", t0.elapsed());
+    assert_eq!(listing["total"], 6000);
+    assert_eq!(listing["truncated"], true);
+    assert_eq!(listing["entries"].as_array().unwrap().len(), 5000);
+}
+
+// ---------------------------------------------------------------- AC-52 native notifications (fake helper)
+
+/// A fake `Overseer Notifier.app` whose executable logs its arguments and exits with `code`.
+fn fake_notifier(dir: &Path, code: i32) -> (std::path::PathBuf, std::path::PathBuf) {
+    let app = dir.join(format!("Fake{code}.app"));
+    let bin = app.join("Contents/MacOS");
+    std::fs::create_dir_all(&bin).unwrap();
+    let log = dir.join(format!("notifier-{code}.log"));
+    std::fs::write(bin.join("notifier"), format!("#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\nexit {code}\n", log.display())).unwrap();
+    std::process::Command::new("chmod").arg("+x").arg(bin.join("notifier")).status().unwrap();
+    (app, log)
+}
+
+#[test]
+fn ac52_notifications_use_the_overseer_helper_and_fall_back_when_denied_or_missing() {
+    let t = tmp();
+    let (fallback, fallback_log) = notifier(t.path()); // records fallback deliveries instead of osascript
+    // Helper present and allowed.
+    let (ok_app, ok_log) = fake_notifier(t.path(), 0);
+    let d = Daemon::start(&[("OVERSEER_TEST_NOTIFIER_DIRECT", "1"), ("OVERSEER_NOTIFIER_APP", ok_app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    assert_eq!(d.call("daemon.test_notice", json!({}))["delivered_via"], "overseer-notifier (ok)");
+    let args = std::fs::read_to_string(&ok_log).unwrap();
+    assert!(args.contains("--title\nOverseer notifications are on\n--body\n"), "{args}");
+    assert!(args.contains("--open\nvscode://beelol.overseer/open-center"), "clicks open the Overseer view: {args}");
+    assert!(!fallback_log.exists(), "no fallback when the helper posted");
+    drop(d);
+    // Helper present but notifications denied: fall back, and say so.
+    let (denied_app, _) = fake_notifier(t.path(), 3);
+    let d = Daemon::start(&[("OVERSEER_TEST_NOTIFIER_DIRECT", "1"), ("OVERSEER_NOTIFIER_APP", denied_app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    let via = d.call("daemon.test_notice", json!({}))["delivered_via"].as_str().unwrap().to_string();
+    assert_eq!(via, format!("overseer-notifier (denied); fell back to {fallback} (ok)"));
+    assert!(std::fs::read_to_string(&fallback_log).unwrap().contains("Overseer notifications are on"));
+    drop(d);
+    // No permission answer yet (exit 5) and helper missing: both fall back.
+    let (pending_app, _) = fake_notifier(t.path(), 5);
+    let d = Daemon::start(&[("OVERSEER_TEST_NOTIFIER_DIRECT", "1"), ("OVERSEER_NOTIFIER_APP", pending_app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    assert!(d.call("daemon.test_notice", json!({}))["delivered_via"].as_str().unwrap().starts_with("overseer-notifier (permission not answered yet); fell back to"));
+    drop(d);
+    let d = Daemon::start(&[("OVERSEER_TEST_NOTIFIER_DIRECT", "1"), ("OVERSEER_NOTIFIER_APP", "/nonexistent/Overseer Notifier.app"), ("OVERSEER_NOTIFY_FALLBACK", &fallback)]);
+    assert!(d.call("daemon.test_notice", json!({}))["delivered_via"].as_str().unwrap().starts_with("overseer-notifier (not installed); fell back to"));
+}
+
+#[test]
+fn ac52_background_notice_is_delivered_by_the_helper() {
+    let t = tmp();
+    let (fallback, _) = notifier(t.path());
+    let (app, log) = fake_notifier(t.path(), 0);
+    let d = Daemon::start(&[("OVERSEER_TEST_NOTIFIER_DIRECT", "1"), ("OVERSEER_NOTIFIER_APP", app.to_str().unwrap()), ("OVERSEER_NOTIFY_FALLBACK", &fallback), ("OVERSEER_BACKGROUND_NOTICE_MS", "300")]);
+    let repo = repo(&t.path().join("r"));
+    let run = run_id(&sh(&d, &repo, "worktree", "sleep 30"));
+    d.wait_status(&run, |s| s == "running", 20);
+    drop(vscode_window(&d));
+    let mut n = vec![];
+    for _ in 0..50 { n = notices(&d); if !n.is_empty() { break; } std::thread::sleep(Duration::from_millis(100)); }
+    assert_eq!(n.len(), 1);
+    assert_eq!(n[0]["payload"]["delivered_via"], "overseer-notifier (ok)");
+    assert!(std::fs::read_to_string(&log).unwrap().contains("Overseer: 1 agent still running"));
+    d.call("run.interrupt", json!({"run_id": run}));
+    d.wait_done(&run, 20);
+}
+
+#[test]
+fn ac52_the_daemon_finds_the_notifier_app_next_to_its_own_binary() {
+    // The installed layout: bin/overseerd-<platform> and bin/Overseer Notifier.app side by side.
+    let t = tmp();
+    let bin = t.path().join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    let daemon = bin.join("overseerd-test");
+    std::fs::copy(BIN, &daemon).unwrap();
+    let (fake, log) = fake_notifier(t.path(), 0);
+    std::fs::rename(&fake, bin.join("Overseer Notifier.app")).unwrap();
+    let home = t.path().join("home");
+    let mut child = std::process::Command::new(&daemon).arg("serve").env("OVERSEER_HOME", &home).env("OVERSEER_TEST_NOTIFIER_DIRECT", "1").env_remove("OVERSEER_NOTIFIER_APP")
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().unwrap();
+    let ctl = |m: &str| String::from_utf8(std::process::Command::new(&daemon).args(["ctl", m, "{}"]).env("OVERSEER_HOME", &home).output().unwrap().stdout).unwrap();
+    let mut out = String::new();
+    for _ in 0..50 { out = ctl("daemon.test_notice"); if out.contains("delivered_via") { break; } std::thread::sleep(Duration::from_millis(100)); }
+    assert!(out.contains("overseer-notifier (ok)"), "{out}");
+    assert!(std::fs::read_to_string(&log).unwrap().contains("--open\nvscode://beelol.overseer/open-center"));
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+// ---------------------------------------------------------------- AC-50 open a pull request
+
+#[test]
+fn ac50_pr_plan_explains_refusals_and_prepares_a_github_branch_without_merging() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &repo, "worktree", "printf 'agent line\\n' >> a.txt");
+    d.wait_done(&run_id(&created), 20);
+    let id = ws_id(&created);
+    // No remote.
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
+    assert_eq!(plan["ok"], false);
+    assert!(plan["reason"].as_str().unwrap().contains("has no Git remote"), "{plan}");
+    // A non-GitHub remote.
+    git(&repo, &["remote", "add", "origin", "https://gitlab.example.invalid/a/b.git"]);
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
+    assert!(plan["reason"].as_str().unwrap().contains("not on GitHub"), "{plan}");
+    // A GitHub remote whose pushes go to a local bare repository (insteadOf), as in the UI test.
+    let bare = r.path().join("remote.git");
+    std::process::Command::new("git").args(["init", "-q", "--bare", bare.to_str().unwrap()]).status().unwrap();
+    git(&repo, &["remote", "set-url", "origin", "https://github.com/test-owner/test-repo.git"]);
+    git(&repo, &["config", &format!("url.{}.insteadOf", bare.display()), "https://github.com/test-owner/test-repo.git"]);
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": id}));
+    assert_eq!(plan["ok"], true, "{plan}");
+    assert_eq!((plan["owner"].as_str(), plan["repo"].as_str(), plan["target"].as_str()), (Some("test-owner"), Some("test-repo"), Some("main")));
+    assert_eq!(plan["uncommitted"], json!(["a.txt"]));
+    let main_before = git(&repo, &["rev-parse", "main"]);
+    let prep = d.call("workspace.pr_prepare", json!({"workspace_id": id}));
+    assert_eq!(prep["committed"], true);
+    assert_eq!(prep["files"][0]["path"], "a.txt");
+    assert!(prep["commits"][0].as_str().unwrap().starts_with("Overseer: "), "{prep}");
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "nothing is merged");
+    d.call("workspace.pr_opened", json!({"workspace_id": id, "url": "https://github.com/test-owner/test-repo/pull/7", "number": 7}));
+    assert!(d.events(&run_id(&created)).iter().any(|e| e["kind"] == "pull_request" && e["payload"]["number"] == 7));
+    assert!(d.try_call("workspace.pr_opened", json!({"workspace_id": id, "url": "javascript:alert(1)", "number": 1})).is_err());
+    // Active run and current checkout: refused with an explanation.
+    let busy = sh(&d, &repo, "worktree", "sleep 30");
+    d.wait_status(&run_id(&busy), |s| s == "running", 20);
+    assert!(d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&busy)}))["reason"].as_str().unwrap().contains("still running"));
+    d.call("run.interrupt", json!({"run_id": run_id(&busy)}));
+    let cur = sh(&d, &repo, "current", "true");
+    d.wait_done(&run_id(&cur), 20);
+    assert!(d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&cur)}))["reason"].as_str().unwrap().contains("current checkout"));
+}
+
+#[test]
+fn ac50_pr_plan_targets_the_branch_name_in_a_fresh_clone() {
+    // Found live: in a fresh clone the default branch is the remote-tracking `origin/master`, and the
+    // plan passed that to GitHub as the base, which GitHub rejects. The target must be the branch name.
+    let r = tmp();
+    let src = repo(&r.path().join("src"));
+    let bare = r.path().join("remote.git");
+    std::process::Command::new("git").args(["clone", "-q", "--bare", src.to_str().unwrap(), bare.to_str().unwrap()]).status().unwrap();
+    let clone = r.path().join("clone");
+    std::process::Command::new("git").args(["clone", "-q", bare.to_str().unwrap(), clone.to_str().unwrap()]).status().unwrap();
+    git(&clone, &["remote", "set-url", "origin", "https://github.com/test-owner/test-repo.git"]);
+    git(&clone, &["config", &format!("url.{}.insteadOf", bare.display()), "https://github.com/test-owner/test-repo.git"]);
+    assert_eq!(git(&clone, &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]), "origin/main");
+    let d = Daemon::start(&[]);
+    let created = sh(&d, &clone, "worktree", "printf 'agent line\\n' >> a.txt");
+    d.wait_done(&run_id(&created), 20);
+    let plan = d.call("workspace.pr_plan", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(plan["ok"], true, "{plan}");
+    assert_eq!(plan["target"], "main", "{plan}");
+    let prep = d.call("workspace.pr_prepare", json!({"workspace_id": ws_id(&created)}));
+    assert_eq!(prep["files"][0]["path"], "a.txt", "{prep}");
+    assert_eq!(prep["commits"].as_array().map(Vec::len), Some(1), "only the run's commit, compared against main: {prep}");
+}

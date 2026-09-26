@@ -1,7 +1,12 @@
+mod accounts;
 mod adapters;
+mod background;
 mod daemon;
+mod files;
 mod git;
+mod merge;
 mod paths;
+mod pr;
 mod redact;
 mod server;
 mod shim;

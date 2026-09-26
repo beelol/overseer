@@ -58,6 +58,9 @@ class Cdp {
         const { sessionId } = await this.call('Target.attachToTarget', { targetId: page.targetId, flatten: true });
         this.workbench = sessionId;
         await this.call('Runtime.enable', {}, sessionId);
+        // Behave as focused even when the test window is not the frontmost app (CDP input does not
+        // activate the window; without this, focus() in webviews is dropped immediately).
+        await this.call('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId).catch(() => {});
         await this.call('Page.enable', {}, sessionId);
         for (let i = 0; i < 80; i++) {
           if (await this.evalWorkbench('!!document.querySelector(".monaco-workbench .part.activitybar")').catch(() => false)) return;
@@ -84,7 +87,7 @@ class Cdp {
 
   async key(key, { meta = false, shift = false, ctrl = false, alt = false } = {}) {
     const modifiers = (alt ? 1 : 0) | (ctrl ? 2 : 0) | (meta ? 4 : 0) | (shift ? 8 : 0);
-    const codes = { Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], Tab: [9, 'Tab'], ArrowDown: [40, 'ArrowDown'], ArrowUp: [38, 'ArrowUp'], Backspace: [8, 'Backspace'], PageDown: [34, 'PageDown'], End: [35, 'End'], Home: [36, 'Home'] };
+    const codes = { Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], Tab: [9, 'Tab'], ArrowDown: [40, 'ArrowDown'], ArrowUp: [38, 'ArrowUp'], Backspace: [8, 'Backspace'], PageDown: [34, 'PageDown'], End: [35, 'End'], Home: [36, 'Home'], F10: [121, 'F10'], ContextMenu: [93, 'ContextMenu'] };
     const [keyCode, code, text] = codes[key] || [key.toUpperCase().charCodeAt(0), 'Key' + key.toUpperCase()];
     const base = { modifiers, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode, key: codes[key] ? key : (shift ? key.toUpperCase() : key), code };
     await this.call('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...base }, this.workbench);
@@ -120,10 +123,24 @@ class Cdp {
     throw new Error(`Timed out waiting for ${label} (last: ${JSON.stringify(last)})`);
   }
 
+  /** Moves keyboard focus out of a webview so workbench shortcuts reach VS Code. */
+  async focusWorkbench() {
+    await this.evalWorkbench(`(() => { const a = document.activeElement; if (a && a.tagName === 'IFRAME') a.blur(); return true; })()`).catch(() => {});
+  }
+
   /** Runs a command through the real command palette. */
   async command(title) {
-    await this.key('p', { meta: true, shift: true });
-    await this.waitFor('!!document.querySelector(".quick-input-widget:not([style*=\\"display: none\\"]) input")', 5000, 'command palette');
+    for (let attempt = 0; ; attempt++) {
+      await this.focusWorkbench();
+      await this.key('p', { meta: true, shift: true });
+      try { await this.waitFor('!!document.querySelector(".quick-input-widget:not([style*=\\"display: none\\"]) input")', 5000, 'command palette'); break; }
+      catch (error) {
+        if (attempt >= 1) throw error;
+        // Keyboard focus can stay inside a webview's own frame; click a neutral workbench spot.
+        const p = await this.evalWorkbench(`(() => { const b = document.querySelector('.part.statusbar').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+        await this.click(p.x, p.y); await delay(300);
+      }
+    }
     await this.type(title);
     await delay(400);
     await this.key('Enter');
@@ -167,6 +184,7 @@ class Cdp {
         try {
           const { sessionId } = await this.call('Target.attachToTarget', { targetId: target.targetId, flatten: true });
           await this.call('Runtime.enable', {}, sessionId); attached.add(target.targetId);
+          await this.call('Emulation.setFocusEmulationEnabled', { enabled: true }, sessionId).catch(() => {});
         } catch {}
       }
       for (const context of [...this.contexts.values()].reverse()) {

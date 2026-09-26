@@ -23,9 +23,14 @@ function gitShow(root, spec) {
 class Review {
   constructor(context, client, model, log) {
     this.context = context; this.client = client; this.model = model; this.log = log;
-    this.comparisons = new Map(); // runId -> selected comparison option
+    // Comparison choice and Follow survive reloads and restarts (workspace state). Follow is
+    // never auto-resumed: a run that was being followed comes back paused.
+    this.comparisons = new Map(Object.entries(context.workspaceState.get('overseer.comparisons', {}))); // runId -> { mode, branch }
     this.follow = new Map(); // runId -> 'off' | 'following' | 'paused'
     this.followNotes = new Map();
+    for (const [runId, state] of Object.entries(context.workspaceState.get('overseer.follow', {}))) {
+      if (state === 'following' || state === 'paused') { this.follow.set(runId, 'paused'); this.followNotes.set(runId, 'Follow was on before VS Code reloaded. It stays paused until you resume it.'); }
+    }
     this.observed = new Map(); // abs path -> last observed text (bounded)
     this.userSaves = new Map(); // abs path -> ms of last user save
     this.lastReveal = new Map(); // runId -> last reveal message
@@ -40,6 +45,8 @@ class Review {
       pauseFollow: (runId, reason) => this.pauseFollow(runId, reason),
       followReady: runId => { const last = this.lastReveal.get(runId); if (last && this.follow.get(runId) === 'following') this.manager.reveal(runId, last); },
       restore: state => this.restore(state),
+      reviewedKeys: runId => Object.keys(this.reviewed()[runId] || {}),
+      reviewHunk: (session, message) => this.reviewHunk(session, message),
     });
     context.subscriptions.push(this.manager,
       vscode.window.registerWebviewPanelSerializer('overseer.review', this.manager),
@@ -102,6 +109,60 @@ class Review {
     return repo;
   }
 
+  // ------------------------------------------------------------ reviewed hunks (AC-42)
+
+  reviewed() { return this.context.workspaceState.get('overseer.reviewedHunks', {}); }
+
+  /**
+   * Accept = mark a hunk reviewed (no Git staging). Keys hash the hunk's base and working text,
+   * so a hunk that changes again is simply no longer reviewed. The hunk is re-checked against
+   * the current text first: if the agent changed it meanwhile, that is a conflict.
+   */
+  async reviewHunk(session, msg) {
+    const runId = session.overseer?.runId;
+    if (!runId || !/^[a-f0-9]{16}$/.test(String(msg.key)) || typeof msg.path !== 'string') throw new Error('Invalid hunk.');
+    const all = this.reviewed();
+    const run = { ...(all[runId] || {}) };
+    if (!msg.reviewed) { delete run[msg.key]; }
+    else {
+      const uri = vscode.Uri.joinPath(session.repo.rootUri, ...msg.path.split('/'));
+      if (path.relative(session.repo.rootUri.fsPath, uri.fsPath).startsWith('..')) throw new Error('File is outside this review.');
+      const open = vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
+      // A clean document may lag an agent's write by a moment; disk is the truth unless it has unsaved edits.
+      const text = open?.isDirty ? open.getText() : await fs.readFile(uri.fsPath, 'utf8').catch(() => '');
+      const lines = text.split(/\r?\n/);
+      const modified = Array.isArray(msg.modified) ? msg.modified : [];
+      const start = Number(msg.modifiedStart) || 0, end = Number(msg.modifiedEnd) || 0;
+      const same = end ? lines.slice(start - 1, end).join('\n') === modified.join('\n') : (start === 0 || lines[start - 1] === msg.anchor);
+      if (!same) throw new Error(`Not marked reviewed: ${msg.path} changed while you were accepting this hunk (conflict). Review the current content.`);
+      run[msg.key] = { path: msg.path, at: Date.now() };
+    }
+    const next = { ...all, [runId]: run };
+    // Bound the stored state: the newest 2,000 hunks per run and 200 runs.
+    for (const id of Object.keys(next)) { const entries = Object.entries(next[id]).sort((a, b) => b[1].at - a[1].at).slice(0, 2000); next[id] = Object.fromEntries(entries); }
+    const runs = Object.keys(next).slice(-200);
+    await this.context.workspaceState.update('overseer.reviewedHunks', Object.fromEntries(runs.map(id => [id, next[id]])));
+  }
+
+  persistFollow() {
+    const saved = {};
+    for (const [runId, state] of this.follow) if (state !== 'off') saved[runId] = state;
+    this.context.workspaceState.update('overseer.follow', saved);
+  }
+
+  setComparison(runId, option) {
+    this.comparisons.set(runId, { mode: option.mode, branch: option.branch });
+    this.context.workspaceState.update('overseer.comparisons', Object.fromEntries([...this.comparisons].slice(-200)));
+  }
+
+  /** Why a run's review cannot open, or undefined when its workspace is usable. */
+  unavailable(run, ws) {
+    if (!ws) return `The workspace for "${run.title}" no longer exists in Overseer's records.`;
+    if (!ws.removed_ms) return undefined;
+    return `The worktree for "${run.title}" (${ws.path}) was removed on ${new Date(ws.removed_ms).toLocaleString()}.` +
+      (ws.branch ? ` Its branch ${ws.branch} was kept, so the commits are still in the repository.` : '') + ' The run panel still has its history.';
+  }
+
   async options(runId, branch) {
     return this.client.request('comparison.options', { run_id: runId, branch });
   }
@@ -116,16 +177,38 @@ class Review {
     return opts.options.find(o => o.default) || opts.options[0];
   }
 
-  async open(runId, { preserveFocus = false, follow } = {}) {
+  async open(runId, { preserveFocus = false, follow, viewColumn } = {}) {
     const run = this.model.run(runId);
     if (!run) throw new Error('Unknown run.');
     const ws = this.model.workspace(run.workspace_id);
-    if (!ws || ws.removed_ms) throw new Error('This run\'s workspace was removed.');
+    const why = this.unavailable(run, ws);
+    if (why) throw new Error(why);
     const repo = await this.repoFor(ws.path);
     const comparison = await this.currentComparison(runId);
-    if (follow !== undefined) this.follow.set(runId, follow ? 'following' : 'off');
+    if (follow !== undefined) { this.follow.set(runId, follow ? 'following' : 'off'); this.persistFollow(); }
     if (String(run.capabilities?.file_activity || '').startsWith('unknown')) this.followNotes.set(runId, 'Filesystem evidence only: this harness does not report its edits, so Follow cannot attribute or jump to them. The file list still refreshes live.');
-    return this.manager.open({ repo, workspaceId: ws.id, runId, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison }, { preserveFocus });
+    return this.manager.open({ repo, workspaceId: ws.id, runId, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison }, { preserveFocus, viewColumn: viewColumn || this.reviewColumn?.() });
+  }
+
+  /** Opens the run's review at the first changed hunk of `rel` (a file edit clicked in the conversation). */
+  async revealEdit(runId, rel) {
+    await this.open(runId);
+    const run = this.model.run(runId);
+    const ws = this.model.workspace(run.workspace_id);
+    const base = (await this.currentComparison(runId).catch(() => undefined))?.base;
+    let line = 1;
+    if (base && rel && !rel.startsWith('/') && !rel.startsWith('..')) {
+      const diff = await new Promise(resolve => execFile('git', ['diff', '-U0', '--no-color', '--no-ext-diff', base, '--', rel], { cwd: ws.path, maxBuffer: 8 * 1024 * 1024 }, (err, out) => resolve(err ? '' : out)));
+      const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/m.exec(diff);
+      if (hunk) line = Math.max(1, Number(hunk[1]) || 1);
+      else if (!diff) {
+        // Untracked files are not in `git diff`; they are new, so the hunk starts at line 1.
+      }
+    }
+    const message = { path: rel, line, attribution: 'opened from the conversation', user: true };
+    // A freshly opened review may not have its file list yet; the webview keeps it pending.
+    this.manager.reveal(runId, message);
+    return message;
   }
 
   async pickComparison(runId) {
@@ -146,7 +229,7 @@ class Review {
     }
     if (!option) return;
     if (!option.available) { vscode.window.showWarningMessage(`${option.label} is unavailable: ${option.detail}`); return; }
-    this.comparisons.set(runId, option);
+    this.setComparison(runId, option);
     await this.open(runId);
   }
 
@@ -177,11 +260,16 @@ class Review {
     // Serializers run during activation, possibly before the daemon connection is up.
     await this.client.waitConnected(20000);
     await this.model.refresh();
-    const repoPath = vscode.Uri.parse(state.repository).fsPath;
-    const runs = this.model.state.runs.filter(r => !r.parent_run_id && this.model.workspace(r.workspace_id)?.path === repoPath);
-    const run = runs.sort((a, b) => b.created_ms - a.created_ms)[0];
+    let run = state.runId && this.model.run(state.runId);
+    if (!run && !state.runId) {
+      // Reviews saved before run ids were recorded: the newest top-level run in that worktree.
+      const repoPath = vscode.Uri.parse(state.repository).fsPath;
+      run = this.model.state.runs.filter(r => !r.parent_run_id && this.model.workspace(r.workspace_id)?.path === repoPath).sort((a, b) => b.created_ms - a.created_ms)[0];
+    }
     if (!run) return undefined;
     const ws = this.model.workspace(run.workspace_id);
+    const why = this.unavailable(run, ws);
+    if (why) throw Object.assign(new Error(why), { runTitle: run.title });
     return { repo: await this.repoFor(ws.path), workspaceId: ws.id, runId: run.id, runTitle: run.title, harness: run.harness, workspaceKind: ws.kind, comparison: await this.currentComparison(run.id) };
   }
 
@@ -190,6 +278,8 @@ class Review {
   setFollow(runId, state) {
     if (!runId) return;
     this.follow.set(runId, state);
+    this.persistFollow();
+    if (/paused/.test(this.followNotes.get(runId) || '')) this.followNotes.delete(runId);
     if (state === 'following') {
       const last = this.lastReveal.get(runId);
       if (last) this.manager.reveal(runId, last);
@@ -197,7 +287,7 @@ class Review {
   }
 
   pauseFollow(runId, reason) {
-    if (runId && this.follow.get(runId) === 'following') { this.follow.set(runId, 'paused'); this.log(`follow paused for ${runId}: ${reason}`); }
+    if (runId && this.follow.get(runId) === 'following') { this.follow.set(runId, 'paused'); this.persistFollow(); this.log(`follow paused for ${runId}: ${reason}`); }
   }
 
   async readText(abs) {

@@ -43,10 +43,10 @@ async function sendFollowUp(s, output, text) {
     const status = s.ctl('profile.status', { id: 'system-codex' });
     check('codex profile signed in with ChatGPT account', status.logged_in && status.method === 'chatgpt-account', { version: status.version, method: status.method, plan: status.identity?.plan, account: status.identity?.account_fingerprint, api_key_present: status.identity?.has_api_key });
 
-    await cdp.command('Overseer: New Task');
+    await cdp.command('Overseer: Start Task with Quick Picks');
     await cdp.pick('New task: repository');
     await cdp.pick('New task: harness', 'codex');
-    await cdp.pick('New task: account profile', 'codex (existing login)');
+    await cdp.pick('New task: account for', 'codex (existing login)');
     if (dry) {
       const b = await cdp.waitFor(`(() => { const b = [...document.querySelectorAll('.notification-toast .monaco-button')].find(b => b.textContent.includes('Launch anyway')); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`, 10000);
       await cdp.click(b.x, b.y);

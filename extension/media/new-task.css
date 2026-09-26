@@ -1,0 +1,39 @@
+/* New Task form. VS Code theme tokens only (light, dark, high contrast). */
+body { margin: 0; padding: 16px 24px 32px; max-width: 980px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); background: var(--vscode-editor-background); line-height: 1.4; }
+h1 { font-size: 1.35em; font-weight: 600; margin: 0 0 4px; }
+.lede { margin: 0 0 18px; color: var(--vscode-descriptionForeground); }
+section { margin: 0 0 20px; }
+h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--vscode-descriptionForeground); margin: 0 0 8px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.tile { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; cursor: pointer; background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, var(--vscode-contrastBorder, transparent))); transition: border-color .12s, background .12s; }
+.tile:hover { background: var(--vscode-list-hoverBackground); }
+.tile.selected { border-color: var(--vscode-focusBorder); background: var(--vscode-list-inactiveSelectionBackground); box-shadow: 0 0 0 1px var(--vscode-focusBorder) inset; }
+.tile:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
+.tile.disabled { cursor: default; opacity: .6; }
+.tile-icon { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-size: 15px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+.tile.selected .tile-icon { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+.tile-body { min-width: 0; flex: 1; }
+.tile-title { display: flex; align-items: center; gap: 6px; font-weight: 600; flex-wrap: wrap; }
+.tile-sub { color: var(--vscode-descriptionForeground); font-size: .92em; margin-top: 2px; overflow-wrap: anywhere; }
+.tile-why { color: var(--vscode-editorWarning-foreground); font-size: .9em; margin-top: 4px; }
+.hints { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.hint { font-size: 10.5px; padding: 1px 7px; border-radius: 9px; border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, var(--vscode-contrastBorder, transparent))); color: var(--vscode-descriptionForeground); }
+.pill { font-size: 10.5px; font-weight: 600; padding: 0 7px; border-radius: 9px; border: 1px solid currentColor; }
+.pill.ok { color: var(--vscode-testing-iconPassed, var(--vscode-charts-green)); }
+.pill.warn { color: var(--vscode-editorWarning-foreground); }
+.pill.off { color: var(--vscode-disabledForeground, var(--vscode-descriptionForeground)); }
+label { display: block; font-weight: 600; margin: 0 0 4px; }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+input, select, textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 6px 8px; border-radius: 6px; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, transparent)); }
+input:focus, select:focus, textarea:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+textarea { min-height: 110px; resize: vertical; }
+.help { color: var(--vscode-descriptionForeground); font-size: .9em; margin-top: 4px; }
+.actions { display: flex; align-items: center; gap: 12px; position: sticky; bottom: 0; padding: 12px 0; background: var(--vscode-editor-background); border-top: 1px solid var(--vscode-panel-border, transparent); }
+button { font: inherit; border-radius: 6px; padding: 6px 16px; cursor: pointer; border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+button:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
+.why { color: var(--vscode-descriptionForeground); }
+.error { color: var(--vscode-errorForeground); border: 1px solid var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground)); background: var(--vscode-inputValidation-errorBackground, transparent); border-radius: 6px; padding: 6px 10px; }
+.empty { color: var(--vscode-descriptionForeground); }

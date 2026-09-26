@@ -9,7 +9,7 @@
   "engines": { "vscode": "^1.136.0" },
   "categories": ["SCM Providers", "Other"],
   "main": "./src/extension.js",
-  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review"],
+  "activationEvents": ["onStartupFinished", "onWebviewPanel:overseer.review", "onWebviewPanel:overseer.output", "onWebviewPanel:overseer.center", "onUri"],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
@@ -33,7 +33,9 @@
       { "view": "overseer.agents", "contents": "Launching agents requires a trusted workspace.\n[Manage Workspace Trust](command:workbench.trust.manage)", "when": "!isWorkspaceTrusted" }
     ],
     "commands": [
+      { "command": "overseer.openCenter", "title": "Open Overseer View", "category": "Overseer", "icon": "$(layout)" },
       { "command": "overseer.newTask", "title": "New Task…", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.newTaskQuick", "title": "Start Task with Quick Picks…", "category": "Overseer", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.refresh", "title": "Refresh", "category": "Overseer", "icon": "$(refresh)" },
       { "command": "overseer.openReview", "title": "Open Review", "category": "Overseer", "icon": "$(diff-multiple)" },
       { "command": "overseer.showOutput", "title": "Show Output", "category": "Overseer", "icon": "$(output)" },
@@ -41,21 +43,31 @@
       { "command": "overseer.interrupt", "title": "Interrupt", "category": "Overseer", "icon": "$(debug-stop)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.selectComparison", "title": "Select Comparison…", "category": "Overseer", "icon": "$(git-compare)" },
       { "command": "overseer.cleanupWorkspace", "title": "Clean Up Worktree…", "category": "Overseer", "icon": "$(trash)", "enablement": "isWorkspaceTrusted" },
-      { "command": "overseer.addProfile", "title": "Add Account Profile…", "category": "Overseer", "icon": "$(person-add)" },
+      { "command": "overseer.addProfile", "title": "Add Account…", "category": "Overseer", "icon": "$(person-add)" },
+      { "command": "overseer.removeAccount", "title": "Remove Account…", "category": "Overseer", "icon": "$(trash)" },
       { "command": "overseer.signIn", "title": "Sign In…", "category": "Overseer", "icon": "$(sign-in)" },
       { "command": "overseer.signOut", "title": "Sign Out", "category": "Overseer", "icon": "$(sign-out)" },
-      { "command": "overseer.renameProfile", "title": "Rename Profile…", "category": "Overseer", "icon": "$(edit)" },
+      { "command": "overseer.renameProfile", "title": "Rename Account…", "category": "Overseer", "icon": "$(edit)" },
       { "command": "overseer.refreshAccounts", "title": "Refresh Account Status", "category": "Overseer", "icon": "$(refresh)" },
       { "command": "overseer.openDirtyDiff", "title": "Open Diff", "category": "Overseer" },
+      { "command": "overseer.openEdit", "title": "Open Edit in Review", "category": "Overseer" },
       { "command": "overseer.showCapabilities", "title": "Show Harness Capabilities", "category": "Overseer", "icon": "$(info)" },
+      { "command": "overseer.openPullRequest", "title": "Open Pull Request…", "category": "Overseer", "icon": "$(git-pull-request)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.mergeBack", "title": "Merge Back…", "category": "Overseer", "icon": "$(git-merge)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.stopAll", "title": "Stop Agents and Daemon…", "category": "Overseer", "icon": "$(debug-stop)" },
+      { "command": "overseer.startDaemon", "title": "Start Daemon", "category": "Overseer" },
+      { "command": "overseer.testNotification", "title": "Test Notification", "category": "Overseer", "icon": "$(bell)" },
       { "command": "overseer.showLog", "title": "Show Daemon Log", "category": "Overseer" },
       { "command": "overseer.restartDaemonConnection", "title": "Reconnect to Daemon", "category": "Overseer" }
     ],
     "menus": {
       "view/title": [
         { "command": "overseer.newTask", "when": "view == overseer.agents", "group": "navigation@1" },
+        { "command": "overseer.openCenter", "when": "view == overseer.agents", "group": "navigation@0" },
         { "command": "overseer.refresh", "when": "view == overseer.agents", "group": "navigation@2" },
         { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "navigation@3" },
+        { "command": "overseer.mergeBack", "title": "Merge Back…", "category": "Overseer", "icon": "$(git-merge)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
         { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
         { "command": "overseer.selectComparison", "when": "view == overseer.dirty", "group": "navigation@1" }
@@ -66,18 +78,25 @@
         { "command": "overseer.interrupt", "when": "view == overseer.agents && viewItem =~ /run-root-active/", "group": "inline@3" },
         { "command": "overseer.followUp", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "1_control@1" },
         { "command": "overseer.selectComparison", "when": "view == overseer.agents && viewItem =~ /run/", "group": "1_control@2" },
+        { "command": "overseer.mergeBack", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "1_control@3" },
+        { "command": "overseer.openPullRequest", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "1_control@4" },
         { "command": "overseer.cleanupWorkspace", "when": "view == overseer.agents && viewItem =~ /run-root/", "group": "9_cleanup@1" },
-        { "command": "overseer.signIn", "when": "view == overseer.accounts && viewItem =~ /profile/", "group": "inline@1" },
+        { "command": "overseer.signIn", "when": "view == overseer.accounts && viewItem =~ /^profile-.*-signedout$/", "group": "inline@1" },
+        { "command": "overseer.signIn", "when": "view == overseer.accounts && viewItem =~ /^profile-/", "group": "1_edit@0" },
         { "command": "overseer.renameProfile", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@1" },
-        { "command": "overseer.signOut", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "1_edit@2" }
+        { "command": "overseer.signOut", "when": "view == overseer.accounts && viewItem =~ /^profile-isolated-signedin$/", "group": "1_edit@2" },
+        { "command": "overseer.removeAccount", "when": "view == overseer.accounts && viewItem =~ /profile-isolated/", "group": "9_remove@1" },
+        { "command": "overseer.addProfile", "when": "view == overseer.accounts && viewItem == provider", "group": "inline@1" }
       ],
       "commandPalette": [
-        { "command": "overseer.openDirtyDiff", "when": "false" }
+        { "command": "overseer.openDirtyDiff", "when": "false" },
+        { "command": "overseer.openEdit", "when": "false" }
       ]
     },
     "configuration": {
       "title": "Overseer",
       "properties": {
+        "overseer.github.apiUrl": { "type": "string", "default": "https://api.github.com", "description": "GitHub API base URL used by Open Pull Request (GitHub Enterprise: https://HOST/api/v3). Pull requests use the GitHub account VS Code is signed in to." },
         "overseer.daemonPath": { "type": "string", "default": "", "markdownDescription": "Path to the `overseerd` binary. Empty uses the binary bundled with the extension.", "scope": "machine" },
         "overseer.review.enableEditing": { "type": "boolean", "default": true, "markdownDescription": "Edit working-tree text directly in the review. Undo/redo is available through Open in Native Diff." },
         "overseer.review.largeDiffThreshold": { "type": "integer", "minimum": 1, "default": 500, "markdownDescription": "Show a Load Diff card when additions + deletions exceed this count." },

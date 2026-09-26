@@ -21,9 +21,9 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     await s.screenshot('activated');
 
     // Account profile for OpenCode through the UI; its config points at the local mock.
-    await cdp.command('Overseer: Add Account Profile');
-    await cdp.pick('Harness for the new account profile', 'opencode');
-    await cdp.input('Profile name', 'OpenCode mock');
+    await cdp.command('Overseer: Add Account');
+    await cdp.pick('Add account: provider', 'OpenCode');
+    await cdp.input('Name for the', 'OpenCode mock');
     await delay(800);
     await cdp.key('Escape');
     const profile = s.ctl('profile.list').find(p => p.name === 'OpenCode mock');
@@ -32,10 +32,10 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     fs.writeFileSync(path.join(profile.home, 'config/opencode/opencode.json'), openCodeConfig(await mock.port()));
 
     // New task through the command palette and quick picks.
-    await cdp.command('Overseer: New Task');
+    await cdp.command('Overseer: Start Task with Quick Picks');
     await cdp.pick('New task: repository');
     await cdp.pick('New task: harness', 'opencode');
-    await cdp.pick('New task: account profile', 'OpenCode mock');
+    await cdp.pick('New task: account for', 'OpenCode mock');
     // Not signed in (the mock needs no credentials): choose "Launch anyway" in the notification.
     await cdp.waitFor(`[...document.querySelectorAll('.notification-toast .monaco-button')].some(b => b.textContent.includes('Launch anyway'))`, 10000, 'launch anyway button');
     const btn = await cdp.evalWorkbench(`(() => { const b = [...document.querySelectorAll('.notification-toast .monaco-button')].find(b => b.textContent.includes('Launch anyway')); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
@@ -66,7 +66,7 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     check('follow navigated across files', files.has('a.txt') && files.has('b.txt'), reveals);
     const aLines = reveals.filter(r => r.includes('a.txt:')).map(r => Number(r.match(/:(\d+)/)[1]));
     check('follow revealed distant lines', reveals.length >= 3 && new Set(reveals.map(r => r.match(/:(\d+)/)?.[1])).size >= 3, { aLines });
-    const outText = await output.eval(`document.getElementById('log').innerText`);
+    const outText = await output.eval(`document.getElementById('conv').innerText`);
     check('output panel streams events', /edit/.test(outText) && /a\.txt|b\.txt/.test(outText), outText.slice(0, 400));
 
     // Manual scroll pauses Follow; position is then left alone until Resume.

@@ -1,12 +1,14 @@
 // Modified for Overseer from Branch Diff (Local) review/browser.js (MIT): adds the
-// comparison/base control, Follow (off/following/paused) and agent-edit reveal.
+// comparison/base control, Follow (off/following/paused), agent-edit reveal, restores
+// the saved scroll anchor once the rows above it have rendered (after reload/restart), and
+// per-hunk Accept (mark reviewed) / Reject (restore the base text through the native edit path).
 import './browser.css';
 import { StatisticsWorker } from './statistics-client';
 import { EditingClient, replaceText } from './editing-client';
 
 const vscode = acquireVsCodeApi();
 const saved = vscode.getState() || {};
-const identity = { repository: document.body.dataset.repository, mode: document.body.dataset.mode, target: document.body.dataset.target };
+const identity = { repository: document.body.dataset.repository, mode: document.body.dataset.mode, target: document.body.dataset.target, runId: document.body.dataset.runId };
 // Save repository identity even if the first comparison has not finished yet.
 vscode.setState({ ...saved, ...identity });
 const diffs = document.getElementById('diffs');
@@ -25,7 +27,7 @@ let requestId = 0, clicked, classifying = false, renderFrame, stopped = false;
 let snapshot, settings = {}, selected = saved.selected, initialized = false, restoring = true;
 let rendering = false, nextSnapshot, pendingJump, hierarchy = saved.hierarchy;
 let frame, resizeFrame, persistTimer, progressTimer, pendingState;
-const editing = new EditingClient({ vscode, saved, repository: identity.repository, snapshot: () => snapshot, settings: () => settings, notice: message, changed: row => { if (!rows.has(row.entry.id)) release(row); else { if (row.largeWhileEditing && !row.editor?.getModifiedEditor().hasTextFocus()) { row.largeWhileEditing = false; row.renderedRevision = undefined; } ensure(row); updateViewport(); } } });
+const editing = new EditingClient({ vscode, saved, repository: identity.repository, snapshot: () => snapshot, settings: () => settings, notice: stickyMessage, changed: row => { if (!rows.has(row.entry.id)) release(row); else { if (row.largeWhileEditing && !row.editor?.getModifiedEditor().hasTextFocus()) { row.largeWhileEditing = false; row.renderedRevision = undefined; } ensure(row); updateViewport(); } } });
 filter.value = saved.filter || '';
 layout.value = saved.layout === 'split' ? 'split' : 'unified';
 let navWidth = saved.navWidth || 260;
@@ -45,9 +47,11 @@ toggleNavigator.addEventListener('click', () => { collapseNavigator(!document.bo
 function persist() {
   clearTimeout(persistTimer);
   if (!snapshot) return;
+  // Overseer: a hidden or zero-height view clamps scrollTop to 0; keep the last real position.
+  if (document.visibilityState === 'hidden' || !diffs.clientHeight) return;
   pendingState = { ...identity, layout: layout.value, closedFiles: [...closedFiles], closedFolders: [...closedFolders],
     navWidth, navCollapsed: document.body.classList.contains('nav-collapsed'), filter: filter.value,
-    selected, scrollTop: diffs.scrollTop, anchor: anchor(), hierarchy };
+    selected, scrollTop: diffs.scrollTop, anchor: restoreGoal ? { id: restoreGoal.id, offset: restoreGoal.offset } : anchor(), hierarchy };
   persistTimer = setTimeout(flushState, 100);
 }
 function flushState() {
@@ -61,11 +65,29 @@ function node(tag, className, text) {
   return element;
 }
 function message(text) { notice.textContent = text || ''; notice.hidden = !text; }
+// Overseer: notices the user must see (conflicts, refused actions) outlive the next live refresh.
+let stickyNotice;
+function stickyMessage(text) { stickyNotice = text ? { text, until: Date.now() + 10000 } : undefined; message(text); }
 function anchor() {
   const element = [...diffs.children].find(el => el.offsetTop + el.offsetHeight > diffs.scrollTop);
   const row = element && rows.get(element.dataset.id);
   return row && { id: row.entry.id, offset: diffs.scrollTop - row.element.offsetTop };
 }
+// Overseer: rows start as short placeholders after a reload and later snapshots can release
+// rendered rows, so the saved anchor is re-applied as diffs render and relayout until the user
+// interacts with the review (or jumps/follows). Until then it is also the position we save.
+let restoreGoal = saved.runId === identity.runId && saved.anchor && typeof saved.anchor.id === 'string' ? { id: saved.anchor.id, offset: Number(saved.anchor.offset) || 0 } : undefined;
+document.body.dataset.restore = restoreGoal ? 'pending' : 'none';
+function pursueRestore() {
+  if (!restoreGoal) return;
+  const row = rows.get(restoreGoal.id);
+  if (!row) return;
+  const want = row.element.offsetTop + restoreGoal.offset;
+  if (diffs.scrollTop !== want) diffs.scrollTop = want;
+  if (Math.abs(diffs.scrollTop - want) < 2 && !snapshot?.cached && row.element.dataset.loadState === 'rendered') document.body.dataset.restore = 'reached';
+}
+function stopRestore(reason) { if (restoreGoal) { restoreGoal = undefined; document.body.dataset.restore = 'cancelled:' + reason; } }
+for (const type of ['wheel', 'touchstart', 'keydown', 'pointerdown']) document.addEventListener(type, () => stopRestore(type), { passive: true, capture: true });
 function restoreAnchor(value) {
   const row = value && rows.get(value.id);
   if (row) diffs.scrollTop = row.element.offsetTop + value.offset;
@@ -91,6 +113,7 @@ function trackScroll() {
 }
 diffs.addEventListener('scroll', trackScroll, { passive: true });
 function jump(id) {
+  stopRestore('jump');
   const row = rows.get(id); if (!row) { pendingJump = id; return; }
   clicked = id; closedFiles.delete(id); row.nearby = true; fold(row); ensure(row);
   diffs.scrollTop = row.element.offsetTop;
@@ -177,6 +200,7 @@ function release(row) {
   queued.delete(row);
   if (!row.editor || !editing.release(row)) return;
   row.viewState = row.editor.saveViewState();
+  row.hunks = []; row.hunkDecorations = undefined;
   row.listeners.forEach(l => l.dispose());
   row.editor.dispose(); row.original.dispose(); row.modified.dispose();
   row.editor = undefined; row.body = undefined; row.renderedRevision = undefined; row.save.disabled = true;
@@ -272,6 +296,7 @@ function showCard(row, body, stats) {
   showCounts(row, stats); loading(row, false); restoreAnchor(position); trackScroll();
 }
 function updateViewport() {
+  pursueRestore();
   const top = diffs.scrollTop - 750, bottom = diffs.scrollTop + diffs.clientHeight + 750;
   for (const row of rows.values()) {
     const start = row.element.offsetTop;
@@ -305,6 +330,7 @@ function resize(row) {
   if (Math.abs(parseFloat(row.host.style.height) - height) > 1) { row.host.style.height = height + 'px'; trackScroll(); }
   row.editor.layout({ width: row.host.clientWidth, height });
   restoreAnchor(savedAnchor);
+  pursueRestore();
 }
 function showProblem(row, revision, problem) {
   if (editing.held(row)) return;
@@ -341,8 +367,9 @@ function applyBody(body) {
       row.editor.getModifiedEditor().onDidContentSizeChange(() => resize(row)),
       row.editor.onDidUpdateDiff(() => {
         if (row.renderedRevision === row.entry.revision) loading(row, false);
-        resize(row);
-      })];
+        resize(row); renderHunks(row);
+      }),
+      row.editor.getModifiedEditor().onDidLayoutChange(() => placeHunks(row))];
     editing.attach(row, monaco);
   } else {
     row.viewState = row.editor.saveViewState();
@@ -355,6 +382,80 @@ function applyBody(body) {
   resize(row);
   if (unchanged) loading(row, false);
   if (row.pendingLine && followState === 'following') { const line = row.pendingLine; row.pendingLine = undefined; requestAnimationFrame(() => revealLine(row, line)); }
+}
+// ------------------------------------------------------------------ Overseer hunk actions
+// Accept marks a hunk reviewed (keyed by its content, so a changed hunk is unreviewed again);
+// Reject replaces the hunk with the comparison base through the same native edit path as
+// typing in the review (a VS Code WorkspaceEdit, undoable in the native editor) and saves.
+let reviewedHunks = new Set();
+function hunkHash(text) {
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < text.length; i++) { const c = text.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619) >>> 0; h2 = Math.imul(h2 ^ c, 2246822519) >>> 0; }
+  return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+}
+function hunkTexts(row, change) {
+  const o = row.original.getLinesContent(), m = row.modified.getLinesContent();
+  const orig = change.originalEndLineNumber ? o.slice(change.originalStartLineNumber - 1, change.originalEndLineNumber) : [];
+  const mod = change.modifiedEndLineNumber ? m.slice(change.modifiedStartLineNumber - 1, change.modifiedEndLineNumber) : [];
+  return { orig, mod, key: hunkHash(row.entry.path + '\u0000' + orig.join('\n') + '\u0000' + mod.join('\n')) };
+}
+function renderHunks(row) {
+  const editor = row.editor?.getModifiedEditor();
+  if (!editor) return;
+  for (const h of row.hunks || []) editor.removeOverlayWidget(h.widget);
+  row.hunks = [];
+  const changes = row.editor.getLineChanges() || [];
+  const reviewedRanges = [];
+  const canEdit = editing.enabled(row);
+  changes.forEach((change, index) => {
+    const { orig, mod, key } = hunkTexts(row, change);
+    const reviewed = reviewedHunks.has(key);
+    const dom = node('div', 'hunk-actions' + (reviewed ? ' reviewed' : ''));
+    dom.dataset.key = key; dom.dataset.hunk = String(index + 1);
+    const where = change.modifiedEndLineNumber ? `lines ${change.modifiedStartLineNumber}–${change.modifiedEndLineNumber}` : `deletion after line ${change.modifiedStartLineNumber}`;
+    dom.setAttribute('role', 'group'); dom.setAttribute('aria-label', `Hunk ${index + 1} of ${row.entry.path}, ${where}`);
+    if (reviewed) { const badge = node('span', 'hunk-badge', '✓'); badge.title = 'Reviewed'; dom.append(badge); }
+    const accept = node('button', 'hunk-accept', reviewed ? '○' : '✓');
+    accept.title = reviewed ? 'Unmark: this hunk is reviewed; mark it not reviewed' : 'Accept: keep this change and mark the hunk reviewed (no Git staging)';
+    accept.setAttribute('aria-label', reviewed ? `Unmark reviewed hunk ${index + 1}` : `Accept hunk ${index + 1}`);
+    accept.addEventListener('click', () => vscode.postMessage({ type: 'hunkReview', reviewed: !reviewed, key, path: row.entry.path, version: snapshot?.version,
+      modifiedStart: change.modifiedStartLineNumber, modifiedEnd: change.modifiedEndLineNumber, modified: mod, anchor: row.modified.getLineContent(Math.max(1, Math.min(change.modifiedStartLineNumber || 1, row.modified.getLineCount()))) }));
+    const reject = node('button', 'hunk-reject', '↶');
+    reject.disabled = !canEdit;
+    reject.title = canEdit ? 'Reject: restore this hunk to the comparison base (undo with Cmd+Z in the native editor)' : 'Reject is unavailable: this file cannot be edited in the review (see Open in Native Diff)';
+    reject.setAttribute('aria-label', `Reject hunk ${index + 1}`);
+    reject.addEventListener('click', () => rejectHunk(row, change, key));
+    dom.append(accept, reject);
+    const widget = { getId: () => `overseer.hunk.${row.entry.id}.${index}`, getDomNode: () => dom, getPosition: () => null };
+    editor.addOverlayWidget(widget);
+    row.hunks.push({ widget, dom, change, key });
+    if (reviewed && change.modifiedEndLineNumber) reviewedRanges.push({ range: { startLineNumber: change.modifiedStartLineNumber, startColumn: 1, endLineNumber: change.modifiedEndLineNumber, endColumn: 1 }, options: { isWholeLine: true, className: 'hunk-reviewed-line' } });
+  });
+  if (!row.hunkDecorations) row.hunkDecorations = editor.createDecorationsCollection();
+  row.hunkDecorations.set(reviewedRanges);
+  row.element.dataset.hunks = String(changes.length);
+  row.element.dataset.reviewed = String(row.hunks.filter(h => reviewedHunks.has(h.key)).length);
+  placeHunks(row);
+}
+function placeHunks(row) {
+  const editor = row.editor?.getModifiedEditor();
+  if (!editor) return;
+  for (const h of row.hunks || []) {
+    const line = Math.max(1, Math.min(row.modified.getLineCount(), h.change.modifiedEndLineNumber ? h.change.modifiedStartLineNumber : h.change.modifiedStartLineNumber + 1));
+    h.dom.style.top = Math.max(0, editor.getTopForLineNumber(line) - editor.getScrollTop()) + 'px';
+  }
+}
+function rejectHunk(row, change, key) {
+  if (!editing.enabled(row) || editing.held(row)) { message('This hunk cannot be rejected in the review right now. Use Open in Native Diff.'); return; }
+  const o = row.original.getLinesContent(), m = row.modified.getLinesContent();
+  // Deletion hunks re-insert the base lines after modifiedStart; others replace the modified lines.
+  const a = change.modifiedEndLineNumber ? change.modifiedStartLineNumber - 1 : change.modifiedStartLineNumber;
+  const b = change.modifiedEndLineNumber ? change.modifiedEndLineNumber : change.modifiedStartLineNumber;
+  const seg = change.originalEndLineNumber ? o.slice(change.originalStartLineNumber - 1, change.originalEndLineNumber) : [];
+  const next = [...m.slice(0, a), ...seg, ...m.slice(b)].join(row.modified.getEOL());
+  editing.hunkOperation(row, key);
+  replaceText(row.modified, next);
+  editing.save(row);
 }
 function theme() {
   if (!monaco) return;
@@ -412,9 +513,9 @@ async function reconcile() {
       }
       const oldStructure = snapshot?.entries.map(e => [e.id, e.path, e.status, e.unsaved]);
       snapshot = next;
-      Object.assign(identity, { repository: next.repository, mode: next.mode, target: next.target });
+      Object.assign(identity, { repository: next.repository, mode: next.mode, target: next.target, runId: next.overseer?.runId || identity.runId });
       updateSettings(next.settings);
-      message(next.error || next.warning);
+      message(next.error || next.warning || (stickyNotice && Date.now() < stickyNotice.until ? stickyNotice.text : ''));
       const description = next.description;
       if (!next.overseer) document.getElementById('comparison').textContent = description ? `${description.headName || 'HEAD'} → ${description.base}` : 'Branch Diff';
       if (!next.overseer) document.getElementById('comparison').title = description ? `Merge-base ${description.mergeBase} → ${next.mode === 'workingTree' ? 'working tree + unsaved edits' : description.headSha}` : '';
@@ -456,8 +557,8 @@ async function reconcile() {
       }
       if (!next.entries.length) diffs.append(node('p', 'empty', next.error ? 'Comparison unavailable: ' + next.error : next.checking ? 'Checking files…' : 'No changes for this comparison. Pre-existing dirty work stays listed in the Workspace Dirty view.'));
       if (restoring) {
-        diffs.scrollTop = saved.scrollTop || 0; restoreAnchor(saved.anchor); restoring = false;
-      } else restoreAnchor(previousAnchor);
+        diffs.scrollTop = saved.scrollTop || 0; restoreAnchor(saved.anchor); pursueRestore(); restoring = false;
+      } else { restoreAnchor(previousAnchor); pursueRestore(); }
       if (pendingJump && rows.has(pendingJump)) { const id = pendingJump; pendingJump = undefined; jump(id); }
       if (pendingReveal) applyReveal(pendingReveal);
       document.body.dataset.version = next.version;
@@ -478,6 +579,12 @@ const followStatus = document.getElementById('follow-state');
 let followState = 'off', pendingReveal;
 function applyOverseer(o) {
   if (!o) return;
+  if (Array.isArray(o.reviewed)) {
+    const next = new Set(o.reviewed);
+    const changed = next.size !== reviewedHunks.size || [...next].some(k => !reviewedHunks.has(k));
+    reviewedHunks = next;
+    if (changed) for (const row of rows.values()) if (row.editor) renderHunks(row);
+  }
   const label = document.getElementById('base-label');
   const c = o.comparison || {};
   label.textContent = c.label || 'Comparison';
@@ -488,7 +595,7 @@ function applyOverseer(o) {
   followState = o.follow || 'off';
   followBox.checked = followState !== 'off';
   resumeButton.hidden = followState !== 'paused';
-  followStatus.textContent = followState === 'paused' ? 'Follow paused by your navigation' : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
+  followStatus.textContent = followState === 'paused' ? (/paused/.test(o.followNote || '') ? o.followNote : 'Follow paused by your navigation') : followState === 'following' ? (o.followNote || 'Following agent edits') : '';
 }
 function userNavigated(reason) {
   if (followState !== 'following') return;
@@ -514,11 +621,13 @@ function revealLine(row, line) {
   return true;
 }
 function applyReveal(value) {
-  if (followState !== 'following') return;
+  // Overseer: `user` reveals (a file edit clicked in the conversation) work without Follow and pause it.
+  if (followState !== 'following' && !value.user) return;
   const id = value.id || snapshot?.entries.find(e => e.path === value.path)?.id;
   if (!id || !rows.has(id)) { pendingReveal = value; return; }
   pendingReveal = undefined;
   const row = rows.get(id);
+  if (value.user) { userNavigated('conversation'); jump(id); document.body.dataset.revealed = value.path + ':' + (value.line || ''); if (!revealLine(row, value.line)) row.pendingLine = value.line; return; }
   jump(id);
   followStatus.textContent = 'Following: ' + value.path + (value.line ? ':' + value.line : '') + (value.attribution ? ' (' + value.attribution + ')' : '');
   if (!revealLine(row, value.line)) row.pendingLine = value.line;
@@ -551,7 +660,8 @@ window.addEventListener('message', event => {
     if (!value.stage) for (const row of rows.values()) if (row.renderedRevision === row.entry.revision) loading(row, false);
   }
   else if (value.type === 'settings') { updateSettings(value.settings); updateViewport(); }
-  else if (value.type === 'notice') message(value.message);
+  else if (value.type === 'hunkReviewed') { if (value.reviewed) reviewedHunks.add(value.key); else reviewedHunks.delete(value.key); for (const row of rows.values()) if (row.hunks?.some(h => h.key === value.key)) renderHunks(row); }
+  else if (value.type === 'notice') stickyMessage(value.message);
 });
 layout.addEventListener('change', () => { updateSettings(settings); persist(); });
 document.getElementById('refresh').addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));

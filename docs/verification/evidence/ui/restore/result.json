@@ -1,0 +1,209 @@
+{
+  "checks": [
+    {
+      "name": "after-reload: review and run panels reopened",
+      "ok": true,
+      "detail": [
+        "Review: R3 removed later (1), Editor Group 1",
+        "Review: R2 other repo (1), Editor Group 1",
+        "Review: R1 long review (2), Editor Group 1",
+        "generic: R3 removed later, Editor Group 2",
+        "generic: R2 other repo, Editor Group 2",
+        "generic: R1 long review, Editor Group 2"
+      ]
+    },
+    {
+      "name": "after-reload: selected run and collapsed task restored in the Agents view",
+      "ok": true,
+      "detail": {
+        "r1Selected": true,
+        "r2Collapsed": true,
+        "r2RunHidden": true
+      }
+    },
+    {
+      "name": "after-reload: review comparison mode restored",
+      "ok": true,
+      "detail": "Since task start"
+    },
+    {
+      "name": "after-reload: review scroll position restored",
+      "ok": true,
+      "detail": {
+        "before": 1200,
+        "after": 1200,
+        "restore": "reached",
+        "rows": [
+          [
+            "a.txt",
+            0,
+            6013,
+            "rendered"
+          ],
+          [
+            "b.txt",
+            6013,
+            263,
+            "reading"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "after-reload: Follow restored paused, not auto-resumed",
+      "ok": true,
+      "detail": {
+        "rows": [
+          [
+            "a.txt",
+            0,
+            6013,
+            "rendered"
+          ],
+          [
+            "b.txt",
+            6013,
+            263,
+            "reading"
+          ]
+        ],
+        "restore": "reached",
+        "top": 1200,
+        "comparison": "Since task start",
+        "follow": true,
+        "resume": true,
+        "followState": "Follow was on before VS Code reloaded. It stays paused until you resume it."
+      }
+    },
+    {
+      "name": "after-reload: run panel scroll position and unsent draft restored",
+      "ok": true,
+      "detail": {
+        "before": 414,
+        "after": {
+          "y": 414,
+          "draft": "unsent follow-up draft"
+        }
+      }
+    },
+    {
+      "name": "after-reload: review for a run in another repository (not open in the window) restored",
+      "ok": true,
+      "detail": "/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoB-8e99c157/r2-other-repo"
+    },
+    {
+      "name": "after-reload: active run kept running",
+      "ok": true,
+      "detail": "running"
+    },
+    {
+      "name": "R3 worktree removed before restart",
+      "ok": true,
+      "detail": "/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoA-839c23f3/r3-removed-later"
+    },
+    {
+      "name": "after-restart: review and run panels reopened",
+      "ok": true,
+      "detail": [
+        "Review: R3 removed later (1), Editor Group 1",
+        "Review: R2 other repo (1), Editor Group 1",
+        "Review: R1 long review (2), Editor Group 1",
+        "generic: R3 removed later, Editor Group 2",
+        "generic: R2 other repo, Editor Group 2",
+        "generic: R1 long review, Editor Group 2"
+      ]
+    },
+    {
+      "name": "after-restart: selected run and collapsed task restored in the Agents view",
+      "ok": true,
+      "detail": {
+        "r1Selected": true,
+        "r2Collapsed": true,
+        "r2RunHidden": true
+      }
+    },
+    {
+      "name": "after-restart: review comparison mode restored",
+      "ok": true,
+      "detail": "Since task start"
+    },
+    {
+      "name": "after-restart: review scroll position restored",
+      "ok": true,
+      "detail": {
+        "before": 1200,
+        "after": 1200,
+        "restore": "reached",
+        "rows": [
+          [
+            "a.txt",
+            0,
+            6013,
+            "rendered"
+          ],
+          [
+            "b.txt",
+            6013,
+            263,
+            "reading"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "after-restart: Follow restored paused, not auto-resumed",
+      "ok": true,
+      "detail": {
+        "rows": [
+          [
+            "a.txt",
+            0,
+            6013,
+            "rendered"
+          ],
+          [
+            "b.txt",
+            6013,
+            263,
+            "reading"
+          ]
+        ],
+        "restore": "reached",
+        "top": 1200,
+        "comparison": "Since task start",
+        "follow": true,
+        "resume": true,
+        "followState": "Follow was on before VS Code reloaded. It stays paused until you resume it."
+      }
+    },
+    {
+      "name": "after-restart: run panel scroll position and unsent draft restored",
+      "ok": true,
+      "detail": {
+        "before": 414,
+        "after": {
+          "y": 414,
+          "draft": "unsent follow-up draft"
+        }
+      }
+    },
+    {
+      "name": "after-restart: review for a run in another repository (not open in the window) restored",
+      "ok": true,
+      "detail": "/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoB-8e99c157/r2-other-repo"
+    },
+    {
+      "name": "after-restart: active run kept running",
+      "ok": true,
+      "detail": "running"
+    },
+    {
+      "name": "removed worktree is explained instead of failing",
+      "ok": true,
+      "detail": {
+        "tab": "Review: R3 removed later (1), Editor Group 1",
+        "text": "The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-0wdPbJ/overseer-home/worktrees/repoA-839c23f3/r3-removed-later) was removed on 9/25/2026, 6:17:26 PM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."
+      }
+    }
+  ]
+}

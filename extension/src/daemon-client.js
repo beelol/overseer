@@ -27,6 +27,7 @@ class DaemonClient extends EventEmitter {
   }
 
   async start() {
+    this.stopped = false;
     for (let attempt = 0; attempt < 50 && !this.disposed; attempt++) {
       try { await this.connect(); return; } catch (error) {
         if (attempt === 0) this.spawnDaemon();
@@ -52,6 +53,8 @@ class DaemonClient extends EventEmitter {
       socket.on('connect', () => {
         opened = true; this.socket = socket; this.connected = true; this.buffer = '';
         this.log('connected to daemon');
+        // Identify as a VS Code window: the daemon notifies when the last one closes while agents run.
+        this.request('hello', { client: 'vscode' }).catch(e => this.log('hello failed: ' + e.message));
         this.emit('connected');
         this.request('events.subscribe', { after: this.cursor }).catch(e => this.log('subscribe failed: ' + e.message));
         resolve();
@@ -64,6 +67,8 @@ class DaemonClient extends EventEmitter {
         for (const { reject: fail } of this.pending.values()) fail(new Error('Daemon connection lost.'));
         this.pending.clear();
         this.emit('disconnected');
+        // A deliberate "Stop Agents and Daemon" (from any window) must not respawn the daemon.
+        if (this.stopped) { this.emit('stopped'); return; }
         if (!this.disposed) this.reconnectLater();
       });
     });
@@ -91,6 +96,7 @@ class DaemonClient extends EventEmitter {
         const event = msg.params;
         if (event.seq <= this.cursor) continue; // replay overlap: never apply twice
         this.cursor = event.seq;
+        if (event.kind === 'daemon_stopping') this.stopped = true;
         this.emit('event', event);
       } else if (msg.method === 'resync') {
         this.log('event stream lagged; resubscribing from cursor ' + this.cursor);
