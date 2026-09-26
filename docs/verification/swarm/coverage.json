@@ -391,7 +391,7 @@
         "daemon/tests/swarm_state.rs",
         "docs/verification/swarm/SWARM-48.md"
       ],
-      "blocker": "Fixture plan validation, exclusive claims, independent subgraphs, and a durable two-turn no-progress stall pass. Live director progress verification, bounded failed planning/repair turns, and live recovery remain unimplemented."
+      "blocker": "Fixture plan validation, independent subgraphs, two failed plan/repair validation turns, recorded accepted-evidence progress, and durable two-turn no-progress stalls pass. Other material-progress and repair-error classes, live director behavior, and complete S3/S5 traces remain unverified."
     },
     "SWARM-49": {
       "status": "partial",
