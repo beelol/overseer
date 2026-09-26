@@ -474,9 +474,13 @@
       "blocker": "Local supervised fixtures now distinguish output silence, interrupted transport, disconnected/unconfirmed exit, progress spam, crash between job-timeout persistence and interrupt, and a worker ignoring the first signal. Confirmed exit keeps the reservation binding as uncertain. A 60-second wall-clock outage, late launch/review race, worker ignoring all escalation, shared usage settlement, and qualified live harness behavior remain unverified."
     },
     "SWARM-52": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "Audit-only permissions and source-write/live-mutation boundaries are not enforced by enabled harness adapters."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_integration.rs",
+        "daemon/src/swarm/integration.rs",
+        "docs/verification/swarm/SWARM-52.md"
+      ],
+      "blocker": "The fixture integration API now defaults runs to no source-change permission, retains it over restart, and requires an explicit isolated-write grant. Generic workers still have writable worktrees; no qualified audit-only harness sandbox, live-service mutation boundary or S1/S2/S4 replay exists."
     },
     "SWARM-53": {
       "status": "partial",
