@@ -646,7 +646,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 now joins its lost-result-receipt fault to Atlas v1 with one durable result and acceptance after restart, but the other named S5 faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins lost-result-receipt and director-death-after-dispatch faults to Atlas v1, with one recovered worker and old-generation rejection, but the other named S5 faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
     }
   },
   "scenarios": {
@@ -707,7 +707,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "The Atlas v1 J2 lost-result-receipt replay survives daemon restart, deduplicates the retry, applies one acceptance and completes the one-job audit with database-backed evidence. The other named S5 faults and full S1-sized ordered replay remain unverified; live harness communication is absent."
+      "blocker": "Atlas v1 J2 replays lost-result-receipt and director death after dispatch admission: restart deduplicates the result retry, while startup recovers one supervised worker, retains its database-backed result and rejects old-generation commands. Both one-job audits complete with accepted evidence. The other named S5 faults and full S1-sized ordered replay remain unverified; live harness communication is absent."
     }
   }
 }

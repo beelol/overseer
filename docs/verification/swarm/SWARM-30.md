@@ -13,3 +13,5 @@ Follow-up: Pause and Resume cannot bypass an uncertain director stall. A separat
 Evidence: `daemon/tests/swarm_director.rs`, `daemon/tests/swarm_state.rs`, `docs/verification/swarm/milestone-11.md`.
 
 Remaining: the fixture supplies termination evidence; no live process identity/liveness proof, replacement target selection, model turn, or unavailable-replacement recovery is implemented. This is not proof that a real director can be safely killed or resumed.
+
+The versioned Atlas [S5](S5.md) replay now combines confirmed director death with a committed dispatch intent before worker acknowledgement. Generation 2 retains and launches one J2 worker after daemon restart; generation-1 claims, revision and directive fail, and the replacement accepts its database-backed finding. This adds a joined backend trace but does not establish live director death detection or replacement model behavior.

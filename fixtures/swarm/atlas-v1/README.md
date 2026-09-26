@@ -12,4 +12,6 @@ Run `npm ci --ignore-scripts` once, then `./run-local.sh` with Docker and Node.j
 
 The opt-in S5 lost-receipt replay in `daemon/tests/swarm_atlas.rs` uses a real J2 probe. It discards the first result reply after persistence, restarts the daemon, replays the same message ID, and verifies one admission, artifact, result, acceptance and completed check. The remaining S5 faults are tracked in `docs/verification/swarm/S5.md`.
 
+The S5 director-death replay uses `swarm-j2-worker.mjs` as a supervised fixture worker. It injects a failure after durable dispatch admission but before launch acknowledgement, advances the director generation on confirmed death, then restarts the daemon. Startup recovers one worker, which probes the disposable J2 database and submits its own artifact and result. A private temporary file supplies that worker with the disposable database URL; the daemon's ordinary worker environment stays restricted.
+
 The passing acceptance and joined replay tests describe the **seeded backend's actual responses**, including the two vulnerabilities. They are not a security fix, a model-agent audit, or a full S1 pass. Autonomous director choices, live harness communication, the stated report detail, source-text injection, and full fault recovery remain open. See `docs/rfcs/swarm-mode-scenarios.md`.

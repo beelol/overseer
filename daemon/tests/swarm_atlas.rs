@@ -474,3 +474,95 @@ fn atlas_s5_lost_result_receipt_replays_once_after_restart() {
         "checks":[{"job_id":"j2","outcome":"passed","evidence":[artifact]}]}));
     assert_eq!(completed["status"],"completed","{completed}");
 }
+
+// S5: a director disappears after the durable dispatch admission, but before
+// the worker launch acknowledgement. The replacement must retain one worker.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_director_death_recovers_one_dispatched_worker() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("atlas-recovery"));
+    let script = repo_root().join("fixtures/swarm/atlas-v1/swarm-j2-worker.mjs");
+    let database_url_file = temp.path().join("disposable-database-url");
+    std::fs::write(&database_url_file,std::env::var("ATLAS_DATABASE_URL").unwrap()).unwrap();
+    let created = d.call("swarm.create", json!({"category":"Atlas dispatch fault",
+        "objective":"Audit foreign task mutation","allowed_targets":["fixture"]}));
+    let run = created["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Tasks","acceptance":"foreign patch and before-after rows",
+         "deps":[],"resource_claims":[{"resource":"atlas-db-j2","mode":"write"}]}
+    ]}));
+    let at = now();
+    let request = json!({"request_id":"atlas-s5-dispatch","target_id":"fixture",
+        "repo":checkout,"program":"/usr/bin/env","args":["node",script,database_url_file],
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,
+            "expires_ms":at+120000,
+            "targets":[{"id":"fixture","account_id":"account",
+                "pool_ids":["pool"],"capabilities":["audit"],
+                "health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+                "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+120000}]}]},
+        "required_capabilities":["audit"],"estimate_milli":{"points":100},
+        "purpose":"worker","inject_failure_after_admit_once":true});
+    assert!(d.try_call("swarm.dispatch.next",request.clone())
+        .unwrap_err().contains("injected failure after admission"));
+    assert!(d.runs().is_empty());
+    let recovered = d.call("swarm.director.recover", json!({"run_id":run,
+        "generation":1,"revision":1,"termination":"confirmed_dead"}));
+    assert_eq!(recovered["generation"],2);
+    assert_eq!(recovered["workers_preserved"],1);
+    assert!(d.try_call("swarm.director.claim_batch",json!({"run_id":run,
+        "generation":1,"revision":1,"now_ms":at+6000})).is_err());
+    assert!(d.try_call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"stale director edit","jobs":[]})).is_err());
+    d.kill9();
+    d.spawn();
+    // Startup replays the persisted launch intent once, without a new admission.
+    assert_eq!(d.runs().len(),1);
+    let replay = d.call("swarm.dispatch.next",request);
+    assert_eq!(replay["status"],"linked","{replay}");
+    assert_eq!(replay["duplicate"],true);
+    assert_eq!(replay["job_id"],"j2");
+    let worker = replay["overseer_run_id"].as_str().unwrap();
+    let attempt = replay["attempt_id"].as_str().unwrap();
+    let finished = d.wait_done(worker,10);
+    assert_eq!(finished["status"],"completed","{finished}; output: {}",
+        d.call("run.raw_output",json!({"run_id":worker})));
+    let artifact = format!("atlas-s5-recovered-{attempt}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let content: String = db.query_row("SELECT content FROM swarm_artifacts WHERE run_id=?1 AND id=?2",
+        rusqlite::params![run,artifact],|r|r.get(0)).unwrap();
+    let evidence: Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(evidence["foreignPatchStatus"],200);
+    assert_eq!(evidence["taskBefore"],"Bob task");
+    assert_eq!(evidence["taskAfter"],"changed-by-alice");
+    let admissions: i64 = db.query_row("SELECT COUNT(*) FROM swarm_admissions WHERE run_id=?1",[run],|r|r.get(0)).unwrap();
+    let launches: i64 = db.query_row("SELECT COUNT(*) FROM swarm_worker_launches WHERE run_id=?1 AND overseer_run_id IS NOT NULL",[run],|r|r.get(0)).unwrap();
+    assert_eq!((admissions,launches),(1,1));
+    drop(db);
+    let terminal = d.call("swarm.worker.reconcile",json!({"run_id":run,"job_id":"j2",
+        "attempt_id":attempt,"generation":2,"revision":1}));
+    assert_eq!(terminal["status"],"terminal","{terminal}");
+    assert!(d.try_call("swarm.direct",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j2","attempt_id":attempt,
+        "message_id":"stale-director","type":"redirect","payload":{}})).is_err());
+    let batch = d.call("swarm.director.claim_batch",json!({"run_id":run,
+        "generation":2,"revision":1,"now_ms":at+6000}));
+    assert_eq!(batch["status"],"claimed","{batch}");
+    assert!(batch["messages"].as_array().unwrap().iter()
+        .any(|message| message["message_id"] == format!("atlas-s5-result-{attempt}")));
+    let decision = d.call("swarm.decide",json!({"run_id":run,"generation":2,
+        "revision":1,"job_id":"j2","decision":"accept","evidence":[artifact]}));
+    assert_eq!(decision["status"],"accepted");
+    d.call("swarm.director.complete_batch",json!({"run_id":run,"generation":2,
+        "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"progress"}));
+    let completed = d.call("swarm.complete",json!({"run_id":run,"generation":2,
+        "revision":1,"request_id":"atlas-s5-director-recovery-complete",
+        "summary":"Foreign task mutation reproduced",
+        "verification":"Recovered J2 worker ran Atlas PostgreSQL before-after probe",
+        "checks":[{"job_id":"j2","outcome":"passed","evidence":[artifact]}]}));
+    assert_eq!(completed["status"],"completed","{completed}");
+}
