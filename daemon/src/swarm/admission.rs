@@ -130,6 +130,10 @@ fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'
     if current["status"] != "planning" && current["status"] != "running" {
         return Ok(blocked("run_not_admitting"));
     }
+    if tx.prepare("SELECT 1 FROM swarm_availability WHERE run_id=?1 AND state='blocked'")?
+        .exists(params![run])? {
+        return Ok(blocked("run_availability_blocked"));
+    }
     let effective = &current["policy"]["effective"];
     let request = json!({
         "now_ms":now,

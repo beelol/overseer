@@ -56,8 +56,8 @@ pub fn claim_batch(store: &mut Store, p: &Value) -> Result<Value> {
             Ok((
                 r.get::<_, i64>(0)?,
                 r.get::<_, String>(1)?,
-                r.get::<_, String>(2)?,
-                r.get::<_, String>(3)?,
+                r.get::<_, Option<String>>(2)?,
+                r.get::<_, Option<String>>(3)?,
                 r.get::<_, String>(4)?,
                 r.get::<_, i64>(5)?,
                 r.get::<_, String>(6)?,
@@ -67,6 +67,12 @@ pub fn claim_batch(store: &mut Store, p: &Value) -> Result<Value> {
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
     if rows.is_empty() {
+        let blocked = tx.prepare("SELECT 1 FROM swarm_availability WHERE run_id=?1 AND state='blocked'")?
+            .exists(params![run])?;
+        if blocked {
+            return Ok(json!({"status":"blocked","messages":[],
+                "reason":current["availability"]["reason"]}));
+        }
         return Ok(json!({"status":"idle","messages":[]}));
     }
     let oldest = rows[0].7;

@@ -329,6 +329,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             crate::swarm::revise(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.policy.preview" => crate::swarm::preview(p)?,
+        "swarm.availability.observe" => {
+            fixture_only()?;
+            crate::swarm::observe_availability(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.policy.set" => crate::swarm::set_policy(&mut d.store.lock().unwrap(), p)?,
         "swarm.admit" => {
             fixture_only()?;

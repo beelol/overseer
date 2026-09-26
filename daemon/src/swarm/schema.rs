@@ -26,6 +26,17 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         CREATE UNIQUE INDEX swarm_active_category
           ON swarm_runs(category_key)
           WHERE status IN ('planning','running','paused','stalled','draining','stopping');
+        CREATE TABLE IF NOT EXISTS swarm_availability(
+          run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          state TEXT NOT NULL CHECK(state IN ('eligible','blocked')),
+          reason TEXT,
+          eligible_targets TEXT NOT NULL,
+          purpose TEXT NOT NULL,
+          observed_ms INTEGER NOT NULL,
+          expires_ms INTEGER NOT NULL,
+          wake_count INTEGER NOT NULL DEFAULT 0,
+          updated_ms INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS swarm_jobs(
           run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
           id TEXT NOT NULL,

@@ -45,6 +45,8 @@ pub fn next(store: &mut Store, p: &Value) -> Result<Value> {
     let mut stmt = store.conn.prepare(
         "SELECT id,category_key,generation,revision,allowed_targets FROM swarm_runs
          WHERE status IN ('planning','running')
+         AND NOT EXISTS(SELECT 1 FROM swarm_availability v
+                        WHERE v.run_id=swarm_runs.id AND v.state='blocked')
          AND EXISTS(SELECT 1 FROM swarm_jobs WHERE run_id=swarm_runs.id AND status='ready')
          ORDER BY category_key,id",
     )?;
