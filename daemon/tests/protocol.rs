@@ -2002,7 +2002,7 @@ fn completed_run_handoff_reuses_workspace_with_a_new_native_session() {
     let trace = r.path().join("handoff-trace.txt");
     let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
         ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_TURN_DELAY_MS"),
-        ("FIXTURE_MODE", "managed-delegation"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
         ("FIXTURE_TURN_DELAY_MS", "1000")]);
     let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app",
         "model":"gpt-6-astra","effort":"high","prompt":"seed context",
@@ -2070,9 +2070,10 @@ fn completed_run_handoff_reuses_workspace_with_a_new_native_session() {
     assert_eq!(run_id(&replay_after_restart), next);
     assert_eq!(replay_after_restart["replayed"], true);
     assert_eq!(d.runs().len(), 2);
-    let delegated = d.call("run.delegate", json!({"work_unit_id":"after-handoff-unit",
-        "parent_run_id":next,"harness":"codex-app","model":"gpt-6-sol",
-        "effort":"medium","prompt":"browser check","title":"browser check"}));
+    let delegated = d.call("auto.dispatch", json!({"work_unit_id":"after-handoff-unit",
+        "parent_run_id":next,"min_tier":"general","required_tools":[],
+        "prompt":"browser check","title":"browser check"}));
+    assert_eq!(delegated["state"], "dispatched", "{delegated}");
     let child = run_id(&delegated);
     assert_eq!(d.wait_done(&child, 15)["status"], "completed");
     assert_eq!(d.call("run.result", json!({"run_id":child}))["state"], "ready");
