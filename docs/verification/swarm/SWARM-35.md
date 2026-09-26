@@ -14,6 +14,8 @@ Evidence: `daemon/tests/swarm_integration.rs` (`dependent_job_waits_for_accepted
 
 Follow-up at `fca22c0`: interrupted patch integration now replays from a durable intent, preserving the accepted dependency artifact and one integration commit. This does not change the contract revision and session-reuse gaps.
 
-Follow-up at `089df35`: a combined checker attached to the current integration commit can now block final completion after individually valid patches produce an invalid combined tree. This is a two-file fixture, not the required S3 contract-revision replay.
+Follow-up at `089df35`: a combined checker attached to the current integration commit can now block final completion after individually valid patches produce an invalid combined tree.
 
-Remaining: the contract-change notification, qualified session reuse and full S3 multi-module replay are not implemented. No live worker path has been replayed. This criterion stays unchecked.
+Follow-up with `catalog-v1`: the versioned S3 fixture revises a timestamp-only contract to a tuple cursor on attempt 2 of the same logical job, redirects one stale module result, rejects its acceptance, and integrates 24 module patches after the contract repair. A combined check fails after four modules and passes after all 24. Replay with `cargo test --offline -p overseerd --test swarm_scenarios -- --ignored`; see [S3](S3.md).
+
+Remaining: applied redirect acknowledgement, qualified session reuse, director-led conflict repair and the complete adaptive S3 run are not implemented. No live worker path has been replayed. This criterion stays unchecked.

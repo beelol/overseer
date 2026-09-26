@@ -1,0 +1,6 @@
+import { read } from "../data.ts";
+import { cursorPage, type CatalogPage } from "../pagination.ts";
+
+export function list(request: URLSearchParams): CatalogPage {
+  return cursorPage(read("RESOURCE_NAME"), request);
+}

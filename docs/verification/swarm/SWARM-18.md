@@ -18,4 +18,6 @@ Follow-up at `fca22c0`: fixture interruptions after patch application and after 
 
 Follow-up at `089df35`: two reviewed patches each pass a fixture checker alone, but the checker fails on their combined integration tree; final completion remains blocked and both patches remain in the isolated worktree. A current passed check permits completion in a separate fixture. No source checkout mutation occurs.
 
-Remaining: no full S3 migration or director conflict resolution was tested. The fixture does not simulate unsaved editor buffers, service-side writes, or all normal launch paths. Keep the RFC box unchecked.
+Follow-up with `catalog-v1`: 26 scripted contract/module patch commits were integrated in a separate worktree while the 24-module source checkout fingerprint stayed unchanged. See [S3](S3.md). This tests isolated Git integration, not live workers editing in parallel.
+
+Remaining: no full adaptive S3 migration or director conflict resolution was tested. The fixture does not simulate unsaved editor buffers, service-side writes, or all normal launch paths. Keep the RFC box unchecked.
