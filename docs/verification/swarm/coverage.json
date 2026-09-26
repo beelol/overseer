@@ -324,9 +324,10 @@
         "daemon/tests/swarm_broker.rs",
         "docs/verification/swarm/milestone-1.md",
         "daemon/tests/swarm_director.rs",
-        "docs/verification/swarm/milestone-5.md"
+        "docs/verification/swarm/milestone-5.md",
+        "docs/verification/swarm/SWARM-41.md"
       ],
-      "blocker": "Durable bounded batching and single active fixture turn pass; live notification, targeted advisories and actual director inference are unimplemented."
+      "blocker": "Durable bounded batching, one active fixture turn and targeted acknowledged advisories pass; live notification, harness delivery and actual director inference remain unimplemented."
     },
     "SWARM-42": {
       "status": "partial",
@@ -481,9 +482,10 @@
       "evidence": [
         "daemon/tests/swarm_state.rs",
         "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "docs/verification/swarm/milestone-1.md",
+        "docs/verification/swarm/SWARM-60.md"
       ],
-      "blocker": "Worker discoveries reach a durable director inbox; authorized peer routing and artifact permissions are not implemented."
+      "blocker": "Worker discoveries reach a durable director inbox and fixture director advisories reach only selected peers with applied receipts; live peer delivery, automatic relevance selection and artifact permissions are not implemented."
     },
     "SWARM-61": {
       "status": "partial",
