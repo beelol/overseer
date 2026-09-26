@@ -1,6 +1,6 @@
 # Unverified Swarm acceptance criteria — dependency audit
 
-Initially inspected at code revision `ffa08ba`; updated after fixture context and scheduling at `09d1a89`, writer isolation at `9a55173`, destination revocation at `51f072f`, cross-target grants at `9148e84`, revocation crash recovery at `f9b3018`, scripted control-event ordering at `a91579c`, and Stop retry recovery at `59d59ff`. This is a gap audit, not verification evidence. The ledger currently has 13 `unverified` and 51 `partial` criteria, each with a specific remaining gap. None is checked in the RFC, and S0–S5 remain unverified.
+Initially inspected at code revision `ffa08ba`; updated after fixture context and scheduling at `09d1a89`, writer isolation at `9a55173`, destination revocation at `51f072f`, cross-target grants at `9148e84`, revocation crash recovery at `f9b3018`, scripted control-event ordering at `a91579c`, Stop retry recovery at `59d59ff`, and unconfirmed-exit readout at `f6886d0`. This is a gap audit, not verification evidence. The ledger currently has 13 `unverified` and 51 `partial` criteria, each with a specific remaining gap. None is checked in the RFC, and S0–S5 remain unverified.
 
 The dependency clusters are:
 

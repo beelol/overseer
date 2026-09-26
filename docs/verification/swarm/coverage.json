@@ -172,7 +172,7 @@
         "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/SWARM-20.md"
       ],
-      "blocker": "Stop interrupts linked scripted local workers, blocks pending launch replay, and retries a simulated failed first signal after daemon restart while exit remains unconfirmed. Live Pause checkpoints, native descendants, visible reservation/exit state in the UI, and full off-mode drain remain unverified."
+      "blocker": "Stop interrupts linked scripted local workers, blocks pending launch replay, and retries a simulated failed first signal after daemon restart. A fresh run readout exposes unconfirmed linked workers until confirmed exit. Live Pause checkpoints, native descendants, reservation/exit display in VS Code, and full off-mode drain remain unverified."
     },
     "SWARM-21": {
       "status": "partial",
@@ -567,7 +567,7 @@
         "docs/verification/swarm/SWARM-62.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "A daemon timer checks deadlines without admission requests, records a deadline reason, cancels queued work, interrupts a linked scripted worker and delivers its terminal event; live checkpoint/interrupt, visible unconfirmed exit and explicit extension remain unverified."
+      "blocker": "A daemon timer checks deadlines without admission requests, records a deadline reason, cancels queued work, interrupts a linked scripted worker and delivers its terminal event. A stopping-run readout now exposes unconfirmed workers, proven in a Stop fixture; deadline-specific readout, live checkpoint/interrupt, VS Code display, and explicit extension remain unverified."
     },
     "SWARM-63": {
       "status": "unverified",

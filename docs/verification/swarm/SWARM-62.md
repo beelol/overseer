@@ -10,6 +10,8 @@ Actual: both runs enter `stopping` within the bounded test wait, expose `stop_re
 
 Follow-up revision `f91fa58`: the supervised-worker fixture sends ten progress messages during a 2.5-second run. The persisted creation time and effective deadline do not move, the daemon still interrupts the worker for `deadline`, and the job is cancelled with one attempt. The full Rust suite passed 128 tests.
 
+At `f6886d0`, `swarm.get` now exposes linked workers whose exits remain unconfirmed while a run is stopping, including the last Stop-signal outcome and bounded detail count. A Stop fixture proves the readout across a simulated failed signal, restart, and confirmed exit. The deadline-specific fixture was not extended to observe this readout; that path remains partial evidence.
+
 Evidence: `daemon/tests/swarm_control.rs`, `daemon/tests/swarm_state.rs`, `daemon/tests/swarm_runtime.rs`, `docs/verification/swarm/milestone-10.md`.
 
-Remaining: the generic local process is not a qualified live harness, and native descendants are not covered. Visible unconfirmed exits, UI display, and an explicit extension that preserves the original account allocation remain unverified.
+Remaining: the generic local process is not a qualified live harness, and native descendants are not covered. Deadline-specific unconfirmed-exit readout, UI display, and an explicit extension that preserves the original account allocation remain unverified.
