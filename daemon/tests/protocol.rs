@@ -2105,6 +2105,43 @@ fn handoff_refuses_a_failed_or_unresolved_source_without_starting_another_run() 
 }
 
 #[test]
+fn handoff_replay_does_not_launch_a_committed_but_unstarted_continuation() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("unstarted-handoff-trace.txt");
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let source = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&source, 15)["status"], "completed");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER reject_handoff_notice BEFORE INSERT ON events
+        WHEN NEW.kind='handoff_created'
+        BEGIN SELECT RAISE(FAIL, 'injected handoff notice failure'); END;").unwrap();
+    let request = json!({"source_run_id":source,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium",
+        "handoff":{"corrections":[],"completed":["seeded context"],
+            "remaining":["review files"],"tests":[],"limitations":[],"unresolved_actions":[]}});
+    assert!(d.try_call("run.handoff", request.clone()).is_err());
+    let continuations = d.runs().into_iter().filter(|run| run["parent_run_id"] == source)
+        .collect::<Vec<_>>();
+    assert_eq!(continuations.len(), 1);
+    let next = continuations[0]["id"].as_str().unwrap().to_string();
+    assert_eq!(continuations[0]["process_generation"], 0);
+    assert_eq!(d.call("run.handoff", request.clone())["state"], "launch_uncertain");
+    d.kill9();
+    db.execute_batch("DROP TRIGGER reject_handoff_notice;").unwrap();
+    d.spawn();
+    let replay = d.call("run.handoff", request);
+    assert_eq!(replay["state"], "launch_uncertain", "{replay}");
+    assert_eq!(run_id(&replay), next);
+    assert_eq!(d.runs().len(), 2);
+    assert_eq!(std::fs::read_to_string(trace).unwrap().matches("turn_model:gpt-6-sol").count(), 0,
+        "recovery must never start an uncertain handoff turn");
+}
+
+#[test]
 fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_routes() {
     let Some(program) = std::env::var_os("PATH").and_then(|path| std::env::split_paths(&path)
         .map(|dir| dir.join("opencode")).find(|candidate| candidate.is_file())) else { return };

@@ -822,7 +822,7 @@ impl Daemon {
             }
             let workspace = self.workspace(&existing.workspace_id)?;
             return Ok(json!({"run":existing,"workspace":workspace,"replayed":true,
-                "state":if existing.status == "queued" { "launch_uncertain" } else { "existing" }}));
+                "state":if existing.process_generation == 0 { "launch_uncertain" } else { "existing" }}));
         }
         if source.status != "completed" || source.attention.is_some() || source.process_generation == 0 {
             bail!("handoff needs a completed, attention-free source checkpoint");
