@@ -188,6 +188,8 @@ fn uncertain_director_stalls_and_confirmed_replacement_replays_unapplied_batch()
     let uncertain=d.call("swarm.director.recover",json!({"run_id":id,"generation":1,
         "revision":1,"termination":"unknown"}));
     assert_eq!(uncertain["status"],"stalled");
+    assert!(d.try_call("swarm.pause",json!({"run_id":id,"generation":1,"revision":1})).is_err());
+    assert!(d.try_call("swarm.resume",json!({"run_id":id,"generation":1,"revision":1})).is_err());
     assert_eq!(d.call("swarm.director.claim_batch",json!({"run_id":id,"generation":1,
         "revision":1,"now_ms":at+7000}))["status"],"stalled");
     assert!(d.try_call("swarm.direct",json!({"run_id":id,"generation":1,"revision":1,

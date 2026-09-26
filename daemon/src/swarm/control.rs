@@ -30,7 +30,7 @@ pub fn pause(store: &mut Store, p: &Value) -> Result<Value> {
     if status == "paused" {
         return Ok(json!({"id":id,"status":"paused","duplicate":true}));
     }
-    if !["planning", "running", "stalled"].contains(&status.as_str()) {
+    if !["planning", "running"].contains(&status.as_str()) {
         bail!("run cannot pause in this state");
     }
     let now = crate::daemon::now();
