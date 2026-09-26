@@ -1,12 +1,12 @@
 # Unverified Swarm acceptance criteria — dependency audit
 
-Initially inspected at code revision `ffa08ba`; updated after fixture context and scheduling at `09d1a89`. This is a gap audit, not verification evidence. The 21 criteria still marked `unverified` in `coverage.json` each have a specific reason. None is checked in the RFC, and S0–S5 remain unverified.
+Initially inspected at code revision `ffa08ba`; updated after fixture context and scheduling at `09d1a89` and writer isolation at `9a55173`. This is a gap audit, not verification evidence. The ledger currently has 14 `unverified` and 50 `partial` criteria, each with a specific remaining gap. None is checked in the RFC, and S0–S5 remain unverified.
 
 The dependency clusters are:
 
-1. Normal launch and Auto Mode integration: SWARM-01/02/05/13/15/16/17/25/26/28/51/59/63. Target and quota fixtures cannot establish live account availability, worker launch, descendant control, liveness, native usage or comparative benefit. The separate Auto Mode branch has only an RFC at this checkpoint; the contract in `docs/rfcs/swarm-auto-contract.md` must be agreed before sharing admission state.
-2. Shared workspace and side effects: SWARM-18/52/57/58. Swarm assignments do not yet select isolated worktrees or enforce read-only source/service permissions, destination ACLs, or side-effect reconciliation.
+1. Normal launch and Auto Mode integration: SWARM-01/02/05/13/15/16/17/25/26/28/51/59/63. Target and quota fixtures cannot establish live account availability, worker launch, descendant control, native usage or comparative benefit. The separate Auto Mode implementation is in flight; the contract in `docs/rfcs/swarm-auto-contract.md` must be agreed before sharing admission state.
+2. Shared workspace and side effects: SWARM-18/52/57/58. Swarm fixture workers now receive isolated worktrees and preserve a dirty source checkout, but conflicting patch integration, read-only source/service enforcement, destination ACLs and live side-effect reconciliation remain open.
 3. Product presentation and truthful outcomes: SWARM-23/37/55. The extension has no Swarm view, and final coverage does not yet classify negative results, environment failures and confirmed defects.
 4. End-to-end scenarios: SWARM-64. Scripted context and round-robin admission are partial SWARM-34/36 evidence, but complete versioned S0–S5 traces and live harness lifecycle qualification have not been replayed.
 
-Each `blocker` field in `coverage.json` names the missing behavior for the 21 criteria and six scenarios. A partial criterion stays partial where fixture evidence exists; an unverified criterion remains unverified even if adjacent code has tests. No lack of live authorization was turned into a passing fixture claim.
+Each `blocker` field in `coverage.json` names missing behavior for the 64 criteria and six scenarios. A partial criterion stays partial where fixture evidence exists; an unverified criterion remains unverified even if adjacent code has tests. No lack of live authorization was turned into a passing fixture claim.

@@ -145,9 +145,12 @@
       "blocker": "Native descendant admission/control or disablement has not been qualified per harness; observed children are not enforced limits."
     },
     "SWARM-18": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "Existing worktree behavior has protocol tests, but Swarm job-to-worktree writer assignment and conflict integration are not connected."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_runtime.rs",
+        "docs/verification/swarm/SWARM-18.md"
+      ],
+      "blocker": "Two fixture Swarm writers receive separate worktrees and leave a dirty source checkout unchanged despite conflicting edits. Safe patch integration, unsaved buffers, service-side writes and normal launch-path enforcement remain unverified."
     },
     "SWARM-19": {
       "status": "partial",
