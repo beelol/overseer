@@ -132,11 +132,7 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
         params![run],
         |r| r.get(0),
     )?;
-    let pending_inbox: i64 = tx.query_row(
-        "SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND recipient='director' AND phase!='applied'",
-        params![run], |r| r.get(0),
-    )?;
-    if active_workers > 0 || active_director > 0 || pending_inbox > 0 {
+    if active_workers > 0 || active_director > 0 {
         bail!("completion requires confirmed worker exits and an applied director inbox");
     }
     for (job, job_revision, _) in jobs {
@@ -215,6 +211,13 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
                 bail!("completion evidence artifact failed integrity check");
             }
         }
+    }
+    let pending_inbox: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND recipient='director' AND phase!='applied'",
+        params![run], |r| r.get(0),
+    )?;
+    if pending_inbox > 0 {
+        bail!("completion requires confirmed worker exits and an applied director inbox");
     }
     let integrated_patches: i64 = tx.query_row(
         "SELECT COUNT(*) FROM swarm_integrated_artifacts WHERE run_id=?1",

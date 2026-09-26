@@ -13,3 +13,5 @@ Follow-up revision `a0ef330`: `terminal_run_replays_a_saved_result_receipt_witho
 Evidence: `daemon/tests/swarm_broker.rs`, `docs/verification/swarm/milestone-15.md`.
 
 Remaining: a live multi-harness reordered message trace, no double dispatch/acceptance/accounting across process recovery, and source-to-director delivery qualification remain unverified.
+
+Follow-up: `swarm_director::unreviewed_result_returns_to_director_after_batch_completion_and_restart` shows that batch completion requeues an undecided result while applying a neighboring progress message. After daemon restart and an unrelated plan revision, only the result is redelivered; a decision covering its sequence permits application exactly once. Replaying the first turn returns its original receipt. The full offline workspace suite passed 214 non-ignored tests, with 11 ignored; the final revision variant passed separately. This does not establish live director or multi-provider replay.

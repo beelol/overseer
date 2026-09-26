@@ -239,6 +239,8 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           token_sha256 TEXT NOT NULL,
           status TEXT NOT NULL CHECK(status IN ('active','complete')),
           accepted_decision_id_at_claim INTEGER NOT NULL DEFAULT 0,
+          applied_count INTEGER NOT NULL DEFAULT 0,
+          pending_review_count INTEGER NOT NULL DEFAULT 0,
           created_ms INTEGER NOT NULL,
           completed_ms INTEGER
         );
@@ -452,6 +454,25 @@ pub fn migrate(conn: &Connection) -> Result<()> {
             "ALTER TABLE swarm_jobs ADD COLUMN resource_claims TEXT NOT NULL DEFAULT '[]';",
         )?;
     }
+    let has_turn_applied_count = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_director_turns') WHERE name='applied_count'")?
+        .exists([])?;
+    if !has_turn_applied_count {
+        conn.execute_batch(
+            "ALTER TABLE swarm_director_turns ADD COLUMN applied_count INTEGER NOT NULL DEFAULT 0;
+             UPDATE swarm_director_turns SET applied_count=(
+               SELECT COUNT(*) FROM swarm_director_turn_messages WHERE turn_id=swarm_director_turns.id
+             ) WHERE status='complete';",
+        )?;
+    }
+    let has_turn_pending_count = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_director_turns') WHERE name='pending_review_count'")?
+        .exists([])?;
+    if !has_turn_pending_count {
+        conn.execute_batch(
+            "ALTER TABLE swarm_director_turns ADD COLUMN pending_review_count INTEGER NOT NULL DEFAULT 0;",
+        )?;
+    }
     Ok(())
 }
 
@@ -512,6 +533,29 @@ mod tests {
                 "".into()
             )
         );
+        migrate(&conn).unwrap();
+    }
+
+    #[test]
+    fn old_completed_director_turns_keep_their_duplicate_receipt_count() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE swarm_director_turns(
+                id TEXT PRIMARY KEY,run_id TEXT NOT NULL,generation INTEGER NOT NULL,
+                revision INTEGER NOT NULL,token_sha256 TEXT NOT NULL,status TEXT NOT NULL,
+                accepted_decision_id_at_claim INTEGER NOT NULL DEFAULT 0,
+                created_ms INTEGER NOT NULL,completed_ms INTEGER);
+             CREATE TABLE swarm_director_turn_messages(
+                turn_id TEXT NOT NULL,seq INTEGER NOT NULL,PRIMARY KEY(turn_id,seq));
+             INSERT INTO swarm_director_turns VALUES('old-turn','run',1,1,'hash','complete',0,1,2);
+             INSERT INTO swarm_director_turn_messages VALUES('old-turn',1),('old-turn',2);",
+        ).unwrap();
+        migrate(&conn).unwrap();
+        let counts: (i64, i64) = conn.query_row(
+            "SELECT applied_count,pending_review_count FROM swarm_director_turns WHERE id='old-turn'",
+            [], |row| Ok((row.get(0)?,row.get(1)?)),
+        ).unwrap();
+        assert_eq!(counts,(2,0));
         migrate(&conn).unwrap();
     }
 }

@@ -12,6 +12,66 @@ fn now() -> i64 {
 }
 
 #[test]
+fn unreviewed_result_returns_to_director_after_batch_completion_and_restart() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Durable result review",
+        "objective":"Audit","allowed_targets":["system-codex"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j","title":"Inspect","acceptance":"evidence","deps":[]}]}));
+    let attempt = d.call("swarm.attempt.register", json!({"run_id":id,
+        "generation":1,"revision":1,"job_id":"j"}));
+    d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"j",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "artifact_id":"proof","source_revision":1,"kind":"finding","content":"verified"}));
+    d.call("swarm.report", json!({"run_id":id,"job_id":"j",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "message_id":"progress-1","type":"progress","revision":1,
+        "payload":{"note":"ready for review"}}));
+    d.call("swarm.report", json!({"run_id":id,"job_id":"j",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "message_id":"result-1","type":"result","revision":1,
+        "payload":{"artifact_ids":["proof"]}}));
+    let first = d.call("swarm.director.claim_batch", json!({"run_id":id,
+        "generation":1,"revision":1,"now_ms":now()+6000}));
+    assert_eq!(first["messages"].as_array().unwrap().len(), 2);
+    let unreviewed = d.call("swarm.director.complete_batch", json!({"run_id":id,
+        "generation":1,"turn_id":first["turn_id"],"token":first["token"]}));
+    assert_eq!(unreviewed["applied"], 1);
+    assert_eq!(unreviewed["pending_review"], 1);
+    d.kill9();
+    d.spawn();
+    d.call("swarm.revise", json!({"id":id,"generation":1,"expected_revision":1,
+        "reason":"Add an independent coverage check","jobs":[
+        {"id":"j","title":"Inspect","acceptance":"evidence","deps":[]},
+        {"id":"other","title":"Check logs","acceptance":"evidence","deps":[]}]}));
+    let second = d.call("swarm.director.claim_batch", json!({"run_id":id,
+        "generation":1,"revision":2,"now_ms":now()+6000}));
+    assert_eq!(second["messages"].as_array().unwrap().len(), 1);
+    assert_eq!(second["messages"][0]["message_id"], "result-1");
+    d.call("swarm.decide", json!({"run_id":id,"generation":1,"revision":2,
+        "job_id":"j","decision":"accept","evidence":["proof"]}));
+    let reviewed = d.call("swarm.director.complete_batch", json!({"run_id":id,
+        "generation":1,"turn_id":second["turn_id"],"token":second["token"]}));
+    assert_eq!(reviewed["applied"], 1);
+    assert_eq!(reviewed["pending_review"], 0);
+    let first_replay = d.call("swarm.director.complete_batch", json!({"run_id":id,
+        "generation":1,"turn_id":first["turn_id"],"token":first["token"]}));
+    assert_eq!(first_replay["duplicate"], true);
+    assert_eq!(first_replay["applied"], 1);
+    assert_eq!(first_replay["pending_review"], 1);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let (phase, decisions): (String, i64) = (
+        db.query_row("SELECT phase FROM swarm_messages WHERE run_id=?1 AND message_id='result-1'",
+            [id], |r| r.get(0)).unwrap(),
+        db.query_row("SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1 AND job_id='j'",
+            [id], |r| r.get(0)).unwrap(),
+    );
+    assert_eq!(phase, "applied");
+    assert_eq!(decisions, 1);
+}
+
+#[test]
 fn director_batches_twenty_events_and_never_claims_two_active_turns() {
     let mut d = Daemon::start(&[]);
     let run = d.call(

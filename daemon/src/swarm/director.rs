@@ -222,25 +222,21 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     if current["generation"] != generation {
         bail!("stale director generation");
     }
-    let (stored_hash, status, turn_revision, accepted_at_claim): (String, String, i64, i64) = store
+    let (stored_hash, status, turn_revision, accepted_at_claim, stored_applied, stored_pending): (String, String, i64, i64, i64, i64) = store
         .conn
         .query_row(
-            "SELECT token_sha256,status,revision,accepted_decision_id_at_claim FROM swarm_director_turns WHERE id=?1 AND run_id=?2 AND generation=?3",
+            "SELECT token_sha256,status,revision,accepted_decision_id_at_claim,applied_count,pending_review_count FROM swarm_director_turns WHERE id=?1 AND run_id=?2 AND generation=?3",
             params![id,run,generation],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
         )
         .optional()?
         .ok_or_else(|| anyhow!("unknown director turn"))?;
     if stored_hash != hash(token) {
         bail!("invalid director turn identity");
     }
-    let count: i64 = store.conn.query_row(
-        "SELECT COUNT(*) FROM swarm_director_turn_messages WHERE turn_id=?1",
-        params![id],
-        |r| r.get(0),
-    )?;
     if status == "complete" {
-        return Ok(json!({"turn_id":id,"applied":count,"duplicate":true,
+        return Ok(json!({"turn_id":id,"applied":stored_applied,
+            "pending_review":stored_pending,"duplicate":true,
             "status":current["status"],"no_progress_turns":current["no_progress_turns"]}));
     }
     if current["status"] == "stalled" {
@@ -248,11 +244,29 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     }
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
-    tx.execute("UPDATE swarm_messages SET phase='applied',updated_ms=?2 WHERE seq IN (SELECT seq FROM swarm_director_turn_messages WHERE turn_id=?1) AND phase='delivered'",params![id,now])?;
-    tx.execute("UPDATE swarm_director_turns SET status='complete',completed_ms=?2 WHERE id=?1 AND status='active'",params![id,now])?;
+    // A claimed batch is only delivery. A terminal report remains reviewable until
+    // a durable decision covers that particular report sequence. Otherwise a
+    // completed model turn could silently consume the only result notification.
+    let pending_review = if current["status"] == "stopping" || current["status"] == "stopped" {
+        0
+    } else {
+        tx.execute(
+            "UPDATE swarm_messages AS m SET phase='queued',updated_ms=?2
+             WHERE m.seq IN (SELECT seq FROM swarm_director_turn_messages WHERE turn_id=?1)
+             AND m.phase='delivered' AND m.kind IN ('result','submit')
+             AND NOT EXISTS (SELECT 1 FROM swarm_decisions d WHERE d.run_id=m.run_id
+                 AND d.job_id=m.job_id AND d.attempt_id=m.attempt_id
+                 AND d.reviewed_message_seq>=m.seq)",
+            params![id,now],
+        )?
+    };
+    let applied = tx.execute("UPDATE swarm_messages SET phase='applied',updated_ms=?2 WHERE seq IN (SELECT seq FROM swarm_director_turn_messages WHERE turn_id=?1) AND phase='delivered'",params![id,now])?;
+    tx.execute("UPDATE swarm_director_turns SET status='complete',completed_ms=?2,
+        applied_count=?3,pending_review_count=?4 WHERE id=?1 AND status='active'",
+        params![id,now,applied as i64,pending_review as i64])?;
     if current["status"] == "stopping" || current["status"] == "stopped" {
         tx.commit()?;
-        return Ok(json!({"turn_id":id,"applied":count,"duplicate":false,
+        return Ok(json!({"turn_id":id,"applied":applied,"pending_review":0,"duplicate":false,
             "status":current["status"],"no_progress_turns":current["no_progress_turns"]}));
     }
     let accepted_now: i64 = tx.query_row(
@@ -286,7 +300,7 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
         )?;
     }
     tx.commit()?;
-    Ok(json!({"turn_id":id,"applied":count,"duplicate":false,
+    Ok(json!({"turn_id":id,"applied":applied,"pending_review":pending_review,"duplicate":false,
         "status":next_status,"no_progress_turns":turns,
         "material_progress":material_progress,"declared_outcome":outcome}))
 }

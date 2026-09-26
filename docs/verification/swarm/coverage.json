@@ -308,9 +308,10 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_director.rs",
-        "docs/verification/swarm/milestone-5.md"
+        "docs/verification/swarm/milestone-5.md",
+        "docs/verification/swarm/SWARM-33.md"
       ],
-      "blocker": "A fixture batch claims at most 20 messages/32 KiB and Stop halts future claims; no model turn, reservation, or semantic review runs."
+      "blocker": "A fixture batch claims at most 20 messages/32 KiB; an undecided result is requeued after turn completion and restart while routine progress applies. Stop halts future claims. No live model turn, provider reservation, semantic review, or explicit unresolved disposition runs."
     },
     "SWARM-34": {
       "status": "partial",
@@ -401,7 +402,7 @@
         "docs/verification/swarm/SWARM-42.md",
         "daemon/tests/swarm_atlas.rs"
       ],
-      "blocker": "Stable-ID dedupe, terminal exact-receipt replay after restart, stale generation checks and late finished-attempt result isolation pass; the joined S1 replay includes duplicate D1. Live dispatch/accounting and broader delayed/reordered message traces remain untested."
+      "blocker": "Stable-ID dedupe, terminal exact-receipt replay after restart, stale generation checks, late finished-attempt result isolation and requeued undecided-result review pass; the joined S1 replay includes duplicate D1. Live dispatch/accounting and broader delayed/reordered message traces remain untested."
     },
     "SWARM-43": {
       "status": "partial",
