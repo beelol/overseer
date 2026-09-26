@@ -168,6 +168,19 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           wave_start_ms INTEGER NOT NULL,
           admitted_count INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS swarm_scheduler_cursor(
+          id INTEGER PRIMARY KEY CHECK(id=1),
+          last_category_key TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS swarm_scheduler_admissions(
+          request_id TEXT PRIMARY KEY,
+          request_sha256 TEXT NOT NULL,
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id),
+          job_id TEXT NOT NULL,
+          attempt_id TEXT NOT NULL UNIQUE REFERENCES swarm_attempts(id),
+          target_id TEXT NOT NULL,
+          created_ms INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS swarm_review_gate(
           run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id),
           held INTEGER NOT NULL CHECK(held IN (0,1))

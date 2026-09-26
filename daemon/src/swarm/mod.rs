@@ -8,6 +8,7 @@ mod plan;
 mod policy;
 mod revision;
 mod runtime;
+mod scheduler;
 mod settings;
 pub mod schema;
 pub use artifacts::{confirm_exit, decide, put};
@@ -20,6 +21,7 @@ pub use policy::preview;
 pub use settings::set_policy;
 pub use revision::revise;
 pub use runtime::{interrupt_workers, launch_worker, reconcile_terminal_workers, reconcile_worker};
+pub use scheduler::next as schedule_next;
 
 use crate::store::Store;
 use anyhow::{anyhow, bail, Result};

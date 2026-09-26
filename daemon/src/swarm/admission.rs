@@ -16,7 +16,21 @@ fn blocked(reason: &str) -> Value {
     json!({"status":"blocked","reason":reason})
 }
 
+pub(super) struct ScheduledCommit<'a> {
+    pub request_id: &'a str,
+    pub request_sha256: &'a str,
+    pub category_key: &'a str,
+}
+
 pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
+    admit_inner(store, p, None)
+}
+
+pub(super) fn admit_scheduled(store: &mut Store, p: &Value, commit: ScheduledCommit<'_>) -> Result<Value> {
+    admit_inner(store, p, Some(commit))
+}
+
+fn admit_inner(store: &mut Store, p: &Value, scheduled: Option<ScheduledCommit<'_>>) -> Result<Value> {
     let run = required(p, "run_id")?;
     let job = required(p, "job_id")?;
     let target = required(p, "target_id")?;
@@ -352,6 +366,14 @@ pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
     }
     tx.execute("INSERT INTO swarm_admissions(run_id,request_id,request_sha256,job_id,attempt_id,target_id,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7)",
         params![run,request_id,request_hash,job,attempt_id,target,now])?;
+    if let Some(commit) = scheduled {
+        tx.execute("INSERT INTO swarm_scheduler_admissions(request_id,request_sha256,run_id,job_id,attempt_id,target_id,created_ms)
+            VALUES(?1,?2,?3,?4,?5,?6,?7)",
+            params![commit.request_id,commit.request_sha256,run,job,attempt_id,target,now])?;
+        tx.execute("INSERT INTO swarm_scheduler_cursor(id,last_category_key) VALUES(1,?1)
+            ON CONFLICT(id) DO UPDATE SET last_category_key=excluded.last_category_key",
+            params![commit.category_key])?;
+    }
     tx.execute("UPDATE swarm_jobs SET attempt_count=attempt_count+1,status='reserved',updated_ms=?3 WHERE run_id=?1 AND id=?2",params![run,job,now])?;
     tx.execute(
         "UPDATE swarm_runs SET status='running',updated_ms=?2 WHERE id=?1 AND status='planning'",
