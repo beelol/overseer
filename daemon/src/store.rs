@@ -121,6 +121,62 @@ fn json_col(row: &Row, idx: &str) -> rusqlite::Result<Value> {
 }
 
 impl Store {
+    pub fn agent_limit(&self) -> Result<i64> {
+        let value: Option<String> = self.conn.query_row(
+            "SELECT value FROM meta WHERE key='agents.max_active'", [], |row| row.get(0)
+        ).optional()?;
+        Ok(value.and_then(|v| v.parse().ok()).unwrap_or(9))
+    }
+
+    pub fn set_agent_limit(&self, limit: i64) -> Result<()> {
+        if !(1..=256).contains(&limit) {
+            bail!("agents.max_active must be between 1 and 256");
+        }
+        self.conn.execute(
+            "INSERT INTO meta(key,value) VALUES('agents.max_active',?1) \
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value", [limit.to_string()]
+        )?;
+        Ok(())
+    }
+
+    /// App slots: one per active top-level run, one per registered Swarm attempt
+    /// without an active run, and one per active director. Native children are
+    /// already represented by their parent run and never consume another slot.
+    pub fn active_agent_count(&self) -> Result<i64> {
+        Ok(self.conn.query_row(
+            "SELECT
+              (SELECT COUNT(*) FROM runs r WHERE r.parent_run_id IS NULL
+               AND r.status IN ('queued','starting','running','waiting_for_user')
+               AND NOT EXISTS (SELECT 1 FROM swarm_worker_launches l
+                 JOIN swarm_attempts a ON a.id=l.attempt_id
+                 WHERE l.overseer_run_id=r.id AND a.status='registered'))
+              + (SELECT COUNT(*) FROM swarm_attempts WHERE status='registered')
+              + (SELECT COUNT(*) FROM swarm_runs
+                 WHERE status IN ('running','paused','stalled','stopping'))",
+            [], |row| row.get(0)
+        )?)
+    }
+
+    pub fn active_agents(&self) -> Result<Vec<Value>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT r.id,r.title,r.status,'run' FROM runs r
+             WHERE r.parent_run_id IS NULL
+             AND r.status IN ('queued','starting','running','waiting_for_user')
+             AND NOT EXISTS (SELECT 1 FROM swarm_worker_launches l
+               JOIN swarm_attempts a ON a.id=l.attempt_id
+               WHERE l.overseer_run_id=r.id AND a.status='registered')
+             UNION ALL SELECT id,job_id,status,'swarm_worker' FROM swarm_attempts
+               WHERE status='registered'
+             UNION ALL SELECT id,category,status,'swarm_director' FROM swarm_runs
+               WHERE status IN ('running','paused','stalled','stopping')"
+        )?;
+        let agents = stmt.query_map([], |row| {
+            Ok(serde_json::json!({"id":row.get::<_,String>(0)?,
+                "title":row.get::<_,String>(1)?,"status":row.get::<_,String>(2)?,
+                "kind":row.get::<_,String>(3)?}))
+        })?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(agents)
+    }
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;

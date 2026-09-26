@@ -18,6 +18,50 @@ use tokio::sync::broadcast;
 pub const ACTIVE: &[&str] = &["queued", "starting", "running", "waiting_for_user"];
 const RAW_SEGMENTS_KEPT: u64 = 4;
 
+#[derive(Debug)]
+pub struct AgentLimitError {
+    pub active: i64,
+    pub limit: i64,
+    pub running_agents: Vec<Value>,
+}
+
+impl std::fmt::Display for AgentLimitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "agent limit reached: {} of {} slots active", self.active, self.limit)
+    }
+}
+
+impl std::error::Error for AgentLimitError {}
+
+struct AgentSlotReservation<'a> {
+    daemon: &'a Daemon,
+    pending: bool,
+}
+
+impl AgentSlotReservation<'_> {
+    fn insert_task_and_run(&mut self, task: &Task, run: &Run) -> Result<()> {
+        let mut pending = self.daemon.pending_agent_slots.lock().unwrap();
+        self.daemon.store.lock().unwrap().insert_task_and_run(task, run, None)?;
+        *pending -= 1;
+        self.pending = false;
+        Ok(())
+    }
+
+    fn release_after_start(&mut self) {
+        let mut pending = self.daemon.pending_agent_slots.lock().unwrap();
+        *pending -= 1;
+        self.pending = false;
+    }
+}
+
+impl Drop for AgentSlotReservation<'_> {
+    fn drop(&mut self) {
+        if self.pending {
+            *self.daemon.pending_agent_slots.lock().unwrap() -= 1;
+        }
+    }
+}
+
 pub fn now() -> i64 {
     shim::now_ms() as i64
 }
@@ -63,6 +107,9 @@ impl TurnOpts {
 
 pub struct Daemon {
     pub store: Mutex<Store>,
+    /// Manual starts reserve capacity before workspace preparation. Admission
+    /// reads this under the same lock, closing the gap before the queued row.
+    pub(crate) pending_agent_slots: Mutex<i64>,
     pub events: broadcast::Sender<Event>,
     tails: Mutex<HashSet<String>>,
     pub(crate) swarm_launch_lock: Mutex<()>,
@@ -103,6 +150,18 @@ pub(crate) struct SwarmWorkerIdentity {
 }
 
 impl Daemon {
+    fn reserve_agent_slot(&self) -> Result<AgentSlotReservation<'_>> {
+        let mut pending = self.pending_agent_slots.lock().unwrap();
+        let store = self.store.lock().unwrap();
+        let active = store.active_agent_count()? + *pending;
+        let limit = store.agent_limit()?;
+        if active >= limit {
+            return Err(AgentLimitError { active, limit, running_agents: store.active_agents()? }.into());
+        }
+        *pending += 1;
+        Ok(AgentSlotReservation { daemon: self, pending: true })
+    }
+
     pub fn open() -> Result<Arc<Self>> {
         paths::ensure_private_dir(&paths::data_dir())?;
         paths::ensure_private_dir(&paths::runtime_dir())?;
@@ -110,7 +169,7 @@ impl Daemon {
         let store = Store::open(&paths::db_path())?;
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
-        let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), exe, started_ms: now(),
+        let daemon = Arc::new(Self { store: Mutex::new(store), pending_agent_slots: Mutex::new(0), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), exe, started_ms: now(),
             ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)) });
         daemon.ensure_system_profiles()?;
         Ok(daemon)
@@ -358,6 +417,11 @@ impl Daemon {
         if prompt.is_empty() && harness != "generic" {
             bail!("prompt is required");
         }
+        let mut slot = if swarm_identity.is_none() {
+            Some(self.reserve_agent_slot()?)
+        } else {
+            None
+        };
         let title = p["title"].as_str().map(str::to_string).unwrap_or_else(|| prompt.chars().take(60).collect());
         let mode = p["workspace_mode"].as_str().unwrap_or("worktree");
         let repo = git::toplevel(Path::new(repo_in)).context("repository not found")?;
@@ -478,8 +542,13 @@ impl Daemon {
         };
         {
             // Task and run appear together: a state snapshot never shows a task without its run.
-            let store = self.store.lock().unwrap();
-            store.insert_task_and_run(&task,&run,swarm_identity.map(|identity|identity.attempt_id.as_str()))?;
+            if let Some(reservation) = &mut slot {
+                reservation.insert_task_and_run(&task, &run)?;
+            } else {
+                self.store.lock().unwrap().insert_task_and_run(
+                    &task, &run, swarm_identity.map(|identity| identity.attempt_id.as_str())
+                )?;
+            }
         }
         let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "extra_args": p["extra_args"].clone()});
         let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };
@@ -539,6 +608,11 @@ impl Daemon {
                 }
             }
         }
+        let mut resume_slot = if follow_up && !ACTIVE.contains(&run.status.as_str()) {
+            Some(self.reserve_agent_slot()?)
+        } else {
+            None
+        };
         let launch_meta: Value = {
             let store = self.store.lock().unwrap();
             store.conn.query_row("SELECT launch FROM runs WHERE id=?1", [run_id], |r| r.get::<_, Option<String>>(0))?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null)
@@ -632,6 +706,9 @@ impl Daemon {
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(run_id))?;
         let app = json!({"prompt": prompt, "cwd": ws.path, "model": run.model, "resume": resume, "approval": generic_meta["approval"].as_str().unwrap_or("on-request")});
         self.spawn_process(&run, &ws, launch, json!({"generic": generic_meta, "app": app}))?;
+        if let Some(reservation) = &mut resume_slot {
+            reservation.release_after_start();
+        }
         Ok(turn)
     }
 

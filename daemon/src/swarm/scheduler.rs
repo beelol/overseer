@@ -8,7 +8,7 @@ use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-pub fn next(store: &mut Store, p: &Value) -> Result<Value> {
+pub fn next(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
     let request_id = required(p, "request_id")?;
     let target = required(p, "target_id")?;
     if request_id.is_empty() || request_id.len() > 128 {
@@ -94,6 +94,7 @@ pub fn next(store: &mut Store, p: &Value) -> Result<Value> {
                 request_sha256: &digest,
                 category_key: key,
             },
+            pending_slots,
         )?;
         if result["status"] == "admitted" {
             let mut result = result;

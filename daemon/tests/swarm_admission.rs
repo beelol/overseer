@@ -165,6 +165,104 @@ fn ordinary_run_occupies_global_slot_until_confirmed_exit() {
 }
 
 #[test]
+fn app_agent_limit_serializes_manual_launches_and_ignores_native_children() {
+    let mut d = Daemon::start(&[]);
+    assert_eq!(d.call("agents.limit.get",json!({}))["max_active"],9);
+    assert_eq!(d.call("agents.limit.set",json!({"max_active":2}))["max_active"],2);
+    assert!(d.try_call("agents.limit.set",json!({"max_active":0})).is_err());
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("agents.limit.get",json!({}))["max_active"],2);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("app-limit"));
+    let first = d.generic(&checkout,"worktree","/bin/sleep", &["8"]);
+    let first_id = run_id(&first);
+    assert!(first["launch_error"].is_null());
+    let child_id = "r-synthetic-native-child";
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap().execute(
+        "INSERT INTO runs(id,task_id,parent_run_id,harness,harness_version,profile_id,model,
+         workspace_id,native_id,status,exit_reason,created_ms,ended_ms,title,relation_source,
+         relation_confidence,capabilities,process_generation)
+         SELECT ?2,task_id,id,harness,harness_version,profile_id,model,workspace_id,
+         'synthetic-child','running',NULL,created_ms,NULL,'Native child','fixture','exact',
+         capabilities,0 FROM runs WHERE id=?1",
+        rusqlite::params![first_id,child_id]).unwrap();
+    let second = d.generic(&checkout,"worktree","/bin/sleep", &["8"]);
+    assert!(second["launch_error"].is_null());
+    let request = json!({"id":7,"method":"task.create","params":{"repo":checkout,
+        "harness":"generic","workspace_mode":"worktree","program":"/bin/sleep",
+        "args":["8"],"prompt":"","title":"over limit"}});
+    let reply: Value = serde_json::from_str(&d.raw(format!("{request}\n").as_bytes())).unwrap();
+    assert_eq!(reply["error"]["code"],"agent_limit","{reply}");
+    assert_eq!(reply["error"]["active"],2);
+    assert_eq!(reply["error"]["limit"],2);
+    d.call("run.interrupt",json!({"run_id":first_id}));
+    d.wait_done(&first_id,5);
+    let third = d.generic(&checkout,"worktree","/bin/sleep", &["1"]);
+    assert!(third["launch_error"].is_null());
+}
+
+#[test]
+fn app_agent_limit_holds_swarm_admission_until_a_slot_frees() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":2}));
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("swarm-limit"));
+    let ordinary = d.generic(&checkout,"worktree","/bin/sleep", &["8"]);
+    let ordinary_id = run_id(&ordinary);
+    let id = setup(&d,"Shared app limit",1);
+    let at = now();
+    let held = admit(&d,&id,"j0","codex-a","at-cap",at,100000,100).unwrap();
+    assert_eq!(held["status"],"blocked","{held}");
+    assert_eq!(held["reason"],"global_agent_limit");
+    d.call("run.interrupt",json!({"run_id":ordinary_id}));
+    d.wait_done(&ordinary_id,5);
+    let admitted = admit(&d,&id,"j0","codex-a","slot-freed",now(),100000,100).unwrap();
+    assert_eq!(admitted["status"],"admitted","{admitted}");
+    let request = json!({"id":8,"method":"task.create","params":{"repo":checkout,
+        "harness":"generic","workspace_mode":"worktree","program":"/bin/sleep",
+        "args":["1"],"prompt":"","title":"manual after swarm"}});
+    let reply: Value = serde_json::from_str(&d.raw(format!("{request}\n").as_bytes())).unwrap();
+    assert_eq!(reply["error"]["code"],"agent_limit","{reply}");
+    assert_eq!(reply["error"]["running_agents"].as_array().unwrap().len(),2);
+}
+
+#[test]
+fn concurrent_manual_starts_cannot_claim_the_same_last_slot() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":1}));
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("concurrent-limit"));
+    let socket = d.socket();
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(3));
+    let mut handles = Vec::new();
+    for n in 0..2 {
+        let socket = socket.clone();
+        let checkout = checkout.clone();
+        let barrier = barrier.clone();
+        handles.push(std::thread::spawn(move || {
+            let mut conn = UnixStream::connect(socket).unwrap();
+            conn.set_read_timeout(Some(std::time::Duration::from_secs(15))).unwrap();
+            let request = json!({"id":n,"method":"task.create","params":{
+                "repo":checkout,"harness":"generic","workspace_mode":"worktree",
+                "program":"/bin/sleep","args":["5"],"prompt":"","title":format!("parallel-{n}")}});
+            barrier.wait();
+            conn.write_all(format!("{request}\n").as_bytes()).unwrap();
+            let mut line = String::new();
+            BufReader::new(conn).read_line(&mut line).unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        }));
+    }
+    barrier.wait();
+    let replies: Vec<Value> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+    assert_eq!(replies.iter().filter(|r| r["result"].is_object()).count(),1,"{replies:?}");
+    assert_eq!(replies.iter().filter(|r| r["error"]["code"]=="agent_limit").count(),1,"{replies:?}");
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],1);
+}
+
+#[test]
 fn ordinary_launches_take_priority_over_active_swarm_capacity() {
     let d = Daemon::start(&[]);
     let temp = tmp();
@@ -397,6 +495,7 @@ fn concurrent_requests_cannot_both_claim_one_run_allocation() {
 #[test]
 fn review_backlog_holds_admissions_until_it_drains_below_four() {
     let d = Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":33}));
     let run = d.call(
         "swarm.create",
         json!({"category":"Review pressure","objective":"Audit many checks",
@@ -471,6 +570,7 @@ fn review_backlog_holds_admissions_until_it_drains_below_four() {
 #[test]
 fn already_admitted_results_can_overflow_review_threshold_without_loss() {
     let mut d = Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":33}));
     let run = d.call("swarm.create", json!({"category":"Review overflow",
         "objective":"Audit many checks","allowed_targets":["codex-a"],
         "policy":{"max_workers":32,"max_executing":33}}));
@@ -514,6 +614,7 @@ fn already_admitted_results_can_overflow_review_threshold_without_loss() {
 #[test]
 fn explicit_ceiling_admits_thirty_two_fixture_workers_without_hidden_eight_cap() {
     let d = Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":33}));
     let run = d.call(
         "swarm.create",
         json!({"category":"Large qualification","objective":"Inspect modules",
@@ -588,6 +689,7 @@ fn planned_write_claim_cannot_be_omitted_at_admission() {
 #[test]
 fn hundred_jobs_cycle_through_thirty_two_slots_and_accept_once() {
     let d = Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":33}));
     let run = d.call("swarm.create", json!({"category":"Hundred job qualification",
         "objective":"Audit one hundred independent paths","allowed_targets":["codex-a"],
         "policy":{"max_workers":32,"max_executing":33}}));
@@ -647,6 +749,7 @@ fn hundred_jobs_cycle_through_thirty_two_slots_and_accept_once() {
 #[test]
 fn quota_headroom_explains_smaller_pool_than_worker_ceiling() {
     let d=Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":33}));
     let run=d.call("swarm.create",json!({"category":"Quota-constrained pool",
         "objective":"Inspect three paths","allowed_targets":["codex-a"],
         "policy":{"max_workers":32,"max_executing":33}}));

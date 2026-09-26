@@ -22,23 +22,27 @@ pub(super) struct ScheduledCommit<'a> {
     pub category_key: &'a str,
 }
 
-pub fn admit(store: &mut Store, p: &Value) -> Result<Value> {
-    admit_inner(store, p, None)
+pub fn admit(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
+    admit_inner(store, p, None, pending_slots)
 }
 
 pub(super) fn admit_scheduled(
     store: &mut Store,
     p: &Value,
     commit: ScheduledCommit<'_>,
+    pending_slots: i64,
 ) -> Result<Value> {
-    admit_inner(store, p, Some(commit))
+    admit_inner(store, p, Some(commit), pending_slots)
 }
 
 fn admit_inner(
     store: &mut Store,
     p: &Value,
     scheduled: Option<ScheduledCommit<'_>>,
+    pending_slots: i64,
 ) -> Result<Value> {
+    let app_active = store.active_agent_count()?;
+    let app_limit = store.agent_limit()?;
     let run = required(p, "run_id")?;
     let job = required(p, "job_id")?;
     let target = required(p, "target_id")?;
@@ -330,6 +334,9 @@ fn admit_inner(
     } else {
         0
     };
+    if app_active + pending_slots + new_director >= app_limit {
+        return Ok(blocked("global_agent_limit"));
+    }
     if global_workers + global_directors + ordinary_agents + new_director
         >= effective["max_executing"].as_i64().unwrap_or(9)
     {

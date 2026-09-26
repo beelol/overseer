@@ -55,7 +55,10 @@ pub fn next(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
                 VALUES(?1,?2,?3,?4)",params![id,digest,p.to_string(),crate::daemon::now()])?;
         }
     }
-    let scheduled = scheduler::next(&mut d.store.lock().unwrap(), p)?;
+    let scheduled = {
+        let pending = d.pending_agent_slots.lock().unwrap();
+        scheduler::next(&mut d.store.lock().unwrap(), p, *pending)?
+    };
     if scheduled["status"] == "blocked" {
         return Ok(scheduled);
     }

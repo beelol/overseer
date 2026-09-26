@@ -173,7 +173,15 @@ async fn connection_loop(
             };
             let reply = match result {
                 Ok(Ok(v)) => json!({"id": id, "result": v}),
-                Ok(Err(e)) => json!({"id": id, "error": {"code": "failed", "message": e.to_string()}}),
+                Ok(Err(e)) => {
+                    if let Some(limit) = e.downcast_ref::<crate::daemon::AgentLimitError>() {
+                        json!({"id": id, "error": {"code": "agent_limit", "message": e.to_string(),
+                            "active": limit.active, "limit": limit.limit,
+                            "running_agents": limit.running_agents}})
+                    } else {
+                        json!({"id": id, "error": {"code": "failed", "message": e.to_string()}})
+                    }
+                },
                 Err(e) => json!({"id": id, "error": {"code": "internal", "message": e.to_string()}}),
             };
             let _ = tx.send(reply).await;
@@ -371,12 +379,14 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.admit" => {
             fixture_only()?;
             let _serial = d.swarm_launch_lock.lock().unwrap();
-            crate::swarm::admit(&mut d.store.lock().unwrap(), p)?
+            let pending = d.pending_agent_slots.lock().unwrap();
+            crate::swarm::admit(&mut d.store.lock().unwrap(), p, *pending)?
         }
         "swarm.schedule.next" => {
             fixture_only()?;
             let _serial = d.swarm_launch_lock.lock().unwrap();
-            crate::swarm::schedule_next(&mut d.store.lock().unwrap(), p)?
+            let pending = d.pending_agent_slots.lock().unwrap();
+            crate::swarm::schedule_next(&mut d.store.lock().unwrap(), p, *pending)?
         }
         "swarm.dispatch.next" => {
             fixture_only()?;
@@ -463,6 +473,18 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             crate::swarm::recover(&mut d.store.lock().unwrap(), p)?
         }
         "profile.create" => json!(d.create_profile(s(p, "name")?, s(p, "harness")?)?),
+        "agents.limit.get" => {
+            let pending = d.pending_agent_slots.lock().unwrap();
+            let store = d.store.lock().unwrap();
+            json!({"max_active": store.agent_limit()?, "active": store.active_agent_count()? + *pending})
+        }
+        "agents.limit.set" => {
+            let limit = p["max_active"].as_i64().ok_or_else(|| anyhow!("max_active must be an integer"))?;
+            let pending = d.pending_agent_slots.lock().unwrap();
+            let store = d.store.lock().unwrap();
+            store.set_agent_limit(limit)?;
+            json!({"max_active": store.agent_limit()?, "active": store.active_agent_count()? + *pending})
+        }
         "profile.rename" => {
             let name = s(p, "name")?.trim();
             if name.is_empty() || name.len() > 80 {

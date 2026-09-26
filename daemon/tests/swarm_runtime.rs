@@ -140,6 +140,7 @@ fn job_deadline_never_accepts_a_worker_that_ignores_interrupt() {
 #[test]
 fn explicit_ceiling_runs_thirty_two_supervised_workers() {
     let d = Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":33}));
     let temp = tmp();
     let checkout = repo(&temp.path().join("large-swarm-source"));
     let run = d.call("swarm.create", json!({"category":"Large local swarm",

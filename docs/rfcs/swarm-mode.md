@@ -113,7 +113,7 @@ take effect through a recorded revision. Permission revocations apply immediatel
 | --- | --- |
 | Accounts | Previously approved account pool; one-time selection if empty. Never use all discovered logins by inference. |
 | Director and workers | Auto picks qualified targets from that pool. No model-name or harness-name preference embedded in swarm policy. |
-| Worker count | Automatic, bounded by a default **8 workers per run** and **9 total executing agents globally**. These are adjustable ceilings, not launch counts or architectural limits. Account/machine limits can lower them. |
+| Worker count | Automatic, bounded by a default **8 workers per run** and the app-level `agents.max_active` default of **9 top-level agents**. A running Swarm director and each registered worker each use one slot; native subagents are part of their parent slot. These are adjustable ceilings, not launch counts or architectural limits. Account/machine limits can lower them. |
 | Growth | At most 4 new worker admissions per wave, at least 5 seconds between growth waves. Failure, revocation and stop take effect immediately. A worker completion can refill within these bounds. |
 | Run allocation | For every allowed shared pool/window with fresh comparable data, allocate at most **10% of its currently unreserved, unprotected remaining allowance**, less any tighter saved limit. Freeze that allocation for this run; a reset or newly found account cannot enlarge it. |
 | Finishing reserve | Larger of 20% of the initial run allocation and estimated remaining synthesis/integration/verification cost, per applicable unit. |
@@ -346,8 +346,9 @@ Proposed concurrency policy:
   exists; unknown telemetry still cannot establish affordable capacity. A qualification target of **32 concurrent
   workers plus one director and 100 logical jobs** proves many-worker support with fixtures;
   it is neither the default live launch size nor an assertion that an account supports it.
-- Every executing director, worker, reviewer, and native descendant counts toward the shared
-  global active-agent limit. Reserve one execution slot for each admitted swarm's director so
+- Every executing top-level agent, including a Swarm worker or a separately launched reviewer,
+  counts toward the shared app-level `agents.max_active` limit. Native subagents belong to their
+  top-level parent and do not consume another app slot. Reserve one slot for each running swarm's director so
   full worker capacity cannot prevent coordination. A waiting director does not count as active,
   but its reserved slot cannot be borrowed by a worker. A total limit of one uses the director
   for serial work. A run awaiting a director slot remains queued.
@@ -479,7 +480,7 @@ fixture proves policy behavior, not live provider compatibility.
 | SWARM-04 | [ ] Given identical plan, policy, telemetry, and reservation state, scheduler decisions and reason codes match on replay. Changing a provider name without changing capabilities/health does not change policy eligibility. |
 | SWARM-05 | [ ] In paired serial/parallel fixtures, include planning/context/integration/review costs. Reject parallelism when benefit is absent or finishing becomes unaffordable; admit an affordable beneficial batch. Retain estimates and actuals. |
 | SWARM-06 | [ ] Give a cheap target insufficient capabilities and a qualified target higher cost. Reject the cheap target; if no qualified target exists, block visibly instead of degrading the quality requirement. |
-| SWARM-07 | [ ] With a configured total max=3, reserve one director slot and allow at most two simultaneous workers. Count reviewers/native descendants too. Demonstrate no fourth admission, director activation while both workers run, slot reuse after confirmed completion, and draining after max is lowered. Max=1 performs serial director work. |
+| SWARM-07 | [ ] With app-level `agents.max_active=3`, reserve one director slot and allow at most two simultaneous top-level workers or separately launched reviewers. Native descendants stay within their parent's slot. Demonstrate no fourth admission across manual and Swarm launches, director activation while both workers run, slot reuse after confirmed completion, and draining after max is lowered. Max=1 performs serial director work. |
 | SWARM-08 | [ ] Concurrent swarm and non-swarm launch requests against one nearly depleted pool cannot both reserve the last capacity. Repeat across two tasks and two profiles known to share a subscription; prove atomic admission. |
 | SWARM-09 | [ ] Two harnesses using the same account share capacity; verified independent accounts retain separate capacity. Uncertain identity cannot produce a doubled allowance. |
 | SWARM-10 | [ ] With 100 compatible units allocated, a 20-unit reserve and 10 already reserved, admit a 60-unit worker and reject a further 11-unit worker. With finishing estimate=35, reject that 60-unit worker. Allow finishing work to draw on the reserve. |

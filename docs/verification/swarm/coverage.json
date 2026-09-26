@@ -1,7 +1,7 @@
 {
   "base_commit": "19edf57ca4c30b0b4788b5416bb5d949a2cdff6c",
   "rfc_sha256": {
-    "swarm-mode.md": "7e5d0d63d2a94e41e5764ac5dce374544f3e349b6afa58226330adfa55645dce",
+    "swarm-mode.md": "d7e5acbc9dd9246f6e0ad33c7c784b5712a227daf36dd75517624d38a0b3d45c",
     "swarm-mode-scenarios.md": "c937732f9053bd16ab92cd6968ed5b30837e7e01947f90e1f46d614b2c58a9cc",
     "swarm-mode-goal.md": "fb1bcf183e39e2edeb27b6d5f641eb8daf639bbaf271f5a4afbc15bcb01de08a"
   },
@@ -64,7 +64,7 @@
         "docs/verification/swarm/SWARM-08.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Fixture Swarm admission counts ordinary active runs and holds new workers at its ceiling. Manual task creation is no longer refused by a Swarm-specific ceiling; app-level max enforcement, lower-maximum draining, reviewer/native-descendant control and live activation remain unimplemented."
+      "blocker": "A persisted app-level max now gates ordinary starts and Swarm admission, with pending manual starts reserved before workspace setup; native children inherit the parent's slot. Lower-maximum draining, separate reviewer execution, max=1 serial director work, and live director activation remain unverified."
     },
     "SWARM-08": {
       "status": "partial",
@@ -74,7 +74,7 @@
         "docs/verification/swarm/SWARM-08.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Fixture Swarm admissions count ordinary active runs and hold new workers while manual activity occupies capacity. Manual launches are allowed even at a Swarm-specific ceiling and no longer share a launch lock with Swarm, so a single app-level limit and atomic shared account-quota reservation across ordinary, Auto and Swarm launches remain unimplemented."
+      "blocker": "A single persisted app-level agent cap now handles ordinary starts and fixture Swarm admission, including concurrent manual starts. Atomic shared account-quota reservation across ordinary, Auto and Swarm launches remains unimplemented; linked profiles and live Auto Mode integration are unverified."
     },
     "SWARM-09": {
       "status": "partial",
