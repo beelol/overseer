@@ -210,6 +210,67 @@ fn explicit_ceiling_runs_thirty_two_supervised_workers() {
 }
 
 #[test]
+fn swarm_writers_keep_conflicting_changes_out_of_a_dirty_source_checkout() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("dirty-swarm-source"));
+    std::fs::write(checkout.join("a.txt"), "user edit\n").unwrap();
+    let source_before = fingerprint(&checkout);
+    let run = d.call("swarm.create", json!({"category":"Isolated writers",
+        "objective":"Inspect independent modules","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"first","title":"First writer","acceptance":"evidence","deps":[]},
+        {"id":"second","title":"Second writer","acceptance":"evidence","deps":[]}
+    ]}));
+    commit_beneficial_batch(&d, id, &["first".into(), "second".into()]);
+    let at = now();
+    let mut workers = Vec::new();
+    for (job, content) in [("first", "first worker\n"), ("second", "second worker\n")] {
+        let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,
+            "revision":1,"job_id":job,"target_id":"fixture-local",
+            "request_id":format!("isolated-{job}"),"now_ms":at,
+            "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+                "targets":[{"id":"fixture-local","account_id":"fixture",
+                    "pool_ids":["fixture-pool"],"capabilities":["code"],
+                    "health":"up","auth":"ok"}],
+                "pools":[{"id":"fixture-pool","windows":[{"id":"run",
+                    "unit":"points","remaining_milli":100000,
+                    "protected_milli":0,"reserved_milli":0,"confidence":"exact",
+                    "expires_ms":at+60000}]}]},
+            "required_capabilities":["code"],
+            "estimate_milli":{"points":100},"purpose":"worker"}));
+        assert_eq!(admitted["status"], "admitted", "{admitted}");
+        let launched = d.call("swarm.worker.launch", json!({"run_id":id,"job_id":job,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "repo":checkout,"program":"/bin/sleep","args":["30"],
+            "prompt":"Inspect","title":format!("Fixture {job}")}));
+        assert_eq!(launched["status"], "launched", "{launched}");
+        let worker = launched["overseer_run_id"].as_str().unwrap().to_string();
+        let state = d.call("state", json!({}));
+        let run_state = state["runs"].as_array().unwrap().iter()
+            .find(|r| r["id"] == worker).unwrap();
+        let workspace = state["workspaces"].as_array().unwrap().iter()
+            .find(|w| w["id"] == run_state["workspace_id"]).unwrap();
+        assert_eq!(workspace["kind"], "worktree");
+        let path = std::path::PathBuf::from(workspace["path"].as_str().unwrap());
+        assert_eq!(std::fs::read_to_string(path.join("a.txt")).unwrap(), "a\n");
+        std::fs::write(path.join("a.txt"), content).unwrap();
+        workers.push((worker, path, content));
+    }
+    assert_ne!(workers[0].1, workers[1].1);
+    for (_, path, expected) in &workers {
+        assert_eq!(std::fs::read_to_string(path.join("a.txt")).unwrap(), *expected);
+    }
+    assert_eq!(fingerprint(&checkout), source_before);
+    d.call("swarm.stop", json!({"run_id":id,"generation":1,"revision":1}));
+    for (worker, _, _) in &workers {
+        assert_ne!(d.wait_done(worker, 10)["status"], "completed");
+    }
+    assert_eq!(fingerprint(&checkout), source_before);
+}
+
+#[test]
 fn job_deadline_interrupts_only_its_worker_despite_progress() {
     let d = Daemon::start(&[]);
     let temp = tmp();
