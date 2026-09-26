@@ -343,6 +343,9 @@ struct ClaudeAuthRead {
 static AUTO_CLAUDE_AUTH_FLIGHTS: OnceLock<Mutex<std::collections::BTreeMap<
     (usize, String), Arc<AutoFlight<ClaudeAuthRead>>>>> = OnceLock::new();
 
+static AUTO_PUBLIC_STATUS_FLIGHTS: OnceLock<Mutex<std::collections::BTreeMap<
+    (std::path::PathBuf, String), Arc<AutoFlight<crate::auto_health::Observation>>>>> = OnceLock::new();
+
 fn collect_shared<K, T, F>(flights: &Mutex<std::collections::BTreeMap<K, Arc<AutoFlight<T>>>>,
     key: K, budget: Duration, collect: F) -> Result<T>
 where K: Ord + Clone, T: Clone, F: FnOnce() -> Result<T> {
@@ -391,6 +394,18 @@ fn discover_auto_profile_shared(d: &Arc<Daemon>, profile_id: &str, workspace_id:
     let flights = AUTO_DISCOVERY_FLIGHTS.get_or_init(|| Mutex::new(std::collections::BTreeMap::new()));
     collect_shared(flights, key, budget,
         || discover_auto_profile(d, profile_id, workspace_id, budget))
+}
+
+/// Public status has no account or workspace scope. Share only overlapping
+/// reads of the same fixed feed, and preserve the source observation time.
+fn collect_public_status_shared(program: &std::path::Path, provider: &str,
+    budget: Duration) -> Result<crate::auto_health::Observation> {
+    let flights = AUTO_PUBLIC_STATUS_FLIGHTS.get_or_init(||
+        Mutex::new(std::collections::BTreeMap::new()));
+    collect_shared(flights, (program.to_path_buf(), provider.to_string()), budget, || {
+        let data = crate::auto_collect::public_status_json(program, provider, budget)?;
+        crate::auto_health::parse_public_status(&data, provider, crate::daemon::now())
+    })
 }
 
 fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
@@ -739,9 +754,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 if !public_providers.is_empty() && public_budget >= Duration::from_millis(20) {
                     for (provider, reading) in collect_unique_bounded(&public_providers,
                         public_budget, |id, timeout| {
-                            let data = crate::auto_collect::public_status_json(
-                                std::path::Path::new("/usr/bin/curl"), id, timeout)?;
-                            crate::auto_health::parse_public_status(&data, id, crate::daemon::now())
+                            collect_public_status_shared(std::path::Path::new("/usr/bin/curl"),
+                                id, timeout)
                         }) {
                         match reading {
                             Ok(observation) => {
@@ -1268,8 +1282,36 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
 #[cfg(test)]
 mod auto_collector_tests {
     use super::*;
+    use std::os::unix::fs::PermissionsExt;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Barrier;
+
+    #[test]
+    fn concurrent_public_status_reads_share_one_fetch_then_refresh() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("fixture-curl");
+        let counter = dir.path().join("status-count");
+        std::fs::write(&program, format!("#!/bin/sh\nsleep 0.25\nprintf 'x\\n' >> '{}'\nprintf '%s' '{{\"components\":[{{\"name\":\"Claude Code\",\"status\":\"operational\"}}]}}'\n", counter.display())).unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let barrier = Barrier::new(3);
+        let readings = std::thread::scope(|scope| {
+            let first = scope.spawn(|| {
+                barrier.wait();
+                collect_public_status_shared(&program, "anthropic", Duration::from_millis(750)).unwrap()
+            });
+            let second = scope.spawn(|| {
+                barrier.wait();
+                collect_public_status_shared(&program, "anthropic", Duration::from_millis(750)).unwrap()
+            });
+            barrier.wait();
+            [first.join().unwrap(), second.join().unwrap()]
+        });
+        assert_eq!(readings[0].observed_ms, readings[1].observed_ms);
+        assert_eq!(std::fs::read_to_string(&counter).unwrap().lines().count(), 1);
+        collect_public_status_shared(&program, "anthropic", Duration::from_millis(750)).unwrap();
+        assert_eq!(std::fs::read_to_string(&counter).unwrap().lines().count(), 2,
+            "a later decision must fetch fresh public status");
+    }
 
     #[test]
     fn hundred_candidates_coalesce_duplicate_keys_with_four_collectors_and_a_deadline() {
