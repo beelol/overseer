@@ -1585,6 +1585,16 @@ fn auto_managed_child_has_an_isolated_parent_snapshot_and_returnable_result() {
     assert_eq!(result["text"], "browser result: parent context found");
     assert_eq!(result["parent_run_id"], parent);
     assert_eq!(d.call("run.result", json!({"run_id":child}))["event_seq"], result["event_seq"]);
+    let notices = d.events(&parent).into_iter().filter(|event|
+        event["kind"] == "managed_child_result_available").collect::<Vec<_>>();
+    assert_eq!(notices.len(), 1, "one durable parent notice per settled child");
+    assert_eq!(notices[0]["payload"]["work_unit_id"], "browser-unit-1");
+    assert_eq!(notices[0]["payload"]["child_run_id"], child);
+    assert_eq!(notices[0]["payload"]["source_event_seq"], result["event_seq"]);
+    assert_eq!(notices[0]["payload"]["state"], "ready");
+    assert!(notices[0]["payload"].get("text").is_none(), "the parent notice is a handle, not a copy of child output");
+    assert!(d.try_call("run.follow_up", json!({"run_id":child,"prompt":"repeat browser check"})).is_err(),
+        "a settled work unit cannot produce a second, unreported child result");
     let usage = d.call("auto.usage.thread.refresh", json!({"run_id":child}));
     assert_eq!(usage["observation"]["attribution"], "same_account_generation", "{usage}");
     assert_eq!(usage["observation"]["subscription_window_relation"], "unverified");
@@ -2366,6 +2376,44 @@ fn auto_managed_child_reattaches_after_daemon_restart_without_relaunch() {
     assert_eq!(d.run(&child)["process_generation"], 1);
     assert_eq!(d.call("run.result", json!({"run_id":child}))["text"], "browser result: parent context found");
     assert_eq!(d.events(&child).iter().filter(|event| event["kind"] == "output" && event["payload"]["role"] == "assistant").count(), 1);
+    let notices = d.events(&parent).into_iter().filter(|event|
+        event["kind"] == "managed_child_result_available").collect::<Vec<_>>();
+    assert_eq!(notices.len(), 1, "restart must neither lose nor duplicate the parent result notice");
+    assert_eq!(notices[0]["payload"]["child_run_id"], child);
+}
+
+#[test]
+fn auto_managed_result_notice_failure_rolls_back_settlement_and_recovers_once() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "managed-delay")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "prompt":"seed context","title":"parent"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let child = run_id(&d.call("run.delegate", json!({"work_unit_id":"browser-notice-fault",
+        "parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol",
+        "effort":"medium","prompt":"browser check"})));
+    d.wait_status(&child, |status| status == "running", 10);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER fail_result_notice BEFORE INSERT ON events
+        WHEN NEW.kind='managed_child_result_available'
+        BEGIN SELECT RAISE(FAIL, 'fixture notice failure'); END;").unwrap();
+    std::thread::sleep(Duration::from_secs(7));
+    assert_eq!(d.run(&child)["status"], "running", "failed notice must not leave a completed child without delivery");
+    let current = d.call("state", json!({}));
+    assert_eq!(current["turns"][&child].as_array().unwrap().last().unwrap()["status"], "completed",
+        "the turn-completion signal was durable before settlement failed");
+    assert!(d.events(&parent).iter().all(|event| event["kind"] != "managed_child_result_available"));
+    db.execute_batch("DROP TRIGGER fail_result_notice;").unwrap();
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert_eq!(d.run(&child)["process_generation"], 1, "recovery must not launch a second child");
+    let notices = d.events(&parent).into_iter().filter(|event|
+        event["kind"] == "managed_child_result_available").collect::<Vec<_>>();
+    assert_eq!(notices.len(), 1);
+    assert_eq!(notices[0]["payload"]["child_run_id"], child);
 }
 
 #[test]

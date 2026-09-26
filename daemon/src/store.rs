@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-pub const SCHEMA_VERSION: i64 = 11;
+pub const SCHEMA_VERSION: i64 = 12;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -226,7 +226,8 @@ impl Store {
             CREATE TABLE IF NOT EXISTS managed_work_units(
               work_unit_id TEXT PRIMARY KEY, parent_run_id TEXT NOT NULL REFERENCES runs(id),
               child_run_id TEXT NOT NULL UNIQUE REFERENCES runs(id),
-              request_hash TEXT NOT NULL, created_ms INTEGER NOT NULL);
+              request_hash TEXT NOT NULL, created_ms INTEGER NOT NULL,
+              result_event_seq INTEGER);
             "#,
         )?;
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;
@@ -236,6 +237,10 @@ impl Store {
         let has_effort: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='effort'")?.exists([])?;
         if !has_effort {
             self.conn.execute_batch("ALTER TABLE runs ADD COLUMN effort TEXT;")?;
+        }
+        let has_result_notice: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('managed_work_units') WHERE name='result_event_seq'")?.exists([])?;
+        if !has_result_notice {
+            self.conn.execute_batch("ALTER TABLE managed_work_units ADD COLUMN result_event_seq INTEGER;")?;
         }
         let has_measurement_effort: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_measurements') WHERE name='effort'")?.exists([])?;
         if !has_measurement_effort {
@@ -431,6 +436,54 @@ impl Store {
             params![id, parent, child, request_hash, crate::daemon::now()],
         )?;
         Ok(())
+    }
+
+    /// Recover the last turn's completed signal when a tail was restarted
+    /// after its raw-output cursor had already advanced.
+    pub fn last_turn_completion(&self, run_id: &str) -> Result<Option<bool>> {
+        let status: Option<(String, Option<i64>)> = self.conn.query_row(
+            "SELECT status,ended_ms FROM turns WHERE run_id=?1 ORDER BY n DESC LIMIT 1",
+            params![run_id], |row| Ok((row.get(0)?, row.get(1)?)),
+        ).optional()?;
+        Ok(match status {
+            Some((status, Some(_))) if status == "completed" => Some(true),
+            Some((status, Some(_))) if status == "failed" => Some(false),
+            _ => None,
+        })
+    }
+
+    /// Called inside the same transaction as the child's terminal status.
+    /// The parent receives a stable handle, never a second copy of child output.
+    pub fn publish_managed_result_notice(&self, child: &Run, observed_ms: i64) -> Result<Option<Event>> {
+        let record: Option<(String, String, Option<i64>)> = self.conn.query_row(
+            "SELECT work_unit_id,parent_run_id,result_event_seq FROM managed_work_units WHERE child_run_id=?1",
+            params![child.id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        ).optional()?;
+        let Some((work_unit_id, parent_id, prior_notice)) = record else { return Ok(None) };
+        if prior_notice.is_some() { return Ok(None) }
+
+        let mut source_event_seq = None;
+        let mut outputs = self.conn.prepare(
+            "SELECT seq,payload FROM events WHERE run_id=?1 AND kind='output' ORDER BY seq DESC LIMIT 5000")?;
+        let rows = outputs.query_map(params![child.id], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))?;
+        for row in rows {
+            let (seq, payload) = row?;
+            let Ok(value) = serde_json::from_str::<Value>(&payload) else { continue };
+            if value["role"] == "assistant" && value["text"].as_str().is_some() {
+                source_event_seq = Some(seq);
+                break;
+            }
+        }
+        let state = if source_event_seq.is_some() { "ready" } else { "completed_without_text" };
+        let event = self.insert_event(observed_ms, Some(&child.task_id), Some(&parent_id),
+            "managed_child_result_available", "daemon", "exact",
+            &serde_json::json!({"work_unit_id":work_unit_id,"child_run_id":child.id,
+                "source_event_seq":source_event_seq,"state":state,"workspace_id":child.workspace_id}))?;
+        let changed = self.conn.execute(
+            "UPDATE managed_work_units SET result_event_seq=?2 WHERE child_run_id=?1 AND result_event_seq IS NULL",
+            params![child.id, event.seq])?;
+        if changed != 1 { return Err(anyhow!("managed result notice lost its exclusive claim")) }
+        Ok(Some(event))
     }
 
     pub fn update_run_status(&self, id: &str, status: &str, reason: Option<&str>, ended: Option<i64>) -> Result<()> {
@@ -962,7 +1015,7 @@ impl Store {
 }
 
 #[cfg(test)]
-mod auto_effort_migration_tests {
+mod schema_migration_tests {
     use super::*;
 
     #[test]
@@ -1007,6 +1060,49 @@ mod auto_effort_migration_tests {
         assert_eq!(rows[0].samples, 1);
         assert_eq!(rows[0].input_tokens, Some(42));
         assert_eq!(rows[0].effort, None);
+    }
+
+    #[test]
+    fn existing_managed_work_units_gain_result_marker_without_losing_identity() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE managed_work_units(
+            work_unit_id TEXT PRIMARY KEY, parent_run_id TEXT NOT NULL,
+            child_run_id TEXT NOT NULL UNIQUE, request_hash TEXT NOT NULL,
+            created_ms INTEGER NOT NULL);
+            INSERT INTO managed_work_units VALUES('browser-1','parent-1','child-1','hash-1',1000);").unwrap();
+        let store = Store { conn };
+        store.migrate().unwrap();
+        store.migrate().unwrap();
+        let (child, marker): (String, Option<i64>) = store.conn.query_row(
+            "SELECT child_run_id,result_event_seq FROM managed_work_units WHERE work_unit_id='browser-1'",
+            [], |row| Ok((row.get(0)?, row.get(1)?)),
+        ).unwrap();
+        assert_eq!(child, "child-1");
+        assert_eq!(marker, None);
+    }
+
+    #[test]
+    fn result_publication_marker_does_not_block_bounded_parent_event_retention() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
+        // Only the event/marker relationship matters here; run foreign keys
+        // are disabled while inserting the minimal fixture identities.
+        store.conn.pragma_update(None, "foreign_keys", "OFF").unwrap();
+        store.conn.execute("INSERT INTO managed_work_units(
+            work_unit_id,parent_run_id,child_run_id,request_hash,created_ms)
+            VALUES('browser-1','parent-1','child-1','hash-1',1000)", []).unwrap();
+        store.conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        let notice = store.insert_event(1000, None, Some("parent-1"),
+            "managed_child_result_available", "daemon", "exact", &serde_json::json!({})).unwrap();
+        store.conn.execute("UPDATE managed_work_units SET result_event_seq=?1 WHERE work_unit_id='browser-1'",
+            params![notice.seq]).unwrap();
+        assert_eq!(store.prune_run_events("parent-1", 0).unwrap(), Some(notice.seq));
+        assert!(store.events_after(0, Some("parent-1"), 10).unwrap().is_empty());
+        let marker: Option<i64> = store.conn.query_row(
+            "SELECT result_event_seq FROM managed_work_units WHERE work_unit_id='browser-1'",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(marker, Some(notice.seq), "publication remains idempotent after event retention");
     }
 }
 

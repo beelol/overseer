@@ -689,6 +689,9 @@ impl Daemon {
         let workspace_gate = self.workspace_gate(&initial.workspace_id);
         let _workspace_guard = workspace_gate.lock().unwrap();
         let run = self.run(run_id)?;
+        if follow_up && run.relation_source.as_deref() == Some("managed-delegation") {
+            bail!("a managed work unit has one result; delegate a new work unit instead");
+        }
         if run.parent_run_id.is_some() && run.relation_source.as_deref() != Some("managed-delegation") {
             bail!("follow-ups go to the top-level run; native children are controlled by their parent harness");
         }
@@ -1549,6 +1552,9 @@ impl Daemon {
 
     fn finalize(&self, run: &Run, dir: &Path, exit: &ExitInfo, state: &TailState) -> Result<()> {
         let interrupted = dir.join("interrupt.requested").exists();
+        let durable_turn_done = if state.turn_done.is_none() && run.harness != "generic" {
+            self.store.lock().unwrap().last_turn_completion(&run.id)?
+        } else { None };
         let (status, reason) = if let Some(err) = &exit.spawn_error {
             ("failed", format!("could not start harness: {err}"))
         } else if interrupted {
@@ -1558,7 +1564,7 @@ impl Daemon {
         } else if let Some(sig) = exit.signal {
             ("failed", format!("killed by signal {sig} (not requested by Overseer)"))
         } else if exit.code == Some(0) {
-            match (run.harness.as_str(), state.turn_done) {
+            match (run.harness.as_str(), state.turn_done.or(durable_turn_done)) {
                 ("generic", _) => ("completed", "exit 0".to_string()),
                 (_, Some(true)) => ("completed", "turn completed; exit 0".to_string()),
                 (_, Some(false)) => ("failed", format!("turn reported failure{}", error_suffix(state))),
@@ -1574,32 +1580,48 @@ impl Daemon {
         let mut emitted = Vec::new();
         {
             let store = self.store.lock().unwrap();
-            let ended = now();
-            store.update_run_status(&run.id, status, Some(reason), Some(ended))?;
-            store.set_run_attention(&run.id, None)?;
-            let turn_status = if status == "completed" { "completed" } else { status };
-            store.finish_open_turns(&run.id, turn_status, ended)?;
-            emitted.push(store.insert_event(ended, Some(&run.task_id), Some(&run.id), "status", "daemon", "exact", &json!({"status": status, "reason": reason}))?);
-            // Children whose end was never reported are unknown, not completed.
-            let mut stack = vec![run.id.clone()];
-            while let Some(parent) = stack.pop() {
-                for child in store.children(&parent)? {
-                    // A managed child has its own supervisor and isolated workspace.
-                    // The parent's process exit is not evidence that it stopped.
-                    if child.relation_source.as_deref() == Some("managed-delegation") {
-                        continue;
-                    }
-                    stack.push(child.id.clone());
-                    if ACTIVE.contains(&child.status.as_str()) {
-                        let why = "parent process ended before the child's final status was reported";
-                        store.update_run_status(&child.id, "unknown", Some(why), Some(ended))?;
-                        emitted.push(store.insert_event(ended, Some(&run.task_id), Some(&child.id), "status", "daemon", "inferred", &json!({"status": "unknown", "reason": why}))?);
+            store.conn.execute_batch("SAVEPOINT settle_run")?;
+            let settled = (|| -> Result<()> {
+                let ended = now();
+                store.update_run_status(&run.id, status, Some(reason), Some(ended))?;
+                store.set_run_attention(&run.id, None)?;
+                let turn_status = if status == "completed" { "completed" } else { status };
+                store.finish_open_turns(&run.id, turn_status, ended)?;
+                emitted.push(store.insert_event(ended, Some(&run.task_id), Some(&run.id), "status", "daemon", "exact", &json!({"status": status, "reason": reason}))?);
+                if status == "completed" && run.relation_source.as_deref() == Some("managed-delegation") {
+                    if let Some(notice) = store.publish_managed_result_notice(run, ended)? {
+                        emitted.push(notice);
                     }
                 }
-            }
-            if let Some(ws) = store.workspace(&run.workspace_id)? {
-                if ws.owner_run_id.as_deref() == Some(&run.id) {
-                    store.set_workspace_owner(&ws.id, None)?;
+                // Children whose end was never reported are unknown, not completed.
+                let mut stack = vec![run.id.clone()];
+                while let Some(parent) = stack.pop() {
+                    for child in store.children(&parent)? {
+                        // A managed child has its own supervisor and isolated workspace.
+                        // The parent's process exit is not evidence that it stopped.
+                        if child.relation_source.as_deref() == Some("managed-delegation") {
+                            continue;
+                        }
+                        stack.push(child.id.clone());
+                        if ACTIVE.contains(&child.status.as_str()) {
+                            let why = "parent process ended before the child's final status was reported";
+                            store.update_run_status(&child.id, "unknown", Some(why), Some(ended))?;
+                            emitted.push(store.insert_event(ended, Some(&run.task_id), Some(&child.id), "status", "daemon", "inferred", &json!({"status": "unknown", "reason": why}))?);
+                        }
+                    }
+                }
+                if let Some(ws) = store.workspace(&run.workspace_id)? {
+                    if ws.owner_run_id.as_deref() == Some(&run.id) {
+                        store.set_workspace_owner(&ws.id, None)?;
+                    }
+                }
+                Ok(())
+            })();
+            match settled {
+                Ok(()) => store.conn.execute_batch("RELEASE settle_run")?,
+                Err(error) => {
+                    let _ = store.conn.execute_batch("ROLLBACK TO settle_run; RELEASE settle_run");
+                    return Err(error);
                 }
             }
         }
