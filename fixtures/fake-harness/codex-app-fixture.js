@@ -59,7 +59,9 @@ rl.on('line', line => {
         cachedInputTokens: 10, netNewInputTokens: 90, totalTokens: 120,
         prompt: 'secret-prompt-sentinel' }]
     };
-    out({ id: m.id, result: { summary: { lifetimeTokens: 999999 }, dailyUsageBuckets: null, threadUsage: usage } });
+    const reply = () => out({ id: m.id, result: { summary: { lifetimeTokens: 999999 }, dailyUsageBuckets: null, threadUsage: usage } });
+    if (process.env.FIXTURE_USAGE_DELAY_MS) setTimeout(reply, Number(process.env.FIXTURE_USAGE_DELAY_MS));
+    else reply();
   } else if (m.method === 'model/list' && ['metadata-models', 'managed-models'].includes(process.env.FIXTURE_MODE)) {
     mark('model_read');
     if (process.env.FIXTURE_MODEL_DELAY_MS && !m.params?.cursor) {

@@ -3524,6 +3524,26 @@ fn auto_failed_thread_usage_read_invalidates_stale_account_capacity() {
 }
 
 #[test]
+fn auto_thread_usage_read_does_not_extend_earlier_quota_freshness() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_USAGE_DELAY_MS"),
+        ("FIXTURE_MODE", "metadata-usage"), ("FIXTURE_USAGE_DELAY_MS", "1200")]);
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "prompt":"requested work","title":"quota timestamp"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let usage = d.call("auto.usage.thread.refresh", json!({"run_id":run}));
+    let quota = d.call("auto.quota.state", json!({"profile_id":"system-codex",
+        "harness":"codex-app", "model":"gpt-6-sol"}));
+    let usage_ms = usage["observation"]["estimate"]["observed_ms"].as_i64().unwrap();
+    let quota_ms = quota["observation"]["snapshot"]["observed_ms"].as_i64().unwrap();
+    assert!(usage_ms - quota_ms >= 1_000,
+        "the later usage response must not extend quota freshness: usage={usage}, quota={quota}");
+}
+
+#[test]
 fn auto_codex_native_allowance_update_is_scoped_and_not_usage() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
@@ -3622,6 +3642,20 @@ fn auto_codex_model_catalog_is_paginated_allowlisted_and_account_scoped() {
     std::fs::write(&account_file, "second-private-account").unwrap();
     d.call("auto.quota.refresh", json!({"profile_id":"system-codex"}));
     assert!(d.call("auto.models.list", json!({"profile_id":"system-codex"}))["catalog"].is_null());
+}
+
+#[test]
+fn auto_codex_quota_freshness_starts_when_its_metadata_arrives() {
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_MODEL_DELAY_MS"),
+        ("FIXTURE_MODE", "metadata-models"), ("FIXTURE_MODEL_DELAY_MS", "1200")]);
+    let models = d.call("auto.models.refresh", json!({"profile_id":"system-codex"}));
+    let quota = d.call("auto.quota.state", json!({"profile_id":"system-codex",
+        "harness":"codex-app", "model":"gpt-6-sol"}));
+    let model_ms = models["catalog"]["observed_ms"].as_i64().unwrap();
+    let quota_ms = quota["observation"]["snapshot"]["observed_ms"].as_i64().unwrap();
+    assert!(model_ms - quota_ms >= 1_000,
+        "the earlier quota response must not inherit a delayed catalog's freshness: models={models}, quota={quota}");
 }
 
 #[test]

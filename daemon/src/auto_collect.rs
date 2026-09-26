@@ -533,6 +533,7 @@ pub fn codex_rate_limits(
 /// response read from the same authenticated metadata session.
 pub struct CodexDiscovery {
     pub rate_limits: Value,
+    pub rate_limits_observed_ms: i64,
     pub models: Value,
 }
 
@@ -550,6 +551,10 @@ pub fn codex_model_list(
         |stdin, stdout, reader, deadline| {
             request(stdin, 3, "account/rateLimits/read", json!({}))?;
             let rate_limits = reader.response(stdout, 3, deadline)?;
+            // Model pagination may consume most of the discovery deadline.
+            // Quota freshness begins when its own response arrives, not when
+            // the later catalog has finished loading.
+            let rate_limits_observed_ms = crate::daemon::now();
             let mut data = Vec::new();
             let mut cursor: Option<String> = None;
             let mut seen = std::collections::BTreeSet::new();
@@ -582,6 +587,7 @@ pub fn codex_model_list(
                 let Some(next) = &cursor else {
                     return Ok(CodexDiscovery {
                         rate_limits,
+                        rate_limits_observed_ms,
                         models: json!({"data": data, "nextCursor": null}),
                     });
                 };
@@ -647,6 +653,7 @@ pub fn codex_tool_inventory(
 /// request. The selected account identity is checked in the same session.
 pub struct CodexThreadUsageRead {
     pub rate_limits: Value,
+    pub rate_limits_observed_ms: i64,
     pub usage: Value,
 }
 
@@ -673,6 +680,7 @@ pub fn codex_thread_usage(
         |stdin, stdout, reader, deadline| {
             request(stdin, 3, "account/rateLimits/read", json!({}))?;
             let rate_limits = reader.response(stdout, 3, deadline)?;
+            let rate_limits_observed_ms = crate::daemon::now();
             request(
                 stdin,
                 4,
@@ -680,7 +688,7 @@ pub fn codex_thread_usage(
                 json!({"threadId":thread_id}),
             )?;
             let usage = reader.response(stdout, 4, deadline)?;
-            Ok(CodexThreadUsageRead { rate_limits, usage })
+            Ok(CodexThreadUsageRead { rate_limits, rate_limits_observed_ms, usage })
         },
     )
 }

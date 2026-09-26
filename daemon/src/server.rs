@@ -1123,7 +1123,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     Duration::from_millis(remaining_metadata_ms(deadline)?))?;
                 let observed_ms = crate::daemon::now();
                 let catalog = crate::auto_route::parse_codex_catalog(&raw.models, observed_ms)?;
-                let snapshot = crate::auto_quota::parse_codex_rate_limits(&raw.rate_limits, &profile.id, observed_ms)?;
+                let snapshot = crate::auto_quota::parse_codex_rate_limits(&raw.rate_limits, &profile.id, raw.rate_limits_observed_ms)?;
                 let fingerprint = crate::auto_quota::account_fingerprint(&raw.rate_limits)?;
                 Ok((observed_ms, catalog, snapshot, fingerprint))
             })();
@@ -1317,7 +1317,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let raw = crate::auto_collect::codex_thread_usage(&program, &env, &crate::adapters::neutral_dir(), thread_id, std::time::Duration::from_secs(5))?;
                 let observed_ms = crate::daemon::now();
                 let fingerprint = crate::auto_quota::account_fingerprint(&raw.rate_limits)?;
-                let snapshot = crate::auto_quota::parse_codex_rate_limits(&raw.rate_limits, profile_id, observed_ms)?;
+                let snapshot = crate::auto_quota::parse_codex_rate_limits(&raw.rate_limits, profile_id, raw.rate_limits_observed_ms)?;
                 let estimate = crate::auto_consumption::parse_codex_thread_usage(&raw.usage, thread_id, observed_ms)?;
                 Ok((observed_ms, fingerprint, snapshot, estimate))
             })();
