@@ -554,9 +554,11 @@
         "docs/verification/swarm/SWARM-58.md",
         "daemon/tests/swarm_ledgerpay.rs",
         "fixtures/swarm/ledgerpay-v1/",
-        "docs/verification/swarm/S2.md"
+        "docs/verification/swarm/S2.md",
+        "fixtures/swarm/ledgerpay-v1/session.py",
+        "fixtures/swarm/ledgerpay-v1/test_session.py"
       ],
-      "blocker": "The durable fixture intent journal blocks repeat execution after a lost acknowledgement and restart. LedgerPay now probes a real local PostgreSQL grant after an update/receipt gap and reports unknown_do_not_retry, but that probe is not linked to the daemon journal across restart; native tool interception, authoritative outcome adapters and live paths remain unverified."
+      "blocker": "A versioned LedgerPay fixture now connects a real PostgreSQL state probe to the durable daemon effect journal across restart: a lost ack leaves counter 1 and one duplicate queued, journal replay refuses execution, and a separate control proves blind redelivery would raise the counter to 2. The outcome is reconciled as applied through a submitted effect_probe. Arbitrary harness tool calls are not intercepted, absent outcomes lack a qualified adapter, cross-category identity and safe claim release remain open, and no live path is qualified."
     },
     "SWARM-59": {
       "status": "partial",
@@ -620,9 +622,11 @@
         "docs/verification/swarm/SWARM-64.md",
         "fixtures/swarm/ledgerpay-v1/",
         "daemon/tests/swarm_ledgerpay.rs",
-        "docs/verification/swarm/S2.md"
+        "docs/verification/swarm/S2.md",
+        "fixtures/swarm/ledgerpay-v1/session.py",
+        "fixtures/swarm/ledgerpay-v1/test_session.py"
       ],
-      "blocker": "S1/S2/S3 have versioned local backends and joined scripted runs. S2 covers signed ingress, K2-to-director-to-K3 discovery, three-worker admission with K4 refill, duplicate 0-to-2 versus protected 0-to-1, stale cancellation order, lost-ack probe and missing-Redis blocked coverage. Autonomous decisions, complete fault/report traces, live communication and S0/S4/S5 remain unverified."
+      "blocker": "S1/S2/S3 have versioned local backends and joined scripted runs. S2 additionally links a persistent PostgreSQL outcome probe to the daemon journal across a lost acknowledgement and restart, while a control proves blind retry would double-apply. Autonomous director/routing decisions, complete fault/report traces, live communication and S0/S4/S5 remain unverified."
     }
   },
   "scenarios": {
@@ -651,9 +655,11 @@
         "fixtures/swarm/ledgerpay-v1/test_backend.py",
         "fixtures/swarm/ledgerpay-v1/test_probe.py",
         "daemon/tests/swarm_ledgerpay.rs",
-        "docs/verification/swarm/S2.md"
+        "docs/verification/swarm/S2.md",
+        "fixtures/swarm/ledgerpay-v1/session.py",
+        "fixtures/swarm/ledgerpay-v1/test_session.py"
       ],
-      "blocker": "Versioned FastAPI/PostgreSQL/Redis backend and joined scripted Swarm run now prove signed ingress, K1-K3 initial admission, K4 refill, K2-to-director-to-K3 discovery, duplicate and protected delivery results, stale-event denial, lost-ack state probe, and missing-Redis blocked coverage. Director/routing decisions and final prose are scripted; the real outcome probe is not journal-linked across restart; full report, fault trace and live communication remain unverified."
+      "blocker": "Versioned FastAPI/PostgreSQL/Redis backend and joined scripted Swarm run prove signed ingress, K1-K3 admission, K4 refill, K2-to-director-to-K3 discovery, duplicate and protected delivery, stale-event denial and missing-Redis blocked coverage. A separate joined replay links a persistent real-database lost-ack probe to daemon effect reconciliation across restart and prevents blind redelivery. Director/routing choices and final prose are scripted; arbitrary harness commands are not journal-enforced, full report/fault trace and live communication remain unverified."
     },
     "S3": {
       "status": "partial",
