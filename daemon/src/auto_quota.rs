@@ -110,9 +110,6 @@ impl QuotaSnapshot {
     }
 
     pub fn state_for(&self, model: &str, now_ms: i64) -> QuotaState {
-        if now_ms < self.observed_ms {
-            return QuotaState::Unknown;
-        }
         if self.ordinary_usage_allowed == Some(false) {
             return QuotaState::Exhausted;
         }
@@ -122,6 +119,9 @@ impl QuotaSnapshot {
             .any(|w| w.used_percent >= 100.0 && w.reset_ms.is_none_or(|reset| reset > now_ms))
         {
             return QuotaState::Exhausted;
+        }
+        if now_ms < self.observed_ms {
+            return QuotaState::Unknown;
         }
         if now_ms >= self.expires_ms {
             return QuotaState::Unknown;
@@ -491,6 +491,19 @@ mod tests {
             QuotaState::Exhausted,
             "an explicit account denial without a reset cannot expire into new capacity"
         );
+    }
+
+    #[test]
+    fn backward_clock_skew_does_not_clear_a_known_quota_block() {
+        let observed = 1_800_000_000_000_i64;
+        let exhausted = parse_codex_rate_limits(&json!({"rateLimits":{
+            "primary":{"usedPercent":100,"resetsAt":1800003600}}}), "pool-1", observed).unwrap();
+        assert_eq!(exhausted.state_for("gpt-6-sol", observed - 1), QuotaState::Exhausted,
+            "clock rollback must not turn a known block into unknown eligibility");
+        let available = parse_codex_rate_limits(&json!({"rateLimits":{
+            "primary":{"usedPercent":30,"resetsAt":1800003600}}}), "pool-1", observed).unwrap();
+        assert_eq!(available.state_for("gpt-6-sol", observed - 1), QuotaState::Unknown,
+            "clock rollback must not carry a capacity claim into the past");
     }
 
     #[test]
