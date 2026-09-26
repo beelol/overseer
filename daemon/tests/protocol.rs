@@ -1887,6 +1887,83 @@ fn auto_dispatch_selects_reachable_local_opencode_provider_after_another_fails()
 }
 
 #[test]
+fn auto_opencode_silent_503_interrupt_replays_as_paused_without_duplicate() {
+    let Some(program) = std::env::var_os("PATH").and_then(|path| std::env::split_paths(&path)
+        .map(|dir| dir.join("opencode")).find(|candidate| candidate.is_file())) else { return };
+    struct MockServer(std::process::Child);
+    impl Drop for MockServer {
+        fn drop(&mut self) { let _ = self.0.kill(); let _ = self.0.wait(); }
+    }
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let start = |name: &str, status: Option<&str>| {
+        let port_file = r.path().join(format!("{name}-port"));
+        let log_file = r.path().join(format!("{name}-log"));
+        let mut command = std::process::Command::new("node");
+        command.arg(fixture("mock-openai/server.js"))
+            .env("MOCK_PORT_FILE", &port_file).env("MOCK_LOG", &log_file)
+            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+        if let Some(status) = status { command.env("MOCK_HTTP_STATUS", status); }
+        let server = MockServer(command.spawn().unwrap());
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !port_file.exists() {
+            assert!(std::time::Instant::now() < deadline, "{name} mock provider did not start");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let endpoint = format!("http://127.0.0.1:{}/v1",
+            std::fs::read_to_string(&port_file).unwrap());
+        (server, endpoint, log_file)
+    };
+    let (_failing, failed_endpoint, failed_log) = start("failing", Some("503"));
+    let (_healthy, healthy_endpoint, healthy_log) = start("healthy", None);
+    std::fs::write(repo.join("opencode.json"), json!({
+        "$schema":"https://opencode.ai/config.json","provider":{
+            "local_a":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":failed_endpoint},
+                "models":{"gpt-oss-120b":{"name":"Local A","tool_call":true,"reasoning":true}}},
+            "local_b":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":healthy_endpoint},
+                "models":{"gpt-oss-120b":{"name":"Local B","tool_call":true,"reasoning":true}}}
+        },"model":"local_a/gpt-oss-120b","small_model":"local_a/gpt-oss-120b",
+        "autoupdate":false,"share":"disabled"}).to_string()).unwrap();
+    git(&repo, &["add", "opencode.json"]);
+    git(&repo, &["commit", "-q", "-m", "two reachable local routes"]);
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_OPENCODE_PATH", program.to_str().unwrap()),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models")]);
+    let profile = d.call("profile.create", json!({"name":"Local 503","harness":"opencode"}));
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"parent checkpoint",
+        "approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = |unit: &str| json!({"work_unit_id":unit,"parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"sandbox":"read_only",
+        "allowed_profiles":[profile["id"]],"prompt":"reply hello","title":"local check"});
+    let first = d.call("auto.dispatch", request("local-503-first"));
+    assert_eq!(first["state"], "dispatched", "{first}");
+    assert!(first["decision"]["selected"].as_str().unwrap().contains("local_a"));
+    let first_id = run_id(&first);
+    let request_deadline = std::time::Instant::now() + Duration::from_secs(8);
+    loop {
+        if std::fs::read_to_string(&failed_log).unwrap_or_default()
+            .contains("/v1/chat/completions") { break; }
+        assert!(std::time::Instant::now() < request_deadline,
+            "OpenCode never requested the failing local endpoint");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(d.events(&first_id).iter().all(|event| event["kind"] != "error"),
+        "the installed OpenCode CLI has not surfaced its retry as a classified error yet");
+    // The installed CLI retries a 503 without emitting an error promptly.
+    // An explicit stop must pause replay instead of starting another child.
+    d.call("run.interrupt", json!({"run_id":first_id}));
+    assert_eq!(d.wait_done(&first_id, 20)["status"], "interrupted");
+    let replay = d.call("auto.dispatch", request("local-503-first"));
+    assert_eq!(replay["state"], "paused", "{replay}");
+    assert_eq!(replay["run"]["id"], first_id);
+    assert!(!healthy_log.exists(), "an uncertain stopped unit cannot silently try another endpoint");
+    assert_eq!(d.runs().len(), 2, "interrupted work must not create a second child");
+}
+
+#[test]
 fn auto_claude_native_quota_keeps_model_scope_and_drops_raw_provider_text() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

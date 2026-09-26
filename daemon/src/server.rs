@@ -580,7 +580,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 }
                 let route_id = format!("{}/{}/{}", child.profile_id.as_deref().unwrap_or("unknown"),
                     child.model.as_deref().unwrap_or("unknown"), child.effort.as_deref().unwrap_or("unknown"));
-                let replay_state = if child.status == "failed" { "paused" } else { "dispatched" };
+                let replay_state = if !ACTIVE.contains(&child.status.as_str())
+                    && child.status != "completed" { "paused" } else { "dispatched" };
                 let mut replay = json!({"state":replay_state,"work_unit_id":work_unit_id,"run":child,
                     "workspace":d.workspace(&child.workspace_id)?,"replayed":true,
                     "decision":{"work_unit_id":work_unit_id,"selected":route_id,"exclusions":[],"reason":"replayed_existing_work_unit"}});
