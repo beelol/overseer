@@ -137,6 +137,10 @@ rl.on('line', line => {
       }
       const finish = () => {
         pendingTurnTimer = null;
+        if (process.env.FIXTURE_EMIT_USAGE === '1') {
+          out({ method: 'thread/tokenUsage/updated', params: { threadId: thread,
+            tokenUsage: { inputTokens: 42, outputTokens: 7 } } });
+        }
         out({ method: 'item/completed', params: { threadId: thread, turnId: turn,
           item: { type: 'agentMessage', id: 'message-1', text } } });
         out({ method: 'turn/completed', params: { threadId: thread, turn: { id: turn, status: 'completed', error: null } } });

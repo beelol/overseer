@@ -1510,6 +1510,47 @@ fn auto_aggregate_failure_rolls_back_learning_without_replaying_the_task() {
 }
 
 #[test]
+fn auto_dispatch_continues_during_local_learning_write_pressure_and_recovers() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("auto-learning-pressure-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_EMIT_USAGE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
+        ("FIXTURE_EMIT_USAGE", "1")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    assert_eq!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().len(), 1);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER learning_capacity_full BEFORE INSERT ON auto_measurements
+        BEGIN SELECT RAISE(FAIL, 'simulated local learning capacity full'); END;").unwrap();
+    let first = d.call("auto.dispatch", json!({"work_unit_id":"learning-pressure-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],"prompt":"browser check"}));
+    assert_eq!(first["state"], "dispatched", "{first}");
+    let first_child = run_id(&first);
+    assert_eq!(d.wait_done(&first_child, 15)["status"], "completed");
+    assert_eq!(d.call("run.result", json!({"run_id":first_child}))["state"], "ready");
+    let paused = d.call("auto.usage.list", json!({}));
+    assert_eq!(paused["learning_paused"], true);
+    assert_eq!(paused["measurements"].as_array().unwrap().len(), 1,
+        "failed learning write must not leave a partial sample");
+    db.execute_batch("DROP TRIGGER learning_capacity_full;").unwrap();
+    let second = d.call("auto.dispatch", json!({"work_unit_id":"learning-pressure-2",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],"prompt":"another bounded child"}));
+    assert_eq!(second["state"], "dispatched", "{second}");
+    let second_child = run_id(&second);
+    assert_eq!(d.wait_done(&second_child, 15)["status"], "completed");
+    let recovered = d.call("auto.usage.list", json!({}));
+    assert_eq!(recovered["learning_paused"], false);
+    assert_eq!(recovered["measurements"].as_array().unwrap().len(), 2);
+    assert_eq!(d.runs().len(), 3);
+    assert_eq!(d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count(), 2);
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 2,
+        "learning recovery must not replay either child turn");
+}
+
+#[test]
 fn auto_codex_thread_credit_estimate_is_metadata_only_and_separate_from_quota() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
