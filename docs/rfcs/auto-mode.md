@@ -206,7 +206,7 @@ These are implementation requirements, not claims about this documentation revis
 
 ### Evidence and boundaries
 
-- [ ] **AUTO-AC-01 — Isolated delivery.** Auto ships disabled by default and manual routing remains unchanged. **Verify:** diff review plus manual create/follow-up/interrupt regression with Auto disabled; confirm release AC IDs and account-governance work are untouched by routing-only changes.
+- [x] **AUTO-AC-01 — Isolated delivery.** Auto ships disabled by default and manual routing remains unchanged. **Verify:** diff review plus manual create/follow-up/interrupt regression with Auto disabled; confirm release AC IDs and account-governance work are untouched by routing-only changes.
 - [x] **AUTO-AC-02 — Capability and metering survey.** Record versions, account APIs/harness sources, supported models/efforts/tools, and whether each exposes remaining allowance, actual charges, or only activity. **Verify:** Read-only versioned probes for supported harnesses/accounts; record authentication method and freshness; missing per-model multipliers remain unknown, not a claimed integration.
 - [x] **AUTO-AC-03 — Provider-neutral eligibility.** Common eligibility checks accept provider/harness/model data independently of routing preferences. **Verify:** Synthetic providers pass the same eligibility path; no provider-specific fallback chain; separate adapter knowledge from measured estimates and bounded task inference.
 - [ ] **AUTO-AC-04 — Distinct routes and shared pools.** Account/model/endpoint scopes and shared quota are preserved. **Verify:** exhaust one account across two harnesses; both are excluded while an independent allowed account remains eligible; test unresolved identity conservatism.
