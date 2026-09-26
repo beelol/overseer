@@ -219,9 +219,12 @@
       "blocker": "Fixture startup automatically drains already-admitted unlinked intents only while their snapshots and target permission remain valid; it retains stale or revoked reservations without launching. Local launch-failure fixtures close an unstarted queued run and reconcile an asynchronously failed worker attempt. Task/run/link/owner insertion rolls back atomically when the worker intent is missing. External worktree cleanup, exact spawn-record crash windows, full result receipt replay, VS Code restart, live Auto Mode refresh and live harness recovery remain unverified."
     },
     "SWARM-23": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "The extension has no Swarm status/usage/limiting-constraint view; daemon fixture output is not UI evidence."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_control.rs",
+        "docs/verification/swarm/SWARM-23.md"
+      ],
+      "blocker": "Background notifications now group active workers under their category and show queued Swarms with zero workers. The extension still has no Swarm active/queued counts, targets/accounts, limiting constraint, usage state, finishing reserve or decision explanation."
     },
     "SWARM-24": {
       "status": "partial",

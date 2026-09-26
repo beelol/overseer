@@ -4,6 +4,22 @@ use common::*;
 use serde_json::json;
 
 #[test]
+fn background_notice_names_queued_swarm_without_a_worker_process() {
+    let d = Daemon::start(&[("OVERSEER_NOTIFY_COMMAND", "/usr/bin/true")]);
+    let run = d.call("swarm.create", json!({"category":"Queued backend audit",
+        "objective":"Inspect backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"pending","title":"Pending","acceptance":"evidence","deps":[]}
+    ]}));
+    let notice = d.call("daemon.background_notice", json!({}))["notice"].clone();
+    assert_eq!(notice["title"], "Overseer: 1 swarm still active");
+    assert_eq!(notice["swarms"][0]["id"], id);
+    assert_eq!(notice["swarms"][0]["active_workers"], 0);
+    assert!(notice["body"].as_str().unwrap().contains("Queued backend audit"));
+}
+
+#[test]
 fn daemon_stop_all_cancels_swarm_without_a_supervised_worker() {
     let mut d = Daemon::start(&[]);
     let run = d.call("swarm.create", json!({"category":"Global stop","objective":"Audit backend",
@@ -26,7 +42,7 @@ fn daemon_stop_all_cancels_swarm_without_a_supervised_worker() {
 
 #[test]
 fn daemon_stop_all_preserves_unconfirmed_swarm_worker_after_control_loss() {
-    let mut d = Daemon::start(&[]);
+    let mut d = Daemon::start(&[("OVERSEER_NOTIFY_COMMAND", "/usr/bin/true")]);
     let temp = tmp();
     let checkout = repo(&temp.path().join("global-stop-source"));
     let run = d.call("swarm.create", json!({"category":"Global active stop",
@@ -51,6 +67,11 @@ fn daemon_stop_all_preserves_unconfirmed_swarm_worker_after_control_loss() {
         "program":"/bin/sleep","args":["30"],"prompt":"Inspect","title":"Global stop worker"}));
     let worker = launched["overseer_run_id"].as_str().unwrap();
     d.wait_status(worker, |status| status == "running", 10);
+    let notice = d.call("daemon.background_notice", json!({}))["notice"].clone();
+    assert_eq!(notice["title"], "Overseer: 1 swarm still active");
+    assert_eq!(notice["swarms"][0]["id"], id);
+    assert_eq!(notice["swarms"][0]["active_workers"], 1);
+    assert!(notice["body"].as_str().unwrap().contains("Global active stop"));
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     let run_dir: String = db.query_row("SELECT run_dir FROM runs WHERE id=?1", [worker],
         |row| row.get(0)).unwrap();
