@@ -47,3 +47,6 @@ and reads GitHub with `gh` (read-only).
    refused: GitHub requires the `delete_repo` scope, which this `gh` login does not have. The repository is still
    there (private, PR #1 closed, branch deleted). Owner action to finish: run
    `gh auth refresh -h github.com -s delete_repo` (browser approval), then the agent (or the owner) deletes it.
+10. The owner granted `delete_repo` (`gh auth refresh -h github.com -s delete_repo`, approved in the browser).
+    Agent: `gh repo delete beelol/overseer-pr-sandbox --yes` → the repository no longer resolves. Nothing of the
+    AC-50 check remains on GitHub.
