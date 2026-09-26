@@ -10,9 +10,15 @@ fn token_hash(token: &str) -> String {
     format!("{:x}", Sha256::digest(token.as_bytes()))
 }
 
-fn check_attempt(store: &Store, run: &str, job: &str, attempt: &str, token: &str) -> Result<i64> {
+pub(super) fn check_attempt(
+    store: &Store,
+    run: &str,
+    job: &str,
+    attempt: &str,
+    token: &str,
+) -> Result<i64> {
     let data: Option<(i64,String)> = store.conn.query_row(
-        "SELECT revision,token_sha256 FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3 AND status='registered'",
+        "SELECT revision,token_sha256 FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3 AND status IN ('registered','finished')",
         params![attempt,run,job], |r| Ok((r.get(0)?,r.get(1)?)),
     ).optional()?;
     let (revision, hash) = data.ok_or_else(|| anyhow!("unknown or inactive attempt identity"))?;

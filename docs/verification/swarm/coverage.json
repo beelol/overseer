@@ -19,11 +19,10 @@
     "SWARM-03": {
       "status": "partial",
       "evidence": [
-        "daemon/tests/swarm_state.rs",
-        "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-2.md"
       ],
-      "blocker": "Scheduler concurrency and overlapping writer control are not implemented."
+      "blocker": "Dependencies and global read/write claims are stored; scheduler concurrency and overlapping worktree writers are not implemented."
     },
     "SWARM-04": {
       "status": "unverified",
@@ -101,9 +100,12 @@
       "blocker": null
     },
     "SWARM-19": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-2.md"
+      ],
+      "blocker": "Submitted artifacts require review and confirmed exit before dependents become ready; combined integration checks remain unimplemented."
     },
     "SWARM-20": {
       "status": "partial",
@@ -200,9 +202,12 @@
       "blocker": null
     },
     "SWARM-35": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-2.md"
+      ],
+      "blocker": "Rejected results do not unlock dependents; contract revision propagation and session reuse remain unimplemented."
     },
     "SWARM-36": {
       "status": "unverified",
@@ -257,14 +262,20 @@
       "blocker": "Delivered/applied states are distinct; live turn-boundary delivery and timeout response are not implemented."
     },
     "SWARM-44": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-2.md"
+      ],
+      "blocker": "Cross-category read/write claims and duplicate hypothesis ownership pass; director redirection is not connected to live workers."
     },
     "SWARM-45": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-2.md"
+      ],
+      "blocker": "Independent reproduction claim can coexist with one hypothesis owner; budgeted job creation and finding merge remain unimplemented."
     },
     "SWARM-46": {
       "status": "unverified",
@@ -272,18 +283,20 @@
       "blocker": null
     },
     "SWARM-47": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-2.md"
+      ],
+      "blocker": "Evidence is required for a review decision; contradictory evidence handling and bounded reproduction remain unimplemented."
     },
     "SWARM-48": {
       "status": "partial",
       "evidence": [
-        "daemon/tests/swarm_state.rs",
-        "daemon/tests/swarm_broker.rs",
-        "docs/verification/swarm/milestone-1.md"
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-2.md"
       ],
-      "blocker": "Cycles, unknown dependencies, duplicate IDs and missing acceptance are rejected; conflict claims and stalled planning are not implemented."
+      "blocker": "Plan validation and conflicting exclusive claims pass; independent valid subgraph retention and stalled planning remain unimplemented."
     },
     "SWARM-49": {
       "status": "partial",
@@ -313,14 +326,20 @@
       "blocker": null
     },
     "SWARM-53": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-2.md"
+      ],
+      "blocker": "Global exclusive resource claim rejects a second writer; contamination detection/replay remains unimplemented."
     },
     "SWARM-54": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": null
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_plan.rs",
+        "docs/verification/swarm/milestone-2.md"
+      ],
+      "blocker": "Artifacts have attempt, job, revision and hash provenance; missing source revisions are rejected, but file removal and revalidation are not tested."
     },
     "SWARM-55": {
       "status": "unverified",

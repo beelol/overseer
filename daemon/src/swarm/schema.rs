@@ -62,6 +62,43 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           UNIQUE(run_id,message_id)
         );
         CREATE INDEX IF NOT EXISTS swarm_inbox ON swarm_messages(run_id,recipient,seq);
+        CREATE TABLE IF NOT EXISTS swarm_claims(
+          resource TEXT NOT NULL,
+          run_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          mode TEXT NOT NULL CHECK(mode IN ('read','write')),
+          status TEXT NOT NULL CHECK(status IN ('active','released')),
+          revision INTEGER NOT NULL,
+          created_ms INTEGER NOT NULL,
+          updated_ms INTEGER NOT NULL,
+          PRIMARY KEY(resource,run_id,job_id),
+          FOREIGN KEY(run_id,job_id) REFERENCES swarm_jobs(run_id,id)
+        );
+        CREATE INDEX IF NOT EXISTS swarm_claims_active ON swarm_claims(resource,status);
+        CREATE TABLE IF NOT EXISTS swarm_artifacts(
+          id TEXT NOT NULL,
+          run_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          attempt_id TEXT NOT NULL REFERENCES swarm_attempts(id),
+          source_revision INTEGER NOT NULL,
+          kind TEXT NOT NULL,
+          content TEXT NOT NULL,
+          sha256 TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,id),
+          FOREIGN KEY(run_id,job_id) REFERENCES swarm_jobs(run_id,id)
+        );
+        CREATE TABLE IF NOT EXISTS swarm_decisions(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          run_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          attempt_id TEXT NOT NULL,
+          revision INTEGER NOT NULL,
+          decision TEXT NOT NULL,
+          evidence TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          UNIQUE(run_id,job_id,attempt_id,decision)
+        );
         "#,
     )?;
     Ok(())

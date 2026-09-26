@@ -1,6 +1,8 @@
+mod artifacts;
 mod broker;
 mod plan;
 pub mod schema;
+pub use artifacts::{confirm_exit, decide, put};
 pub use broker::{ack, direct, messages, register, report};
 
 use crate::store::Store;
@@ -192,4 +194,83 @@ pub fn stop(store: &mut Store, p: &Value) -> Result<Value> {
     )?;
     tx.commit()?;
     Ok(json!({"id":id,"status":"stopping","duplicate":false}))
+}
+
+pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
+    let run = required(p, "run_id")?;
+    let job = required(p, "job_id")?;
+    let resource = required(p, "resource")?.trim();
+    let mode = required(p, "mode")?;
+    let generation = p["generation"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing generation"))?;
+    let revision = p["revision"]
+        .as_i64()
+        .ok_or_else(|| anyhow!("missing revision"))?;
+    if resource.is_empty() || resource.len() > 512 || resource.chars().any(char::is_control) {
+        bail!("invalid resource claim");
+    }
+    if mode != "read" && mode != "write" {
+        bail!("claim mode must be read or write");
+    }
+    let current = get(store, run)?;
+    if current["generation"] != generation {
+        bail!("stale director generation");
+    }
+    if current["revision"] != revision {
+        bail!("stale plan revision");
+    }
+    if current["status"] != "planning" && current["status"] != "running" {
+        bail!("swarm run does not permit claims");
+    }
+    let status: String = store
+        .conn
+        .query_row(
+            "SELECT status FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            params![run, job],
+            |r| r.get(0),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("unknown job"))?;
+    if [
+        "cancelled",
+        "cancel_requested",
+        "superseded",
+        "failed",
+        "accepted",
+    ]
+    .contains(&status.as_str())
+    {
+        bail!("job cannot claim a resource in this state");
+    }
+    let tx = store.conn.transaction()?;
+    let mut stmt = tx.prepare(
+        "SELECT run_id,job_id,mode FROM swarm_claims WHERE resource=?1 AND status='active'",
+    )?;
+    let existing = stmt
+        .query_map(params![resource], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    for (owner_run, owner_job, owner_mode) in &existing {
+        if owner_run == run && owner_job == job {
+            if owner_mode == mode {
+                return Ok(json!({"resource":resource,"mode":mode,"duplicate":true}));
+            }
+            bail!("claim conflict: mode change requires release and revalidation");
+        }
+        if mode == "write" || owner_mode == "write" {
+            bail!("claim conflict on {resource}: owned by {owner_run}/{owner_job}");
+        }
+    }
+    let now = crate::daemon::now();
+    tx.execute("INSERT INTO swarm_claims(resource,run_id,job_id,mode,status,revision,created_ms,updated_ms) VALUES(?1,?2,?3,?4,'active',?5,?6,?6)",
+        params![resource,run,job,mode,revision,now])?;
+    tx.commit()?;
+    Ok(json!({"resource":resource,"mode":mode,"duplicate":false}))
 }
