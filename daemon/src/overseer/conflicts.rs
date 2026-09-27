@@ -151,7 +151,7 @@ impl Daemon {
     }
 
     /// Scan one agent against every agent it can collide with, and record what is found.
-    pub fn scan_conflicts(&self, run_id: &str) -> Result<Value> {
+    pub fn scan_conflicts(self: &Arc<Self>, run_id: &str) -> Result<Value> {
         let root = self.root_of(run_id)?;
         {
             let mut scanning = self.coord.scanning.lock().unwrap();
@@ -164,7 +164,7 @@ impl Daemon {
         result
     }
 
-    fn scan_conflicts_inner(&self, root: &Run) -> Result<Value> {
+    fn scan_conflicts_inner(self: &Arc<Self>, root: &Run) -> Result<Value> {
         let started = Instant::now();
         let (me, others) = self.parties(root)?;
         let Some(me) = me else {
@@ -175,7 +175,9 @@ impl Daemon {
         // This agent's own changes, cached for the digest and the roster.
         if let Some(base) = self.task_base(&me.task, cwd) {
             if let Ok(changed) = changed_between(cwd, &base, &me.tree) {
+                let paths: Vec<String> = changed.iter().map(|(p, _)| p.clone()).collect();
                 self.coord.changes.lock().unwrap().insert(me.ws.id.clone(), changed);
+                self.check_guardrails(&root.id, &paths)?;
             }
         }
         let mut found: BTreeMap<String, (String, String, Option<String>, Option<String>, Vec<String>)> = BTreeMap::new();

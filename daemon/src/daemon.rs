@@ -524,6 +524,9 @@ impl Daemon {
         generic_meta["opts"] = json!({"effort": effort, "mode": mode});
         let snap = self.take_snapshot(&ws, "run-start")?;
         let n = self.store.lock().unwrap().turns(run_id)?.len() as i64 + 1;
+        let preface = if follow_up { self.guardrail_preface(run_id) } else { String::new() };
+        let prompt_owned = if preface.is_empty() { prompt.to_string() } else { format!("{preface}\n\n{prompt}") };
+        let prompt = prompt_owned.as_str();
         let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt.into(), snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
         self.store.lock().unwrap().insert_turn(&turn)?;
         self.emit(Some(&run.task_id), Some(run_id), "turn_started", "daemon", "exact", json!({"turn": turn, "snapshot": snap.commit_sha}))?;
@@ -555,7 +558,10 @@ impl Daemon {
             }
         }
         let args: Option<Vec<String>> = generic_meta["args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
-        let extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
+        let mut extra_args: Vec<String> = generic_meta["extra_args"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
+        if follow_up {
+            extra_args.extend(self.guardrail_launch_args(run_id, &run.harness));
+        }
         let resume = if follow_up { run.native_id.clone() } else { None };
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
@@ -1304,6 +1310,9 @@ impl Daemon {
             Some(snap) => options.push(json!({"mode": "task_start", "label": "Since task start", "base": snap.commit_sha, "available": true,
                 "detail": format!("task-start snapshot {} (HEAD {} plus dirty contents at creation)", snap.id, snap.head.clone().unwrap_or_else(|| "none".into())), "provenance": "recorded"})),
             None => options.push(json!({"mode": "task_start", "label": "Since task start", "available": false, "detail": "task-start snapshot missing"})),
+        }
+        if let Some(snap) = self.redirect_snapshot(&root.workspace_id) {
+            options.push(json!({"mode": "redirect", "label": "Since the change of direction", "base": snap.commit_sha, "available": true, "detail": format!("snapshot {} taken when Overseer redirected this agent", snap.id), "provenance": "recorded", "snapshot": snap}));
         }
         match &task.fork_commit {
             Some(fork) if git::rev_parse(path, fork).is_some() => {

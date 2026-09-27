@@ -13,10 +13,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 pub const LEVELS: &[&str] = &["ask_first", "steer", "auto"];
-/// Actions Overseer may ask for today; later steps add hold, guardrail, redirect, watch, share.
-pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin"];
-/// Quiet actions happen at once at the Steer level; the rest stay proposals there.
-const QUIET: &[&str] = &["message", "pin"];
+/// Actions Overseer may ask for today; share, report, area and watch arrive with their steps.
+pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "release", "guardrail", "redirect", "archive"];
+/// The settle window in which what the owner asked for can still be cancelled (AC-170's).
+pub const SETTLE_MS: i64 = 2000;
 const TURN_BYTES: usize = 32 * 1024;
 pub const FROM_OVERSEER: &str = "From Overseer: ";
 pub const OPEN: &str = "<overseer-state>";
@@ -313,7 +313,7 @@ impl Daemon {
             run_id
         };
         let cursor = self.store.lock().unwrap().max_seq()?;
-        self.store.lock().unwrap().conn.execute("UPDATE overseer_sessions SET last_seq=?2, last_turn_ms=?3 WHERE id=?1", rusqlite::params![sid, cursor, crate::daemon::now()])?;
+        self.store.lock().unwrap().conn.execute("UPDATE overseer_sessions SET last_seq=?2, last_turn_ms=?3, last_cause='owner' WHERE id=?1", rusqlite::params![sid, cursor, crate::daemon::now()])?;
         let turns = self.store.lock().unwrap().turns(&run_id)?;
         Ok(json!({"run_id": run_id, "turn": turns.last().map(|t| t.id.clone())}))
     }
@@ -368,10 +368,19 @@ impl Daemon {
             bail!("no actions");
         }
         let mut checked = Vec::new();
+        let cause: String = self.store.lock().unwrap().conn.query_row("SELECT COALESCE(last_cause, 'owner') FROM overseer_sessions WHERE id=?1", [&sid], |r| r.get(0)).unwrap_or_else(|_| "owner".into());
+        let owner_asked = cause == "owner";
         for a in &list {
             let kind = a["action"].as_str().unwrap_or("");
             if !ACTIONS.contains(&kind) {
                 bail!("{kind:?} is not an action Overseer has; the actions are {}", ACTIONS.join(", "));
+            }
+            let class = super::control::action_class(kind).unwrap_or(super::control::NEVER);
+            if class == super::control::NEVER {
+                bail!("{kind} is not from the conversation");
+            }
+            if class == super::control::CONFIRM && !owner_asked {
+                bail!("{kind} happens only when the owner asks for it; this turn was started by {cause}");
             }
             if kind != "start" {
                 let id = a["agent"].as_str().ok_or_else(|| anyhow!("{kind} needs an agent id"))?;
@@ -397,23 +406,42 @@ impl Daemon {
         if text_len > 16 * 1024 {
             bail!("the messages are too long (16 KiB in all)");
         }
-        let at_once = match level.as_str() {
-            "auto" => true,
-            "steer" => checked.iter().all(|a| QUIET.contains(&a["action"].as_str().unwrap_or(""))),
-            _ => false,
+        let confirm = checked.iter().any(|a| super::control::action_class(a["action"].as_str().unwrap_or("")) == Some(super::control::CONFIRM));
+        // At Ask first everything waits for a yes. At Steer and Auto what the owner asked for goes
+        // out after the settle window; what Overseer starts by itself goes at once when the level
+        // allows it (quiet actions at Steer, every Steer action at Auto), else it is a proposal.
+        let (at_once, settle) = if confirm || level == "ask_first" {
+            (false, false)
+        } else if owner_asked {
+            (false, true)
+        } else {
+            match level.as_str() {
+                "auto" => (true, false),
+                "steer" => (checked.iter().all(|a| super::control::QUIET.contains(&a["action"].as_str().unwrap_or(""))), false),
+                _ => (false, false),
+            }
         };
         let id = format!("p-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
         let now = crate::daemon::now();
         let lines: Vec<String> = checked.iter().map(|a| self.describe(a)).collect();
         let last_message: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT id FROM overseer_messages WHERE session_id=?1 AND source='overseer' ORDER BY seq DESC LIMIT 1", [&sid], |r| r.get(0)).ok();
         self.store.lock().unwrap().conn.execute("INSERT INTO overseer_proposals(id, session_id, message_id, ts, actions, state, source) VALUES(?1, ?2, ?3, ?4, ?5, 'open', ?6)", rusqlite::params![id, sid, last_message, now, serde_json::to_string(&checked)?, source])?;
-        let card = json!({"id": id, "actions": checked, "lines": lines, "state": "open", "level": level, "via": source,
+        let state = if settle { "settling" } else { "open" };
+        let settle_until = if settle { Some(now + SETTLE_MS) } else { None };
+        self.store.lock().unwrap().conn.execute("UPDATE overseer_proposals SET state=?2, settle_until=?3, cause=?4 WHERE id=?1", rusqlite::params![id, state, settle_until, cause])?;
+        let card = json!({"id": id, "actions": checked, "lines": lines, "state": state, "level": level, "via": source, "cause": cause, "settle_until": settle_until, "confirm": confirm,
             "note": if source == "text" { "Proposed in text: this harness has no tools, so the state was sent with the message." } else { "" }});
         let run_id = session["run_id"].as_str().map(str::to_string);
         self.emit(None, run_id.as_deref(), "proposal", "overseer", "exact", card.clone())?;
         if at_once {
             let result = self.overseer_answer(&id, true, "overseer", &format!("the {} level", level.replace('_', " ")))?;
             return Ok(json!({"proposal": id, "state": result["state"], "done": true, "result": result["result"]}));
+        }
+        if settle {
+            return Ok(json!({"proposal": id, "state": "settling", "done": false, "result": format!("Going out in {} s unless the owner cancels.", SETTLE_MS / 1000)}));
+        }
+        if confirm {
+            return Ok(json!({"proposal": id, "state": "open", "done": false, "result": "Read back to the owner; it needs their yes."}));
         }
         Ok(json!({"proposal": id, "state": "open", "done": false, "result": "Proposed to the owner; nothing happens until they say yes."}))
     }
@@ -427,11 +455,27 @@ impl Daemon {
                 .conn
                 .query_row("SELECT actions, state, session_id, result, answered_by FROM overseer_proposals WHERE id=?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))
                 .map_err(|_| anyhow!("unknown proposal {id}"))?;
-            if row.1 != "open" {
-                bail!("already_answered: {} by {} ({})", row.1, row.4.unwrap_or_default(), row.3.unwrap_or_default());
+            if row.1 != "open" && row.1 != "settling" {
+                let (mut state, mut who, mut result) = (row.1.clone(), row.4.clone().unwrap_or_default(), row.3.clone().unwrap_or_default());
+                if state == "answering" {
+                    // The first answer is still being carried out: report its outcome, not its middle.
+                    drop(store);
+                    for _ in 0..100 {
+                        std::thread::sleep(std::time::Duration::from_millis(50));
+                        let store = self.store.lock().unwrap();
+                        let now_row: (String, Option<String>, Option<String>) = store.conn.query_row("SELECT state, answered_by, result FROM overseer_proposals WHERE id=?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+                        if now_row.0 != "answering" {
+                            state = now_row.0;
+                            who = now_row.1.unwrap_or_default();
+                            result = now_row.2.unwrap_or_default();
+                            break;
+                        }
+                    }
+                }
+                bail!("already_answered: {state} by {who} ({result})");
             }
             // Claim it before doing anything, so a second answer racing this one finds it taken.
-            let claimed = store.conn.execute("UPDATE overseer_proposals SET state='answering', answered_by=?2, answered_ms=?3, surface=?4 WHERE id=?1 AND state='open'", rusqlite::params![id, by, now, surface])?;
+            let claimed = store.conn.execute("UPDATE overseer_proposals SET state='answering', answered_by=?2, answered_ms=?3, surface=?4 WHERE id=?1 AND state IN ('open', 'settling')", rusqlite::params![id, by, now, surface])?;
             if claimed == 0 {
                 bail!("already_answered");
             }
@@ -469,6 +513,33 @@ impl Daemon {
         finish("yes", &result)
     }
 
+    /// Inside the settle window: nothing has gone out yet, and nothing will.
+    pub fn overseer_cancel(&self, id: &str, by: &str) -> Result<Value> {
+        let n = self.store.lock().unwrap().conn.execute("UPDATE overseer_proposals SET state='cancelled', answered_by=?2, answered_ms=?3, result='Cancelled: nothing was sent.' WHERE id=?1 AND state IN ('settling', 'open')", rusqlite::params![id, by, crate::daemon::now()])?;
+        if n == 0 {
+            bail!("already_answered");
+        }
+        let run_id: Option<String> = self.overseer_session().ok().and_then(|s| s["run_id"].as_str().map(str::to_string));
+        self.emit(None, run_id.as_deref(), "proposal_answered", by, "exact", json!({"id": id, "state": "cancelled", "result": "Cancelled: nothing was sent.", "by": by}))?;
+        Ok(json!({"id": id, "state": "cancelled"}))
+    }
+
+    /// Settled proposals whose window has passed go out.
+    pub fn settle_due(self: &Arc<Self>) -> Result<()> {
+        let due: Vec<String> = {
+            let store = self.store.lock().unwrap();
+            let mut stmt = store.conn.prepare("SELECT id FROM overseer_proposals WHERE state='settling' AND settle_until <= ?1")?;
+            let ids = stmt.query_map([crate::daemon::now()], |r| r.get::<_, String>(0))?.flatten().collect();
+            ids
+        };
+        for id in due {
+            if let Err(e) = self.overseer_answer(&id, true, "settle", "the settle window") {
+                crate::log(&format!("settle: {e}"));
+            }
+        }
+        Ok(())
+    }
+
     /// One action, carried out through the daemon's own methods.
     fn perform(self: &Arc<Self>, a: &Value, proposal: &str, by: &str) -> Result<String> {
         let title = a["title"].as_str().unwrap_or("").to_string();
@@ -477,13 +548,49 @@ impl Daemon {
                 let agent = a["agent"].as_str().unwrap_or("");
                 let text = a["text"].as_str().unwrap_or("").to_string();
                 let delivery = self.queue_message(agent, &text, "overseer", json!({"proposal": proposal, "by": by}))?;
+                self.dispatch_record(proposal, agent, "message", "add", &text, a["why"].as_str().unwrap_or("named"), if delivery == "queued" { "held" } else { "delivered" })?;
                 Ok(format!("sent \"{text}\" to {title}{}", if delivery == "queued" { " (queued until its turn ends)" } else { "" }))
             }
             "stop" => {
                 let agent = a["agent"].as_str().unwrap_or("");
                 self.interrupt(agent)?;
                 self.emit(None, Some(agent), "overseer_action", "overseer", "exact", json!({"action": "stop", "proposal": proposal, "by": by}))?;
+                self.dispatch_record(proposal, agent, "stop", "stop", "", a["why"].as_str().unwrap_or("named"), "sent")?;
                 Ok(format!("stopped {title}"))
+            }
+            "hold" => {
+                let agent = a["agent"].as_str().unwrap_or("");
+                let reason = a["reason"].as_str().or(a["text"].as_str()).unwrap_or("held by Overseer");
+                let r = self.agent_hold(agent, reason, "overseer", a["now"].as_bool().unwrap_or(false), a["release_on"].clone(), Some(proposal))?;
+                self.dispatch_record(proposal, agent, "hold", "hold", reason, a["why"].as_str().unwrap_or("named"), "sent")?;
+                Ok(format!("held {title}{}", if r["stopped"] == true { " (stopped now)" } else { "" }))
+            }
+            "release" => {
+                let agent = a["agent"].as_str().unwrap_or("");
+                self.agent_release(agent, "overseer", a["reason"].as_str().unwrap_or("released by Overseer"))?;
+                self.dispatch_record(proposal, agent, "release", "release", "", a["why"].as_str().unwrap_or("named"), "sent")?;
+                Ok(format!("released {title}"))
+            }
+            "guardrail" => {
+                let agent = a["agent"].as_str().unwrap_or("");
+                let list = |k: &str| a[k].as_array().map(|x| x.iter().filter_map(|v| v.as_str().map(str::to_string)).collect::<Vec<_>>()).unwrap_or_default();
+                let r = self.agent_guardrail(agent, a["words"].as_str().or(a["text"].as_str()).unwrap_or(""), &list("allow"), &list("deny"), a["hold_on_cross"].as_bool().unwrap_or(false), "overseer")?;
+                self.dispatch_record(proposal, agent, "guardrail", "guardrail", a["words"].as_str().or(a["text"].as_str()).unwrap_or(""), a["why"].as_str().unwrap_or("named"), "sent")?;
+                Ok(format!("set a guardrail on {title} ({})", r["enforcement"].as_str().unwrap_or("watched")))
+            }
+            "redirect" => {
+                let agent = a["agent"].as_str().unwrap_or("");
+                let text = a["text"].as_str().unwrap_or("").to_string();
+                let r = self.agent_redirect(agent, &text, "overseer", json!({"proposal": proposal, "by": by}))?;
+                self.dispatch_record(proposal, agent, "redirect", "redirect", &text, a["why"].as_str().unwrap_or("named"), if r["delivery"] == "sent" { "delivered" } else { "held" })?;
+                Ok(format!("redirected {title}: \"{text}\" ({})", r["delivery"].as_str().unwrap_or("")))
+            }
+            "archive" => {
+                let agent = a["agent"].as_str().unwrap_or("");
+                let run = self.run(agent)?;
+                self.task_archive(&run.task_id, true)?;
+                self.dispatch_record(proposal, agent, "archive", "archive", "", a["why"].as_str().unwrap_or("named"), "sent")?;
+                Ok(format!("archived {title}"))
             }
             "pin" => {
                 let agent = a["agent"].as_str().unwrap_or("");
@@ -503,6 +610,7 @@ impl Daemon {
                     }
                 }
                 self.emit(None, Some(&run), "overseer_action", "overseer", "exact", json!({"action": "start", "proposal": proposal, "by": by}))?;
+                self.dispatch_record(proposal, &run, "start", "start", a["prompt"].as_str().unwrap_or(""), "new agent", "delivered")?;
                 Ok(format!("started {title}"))
             }
             other => bail!("no action {other}"),
@@ -519,7 +627,8 @@ impl Daemon {
             bail!("{} is a native child; it is steered through its parent", run.title);
         }
         let prompt = if source == "overseer" { format!("{FROM_OVERSEER}{text}") } else { text.to_string() };
-        let idle = !ACTIVE.contains(&run.status.as_str()) || crate::adapters::follow_up_via_stdin(&run.harness, text).is_some();
+        let held = self.hold_of(run_id).is_some();
+        let idle = !held && (!ACTIVE.contains(&run.status.as_str()) || crate::adapters::follow_up_via_stdin(&run.harness, text).is_some());
         if idle {
             let turn = self.start_turn(run_id, &prompt, true, &TurnOpts { model: None, effort: None, mode: None, images: Vec::new() })?;
             self.store.lock().unwrap().conn.execute("INSERT OR REPLACE INTO turn_sources(turn_id, source, detail) VALUES(?1, ?2, ?3)", rusqlite::params![turn.id, source, detail.to_string()])?;
@@ -533,7 +642,7 @@ impl Daemon {
     }
 
     /// When an agent's turn ends, the messages queued for it become its next turn.
-    fn deliver_queued(self: &Arc<Self>, run_id: &str) -> Result<()> {
+    pub(crate) fn deliver_queued(self: &Arc<Self>, run_id: &str) -> Result<()> {
         let pending: Vec<(i64, String, String, String)> = {
             let store = self.store.lock().unwrap();
             let mut stmt = store.conn.prepare("SELECT rowid, source, text, detail FROM queued_messages WHERE run_id=?1 AND delivered_ms IS NULL ORDER BY rowid")?;
@@ -544,7 +653,7 @@ impl Daemon {
             return Ok(());
         }
         let run = self.run(run_id)?;
-        if ACTIVE.contains(&run.status.as_str()) {
+        if ACTIVE.contains(&run.status.as_str()) || self.hold_of(run_id).is_some() {
             return Ok(());
         }
         let text = pending.iter().map(|(_, _, t, _)| t.clone()).collect::<Vec<_>>().join("\n\n");
@@ -613,6 +722,23 @@ impl Daemon {
 /// The session's loop: Overseer's words into the conversation, its next queued turn, and the
 /// queued messages of every agent, delivered when their turns end.
 pub fn start(daemon: Arc<Daemon>) {
+    let ticker = daemon.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
+        loop {
+            interval.tick().await;
+            let d = ticker.clone();
+            let _ = tokio::task::spawn_blocking(move || {
+                if let Err(e) = d.settle_due() {
+                    crate::log(&format!("settle: {e:#}"));
+                }
+                if let Err(e) = d.release_due_holds("tick", None, &Value::Null) {
+                    crate::log(&format!("holds: {e:#}"));
+                }
+            })
+            .await;
+        }
+    });
     tokio::spawn(async move {
         let mut live = daemon.events.subscribe();
         loop {
@@ -627,12 +753,30 @@ pub fn start(daemon: Arc<Daemon>) {
             let payload = e.payload.clone();
             let _ = tokio::task::spawn_blocking(move || {
                 let role = d.run_role(&run);
-                let result = match (kind.as_str(), role.as_str()) {
-                    ("output", "overseer") if payload["role"] == "assistant" => d.overseer_said(&run, payload["text"].as_str().unwrap_or("")),
-                    ("turn_done", "overseer") | ("status", "overseer") => d.overseer_turn_ended(&run),
-                    ("turn_done", _) | ("status", _) => d.deliver_queued(&run),
-                    _ => Ok(()),
-                };
+                let result = (|| -> Result<()> {
+                    match (kind.as_str(), role.as_str()) {
+                        ("output", "overseer") if payload["role"] == "assistant" => d.overseer_said(&run, payload["text"].as_str().unwrap_or(""))?,
+                        ("turn_done", "overseer") | ("status", "overseer") => d.overseer_turn_ended(&run)?,
+                        ("turn_started", _) => {
+                            d.dispatch_advance(&run, "delivered", payload["turn"]["id"].as_str())?;
+                        }
+                        ("turn_done", _) => {
+                            d.dispatch_advance(&run, "answered", None)?;
+                            d.deliver_queued(&run)?;
+                        }
+                        ("status", _) => {
+                            d.deliver_queued(&run)?;
+                            d.release_due_holds("status", Some(&run), &payload)?;
+                        }
+                        ("file_activity", _) => {
+                            let paths: Vec<String> = payload["paths"].as_array().map(|a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                            d.check_guardrails(&run, &paths)?;
+                        }
+                        ("conflict_closed", _) => d.release_due_holds("conflict_closed", Some(&run), &payload)?,
+                        _ => {}
+                    }
+                    Ok(())
+                })();
                 if let Err(err) = result {
                     crate::log(&format!("overseer session: {err:#}"));
                 }

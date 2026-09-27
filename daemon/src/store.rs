@@ -178,14 +178,23 @@ impl Store {
             CREATE TABLE IF NOT EXISTS turn_sources(turn_id TEXT PRIMARY KEY, source TEXT NOT NULL, detail TEXT);
             CREATE TABLE IF NOT EXISTS overseer_sessions(
               id TEXT PRIMARY KEY, started_ms INTEGER NOT NULL, archived_ms INTEGER, harness TEXT, model TEXT, run_id TEXT, task_id TEXT,
-              level TEXT NOT NULL DEFAULT 'ask_first', last_seq INTEGER NOT NULL DEFAULT 0, last_turn_ms INTEGER);
+              level TEXT NOT NULL DEFAULT 'ask_first', last_seq INTEGER NOT NULL DEFAULT 0, last_turn_ms INTEGER, last_cause TEXT);
             CREATE TABLE IF NOT EXISTS overseer_messages(
               seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL, session_id TEXT NOT NULL, ts INTEGER NOT NULL,
               source TEXT NOT NULL, surface TEXT, text TEXT NOT NULL, card TEXT);
             CREATE TABLE IF NOT EXISTS overseer_proposals(
               id TEXT PRIMARY KEY, session_id TEXT NOT NULL, message_id TEXT, ts INTEGER NOT NULL, actions TEXT NOT NULL,
-              state TEXT NOT NULL, source TEXT, answered_by TEXT, answered_ms INTEGER, surface TEXT, result TEXT);
+              state TEXT NOT NULL, source TEXT, answered_by TEXT, answered_ms INTEGER, surface TEXT, result TEXT, settle_until INTEGER, cause TEXT);
             CREATE TABLE IF NOT EXISTS overseer_pending(session_id TEXT NOT NULL, message_id TEXT, ts INTEGER NOT NULL, text TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS holds(
+              run_id TEXT PRIMARY KEY, set_by TEXT NOT NULL, reason TEXT NOT NULL, set_ms INTEGER NOT NULL, release_on TEXT NOT NULL, card_id TEXT);
+            CREATE TABLE IF NOT EXISTS guardrails(
+              id TEXT PRIMARY KEY, run_id TEXT NOT NULL, set_by TEXT NOT NULL, words TEXT NOT NULL, allow TEXT NOT NULL, deny TEXT NOT NULL,
+              hold_on_cross INTEGER NOT NULL, enforcement TEXT NOT NULL, created_ms INTEGER NOT NULL, removed_ms INTEGER);
+            CREATE TABLE IF NOT EXISTS guardrail_crossings(guardrail_id TEXT NOT NULL, run_id TEXT NOT NULL, paths TEXT NOT NULL, ts INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS dispatches(
+              id TEXT PRIMARY KEY, card_id TEXT NOT NULL, run_id TEXT NOT NULL, action TEXT NOT NULL, delivery TEXT NOT NULL, message TEXT NOT NULL,
+              why TEXT NOT NULL, state TEXT NOT NULL, held_ms INTEGER NOT NULL, sent_ms INTEGER, delivered_ms INTEGER, picked_ms INTEGER, answered_ms INTEGER, turn_id TEXT);
             CREATE TABLE IF NOT EXISTS queued_messages(
               run_id TEXT NOT NULL, ts INTEGER NOT NULL, source TEXT NOT NULL, text TEXT NOT NULL, detail TEXT,
               delivered_ms INTEGER, turn_id TEXT);

@@ -253,7 +253,18 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "branches": crate::git::branches(&root), "status": crate::git::status(&root)?})
         }
         "task.create" => d.create_task(p)?,
-        "run.follow_up" => json!(d.start_turn(s(p, "run_id")?, s(p, "prompt")?, true, &crate::daemon::TurnOpts::from_params(p)?)?),
+        "run.follow_up" => {
+            // A held agent takes no new turn: the owner's own message offers Release and send.
+            let run_id = s(p, "run_id")?;
+            if let Some(hold) = d.hold_of(run_id) {
+                if p["release"].as_bool().unwrap_or(false) {
+                    d.agent_release(run_id, "owner", "released to send a message")?;
+                } else {
+                    return Err(anyhow!("held: {} (by {}). Release and send?", hold["reason"].as_str().unwrap_or(""), hold["by"].as_str().unwrap_or("")));
+                }
+            }
+            json!(d.start_turn(run_id, s(p, "prompt")?, true, &crate::daemon::TurnOpts::from_params(p)?)?)
+        }
         "run.interrupt" => d.interrupt(s(p, "run_id")?)?,
         "run.permission" => d.answer_permission(s(p, "run_id")?, s(p, "request_id")?, p["allow"].as_bool().unwrap_or(false), p["message"].as_str().unwrap_or(""))?,
         "run.raw_output" => d.raw_output(s(p, "run_id")?, p["max_bytes"].as_u64().unwrap_or(256 * 1024).min(4 * 1024 * 1024) as usize)?,
@@ -313,8 +324,22 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "overseer.propose" => d.overseer_propose(&p["actions"], p["source"].as_str().unwrap_or("api"))?,
         "overseer.answer" => d.overseer_answer(s(p, "id")?, p["yes"].as_bool().unwrap_or(false), p["surface"].as_str().unwrap_or("vscode"), p["by"].as_str().unwrap_or("owner"))?,
         "overseer.level" => d.overseer_level(p["level"].as_str())?,
+        "overseer.cancel" => d.overseer_cancel(s(p, "id")?, p["by"].as_str().unwrap_or("owner"))?,
         "overseer.fresh" => d.overseer_fresh()?,
         "run.queue" => json!({"delivery": d.queue_message(s(p, "run_id")?, s(p, "text")?, p["source"].as_str().unwrap_or("owner"), json!({}))?}),
+        "run.redirect" => d.agent_redirect(s(p, "run_id")?, s(p, "text")?, p["source"].as_str().unwrap_or("owner"), json!({}))?,
+        "agent.hold" => d.agent_hold(s(p, "run_id")?, p["reason"].as_str().unwrap_or("held by the owner"), p["by"].as_str().unwrap_or("owner"), p["now"].as_bool().unwrap_or(false), p["release_on"].clone(), p["card"].as_str())?,
+        "agent.release" => d.agent_release(s(p, "run_id")?, p["by"].as_str().unwrap_or("owner"), p["why"].as_str().unwrap_or("released"))?,
+        "agent.holds" => d.holds_list()?,
+        "agent.guardrail" => {
+            let list = |k: &str| p[k].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect::<Vec<_>>()).unwrap_or_default();
+            d.agent_guardrail(s(p, "run_id")?, p["words"].as_str().unwrap_or(""), &list("allow"), &list("deny"), p["hold_on_cross"].as_bool().unwrap_or(false), p["by"].as_str().unwrap_or("owner"))?
+        }
+        "agent.guardrail_remove" => d.agent_guardrail_remove(s(p, "id")?, p["by"].as_str().unwrap_or("owner"))?,
+        "agent.guardrails" => json!({"guardrails": d.guardrails_of(s(p, "run_id")?)?}),
+        "agent.redirect" => d.agent_redirect(s(p, "run_id")?, s(p, "text")?, p["source"].as_str().unwrap_or("owner"), json!({}))?,
+        "conflict.resolve" => d.conflict_resolve(s(p, "id")?, s(p, "how")?, p["keeper"].as_str(), p["by"].as_str().unwrap_or("owner"))?,
+        "overseer.card" => d.card(s(p, "id")?)?,
         "run.queued" => d.queued_messages(s(p, "run_id")?)?,
         "run.unqueue" => d.unqueue_message(s(p, "run_id")?, p["id"].as_i64().unwrap_or(0))?,
         "overseer.tools" => d.overseer_tools(s(p, "token")?)?,

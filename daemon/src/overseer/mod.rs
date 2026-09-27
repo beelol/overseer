@@ -4,6 +4,7 @@
 //! shell directly: it reads through `overseer.tool` and asks the daemon to act.
 
 pub mod conflicts;
+pub mod control;
 pub mod digest;
 pub mod mcp;
 pub mod session;

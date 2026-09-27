@@ -640,3 +640,420 @@ fn ac184_quotes_diffs_bounds_turns_and_falls_back_without_tools() {
     let yes = d2.call("overseer.answer", json!({"id": open[0]["id"], "yes": true, "surface": "ctl"}));
     assert!(yes["result"].as_str().unwrap().starts_with("Done: sent"));
 }
+
+/// The SQL the tests use to put the daemon's store into a state a client cannot ask for.
+fn sql(d: &Daemon, statement: &str) {
+    let db = d.home.path().join("overseer.sqlite");
+    let out = Command::new("sqlite3").arg(&db).arg(statement).output().unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+}
+
+/// AC-185: every daemon method has a class; a Confirm action with no request from the owner is
+/// refused; "stop everyone" is one card with a row per agent; a card's text is the text sent;
+/// cards survive a restart; a native child is refused.
+#[test]
+fn ac185_actions_have_classes_and_cards() {
+    // Every method dispatched by the daemon is in the class table (the table is the source of
+    // the phone's classes too); a method without one is a test failure.
+    let source = std::fs::read_to_string(repo_root().join("daemon/src/server.rs")).unwrap();
+    let classes = std::fs::read_to_string(repo_root().join("daemon/src/overseer/control.rs")).unwrap();
+    let mut missing = Vec::new();
+    for line in source.lines() {
+        let l = line.trim();
+        if let Some(rest) = l.strip_prefix('"') {
+            if let Some(end) = rest.find("\" =>") {
+                let method = &rest[..end];
+                if method.contains('.') || method == "hello" || method == "state" || method == "search" {
+                    if !classes.contains(&format!("(\"{method}\", ")) {
+                        missing.push(method.to_string());
+                    }
+                }
+            }
+        }
+    }
+    assert!(classes.contains("(\"events.subscribe\", \"read\")"));
+    assert!(missing.is_empty(), "methods without a class: {missing:?}");
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let mut d = overseer_daemon(&mode_file);
+    let mut agents = Vec::new();
+    for i in 0..4 {
+        let created = d.call("task.create", json!({"repo": repo, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sh", "args": ["-c", "sleep 120"], "prompt": "", "title": format!("Agent {i}")}));
+        agents.push(run_id(&created));
+    }
+    for a in &agents {
+        d.wait_status(a, |s| s == "running", 20);
+    }
+    // A nested fixture run for the native-child refusal.
+    let nested = claude_task(&d, &repo, &mode_file, "nested", "Nested", "delegate");
+    d.wait_done(&nested, 30);
+    let child = d.call("state", json!({}))["runs"].as_array().unwrap().iter().find(|r| r["parent_run_id"] == nested).unwrap()["id"].as_str().unwrap().to_string();
+    // The session exists; the owner asked for nothing yet, so a Confirm action from Overseer itself is refused.
+    d.call("overseer.session", json!({}));
+    sql(&d, "UPDATE overseer_sessions SET last_cause='check_in';");
+    let err = d.try_call("overseer.propose", json!({"actions": [{"action": "archive", "agent": agents[0]}], "source": "test"})).unwrap_err();
+    assert!(err.contains("only when the owner asks"), "{err}");
+    let err = d.try_call("overseer.propose", json!({"actions": [{"action": "message", "agent": child, "text": "hi"}], "source": "test"})).unwrap_err();
+    assert!(err.contains("native child"), "{err}");
+    let err = d.try_call("overseer.propose", json!({"actions": [{"action": "cleanup", "agent": agents[0]}], "source": "test"})).unwrap_err();
+    assert!(err.contains("not an action Overseer has"), "{err}");
+    // Stop everyone: one card with four rows; four interrupts within a second of the yes.
+    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
+    let stops: Vec<Value> = agents.iter().map(|a| json!({"action": "stop", "agent": a})).collect();
+    let proposed = d.call("overseer.propose", json!({"actions": stops, "source": "test"}));
+    let card_id = proposed["proposal"].as_str().unwrap().to_string();
+    assert_eq!(proposed["state"], "open");
+    let started = std::time::Instant::now();
+    let answer = d.call("overseer.answer", json!({"id": card_id, "yes": true, "surface": "ctl", "by": "owner"}));
+    assert_eq!(answer["state"], "yes");
+    for a in &agents {
+        d.wait_status(a, |s| s == "interrupted", 5);
+    }
+    assert!(started.elapsed() < Duration::from_secs(2), "four stops took {:?}", started.elapsed());
+    let card = d.call("overseer.card", json!({"id": card_id}));
+    assert_eq!(card["rows"].as_array().unwrap().len(), 4);
+    assert!(card["rows"].as_array().unwrap().iter().all(|r| r["action"] == "stop" && r["delivery"] == "stop"));
+    assert_eq!(card["actions"].as_array().unwrap().len(), 4);
+    // A message's card row holds the text that was sent, byte for byte.
+    let msg = d.call("overseer.propose", json!({"actions": [{"action": "message", "agent": agents[1], "text": "Please add tests — carefully."}], "source": "test"}));
+    let mid = msg["proposal"].as_str().unwrap().to_string();
+    d.call("overseer.answer", json!({"id": mid, "yes": true, "surface": "ctl", "by": "owner"}));
+    let card = d.call("overseer.card", json!({"id": mid}));
+    let row = &card["rows"][0];
+    assert_eq!(row["message"], "Please add tests — carefully.");
+    let turns = d.call("run.turns", json!({"run_id": agents[1]}));
+    let last = turns.as_array().unwrap().last().unwrap();
+    assert_eq!(last["prompt"], "From Overseer: Please add tests — carefully.");
+    assert!(["delivered", "answered", "picked_up"].contains(&row["state"].as_str().unwrap()), "{row}");
+    // Cards are the same after a restart.
+    let before = d.call("overseer.card", json!({"id": card_id}));
+    d.kill9();
+    d.spawn();
+    let after = d.call("overseer.card", json!({"id": card_id}));
+    assert_eq!(before["rows"], after["rows"]);
+    assert_eq!(before["state"], after["state"]);
+}
+
+/// AC-186: at Steer what the owner asked for goes out after the settle window and can be
+/// cancelled inside it; what Overseer starts by itself is done at once when quiet and proposed
+/// when not; at Auto everything Steer goes at once and Confirm still waits; two clients
+/// answering one proposal at the same moment get one outcome; a stale proposal is not done.
+#[test]
+fn ac186_levels_decide_how_steer_actions_happen() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    let (a, _) = sleeper(&d, &repo, "Agent A");
+    let (b, _) = sleeper(&d, &repo, "Agent B");
+    let (c, _) = sleeper(&d, &repo, "Agent C");
+    d.call("overseer.session", json!({}));
+    let turns = |id: &str| d.call("run.turns", json!({"run_id": id})).as_array().unwrap().len();
+    // Steer, the owner asked: a message settles, then goes.
+    d.call("overseer.level", json!({"level": "steer"}));
+    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "message", "agent": a, "text": "Owner says hi"}], "source": "test"}));
+    assert_eq!(p["state"], "settling");
+    let before = turns(&a);
+    std::thread::sleep(Duration::from_millis(600));
+    assert_eq!(turns(&a), before, "nothing yet inside the window");
+    std::thread::sleep(Duration::from_millis(2200));
+    let card = d.call("overseer.card", json!({"id": p["proposal"]}));
+    assert_eq!(card["state"], "yes", "{card}");
+    // The sleeper is a generic program, which takes a follow-up on its stdin at once (AC-60).
+    assert_eq!(turns(&a), before + 1, "the message went after the window");
+    // A cancel inside the window sends nothing.
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "redirect", "agent": b, "text": "Change course"}], "source": "test"}));
+    assert_eq!(p["state"], "settling");
+    d.call("overseer.cancel", json!({"id": p["proposal"], "by": "owner"}));
+    std::thread::sleep(Duration::from_millis(2500));
+    assert_eq!(d.call("overseer.card", json!({"id": p["proposal"]}))["state"], "cancelled");
+    assert_eq!(d.run(&b)["status"], "running", "not stopped");
+    // Steer, Overseer by itself: a hold at once, a redirect waits.
+    sql(&d, "UPDATE overseer_sessions SET last_cause='check_in';");
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "hold", "agent": c, "reason": "drifting"}], "source": "test"}));
+    assert_eq!(p["done"], true, "{p}");
+    assert!(d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().any(|h| h["run_id"] == c));
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "redirect", "agent": b, "text": "Change course"}], "source": "test"}));
+    assert_eq!(p["state"], "open");
+    assert_eq!(d.run(&b)["status"], "running");
+    // Auto: the redirect goes at once, with its card and cause; a Confirm action still waits for
+    // the owner (and needs the owner to have asked).
+    d.call("overseer.level", json!({"level": "auto"}));
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "redirect", "agent": b, "text": "Change course now"}], "source": "test"}));
+    assert_eq!(p["done"], true, "{p}");
+    d.wait_status(&b, |s| s != "running", 10);
+    let card = d.call("overseer.card", json!({"id": p["proposal"]}));
+    assert_eq!(card["rows"][0]["delivery"], "redirect");
+    assert_eq!(card["via"], "test");
+    let ev = d.events(&b);
+    assert!(ev.iter().any(|e| e["kind"] == "redirect" && e["payload"]["detail"]["by"].as_str().unwrap_or("").contains("auto")), "{:?}", ev.iter().filter(|e| e["kind"] == "redirect").collect::<Vec<_>>());
+    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "archive", "agent": c}], "source": "test"}));
+    assert_eq!(p["state"], "open");
+    assert_eq!(p["done"], false);
+    // A stale proposal: the agent changed state since it was made.
+    d.call("overseer.level", json!({"level": "ask_first"}));
+    let (e, _) = sleeper(&d, &repo, "Agent E");
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "message", "agent": e, "text": "hi"}], "source": "test"}));
+    d.call("run.interrupt", json!({"run_id": e}));
+    d.wait_status(&e, |s| s == "interrupted", 10);
+    let answer = d.call("overseer.answer", json!({"id": p["proposal"], "yes": true, "surface": "ctl", "by": "owner"}));
+    assert_eq!(answer["state"], "stale");
+    assert!(answer["result"].as_str().unwrap().contains("Ask again"));
+    // Two clients answer one proposal within 50 ms of each other, 100 times: one outcome each time.
+    let d = std::sync::Arc::new(d);
+    for i in 0..100 {
+        let p = d.call("overseer.propose", json!({"actions": [{"action": "pin", "agent": a}], "source": "test"}));
+        let id = p["proposal"].as_str().unwrap().to_string();
+        let (d1, d2) = (d.clone(), d.clone());
+        let (i1, i2) = (id.clone(), id.clone());
+        let t1 = std::thread::spawn(move || d1.try_call("overseer.answer", json!({"id": i1, "yes": true, "surface": "vscode", "by": "owner"})));
+        let t2 = std::thread::spawn(move || d2.try_call("overseer.answer", json!({"id": i2, "yes": false, "surface": "phone", "by": "phone"})));
+        let (r1, r2) = (t1.join().unwrap(), t2.join().unwrap());
+        assert!(r1.is_ok() != r2.is_ok(), "round {i}: exactly one answer counts: {r1:?} {r2:?}");
+        let card = d.call("overseer.card", json!({"id": id}));
+        let winner = if r1.is_ok() { "yes" } else { "no" };
+        assert_eq!(card["state"], winner, "round {i}");
+        let loser = if r1.is_ok() { r2.unwrap_err() } else { r1.unwrap_err() };
+        assert!(loser.contains("already_answered") && loser.contains(winner), "round {i}: {loser}");
+    }
+}
+
+/// AC-187: a held agent starts no turn until released, from a queued message or from Overseer;
+/// each release condition; hold everything; a write across a guardrail is reported within 2 s
+/// and holds the agent when the guardrail says so; the label per harness; a restart keeps both.
+#[test]
+fn ac187_holds_and_guardrails() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::create_dir_all(repo.join("api")).unwrap();
+    std::fs::create_dir_all(repo.join("docs")).unwrap();
+    std::fs::write(repo.join("api/x.txt"), "x\n").unwrap();
+    std::fs::write(repo.join("docs/y.txt"), "y\n").unwrap();
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-qm", "dirs"]);
+    let mode_file = r.path().join("mode");
+    let mut d = overseer_daemon(&mode_file);
+    let turns = |d: &Daemon, id: &str| d.call("run.turns", json!({"run_id": id})).as_array().unwrap().len();
+    // An idle agent, held: a queued message, Overseer's message and the owner's own message all wait.
+    let done = d.generic(&repo, "worktree", "/bin/sh", &["-c", "echo done"]);
+    let done = run_id(&done);
+    d.wait_done(&done, 20);
+    let held = d.call("agent.hold", json!({"run_id": done, "reason": "wait for the review", "by": "owner"}));
+    assert_eq!(held["held"], true);
+    assert_eq!(d.call("run.queue", json!({"run_id": done, "text": "queued while held", "source": "owner"}))["delivery"], "queued");
+    d.call("overseer.session", json!({}));
+    d.call("overseer.level", json!({"level": "auto"}));
+    sql(&d, "UPDATE overseer_sessions SET last_cause='check_in';");
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "message", "agent": done, "text": "from Overseer while held"}], "source": "test"}));
+    assert_eq!(p["done"], true);
+    std::thread::sleep(Duration::from_millis(800));
+    assert_eq!(turns(&d, &done), 1, "no turn while held");
+    let err = d.try_call("run.follow_up", json!({"run_id": done, "prompt": "owner's own"})).unwrap_err();
+    assert!(err.contains("held") && err.contains("Release and send"), "{err}");
+    // A restart keeps the hold.
+    d.kill9();
+    d.spawn();
+    assert!(d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().any(|h| h["run_id"] == done && h["reason"] == "wait for the review"));
+    // Released: what waited goes as one turn.
+    d.call("agent.release", json!({"run_id": done, "by": "owner"}));
+    d.wait_done(&done, 20);
+    let t = d.call("run.turns", json!({"run_id": done}));
+    assert_eq!(t.as_array().unwrap().len(), 2, "{t}");
+    assert!(t[1]["prompt"].as_str().unwrap().contains("queued while held") && t[1]["prompt"].as_str().unwrap().contains("From Overseer: from Overseer while held"));
+    // Release and send: the owner's message releases the hold.
+    d.call("agent.hold", json!({"run_id": done, "reason": "again", "by": "owner"}));
+    d.call("run.follow_up", json!({"run_id": done, "prompt": "owner's own", "release": true}));
+    d.wait_done(&done, 20);
+    assert!(d.call("agent.holds", json!({}))["holds"].as_array().unwrap().is_empty());
+    // Release conditions: another agent finishing, a conflict closed, a time.
+    let (x, _) = sleeper(&d, &repo, "X");
+    let (y, _) = sleeper(&d, &repo, "Y");
+    d.call("agent.hold", json!({"run_id": x, "reason": "after Y", "by": "owner", "release_on": {"kind": "agent_done", "id": y}}));
+    d.call("run.interrupt", json!({"run_id": y}));
+    d.wait_status(&y, |s| s == "interrupted", 10);
+    let started = std::time::Instant::now();
+    loop {
+        if d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().all(|h| h["run_id"] != x) {
+            break;
+        }
+        assert!(started.elapsed() < Duration::from_secs(5), "hold on X not released after Y finished");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(d.events(&x).iter().any(|e| e["kind"] == "release" && e["payload"]["why"].as_str().unwrap().contains("Y finished")));
+    let at = crate::common::repo_root().display().to_string().len() as i64; // any small number of ms
+    let _ = at;
+    d.call("agent.hold", json!({"run_id": x, "reason": "for a moment", "by": "owner", "release_on": {"kind": "time", "at_ms": d.call("hello", json!({}))["pid"].as_i64().map(|_| 0).unwrap_or(0)}}));
+    // at_ms 0 is in the past: released on the next tick.
+    let started = std::time::Instant::now();
+    loop {
+        if d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().all(|h| h["run_id"] != x) {
+            break;
+        }
+        assert!(started.elapsed() < Duration::from_secs(5), "timed hold not released");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    // Hold everything: one proposal over every agent.
+    let (p1, _) = sleeper(&d, &repo, "P1");
+    let (p2, _) = sleeper(&d, &repo, "P2");
+    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "hold", "agent": p1, "reason": "everyone"}, {"action": "hold", "agent": p2, "reason": "everyone"}, {"action": "hold", "agent": x, "reason": "everyone"}], "source": "test"}));
+    d.call("overseer.answer", json!({"id": p["proposal"], "yes": true, "surface": "ctl", "by": "owner"}));
+    let holds = d.call("agent.holds", json!({}));
+    assert_eq!(holds["holds"].as_array().unwrap().iter().filter(|h| h["reason"] == "everyone").count(), 3);
+    // Guardrails: words repeated each later turn; a write inside a forbidden path is reported
+    // within 2 s and holds the agent when the guardrail says so.
+    let (w, ws) = sleeper(&d, &repo, "Writer");
+    let g = d.call("agent.guardrail", json!({"run_id": w, "words": "Stay in docs.", "deny": ["api"], "hold_on_cross": true, "by": "owner"}));
+    assert_eq!(g["enforcement"], "watched", "a generic harness cannot refuse writes itself");
+    std::fs::write(ws.join("api/x.txt"), "changed by the writer\n").unwrap();
+    let started = std::time::Instant::now();
+    loop {
+        let ev = d.events(&w);
+        if ev.iter().any(|e| e["kind"] == "guardrail_crossed" && e["payload"]["paths"][0] == "api/x.txt") {
+            break;
+        }
+        // Harnesses that report file activity are caught within 2 s of the event; a generic
+        // program's edits are seen by the sweep.
+        assert!(started.elapsed() < Duration::from_secs(12), "crossing not reported");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    d.wait_status(&w, |s| s == "interrupted", 5);
+    assert!(d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().any(|h| h["run_id"] == w && h["reason"].as_str().unwrap().contains("guardrail")));
+    // A harness that reports its edits is caught from the event itself: the guardrail is set
+    // while the agent is busy on a turn that writes nothing; its next turn writes in src/.
+    std::fs::write(repo.join("README.md"), "# Demo\n").unwrap();
+    git(&repo, &["add", "README.md"]);
+    git(&repo, &["commit", "-qm", "readme"]);
+    let c = claude_task(&d, &repo, &mode_file, "slow", "Claude writer", "write sessions");
+    d.wait_status(&c, |s| s == "running", 20);
+    d.call("agent.guardrail", json!({"run_id": c, "words": "Only docs.", "deny": ["src"], "by": "owner"}));
+    d.wait_done(&c, 30);
+    std::fs::write(&mode_file, "showcase").unwrap();
+    d.call("run.follow_up", json!({"run_id": c, "prompt": "now write the sessions code"}));
+    d.wait_done(&c, 30);
+    let ev = d.events(&c);
+    let crossed = ev.iter().find(|e| e["kind"] == "guardrail_crossed").expect("the showcase run wrote in src/");
+    let activity = ev.iter().find(|e| e["kind"] == "file_activity" && e["payload"]["paths"].as_array().unwrap().iter().any(|p| p.as_str().unwrap().starts_with("src/"))).unwrap();
+    assert!(crossed["ts"].as_i64().unwrap() - activity["ts"].as_i64().unwrap() <= 2000);
+    assert_eq!(crossed["payload"]["enforcement"], "enforced", "Claude Code takes deny rules");
+    // The words and the deny rules went with that turn.
+    let rails = d.call("agent.guardrails", json!({"run_id": c}));
+    assert_eq!(rails["guardrails"].as_array().unwrap().len(), 1);
+    let t = d.call("run.turns", json!({"run_id": c}));
+    let last = t.as_array().unwrap().last().unwrap();
+    assert!(last["prompt"].as_str().unwrap().starts_with("[Guardrails from Overseer: Only docs. Do not change: src.]"), "{}", last["prompt"]);
+    let (_, dir) = launch_info(&d, &c);
+    let launch: Value = serde_json::from_slice(&std::fs::read(dir.join("launch.json")).unwrap()).unwrap();
+    let args = launch["args"].as_array().unwrap().iter().map(|a| a.as_str().unwrap()).collect::<Vec<_>>().join(" ");
+    assert!(args.contains("--disallowedTools Edit(src/**),Write(src/**),MultiEdit(src/**)"), "{args}");
+    // A restart keeps the guardrail.
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("agent.guardrails", json!({"run_id": c}))["guardrails"].as_array().unwrap().len(), 1);
+    d.call("agent.guardrail_remove", json!({"id": rails["guardrails"][0]["id"], "by": "owner"}));
+    assert!(d.call("agent.guardrails", json!({"run_id": c}))["guardrails"].as_array().unwrap().is_empty());
+}
+
+/// AC-188: a redirect keeps a snapshot, stops the turn, sends the direction as the next turn and
+/// shows delivered then answered; the review gains "since the change of direction"; a queued
+/// message survives a restart and is delivered once; nothing uncommitted is lost.
+#[test]
+fn ac188_redirect_and_the_queue() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let mut d = overseer_daemon(&mode_file);
+    // A Claude fixture busy for five seconds, then redirected mid-turn.
+    std::fs::write(&mode_file, "slow").unwrap();
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "first direction", "title": "Slow"}));
+    let slow = run_id(&created);
+    let ws = ws_path(&d, &created);
+    d.wait_status(&slow, |s| s == "running", 20);
+    std::fs::write(ws.join("draft.txt"), "uncommitted work\n").unwrap();
+    let redirected = d.call("agent.redirect", json!({"run_id": slow, "text": "Do the other thing instead", "source": "overseer"}));
+    assert!(redirected["delivery"].as_str().unwrap().starts_with("stopping"));
+    let snap_id = redirected["snapshot"].as_str().unwrap().to_string();
+    d.wait_status(&slow, |s| s == "interrupted" || s == "running", 15);
+    // The next turn carries the direction, from Overseer.
+    let started = std::time::Instant::now();
+    loop {
+        let t = d.call("run.turns", json!({"run_id": slow}));
+        if t.as_array().unwrap().len() == 2 {
+            assert_eq!(t[1]["prompt"], "From Overseer: Do the other thing instead");
+            break;
+        }
+        assert!(started.elapsed() < Duration::from_secs(15), "no second turn: {t}");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    d.wait_done(&slow, 30);
+    assert_eq!(std::fs::read_to_string(ws.join("draft.txt")).unwrap(), "uncommitted work\n", "nothing uncommitted is lost");
+    let ev = d.events(&slow);
+    assert!(ev.iter().any(|e| e["kind"] == "redirect" && e["payload"]["snapshot"] == snap_id));
+    let last = d.call("run.turns", json!({"run_id": slow}))[1].clone();
+    assert_eq!(last["status"], "completed");
+    // The review offers "since the change of direction" from that snapshot.
+    let options = d.call("comparison.options", json!({"run_id": slow}));
+    let since = options["options"].as_array().unwrap().iter().find(|o| o["mode"] == "redirect").expect("redirect comparison");
+    assert_eq!(since["available"], true);
+    assert_eq!(since["snapshot"]["id"], snap_id);
+    // An edit after the redirect shows against it; the earlier draft does not.
+    std::fs::write(ws.join("after.txt"), "after\n").unwrap();
+    let paths: Vec<String> = diff_paths(&d, &created, since["base"].as_str().unwrap()).into_iter().map(|(_, p)| p).collect();
+    assert!(paths.contains(&"after.txt".to_string()) && !paths.contains(&"draft.txt".to_string()), "{paths:?}");
+    // The dispatch of a message: delivered when its turn starts, answered when it ends.
+    std::fs::write(&mode_file, "echo").unwrap();
+    let echo = claude_task(&d, &repo, &mode_file, "echo", "Echo", "hello");
+    d.wait_done(&echo, 30);
+    d.call("overseer.session", json!({}));
+    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "message", "agent": echo, "text": "second"}], "source": "test"}));
+    d.call("overseer.answer", json!({"id": p["proposal"], "yes": true, "surface": "ctl", "by": "owner"}));
+    d.wait_done(&echo, 30);
+    std::thread::sleep(Duration::from_millis(500));
+    let card = d.call("overseer.card", json!({"id": p["proposal"]}));
+    assert_eq!(card["rows"][0]["state"], "answered", "{card}");
+    assert!(card["rows"][0]["delivered_ms"].is_number() && card["rows"][0]["answered_ms"].is_number());
+    // A queued message survives a restart and is delivered exactly once: a Claude fixture busy
+    // for eight seconds keeps running under its supervisor while the daemon is down.
+    let mut d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude_fixture()), ("CLAUDE_FIXTURE_MODE_FILE", &mode_file.display().to_string()), ("FIXTURE_SLOW_MS", "8000"), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,FIXTURE_SLOW_MS")]);
+    std::fs::write(&mode_file, "slow").unwrap();
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "long job", "title": "Busy"}));
+    let busy = run_id(&created);
+    d.wait_status(&busy, |s| s == "running", 20);
+    assert_eq!(d.call("run.queue", json!({"run_id": busy, "text": "after you finish", "source": "owner"}))["delivery"], "queued");
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("run.queued", json!({"run_id": busy}))["queued"].as_array().unwrap().len(), 1);
+    d.wait_status(&busy, |s| s != "running", 30);
+    let started = std::time::Instant::now();
+    loop {
+        let t = d.call("run.turns", json!({"run_id": busy}));
+        if t.as_array().unwrap().len() >= 2 {
+            assert_eq!(t.as_array().unwrap().len(), 2);
+            assert_eq!(t[1]["prompt"], "after you finish");
+            break;
+        }
+        assert!(started.elapsed() < Duration::from_secs(15), "queued message not delivered: {t}");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    std::thread::sleep(Duration::from_secs(1));
+    assert_eq!(d.call("run.turns", json!({"run_id": busy})).as_array().unwrap().len(), 2, "delivered once");
+    assert!(d.call("run.queued", json!({"run_id": busy}))["queued"].as_array().unwrap().is_empty());
+    // A redirect the harness cannot pick up: the direction is still delivered once.
+    let (gen, _) = sleeper(&d, &repo, "Gen");
+    d.call("agent.redirect", json!({"run_id": gen, "text": "turn around", "source": "overseer"}));
+    d.wait_status(&gen, |s| s != "running", 15);
+    let started = std::time::Instant::now();
+    loop {
+        if d.call("run.turns", json!({"run_id": gen})).as_array().unwrap().len() == 2 {
+            break;
+        }
+        assert!(started.elapsed() < Duration::from_secs(15));
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    std::thread::sleep(Duration::from_secs(1));
+    assert_eq!(d.call("run.turns", json!({"run_id": gen})).as_array().unwrap().len(), 2, "one delivery");
+}
