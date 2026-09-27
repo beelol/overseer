@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Makes the app icon, Android's adaptive and themed icons, the launch image and the in-app mark
+// Makes the app icon, Android's adaptive and themed icons and the launch image
 // from the owner's brand files (AC-178) and the design tokens.
 //
 //   node scripts/gen-assets.mjs           writes phone/assets/
@@ -8,7 +8,8 @@
 // The PNG files it writes are kept in the repository, so building the app does not run this.
 // The sources are the three files of docs/design/brand/ (see docs/design/brand.md):
 //   overseer-app-icon.png   the home-screen icon
-//   overseer-logo.png       the colour mark: Android's adaptive foreground, marks inside the app
+//   overseer-logo.png       the colour mark: Android's adaptive foreground (and any mark of
+//                           Overseer's own the app shows; today it shows none)
 //   overseer-icon-flat.png  the single-colour silhouette: Android's themed icon, the launch
 //                           screen and the door, in grayscale
 
@@ -99,6 +100,4 @@ await write('android-icon-monochrome.png', centred(tinted(flat, '#ffffff'), 0.5)
 // The launch screen and the door (AC-136): the silhouette in grayscale, one per appearance.
 await write('launch-mark-light.png', centred(tinted(flat, light.silver), 0.5));
 await write('launch-mark-dark.png', centred(tinted(flat, dark.silver), 0.5));
-// Overseer's own mark inside the app (the pairing screen): the colour mark.
-await write('overseer-logo.png', centred(logo, 1, 512));
 if (check) console.log(`assets: ${outputs.length} files match docs/design/brand/`);

@@ -5,7 +5,7 @@
 export { Actions, Button, Chip, IconButton, type ButtonKind, type ButtonProps, type ChipProps, type IconButtonProps } from './Button';
 export { ConnectionLine, connectionText, useMinute, WatchOnlyLine } from './ConnectionLine';
 export { Icon, type IconName, type IconProps } from './Icon';
-export { Logo, logoFile, Mark, OverseerLogo, type LogoProps } from './Logo';
+export { Logo, logoFile, Mark, type LogoProps } from './Logo';
 export { Empty, Row, Section, SwitchRow, type EmptyProps, type RowProps, type SectionProps, type SwitchRowProps } from './Rows';
 export { Screen, type ScreenProps } from './Screen';
 export { Confirm, Menu, Sheet, type ConfirmProps, type MenuItem, type MenuProps, type SheetProps } from './Sheet';
