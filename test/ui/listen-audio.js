@@ -20,9 +20,9 @@ const path = require('path');
 const cp = require('child_process');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
-// Records of earlier sessions are kept: a new session adds its own file.
+// What earlier sessions left in the folder is kept: a new session adds its own record.
 const kept = path.join(repoRoot, 'docs/verification/evidence/ui/audio-listening');
-const earlier = fs.existsSync(kept) ? fs.readdirSync(kept).filter(f => /^marks.*\.json$/.test(f)).map(f => [f, fs.readFileSync(path.join(kept, f))]) : [];
+const earlier = fs.existsSync(kept) ? fs.readdirSync(kept).filter(f => f !== 'install.log').map(f => [f, fs.readFileSync(path.join(kept, f))]) : [];
 const args = process.argv.slice(2);
 const play = (args[args.indexOf('--play') + 1] || '').split(',').filter(Boolean);
 const automatic = args.includes('--play');
