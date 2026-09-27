@@ -670,8 +670,13 @@ impl Daemon {
     /// Queued messages for a run, for the UI.
     pub fn queued_messages(&self, run_id: &str) -> Result<Value> {
         let store = self.store.lock().unwrap();
-        let mut stmt = store.conn.prepare("SELECT rowid, ts, source, text FROM queued_messages WHERE run_id=?1 AND delivered_ms IS NULL ORDER BY rowid")?;
-        let rows: Vec<Value> = stmt.query_map([run_id], |r| Ok(json!({"id": r.get::<_, i64>(0)?, "ts": r.get::<_, i64>(1)?, "source": r.get::<_, String>(2)?, "text": r.get::<_, String>(3)?})))?.collect::<rusqlite::Result<_>>()?;
+        let mut stmt = store.conn.prepare("SELECT rowid, ts, source, text, detail FROM queued_messages WHERE run_id=?1 AND delivered_ms IS NULL ORDER BY rowid")?;
+        let rows: Vec<Value> = stmt
+            .query_map([run_id], |r| {
+                let detail: Value = r.get::<_, Option<String>>(4)?.and_then(|d| serde_json::from_str(&d).ok()).unwrap_or(json!({}));
+                Ok(json!({"id": r.get::<_, i64>(0)?, "ts": r.get::<_, i64>(1)?, "source": r.get::<_, String>(2)?, "text": r.get::<_, String>(3)?, "redirect": detail["redirect"] == true}))
+            })?
+            .collect::<rusqlite::Result<_>>()?;
         Ok(json!({"queued": rows}))
     }
 

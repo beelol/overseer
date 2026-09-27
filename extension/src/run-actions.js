@@ -10,26 +10,34 @@ const ACTIVE = new Set(['queued', 'starting', 'running']);
  * (interrupt, then send once the run has stopped). One pending message per run; any window.
  */
 class Steering {
+  // Since Gate S (AC-188) the queue lives in the daemon: a queued message survives this window and
+  // is delivered by the daemon when the agent's turn ends; stop-then-send is the daemon's redirect.
+  // This class only mirrors what the daemon holds, so the chat can show it.
   constructor(client, model) {
-    this.client = client; this.model = model; this.pending = new Map(); // run id -> { text, options, how }
-    client.on('event', ev => { if (['status', 'turn_done'].includes(ev.kind) && this.pending.has(ev.run_id)) setTimeout(() => this.flush(ev.run_id), 300); });
+    this.client = client; this.model = model; this.pending = new Map(); // run id -> { text, how, id }
+    client.on('event', ev => { if (['queued', 'turn_started', 'redirect'].includes(ev.kind) && ev.run_id) this.refresh(ev.run_id); });
   }
   queued(runId) { return this.pending.get(runId); }
-  async set(runId, text, options, how) {
-    if (how === 'cancel') { this.pending.delete(runId); this.model.emitter.fire(); return; }
-    this.pending.set(runId, { text, options, how });
+  async refresh(runId) {
+    try {
+      const r = await this.client.request('run.queued', { run_id: runId });
+      const first = (r.queued || [])[0];
+      if (first) this.pending.set(runId, { text: first.text.replace(/^From Overseer: /, ''), how: first.redirect ? 'interrupt' : 'queue', id: first.id, source: first.source });
+      else this.pending.delete(runId);
+    } catch { this.pending.delete(runId); }
     this.model.emitter.fire();
-    if (how === 'interrupt') await this.client.request('run.interrupt', { run_id: runId });
-    await this.flush(runId);
   }
-  async flush(runId) {
-    const p = this.pending.get(runId); if (!p) return;
-    const state = await this.client.request('state');
-    const run = state.runs.find(r => r.id === runId);
-    if (!run || ACTIVE.has(run.status)) return; // still working: try again on the next status event
-    this.pending.delete(runId);
-    try { await this.client.request('run.follow_up', { run_id: runId, prompt: p.text, ...(p.options || {}) }); }
-    finally { this.model.scheduleRefresh(); }
+  async set(runId, text, options, how) {
+    if (how === 'cancel') {
+      const p = this.pending.get(runId);
+      if (p?.id) await this.client.request('run.unqueue', { run_id: runId, id: p.id });
+      await this.refresh(runId);
+      return;
+    }
+    try {
+      if (how === 'interrupt') await this.client.request('run.redirect', { run_id: runId, text, source: 'owner' });
+      else await this.client.request('run.queue', { run_id: runId, text, source: 'owner' });
+    } finally { await this.refresh(runId); this.model.scheduleRefresh(); }
   }
 }
 
