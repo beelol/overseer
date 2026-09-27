@@ -1,0 +1,22 @@
+# An agent's conversation is open while it writes: every line that arrives is timed by the app.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: false
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${RUN}"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "agents.row.${RUN}"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 30000
+- takeScreenshot: stream-watched

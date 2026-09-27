@@ -1,7 +1,9 @@
 // The phone's scenarios, in the order they run. Each drives the app with a flow (e2e/flows) and
 // then asks the daemon what happened, as the Mac sees it: a scenario passes only when both agree.
 
+import fs from 'node:fs';
 import net from 'node:net';
+import path from 'node:path';
 
 /**
  * The storage namespaces that hold things of the Mac: the cached state and what the screens
@@ -56,10 +58,50 @@ export const scenarios = [
   {
     name: 'agents',
     criteria: ['AC-124'],
-    says: 'every agent, those that need the owner first',
+    says: 'every agent, those that need the owner first; every agent of the Mac has its row on the phone',
     async run(c) {
       await c.flow('agents', { SHOWCASE: c.runs.showcase, PERMISSION: c.runs.permission });
       c.shot('agents');
+      // The rows the phone must show: its own view model (parity-tested against VS Code's side
+      // bar) over the daemon's state. Each is looked for on the screen, above or below.
+      const { agents: model, store } = await import('../model/src/index.ts');
+      const rows = model.agentRows(store.load(c.lab.call('state')), { now: Date.now() }).filter((r) => r.runId && r.kind !== 'needs');
+      const ids = [...new Set(rows.map((r) => r.runId))];
+      expect(ids.length >= 9, `the Mac has only ${ids.length} agents; the check needs nine or more`);
+      const steps = ids.flatMap((id) => [
+        `- scrollUntilVisible:\n    element:\n      id: "agents.row.${id}"\n    direction: DOWN\n    timeout: 8000\n    optional: true`,
+        `- scrollUntilVisible:\n    element:\n      id: "agents.row.${id}"\n    direction: UP\n    timeout: 8000`,
+      ]);
+      const file = path.join(path.dirname(c.out), 'maestro', c.platform, 'generated', 'agents-every-row.yaml');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, `# Every agent of the Mac, as the phone's view model lists it from the daemon's state.\nappId: \${APP}\n---\n- extendedWaitUntil:\n    visible:\n      id: "agents.screen"\n    timeout: 30000\n${steps.join('\n')}\n`);
+      await c.flow(file);
+      c.log.say(`  ${ids.length} agents of the Mac (nested children among them: ${rows.filter((r) => r.kind === 'child').length}), each found on the phone`);
+      return { agents: ids.length, children: rows.filter((r) => r.kind === 'child').length };
+    },
+  },
+  {
+    name: 'delay',
+    criteria: ['AC-124'],
+    says: "a line an agent prints reaches the phone's screen: the delay from the Mac's event to the frame that shows it",
+    async run(c) {
+      c.dev.remove('perf.delay');
+      const created = c.lab.call('task.create', {
+        repo: c.lab.info().repo, harness: 'generic', workspace_mode: 'worktree', program: '/bin/sh', prompt: '', title: 'Timed lines',
+        args: ['-c', 'i=0; while [ $i -lt 400 ]; do echo line$i; i=$((i+1)); sleep 0.1; done'],
+      });
+      const id = created.run.id;
+      await c.flow('watch-stream', { RUN: id });
+      await c.sleep(20_000);
+      const delay = await c.until('the delays the app recorded', () => {
+        const raw = c.dev.read('perf.delay');
+        const summary = raw ? JSON.parse(JSON.parse(raw)) : null;
+        return summary && summary.count >= 50 ? summary : null;
+      }, 30_000);
+      c.lab.call('run.interrupt', { run_id: id });
+      const round = (n) => Math.round(n * 10) / 10;
+      c.log.say(`  from the Mac's event to the frame that shows it: ${delay.count} lines, p50 ${round(delay.p50)} ms, p95 ${round(delay.p95)} ms, longest ${round(delay.max)} ms (AC-58 holds a VS Code tile to 250 ms)`);
+      return { delay: { count: delay.count, p50: round(delay.p50), p95: round(delay.p95), max: round(delay.max) } };
     },
   },
   {

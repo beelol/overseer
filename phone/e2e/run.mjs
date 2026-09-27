@@ -116,7 +116,9 @@ async function startLab(log, platform, out) {
 }
 
 async function flow(log, dev, name, env, out) {
-  const file = path.join(here, 'flows', `${name}.yaml`);
+  // A flow of e2e/flows by name, or a flow a scenario wrote, by its path.
+  const file = path.isAbsolute(name) ? name : path.join(here, 'flows', `${name}.yaml`);
+  name = path.basename(name, '.yaml');
   const args = ['--udid', dev.id, 'test', '--debug-output', path.join(out, 'maestro', dev.platform, name), '--flatten-debug-output'];
   const { SHOTS: shots = path.join(out, dev.platform, 'screens'), ...given } = env;
   for (const [key, value] of Object.entries({ APP: BUNDLE, ...given })) args.push('-e', `${key}=${value}`);
@@ -214,8 +216,8 @@ async function platformRun(args, platform, summary) {
       const started = Date.now();
       try {
         log.say(`scenario ${scenario.name} (${scenario.criteria.join(', ')}): ${scenario.says}`);
-        await scenario.run(context);
-        results.push({ name: scenario.name, criteria: scenario.criteria, ok: true, seconds: Math.round((Date.now() - started) / 100) / 10 });
+        const figures = await scenario.run(context);
+        results.push({ name: scenario.name, criteria: scenario.criteria, ok: true, seconds: Math.round((Date.now() - started) / 100) / 10, ...(figures ? { figures } : {}) });
         log.say(`ok   ${scenario.name}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
