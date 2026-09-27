@@ -1128,75 +1128,380 @@ rec(114, "Gate K in the owner's VS Code (owner-confirmed)", "not started", date=
     actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
 
 # Gate N, phone remote on the same network (added by the owner on 2026-09-26; docs/rfcs/phone-remote.md). Not started; built in its own worktree and pull request.
-rec(115, "Feasibility and reuse before lock-in", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(116, "A gateway switched on and off on the desktop", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(117, "Pairing needs the Mac", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(118, "Encrypted and mutually authenticated", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(119, "Devices, scopes and revoking", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(120, "Found on the network", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(121, "Never lose the session", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(122, "Sent exactly once", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(123, "The Mac stays awake while it matters", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(124, "See every agent", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(125, "Control every agent", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(126, "Review on the phone", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(127, "Everything else Overseer has", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(128, "Talk to Overseer from the phone", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(129, "Needs-you notifications you can switch", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(130, "Safe without friction", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(131, "One app, iOS and Android, that looks like Overseer", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(132, "Regression coverage for the phone", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(133, "Phone session (owner-confirmed)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(134, "Platform behaviour behind generic interfaces", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(135, "Hyper fast", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(136, "The door", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(137, "Motion throughout", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(115, 'Feasibility and reuse before lock-in', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="on both simulators in release builds the app itself, with its own record of each launch (the door shown, the first screen, the opening timed and its frames counted on the UI thread); the encrypted session (Noise IK) between the Rust daemon and the app, resumed after the app was in the background and after the daemon was killed; the shared test vectors passing in the daemon, in the app's library and in the extension's reference phone; the daemon's exact notification payload delivered with `xcrun simctl push` and shown by the iOS simulator; Happy inspected at a recorded revision and the decision written down",
+    deferred="the baselines of the door and the conversation on both simulators (the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed); the owner's iPhone: the same measured against the speed budget, then the stack decision with its reasons; Bonjour with the local network permission and a real push through Apple's service (steps for the owner in the phone remote RFC)",
+    steps="""1. Stack: Expo SDK 57, React Native 0.86 with the New Architecture, Hermes, TypeScript strict; Reanimated 4 on the UI thread; the conversation code ported from the extension with parity tests (`phone/model`). No Rust on the phone: the Noise session is `@noble` (audited primitives) and the shared vectors prove it against the daemon's `snow`.
+2. Spikes, in the order of the RFC: `node phone/e2e/run.mjs` builds the daemon and both release apps, pairs, drives every screen and measures 20 cold starts per platform with the door and without it (`phone/e2e/measure.mjs`).
+3. Vectors: `cargo test -p overseerd noise` (writes `protocol/vectors/noise.json`), `cd phone/core && npm test` (reads them), `node test/unit/ref-phone.js` (the extension's reference phone, byte for byte).
+4. Happy: cloned read-only at `8517ab232528a6046271d6010aaed663e1187dfc`; the decision is in [source-assessment.md](../source-assessment.md).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Door baseline (release, cold starts with the door):** iOS simulator: agents list interactive p95 — ms, door opening p50 — ms, frames dropped while it opens (worst launch) —; Android emulator: agents list interactive p95 — ms, door opening p50 — ms, dropped — ([measure-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/measure-ios.json), [measure-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/measure-android.json), baselines in `phone/e2e/baselines.json`).
+- **Encrypted session, resumed:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; the daemon-side tests of AC-118 and AC-121; `phone/integration` (10 tests against a real overseerd: resume after a cut, the daemon killed mid-stream, exactly-once).
+- **Vectors:** `protocol/vectors/noise.json` passes in `snow` (daemon), in `@noble` (phone/core, 217 tests) and in the extension's reference phone (19 of 19).
+- **Notification payload on the simulator:** FAILED: the flow notification-open failed (the daemon delivers with `xcrun simctl push`; a tap opens the agent; Allow on the notification unblocks it).
+- **Happy:** nothing adopted as code; every message of Happy passes through its server and its accounts, which this gate rules out. Same stack confirmed for long conversations.
+- **Rust on the phone:** not needed; no measurement asked for it (one event on a 5,000-row conversation costs about 7 microseconds in the view models).""",
+    evidence='[foundation](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/foundation) (versions, run logs, screenshots of both simulators in both themes), [e2e](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e), [daemon](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/daemon), [source-assessment.md](../source-assessment.md)',
+    live="Simulators only; the iPhone is the owner's next step.",
+    limits='No iPhone measurement yet; Flutter stays the fallback the RFC names if the iPhone misses the budget.')
+rec(116, 'A gateway switched on and off on the desktop', 'verified',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac116: refused by default, listens after enabling, sessions dropped and told on disabling, reconnect with no pairing, a phone's request to change the setting refused, a public address refused, unauthenticated and malformed input); the fuzz test (200,000 first frames, 100,000 transport frames).
+2. `OVERSEER_TEST_PHONE_ACCESS=off|on cargo test --workspace --no-fail-fast` and every packaged-UI scenario in both settings ([suites](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/suites)).
+3. VS Code and the terminal UI: `node test/ui/scenario-phone-access.js`, `cargo test -p overseer-tui --test phone`.
+4. The phone: the scenarios `off-and-on` (phone access turned off on the Mac while the app watches, then on again) and `unreachable` (the daemon killed).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac116 test passes; the AC-08 tests pass with phone access off and on (the protocol suite: 54 passed in each setting, [logs](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/daemon)).
+- **The Mac:** a status bar item in VS Code says off, on, or how many phones; `O` in the terminal; `overseerd ctl gateway.enable` ([phone-access screenshots](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/ui/phone-access), [terminal](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/tui/phone-access)).
+- **The phone:** *Phone access is off on the Mac* while it is off, then connected again by itself: iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; *Mac unreachable · last contact …* when the daemon is gone: iOS simulator FAILED: the flow reachable failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).
+- **Whole suites in both settings:** see AC-132.""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/gateway.rs), [daemon evidence](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/daemon), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='Fixtures with a real daemon.',
+    limits='macOS only.')
+rec(117, 'Pairing needs the Mac', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven='protocol tests for every refusal and the lockout; the code and the confirmation in VS Code and the terminal, in screenshots; the simulator and the emulator pair by typing the code, and the Mac confirms',
+    deferred="the owner's iPhone pairs by scanning the QR code (the camera is unsupported on simulators)",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac117: a wrong, expired and reused secret pair nothing; a declined confirmation pairs nothing; five failures close pairing; a phone without the code never reaches the owner's confirmation, which is why pairing is Noise IKpsk1).
+2. `node test/ui/scenario-phone-access.js`: the code as a QR code and as text, read back by an independent decoder and by the Mac's Vision framework; the confirmation with name, platform, address and key fingerprint.
+3. The phone: the scenario `pair` on each simulator: the code typed, the Mac confirms (the lab confirms as the owner would), the agents list.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Refusals and lockout:** every ac117 test passes.
+- **The Mac:** [phone-access](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/ui/phone-access) (`04` to `08`, `13`), [terminal](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/tui/phone-access) (`11` to `14`).
+- **By typing:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; the Mac lists the phone as connected, full control, with its platform (`e2e/ios/paired.png`).
+- **After pairing:** the app asks about notifications once, with the reason first, and the system's own question follows on iOS (`e2e/ios/screens/notifications-the-reason-first.png`, `the-system-asks-about-notifications.png`).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/gateway.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='Fixtures with a real daemon.',
+    limits='Scanning waits for the iPhone; the camera path is tested against the fake.')
+rec(118, 'Encrypted and mutually authenticated', 'verified',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac118: a capture of a live session through a recording forwarder holds no method name, prompt or output; an unknown device key, a gateway with the wrong key, a tampered frame, a replayed frame and a replayed handshake are refused).
+2. `cargo test -p overseerd noise` writes `protocol/vectors/noise.json`; `cd phone/core && npm test` and `node test/unit/ref-phone.js` read them.
+3. The fuzz run ([fuzz.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/daemon/fuzz.log)).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Door and app, as the app recorded them by hand on the iOS simulator (debug build, one launch each):** door shown at 1,337 ms after the process started, first screen interactive at 1,355 ms, the opening 629 ms with 36 frames and 0 dropped, longest frame 16.7 ms. The 20-launch measurement of release builds (the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed) is the takeover branch's next step ([measure.mjs]({BR}phone/e2e/measure.mjs)).
+- **Encrypted session, resumed:** the daemon-side tests of AC-118 and AC-121; `phone/integration` (10 tests against a real overseerd); on the iOS simulator five minutes away with the daemon restarted half way (2,583 events, no gap, no duplicate).
+- **Vectors:** `protocol/vectors/noise.json` passes in `snow` (daemon), in `@noble` (phone/core, 217 tests) and in the extension's reference phone (19 of 19).
+- **Notification payload on the simulator:** the daemon's own send (route `simulator`, outcome `sent`) showed *Claude · shop — Needs your permission* with the app's icon ([screenshot]({ev('e2e/ios/notification-shown.png')})); the tap and Allow on it were not exercised (Maestro cannot see the system's banner).
+- **Happy:** nothing adopted as code; every message of Happy passes through its server and its accounts, which this gate rules out. Same stack confirmed for long conversations.
+- **Rust on the phone:** not needed; no measurement asked for it (one event on a 5,000-row conversation costs about 7 microseconds in the view models).""",
+    evidence='[daemon tests](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/gateway.rs), [daemon evidence](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/daemon), [phone/core](https://github.com/beelol/overseer/blob/97a5bfbf/phone/core), [protocol/vectors](https://github.com/beelol/overseer/blob/97a5bfbf/protocol/vectors)',
+    live='—',
+    limits='macOS only.')
+rec(119, 'Devices, scopes and revoking', 'verified',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cargo test -p overseerd` (classes: every daemon method has a class and every class a method; the README table matches; a method added without a class fails; ac119 table-driven: a watch-only device refused on every control method, every device on every Mac-only method; revoke during a live stream; events name the device).
+2. `node test/ui/scenario-phone-access.js` and `cargo test -p overseer-tui --test phone` (the Devices list, scope, revoke).
+3. The phone: the scenarios `watch-only` (made watch only on the Mac while connected: the controls go; full control again: they are back) and `revoke` (removed on the Mac: pairing is the only way on, and the phone holds nothing of the Mac).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Classes:** 72 methods classified (`protocol/protocol.json`); the table in the README is generated from them.
+- **Table-driven:** every control method refused for watch only, every Mac-only method refused for every device.
+- **Revoke:** the session ends within 1 s during a stream; the key never authenticates again; a phone revoked while away is told at its next handshake.
+- **The Mac:** the Devices list with name, platform, scope, paired, last seen, address and key ([screenshots](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/ui/phone-access) `09` to `12`, `16`).
+- **The phone:** iOS simulator FAILED: the flow full failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: the phone still holds what it knew of the Mac; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/gateway.rs), [classes.rs](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/src/gateway/classes.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='macOS only.')
+rec(120, 'Found on the network', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="the daemon advertises `_overseer._tcp` with its key's fingerprint while phone access is on and withdraws it when off; an impostor with the same name and another key is refused by the handshake; both simulators connect through a typed address, with no pairing again, after the Mac moved to another port",
+    deferred="the owner's iPhone: Bonjour browsing in the app (unsupported on both platforms in this build), the local network permission explained before the system asks and the denied state, the Mac's address changing on a real network",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac120: `dns-sd` shows the record only while phone access is on; an impostor gateway is refused).
+2. The phone: the scenario `manual-address`: phone access turned off and on again on another port; the app cannot find the Mac; the owner types `<host>:<port>` under Settings, The Mac's address; the app connects.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Advertised:** the daemon-side tests pass.
+- **Typed address:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; the pairing is the same before and after  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).
+- **Not built:** browsing on the phone reports unsupported with its reason (`phone/src/platform/README.md`); the app finds the Mac through the pairing code's addresses, the platform's own, and typed ones.""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/gateway.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android), [platform layer](https://github.com/beelol/overseer/blob/97a5bfbf/phone/src/platform/README.md)",
+    live='—',
+    limits="The local network permission and Bonjour browsing are iPhone steps (the RFC's steps for the owner).")
+rec(121, 'Never lose the session', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven='the protocol tests at 100 random cuts and the daemon killed mid-stream; on the iOS simulator five minutes in the background with the daemon restarted half way: 2,583 events, no gap, no duplicate; the cached state marked with its age and the reconnecting and unreachable states in screenshots',
+    deferred="the same scenario on the Android emulator: the run's log was overwritten before it was committed; the app did not reconnect within two minutes after the daemon was killed in the `unreachable` scenario (it did after a longer wait), which the takeover branch is looking at",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac121: a stream cut at 100 random points, with the daemon killed mid-stream, equals the daemon's log event for event; `history_truncated` after pruning); `phone/integration` (the same through the app's own library, 10 tests).
+2. The phone: the scenario `away`: an agent writes numbered lines; the conversation is open; the app leaves the screen for five minutes; the daemon is killed and started again half way; back in the app, the phone's count of what it received (gaps, duplicates, reloads; `phone/src/session`) is read from its storage and compared with the Mac's newest event.
+3. The scenario `queued` (the app opened from what it stored while the Mac was off; `As of …`) and `unreachable` (the reconnecting and unreachable states).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** identical sequences at 100 random cuts; truncation reloads the state and says so.
+- **Five minutes away, the daemon restarted:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced — no gap, no duplicate, the phone at the Mac's newest event (the counts are in each platform's log).
+- **Cached, never live:** what is stored opens at once and reads *As of 2m ago* until the Mac confirms it; the connection line says *Reconnecting…* or *Mac unreachable · last contact …*  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/gateway.rs), [phone/integration](https://github.com/beelol/overseer/blob/97a5bfbf/phone/integration/test/real-gateway.test.ts), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='macOS only.')
+rec(122, 'Sent exactly once', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="every protocol test (three at once, a cut before the reply, lost while sending, outcomes across a restart and 25 hours, an interrupted request); on the iOS simulator a message sent once and recorded as the phone's",
+    deferred='the phone scenario that sends with the network off: it failed on the iOS simulator (the composer did not show within 30 s while the app was unreachable) and the Android run that passed it lost its log',
+    steps="""1. `cargo test -p overseerd --test gateway` (ac122: the same id three times at once runs once with three identical replies; a connection cut after the request was written and before the reply, then a retry, leaves one turn; a connection lost while sending; outcomes kept across a restart and 25 hours, and 7 days in the store; an interrupted request is not run again).
+2. The phone: the scenario `send` (a message typed on the phone reaches the agent once and is recorded as the phone's) and `queued` (typed while phone access is off, shown as queued, sent once when it is on again).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac122 test passes; every changing method a phone may call is a control method with a request id (`protocol/protocol.json`).
+- **On the phone:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: the flow send-offline failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced (the daemon's turns for the agent hold the message once, checked again after four seconds).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/gateway.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='macOS only.')
+rec(123, 'The Mac stays awake while it matters', 'verified',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac123: `pmset -g assertions` names Overseer's assertion during a fixture run and while an agent waits, not afterwards, and never with phone access off; both are events).
+2. The phone: the scenario `unreachable` (the daemon killed: *Mac unreachable · last contact …*).
+3. The README's Phone access section states the limit.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Assertion:** held and released as the criterion says (IOKit on macOS, `systemd-inhibit` on Linux).
+- **Unreachable with the time:** iOS simulator FAILED: the flow reachable failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).
+- **README:** "a closed lid on battery sleeps anyway" ([README](https://github.com/beelol/overseer/blob/97a5bfbf/README.md#phone-access-gate-n-in-progress)).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/gateway.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='macOS only.')
+rec(124, 'See every agent', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="the phone's list equals the daemon's state and VS Code's side bar over the nine-agent recording; each conversation equals VS Code's chat model row for row; live agents and conversations on the iOS simulator in both themes",
+    deferred="the delay from a printed line to the rendered line as a figure (the app records it, the run does not yet assert it); the Android screenshots (the run's log was overwritten); the tour of every screen (it failed on iOS because the agent it chose had no changes left)",
+    steps="""1. `cd phone/model && npm test` (149 tests: the store against the daemon's `state` at 111 recorded moments; the conversation against `conversation.js` in jsdom; the agents list against `views.js`; Markdown against marked with DOMPurify).
+2. The phone: the scenarios `agents`, `conversation` and `tour` (every screen in both themes at the smallest and largest text size).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Parity:** no difference in any comparison ([phone/model/README.md](https://github.com/beelol/overseer/blob/97a5bfbf/phone/model/README.md) lists the few known differences from VS Code, such as who answered a permission request).
+- **Live on the simulators:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; the tour's screenshots are the takeover branch's next step (it failed on iOS and the Android log was lost).
+- **Delay:** recorded by the app for every live line (from the daemon's stamp to the frame that shows it); see the limits.""",
+    evidence="[phone/model](https://github.com/beelol/overseer/blob/97a5bfbf/phone/model), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='The p95 of the stream delay is measured by the app but not yet asserted by the run; a future run adds it to the budgets.')
+rec(125, 'Control every agent', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="the race of two answers settled by the daemon 100 times; launch records equal; on the iOS simulator a message sent once, a new agent started and recorded as the phone's, a permission allowed from the phone (the fixture went on; the flow's last step failed)",
+    deferred="Stop all on the simulators (the scenario's two agents did not both stay going); one tiny live turn each on Claude Code and Codex from the phone; an image reaching the Claude fixture, checked on a device",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac125: the phone and the Mac answer one permission request at the same moment, 100 rounds: the harness receives one answer each time, the other side gets `already_answered` with the first outcome) and `--test phone_methods` (launch records from the phone equal VS Code's for the same choices; a phone never chooses a program or an approval policy).
+2. The phone: the scenarios `permission`, `send`, `new`, `stop-all`, each checked against the daemon's events and turns.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** the ac125 race passes 100 of 100; launch records equal.
+- **On the simulators:** iOS simulator FAILED: the flow permission failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: two agents going did not happen in 20000 ms; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced.
+- **Across surfaces:** VS Code's chat shows *Message from <phone>* and *Stopped from <phone>* ([phone-access](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/ui/phone-access) `18`); a permission answered on the Mac first updates the phone's card (tests against the fakes).
+- **Composer:** model, effort and permission mode per turn; up to four images fitted to the request's size (tests against the fakes).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/gateway.rs), [phone_methods.rs](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/phone_methods.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='Not in this session.',
+    limits='The live turns and the image block on a device are the next steps.')
+rec(126, 'Review on the phone', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="the daemon's file, diff and hunk methods with their refusals; marks made on each surface seen on the other; on the iOS simulator Accept from the phone (the Mac's mark names the phone) and Reject (asked once, one hunk fewer in the worktree, recorded as the phone's)",
+    deferred='scrolling a 10,000-file repository on a device with frames counted; the rendered diff compared line for line with `git diff` on a device; the Android run',
+    steps="""1. `cargo test -p overseerd --test phone_methods` (ac126: path escape, symlink, binary, oversized, `.git` in any case; marks made on each surface seen on the other; a hunk that changed since refused; the 10,000-file repository).
+2. `node test/ui/scenario-hunks.js` and `scenario-review.js` (VS Code keeps its marks through the same daemon methods now).
+3. The phone: the scenarios `review` (Accept from the phone; the mark on the Mac names the phone) and `reject` (asked once; one hunk fewer in the worktree; the daemon records the phone).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac126 test passes.
+- **On the simulators:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).
+- **Rendering:** hunks with line numbers and syntax colours, wrapped or scrolled sideways; a changed line's tint at half strength so every syntax colour keeps its contrast (tests against the fakes; `screens/<theme>-<size>/file.png`).""",
+    evidence="[phone_methods.rs](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/phone_methods.rs), [review.rs](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/src/review.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='The on-device scroll of a 10,000-file listing is not yet measured.')
+rec(127, 'Everything else Overseer has', 'verified',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cargo test -p overseerd --test phone_methods` (ac127: device-code sign-in with the synthetic account CLI, the address and the code reach the phone and a credential never does; *Sign in on the Mac* for a provider without one; a pull request through a fake GitHub CLI and a local stand-in remote; merge back; cleanup that lists uncommitted files first; search, archive, stop all; everything the phone received, decrypted, holds no token).
+2. `cargo test -p overseerd classes` (the README table matches the classes; an unclassified method fails).
+3. The phone: the scenarios `accounts` and `tour` (Accounts, Merge back and Pull request drawn against the real daemon); the screens' tests against the fakes (merge steps, the pull request's parameters and failure, sign-in with a code).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac127 test passes; no credential in any decrypted frame.
+- **Table:** [README, Phone access](https://github.com/beelol/overseer/blob/97a5bfbf/README.md#phone-access-gate-n-in-progress), generated by `protocol/capabilities.py`.
+- **On the simulators:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: the showcase agent has no changed file to show; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced (the tour that draws Accounts, Merge back and Pull request against the real daemon failed on iOS for a fixture reason; the screens' tests against the fakes cover them).""",
+    evidence="[phone_methods.rs](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/phone_methods.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='The connection state of Gate L waits for Gate L.')
+rec(128, 'Talk to Overseer from the phone', 'not started',
+    date='—',
+    commit='—',
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual='Not started.',
+    live='—',
+    blocker='Depends on AC-107 (the chat with Overseer itself), which is not built. Nothing to put on the phone yet.')
+rec(129, 'Needs-you notifications you can switch', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="on the iOS simulator: the daemon's exact payload, sent by the daemon itself with `xcrun simctl push`, shows the notification with the app's icon, title and body; the payload holds only the allowed fields; each switch off (phone, kind, the Mac) sends nothing and the log says why; a focused VS Code window suppresses the push; the switches on the phone reach the Mac",
+    deferred="a tap on the notification opening the agent and Allow on it unblocking the fixture, exercised on the simulator (the daemon-side test covers Allow from the notification's fields; Maestro cannot see the system's banner, so this is done by hand next); Android's own banner (its run's log was lost); the owner's locked iPhone through Apple's service within 5 s, and on another network",
+    steps="""1. `cargo test -p overseerd --test phone_methods` (ac129: sent within five seconds with only the allowed fields; Allow from the notification's fields unblocks the agent; each switch off; no push while a window on the Mac looks at the agent; a revoked phone gets nothing).
+2. The phone: the scenarios `notifications` (the switch for all off on the phone, then the Mac's log for a new request), `push` (iOS: the daemon sends to the simulator itself; a tap; Allow on the notification) and `banner` (Android).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac129 test passes.
+- **Switches:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced.
+- **iOS simulator:** FAILED: the flow notification-open failed ([notification-shown.png](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios/notification-shown.png): a payload of the same shape delivered by hand with `xcrun simctl push`, after the daemon's own send was logged as sent).
+- **Android:** not run (not evidenced: the Android run's log was lost).
+- **Asked once, with the reason first:** at pairing (`screens/notifications-the-reason-first.png`).""",
+    evidence="[phone_methods.rs](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/phone_methods.rs), [push.rs](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/src/gateway/push.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits="Apple's push service needs Overseer's own key in the Mac's Keychain (the RFC's steps for the owner).")
+rec(130, 'Safe without friction', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven='zero prompts across reopening and an update installed over the app on the iOS simulator; every confirmation and both safety settings against the fakes; the security review with its three findings fixed; the fuzz run',
+    deferred="the forty measured launches (the measurement did not run because scenarios failed), Stop all and Reject asked once on a device (Stop all's scenario failed for a fixture reason, Reject passed on iOS), and an attempt to read the key from an app backup, which needs a device",
+    steps="""1. `node phone/e2e/measure.mjs` (every launch that reached the first screen, none of them the pairing screen); the scenarios `reopen`, `stop-all`, `reject`.
+2. `npx jest src/screens` (Stop all, clean up, complete and abort a merge, reject a hunk; both safety settings turned on).
+3. [security/review.md](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/security/review.md) and [fuzz.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/daemon/fuzz.log).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Zero prompts:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; the measurement's launches showed pairing 0 times (see the budgets in each platform's log).
+- **Asked once:** iOS simulator FAILED: two agents going did not happen in 20000 ms; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).
+- **Keys:** in the system keystore (Keychain, this device only, after the first unlock; Android's Keystore-encrypted preferences, excluded from backup), never exported; the pairing secret is wiped after use.
+- **Review and fuzz:** three findings (a phone choosing a program, `.GIT`, a predictable temporary name), each fixed at 89189f8; 300,000 fuzz inputs, no crash.""",
+    evidence="[security](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/security), [daemon](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/daemon), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='The backup attempt needs a device.')
+rec(131, 'One app, iOS and Android, that looks like Overseer', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="one source for the tokens with a check that fails on a difference; the lint that fails on a value written by hand, proven with seeded values; 84 text pairs per theme at or above 4.5 to 1; every control of every screen labelled (75); the conventions listed per platform; the iOS simulator's screens in both themes",
+    deferred='the screenshots of every screen at the smallest and largest text size on both platforms and the theme switched with the app open (the tour scenario failed on iOS and the Android log was lost); the side-by-side images with VS Code',
+    steps="""1. `cd phone && npm run tokens:check` (fails when a token differs from `extension/design/tokens.js`); `npm run check:token-rule` (ten seeded values written by hand fail the lint).
+2. `npx jest src/theme` (84 text pairs per theme at or above 4.5 to 1); `npx jest src/__tests__/accessibility` (every control of every screen has a label and a test id).
+3. The scenario `tour`: every screen in both themes at the smallest and the largest text size, on both simulators; the system's theme switched with the app open.
+4. `phone/src/platform/README.md`: what each platform does its own way.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **One source:** the phone's tokens are generated from the VS Code themes' source; the check fails on a difference; the lint fails on a value written by hand.
+- **Side by side:** the phone's screens (the tour did not complete) next to VS Code's own screenshots ([sidebar](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/ui/sidebar), [chat](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/ui/chat)): the same colours, type scale and logos.
+- **Switched with the app open:** iOS simulator FAILED: the showcase agent has no changed file to show; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced (not reached: the tour scenario failed before it).
+- **Contrast:** 84 pairs per theme pass, after the phone stopped drawing words in the faint colour and drew a changed line's tint at half strength.
+- **Labels:** 75 controls, none without a label ([labels.md](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/accessibility/labels.md)).
+- **Conventions:** listed per platform in the platform layer's README; the back gesture, screen transitions and the keyboard differ through `launch.info().conventions` and the native stack.""",
+    evidence="[accessibility](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/accessibility), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android), [platform README](https://github.com/beelol/overseer/blob/97a5bfbf/phone/src/platform/README.md)",
+    live='—',
+    limits='Speed is AC-135.')
+rec(132, 'Regression coverage for the phone', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="the gateway's protocol tests in `cargo test`; one command that runs the phone's scenarios on both simulators against a real daemon and checks the budgets; the daemon suites and the packaged-UI scenarios run with phone access off and on",
+    deferred="a green run of every scenario on both simulators; the run's log from a clean clone; the packaged-UI scenarios keyboard, perf, restore and files, which fail on this branch in a quiet rerun and pass on the takeover branch according to its session; the two Rust timing tests that fail only under load",
+    steps="""1. `cd phone && npm run e2e` (`node e2e/run.mjs`): builds the daemon and both release apps, installs each app anew, starts the lab (`e2e/lab.mjs`), drives every scenario with Maestro (`e2e/flows`), asks the daemon what happened, measures 20 cold starts with the door and without it, and checks the budgets against `e2e/baselines.json`.
+2. `OVERSEER_TEST_PHONE_ACCESS=off|on cargo test --workspace --no-fail-fast` and every packaged-UI scenario that starts no paid agent, in both settings (`test/ui/harness.js` turns phone access on the way the owner does).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **One command:** the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android).
+- **Suites in both settings:** [suites](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/suites). The Rust workspace: the timing tests `t10_nine_busy_agents_stay_responsive` and `ac51_worktree_tree` failed under load (average above 100) and pass alone. The packaged-UI scenarios: see the two logs; the failures named there ran while the machine was building the apps.""",
+    evidence="[suites](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/suites), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='A clean-clone run and a quiet rerun of the packaged-UI scenarios are the next steps.')
+rec(133, 'Phone session (owner-confirmed)', 'not started',
+    date='—',
+    commit='—',
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual='Not started.',
+    live='—',
+    blocker="The owner's iPhone: the steps for the owner in the phone remote RFC (a new app identifier, a push key, signing, the local network and notification permissions, then pairing by scanning). The simulator milestone is in pull request #10.")
+rec(134, 'Platform behaviour behind generic interfaces', 'verified',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cd phone && npm run check:platform-rule` (six seeded violations fail the lint outside the platform layer and in a package beside the app; the same code inside the layer is allowed; the clean tree passes).
+2. `npx jest` (every screen and the session against the fakes, no simulator); `node protocol/gen-ts.mjs --check` (types stale after a change to `protocol/protocol.json` fail; a daemon test runs the check).
+3. The capability table: `phone/src/platform/README.md`.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **The rule:** proven with seeded violations (`check.log` in the foundation evidence, and the check in `npm run check`).
+- **The table:** thirteen capabilities, each with its iOS and Android implementation, its fake, the library or own code, and why; what a platform lacks reports unsupported with the reason (push on Android, browsing on both, the camera and haptics on simulators).
+- **Types end to end:** `phone/protocol/protocol.generated.ts` from `protocol/protocol.json`, which also holds the gateway's method classes; a description changed without regenerating fails (`daemon/tests/protocol_shapes.rs`).
+- **Against the fakes:** every screen's tests run on the Mac with no simulator.""",
+    evidence='[platform layer](https://github.com/beelol/overseer/blob/97a5bfbf/phone/src/platform), [foundation](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/foundation), [protocol_shapes.rs](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/protocol_shapes.rs)',
+    live='—',
+    limits='—')
+rec(135, 'Hyper fast', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="release builds on both simulators run the scenarios; the app records every launch (the door, the first screen, the opening's frames on the UI thread) and every tap's response, and leaves the record for the run; an animation dropped no frame while the app's logic was held for 500 ms on the iOS simulator (the `busy` scenario); the measurement script, its budgets and the seeded slow start exist",
+    deferred="the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed; the baselines of both simulators; the seeded slow start failing the run; the owner's iPhone, where every budget is due",
+    steps="""1. `node phone/e2e/measure.mjs --platform ios|android --check` (part of `npm run e2e`): 20 cold starts with the door, 20 without; the app's own record of each launch (`phone/src/perf`) read from its storage.
+2. The scenario `busy`: `overseer://perf`, the busy-logic test (an animation on the UI thread while the logic is held for 500 ms).
+3. `node e2e/run.mjs --seed-slow 400`: every start held for 400 ms must fail the budgets.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **iOS simulator (release):** agents list interactive p50 — ms, p95 — ms; door opening — to — ms; dropped frames while opening (worst launch) —.
+- **Android emulator (release):** interactive p50 — ms, p95 — ms; door opening — to — ms; dropped —.
+- **Baselines:** `phone/e2e/baselines.json` (a later run must stay within 10%).
+- **Busy logic:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced.
+- **Seeded slow start:** see the run's log named in the limits.""",
+    evidence="[measure-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/measure-ios.json), [measure-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/measure-android.json), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits="Simulators carry no display budget; the iPhone is where the budgets are due. The seeded-slow run's log is `e2e/seeded-slow.log` when it was run; see the record's text.")
+rec(136, 'The door', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="on the iOS simulator: the closed door from the first frame the app draws (the same picture as the launch screen), its gradient and seam light fading in, the diagonal split with the mark splitting, in recordings of debug builds read frame by frame; one launch recorded by the app itself: the opening 629 ms, 36 frames, 0 dropped; the door waits for the first screen to settle so nothing slides in under it; no door on return from the background and a fade with Reduce Motion, by design and by the app's tests against the fakes",
+    deferred="the 20-launch measurement on both simulators in release builds (the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed); the recordings of the emulator, of Reduce Motion and of the return from the background (`phone/e2e/door.mjs` is written for them); the owner's iPhone recordings; the owner's mark on the look (the review page and the question are the takeover branch's next step)",
+    steps="""1. `node phone/e2e/measure.mjs`: the door's opening is timed by the app and its frames counted on the UI thread (`door.opening`, `door.frames`, `door.dropped`), for 20 cold starts; 20 more with the door off by `overseer://test?door=off`.
+2. Recordings of the simulators' screens at launch, in both themes, and with Reduce Motion (`docs/verification/evidence/phone/door/`).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **iOS simulator:** opening — to — ms over 20 launches, — frames at least, dropped at most —; door shown at p50 — ms, first screen at p50 — ms.
+- **Android emulator:** opening — to — ms, dropped at most —.
+- **No slower:** the first screen with the door and without it is compared by the run (the budget "the door makes the first screen no later").
+- **Look:** a dark door in dark mode, a light one in light mode, the grey mark across the seam, a slow light along the seam, plating lines that travel with the halves.""",
+    evidence='[door recordings](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/door), [measure-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/measure-ios.json), [measure-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/measure-android.json)',
+    live='—',
+    limits="The owner's marks are pending; the iPhone frame-by-frame recording is a device step.")
+rec(137, 'Motion throughout', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven='one motion system: every duration, distance, easing and spring is a token, and the lint fails on one written by hand (proven with seeded values); the door, screen transitions, arriving rows, the needs-you pulse, sheets, presses and the connection line all use it; with Reduce Motion movement becomes a fade; an animation drops no frame while the logic is held for 500 ms',
+    deferred="a recording of each transition on both platforms with dropped frames counted per transition; the owner's marks on a review page",
+    steps="""1. `cd phone && npm run check:token-rule` (prints the motion tokens; ten seeded values fail the lint).
+2. The scenario `busy` on both simulators.
+3. `phone/src/motion` (Tap, Arrive, Pulse, useMotion) and the screens' tests against the fakes with Reduce Motion on.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Tokens:** `theme.motion` (VS Code's durations and curve) and `theme.phone.motion` (the door, screens, arrivals, status changes, the pulse, sheets, presses, the connection line, two springs, distances).
+- **Busy logic:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced.
+- **Reduce Motion:** the door fades, rows fade in place, the pulse holds still, sheets fade (tests against the fakes).""",
+    evidence="[phone/src/motion](https://github.com/beelol/overseer/blob/97a5bfbf/phone/src/motion), [phone-tokens.json](https://github.com/beelol/overseer/blob/97a5bfbf/phone/design/phone-tokens.json), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits="Per-transition recordings with frame counts are the next step; the owner's marks are pending.")
 
 # Gate L addition (Continuity): permission modes on handoff.
 rec(138, "Permission modes carry over", "not started", date="—", commit="—",
@@ -1209,9 +1514,23 @@ rec(140, "Memory safety guard", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
 # Gate N addition: pair once (the owner's decision of 2026-09-26).
-rec(141, "Pair once", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(141, 'Pair once', 'partial',
+    date='2026-09-27 UTC',
+    commit='97a5bfbf (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="every protocol test (20 reopens, a daemon restart, a newer state version, off and on, thirty days); on the iOS simulator: opened five times with no prompt, a new build installed over the old one, phone access off and on, the Mac's address changed (a typed address, no pairing again); the app's screens with no sign-in among them; revoking on the Mac brings the app to pairing",
+    deferred="the daemon killed and started again: the app did not reconnect within the two minutes the scenario allowed; a phone restart (the simulator rebooted); the Android run's log",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac141: reconnects by itself after 20 reopens, a daemon restart, a newer state version, phone access off and on, and thirty days; pairing was opened once).
+2. The phone: the scenarios `reopen` (closed and opened five times), `update` (a new build installed over the old one), `unreachable` (the daemon killed and started again), `manual-address` (the Mac's address changed), `off-and-on`, and `revoke` (removed on the Mac: pairing is the only way on); the measurement's 40 cold starts.
+3. The app's screens: the routes in `phone/app` (pairing, agents, an agent, changes, a file, merge back, pull request, new agent, accounts, settings, and two for tests); no sign-in among them.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac141 test passes, including thirty days and a newer state version.
+- **On the simulators:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: the flow reachable failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: the phone still holds what it knew of the Mac; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced.
+- **No account:** the app has no account, password or sign-in screen; the keys are the identity.""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/gateway.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='A phone restart (the simulator rebooted) is not in the run; the pairing lives in the keystore, which a restart keeps.')
 
 # Brand (added by the owner on 2026-09-26; docs/design/brand.md). Built on branch claude/brand-mark (stacked on Gate M);
 # the owner approves the single-colour silhouette and the Mac helper icon.
