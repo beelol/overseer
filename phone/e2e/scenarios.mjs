@@ -19,8 +19,11 @@ export const scenarios = [
     needed: true,
     always: true,
     async run(c) {
-      c.name = `Lab ${c.platform}`;
-      await c.flow('pair', { CODE: c.lab.code(), NAME: c.name, NOTIFICATIONS: 'pair.notifications.allow' });
+      const already = c.lab.call('gateway.devices').devices.find((d) => d.platform === c.platform && !d.revoked_ms);
+      c.name = already ? already.name : `Lab ${c.platform}`;
+      // A phone that is paired already (working on scenarios) is not paired again: it never is.
+      if (already) await c.flow('opened');
+      else await c.flow('pair', { CODE: c.lab.code(), NAME: c.name, NOTIFICATIONS: 'pair.notifications.allow' });
       const device = await c.until('the phone on the list of the Mac, connected', () => c.lab.call('gateway.devices').devices.find((d) => d.name === c.name && d.connected));
       c.deviceId = device.id;
       expect(device.scope === 'full', `a new phone has full control, this one has ${device.scope}`);

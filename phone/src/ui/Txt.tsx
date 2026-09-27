@@ -5,7 +5,8 @@ import { lineHeight, type Theme } from '@/theme';
 import { makeStyles, weight } from './styles';
 
 export type TxtKind = 'title' | 'heading' | 'body' | 'strong' | 'label' | 'small' | 'mono';
-export type TxtTone = 'text' | 'muted' | 'faint' | 'accent' | 'link' | 'red' | 'green' | 'amber' | 'onAccent';
+/** The colours words may have. Each meets WCAG AA on every surface the app draws words on. */
+export type TxtTone = 'text' | 'muted' | 'accent' | 'link' | 'red' | 'green' | 'amber' | 'onAccent';
 
 export interface TxtProps extends TextProps {
   readonly kind?: TxtKind;
@@ -29,7 +30,6 @@ const useStyles = makeStyles((theme) => ({
   ...kinds(theme),
   'tone.text': { color: theme.colors.text },
   'tone.muted': { color: theme.colors.muted },
-  'tone.faint': { color: theme.colors.faint },
   'tone.accent': { color: theme.colors.accent },
   'tone.link': { color: theme.colors.link },
   'tone.red': { color: theme.colors.red },

@@ -37,7 +37,7 @@ export function TaskField({ value, onChange, editable }: TaskFieldProps) {
       multiline
       placeholder={WORDS.taskHint}
       maxFontSizeMultiplier={MAX_TEXT_SCALE}
-      placeholderTextColor={theme.colors.faint}
+      placeholderTextColor={theme.colors.muted}
       selectionColor={theme.colors.accent}
       keyboardAppearance={theme.scheme}
       style={styles.input}

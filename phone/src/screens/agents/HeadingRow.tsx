@@ -36,12 +36,12 @@ export const HeadingRow = memo(function HeadingRow({ row, onFold }: HeadingRowPr
   const fold = useCallback(() => onFold(row), [onFold, row]);
   const content = (
     <>
-      <Icon name={ICON[row.icon ?? ''] ?? 'repo'} size="sm" tone={row.badgeTone === 'orange' ? 'amber' : 'faint'} />
+      <Icon name={ICON[row.icon ?? ''] ?? 'repo'} size="sm" tone={row.badgeTone === 'orange' ? 'amber' : 'muted'} />
       <Txt kind="small" tone="muted" numberOfLines={1} style={styles.label}>
         {row.kind === 'section' ? row.label.toUpperCase() : row.label}
       </Txt>
       {row.description ? (
-        <Txt kind="small" tone={row.badgeTone === 'orange' ? 'amber' : 'faint'}>
+        <Txt kind="small" tone={row.badgeTone === 'orange' ? 'amber' : 'muted'}>
           {row.description}
         </Txt>
       ) : null}

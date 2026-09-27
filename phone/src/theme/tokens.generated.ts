@@ -293,5 +293,6 @@ export const phone = {
     pressed: 0.7,
     disabled: 0.45,
     scrim: 0.4,
+    diffTint: 0.5,
   },
 } as const;

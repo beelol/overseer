@@ -10,6 +10,8 @@
 //   node e2e/run.mjs --seed-slow 400       holds every start for 400 ms: the run must fail
 //   node e2e/run.mjs --only pair,send      some scenarios only
 //   node e2e/run.mjs --out <dir>           where logs, screenshots and results go
+//   node e2e/run.mjs --dev <lab state>     for working on scenarios: the installed app as it is
+//                                          (debug or release, paired or not) and a running lab
 //
 // It uses Overseer's own simulator and virtual device, an overseerd with its own data folder,
 // and fixture agents. It never touches the owner's daemon, checkouts, logins or other devices.
@@ -45,6 +47,8 @@ function parse(argv) {
     else if (arg === '--seed-slow') args.slow = Number(next());
     else if (arg === '--only') args.only = next().split(',');
     else if (arg === '--out') args.out = path.resolve(next());
+    // For working on the scenarios: the app as it is installed and paired, and a lab that runs already.
+    else if (arg === '--dev') args.dev = next();
     else throw new Error(`unknown argument: ${arg}`);
   }
   return args;
@@ -75,6 +79,19 @@ function run(log, command, args, options = {}) {
   return output;
 }
 
+function labAt(state, stop) {
+  const lab = (...args) => execFileSync('node', [path.join(here, 'lab.mjs'), ...args], { cwd: phone, encoding: 'utf8' }).trim();
+  return {
+    state,
+    info: () => JSON.parse(fs.readFileSync(state, 'utf8')),
+    call: (method, params = {}) => JSON.parse(lab('call', state, method, JSON.stringify(params))),
+    code: () => lab('code', state),
+    agent: (mode, title, prompt = 'go') => lab('agent', state, mode, title, prompt),
+    mode: (mode) => lab('mode', state, mode),
+    stop,
+  };
+}
+
 /** The lab: a real overseerd of its own, with fixture agents. */
 async function startLab(log, platform, out) {
   const state = path.join(out, `lab-${platform}.json`);
@@ -90,19 +107,10 @@ async function startLab(log, platform, out) {
     if (Date.now() > end) throw new Error('the lab daemon did not start within a minute');
     await sleep(200);
   }
-  const lab = (...args) => execFileSync('node', [path.join(here, 'lab.mjs'), ...args], { cwd: phone, encoding: 'utf8' }).trim();
-  return {
-    state,
-    info: () => JSON.parse(fs.readFileSync(state, 'utf8')),
-    call: (method, params = {}) => JSON.parse(lab('call', state, method, JSON.stringify(params))),
-    code: () => lab('code', state),
-    agent: (mode, title, prompt = 'go') => lab('agent', state, mode, title, prompt),
-    mode: (mode) => lab('mode', state, mode),
-    stop: async () => {
-      child.kill('SIGTERM');
-      await new Promise((resolve) => (child.exitCode !== null ? resolve() : child.on('exit', resolve)));
-    },
-  };
+  return labAt(state, async () => {
+    child.kill('SIGTERM');
+    await new Promise((resolve) => (child.exitCode !== null ? resolve() : child.on('exit', resolve)));
+  });
 }
 
 async function flow(log, dev, name, env, out) {
@@ -137,16 +145,22 @@ async function until(what, ok, ms = 20_000) {
 async function platformRun(args, platform, summary) {
   const out = path.join(args.out, platform);
   fs.rmSync(out, { recursive: true, force: true });
+  fs.rmSync(path.join(args.out, 'maestro', platform), { recursive: true, force: true });
   const log = new Log(path.join(args.out, `${platform}.log`));
   log.say(`The phone's scenarios on ${platform}. Commit ${execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()}.`);
   const dev = device(platform);
-  if (!fs.existsSync(APPS[platform])) throw new Error(`${APPS[platform]} is missing: build the release app first (without --skip-build)`);
-  // A phone that has never been paired: the app is installed anew, with nothing stored.
-  dev.stop();
-  dev.uninstall();
-  dev.install(APPS[platform]);
-  dev.appearance('dark');
-  const lab = await startLab(log, platform, args.out);
+  let lab;
+  if (args.dev) {
+    lab = labAt(path.resolve(args.dev), async () => undefined);
+  } else {
+    if (!fs.existsSync(APPS[platform])) throw new Error(`${APPS[platform]} is missing: build the release app first (without --skip-build)`);
+    // A phone that has never been paired: the app is installed anew, with nothing stored.
+    dev.stop();
+    dev.uninstall();
+    dev.install(APPS[platform]);
+    dev.appearance('dark');
+    lab = await startLab(log, platform, args.out);
+  }
   const results = [];
   const context = { log, dev, lab, out, platform, until, sleep, flow: (name, env = {}) => flow(log, dev, name, env, args.out), shot: (name) => dev.screenshot(path.join(out, `${name}.png`)) };
   fs.mkdirSync(out, { recursive: true });
@@ -194,7 +208,7 @@ async function platformRun(args, platform, summary) {
       }
     }
   } finally {
-    dev.stop();
+    if (!args.dev) dev.stop();
     await lab.stop();
   }
   summary[platform] = results;
@@ -205,7 +219,8 @@ async function main() {
   const args = parse(process.argv.slice(2));
   fs.mkdirSync(args.out, { recursive: true });
   const build = new Log(path.join(args.out, 'build.log'));
-  run(build, 'cargo', ['build', '-p', 'overseerd'], { cwd: root });
+  if (args.dev) args.build = false;
+  else run(build, 'cargo', ['build', '-p', 'overseerd'], { cwd: root });
   if (args.build) {
     for (const platform of args.platforms) run(build, 'node', [path.join(phone, 'scripts', `run-${platform}.mjs`), '--release'], { env: { ...process.env, LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' } });
   }

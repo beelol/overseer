@@ -10,7 +10,8 @@ export type { IconName };
 export interface IconProps {
   readonly name: IconName;
   readonly size?: keyof Theme['phone']['size']['icon'];
-  readonly tone?: TxtTone;
+  /** A colour of words, or `faint`, which is for decoration and never for words. */
+  readonly tone?: TxtTone | 'faint';
   readonly style?: StyleProp<TextStyle>;
 }
 

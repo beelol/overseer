@@ -46,7 +46,7 @@ export function Field({ testID, label, value, onChange, ...rest }: FieldProps) {
         value={value}
         onChangeText={onChange}
         maxFontSizeMultiplier={MAX_TEXT_SCALE}
-        placeholderTextColor={theme.colors.faint}
+        placeholderTextColor={theme.colors.muted}
         selectionColor={theme.colors.accent}
         keyboardAppearance={theme.scheme}
         style={styles.input}

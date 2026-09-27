@@ -144,7 +144,7 @@ export const AccountRow = memo(function AccountRow({
           </Txt>
         ) : null}
         {signedIn && usage !== undefined && !usage.reported ? (
-          <Txt testID={`accounts.usage.${account.id}.none`} kind="small" tone="faint">
+          <Txt testID={`accounts.usage.${account.id}.none`} kind="small" tone="muted">
             {ACCOUNTS.notReported}
           </Txt>
         ) : null}

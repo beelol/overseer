@@ -54,3 +54,13 @@ export const themes: Readonly<Record<ColorScheme, Theme>> = Object.freeze({
 export function lineHeight(fontSize: number, ratio: number): number {
   return Math.round(fontSize * ratio);
 }
+
+/**
+ * A colour of the palette that carries its own alpha (`#RRGGBBAA`), drawn weaker: its alpha
+ * times `factor`. A colour without alpha gets `factor` as its alpha.
+ */
+export function faded(color: string, factor: number): string {
+  const alpha = color.length === 9 ? parseInt(color.slice(7, 9), 16) / 255 : 1;
+  const next = Math.max(0, Math.min(255, Math.round(alpha * factor * 255)));
+  return `${color.slice(0, 7)}${next.toString(16).padStart(2, '0')}`;
+}

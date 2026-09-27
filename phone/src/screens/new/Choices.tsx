@@ -119,7 +119,7 @@ function Other({ testID, other, onClose }: { readonly testID: string; readonly o
           autoCorrect={false}
           returnKeyType="done"
           maxFontSizeMultiplier={MAX_TEXT_SCALE}
-          placeholderTextColor={theme.colors.faint}
+          placeholderTextColor={theme.colors.muted}
           selectionColor={theme.colors.accent}
           keyboardAppearance={theme.scheme}
           style={styles.input}

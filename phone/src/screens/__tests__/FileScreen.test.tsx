@@ -7,7 +7,8 @@ import type { ReviewStore } from '@/screens/review/comparison';
 import { comparisons, draw, hunk, hunksOf, LATEST, letLongTimersGo, notShown, refusal, RUN, stateWith, TASK_START, wait, WORKSPACE } from '@/screens/review/testing';
 import { createTestApp, makeEvent, type TestApp } from '@/testing';
 import { router } from '@/testing/router';
-import { palettes } from '@/theme/tokens.generated';
+import { palettes, phone } from '@/theme/tokens.generated';
+import { faded } from '@/theme';
 
 jest.mock('expo-router', () => require('@/testing/router').mockRouter());
 jest.mock('@shopify/flash-list/dist/recyclerview/utils/measureLayout', () => ({
@@ -65,8 +66,8 @@ describe("a file's changes", () => {
 
     const removed = screen.getByTestId(`file.line.${ONE.key}:-0`);
     const added = screen.getByTestId(`file.line.${ONE.key}:+2`);
-    expect(removed).toHaveStyle({ backgroundColor: palettes.dark.removedBg });
-    expect(added).toHaveStyle({ backgroundColor: palettes.dark.addedBg });
+    expect(removed).toHaveStyle({ backgroundColor: faded(palettes.dark.removedBg, phone.opacity.diffTint) });
+    expect(added).toHaveStyle({ backgroundColor: faded(palettes.dark.addedBg, phone.opacity.diffTint) });
     expect(removed).toHaveTextContent('12−const total = 0; // nothing yet');
     expect(added).toHaveTextContent('14+const tax = total * 0.2;');
     expect(screen.getByLabelText('Removed, line 12: const total = 0; // nothing yet')).toBeTruthy();

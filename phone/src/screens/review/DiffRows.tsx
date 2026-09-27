@@ -1,3 +1,4 @@
+import { faded } from '@/theme';
 import { memo, useMemo } from 'react';
 import { Animated, View } from 'react-native';
 
@@ -12,12 +13,15 @@ const useStyles = makeStyles((theme) => ({
   where: { flexGrow: 1, flexShrink: 1, gap: theme.space[1] },
   counts: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2] },
   line: { flexDirection: 'row', alignItems: 'stretch' },
-  removed: { backgroundColor: theme.colors.removedBg },
-  added: { backgroundColor: theme.colors.addedBg },
+  // The tint of a changed line is the theme's, drawn at half strength: on a phone the code sits
+  // on it in small type, and every syntax colour keeps its contrast (the contrast test).
+  removed: { backgroundColor: faded(theme.colors.removedBg, theme.phone.opacity.diffTint) },
+  added: { backgroundColor: faded(theme.colors.addedBg, theme.phone.opacity.diffTint) },
   gutter: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: theme.space[2] },
   gutterRemoved: { backgroundColor: theme.colors.removedLine },
   gutterAdded: { backgroundColor: theme.colors.addedLine },
-  number: { color: theme.colors.lineNumber, textAlign: 'right' },
+  // On the gutter's stronger tint the number takes the text's colour.
+  number: { color: theme.colors.text, textAlign: 'right' },
   sign: { paddingHorizontal: theme.space[1], color: theme.colors.muted },
   code: { paddingRight: theme.space[3] },
   wrapped: { flex: 1 },

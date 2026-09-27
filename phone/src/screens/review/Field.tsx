@@ -60,7 +60,7 @@ export function Field({ testID, label, value, onChangeText, placeholder, icon, t
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={theme.colors.faint}
+          placeholderTextColor={theme.colors.muted}
           selectionColor={theme.colors.accent}
           keyboardAppearance={theme.scheme}
           maxFontSizeMultiplier={MAX_TEXT_SCALE}

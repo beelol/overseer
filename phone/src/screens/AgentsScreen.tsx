@@ -161,7 +161,7 @@ export function AgentsScreen() {
       {searching ? <SearchField query={list.query} onChange={setQuery} onClose={closeSearch} matches={list.matches} /> : null}
       <Filters filter={list.filter} onChange={list.setFilter} needs={list.counts.needs} />
       {stale ? (
-        <Txt testID="agents.age" kind="small" tone="faint" style={styles.quiet}>
+        <Txt testID="agents.age" kind="small" tone="muted" style={styles.quiet}>
           {WORDS.asOf(text.agoInWords(stateAt, Math.max(now, stateAt ?? 0)))}
         </Txt>
       ) : null}

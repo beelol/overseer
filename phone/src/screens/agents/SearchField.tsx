@@ -40,7 +40,7 @@ export function SearchField({ query, onChange, onClose, matches }: SearchFieldPr
           autoCorrect={false}
           returnKeyType="search"
           maxFontSizeMultiplier={MAX_TEXT_SCALE}
-          placeholderTextColor={theme.colors.faint}
+          placeholderTextColor={theme.colors.muted}
           selectionColor={theme.colors.accent}
           keyboardAppearance={theme.scheme}
           style={styles.input}

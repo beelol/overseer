@@ -32,7 +32,7 @@ const useStyles = makeStyles((theme) => ({
   wide: { alignSelf: 'stretch' },
   primary: { backgroundColor: theme.colors.accentStrong },
   secondary: { backgroundColor: theme.colors.raised2, borderWidth: theme.phone.size.hairline, borderColor: theme.colors.borderStrong },
-  danger: { backgroundColor: theme.colors.removedLine, borderWidth: theme.phone.size.hairline, borderColor: theme.colors.red },
+  danger: { backgroundColor: theme.colors.removedBg, borderWidth: theme.phone.size.hairline, borderColor: theme.colors.red },
   quiet: { backgroundColor: 'transparent' },
 }));
 
@@ -109,7 +109,7 @@ export function Chip({ label, accessibilityLabel, selected, icon, count, ...rest
         {label}
       </Txt>
       {count !== undefined && count > 0 ? (
-        <Txt kind="small" tone="accent">
+        <Txt kind="small" tone={selected ? 'text' : 'accent'}>
           {count}
         </Txt>
       ) : null}
