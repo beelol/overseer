@@ -528,9 +528,9 @@ pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
         "cancel_requested",
         "superseded",
         "failed",
-        "accepted",
     ]
     .contains(&status.as_str())
+        || (status == "accepted" && !after_use)
     {
         bail!("job cannot claim a resource in this state");
     }
@@ -570,11 +570,37 @@ pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
             }
         }
     }
+    if after_use {
+        // A mutable database can retain another worker's writes after that worker exits
+        // and its admission claim is released. Keep observed use across that boundary.
+        let mut observed = tx.prepare(
+            "SELECT run_id,job_id,attempt_id,mode FROM swarm_resource_observations
+             WHERE resource=?1 AND NOT (run_id=?2 AND job_id=?3)"
+        )?;
+        let peers = observed.query_map(params![resource,run,job], |r| {
+            Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,
+                r.get::<_,String>(2)?,r.get::<_,String>(3)?))
+        })?.collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(observed);
+        for (peer_run,peer_job,peer_attempt,peer_mode) in peers {
+            if (mode == "write" || peer_mode == "write")
+                && !conflicts.iter().any(|(r,j,a)| r == &peer_run && j == &peer_job && a == &peer_attempt) {
+                conflicts.push((peer_run,peer_job,peer_attempt));
+            }
+        }
+    }
     if own_mode.is_some_and(|held| held != mode) && !after_use {
         bail!("claim conflict: mode change requires release and revalidation");
     }
     let now = crate::daemon::now();
     if let Some(attempt) = observed_attempt {
+        tx.execute("INSERT INTO swarm_resource_observations
+            (run_id,job_id,attempt_id,resource,mode,created_ms,updated_ms)
+            VALUES(?1,?2,?3,?4,?5,?6,?6)
+            ON CONFLICT(attempt_id,resource) DO UPDATE SET
+              mode=CASE WHEN mode='write' OR excluded.mode='write' THEN 'write' ELSE 'read' END,
+              updated_ms=excluded.updated_ms",
+            params![run,job,attempt,resource,mode,now])?;
         if !conflicts.is_empty() {
             for (peer_run,peer_job,peer_attempt) in &conflicts {
                 for (affected_run,affected_job,affected_attempt,other_run,other_job) in [
@@ -607,6 +633,7 @@ pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
     }
     if let Some(held) = own_mode {
         if held == mode || held == "write" {
+            tx.commit()?;
             return Ok(json!({"resource":resource,"mode":held,"duplicate":true}));
         }
         tx.execute("UPDATE swarm_claims SET mode='write',updated_ms=?4

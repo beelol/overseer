@@ -136,6 +136,18 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           FOREIGN KEY(run_id,job_id) REFERENCES swarm_jobs(run_id,id)
         );
         CREATE INDEX IF NOT EXISTS swarm_claims_active ON swarm_claims(resource,status);
+        CREATE TABLE IF NOT EXISTS swarm_resource_observations(
+          run_id TEXT NOT NULL,
+          job_id TEXT NOT NULL,
+          attempt_id TEXT NOT NULL REFERENCES swarm_attempts(id),
+          resource TEXT NOT NULL,
+          mode TEXT NOT NULL CHECK(mode IN ('read','write')),
+          created_ms INTEGER NOT NULL,
+          updated_ms INTEGER NOT NULL,
+          PRIMARY KEY(attempt_id,resource)
+        );
+        CREATE INDEX IF NOT EXISTS swarm_observations_resource
+          ON swarm_resource_observations(resource);
         CREATE TABLE IF NOT EXISTS swarm_resource_contamination(
           run_id TEXT NOT NULL,
           job_id TEXT NOT NULL,

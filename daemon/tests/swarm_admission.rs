@@ -443,14 +443,14 @@ fn late_shared_database_use_quarantines_evidence_and_bounds_retries() {
             "message_id":format!("result-{label}"),"type":"result","revision":1,
             "payload":{"artifact_ids":[format!("evidence-{label}")]}}));
     }
-    let observed=|run:&str,attempt:&Value|json!({"run_id":run,"job_id":"j0",
+    let observed=|run:&str,attempt:&Value,resource:&str|json!({"run_id":run,"job_id":"j0",
         "attempt_id":attempt["attempt_id"],"token":attempt["token"],
-        "generation":1,"revision":1,"resource":"db:shared-late","mode":"write",
+        "generation":1,"revision":1,"resource":resource,"mode":"write",
         "after_use":true});
-    assert_eq!(d.call("swarm.claim",observed(&first,&a))["duplicate"],false);
-    let conflict=d.call("swarm.claim",observed(&second,&b));
+    assert_eq!(d.call("swarm.claim",observed(&first,&a,"db:shared-late"))["duplicate"],false);
+    let conflict=d.call("swarm.claim",observed(&second,&b,"db:shared-late"));
     assert_eq!(conflict["status"],"contaminated", "{conflict}");
-    assert_eq!(d.call("swarm.claim",observed(&second,&b))["duplicate"],true);
+    assert_eq!(d.call("swarm.claim",observed(&second,&b,"db:shared-late"))["duplicate"],true);
     for (run,attempt,label) in [(&first,&a,"a"),(&second,&b,"b")] {
         assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"cancel_requested");
         assert_eq!(d.call("swarm.coverage",json!({"run_id":run}))["rows"][0]["coverage_state"],"contaminated");
@@ -463,13 +463,13 @@ fn late_shared_database_use_quarantines_evidence_and_bounds_retries() {
             "job_id":"j0","attempt_id":attempt["attempt_id"]}));
         assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"ready");
     }
-    assert_eq!(d.call("swarm.claim",observed(&second,&b))["duplicate"],true);
+    assert_eq!(d.call("swarm.claim",observed(&second,&b,"db:shared-late"))["duplicate"],true);
     let retried=admit(&d,&first,"j0","codex-a","late-a-retry",at,1000000,100).unwrap();
     assert_eq!(retried["status"],"admitted");
     assert_ne!(retried["attempt_id"],a["attempt_id"]);
     let retried_peer=admit(&d,&second,"j0","codex-a","late-b-retry",at,1000000,100).unwrap();
-    d.call("swarm.claim",observed(&first,&retried));
-    assert_eq!(d.call("swarm.claim",observed(&second,&retried_peer))["status"],"contaminated");
+    d.call("swarm.claim",observed(&first,&retried,"db:shared-late-reset"));
+    assert_eq!(d.call("swarm.claim",observed(&second,&retried_peer,"db:shared-late-reset"))["status"],"contaminated");
     for (run,attempt) in [(&first,&retried),(&second,&retried_peer)] {
         d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,"revision":1,
             "job_id":"j0","attempt_id":attempt["attempt_id"]}));
@@ -518,6 +518,75 @@ fn late_shared_read_only_snapshot_remains_parallel() {
         assert_ne!(result["status"],"contaminated", "{result}");
         assert_ne!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"cancel_requested");
     }
+}
+
+#[test]
+fn historical_shared_database_use_revokes_accepted_evidence_after_exit() {
+    let mut d=Daemon::start(&[]);
+    let first=setup(&d,"Historical DB A",1);
+    let second=setup(&d,"Historical DB B",1);
+    let at=now();
+    let a=admit(&d,&first,"j0","codex-a","historical-a",at,1000000,100).unwrap();
+    let observed=|run:&str,attempt:&Value|json!({"run_id":run,"job_id":"j0",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "generation":1,"revision":1,"resource":"db:historical","mode":"write",
+        "after_use":true});
+    d.call("swarm.claim",observed(&first,&a));
+    d.call("swarm.artifact.put",json!({"run_id":first,"job_id":"j0",
+        "attempt_id":a["attempt_id"],"token":a["token"],
+        "artifact_id":"historical-evidence","source_revision":1,
+        "kind":"finding","content":"row changed"}));
+    d.call("swarm.report",json!({"run_id":first,"job_id":"j0",
+        "attempt_id":a["attempt_id"],"token":a["token"],
+        "message_id":"historical-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["historical-evidence"],"audit_outcome":"negative"}}));
+    d.call("swarm.decide",json!({"run_id":first,"generation":1,"revision":1,
+        "job_id":"j0","decision":"accept","evidence":["historical-evidence"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":first,"generation":1,
+        "revision":1,"job_id":"j0","attempt_id":a["attempt_id"]}));
+    assert_eq!(d.call("swarm.coverage",json!({"run_id":first}))["rows"][0]["coverage_state"],
+        "checked_negative");
+    d.kill9();
+    d.spawn();
+
+    let b=admit(&d,&second,"j0","codex-a","historical-b",at,1000000,100).unwrap();
+    let conflict=d.call("swarm.claim",observed(&second,&b));
+    assert_eq!(conflict["status"],"contaminated", "{conflict}");
+    assert_eq!(d.call("swarm.coverage",json!({"run_id":first}))["rows"][0]["coverage_state"],
+        "contaminated");
+    assert_ne!(d.call("swarm.jobs",json!({"id":first}))["jobs"][0]["status"],"accepted");
+    assert_ne!(d.call("swarm.jobs",json!({"id":second}))["jobs"][0]["status"],"accepted");
+    assert!(d.try_call("swarm.complete",json!({"id":first,"generation":1,"revision":1,
+        "summary":"Done"})).is_err());
+}
+
+#[test]
+fn accepted_but_active_worker_can_report_late_shared_resource_use() {
+    let d=Daemon::start(&[]);
+    let first=setup(&d,"Accepted late A",1);
+    let second=setup(&d,"Accepted late B",1);
+    let at=now();
+    let a=admit(&d,&first,"j0","codex-a","accepted-a",at,1000000,100).unwrap();
+    let b=admit(&d,&second,"j0","codex-a","accepted-b",at,1000000,100).unwrap();
+    d.call("swarm.artifact.put",json!({"run_id":first,"job_id":"j0",
+        "attempt_id":a["attempt_id"],"token":a["token"],
+        "artifact_id":"accepted-evidence","source_revision":1,
+        "kind":"finding","content":"checked"}));
+    d.call("swarm.report",json!({"run_id":first,"job_id":"j0",
+        "attempt_id":a["attempt_id"],"token":a["token"],
+        "message_id":"accepted-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["accepted-evidence"],"audit_outcome":"negative"}}));
+    d.call("swarm.decide",json!({"run_id":first,"generation":1,"revision":1,
+        "job_id":"j0","decision":"accept","evidence":["accepted-evidence"]}));
+    let observed=|run:&str,attempt:&Value|json!({"run_id":run,"job_id":"j0",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "generation":1,"revision":1,"resource":"db:accepted-late","mode":"write",
+        "after_use":true});
+    d.call("swarm.claim",observed(&second,&b));
+    assert_eq!(d.call("swarm.claim",observed(&first,&a))["status"],"contaminated");
+    assert_eq!(d.call("swarm.coverage",json!({"run_id":first}))["rows"][0]["coverage_state"],
+        "contaminated");
+    assert_ne!(d.call("swarm.jobs",json!({"id":first}))["jobs"][0]["status"],"accepted");
 }
 
 #[test]
