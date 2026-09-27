@@ -212,3 +212,24 @@ one invalidated integrated job, and one fresh patch repair in the local fixture.
 Multiple invalidated integrated jobs, exhausted attempt budget, an explicit
 no-code-change disposition, director semantic judgment, unresolved partial
 reporting, and qualified live review remain unverified; SWARM-47 is partial.
+
+Two-patch dependent repair at `535dc01` (2026-09-27): a second fixture
+integrates A's patch, then B's patch after A's integration, before a late
+contradiction invalidates both accepted jobs. The director revises both
+acceptance checks, obtains an accepted independent reproduction supporting
+the original route result, and resolves the conflict. Before the change,
+integration of A's fresh repair was refused because B's old integrated patch
+was also stale. The branch guard now allows a fresh accepted repair only when
+that job has no still-stale integrated ancestor. A repairs first; B remains
+planned until A's new patch is integrated, then B repairs. The fixture checks
+that each repair is a new child commit of the preceding private commit and
+that the user's source checkout is unchanged. It failed first at A's repair
+and passed after the ordering rule.
+
+The affected integration (24), conflict (8), plan (11), and state (19) suites
+passed with `--offline -- --test-threads=1`; `git diff --check` passed. This
+qualifies one two-job dependency chain in a scripted local backend. Independent
+multi-patch repair with overlapping edits, an exhausted attempt budget,
+explicit no-code-change disposition, autonomous semantic judgment, unresolved
+partial reporting, and qualified live director review remain unverified.
+SWARM-47 remains partial.
