@@ -13,6 +13,13 @@ appId: ${APP}
       id: "agents.row.${SHOWCASE}"
     direction: DOWN
     timeout: 20000
+    centerElement: true
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000
 # Tapped again when nothing changed: on a loaded machine the simulator can drop the touch of a
 # cold start's first tap (the screen stayed on the list for 30 s in one run).
 - tapOn:

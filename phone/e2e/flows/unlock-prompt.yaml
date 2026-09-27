@@ -1,0 +1,20 @@
+# The system's unlock prompt: Face ID's first-use question on iOS; the PIN on Android.
+appId: ${APP}
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "OK"
+          optional: true
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            text: ".*PIN.*"
+          timeout: 20000
+      - inputText: "${PIN}"
+      - pressKey: Enter

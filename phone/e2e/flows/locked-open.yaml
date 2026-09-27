@@ -1,0 +1,12 @@
+# Opened with the app lock on: covered, and the device's unlock is asked for.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "lock.screen"
+    timeout: 30000
+- takeScreenshot: locked
+- runFlow:
+    file: unlock-prompt.yaml

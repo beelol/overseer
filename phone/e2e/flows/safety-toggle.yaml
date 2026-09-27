@@ -1,0 +1,23 @@
+# Turn a safety setting on from Settings: the change asks for the device's own unlock.
+# On Android the PIN is typed here; on iOS the run matches Face ID from the Mac.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- tapOn:
+    id: "agents.menu"
+- tapOn:
+    id: "agents.menu.settings"
+- scrollUntilVisible:
+    element:
+      id: "${SWITCH}"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "${SWITCH}"
+- runFlow:
+    file: unlock-prompt.yaml

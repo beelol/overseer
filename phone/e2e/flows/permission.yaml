@@ -12,6 +12,13 @@ appId: ${APP}
       id: "agents.needs.${PERMISSION}"
     direction: DOWN
     timeout: 20000
+    centerElement: true
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "agents.needs.${PERMISSION}"
+    direction: DOWN
+    timeout: 20000
 - tapOn:
     id: "agents.needs.${PERMISSION}"
 - extendedWaitUntil:

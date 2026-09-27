@@ -1,0 +1,15 @@
+# Stop all agents with the unlock before changes on: asked once, then the device's unlock.
+appId: ${APP}
+---
+- tapOn:
+    id: "agents.menu"
+- tapOn:
+    id: "agents.menu.stop"
+- extendedWaitUntil:
+    visible:
+      id: "agents.stop.confirm"
+    timeout: 10000
+- tapOn:
+    id: "agents.stop.confirm"
+- runFlow:
+    file: unlock-prompt.yaml

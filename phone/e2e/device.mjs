@@ -29,6 +29,9 @@ function quiet(command, args) {
   }
 }
 
+/** The emulator's PIN while the safety settings are tried: set, typed and cleared by the run. */
+export const PIN = '1357';
+
 const sql = (text) => `'${String(text).replaceAll("'", "''")}'`;
 
 function iosDevice() {
@@ -58,6 +61,17 @@ function ios() {
     launch: () => void simctl('launch', udid, BUNDLE),
     /** How far the device's clock is ahead of the Mac's, in milliseconds: the simulator uses the Mac's own. */
     clockOffset: () => 0,
+    // The device's own unlock, for the safety settings: Face ID enrolled on Overseer's simulator
+    // and matched through the simulator's biometric notifications (what Simulator's Features menu does).
+    unlockSetUp: () => {
+      simctl('spawn', udid, 'notifyutil', '-s', 'com.apple.BiometricKit.enrollmentChanged', '1');
+      simctl('spawn', udid, 'notifyutil', '-p', 'com.apple.BiometricKit.enrollmentChanged');
+    },
+    unlockMatch: () => void simctl('spawn', udid, 'notifyutil', '-p', 'com.apple.BiometricKit_Sim.pearl.match'),
+    unlockTearDown: () => {
+      simctl('spawn', udid, 'notifyutil', '-s', 'com.apple.BiometricKit.enrollmentChanged', '0');
+      simctl('spawn', udid, 'notifyutil', '-p', 'com.apple.BiometricKit.enrollmentChanged');
+    },
     /** Shuts the simulator down and boots it again; returns once it has booted. */
     reboot: () => {
       quiet('xcrun', ['simctl', 'shutdown', udid]);
@@ -113,6 +127,11 @@ function android() {
       });
       return Math.round(readings.sort((a, b) => a - b)[1]);
     },
+    // The device's own unlock, for the safety settings: a PIN on Overseer's own virtual device,
+    // typed by the flow into the system's prompt, and cleared afterwards.
+    unlockSetUp: () => void shell(`locksettings set-pin ${PIN}`),
+    unlockMatch: () => undefined,
+    unlockTearDown: () => void quiet(ADB, ['-s', serial, 'shell', `locksettings clear --old ${PIN}`]),
     // `monkey` reports failure (exit 251) on this emulator image and starts nothing; the activity is started by name.
     launch: () => void shell(`am start -n ${BUNDLE}/.MainActivity >/dev/null 2>&1`),
     /** Reboots the emulator and waits until Android says it has booted; storage is read as root again afterwards. */

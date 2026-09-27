@@ -14,3 +14,10 @@ appId: ${APP}
       id: "agents.row.${SHOWCASE}"
     direction: DOWN
     timeout: 20000
+    centerElement: true
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000

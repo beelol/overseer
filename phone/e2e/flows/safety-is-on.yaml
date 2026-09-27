@@ -1,0 +1,9 @@
+# A safety setting shows as on.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    visible:
+      id: "${SWITCH}"
+      checked: true
+    timeout: 20000
+- takeScreenshot: ${SHOT}

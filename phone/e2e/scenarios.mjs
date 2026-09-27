@@ -7,6 +7,8 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
+import { PIN } from './device.mjs';
+
 /**
  * The storage namespaces that hold things of the Mac: the cached state and what the screens
  * learned (src/session/learned.ts). The connection library's pairing and the typed address are
@@ -366,6 +368,49 @@ export const scenarios = [
       await c.flow('merge-complete', { RUN: plain });
       expect(git('ls-tree', '--name-only', 'main').split('\n').includes('stock-note.txt'), "the agent's commit did not land on main");
       return { aborted: clash, completed: plain };
+    },
+  },
+  {
+    name: 'safety',
+    criteria: ['AC-130'],
+    says: "both safety settings turned on from the phone, each with the device's own unlock: the app is locked when opened, and Stop all asks for the unlock",
+    async run(c) {
+      const matched = async (times = 4) => {
+        // Face ID is matched from the Mac once the prompt is up; a match with no prompt does nothing.
+        for (let i = 0; i < times; i += 1) {
+          await c.sleep(1500);
+          c.dev.unlockMatch();
+        }
+      };
+      const stored = (key) => c.dev.read(`settings.${key}`) === 'true';
+      c.dev.unlockSetUp();
+      try {
+        // The unlock before changes first: once the app lock is on, every launch meets the lock.
+        await c.flow('safety-toggle', { SWITCH: 'settings.safety.unlock', PIN });
+        await matched();
+        await c.flow('safety-is-on', { SWITCH: 'settings.safety.unlock', SHOT: 'safety-unlock-on' });
+        await c.flow('safety-toggle', { SWITCH: 'settings.safety.lock', PIN });
+        await matched();
+        await c.flow('safety-is-on', { SWITCH: 'settings.safety.lock', SHOT: 'safety-lock-on' });
+        expect(stored('appLock') && stored('unlockBeforeChanges'), 'the phone did not keep both settings on');
+        // Opened again: covered until the device's unlock.
+        await c.flow('locked-open', { PIN });
+        await matched();
+        await c.flow('unlocked');
+        // A change that cannot be undone: Stop all asks once, then for the unlock.
+        const waiting = c.lab.agent('showcase-permission', 'Weigh the crates', 'weigh the crates');
+        await c.until('the agent waiting for the owner', () => run(c, waiting)?.status === 'waiting_for_user', 60_000);
+        await c.flow('stop-all-unlock', { PIN });
+        await matched();
+        await c.until('the agent stopped after the unlock', () => !ACTIVE.includes(run(c, waiting).status), 30_000);
+        return { appLock: true, unlockBeforeChanges: true };
+      } finally {
+        // Back to the defaults for the scenarios that follow, and the device as it was.
+        c.dev.stop();
+        c.dev.write('settings.appLock', false);
+        c.dev.write('settings.unlockBeforeChanges', false);
+        c.dev.unlockTearDown();
+      }
     },
   },
   {

@@ -12,6 +12,13 @@ appId: ${APP}
       id: "agents.row.${RUN}"
     direction: DOWN
     timeout: 20000
+    centerElement: true
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${RUN}"
+    direction: DOWN
+    timeout: 20000
 - tapOn:
     id: "agents.row.${RUN}"
 - extendedWaitUntil:
