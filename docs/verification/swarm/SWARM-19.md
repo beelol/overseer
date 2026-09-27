@@ -42,3 +42,13 @@ for its consumer before integration. The daemon returns
 dependency-satisfaction check as readiness. After integration the consumer is
 ready. The focused test and all 19 integration tests passed. This makes the
 hold's cause observable; it does not qualify a live integration path.
+
+At `b82ab91`, the coverage readout now gives a stopped run an explicit
+`incomplete` outcome and preserves its per-job accepted, cancelled and
+unresolved evidence after daemon restart. A separate state fixture confirms
+that only an evidence-gated `swarm.complete` record reads `complete`; an empty
+stopped run is incomplete too. The affected conflict (9), broker (18),
+integration (25) and state (19) suites passed. This improves the truthful
+partial-result path, but it does not resolve stopped integration intents,
+qualify live verification, or prove the combined-failure scenario through
+a normal launch. SWARM-19 remains partial.

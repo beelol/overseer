@@ -254,3 +254,23 @@ local integration path. An explicit disposition that can close an unrepaired
 run with a partial report, independent overlapping patch repair, autonomous
 semantic judgment, and a qualified live director remain unverified. SWARM-47
 stays partial.
+
+Stopped unresolved outcome at `b82ab91` (2026-09-27): a focused fixture
+submits incompatible left/right results, accepts a separate negative check,
+records the disagreement as explicitly unresolved, and stops the run. After
+both remaining attempt exits are confirmed and the daemon restarts,
+`swarm.coverage` returns `outcome: incomplete`, the durable stop reason,
+the accepted check as `checked_negative`, both disputed rows as
+`conflict_unresolved`, and the original left/right artifact references in
+its conflict list. `swarm.complete` still refuses a passed verdict. The
+fixture first failed because the readout had only job rows and no overall
+outcome or conflict chain. The focused nine-test conflict suite and the
+affected broker (18), integration (25), and state (19) suites passed with
+`--offline -- --test-threads=1`; the two new state assertions also confirm
+that a genuinely completed run reads `complete` and an empty stopped run
+reads `incomplete`.
+
+This is a durable structured partial readout, not a director-authored final
+analysis or an automatic Stop decision. The exhausted integrated-patch case
+still needs a joined closing replay, and live director judgment remains
+unqualified. SWARM-47 stays partial.
