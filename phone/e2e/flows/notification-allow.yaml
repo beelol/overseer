@@ -14,4 +14,4 @@ appId: ${APP}
     timeout: 3000
 - takeScreenshot: notification-actions
 - tapOn:
-    point: "40%,21.5%"
+    point: "40%,21%"
