@@ -28,7 +28,7 @@ import { scenarios } from './scenarios.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const phone = path.join(here, '..');
 const root = path.join(phone, '..');
-const PORTS = { ios: 47821, android: 47822 };
+const PORTS = { ios: 47841, android: 47842 };
 const APPS = {
   ios: path.join(phone, 'ios', 'build', 'Build', 'Products', 'Release-iphonesimulator', 'Overseer.app'),
   android: path.join(phone, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk'),
