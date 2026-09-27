@@ -5,8 +5,10 @@
 //
 // With --play the session does the named steps by itself and says each one aloud before it
 // starts, so the owner only listens: once (two agents need you at the same moment), system
-// (System voice), commander=<folder> (the owner's own folder, played where it is), closed (the
-// VS Code window is quit first). --silent sends the cues to a log instead of the speakers.
+// (System voice), reactor (back to the Reactor cues), commander=<folder> (the owner's own folder,
+// played where it is), off (Audio Mode off: silence), closed (the VS Code window is quit first).
+// The record lists the player processes the daemon started in each step, with the Commander
+// folder's path left out. --silent sends the cues to a log instead of the speakers.
 //
 // Opens VS Code with its own profile and its own Overseer home, with the packaged VSIX installed,
 // so the owner's own VS Code, daemon and agents are not touched. Agents are fixtures: no account
@@ -61,13 +63,36 @@ function quitWindow() {
   for (const pid of cp.spawnSync('pgrep', ['-f', s.profile], { encoding: 'utf8' }).stdout.trim().split('\n').filter(Boolean)) { try { process.kill(Number(pid), 'SIGKILL'); } catch {} }
 }
 
+/** Watches the players the session's daemon starts (afplay, say): a separate process lists them every 40 ms. */
+function watchPlayers() {
+  const file = path.join(s.root, 'players.jsonl');
+  const daemon = cp.spawnSync('pgrep', ['-f', `${s.extensions}/.*overseerd-.* serve`], { encoding: 'utf8' }).stdout.trim().split('\n')[0];
+  const code = `const cp=require('child_process'),fs=require('fs');const seen=new Set();setInterval(()=>{const out=cp.spawnSync('ps',['-axo','pid=,ppid=,args='],{encoding:'utf8'}).stdout;for(const l of out.split('\\n')){const m=l.trim().match(/^(\\d+)\\s+(\\d+)\\s+(\\/usr\\/bin\\/(?:afplay|say)\\b.*)$/);if(m&&m[2]===${JSON.stringify(daemon)}&&!seen.has(m[1])){seen.add(m[1]);fs.appendFileSync(${JSON.stringify(file)},JSON.stringify({t:Date.now(),args:m[3]})+'\\n');}}},40);`;
+  const child = cp.spawn(process.execPath, ['-e', code], { stdio: 'ignore' });
+  return { since: t0 => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : []).filter(e => e.t >= t0).map(e => e.args), stop: () => { try { child.kill('SIGKILL'); } catch {} } };
+}
+
 /** The steps named with --play, one after the other. */
 async function automatic_steps() {
   record.played = [];
+  record.players = {};
+  let folder = '';
+  const watcher = silent ? null : watchPlayers();
   tryCtl('audio.set', { enabled: true, track: 'reactor' });
   for (const step of play) {
     const [name, value] = step.split(/=(.*)/s);
-    if (name === 'once') {
+    const began = Date.now();
+    if (name === 'reactor') {
+      if (!tryCtl('audio.set', { enabled: true, track: 'reactor' })) continue;
+      announce('Back to the Reactor cues. You should hear a start cue and a complete cue, then a start cue and an attention cue.');
+      await generic(); await delay(2500);
+      await needs(1);
+    } else if (name === 'off') {
+      if (!tryCtl('audio.set', { enabled: false })) continue;
+      announce('Audio Mode is off now. Two agents run, and you should hear nothing until the next announcement.');
+      await generic(); await delay(2500);
+      await needs(1);
+    } else if (name === 'once') {
       announce('Two agents need you at the same moment. You should hear the agents start, then a single attention cue for both.');
       await needs(2);
     } else if (name === 'system') {
@@ -78,7 +103,8 @@ async function automatic_steps() {
       await generic(); await delay(2500);
       await needs(1);
     } else if (name === 'commander') {
-      if (!value || !tryCtl('audio.import_commander', { path: value }) || !tryCtl('audio.set', { track: 'commander' })) { say('  the Commander folder could not be used; this step was not played'); continue; }
+      folder = value || folder;
+      if (!folder || !tryCtl('audio.import_commander', { path: folder }) || !tryCtl('audio.set', { enabled: true, track: 'commander' })) { say('  the Commander folder could not be used; this step was not played'); record.heard.push('the Commander folder could not be used'); continue; }
       announce('Your Commander folder. You should hear your recordings for started, complete, and then started and needs attention.');
       await generic(); await delay(2500);
       await needs(1);
@@ -92,10 +118,15 @@ async function automatic_steps() {
     await delay(3500);
     stopAgents();
     record.played.push(name);
-    tryCtl('audio.set', { track: 'reactor' });
+    if (watcher) {
+      const real = folder ? fs.realpathSync(folder) : null;
+      record.players[`${record.played.length}. ${name}`] = watcher.since(began).filter(a => !/ -v Samantha /.test(a)).map(a => a.split(s.home).join('<daemon folder>').split(real || '\u0000').join('<commander folder>').split(folder || '\u0000').join('<commander folder>'));
+    }
+    tryCtl('audio.set', { enabled: true, track: 'reactor' });
     await delay(1500);
   }
-  for (const key of ['open', 'closed', 'once', 'system', 'commander', 'off']) record.steps[key] = record.played.includes(key) ? 'played; waits for the owner to say what was heard' : 'not played in this session';
+  watcher?.stop();
+  for (const key of ['open', 'closed', 'once', 'system', 'commander', 'off', 'reactor']) record.steps[key] = record.played.includes(key) ? 'played; waits for the owner to say what was heard' : 'not played in this session';
   if (silent) record.cue_log = fs.existsSync(cueLog) ? fs.readFileSync(cueLog, 'utf8').split('\n').filter(Boolean) : [];
   writeRecord();
   if (!silent) announce('That was the last step.');
@@ -231,7 +262,8 @@ async function marks() {
     try { s.child?.kill('SIGTERM'); } catch {}
     await s.quit();
     s.stopDaemon();
-    fs.rmSync(s.root, { recursive: true, force: true });
+    // The daemon may still be writing as it stops.
+    try { fs.rmSync(s.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }); } catch (error) { say(`  could not remove ${s.root}: ${error.code}`); }
     if (!fs.readdirSync(s.evidence).some(f => /^marks.*\.json$/.test(f))) fs.rmSync(s.evidence, { recursive: true, force: true });
     say('Session closed: VS Code window, agents and daemon stopped.');
     process.exit(0);
