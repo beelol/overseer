@@ -410,6 +410,99 @@ fn finished_attempt_cannot_receive_a_new_directive_but_can_replay_one() {
 }
 
 #[test]
+fn acceptance_waits_for_directive_application_before_unlocking_dependents() {
+    for kind in ["redirect","advisory","retract"] {
+        let mut d = Daemon::start(&[]);
+        let made = d.call("swarm.create",json!({"category":"Applied assignment",
+            "objective":"Audit the route before its dependent review",
+            "allowed_targets":["system-codex"]}));
+        let run = made["id"].as_str().unwrap();
+        d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+            {"id":"routes","title":"Audit route","acceptance":"route proof"},
+            {"id":"review","title":"Review route","acceptance":"review proof","deps":["routes"]}
+        ]}));
+        let attempt = d.call("swarm.attempt.register",json!({"run_id":run,
+            "job_id":"routes","generation":1,"revision":1}));
+        d.call("swarm.direct",json!({"run_id":run,"job_id":"routes",
+            "attempt_id":attempt["id"],"message_id":"focus-change",
+            "generation":1,"revision":1,"type":kind,"payload":{"focus":"check the revised boundary"}}));
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"routes",
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "artifact_id":"route-proof","source_revision":1,"kind":"finding","content":"route evidence"}));
+        d.call("swarm.report",json!({"run_id":run,"job_id":"routes",
+            "attempt_id":attempt["id"],"token":attempt["token"],"message_id":"route-result",
+            "type":"result","revision":1,"payload":{"artifact_ids":["route-proof"]}}));
+        let decision = json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":"routes","decision":"accept","evidence":["route-proof"]});
+        for phase in ["queued","delivered"] {
+            if phase == "delivered" {
+                d.call("swarm.ack",json!({"run_id":run,"message_id":"focus-change",
+                    "recipient":attempt["id"],"token":attempt["token"],
+                    "revision":1,"phase":"delivered"}));
+                d.kill9();
+                d.spawn();
+            }
+            let error = d.try_call("swarm.decide",decision.clone()).unwrap_err();
+            assert!(error.contains("unapplied directive"),"{phase}: {error}");
+            let jobs = d.call("swarm.jobs",json!({"id":run}));
+            assert_eq!(jobs["jobs"].as_array().unwrap().iter()
+                .find(|job| job["id"] == "review").unwrap()["status"],"planned");
+        }
+        d.call("swarm.ack",json!({"run_id":run,"message_id":"focus-change",
+            "recipient":attempt["id"],"token":attempt["token"],"revision":1,"phase":"applied"}));
+        assert_eq!(d.call("swarm.decide",decision)["status"],"accepted");
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"job_id":"routes",
+            "attempt_id":attempt["id"],"generation":1,"revision":1}));
+        let jobs = d.call("swarm.jobs",json!({"id":run}));
+        assert_eq!(jobs["jobs"].as_array().unwrap().iter()
+            .find(|job| job["id"] == "review").unwrap()["status"],"ready");
+    }
+}
+
+#[test]
+fn completion_does_not_hide_a_directive_sent_after_review() {
+    for applied in [false,true] {
+        let d = Daemon::start(&[]);
+        let (run,attempt,token) = planned(&d);
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"routes",
+            "attempt_id":attempt,"token":token,"artifact_id":"proof",
+            "source_revision":1,"kind":"finding","content":"route evidence"}));
+        d.call("swarm.report",json!({"run_id":run,"job_id":"routes",
+            "attempt_id":attempt,"token":token,"message_id":"result",
+            "type":"result","revision":1,"payload":{"artifact_ids":["proof"]}}));
+        d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":"routes","decision":"accept","evidence":["proof"]}));
+        d.call("swarm.direct",json!({"run_id":run,"job_id":"routes",
+            "attempt_id":attempt,"message_id":"after-review","generation":1,
+            "revision":1,"type":"advisory","payload":{"focus":"confirm the shared discovery"}}));
+        if applied {
+            for phase in ["delivered","applied"] {
+                d.call("swarm.ack",json!({"run_id":run,"message_id":"after-review",
+                    "recipient":attempt,"token":token,"revision":1,"phase":phase}));
+            }
+        }
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"job_id":"routes",
+            "attempt_id":attempt,"generation":1,"revision":1}));
+        d.call("swarm.ack",json!({"run_id":run,"message_id":"result",
+            "recipient":"director","generation":1,"revision":1,"phase":"applied"}));
+        rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap()
+            .execute("UPDATE swarm_runs SET status='running' WHERE id=?1",[&run]).unwrap();
+        let completion = json!({"run_id":run,"generation":1,"revision":1,
+            "request_id":"complete-directive","summary":"Route checked",
+            "verification":"Accepted route proof","checks":[
+                {"job_id":"routes","outcome":"passed","evidence":["proof"]}
+            ]});
+        if applied {
+            assert_eq!(d.call("swarm.complete",completion)["status"],"completed");
+        } else {
+            let error = d.try_call("swarm.complete",completion).unwrap_err();
+            assert!(error.contains("unapplied directive"),"{error}");
+            assert_eq!(d.call("swarm.get",json!({"id":run}))["status"],"running");
+        }
+    }
+}
+
+#[test]
 fn unapplied_redirect_times_out_and_holds_dependent_work() {
     let mut d = Daemon::start(&[]);
     let run = d.call("swarm.create", json!({"category":"Redirect timeout",

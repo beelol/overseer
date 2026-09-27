@@ -207,6 +207,14 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
         ).optional()?;
         let (attempt, accepted_evidence, reviewed_message_seq) =
             decision.ok_or_else(|| anyhow!("accepted job lacks a review decision"))?;
+        let unapplied_directive = tx.prepare(
+            "SELECT 1 FROM swarm_messages WHERE run_id=?1 AND job_id=?2
+             AND attempt_id=?3 AND sender='director' AND recipient=?3
+             AND kind IN ('redirect','advisory','retract') AND phase!='applied'",
+        )?.exists(params![run,job,attempt])?;
+        if unapplied_directive {
+            bail!("unapplied directive blocks completion");
+        }
         let mut results = tx.prepare(
             "SELECT payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3 AND revision=?4 AND kind='result'",
         )?;

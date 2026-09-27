@@ -171,6 +171,14 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
         bail!("job cannot be decided in this state");
     }
     if decision == "accept" {
+        let unapplied_directive = store.conn.prepare(
+            "SELECT 1 FROM swarm_messages WHERE run_id=?1 AND job_id=?2
+             AND attempt_id=?3 AND sender='director' AND recipient=?3
+             AND kind IN ('redirect','advisory','retract') AND phase!='applied'",
+        )?.exists(params![run,job,attempt])?;
+        if unapplied_directive {
+            bail!("unapplied directive blocks acceptance");
+        }
         let unresolved_conflict: bool = store.conn.prepare(
             "SELECT 1 FROM swarm_conflicts WHERE run_id=?1 AND status!='resolved'
              AND (left_job_id=?2 OR right_job_id=?2)",
