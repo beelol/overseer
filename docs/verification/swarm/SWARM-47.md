@@ -40,3 +40,22 @@ passed 4 + 18 + 11 + 19 tests; `git diff --check` passed.
 This is fixture-only. Autonomous semantic judgment, a complete dependent-job
 re-review after contradiction, an unresolved partial final report, and a
 qualified live director path remain unverified. SWARM-47 stays partial.
+
+Transitive dependency hold at `48e8697` (2026-09-27):
+`late_conflict_holds_a_ready_transitive_dependent_before_admission` accepts
+the right-hand route finding and a middle job based on it, making a leaf job
+ready. When a later left-hand result disputes the route finding, the fixture
+previously observed the leaf still `ready`. The broker now records the conflict
+and demotes affected ready jobs in one transaction. Dependency checks walk
+the full upstream chain, and admission rechecks dependencies even if a job
+was already marked ready, so the leaf waits on its middle prerequisite rather
+than launching from disputed evidence. After an independent accepted
+reproduction supports the original right-hand finding, resolution rematerializes
+the leaf as ready. The focused test failed before the fix and passed afterward.
+
+The affected admission, conflict, context, plan, scheduler, and state suites
+passed 35 + 5 + 5 + 11 + 4 + 19 tests; the strengthened resolution/refill
+assertion passed in a later focused rerun. `git diff --check` passed. Already
+running or accepted dependent work is not yet interrupted/re-reviewed solely
+because a conflict opens; that remains a separate safety gap, along with live
+director behavior and semantic choice. The criterion remains partial.
