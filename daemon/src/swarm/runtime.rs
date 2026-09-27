@@ -226,14 +226,19 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
     let attempt = required(p, "attempt_id")?;
     let token = required(p, "token")?;
     let repo = required(p, "repo")?;
-    let program = required(p, "program")?;
+    let harness = p["harness"].as_str().unwrap_or("generic");
+    if !["generic", "codex", "codex-app", "claude", "opencode"].contains(&harness) {
+        bail!("unknown fixture worker harness");
+    }
+    let program = if harness == "generic" { required(p, "program")? }
+        else { p["program"].as_str().unwrap_or("") };
     let prompt = required(p, "prompt")?;
     let title = required(p, "title")?;
     let args = p["args"]
         .as_array()
         .ok_or_else(|| anyhow!("args must be an array"))?;
-    if program.is_empty()
-        || !program.starts_with('/')
+    if (harness == "generic" && (program.is_empty() || !program.starts_with('/')))
+        || (harness != "generic" && (!program.is_empty() || !args.is_empty()))
         || program.len() > 1024
         || prompt.len() > 8000
         || title.is_empty()
@@ -300,10 +305,11 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
             )?;
         }
     }
+    let program_override = if harness == "generic" { json!(program) } else { Value::Null };
     let task = d.create_task_for_swarm(
         &json!({
-            "repo":repo,"harness":"generic","workspace_mode":"worktree",
-            "program":program,"args":args,"prompt":assigned_prompt,"title":title,
+            "repo":repo,"harness":harness,"workspace_mode":"worktree",
+            "program":program_override,"args":args,"prompt":assigned_prompt,"title":title,
         }),
         &SwarmWorkerIdentity {
             run_id: run.to_string(),

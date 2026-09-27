@@ -944,6 +944,79 @@ fn parent_exit_waits_for_native_descendant_receipts_before_finishing_attempt() {
 }
 
 #[test]
+fn synthetic_claude_background_child_does_not_finish_swarm_attempt_at_launch_stub() {
+    let fixture_path = repo_root().join("fixtures/fake-harness/claude-fixture.js")
+        .display().to_string();
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture_path),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "background")]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("claude-background-source"));
+    let run = d.call("swarm.create",json!({"category":"Synthetic child ordering",
+        "objective":"Inspect backend","allowed_targets":["fixture-claude"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let at = now();
+    let admitted = d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"inspect","target_id":"fixture-claude","request_id":"recorded-claude-child",
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-claude","account_id":"fixture","pool_ids":["pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(admitted["status"],"admitted");
+    let launched = d.call("swarm.worker.launch",json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "repo":checkout,"harness":"claude","args":[],
+        "prompt":"Inspect","title":"Synthetic Claude worker"}));
+    assert_eq!(launched["status"],"launched", "{launched}");
+    let worker = launched["overseer_run_id"].as_str().unwrap();
+    let run_dir: String = rusqlite::Connection::open(d.home.path().join("overseer.sqlite"))
+        .unwrap().query_row("SELECT run_dir FROM runs WHERE id=?1",[worker],|row|row.get(0)).unwrap();
+    let launch_file = std::fs::read_to_string(std::path::Path::new(&run_dir).join("launch.json")).unwrap();
+    assert!(!launch_file.contains(admitted["token"].as_str().unwrap()),
+        "synthetic harness must not receive the worker broker credential");
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    let waiting = loop {
+        let state = d.run(worker);
+        if state["status"]=="waiting_for_user" { break state; }
+        assert!(state["status"]!="failed" && std::time::Instant::now()<until,
+            "synthetic harness did not reach permission pause: {state}; events: {:?}",d.events(worker));
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    };
+    let child = d.runs().into_iter().find(|row| row["parent_run_id"]==worker)
+        .expect("synthetic Agent event created a native child");
+    assert_eq!(child["native_id"],"toolu_bg");
+    let interim = d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}));
+    assert!(["active","suspect","unknown"].contains(&interim["status"].as_str().unwrap()),
+        "an async launch stub cannot finish the attempt: {interim}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let attempt_status: String = db.query_row("SELECT status FROM swarm_attempts WHERE id=?1",
+        [admitted["attempt_id"].as_str().unwrap()],|row|row.get(0)).unwrap();
+    assert_eq!(attempt_status,"registered");
+    d.call("run.permission",json!({"run_id":worker,
+        "request_id":waiting["attention"]["request_id"],"allow":false}));
+    assert_eq!(d.wait_done(worker,15)["status"],"completed");
+    let reconciled = d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}));
+    assert_eq!(reconciled["status"],"terminal", "{reconciled}");
+    assert_eq!(d.call("swarm.jobs",json!({"id":id}))["jobs"][0]["status"],"reserved");
+    let duplicate = d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}));
+    assert_eq!(duplicate["duplicate"],true);
+    let terminal_count: i64 = rusqlite::Connection::open(d.home.path().join("overseer.sqlite"))
+        .unwrap().query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1
+            AND attempt_id=?2 AND kind='terminal'",
+            rusqlite::params![id,admitted["attempt_id"].as_str().unwrap()],|row|row.get(0)).unwrap();
+    assert_eq!(terminal_count,1);
+}
+
+#[test]
 fn failed_worker_program_releases_its_execution_attempt() {
     let d=Daemon::start(&[]);
     let temp=tmp();

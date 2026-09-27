@@ -740,30 +740,36 @@ impl Daemon {
             },
         )?;
         if let Some(identity) = swarm_identity {
-            if run.harness != "generic" || std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() != Ok("1") {
-                bail!("scripted Swarm identity requires fixture-only generic harness");
+            if std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() != Ok("1")
+                || (run.harness != "generic" && !matches!(identity, SwarmLaunchIdentity::Worker(_))) {
+                bail!("scripted Swarm identity requires a fixture worker or generic director");
             }
-            let mut private_env = vec![
-                ("OVERSEER_HOME", paths::data_dir().display().to_string()),
-                ("OVERSEER_SOCKET", paths::socket_path().display().to_string()),
-                ("OVERSEER_BIN", self.exe.display().to_string()),
-            ];
-            match identity {
-                SwarmLaunchIdentity::Worker(identity) => private_env.extend([
-                    ("OVERSEER_SWARM_RUN_ID", identity.run_id.clone()),
-                    ("OVERSEER_SWARM_JOB_ID", identity.job_id.clone()),
-                    ("OVERSEER_SWARM_ATTEMPT_ID", identity.attempt_id.clone()),
-                    ("OVERSEER_SWARM_TOKEN", identity.token.clone()),
-                    ("OVERSEER_SWARM_REVISION", identity.revision.to_string()),
-                ]),
-                SwarmLaunchIdentity::Director(identity) => private_env.extend([
-                    ("OVERSEER_SWARM_RUN_ID", identity.run_id.clone()),
-                    ("OVERSEER_SWARM_GENERATION", identity.generation.to_string()),
-                    ("OVERSEER_SWARM_DIRECTOR_TOKEN", identity.token.clone()),
-                ]),
-            }
-            for (key, value) in private_env {
-                launch.env.insert(key.to_string(), value);
+            // Synthetic provider streams exercise lifecycle parsing without giving a
+            // model harness a worker command credential. Generic fixture scripts
+            // keep their private broker environment for scripted report/ack calls.
+            if run.harness == "generic" {
+                let mut private_env = vec![
+                    ("OVERSEER_HOME", paths::data_dir().display().to_string()),
+                    ("OVERSEER_SOCKET", paths::socket_path().display().to_string()),
+                    ("OVERSEER_BIN", self.exe.display().to_string()),
+                ];
+                match identity {
+                    SwarmLaunchIdentity::Worker(identity) => private_env.extend([
+                        ("OVERSEER_SWARM_RUN_ID", identity.run_id.clone()),
+                        ("OVERSEER_SWARM_JOB_ID", identity.job_id.clone()),
+                        ("OVERSEER_SWARM_ATTEMPT_ID", identity.attempt_id.clone()),
+                        ("OVERSEER_SWARM_TOKEN", identity.token.clone()),
+                        ("OVERSEER_SWARM_REVISION", identity.revision.to_string()),
+                    ]),
+                    SwarmLaunchIdentity::Director(identity) => private_env.extend([
+                        ("OVERSEER_SWARM_RUN_ID", identity.run_id.clone()),
+                        ("OVERSEER_SWARM_GENERATION", identity.generation.to_string()),
+                        ("OVERSEER_SWARM_DIRECTOR_TOKEN", identity.token.clone()),
+                    ]),
+                }
+                for (key, value) in private_env {
+                    launch.env.insert(key.to_string(), value);
+                }
             }
         }
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(run_id))?;
