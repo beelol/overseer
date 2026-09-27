@@ -11,3 +11,5 @@ Observed: the new test failed against the previous behavior because both message
 Evidence: `daemon/tests/swarm_director.rs::unreviewed_result_returns_to_director_after_batch_completion_and_restart`, `daemon/src/swarm/schema.rs::old_completed_director_turns_keep_their_duplicate_receipt_count`, `daemon/src/swarm/director.rs`, and `daemon/src/swarm/completion.rs`.
 
 Remaining: these are scripted daemon fixtures. There is no live director model turn or qualified provider reservation. An undecidable terminal report remains queued and can stall after two no-progress turns; the director needs an explicit durable unresolved disposition before live use. Stop remains immediate through the existing control path.
+
+At `52eea97`, a versioned Atlas J2 probe precedes 2,000 duplicate progress messages. A concurrent Stop is acknowledged in 7 ms on the recorded machine, leaving one progress envelope and no acceptance decision; see [S5](S5.md). This strengthens local Stop priority evidence but does not qualify a live director turn.

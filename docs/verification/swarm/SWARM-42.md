@@ -14,4 +14,6 @@ Evidence: `daemon/tests/swarm_broker.rs`, `docs/verification/swarm/milestone-15.
 
 Remaining: a live multi-harness reordered message trace, no double dispatch/acceptance/accounting across process recovery, and source-to-director delivery qualification remain unverified.
 
+At `52eea97`, the versioned Atlas S5 replay sends one J2 progress envelope after a real PostgreSQL probe, then replays the same ID and body 2,000 times while Stop is requested. All duplicates receive duplicate receipts and only one progress message reaches the director inbox; see [S5](S5.md). This strengthens local deduplication and Stop evidence but does not verify a live harness or the remaining reordered-message cases.
+
 Follow-up: `swarm_director::unreviewed_result_returns_to_director_after_batch_completion_and_restart` shows that batch completion requeues an undecided result while applying a neighboring progress message. After daemon restart and an unrelated plan revision, only the result is redelivered; a decision covering its sequence permits application exactly once. Replaying the first turn returns its original receipt. The full offline workspace suite passed 214 non-ignored tests, with 11 ignored; the final revision variant passed separately. This does not establish live director or multi-provider replay.

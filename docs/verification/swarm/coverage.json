@@ -315,9 +315,11 @@
       "evidence": [
         "daemon/tests/swarm_director.rs",
         "docs/verification/swarm/milestone-5.md",
-        "docs/verification/swarm/SWARM-33.md"
+        "docs/verification/swarm/SWARM-33.md",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md"
       ],
-      "blocker": "A fixture batch claims at most 20 messages/32 KiB; an undecided result is requeued after turn completion and restart while routine progress applies. Stop halts future claims. No live model turn, provider reservation, semantic review, or explicit unresolved disposition runs."
+      "blocker": "A fixture batch claims at most 20 messages/32 KiB; an undecided result is requeued after turn completion and restart while routine progress applies. A joined Atlas replay acknowledges Stop in 7 ms during 2,000 duplicate progress updates and retains one director envelope. No live model turn, provider reservation, semantic review, or explicit unresolved disposition runs."
     },
     "SWARM-34": {
       "status": "partial",
@@ -354,7 +356,7 @@
         "daemon/tests/swarm_state.rs",
         "docs/verification/swarm/SWARM-37.md"
       ],
-      "blocker": "A 100-job daemon fixture verifies aggregate state counts, filtered cursor pages, director owner readout and separate supervised-worker count across restart. It does not launch 32 supervised workers or render the required VS Code view, account usage, blockers and worker detail; Pause/Stop acknowledgement latency is unmeasured."
+      "blocker": "A 100-job daemon fixture verifies aggregate state counts, filtered cursor pages, director owner readout and separate supervised-worker count across restart. A separate one-attempt Atlas replay measured 7 ms Stop acknowledgement during duplicate traffic. It does not combine 32 supervised workers with the required VS Code view, account usage, blockers and worker detail; Pause latency remains unmeasured."
     },
     "SWARM-38": {
       "status": "partial",
@@ -411,7 +413,7 @@
         "docs/verification/swarm/SWARM-42.md",
         "daemon/tests/swarm_atlas.rs"
       ],
-      "blocker": "Stable-ID dedupe, terminal exact-receipt replay after restart, stale generation checks, late finished-attempt result isolation and requeued undecided-result review pass; the joined S1 replay includes duplicate D1. Live dispatch/accounting and broader delayed/reordered message traces remain untested."
+      "blocker": "Stable-ID dedupe, terminal exact-receipt replay after restart, stale generation checks, late finished-attempt result isolation and requeued undecided-result review pass; the joined S1 replay includes duplicate D1, and joined S5 collapses 2,000 J2 progress replays to one director envelope during Stop. Live dispatch/accounting and broader delayed/reordered message traces remain untested."
     },
     "SWARM-43": {
       "status": "partial",
@@ -681,7 +683,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins six named Atlas v1 faults: lost result receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, malformed dependencies with valid J2 continuation, and real shared-schema contamination with isolated retries. Other named faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins seven named Atlas v1 faults: lost result receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, malformed dependencies with valid J2 continuation, real shared-schema contamination with isolated retries, and a 2,000-message duplicate-progress flood during Stop. Other named faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
     }
   },
   "scenarios": {
@@ -746,7 +748,7 @@
         "docs/verification/swarm/S5.md",
         "fixtures/swarm/atlas-v1/probe-shared.mjs"
       ],
-      "blocker": "Atlas v1 joins six named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, and two scripted clients sharing one mutable PostgreSQL schema before isolated retries. Separate daemon fixtures cover SQLite-full replay and completed-run contamination. Other named S5 faults, Atlas-backed full storage and a full S1-sized ordered replay remain unverified. Live provider harness communication and automatic resource alias discovery are absent."
+      "blocker": "Atlas v1 joins seven named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, two scripted clients sharing one mutable PostgreSQL schema before isolated retries, and 2,000 duplicate progress messages during a 7 ms Stop acknowledgement. Separate daemon fixtures cover SQLite-full replay and completed-run contamination. Other named S5 faults, Atlas-backed full storage and a full S1-sized ordered replay remain unverified. Live provider harness communication and automatic resource alias discovery are absent."
     }
   }
 }
