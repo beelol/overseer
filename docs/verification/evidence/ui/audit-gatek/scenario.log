@@ -1,114 +1,114 @@
-[2026-09-27T00:55:56.120Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T00:56:02.697Z] runs {"showcase":{"id":"r-f20b6b011480","status":"completed"},"permission":{"id":"r-97996796d32f","status":"waiting_for_user"},"nested":{"id":"r-e8a4eca0ce1d","status":"completed"},"watch":{"id":"r-32bfd81d9e68","status":"running"},"failed":{"id":"r-469ca9673d81","status":"failed"}}
-[2026-09-27T00:56:08.505Z] PASS agents: side-bar title actions show their name in VS Code's hover "Search Agents (⌥⌘F)"
-[2026-09-27T00:56:12.119Z] screenshot docs/verification/evidence/ui/audit-gatek/01-dashboard-overseer-dark-1280.png
-[2026-09-27T00:56:12.121Z] view dashboard Overseer Dark@1280: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:12.122Z] view agents Overseer Dark@1280: 225 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:12.123Z] view chat Overseer Dark@1280: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:12.124Z] view files Overseer Dark@1280: 59 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:12.126Z] view review Overseer Dark@1280: 150 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:13.727Z] screenshot docs/verification/evidence/ui/audit-gatek/02-dashboard-overseer-dark-900.png
-[2026-09-27T00:56:13.729Z] view dashboard Overseer Dark@900: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:13.730Z] view agents Overseer Dark@900: 225 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:13.730Z] view chat Overseer Dark@900: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:13.731Z] view files Overseer Dark@900: 59 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:13.732Z] view review Overseer Dark@900: 129 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:17.320Z] screenshot docs/verification/evidence/ui/audit-gatek/03-dashboard-overseer-light-1280.png
-[2026-09-27T00:56:17.322Z] view dashboard Overseer Light@1280: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:17.323Z] view agents Overseer Light@1280: 225 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:17.323Z] view chat Overseer Light@1280: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:17.324Z] view files Overseer Light@1280: 59 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:17.325Z] view review Overseer Light@1280: 150 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:18.890Z] screenshot docs/verification/evidence/ui/audit-gatek/04-dashboard-overseer-light-900.png
-[2026-09-27T00:56:18.892Z] view dashboard Overseer Light@900: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:18.893Z] view agents Overseer Light@900: 225 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:18.894Z] view chat Overseer Light@900: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:18.894Z] view files Overseer Light@900: 59 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:18.896Z] view review Overseer Light@900: 129 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:22.484Z] screenshot docs/verification/evidence/ui/audit-gatek/05-dashboard-default-dark-modern-1280.png
-[2026-09-27T00:56:22.486Z] view dashboard Default Dark Modern@1280: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:22.487Z] view agents Default Dark Modern@1280: 225 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:22.487Z] view chat Default Dark Modern@1280: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:22.488Z] view files Default Dark Modern@1280: 59 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:22.489Z] view review Default Dark Modern@1280: 150 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:24.069Z] screenshot docs/verification/evidence/ui/audit-gatek/06-dashboard-default-dark-modern-900.png
-[2026-09-27T00:56:24.071Z] view dashboard Default Dark Modern@900: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:24.072Z] view agents Default Dark Modern@900: 225 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:24.073Z] view chat Default Dark Modern@900: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:24.073Z] view files Default Dark Modern@900: 59 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:24.075Z] view review Default Dark Modern@900: 129 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:28.663Z] screenshot docs/verification/evidence/ui/audit-gatek/07-grid-overseer-dark-1280.png
-[2026-09-27T00:56:28.664Z] view grid Overseer Dark@1280: 993 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:30.249Z] screenshot docs/verification/evidence/ui/audit-gatek/08-grid-overseer-dark-900.png
-[2026-09-27T00:56:30.250Z] view grid Overseer Dark@900: 993 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:33.857Z] screenshot docs/verification/evidence/ui/audit-gatek/09-grid-overseer-light-1280.png
-[2026-09-27T00:56:33.858Z] view grid Overseer Light@1280: 993 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:35.447Z] screenshot docs/verification/evidence/ui/audit-gatek/10-grid-overseer-light-900.png
-[2026-09-27T00:56:35.448Z] view grid Overseer Light@900: 993 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:39.039Z] screenshot docs/verification/evidence/ui/audit-gatek/11-grid-default-dark-modern-1280.png
-[2026-09-27T00:56:39.040Z] view grid Default Dark Modern@1280: 993 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:40.618Z] screenshot docs/verification/evidence/ui/audit-gatek/12-grid-default-dark-modern-900.png
-[2026-09-27T00:56:40.619Z] view grid Default Dark Modern@900: 993 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:47.603Z] screenshot docs/verification/evidence/ui/audit-gatek/13-new-agent-overseer-dark-1280.png
-[2026-09-27T00:56:47.605Z] view new-agent Overseer Dark@1280: 107 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:49.191Z] screenshot docs/verification/evidence/ui/audit-gatek/14-new-agent-overseer-dark-900.png
-[2026-09-27T00:56:49.192Z] view new-agent Overseer Dark@900: 107 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:52.777Z] screenshot docs/verification/evidence/ui/audit-gatek/15-new-agent-overseer-light-1280.png
-[2026-09-27T00:56:52.778Z] view new-agent Overseer Light@1280: 107 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:54.347Z] screenshot docs/verification/evidence/ui/audit-gatek/16-new-agent-overseer-light-900.png
-[2026-09-27T00:56:54.348Z] view new-agent Overseer Light@900: 107 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:57.936Z] screenshot docs/verification/evidence/ui/audit-gatek/17-new-agent-default-dark-modern-1280.png
-[2026-09-27T00:56:57.936Z] view new-agent Default Dark Modern@1280: 107 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:56:59.503Z] screenshot docs/verification/evidence/ui/audit-gatek/18-new-agent-default-dark-modern-900.png
-[2026-09-27T00:56:59.504Z] view new-agent Default Dark Modern@900: 107 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:57:06.547Z] screenshot docs/verification/evidence/ui/audit-gatek/19-accounts-overseer-dark-1280.png
-[2026-09-27T00:57:06.548Z] view accounts Overseer Dark@1280: 149 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:57:08.139Z] screenshot docs/verification/evidence/ui/audit-gatek/20-accounts-overseer-dark-900.png
-[2026-09-27T00:57:08.140Z] view accounts Overseer Dark@900: 149 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:57:11.744Z] screenshot docs/verification/evidence/ui/audit-gatek/21-accounts-overseer-light-1280.png
-[2026-09-27T00:57:11.745Z] view accounts Overseer Light@1280: 149 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:57:13.325Z] screenshot docs/verification/evidence/ui/audit-gatek/22-accounts-overseer-light-900.png
-[2026-09-27T00:57:13.325Z] view accounts Overseer Light@900: 149 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:57:16.913Z] screenshot docs/verification/evidence/ui/audit-gatek/23-accounts-default-dark-modern-1280.png
-[2026-09-27T00:57:16.913Z] view accounts Default Dark Modern@1280: 149 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:57:18.481Z] screenshot docs/verification/evidence/ui/audit-gatek/24-accounts-default-dark-modern-900.png
-[2026-09-27T00:57:18.482Z] view accounts Default Dark Modern@900: 149 chars, 0 long runs, 0 overflow, 0 unnamed
-[2026-09-27T00:57:18.493Z] summary {"dashboard":{"chars":1109,"longRuns":[],"overflow":0,"unnamed":[]},"agents":{"chars":225,"longRuns":[],"overflow":0,"unnamed":[]},"chat":{"chars":1050,"longRuns":[],"overflow":0,"unnamed":[]},"files":{"chars":59,"longRuns":[],"overflow":0,"unnamed":[]},"review":{"chars":150,"longRuns":[],"overflow":0,"unnamed":[]},"grid":{"chars":993,"longRuns":[],"overflow":0,"unnamed":[]},"new-agent":{"chars":107,"longRuns":[],"overflow":0,"unnamed":[]},"accounts":{"chars":149,"longRuns":[],"overflow":0,"unnamed":[]}}
-[2026-09-27T00:57:18.494Z] PASS dashboard: no horizontal overflow at 1280/900 px in every theme 0
-[2026-09-27T00:57:18.494Z] PASS dashboard: no unbroken text run over 80 characters outside code []
-[2026-09-27T00:57:18.494Z] PASS dashboard: every icon-only control has a name and a tooltip []
-[2026-09-27T00:57:18.494Z] PASS agents: no horizontal overflow at 1280/900 px in every theme 0
-[2026-09-27T00:57:18.494Z] PASS agents: no unbroken text run over 80 characters outside code []
-[2026-09-27T00:57:18.494Z] PASS agents: every icon-only control has a name and a tooltip []
-[2026-09-27T00:57:18.494Z] PASS agents: at least 40% less visible text than today's UI (531 → 225) {"before":531,"after":225,"reduction":"58%"}
-[2026-09-27T00:57:18.494Z] PASS chat: no horizontal overflow at 1280/900 px in every theme 0
-[2026-09-27T00:57:18.494Z] PASS chat: no unbroken text run over 80 characters outside code []
-[2026-09-27T00:57:18.494Z] PASS chat: every icon-only control has a name and a tooltip []
-[2026-09-27T00:57:18.494Z] PASS chat: at least 40% less visible text than today's UI (2795 → 1050) {"before":2795,"after":1050,"reduction":"62%"}
-[2026-09-27T00:57:18.494Z] PASS files: no horizontal overflow at 1280/900 px in every theme 0
-[2026-09-27T00:57:18.494Z] PASS files: no unbroken text run over 80 characters outside code []
-[2026-09-27T00:57:18.494Z] PASS files: every icon-only control has a name and a tooltip []
-[2026-09-27T00:57:18.494Z] PASS files: at least 40% less visible text than today's UI (127 → 59) {"before":127,"after":59,"reduction":"54%"}
-[2026-09-27T00:57:18.494Z] PASS review: no horizontal overflow at 1280/900 px in every theme 0
-[2026-09-27T00:57:18.494Z] PASS review: no unbroken text run over 80 characters outside code []
-[2026-09-27T00:57:18.494Z] PASS review: every icon-only control has a name and a tooltip []
-[2026-09-27T00:57:18.494Z] PASS review: at least 40% less visible text than today's UI (350 → 150) {"before":350,"after":150,"reduction":"57%"}
-[2026-09-27T00:57:18.494Z] PASS grid: no horizontal overflow at 1280/900 px in every theme 0
-[2026-09-27T00:57:18.494Z] PASS grid: no unbroken text run over 80 characters outside code []
-[2026-09-27T00:57:18.494Z] PASS grid: every icon-only control has a name and a tooltip []
-[2026-09-27T00:57:18.494Z] PASS new-agent: no horizontal overflow at 1280/900 px in every theme 0
-[2026-09-27T00:57:18.494Z] PASS new-agent: no unbroken text run over 80 characters outside code []
-[2026-09-27T00:57:18.494Z] PASS new-agent: every icon-only control has a name and a tooltip []
-[2026-09-27T00:57:18.494Z] PASS new-agent: at least 40% less visible text than today's UI (1037 → 107) {"before":1037,"after":107,"reduction":"90%"}
-[2026-09-27T00:57:18.494Z] PASS accounts: no horizontal overflow at 1280/900 px in every theme 0
-[2026-09-27T00:57:18.494Z] PASS accounts: no unbroken text run over 80 characters outside code []
-[2026-09-27T00:57:18.494Z] PASS accounts: every icon-only control has a name and a tooltip []
-[2026-09-27T00:57:18.494Z] PASS accounts: at least 40% less visible text than today's UI (381 → 149) {"before":381,"after":149,"reduction":"61%"}
-[2026-09-27T00:57:18.495Z] text: Gate J → Gate K [{"view":"dashboard","gatej":1360,"gatek":1109},{"view":"agents","gatej":238,"gatek":225},{"view":"chat","gatej":1063,"gatek":1050},{"view":"files","gatej":59,"gatek":59},{"view":"review","gatej":175,"gatek":150},{"view":"grid","gatej":993,"gatek":993},{"view":"new-agent","gatej":133,"gatek":107},{"view":"accounts","gatej":189,"gatek":149}]
-[2026-09-27T00:57:18.495Z] PASS agents: the side bar stays within the Gate J agents budget (238 characters) 225
-[2026-09-27T00:57:18.495Z] PASS chat: no more visible text than Gate J (1063 → 1050) {"view":"chat","gatej":1063,"gatek":1050}
-[2026-09-27T00:57:18.495Z] PASS files: no more visible text than Gate J (59 → 59) {"view":"files","gatej":59,"gatek":59}
-[2026-09-27T00:57:18.495Z] PASS review: no more visible text than Gate J (175 → 150) {"view":"review","gatej":175,"gatek":150}
-[2026-09-27T00:57:18.495Z] PASS grid: no more visible text than Gate J (993 → 993) {"view":"grid","gatej":993,"gatek":993}
-[2026-09-27T00:57:18.495Z] PASS new-agent: no more visible text than Gate J (133 → 107) {"view":"new-agent","gatej":133,"gatek":107}
-[2026-09-27T00:57:18.495Z] PASS accounts: no more visible text than Gate J (189 → 149) {"view":"accounts","gatej":189,"gatek":149}
+[2026-09-27T01:30:42.901Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T01:30:49.525Z] runs {"showcase":{"id":"r-9a1bfcf643e2","status":"completed"},"permission":{"id":"r-6fdc91d28ddd","status":"waiting_for_user"},"nested":{"id":"r-4a46f18ea959","status":"completed"},"watch":{"id":"r-77ce4416e0cb","status":"running"},"failed":{"id":"r-68f04422dfeb","status":"failed"}}
+[2026-09-27T01:30:55.335Z] PASS agents: side-bar title actions show their name in VS Code's hover "Search Agents (⌥⌘F)"
+[2026-09-27T01:30:58.956Z] screenshot docs/verification/evidence/ui/audit-gatek/01-dashboard-overseer-dark-1280.png
+[2026-09-27T01:30:58.960Z] view dashboard Overseer Dark@1280: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:30:58.961Z] view agents Overseer Dark@1280: 225 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:30:58.962Z] view chat Overseer Dark@1280: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:30:58.962Z] view files Overseer Dark@1280: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:30:58.964Z] view review Overseer Dark@1280: 150 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:00.569Z] screenshot docs/verification/evidence/ui/audit-gatek/02-dashboard-overseer-dark-900.png
+[2026-09-27T01:31:00.571Z] view dashboard Overseer Dark@900: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:00.572Z] view agents Overseer Dark@900: 225 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:00.573Z] view chat Overseer Dark@900: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:00.573Z] view files Overseer Dark@900: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:00.575Z] view review Overseer Dark@900: 129 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:04.175Z] screenshot docs/verification/evidence/ui/audit-gatek/03-dashboard-overseer-light-1280.png
+[2026-09-27T01:31:04.177Z] view dashboard Overseer Light@1280: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:04.177Z] view agents Overseer Light@1280: 225 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:04.178Z] view chat Overseer Light@1280: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:04.179Z] view files Overseer Light@1280: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:04.180Z] view review Overseer Light@1280: 150 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:05.756Z] screenshot docs/verification/evidence/ui/audit-gatek/04-dashboard-overseer-light-900.png
+[2026-09-27T01:31:05.758Z] view dashboard Overseer Light@900: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:05.759Z] view agents Overseer Light@900: 225 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:05.760Z] view chat Overseer Light@900: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:05.760Z] view files Overseer Light@900: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:05.761Z] view review Overseer Light@900: 129 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:09.358Z] screenshot docs/verification/evidence/ui/audit-gatek/05-dashboard-default-dark-modern-1280.png
+[2026-09-27T01:31:09.360Z] view dashboard Default Dark Modern@1280: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:09.361Z] view agents Default Dark Modern@1280: 225 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:09.361Z] view chat Default Dark Modern@1280: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:09.362Z] view files Default Dark Modern@1280: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:09.363Z] view review Default Dark Modern@1280: 150 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:10.935Z] screenshot docs/verification/evidence/ui/audit-gatek/06-dashboard-default-dark-modern-900.png
+[2026-09-27T01:31:10.936Z] view dashboard Default Dark Modern@900: 1109 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:10.937Z] view agents Default Dark Modern@900: 225 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:10.938Z] view chat Default Dark Modern@900: 1050 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:10.938Z] view files Default Dark Modern@900: 59 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:10.939Z] view review Default Dark Modern@900: 129 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:15.554Z] screenshot docs/verification/evidence/ui/audit-gatek/07-grid-overseer-dark-1280.png
+[2026-09-27T01:31:15.555Z] view grid Overseer Dark@1280: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:17.149Z] screenshot docs/verification/evidence/ui/audit-gatek/08-grid-overseer-dark-900.png
+[2026-09-27T01:31:17.150Z] view grid Overseer Dark@900: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:20.790Z] screenshot docs/verification/evidence/ui/audit-gatek/09-grid-overseer-light-1280.png
+[2026-09-27T01:31:20.791Z] view grid Overseer Light@1280: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:22.399Z] screenshot docs/verification/evidence/ui/audit-gatek/10-grid-overseer-light-900.png
+[2026-09-27T01:31:22.400Z] view grid Overseer Light@900: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:26.014Z] screenshot docs/verification/evidence/ui/audit-gatek/11-grid-default-dark-modern-1280.png
+[2026-09-27T01:31:26.016Z] view grid Default Dark Modern@1280: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:27.592Z] screenshot docs/verification/evidence/ui/audit-gatek/12-grid-default-dark-modern-900.png
+[2026-09-27T01:31:27.594Z] view grid Default Dark Modern@900: 993 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:34.590Z] screenshot docs/verification/evidence/ui/audit-gatek/13-new-agent-overseer-dark-1280.png
+[2026-09-27T01:31:34.591Z] view new-agent Overseer Dark@1280: 107 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:36.187Z] screenshot docs/verification/evidence/ui/audit-gatek/14-new-agent-overseer-dark-900.png
+[2026-09-27T01:31:36.189Z] view new-agent Overseer Dark@900: 107 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:39.812Z] screenshot docs/verification/evidence/ui/audit-gatek/15-new-agent-overseer-light-1280.png
+[2026-09-27T01:31:39.813Z] view new-agent Overseer Light@1280: 107 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:41.401Z] screenshot docs/verification/evidence/ui/audit-gatek/16-new-agent-overseer-light-900.png
+[2026-09-27T01:31:41.402Z] view new-agent Overseer Light@900: 107 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:44.992Z] screenshot docs/verification/evidence/ui/audit-gatek/17-new-agent-default-dark-modern-1280.png
+[2026-09-27T01:31:44.993Z] view new-agent Default Dark Modern@1280: 107 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:46.560Z] screenshot docs/verification/evidence/ui/audit-gatek/18-new-agent-default-dark-modern-900.png
+[2026-09-27T01:31:46.561Z] view new-agent Default Dark Modern@900: 107 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:53.606Z] screenshot docs/verification/evidence/ui/audit-gatek/19-accounts-overseer-dark-1280.png
+[2026-09-27T01:31:53.608Z] view accounts Overseer Dark@1280: 149 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:55.199Z] screenshot docs/verification/evidence/ui/audit-gatek/20-accounts-overseer-dark-900.png
+[2026-09-27T01:31:55.200Z] view accounts Overseer Dark@900: 149 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:31:58.797Z] screenshot docs/verification/evidence/ui/audit-gatek/21-accounts-overseer-light-1280.png
+[2026-09-27T01:31:58.797Z] view accounts Overseer Light@1280: 149 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:32:00.386Z] screenshot docs/verification/evidence/ui/audit-gatek/22-accounts-overseer-light-900.png
+[2026-09-27T01:32:00.387Z] view accounts Overseer Light@900: 149 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:32:03.981Z] screenshot docs/verification/evidence/ui/audit-gatek/23-accounts-default-dark-modern-1280.png
+[2026-09-27T01:32:03.982Z] view accounts Default Dark Modern@1280: 149 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:32:05.557Z] screenshot docs/verification/evidence/ui/audit-gatek/24-accounts-default-dark-modern-900.png
+[2026-09-27T01:32:05.558Z] view accounts Default Dark Modern@900: 149 chars, 0 long runs, 0 overflow, 0 unnamed
+[2026-09-27T01:32:05.573Z] summary {"dashboard":{"chars":1109,"longRuns":[],"overflow":0,"unnamed":[]},"agents":{"chars":225,"longRuns":[],"overflow":0,"unnamed":[]},"chat":{"chars":1050,"longRuns":[],"overflow":0,"unnamed":[]},"files":{"chars":59,"longRuns":[],"overflow":0,"unnamed":[]},"review":{"chars":150,"longRuns":[],"overflow":0,"unnamed":[]},"grid":{"chars":993,"longRuns":[],"overflow":0,"unnamed":[]},"new-agent":{"chars":107,"longRuns":[],"overflow":0,"unnamed":[]},"accounts":{"chars":149,"longRuns":[],"overflow":0,"unnamed":[]}}
+[2026-09-27T01:32:05.574Z] PASS dashboard: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-27T01:32:05.575Z] PASS dashboard: no unbroken text run over 80 characters outside code []
+[2026-09-27T01:32:05.575Z] PASS dashboard: every icon-only control has a name and a tooltip []
+[2026-09-27T01:32:05.575Z] PASS agents: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-27T01:32:05.575Z] PASS agents: no unbroken text run over 80 characters outside code []
+[2026-09-27T01:32:05.575Z] PASS agents: every icon-only control has a name and a tooltip []
+[2026-09-27T01:32:05.575Z] PASS agents: at least 40% less visible text than today's UI (531 → 225) {"before":531,"after":225,"reduction":"58%"}
+[2026-09-27T01:32:05.575Z] PASS chat: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-27T01:32:05.575Z] PASS chat: no unbroken text run over 80 characters outside code []
+[2026-09-27T01:32:05.575Z] PASS chat: every icon-only control has a name and a tooltip []
+[2026-09-27T01:32:05.575Z] PASS chat: at least 40% less visible text than today's UI (2795 → 1050) {"before":2795,"after":1050,"reduction":"62%"}
+[2026-09-27T01:32:05.575Z] PASS files: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-27T01:32:05.575Z] PASS files: no unbroken text run over 80 characters outside code []
+[2026-09-27T01:32:05.575Z] PASS files: every icon-only control has a name and a tooltip []
+[2026-09-27T01:32:05.575Z] PASS files: at least 40% less visible text than today's UI (127 → 59) {"before":127,"after":59,"reduction":"54%"}
+[2026-09-27T01:32:05.575Z] PASS review: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-27T01:32:05.575Z] PASS review: no unbroken text run over 80 characters outside code []
+[2026-09-27T01:32:05.575Z] PASS review: every icon-only control has a name and a tooltip []
+[2026-09-27T01:32:05.575Z] PASS review: at least 40% less visible text than today's UI (350 → 150) {"before":350,"after":150,"reduction":"57%"}
+[2026-09-27T01:32:05.575Z] PASS grid: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-27T01:32:05.575Z] PASS grid: no unbroken text run over 80 characters outside code []
+[2026-09-27T01:32:05.575Z] PASS grid: every icon-only control has a name and a tooltip []
+[2026-09-27T01:32:05.575Z] PASS new-agent: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-27T01:32:05.575Z] PASS new-agent: no unbroken text run over 80 characters outside code []
+[2026-09-27T01:32:05.575Z] PASS new-agent: every icon-only control has a name and a tooltip []
+[2026-09-27T01:32:05.575Z] PASS new-agent: at least 40% less visible text than today's UI (1037 → 107) {"before":1037,"after":107,"reduction":"90%"}
+[2026-09-27T01:32:05.575Z] PASS accounts: no horizontal overflow at 1280/900 px in every theme 0
+[2026-09-27T01:32:05.575Z] PASS accounts: no unbroken text run over 80 characters outside code []
+[2026-09-27T01:32:05.575Z] PASS accounts: every icon-only control has a name and a tooltip []
+[2026-09-27T01:32:05.575Z] PASS accounts: at least 40% less visible text than today's UI (381 → 149) {"before":381,"after":149,"reduction":"61%"}
+[2026-09-27T01:32:05.576Z] text: Gate J → Gate K [{"view":"dashboard","gatej":1360,"gatek":1109},{"view":"agents","gatej":238,"gatek":225},{"view":"chat","gatej":1063,"gatek":1050},{"view":"files","gatej":59,"gatek":59},{"view":"review","gatej":175,"gatek":150},{"view":"grid","gatej":993,"gatek":993},{"view":"new-agent","gatej":133,"gatek":107},{"view":"accounts","gatej":189,"gatek":149}]
+[2026-09-27T01:32:05.576Z] PASS agents: the side bar stays within the Gate J agents budget (238 characters) 225
+[2026-09-27T01:32:05.576Z] PASS chat: no more visible text than Gate J (1063 → 1050) {"view":"chat","gatej":1063,"gatek":1050}
+[2026-09-27T01:32:05.576Z] PASS files: no more visible text than Gate J (59 → 59) {"view":"files","gatej":59,"gatek":59}
+[2026-09-27T01:32:05.576Z] PASS review: no more visible text than Gate J (175 → 150) {"view":"review","gatej":175,"gatek":150}
+[2026-09-27T01:32:05.576Z] PASS grid: no more visible text than Gate J (993 → 993) {"view":"grid","gatej":993,"gatek":993}
+[2026-09-27T01:32:05.576Z] PASS new-agent: no more visible text than Gate J (133 → 107) {"view":"new-agent","gatej":133,"gatek":107}
+[2026-09-27T01:32:05.576Z] PASS accounts: no more visible text than Gate J (189 → 149) {"view":"accounts","gatej":189,"gatek":149}

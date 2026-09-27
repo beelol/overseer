@@ -111,6 +111,34 @@
       }
     },
     {
+      "name": "the status filters under the field narrow the list (Working, Done, Archived) and All brings it back; the field says how many are shown",
+      "ok": true,
+      "detail": {
+        "onlyWorking": [
+          "followups-repo",
+          "Still working"
+        ],
+        "workingCount": "1 agent",
+        "onlyDone": [
+          "followups-repo",
+          "Gamma tests",
+          "Beta docs",
+          "Name check"
+        ],
+        "onlyArchived": [
+          "followups-repo",
+          "Alpha refactor"
+        ],
+        "everything": [
+          "followups-repo",
+          "Still working",
+          "Gamma tests",
+          "Beta docs",
+          "Name check"
+        ]
+      }
+    },
+    {
       "name": "with no agent working or pinned, the grid command goes to the home composer with a one-line note (no empty grid screen)",
       "ok": true,
       "detail": {

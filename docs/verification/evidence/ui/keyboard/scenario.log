@@ -1,12 +1,12 @@
-[2026-09-27T01:02:00.790Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T01:02:10.363Z] screenshot docs/verification/evidence/ui/keyboard/01-needs-you.png
-[2026-09-27T01:02:10.364Z] PASS Needs you gathers permission requests, the failure and the finished run with changes, counted on the view and in the status bar {"list":[{"title":"Write file A","why":"Approve"},{"title":"Write file B","why":"Approve"},{"title":"Broken build","why":"Failed"},{"title":"Small edit","why":"Review"}],"badge":"4","status":"eye  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."}
-[2026-09-27T01:02:14.239Z] PASS ⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request {"first":"r-2f6d353acc53","second":"r-a15c9c88ed64","firstDone":"completed","secondDone":"completed","denied":true}
-[2026-09-27T01:02:18.941Z] PASS ⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each {"visited":["r-9523a4c43b47","r-2f6d353acc53","r-80ca10493234"],"left":[]}
-[2026-09-27T01:02:22.646Z] PASS ⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent {"switched":"r-563ab517ac91","stopped":"interrupted"}
-[2026-09-27T01:02:24.988Z] PASS ⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent {"created":"r-07ccf5917f7c","nowSelected":"r-07ccf5917f7c"}
-[2026-09-27T01:02:25.710Z] prompt before Enter {"value":"And add a test","focused":"prompt"}
-[2026-09-27T01:02:26.388Z] PASS Enter in the chat composer sends a follow-up {"turns":2}
-[2026-09-27T01:02:26.496Z] screenshot docs/verification/evidence/ui/keyboard/02-keyboard-done.png
-[2026-09-27T01:02:31.506Z] PASS the shortcuts also work from the side bar (⌥⌘A opens the agent switcher, ⌥⌘N the composer) {"inList":true,"switcher":true,"composer":true}
-[2026-09-27T01:02:31.506Z] PASS every control in the dashboard has a screen-reader label {"checked":36,"bad":[]}
+[2026-09-27T01:32:07.931Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T01:32:17.365Z] screenshot docs/verification/evidence/ui/keyboard/01-needs-you.png
+[2026-09-27T01:32:17.367Z] PASS Needs you gathers permission requests, the failure and the finished run with changes, counted on the view and in the status bar {"list":[{"title":"Write file A","why":"Approve"},{"title":"Write file B","why":"Approve"},{"title":"Broken build","why":"Failed"},{"title":"Small edit","why":"Review"}],"badge":"4","status":"eye  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."}
+[2026-09-27T01:32:21.260Z] PASS ⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request {"first":"r-94a3f97bb692","second":"r-c35636fe9023","firstDone":"completed","secondDone":"completed","denied":true}
+[2026-09-27T01:32:25.972Z] PASS ⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each {"visited":["r-96674ffa13c4","r-94a3f97bb692","r-35e5677b02d8"],"left":[]}
+[2026-09-27T01:32:29.669Z] PASS ⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent {"switched":"r-70e2f82af047","stopped":"interrupted"}
+[2026-09-27T01:32:32.023Z] PASS ⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent {"created":"r-cae06a22aca2","nowSelected":"r-cae06a22aca2"}
+[2026-09-27T01:32:34.800Z] prompt before Enter {"value":"And add a test","focused":"prompt"}
+[2026-09-27T01:32:35.477Z] PASS Enter in the chat composer sends a follow-up {"turns":2}
+[2026-09-27T01:32:35.587Z] screenshot docs/verification/evidence/ui/keyboard/02-keyboard-done.png
+[2026-09-27T01:32:40.631Z] PASS the shortcuts also work from the side bar (⌥⌘A opens the agent switcher, ⌥⌘N the composer) {"inList":true,"switcher":true,"composer":true}
+[2026-09-27T01:32:40.633Z] PASS every control in the dashboard has a screen-reader label {"checked":36,"bad":[]}
