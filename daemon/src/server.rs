@@ -64,6 +64,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
                 }
                 crate::swarm::retry_revoked_interrupts(&daemon)?;
                 crate::swarm::retry_stopping_interrupts(&daemon)?;
+                crate::swarm::retry_contaminated_interrupts(&daemon)?;
                 crate::swarm::reconcile_terminal_workers(&daemon)?;
                 crate::swarm::sample_due_workers(&daemon, crate::daemon::now())?;
                 Ok::<(), anyhow::Error>(())
@@ -390,7 +391,13 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.off" => crate::swarm::off(&mut d.store.lock().unwrap(), p)?,
         "swarm.claim" => {
             fixture_only()?;
-            crate::swarm::claim(&mut d.store.lock().unwrap(), p)?
+            let claim = crate::swarm::claim(&mut d.store.lock().unwrap(), p)?;
+            if claim["status"] == "contaminated" {
+                if let Err(error) = crate::swarm::retry_contaminated_interrupts(d) {
+                    crate::log(&format!("swarm contamination interrupt failed: {error}"));
+                }
+            }
+            claim
         }
         "swarm.artifact.put" => crate::swarm::put(&mut d.store.lock().unwrap(), p)?,
         "swarm.integrate" => {

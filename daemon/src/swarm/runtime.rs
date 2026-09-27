@@ -349,6 +349,45 @@ pub fn retry_stopping_interrupts(d: &Arc<Daemon>) -> Result<usize> {
     Ok(retried)
 }
 
+/// Stop only workers whose own job was quarantined by a late resource conflict.
+/// The job transition is durable before socket I/O, so restart retries a missed signal.
+pub fn retry_contaminated_interrupts(d: &Arc<Daemon>) -> Result<Value> {
+    let now = crate::daemon::now();
+    let linked = {
+        let store = d.store.lock().unwrap();
+        let mut stmt = store.conn.prepare(
+            "SELECT l.run_id,r.id FROM swarm_worker_launches l
+             JOIN swarm_jobs j ON j.run_id=l.run_id AND j.id=l.job_id
+             JOIN runs r ON r.id=l.overseer_run_id
+             LEFT JOIN swarm_stop_signals s ON s.run_id=l.run_id AND s.overseer_run_id=r.id
+             WHERE j.stop_reason='resource_contamination'
+               AND j.status IN ('cancel_requested','blocked')
+               AND r.status IN ('queued','starting','running','waiting_for_user')
+               AND (s.overseer_run_id IS NULL OR s.last_attempt_ms<=?1)
+             ORDER BY l.run_id,r.id LIMIT 100",
+        )?;
+        let rows = stmt.query_map(params![now-STOP_RETRY_MS], |row| {
+            Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))
+        })?.collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
+    };
+    let mut requested = Vec::new();
+    let mut unconfirmed = Vec::new();
+    for (run,worker) in linked {
+        let result = d.interrupt(&worker);
+        let outcome = if result.is_ok() { "requested" } else { "unconfirmed" };
+        d.store.lock().unwrap().conn.execute(
+            "INSERT INTO swarm_stop_signals(run_id,overseer_run_id,attempts,last_attempt_ms,last_outcome)
+             VALUES(?1,?2,1,?3,?4) ON CONFLICT(run_id,overseer_run_id) DO UPDATE SET
+             attempts=attempts+1,last_attempt_ms=excluded.last_attempt_ms,
+             last_outcome=excluded.last_outcome",
+            params![run,worker,now,outcome],
+        )?;
+        if result.is_ok() { requested.push(worker); } else { unconfirmed.push(worker); }
+    }
+    Ok(json!({"interrupt_requested":requested,"unconfirmed":unconfirmed}))
+}
+
 /// Copy a supervised worker's terminal state into the durable director inbox.
 /// A process exit is only lifecycle evidence; the director still has to assess
 /// a separate result/artifact before the job can be accepted.

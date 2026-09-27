@@ -56,6 +56,11 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
             None => (None, None, Value::Null),
         };
         let outcome = payload["audit_outcome"].as_str();
+        let contaminated = if let Some(attempt) = attempt.as_deref() {
+            store.conn.prepare("SELECT 1 FROM swarm_resource_contamination
+                WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3")?
+                .exists(params![run,job,attempt])?
+        } else { false };
         let reviewed: Option<(String, i64)> = store.conn.query_row(
             "SELECT attempt_id,reviewed_message_seq FROM swarm_decisions
              WHERE run_id=?1 AND job_id=?2 AND decision='accept' ORDER BY id DESC LIMIT 1",
@@ -77,7 +82,7 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
         } else {
             false
         };
-        let state = match outcome {
+        let state = if contaminated { "contaminated" } else { match outcome {
             Some("environment_failure") => "environment_blocked",
             _ if review_stale => "review_stale",
             Some("negative") if status == "accepted" => "checked_negative",
@@ -86,7 +91,7 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
             Some("confirmed_defect") => "defect_awaiting_review",
             _ if payload.is_null() => "unreported",
             _ => "unclassified",
-        };
+        }};
         rows.push(json!({
             "job_id":job,"plan_revision":revision,"job_status":status,
             "attempt_id":attempt,"message_id":message,

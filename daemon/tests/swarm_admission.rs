@@ -426,6 +426,101 @@ fn mutable_resource_conflict_is_rejected_before_reserving_an_attempt() {
 }
 
 #[test]
+fn late_shared_database_use_quarantines_evidence_and_bounds_retries() {
+    let d=Daemon::start(&[]);
+    let first=setup(&d,"Late DB A",1);
+    let second=setup(&d,"Late DB B",1);
+    let at=now();
+    let a=admit(&d,&first,"j0","codex-a","late-a",at,1000000,100).unwrap();
+    let b=admit(&d,&second,"j0","codex-a","late-b",at,1000000,100).unwrap();
+    for (run,attempt,label) in [(&first,&a,"a"),(&second,&b,"b")] {
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"j0",
+            "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+            "artifact_id":format!("evidence-{label}"),"source_revision":1,
+            "kind":"finding","content":"db row changed"}));
+        d.call("swarm.report",json!({"run_id":run,"job_id":"j0",
+            "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+            "message_id":format!("result-{label}"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[format!("evidence-{label}")]}}));
+    }
+    let observed=|run:&str,attempt:&Value|json!({"run_id":run,"job_id":"j0",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "generation":1,"revision":1,"resource":"db:shared-late","mode":"write",
+        "after_use":true});
+    assert_eq!(d.call("swarm.claim",observed(&first,&a))["duplicate"],false);
+    let conflict=d.call("swarm.claim",observed(&second,&b));
+    assert_eq!(conflict["status"],"contaminated", "{conflict}");
+    assert_eq!(d.call("swarm.claim",observed(&second,&b))["duplicate"],true);
+    for (run,attempt,label) in [(&first,&a,"a"),(&second,&b,"b")] {
+        assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"cancel_requested");
+        assert_eq!(d.call("swarm.coverage",json!({"run_id":run}))["rows"][0]["coverage_state"],"contaminated");
+        assert!(d.try_call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":"j0","decision":"accept","evidence":[format!("evidence-{label}")]})).is_err());
+        let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let retained:i64=db.query_row("SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1",[run],|r|r.get(0)).unwrap();
+        assert_eq!(retained,1);
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":"j0","attempt_id":attempt["attempt_id"]}));
+        assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"ready");
+    }
+    assert_eq!(d.call("swarm.claim",observed(&second,&b))["duplicate"],true);
+    let retried=admit(&d,&first,"j0","codex-a","late-a-retry",at,1000000,100).unwrap();
+    assert_eq!(retried["status"],"admitted");
+    assert_ne!(retried["attempt_id"],a["attempt_id"]);
+    let retried_peer=admit(&d,&second,"j0","codex-a","late-b-retry",at,1000000,100).unwrap();
+    d.call("swarm.claim",observed(&first,&retried));
+    assert_eq!(d.call("swarm.claim",observed(&second,&retried_peer))["status"],"contaminated");
+    for (run,attempt) in [(&first,&retried),(&second,&retried_peer)] {
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":"j0","attempt_id":attempt["attempt_id"]}));
+        assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"failed");
+        let third=admit(&d,run,"j0","codex-a","forbidden-third",at,1000000,100);
+        assert!(third.is_err() || third.unwrap()["status"]!="admitted");
+    }
+}
+
+#[test]
+fn late_write_after_declared_read_quarantines_both_attempts() {
+    let d=Daemon::start(&[]);
+    let first=setup(&d,"Late upgrade A",1);
+    let second=setup(&d,"Late upgrade B",1);
+    for run in [&first,&second] {
+        d.call("swarm.claim",json!({"run_id":run,"job_id":"j0","generation":1,
+            "revision":1,"resource":"db:upgrade","mode":"read"}));
+    }
+    let at=now();
+    let a=admit(&d,&first,"j0","codex-a","upgrade-a",at,1000000,100).unwrap();
+    let b=admit(&d,&second,"j0","codex-a","upgrade-b",at,1000000,100).unwrap();
+    let conflict=d.call("swarm.claim",json!({"run_id":first,"job_id":"j0",
+        "attempt_id":a["attempt_id"],"token":a["token"],"generation":1,"revision":1,
+        "resource":"db:upgrade","mode":"write","after_use":true}));
+    assert_eq!(conflict["status"],"contaminated", "{conflict}");
+    for (run,attempt) in [(&first,&a),(&second,&b)] {
+        assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"cancel_requested");
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":"j0","attempt_id":attempt["attempt_id"]}));
+    }
+}
+
+#[test]
+fn late_shared_read_only_snapshot_remains_parallel() {
+    let d=Daemon::start(&[]);
+    let first=setup(&d,"Read A",1);
+    let second=setup(&d,"Read B",1);
+    let at=now();
+    let a=admit(&d,&first,"j0","codex-a","read-a",at,1000000,100).unwrap();
+    let b=admit(&d,&second,"j0","codex-a","read-b",at,1000000,100).unwrap();
+    for (run,attempt) in [(&first,&a),(&second,&b)] {
+        let result=d.call("swarm.claim",json!({"run_id":run,"job_id":"j0",
+            "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+            "generation":1,"revision":1,"resource":"db:snapshot","mode":"read",
+            "after_use":true}));
+        assert_ne!(result["status"],"contaminated", "{result}");
+        assert_ne!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"cancel_requested");
+    }
+}
+
+#[test]
 fn run_percentage_overrides_change_frozen_allocation_and_finishing_reserve() {
     let d=Daemon::start(&[]);
     let run=d.call("swarm.create",json!({"category":"Budget override","objective":"Audit",

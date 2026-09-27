@@ -13,6 +13,62 @@ fn now() -> i64 {
 }
 
 #[test]
+fn late_resource_conflict_interrupts_only_affected_supervised_workers() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("contamination-source"));
+    let run = d.call("swarm.create", json!({"category":"Late resource collision",
+        "objective":"Inspect backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"a","title":"A","acceptance":"evidence","deps":[]},
+        {"id":"b","title":"B","acceptance":"evidence","deps":[]},
+        {"id":"unrelated","title":"Unrelated","acceptance":"evidence","deps":[]}
+    ]}));
+    commit_beneficial_batch(&d,id,&["a".into(),"b".into(),"unrelated".into()]);
+    let at=now();
+    let mut attempts=Vec::new();
+    for job in ["a","b","unrelated"] {
+        let admitted=d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+            "job_id":job,"target_id":"fixture-local","request_id":format!("admit-{job}"),
+            "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+                "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["pool"],
+                    "capabilities":["code"],"health":"up","auth":"ok"}],
+                "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                    "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+                    "confidence":"exact","expires_ms":at+60000}]}]},
+            "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+        assert_eq!(admitted["status"],"admitted", "{admitted}");
+        let launched=d.call("swarm.worker.launch",json!({"run_id":id,"job_id":job,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "repo":checkout,"program":"/bin/sleep","args":["30"],
+            "prompt":"Inspect","title":format!("Worker {job}")}));
+        let worker=launched["overseer_run_id"].as_str().unwrap().to_string();
+        attempts.push((job,admitted,worker));
+    }
+    let observed=|job:&str,attempt:&serde_json::Value|json!({"run_id":id,"job_id":job,
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "generation":1,"revision":1,"resource":"db:late","mode":"write","after_use":true});
+    d.call("swarm.claim",observed("a",&attempts[0].1));
+    assert_eq!(d.call("swarm.claim",observed("b",&attempts[1].1))["status"],"contaminated");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    for (_,_,worker) in &attempts[..2] {
+        let run_dir:String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[worker],|r|r.get(0)).unwrap();
+        let marker=std::path::Path::new(&run_dir).join("interrupt.requested");
+        let until=std::time::Instant::now()+std::time::Duration::from_secs(3);
+        while !marker.exists() {
+            assert!(std::time::Instant::now()<until,"affected worker was not interrupted");
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+    let unrelated=&attempts[2].2;
+    let run_dir:String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[unrelated],|r|r.get(0)).unwrap();
+    assert!(!std::path::Path::new(&run_dir).join("interrupt.requested").exists());
+    assert!(["queued","starting","running"].contains(&d.run(unrelated)["status"].as_str().unwrap()));
+    d.call("swarm.stop",json!({"run_id":id,"generation":1,"revision":1}));
+}
+
+#[test]
 fn job_deadline_interrupt_retries_after_daemon_crash() {
     let mut d = Daemon::start(&[]);
     let temp = tmp();

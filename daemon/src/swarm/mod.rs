@@ -45,7 +45,8 @@ pub use policy::preview;
 pub use settings::set_policy;
 pub use revision::revise;
 pub use runtime::{interrupt_workers, launch_worker, liveness, reconcile_terminal_workers,
-    reconcile_worker, retry_stopping_interrupts, sample_due_workers, sample_liveness};
+    reconcile_worker, retry_contaminated_interrupts, retry_stopping_interrupts,
+    sample_due_workers, sample_liveness};
 pub use runtime::launch_director;
 pub use runtime::interrupt_workers_with_fault;
 pub use scheduler::next as schedule_next;
@@ -494,6 +495,25 @@ pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
     if current["status"] != "planning" && current["status"] != "running" {
         bail!("swarm run does not permit claims");
     }
+    let after_use = p["after_use"] == true;
+    let observed_attempt = if after_use {
+        let attempt = required(p, "attempt_id")?;
+        let token = required(p, "token")?;
+        broker::check_attempt(store, run, job, attempt, token)?;
+        let previous: i64 = store.conn.query_row(
+            "SELECT COUNT(*) FROM swarm_resource_contamination WHERE run_id=?1 AND job_id=?2
+             AND attempt_id=?3 AND resource=?4",
+            params![run,job,attempt,resource], |r| r.get(0))?;
+        if previous > 0 {
+            return Ok(json!({"resource":resource,"mode":mode,"status":"contaminated","duplicate":true}));
+        }
+        let active = store.conn.prepare("SELECT 1 FROM swarm_attempts WHERE id=?1 AND status='registered'")?
+            .exists([attempt])?;
+        if !active {
+            bail!("late resource observation requires an active attempt");
+        }
+        Some(attempt)
+    } else { None };
     let status: String = store
         .conn
         .query_row(
@@ -528,20 +548,77 @@ pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
+    let mut conflicts = Vec::new();
+    let mut own_mode = None;
     for (owner_run, owner_job, owner_mode) in &existing {
         if owner_run == run && owner_job == job {
-            if owner_mode == mode {
-                return Ok(json!({"resource":resource,"mode":mode,"duplicate":true}));
-            }
-            bail!("claim conflict: mode change requires release and revalidation");
+            own_mode = Some(owner_mode.as_str());
+            continue;
         }
         if mode == "write" || owner_mode == "write" {
-            bail!("claim conflict on {resource}: owned by {owner_run}/{owner_job}");
+            if !after_use {
+                bail!("claim conflict on {resource}: owned by {owner_run}/{owner_job}");
+            }
+            let peer_attempt: Option<String> = tx.query_row(
+                "SELECT id FROM swarm_attempts WHERE run_id=?1 AND job_id=?2 AND status='registered'
+                 ORDER BY created_ms DESC LIMIT 1",
+                params![owner_run,owner_job], |r| r.get(0)).optional()?;
+            if let Some(peer_attempt) = peer_attempt {
+                conflicts.push((owner_run.clone(),owner_job.clone(),peer_attempt));
+            } else {
+                bail!("claim conflict on {resource}: owned by {owner_run}/{owner_job}; usage overlap is unconfirmed");
+            }
         }
     }
+    if own_mode.is_some_and(|held| held != mode) && !after_use {
+        bail!("claim conflict: mode change requires release and revalidation");
+    }
     let now = crate::daemon::now();
-    tx.execute("INSERT INTO swarm_claims(resource,run_id,job_id,mode,status,revision,created_ms,updated_ms) VALUES(?1,?2,?3,?4,'active',?5,?6,?6)",
-        params![resource,run,job,mode,revision,now])?;
+    if let Some(attempt) = observed_attempt {
+        if !conflicts.is_empty() {
+            for (peer_run,peer_job,peer_attempt) in &conflicts {
+                for (affected_run,affected_job,affected_attempt,other_run,other_job) in [
+                    (run,job,attempt,peer_run.as_str(),peer_job.as_str()),
+                    (peer_run.as_str(),peer_job.as_str(),peer_attempt.as_str(),run,job),
+                ] {
+                    tx.execute("INSERT OR IGNORE INTO swarm_resource_contamination
+                        (run_id,job_id,attempt_id,resource,peer_run_id,peer_job_id,created_ms)
+                        VALUES(?1,?2,?3,?4,?5,?6,?7)",
+                        params![affected_run,affected_job,affected_attempt,resource,other_run,other_job,now])?;
+                    tx.execute("UPDATE swarm_jobs SET status='cancel_requested',
+                        stop_reason='resource_contamination',updated_ms=?3
+                        WHERE run_id=?1 AND id=?2 AND status IN ('reserved','launching','running','submitted')",
+                        params![affected_run,affected_job,now])?;
+                    tx.execute("UPDATE swarm_jobs SET status='blocked',
+                        stop_reason='resource_contamination',updated_ms=?3
+                        WHERE run_id=?1 AND id=?2 AND status='accepted'",
+                        params![affected_run,affected_job,now])?;
+                    tx.execute("INSERT OR IGNORE INTO swarm_messages
+                        (run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+                        SELECT a.run_id,'contamination-'||a.id,a.job_id,a.id,'control',a.id,'stop',a.revision,?2,'queued',?3,?3
+                        FROM swarm_attempts a WHERE a.id=?1 AND a.status='registered'",
+                        params![affected_attempt,json!({"resource":resource,"reason":"resource_contamination"}).to_string(),now])?;
+                }
+            }
+            tx.commit()?;
+            return Ok(json!({"resource":resource,"mode":mode,"status":"contaminated",
+                "affected":conflicts.len()+1,"duplicate":false}));
+        }
+    }
+    if let Some(held) = own_mode {
+        if held == mode || held == "write" {
+            return Ok(json!({"resource":resource,"mode":held,"duplicate":true}));
+        }
+        tx.execute("UPDATE swarm_claims SET mode='write',updated_ms=?4
+            WHERE resource=?1 AND run_id=?2 AND job_id=?3 AND status='active'",
+            params![resource,run,job,now])?;
+    } else {
+        tx.execute("INSERT INTO swarm_claims(resource,run_id,job_id,mode,status,revision,created_ms,updated_ms)
+            VALUES(?1,?2,?3,?4,'active',?5,?6,?6)
+            ON CONFLICT(resource,run_id,job_id) DO UPDATE SET
+                mode=excluded.mode,status='active',revision=excluded.revision,updated_ms=excluded.updated_ms",
+            params![resource,run,job,mode,revision,now])?;
+    }
     tx.commit()?;
-    Ok(json!({"resource":resource,"mode":mode,"duplicate":false}))
+    Ok(json!({"resource":resource,"mode":mode,"duplicate":own_mode.is_some_and(|held| held==mode)}))
 }

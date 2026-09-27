@@ -516,11 +516,12 @@
       "evidence": [
         "daemon/tests/swarm_plan.rs",
         "daemon/tests/swarm_admission.rs",
+        "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/milestone-2.md",
         "docs/verification/swarm/milestone-13.md",
         "docs/verification/swarm/SWARM-53.md"
       ],
-      "blocker": "Fixture admission atomically acquires durable planned claims even when the request omits them, rejects claim downgrades, and holds conflicting read/write requests until release; real tool/resource discovery, contamination detection and selective rerun remain unimplemented."
+      "blocker": "Fixture late observations now quarantine conflicting active attempts, invalidate coverage, interrupt only affected supervised workers, retry within attempt and budget bounds, and allow shared read-only access. Live tool/resource discovery, alias canonicalization, external contamination proof, and full Atlas replay remain unavailable."
     },
     "SWARM-54": {
       "status": "partial",
@@ -724,9 +725,11 @@
         "fixtures/swarm/atlas-v1/",
         "daemon/tests/swarm_atlas.rs",
         "daemon/tests/swarm_faults.rs",
+        "daemon/tests/swarm_admission.rs",
+        "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Atlas v1 J2 replays lost-result-receipt and director death after dispatch admission: restart deduplicates the result retry, while startup recovers one supervised worker, retains its database-backed result and rejects old-generation commands. A separate daemon fixture covers SQLite-full admission blocking and result replay across restart. Both one-job Atlas audits complete with accepted evidence; the other named S5 faults, Atlas-backed full storage, and full S1-sized ordered replay remain unverified. Live harness communication is absent."
+      "blocker": "Atlas v1 J2 replays lost-result-receipt and director death after dispatch admission: restart deduplicates the result retry, while startup recovers one supervised worker, retains its database-backed result and rejects old-generation commands. Separate daemon fixtures cover SQLite-full replay and synthetic late shared-database contamination with targeted interrupts and bounded retries. Both one-job Atlas audits complete with accepted evidence; the other named S5 faults, Atlas-backed contamination/full storage, and full S1-sized ordered replay remain unverified. Live harness communication is absent."
     }
   }
 }
