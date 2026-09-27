@@ -133,9 +133,13 @@
       "blocker": null
     },
     "SWARM-13": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "Live adapter enforcement and native usage reconciliation are absent; quota evidence remains injected fixture data."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_runtime.rs",
+        "docs/rfcs/swarm-auto-contract.md",
+        "docs/verification/swarm/SWARM-13.md"
+      ],
+      "blocker": "Confirmed exit retains uncertain reservation, and the shared contract now distinguishes Auto percentage windows from estimated thread credits. Live adapter enforcement, attributable native-unit settlement, delayed-usage overrun replay and parent/child dedupe are still absent."
     },
     "SWARM-14": {
       "status": "partial",
@@ -144,9 +148,10 @@
         "daemon/tests/swarm_availability.rs",
         "docs/verification/swarm/milestone-4.md",
         "docs/verification/swarm/SWARM-14.md",
-        "docs/verification/swarm/CONTRACT-03.md"
+        "docs/verification/swarm/CONTRACT-03.md",
+        "daemon/src/swarm/policy.rs"
       ],
-      "blocker": "Local fixtures now distinguish rate limit, local harness failure, outage, auth failure and quota exhaustion on one route while an independent OpenCode-labeled route stays eligible; a rate-limit observation blocks A admission and preserves B's ongoing report. Live scoped Auto Mode observations, endpoint/model exclusion keys, actual harness failure/reconnect, and active process reconciliation remain unverified."
+      "blocker": "Fixture health scopes now exclude endpoint aliases, account-auth aliases and every route needing a failed local harness; exact zero quota has a separate reason and a healthy OpenCode endpoint still admits work. Auto Mode live observations, model-window exclusions, actual harness failure/reconnect and active-process reconciliation remain unverified."
     },
     "SWARM-15": {
       "status": "partial",

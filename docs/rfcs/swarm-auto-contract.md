@@ -1,8 +1,8 @@
 # Swarm ↔ Auto Mode integration contract (implementation boundary)
 
 Status: proposed boundary in `codex/swarm-mode`, checked read-only against the separate
-local `codex/automode-rfc` branch at `925b3f4` on 2026-09-27 (its published branch was
-still at `c769383`). That implementation is not merged here. Auto's route type exposes
+local `codex/automode-rfc` branch at `7ca6b89d` on 2026-09-27 (its published branch was
+still at `c7693836`). That implementation is not merged here. Auto's route type exposes
 harness, provider, endpoint, profile, pool, model and effort; its selector, structured
 quota collection, durable selected launch intent, and run-bound managed-child bridge
 exist on that branch. Its `auto_pool_claims` serialize Auto's own unknown-draw child
@@ -108,8 +108,14 @@ second category allocation.
 
 Availability is scoped: a local harness failure, account auth failure, endpoint
 outage, model-specific exhaustion, account quota rejection, and ordinary job failure
-have different exclusion keys. A public status incident alone is advisory. Known
-stale observations and never-known values are distinct: both require refresh before
+have different exclusion keys. A public status incident alone is advisory.
+Snapshot health failures carry an explicit target, account, endpoint or harness scope;
+target is the conservative default when scope is absent. An endpoint-scoped failure
+requires a stable endpoint identity. Account authentication failure applies to all
+aliases of that account, while a local harness failure applies to each route needing
+that harness. Model-specific exhaustion still needs a model-scoped bucket in the
+shared Auto feed and remains unverified.
+Known stale observations and never-known values are distinct: both require refresh before
 fan-out, but a known exhaustion remains blocking until a newer authoritative
 observation clears it. A confirmed pre-effect failure may try another eligible
 target only while the logical job's attempt budget remains. An uncertain effect
@@ -128,6 +134,21 @@ snapshots. Auto's `auto.dispatch` persists selected intent and can return
 `launch_pending`; its local `auto_pool_claims` also hold an Auto-only in-flight pool
 when draw is unknown. Neither path commits comparable allowance across ordinary,
 Auto and Swarm launches. The
+read-only `7ca6b89d` comparison found Auto's `QuotaWindow.used_percent` bucket readings
+and `ThreadUsageEstimate.estimated_credits_micros`. Those are different units: the credits
+are estimated thread activity, not reported subscription-window draw. The shared adapter
+may expose an applicable, fresh quota bucket in **percentage points** with its pool, model,
+plan, reset, observation age, source and precision; it must not convert estimated credits or
+tokens into remaining percentage points. Auto's `assess_window_delta` can return a bounded
+interval only when account generation, model/version, window identity, meter precision,
+overlap, outside usage and reporting settlement are qualified. An unverified interval cannot
+settle or release a Swarm reservation. Parent usage that includes native children is one
+inclusive total; adding child reports to it would double count. Until the shared authority
+accepts a comparable attributed total and fresh provider observation, a confirmed process
+exit retains uncertain capacity. A hard cap may be labelled strict only when the selected
+adapter demonstrates enforcement for the worker and descendants; delayed provider readings
+are an estimate-based stopping threshold with possible overshoot.
+The
 fixture path now persists the selected target's harness in its admission and
 refuses a worker launch under another harness. It also persists an injected
 target's profile, model and optional effort, passing the saved choices to the
