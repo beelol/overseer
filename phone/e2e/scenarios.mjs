@@ -491,7 +491,7 @@ export const scenarios = [
       expect(!c.dev.read('overseer.pairing'), 'the phone still holds its pairing');
       const kept = c.dev.keys().filter((key) => OF_THE_MAC.some((namespace) => key.startsWith(`${namespace}.`)) || key === 'discovery.manual');
       expect(kept.length === 0, `the phone still holds ${kept.join(', ')}`);
-      c.log(`storage after the revoke: ${c.dev.keys().join(', ') || 'nothing'}`);
+      c.log.say(`storage after the revoke: ${c.dev.keys().join(', ') || 'nothing'}`);
     },
   },
 ];

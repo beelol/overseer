@@ -176,18 +176,22 @@ async function main() {
   for (const c of checks) log(`${c.ok ? 'ok  ' : 'FAIL'} ${c.name}: ${c.value} (limit ${c.limit})${c.note ? ` — ${c.note}` : ''}`);
   result.checks = checks;
 
-  if (args.writeBaseline) {
+  const failed = checks.filter((c) => !c.ok);
+  if (args.writeBaseline && failed.length === 0) {
     baselines[args.platform] = { at: result.at, 'agents.interactive.p95': withDoor['agents.interactive'].p95, 'agents.interactive.p50': withDoor['agents.interactive'].p50, 'door.opening.p50': withDoor['door.opening'].p50, 'javascript.loaded.p50': withDoor['javascript.loaded'].p50 };
     fs.writeFileSync(BASELINES, `${JSON.stringify(baselines, null, 2)}\n`);
     log(`Baseline of ${args.platform} written to e2e/baselines.json`);
+  } else if (args.writeBaseline) {
+    // A run that missed a budget is no baseline: the last good one stays.
+    log(`Baseline of ${args.platform} not written: a budget was missed`);
   }
   if (args.out) {
     fs.mkdirSync(args.out, { recursive: true });
     fs.writeFileSync(path.join(args.out, `measure-${args.platform}.json`), `${JSON.stringify(result, null, 2)}\n`);
     fs.writeFileSync(path.join(args.out, `measure-${args.platform}.log`), `${lines.join('\n')}\n`);
   }
-  const failed = checks.filter((c) => !c.ok);
-  if (args.check && failed.length > 0) {
+  // A missed budget fails the measurement whether it checks a baseline or writes one.
+  if (failed.length > 0) {
     console.error(`${failed.length} budget${failed.length === 1 ? '' : 's'} missed`);
     process.exit(1);
   }
