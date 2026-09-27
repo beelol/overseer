@@ -93,6 +93,41 @@
           "aria": "Record route 4 evidence\nready · 0 attempts"
         }
       ]
+    },
+    {
+      "name": "Pause from the Swarm row changes durable daemon state within 2 seconds",
+      "ok": true,
+      "detail": {
+        "pause_ms": 602
+      }
+    },
+    {
+      "name": "Resume from the Swarm row restores durable daemon state",
+      "ok": true
+    },
+    {
+      "name": "Swarm off cancels the queued backlog",
+      "ok": true,
+      "detail": {
+        "status": "stopped",
+        "counts": {
+          "by_status": {
+            "cancelled": 100
+          },
+          "total": 100
+        }
+      }
+    },
+    {
+      "name": "Stop waits for the owner confirmation",
+      "ok": true
+    },
+    {
+      "name": "confirmed Stop cancels queued work within 2 seconds",
+      "ok": true,
+      "detail": {
+        "stop_ms": 73
+      }
     }
   ]
 }

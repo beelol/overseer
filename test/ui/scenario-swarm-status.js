@@ -13,7 +13,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
   };
   try {
     const repo = makeRepo(path.join(s.root, 'backend'), { dirty: false });
-    s.settings();
+    s.settings({ 'window.menuStyle': 'custom' });
     s.install(latestVsix());
     s.launch(repo, { OVERSEER_SWARM_FIXTURE_API: '1', OVERSEER_CODEX_PATH: '/nonexistent/codex',
       OVERSEER_CLAUDE_PATH: '/nonexistent/claude', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode' });
@@ -41,6 +41,59 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
       expanded.some(r => r.label === 'Director') && expanded.some(r => r.label === 'Check route 0'),
       expanded.slice(0, 8));
     await s.screenshot('swarm-expanded');
+
+    const chooseControl = async (title, category = 'Backend audit') => {
+      const pt = await cdp.waitFor(`(() => {
+        const row = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent &&
+          r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(category)});
+        if (!row) return null;
+        const b = row.getBoundingClientRect(); return { x: b.left + 130, y: b.top + b.height / 2 };
+      })()`, 10000, 'Swarm row');
+      await cdp.click(pt.x, pt.y, { button: 'right' });
+      await delay(400);
+      s.note('Swarm context menu', await cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-menu .action-item .action-label')]
+        .map(a => a.getAttribute('aria-label') || a.textContent.trim()).filter(Boolean)`));
+      const action = await cdp.waitFor(`(() => {
+        const label = [...document.querySelectorAll('.monaco-menu .action-item .action-label')]
+          .find(a => (a.getAttribute('aria-label') || a.textContent.trim()) === ${JSON.stringify(title)});
+        if (!label) return null;
+        const b = label.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+      })()`, 10000, title);
+      await cdp.click(action.x, action.y);
+    };
+    const waitStatus = async (status, id = made.id) => {
+      for (let n = 0; n < 40; n++) {
+        if (s.ctl('swarm.get', { id }).status === status) return true;
+        await delay(100);
+      }
+      return false;
+    };
+    let controlStarted = Date.now();
+    await chooseControl('Pause Swarm');
+    const paused = await waitStatus('paused');
+    const pauseMs = Date.now() - controlStarted;
+    check('Pause from the Swarm row changes durable daemon state within 2 seconds',
+      paused && pauseMs < 2000, { pause_ms: pauseMs });
+    await chooseControl('Resume Swarm');
+    check('Resume from the Swarm row restores durable daemon state', await waitStatus('running'));
+    await chooseControl('Turn Swarm Off');
+    const off = s.ctl('swarm.get', { id: made.id });
+    check('Swarm off cancels the queued backlog', ['draining', 'stopped'].includes(off.status) &&
+      off.job_counts.by_status.ready === undefined, { status: off.status, counts: off.job_counts });
+
+    const toStop = s.ctl('swarm.create', { category: 'Stop audit', objective: 'Audit one route', allowed_targets: [] });
+    s.ctl('swarm.plan', { id: toStop.id, generation: 1, revision: 0,
+      jobs: [{ id: 'one', title: 'Check one route', acceptance: 'Evidence', deps: [] }] });
+    await cdp.command('Overseer: Refresh');
+    await chooseControl('Stop Swarm…', 'Stop audit');
+    await cdp.waitFor(`document.body.innerText.includes('Stop Stop audit swarm?')`, 10000, 'Stop confirmation');
+    check('Stop waits for the owner confirmation', s.ctl('swarm.get', { id: toStop.id }).status !== 'stopped');
+    controlStarted = Date.now();
+    await cdp.key('Enter');
+    const stopped = await waitStatus('stopped', toStop.id);
+    const stopMs = Date.now() - controlStarted;
+    check('confirmed Stop cancels queued work within 2 seconds', stopped && stopMs < 2000,
+      { stop_ms: stopMs });
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

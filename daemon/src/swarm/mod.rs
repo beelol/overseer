@@ -332,7 +332,8 @@ pub fn list(store: &Store, p: &Value) -> Result<Value> {
         runs.push(json!({
             "id": full["id"], "category": full["category"], "objective": full["objective"],
             "status": full["status"], "created_ms": full["created_ms"],
-            "updated_ms": full["updated_ms"], "revision": full["revision"],
+            "updated_ms": full["updated_ms"], "generation": full["generation"],
+            "revision": full["revision"],
             "policy": full["policy"], "allowed_targets": full["allowed_targets"],
             "job_counts": full["job_counts"],
             "active_worker_processes": full["active_worker_processes"],

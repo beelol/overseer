@@ -247,7 +247,7 @@ class AgentsProvider {
     item.description = `${working} working · ${counts.ready || 0} ready · ${counts.blocked || 0} blocked`;
     item.tooltip = `${run.objective}\n${run.status} · ${run.job_counts?.total || 0} jobs\n${item.description}`;
     item.accessibilityInformation = { label: `${run.category} swarm, ${run.status}, ${item.description}` };
-    item.contextValue = 'swarm-run';
+    item.contextValue = 'swarm-run-' + run.status;
     return { item, swarm: run, parent };
   }
   async swarmPage(run, cursor, parent, includeDirector) {

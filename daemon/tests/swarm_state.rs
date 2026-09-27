@@ -101,6 +101,8 @@ fn swarm_list_pages_run_summaries_without_loading_job_rows() {
     assert_eq!(backend["job_counts"]["total"], 1);
     assert_eq!(backend["job_counts"]["by_status"]["ready"], 1);
     assert_eq!(backend["active_worker_processes"], 0);
+    assert_eq!(backend["generation"], 1);
+    assert_eq!(backend["revision"], 1);
     assert!(backend.get("jobs").is_none());
 }
 

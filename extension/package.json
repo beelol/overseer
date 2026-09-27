@@ -80,6 +80,10 @@
       { "command": "overseer.newTaskQuick", "title": "Start Task with Quick Picks…", "category": "Overseer", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.refresh", "title": "Refresh", "category": "Overseer", "icon": "$(refresh)" },
       { "command": "overseer.filterSwarmJobs", "title": "Filter Swarm Jobs…", "category": "Overseer", "icon": "$(filter)" },
+      { "command": "overseer.pauseSwarm", "title": "Pause Swarm", "category": "Overseer", "icon": "$(debug-pause)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.resumeSwarm", "title": "Resume Swarm", "category": "Overseer", "icon": "$(debug-continue)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.stopSwarm", "title": "Stop Swarm…", "category": "Overseer", "icon": "$(debug-stop)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.turnSwarmOff", "title": "Turn Swarm Off", "category": "Overseer", "icon": "$(circle-slash)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.openReview", "title": "Open Review", "category": "Overseer", "icon": "$(diff-multiple)" },
       { "command": "overseer.showOutput", "title": "Show Output", "category": "Overseer", "icon": "$(output)" },
       { "command": "overseer.followUp", "title": "Send Follow-up…", "category": "Overseer", "icon": "$(comment)", "enablement": "isWorkspaceTrusted" },
@@ -146,7 +150,11 @@
         { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" }
       ],
       "view/item/context": [
-        { "command": "overseer.filterSwarmJobs", "when": "view == overseer.agents && viewItem == swarm-run", "group": "inline@1" },
+        { "command": "overseer.filterSwarmJobs", "when": "view == overseer.agents && viewItem =~ /^swarm-run-/", "group": "inline@1" },
+        { "command": "overseer.pauseSwarm", "when": "view == overseer.agents && viewItem =~ /^swarm-run-(planning|running)$/", "group": "2_control@1" },
+        { "command": "overseer.resumeSwarm", "when": "view == overseer.agents && viewItem == swarm-run-paused", "group": "2_control@2" },
+        { "command": "overseer.turnSwarmOff", "when": "view == overseer.agents && viewItem =~ /^swarm-run-(planning|running|paused|stalled)$/", "group": "2_control@3" },
+        { "command": "overseer.stopSwarm", "when": "view == overseer.agents && viewItem =~ /^swarm-run-(planning|running|paused|stalled|draining|stopping)$/", "group": "2_control@4" },
         { "command": "overseer.interrupt", "when": "view == overseer.agents && viewItem =~ /^agent-active/", "group": "inline@1" },
         { "command": "overseer.archiveAgent", "when": "view == overseer.agents && viewItem =~ /^agent-done(?!-archived)/", "group": "inline@2" },
         { "command": "overseer.restoreAgent", "when": "view == overseer.agents && viewItem =~ /^agent-done-archived/", "group": "inline@2" },
@@ -194,7 +202,7 @@
     }
   },
   "scripts": {
-    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/review.js && node --check src/output-panel.js && node --check branch-diff/review/panel.js",
+    "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/swarm-controls.js && node --check src/review.js && node --check src/output-panel.js && node --check branch-diff/review/panel.js",
     "build:review": "node branch-diff/scripts/build-review.js",
     "package": "node scripts/package.js",
     "test": "node ../test/unit/run.js"
