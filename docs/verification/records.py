@@ -1307,6 +1307,53 @@ rec(161, "Everything merged into one main", "not started", date="—", commit="�
     expected="See the RFC criterion (Gate Q).",
     actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
 
+# Gate R, Voice Mode (added by the owner on 2026-09-27). Not started.
+rec(162, "Voice spike before lock-in", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27; the goal's first step).")
+rec(163, "Owned by the daemon, heard in Rust, off until asked", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(164, "Holds the floor", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(165, "A quick answer that it is working on it", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(166, "The right agents, from context", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(167, "Redirect without trampling", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(168, "New agents from a request", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(169, "Evidence for every word sent", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(170, "Correct and cancel", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(171, "What voice may do", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(172, "One speaker at a time", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(173, "Private and bounded", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(174, "Voice in the UI", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(175, "Keeps working when things fail", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(176, "Voice Mode by voice (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+
 SHORT_BLOCKERS = {
     154: "not started (Gate Q, added by the owner on 2026-09-27)",
     155: "not started (Gate Q, added by the owner on 2026-09-27)",
@@ -1408,6 +1455,21 @@ SHORT_BLOCKERS = {
     139: "not started (Gate L, added by the owner on 2026-09-26; the goal's first step)",
     140: "not started (Gate L, added by the owner on 2026-09-26)",
     141: "not started (Gate N, added by the owner on 2026-09-26)",
+    162: "not started (Gate R, added by the owner on 2026-09-27; the goal's first step)",
+    163: "not started (Gate R, added by the owner on 2026-09-27)",
+    164: "not started (Gate R, added by the owner on 2026-09-27)",
+    165: "not started (Gate R, added by the owner on 2026-09-27)",
+    166: "not started (Gate R, added by the owner on 2026-09-27)",
+    167: "not started (Gate R, added by the owner on 2026-09-27)",
+    168: "not started (Gate R, added by the owner on 2026-09-27)",
+    169: "not started (Gate R, added by the owner on 2026-09-27)",
+    170: "not started (Gate R, added by the owner on 2026-09-27)",
+    171: "not started (Gate R, added by the owner on 2026-09-27)",
+    172: "not started (Gate R, added by the owner on 2026-09-27)",
+    173: "not started (Gate R, added by the owner on 2026-09-27)",
+    174: "not started (Gate R, added by the owner on 2026-09-27)",
+    175: "not started (Gate R, added by the owner on 2026-09-27)",
+    176: "not started (Gate R, added by the owner on 2026-09-27)",
 }
 TOTAL = 53
 
