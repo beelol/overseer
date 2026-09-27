@@ -282,6 +282,45 @@ export const scenarios = [
     },
   },
   {
+    name: 'big-repo',
+    criteria: ['AC-126', 'AC-135'],
+    says: 'an agent in a repository of 10,000 files changes 500: the phone lists them, and the list scrolls without dropped frames',
+    async run(c) {
+      const dir = path.join(path.dirname(c.lab.info().repo), 'warehouse');
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' });
+        git('init', '-q', '-b', 'main');
+        git('config', 'user.name', 'Lab');
+        git('config', 'user.email', 'lab@example.invalid');
+        git('config', 'commit.gpgsign', 'false');
+        for (let d = 0; d < 100; d += 1) {
+          const shelf = path.join(dir, `shelf${String(d).padStart(2, '0')}`);
+          fs.mkdirSync(shelf);
+          for (let f = 0; f < 100; f += 1) fs.writeFileSync(path.join(shelf, `item${String(f).padStart(2, '0')}.txt`), `shelf ${d} item ${f}\n`);
+        }
+        git('add', '.');
+        git('commit', '-q', '-m', '10,000 files');
+      }
+      const created = c.lab.call('task.create', {
+        repo: dir, harness: 'generic', workspace_mode: 'worktree', program: '/bin/sh', prompt: '', title: 'Restock the warehouse',
+        args: ['-c', 'for f in shelf0[0-4]/item*.txt; do echo restocked >> "$f"; done'],
+      });
+      const id = created.run.id;
+      await c.until('the agent done', () => !ACTIVE.includes(run(c, id)?.status ?? 'queued'), 120_000);
+      const changes = c.lab.call('workspace.changes', { workspace_id: run(c, id).workspace_id });
+      expect(changes.files === 500, `the Mac counts ${changes.files} changed files, not 500`);
+      c.dev.remove('perf.scroll');
+      await c.flow('big-repo', { RUN: id, FIRST: 'shelf00/item00.txt' });
+      const raw = c.dev.read('perf.scroll');
+      const scroll = raw ? JSON.parse(JSON.parse(raw)).changes : null;
+      expect(scroll && scroll.scrolls >= 5, `the app timed ${scroll?.scrolls ?? 0} scrolls of the list`);
+      c.log.say(`  10,000 files, 500 changed: ${scroll.scrolls} scrolls of the list, ${scroll.frames} frames, ${scroll.dropped} dropped (${scroll.droppedPercent}%), longest ${scroll.longest} ms; load average ${os.loadavg()[0].toFixed(1)}`);
+      expect(scroll.droppedPercent <= 1, `${scroll.dropped} of ${scroll.frames + scroll.dropped} frames dropped while the list scrolled (${scroll.droppedPercent}%, the budget is 1%)`);
+      return { files: changes.files, scroll };
+    },
+  },
+  {
     name: 'new',
     criteria: ['AC-125'],
     says: 'a new agent started from the phone',

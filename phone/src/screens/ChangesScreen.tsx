@@ -5,6 +5,7 @@ import { View } from 'react-native';
 
 import { review, text, type Hunk } from '@/model';
 import { Tap } from '@/motion';
+import { useScrollFrames } from '@/perf';
 import { routes } from '@/routes';
 import { useSessionValue } from '@/session';
 import { Empty, Icon, makeStyles, Screen, Txt, useMinute } from '@/ui';
@@ -36,6 +37,8 @@ const typeOfRow = (row: review.FileRow): string => row.kind;
  * list is the model's (`review.changedFiles`); it is asked again while the agent edits.
  */
 export function ChangesScreen() {
+  // Every scroll of the list is timed on the UI thread (AC-126: a large repository scrolls without dropped frames).
+  const scrollFrames = useScrollFrames('changes');
   const styles = useStyles();
   const router = useRouter();
   const { run: runId } = useReviewParams();
@@ -150,6 +153,7 @@ export function ChangesScreen() {
       <View style={styles.list}>
         <FlashList
           testID="changes.list"
+          {...scrollFrames}
           data={rows}
           renderItem={renderItem}
           keyExtractor={keyOfRow}
