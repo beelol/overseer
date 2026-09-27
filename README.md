@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **123 / 202** · **6** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-83, AC-97, AC-114, AC-115, AC-116, AC-117, AC-118, AC-119, AC-120, AC-121, AC-122, AC-123, AC-124, AC-125, AC-126, AC-127, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-134, AC-135, AC-136, AC-137, AC-141, AC-146, AC-148, AC-149, AC-151, AC-152, AC-156, AC-161, AC-162, AC-163, AC-164, AC-165, AC-166, AC-167, AC-168, AC-169, AC-170, AC-171, AC-172, AC-173, AC-174, AC-175, AC-176, AC-177, AC-178, AC-179, AC-180, AC-181, AC-182, AC-183, AC-184, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **125 / 202** · **6** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-83, AC-97, AC-114, AC-115, AC-116, AC-117, AC-118, AC-119, AC-120, AC-121, AC-122, AC-123, AC-124, AC-125, AC-126, AC-127, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-134, AC-135, AC-136, AC-137, AC-141, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-165, AC-166, AC-167, AC-168, AC-169, AC-170, AC-171, AC-172, AC-173, AC-174, AC-175, AC-176, AC-177, AC-178, AC-179, AC-181, AC-182, AC-183, AC-184, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -182,7 +182,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-149** A steady UI suite — ◐ partial: causes fixed on main: the UI harness aims a click only once its target has stopped moving; the review no longer takes keyboard focus while following an agent; ⌥⌘J presses queue; the keyboard scenario waits for each selection; staging refreshes the review in 225 ms (was about 2 s); the hunk scenario's redo passed in every run this session / deferred: three consecutive clean full runs on one build, and the first-edit p95 under 400 ms over ten runs (last single runs: 361 and 466 ms): both need a machine where no other agent is running VS Code scenarios at the same time (the phone and Continuity agents were running theirs throughout) — [evidence](docs/verification/AC-149.md)
 - [x] **AC-150** The first click always lands — [evidence](docs/verification/AC-150.md)
 - [ ] **AC-151** Every live scenario rerun on the current build — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-151.md)
-- [ ] **AC-152** Performance re-measured — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-152.md)
+- [x] **AC-152** Performance re-measured — [evidence](docs/verification/AC-152.md)
 - [x] **AC-153** A ledger that stays true — [evidence](docs/verification/AC-153.md)
 - [x] **AC-154** Composer choices fill the row — [evidence](docs/verification/AC-154.md)
 - [x] **AC-155** One-line search with a filter menu — [evidence](docs/verification/AC-155.md)
@@ -210,7 +210,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-177** The mark shows it is hearing you — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-177.md)
 - [ ] **AC-178** The phone app uses the owner's mark — not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files — [evidence](docs/verification/AC-178.md)
 - [ ] **AC-179** The Mac surfaces use the owner's mark — not started (Brand, added by the owner on 2026-09-27): the Mac helper's icon is built with AC-142; a menu-bar item does not exist yet — [evidence](docs/verification/AC-179.md)
-- [ ] **AC-180** Spikes before lock-in — not started (Gate S, added by the owner on 2026-09-27; the goal's first step) — [evidence](docs/verification/AC-180.md)
+- [x] **AC-180** Spikes before lock-in — [evidence](docs/verification/AC-180.md)
 - [ ] **AC-181** Overseer lives in the daemon — not started (Gate S, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-181.md)
 - [ ] **AC-182** One conversation, from home — not started (Gate S, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-182.md)
 - [ ] **AC-183** A digest of every agent — not started (Gate S, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-183.md)
@@ -425,7 +425,6 @@ the owner action or decision each one needs.
 - [ ] [AC-148](docs/verification/AC-148.md) (Checks on every pull request): Not started (Gate P, added by the owner on 2026-09-27).
 - [ ] [AC-149](docs/verification/AC-149.md) (A steady UI suite): Needs a quiet machine (no other agent running UI scenarios) for the three-in-a-row runs and the p95.
 - [ ] [AC-151](docs/verification/AC-151.md) (Every live scenario rerun on the current build): Not started (Gate P, added by the owner on 2026-09-27).
-- [ ] [AC-152](docs/verification/AC-152.md) (Performance re-measured): Not started (Gate P, added by the owner on 2026-09-27).
 - [ ] [AC-156](docs/verification/AC-156.md) (Every agent works from the same rules): Waits for the Auto agent's next merge of main.
 - [ ] [AC-161](docs/verification/AC-161.md) (Everything merged into one main): Not started (Gate Q, added by the owner on 2026-09-27).
 - [ ] [AC-162](docs/verification/AC-162.md) (Voice spike before lock-in): Not started (Gate R, added by the owner on 2026-09-27; the goal's first step).
@@ -446,7 +445,6 @@ the owner action or decision each one needs.
 - [ ] [AC-177](docs/verification/AC-177.md) (The mark shows it is hearing you): Not started (Gate R, added by the owner on 2026-09-27).
 - [ ] [AC-178](docs/verification/AC-178.md) (The phone app uses the owner's mark): Not started: the phone app's agent (Gate N) replaces its placeholder marks with the owner's files in docs/design/brand/.
 - [ ] [AC-179](docs/verification/AC-179.md) (The Mac surfaces use the owner's mark): Not started: verified with AC-142's merge for the helper; the menu-bar part waits for a menu-bar item.
-- [ ] [AC-180](docs/verification/AC-180.md) (Spikes before lock-in): Not started (Gate S, added by the owner on 2026-09-27; the goal's first step).
 - [ ] [AC-181](docs/verification/AC-181.md) (Overseer lives in the daemon): Not started (Gate S, added by the owner on 2026-09-27).
 - [ ] [AC-182](docs/verification/AC-182.md) (One conversation, from home): Not started (Gate S, added by the owner on 2026-09-27).
 - [ ] [AC-183](docs/verification/AC-183.md) (A digest of every agent): Not started (Gate S, added by the owner on 2026-09-27).
