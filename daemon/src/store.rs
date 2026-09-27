@@ -866,7 +866,7 @@ impl Store {
                 return Err(anyhow!("parent Auto budget is exhausted"));
             }
         }
-        if self.auto_pool_claimed(pool_id)? {
+        if self.auto_pool_claimed_for_child(pool_id, &parent.id, account_generation)? {
             return Ok(None);
         }
         self.insert_auto_launch_intent(work_unit_id, &parent.id, requirements_hash,
@@ -892,6 +892,24 @@ impl Store {
             "SELECT EXISTS(SELECT 1 FROM auto_pool_claims WHERE (pool_id=?1 OR pool_id='legacy/unresolved')
                 AND state IN ('active','uncertain'))",
             [pool_id], |row| row.get(0))?)
+    }
+
+    /// A running Auto root owns an allocation that may admit one of its own
+    /// children. Only that root's active, same-generation claim is ignored;
+    /// an independent child, another root, or an uncertain root still blocks.
+    pub fn auto_pool_claimed_for_child(&self, pool_id: &str, parent_run_id: &str,
+        account_generation: Option<i64>) -> Result<bool> {
+        Ok(self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM auto_pool_claims c
+                LEFT JOIN auto_root_intents i ON i.work_unit_id=c.work_unit_id
+                LEFT JOIN runs r ON r.id=i.run_id
+                WHERE (c.pool_id=?1 OR c.pool_id='legacy/unresolved')
+                  AND c.state IN ('active','uncertain')
+                  AND NOT (c.pool_id=?1 AND c.state='active'
+                    AND c.account_generation IS ?3 AND COALESCE(i.run_id,'')=?2
+                    AND COALESCE(r.status,'')='running' AND r.ended_ms IS NULL
+                    AND COALESCE(r.process_generation,0)>0))",
+            params![pool_id, parent_run_id, account_generation], |row| row.get(0))?)
     }
 
     /// Called in the terminal run transaction. Unknown or still-running
@@ -2477,6 +2495,26 @@ mod schema_migration_tests {
         assert!(store.insert_auto_selected_decision("second-child", &parent, "hash",
             "profile/model/medium", "account/shared", Some(1), 300_000,
             &decision).unwrap().is_none(), "root claim must block a child");
+        store.conn.execute("UPDATE runs SET status='running',process_generation=1 WHERE id='root-r'", []).unwrap();
+        let running_root = store.run("root-r").unwrap().unwrap();
+        assert!(store.insert_auto_selected_decision("changed-account-child", &running_root, "hash",
+            "profile/model/medium", "account/shared", Some(2), 300_000,
+            &decision).unwrap().is_none(), "a new account generation cannot inherit the root claim");
+        assert!(store.insert_auto_selected_decision("nested-child", &running_root, "hash",
+            "profile/model/medium", "account/shared", Some(1), 300_000,
+            &decision).unwrap().is_some(),
+            "a running Auto root may admit one bounded child under its own active pool claim");
+        assert!(store.insert_auto_selected_decision("other-child", &parent, "hash",
+            "profile/model/medium", "account/shared", Some(1), 300_000,
+            &decision).unwrap().is_none(), "the nested claim must still block another parent");
+        assert!(store.insert_auto_selected_decision("second-nested-child", &running_root, "hash",
+            "profile/model/medium", "account/shared", Some(1), 300_000,
+            &decision).unwrap().is_none(), "the parent may not fan out a second unknown-draw child");
+        assert!(store.release_unstarted_auto_pool_claim("nested-child").unwrap());
+        store.conn.execute("UPDATE auto_pool_claims SET state='uncertain' WHERE work_unit_id='root-unit'", []).unwrap();
+        assert!(store.insert_auto_selected_decision("uncertain-root-child", &running_root, "hash",
+            "profile/model/medium", "account/shared", Some(1), 300_000,
+            &decision).unwrap().is_none(), "an uncertain root claim cannot admit a new child");
         drop(store);
         let reopened = Store::open(&path).unwrap();
         let saved = reopened.auto_root_intent("root-unit").unwrap().unwrap();

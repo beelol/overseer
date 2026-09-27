@@ -1707,7 +1707,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 {
                     let store = d.store.lock().unwrap();
                     for route in &mut routes {
-                        route.in_flight_pool_claim = store.auto_pool_claimed(&route.pool_id)?;
+                        route.in_flight_pool_claim = store.auto_pool_claimed_for_child(
+                            &route.pool_id, &parent.id, account_generations.get(&route.profile_id).copied())?;
                     }
                 }
                 let work = WorkUnit { id:work_unit_id.into(), min_tier, required_tools:required_tools.clone(),

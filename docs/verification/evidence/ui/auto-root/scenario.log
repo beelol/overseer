@@ -1,0 +1,9 @@
+[2026-09-27T15:33:31.014Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T15:33:33.708Z] PASS Auto gate is off before an explicit UI choice
+[2026-09-27T15:33:36.867Z] PASS the UI enabled Auto and the daemon chose one model and effort before the fixture turn {"run":"r-fddc5ad913c34de79db966aed154e209","status":"completed","model":"gpt-6-sol","effort":"medium","selected":"system-codex/gpt-6-sol/medium","output":"parent ready"}
+[2026-09-27T15:33:36.868Z] PASS the selected Auto run opens in the same chat surface as a manual run
+[2026-09-27T15:33:36.927Z] screenshot docs/verification/evidence/ui/auto-root/01-auto-root-chat.png
+[2026-09-27T15:33:41.691Z] PASS Auto parent receives a browser-labelled child result and assigns a stronger diagnosis unit while healthy {"parent":"r-7ca53fc294a14876a6b5696d4b403fde","status":"completed","children":[{"id":"r-42387fd50e44","model":"gpt-6-sol","effort":"medium","status":"completed"},{"id":"r-c5dcef3553ef","model":"gpt-6-astra","effort":"high","status":"completed"}],"output":"browser result: parent context found; continued with browser result"}
+[2026-09-27T15:33:41.766Z] screenshot docs/verification/evidence/ui/auto-root/02-auto-delegation.png
+[2026-09-27T15:33:56.697Z] PASS window reload keeps the original Auto run and remembers Auto as the next choice {"runs":["r-fddc5ad913c34de79db966aed154e209"],"remembered":"Agent: Auto routing"}
+[2026-09-27T15:33:56.742Z] screenshot docs/verification/evidence/ui/auto-root/03-auto-remembered.png

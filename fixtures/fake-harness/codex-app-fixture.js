@@ -8,6 +8,11 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { spawn } = require('child_process');
+if (process.argv[2] === 'login' && process.argv[3] === 'status') {
+  const auth = path.join(process.env.CODEX_HOME || path.join(process.env.HOME || '', '.codex'), 'auth.json');
+  console.log(fs.existsSync(auth) ? 'Logged in using ChatGPT' : 'Not logged in');
+  process.exit(fs.existsSync(auth) ? 0 : 1);
+}
 if (process.argv[2] !== 'app-server') { console.log('codex-app-fixture 0.0.0 (synthetic)'); process.exit(0); }
 const out = o => process.stdout.write(JSON.stringify(o) + '\n');
 const mark = event => { if (process.env.FIXTURE_TRACE_FILE) fs.appendFileSync(process.env.FIXTURE_TRACE_FILE, event + '\n'); };
