@@ -6,30 +6,51 @@ Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 and AC-141 (Gate
 
 ## Goal for the first pull request
 
-This is the goal to activate. It is the simulator milestone, 22 of the gate's 24 criteria.
+This is the goal to activate. It is the simulator milestone, 22 of the gate's 24 criteria. It is
+3596 characters, under the 4,000 limit, and stands on its own.
 
 ```text
-Implement the simulator milestone of Gate N, the phone remote, in one draft pull request from
-this worktree. Follow docs/rfcs/phone-remote-goal.md and docs/rfcs/phone-remote.md. The criteria
-are in docs/overseer-rfc.md.
+GOAL: Build the simulator milestone of Gate N, Overseer's phone remote on the same network, in one draft pull request from this worktree.
 
-Done when all of these hold:
-1. Verified with evidence records and checked boxes: AC-116, AC-118, AC-119, AC-121, AC-122,
-   AC-123, AC-124, AC-125, AC-126, AC-127, AC-130, AC-131, AC-132, AC-134, AC-141.
-2. Verified on the iOS simulator and the Android emulator, recorded as partial with the iPhone
-   part named as the owner's next step: AC-115, AC-117, AC-120, AC-129, AC-135.
-3. AC-136 and AC-137 verified except for the owner's marks: the review page is published and
-   the owner has been asked.
-4. AC-128 and AC-133 left not started with the blocker recorded (AC-107; the owner's iPhone).
-5. cargo test --workspace and the existing packaged-UI suites pass with phone access off and on.
-6. The pull request is marked ready and its report ends with the steps the owner still has to do.
+READ FIRST: docs/rfcs/phone-remote.md (design), docs/rfcs/phone-remote-goal.md (full instruction), and Gate N in docs/overseer-rfc.md (criteria with their Verify clauses).
 
-Rules: the phone talks only to the Overseer daemon; no relay and no server. Expo for the app,
-Rust in the daemon. Pair once: no sign-in and no app lock. Phone access is switched on the
-desktop only. Do not read, use or change the Apple assets or Android virtual devices of other
-projects. Keep the pull request a draft that says work continues until done. Never weaken a
-criterion or record evidence that was not produced. When only the owner can unblock something,
-ask one precise question and keep working on the rest. Session budget: eight hours.
+WHAT TO BUILD
+- In overseerd (Rust): a gateway for phones, off by default and switched on the desktop only; pairing started on the Mac; an encrypted, mutually authenticated session; a device list with scopes and revoke; resume from the event cursor; exactly-once requests; daemon methods for files, review marks and pull requests; a push sender with switches.
+- In phone/ (Expo, TypeScript): one app for iOS and Android that lists every agent, shows each conversation live, and controls everything VS Code controls. Light and dark themes generated from extension/design/tokens.js, following the system setting. A platform layer with one generic interface per capability. The door on a cold start, and one motion system.
+- In the extension and the terminal UI: the phone access switch, Pair a Phone, and the Devices list.
+
+ORDER (do not start a phase before the one above it has evidence)
+1. Prove: spikes and speed baselines on both simulators (AC-115).
+2. Connect: AC-116 to AC-120, AC-134, AC-141.
+3. Hold: AC-121 to AC-123.
+4. See and control: AC-124 to AC-127, AC-131.
+5. Feel: AC-135 to AC-137.
+6. Needs you, safely: AC-129, AC-130.
+7. Confirm: AC-132.
+
+DONE WHEN ALL OF THESE HOLD
+1. Verified, with evidence records written through records.py and boxes checked: AC-116, AC-118, AC-119, AC-121, AC-122, AC-123, AC-124, AC-125, AC-126, AC-127, AC-130, AC-131, AC-132, AC-134, AC-141.
+2. Verified on the iOS simulator and the Android emulator and recorded as partial, with the iPhone part named as the owner's next step: AC-115, AC-117, AC-120, AC-129, AC-135.
+3. AC-136 and AC-137 verified except for the owner's marks: a review page is published and the owner has been asked.
+4. AC-128 and AC-133 left not started with their blockers recorded (AC-107; the owner's iPhone).
+5. cargo test --workspace and the existing packaged-UI suites pass with phone access off and with it on.
+6. The pull request is marked ready. Its report lists what is verified, what is partial, and the steps the owner still has to do.
+
+RULES
+- The phone talks only to the Overseer daemon. No relay, no server, no cloud account.
+- Pair once. The app never asks to pair, sign in or confirm again, and it does not lock itself.
+- Do not change the Unix socket boundary (AC-08).
+- Rust on the phone only if a measurement shows it is needed.
+- Do not read, use or change Apple assets or Android virtual devices that belong to other projects. Create Overseer's own.
+- Test against an isolated OVERSEER_HOME, never the owner's running daemon.
+- Live agent turns follow the owner's paid-turn rules: tiny prompts, one attempt per step.
+- Never accept a license, enter a password or change a system setting for the owner.
+- Keep the pull request a draft that says work continues until done. Never push to another agent's branch. Criteria, records and RFC revisions go to main.
+- Never weaken or delete a criterion, and never record evidence that was not produced. A partial milestone is progress, not completion.
+- When only the owner can unblock a step, ask one precise question and continue with the rest. Never wait in a foreground loop.
+- If a spike fails, revise the RFC and record why before building on it.
+
+BUDGET: eight hours for this session. If it ends first, commit, push, and report exactly what remains.
 ```
 
 | Group | Criteria |
