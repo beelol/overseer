@@ -187,6 +187,20 @@ impl Daemon {
         let daemon = Arc::new(Self { store: Mutex::new(store), pending_agent_slots: Mutex::new(0), events: tx, tails: Mutex::new(HashSet::new()), swarm_launch_lock: Mutex::new(()), swarm_integration_lock: Mutex::new(()), swarm_storage_blocked: std::sync::atomic::AtomicBool::new(false), exe, started_ms: now(),
             ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)) });
         daemon.ensure_system_profiles()?;
+        {
+            let mut store = daemon.store.lock().unwrap();
+            // A SQLite page ceiling is connection-local. This fixture reapplies
+            // it after restart so a still-full disk can be replayed reliably.
+            if std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() == Ok("1")
+                && std::env::var("OVERSEER_TEST_SWARM_STORAGE_PAGE_LIMIT").as_deref() == Ok("current") {
+                let pages: i64 = store.conn.pragma_query_value(None, "page_count", |r| r.get(0))?;
+                store.conn.pragma_update(None, "max_page_count", pages)?;
+            }
+            if let Err(error) = store.probe_swarm_write_capacity() {
+                daemon.swarm_storage_blocked.store(true, std::sync::atomic::Ordering::SeqCst);
+                crate::log(&format!("swarm storage write probe failed at startup: {error}"));
+            }
+        }
         Ok(daemon)
     }
 

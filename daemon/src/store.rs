@@ -204,6 +204,16 @@ impl Store {
         Ok(Self { conn })
     }
 
+    /// Prove a fresh Swarm write can allocate database pages. A rolled-back
+    /// insert leaves no probe row, but still fails when SQLite cannot write.
+    pub fn probe_swarm_write_capacity(&mut self) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute("INSERT INTO meta(key,value) VALUES(?1,?2)",
+            params![format!("swarm.storage.probe.{}", uuid::Uuid::new_v4()), "x".repeat(32 * 1024)])?;
+        tx.rollback()?;
+        Ok(())
+    }
+
     fn migrate(&self) -> Result<()> {
         self.conn.execute_batch(
             r#"

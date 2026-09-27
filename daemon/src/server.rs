@@ -329,10 +329,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.storage.recover" => {
             let _serial = d.swarm_launch_lock.lock().unwrap();
             let mut store = d.store.lock().unwrap();
-            let tx = store.conn.transaction()?;
-            tx.execute("INSERT INTO meta(key,value) VALUES(?1,?2)",
-                rusqlite::params![format!("swarm.storage.probe.{}", uuid::Uuid::new_v4()), "x".repeat(32 * 1024)])?;
-            tx.rollback()?;
+            store.probe_swarm_write_capacity()?;
             d.swarm_storage_blocked.store(false, Ordering::SeqCst);
             json!({"state":"ready"})
         }
