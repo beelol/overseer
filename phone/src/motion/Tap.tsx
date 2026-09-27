@@ -1,6 +1,6 @@
 import { useCallback, type ReactNode } from 'react';
 import { Pressable, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { perf } from '@/perf';
 import { useCapabilities, type HapticMoment } from '@/platform';
@@ -43,14 +43,14 @@ export function Tap({ testID, accessibilityLabel, children, style, haptic, scale
 
   const pressIn = useCallback(
     (event: GestureResponderEvent) => {
-      pressed.set(withTiming(1, { duration: press.in }));
+      pressed.set(withTiming(1, { duration: press.in, reduceMotion: ReduceMotion.Never }));
       onPressIn?.(event);
     },
     [pressed, press.in, onPressIn],
   );
   const pressOut = useCallback(
     (event: GestureResponderEvent) => {
-      pressed.set(withTiming(0, { duration: press.out }));
+      pressed.set(withTiming(0, { duration: press.out, reduceMotion: ReduceMotion.Never }));
       onPressOut?.(event);
     },
     [pressed, press.out, onPressOut],

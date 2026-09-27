@@ -1,6 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withSpring, withTiming, type WithSpringConfig, type WithTimingConfig } from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withRepeat, withSpring, withTiming, type WithSpringConfig, type WithTimingConfig } from 'react-native-reanimated';
 
 import { useCapabilities, useLive } from '@/platform';
 import { useTheme, type Theme } from '@/theme';
@@ -28,8 +28,11 @@ export function useMotion(): Motion {
       reduced,
       tokens: theme.phone.motion,
       ease,
-      timing: (duration) => ({ duration, easing: ease }),
-      spring: (name) => ({ ...theme.phone.motion.spring[name], reduceMotion: undefined }),
+      // Reduce Motion is the app's to honour: it takes the travel out (`travel`, the door's split)
+      // and keeps the fades. Left to its default, Reanimated would jump every animation to its end
+      // when the system asks for less motion, and the fades would vanish with the movement.
+      timing: (duration) => ({ duration, easing: ease, reduceMotion: ReduceMotion.Never }),
+      spring: (name) => ({ ...theme.phone.motion.spring[name], reduceMotion: ReduceMotion.Never }),
       travel: (distance) => (reduced ? 0 : distance),
     };
   }, [theme, reduced]);
