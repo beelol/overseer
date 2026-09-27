@@ -13,3 +13,12 @@ Commands: `cargo test --offline -p overseerd --test swarm_admission quota_window
 Evidence: `daemon/tests/swarm_admission.rs` (`quota_window_reset_does_not_grant_a_second_run_allocation`), `daemon/src/swarm/admission.rs`. Existing policy previews for unlike units and multiple windows are in `daemon/tests/swarm_policy.rs`.
 
 Remaining: the reset fixture uses synthetic quota points and unlinked attempts. It does not prove live reset detection, actual native-unit usage reconciliation, unlike-unit end-to-end admission, or a full short/long-window run. Keep the RFC box unchecked.
+
+Pool-freeze follow-up: the run now persists a cap for every then-approved
+comparable pool when its first worker is admitted. On a reset to a new window
+ID in the same pool and unit, admission carries the old ceiling forward and
+also limits it by the new window's current headroom. The existing
+`quota_window_reset_does_not_grant_a_second_run_allocation` regression still
+holds the 70-point request and admits 20 points at the 100-point cap. A new
+pool selected after work begins cannot use the reset rule to mint an
+allocation. This remains an injected-window fixture, so SWARM-11 is partial.

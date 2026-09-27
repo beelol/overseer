@@ -261,6 +261,36 @@ fn quota_window_reset_does_not_grant_a_second_run_allocation() {
 }
 
 #[test]
+fn newly_selected_account_cannot_create_allocation_after_first_admission() {
+    let d=Daemon::start(&[]);
+    let run=setup(&d,"New account after work starts",2);
+    let at=now();
+    let first=admit(&d,&run,"j0","codex-a","initial-account",at,100000,100).unwrap();
+    assert_eq!(first["status"],"admitted","{first}");
+    d.call("swarm.targets.set",json!({"run_id":run,"request_id":"select-new-account",
+        "owner_confirmed":true,"expected_control_revision":0,
+        "allowed_targets":["new-account"]}));
+    let mut next=snapshot(at+2000,1000000);
+    next["targets"].as_array_mut().unwrap().push(json!({"id":"new-account",
+        "account_id":"new-account","pool_ids":["new-pool"],"capabilities":["code"],
+        "health":"up","auth":"ok"}));
+    next["pools"].as_array_mut().unwrap().push(json!({"id":"new-pool","windows":[{
+        "id":"week","unit":"points","remaining_milli":1000000,
+        "protected_milli":0,"reserved_milli":0,"confidence":"exact",
+        "expires_ms":at+62000}]}));
+    let observed=d.call("swarm.availability.observe",json!({"run_id":run,
+        "snapshot":next,"now_ms":at+2000,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(observed["state"],"eligible","{observed}");
+    let held=d.call("swarm.admit",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"j1","target_id":"new-account","request_id":"new-account-admission",
+        "snapshot":next,"now_ms":at+2000,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(held["reason"],"allocation_not_frozen","{held}");
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["registered_attempts"],1);
+}
+
+#[test]
 fn shared_pool_reservation_blocks_stale_capacity_across_categories() {
     let d = Daemon::start(&[]);
     let first = setup(&d, "Backend pool", 1);

@@ -66,3 +66,19 @@ remains reviewable. The opt-in Atlas runner passed all 17 joined tests. The
 separate packaged sidebar fixture already shows this data visually, but it
 still does not draw the Atlas run itself, and the source is injected rather than
 live Auto telemetry. SWARM-59 remains partial.
+
+Owner target-selection fixture follow-up: `swarm.targets.set` requires an
+explicit owner-confirmed action, request ID and current control revision. A
+changed selection persists across restart, invalidates its previous
+availability assessment, and holds new admissions until a fresh snapshot is
+observed. The newly eligible state wakes the director once; a later assessment
+refresh, repeated request or unchanged selection does not wake it again. A
+second fixture admits a
+worker on account A, records an artifact, switches future work to previously
+approved account B, and confirms A cannot take the next job while the active
+attempt, reservation and artifact remain. B's allowance grows tenfold in the
+new observation, but its original per-run cap still blocks a 9,000-point job
+and admits a 100-point job. A new account/pool introduced after the first
+admission is held as `allocation_not_frozen`. The action is fixture-gated;
+there is still no normal owner control, live Auto update, or qualified provider
+interruption. Keep SWARM-59 partial.

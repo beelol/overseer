@@ -13,3 +13,13 @@ Evidence: `daemon/tests/swarm_runtime.rs` (`stop_retries_an_initially_unreachabl
 Follow-up at `28bbe73`: `daemon/tests/swarm_admission.rs` (`shared_pool_reservation_blocks_stale_capacity_across_categories`) admits an attempt in one category, uses the fixture exit-confirmation API, then retries admission from another category on the same quota pool. The second category remains blocked against a stale snapshot while the first reservation is `uncertain`. The separate runtime fixture above covers an actual supervised worker exit. Replay: `cargo test --offline -p overseerd --test swarm_admission shared_pool_reservation_blocks_stale_capacity_across_categories -- --nocapture` passed.
 
 Remaining: no authoritative native usage measurement or reconciliation transaction exists, so the uncertain hold cannot yet be released or charged to actual use. Finishing-work draw and live harness/account qualification are also unverified. This criterion remains unchecked.
+
+Pool-freeze follow-up: the first successful admission now records the run's
+allocation ceiling for every then-approved pool with comparable allowance.
+Changing the selected target later cannot calculate a larger allocation from
+an account's increased balance or from a newly introduced pool. The
+owner-selection fixture confirms a tenfold balance increase does not enlarge
+the original cap; a separate fixture blocks a newly selected account with no
+frozen pool allocation. A run with no admitted work may still recover as fresh
+allowance arrives. The original finishing-reserve and uncertain-settlement
+limitations above remain, so SWARM-10 is partial.

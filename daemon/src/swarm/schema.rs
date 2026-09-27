@@ -2,6 +2,9 @@ use anyhow::Result;
 use rusqlite::Connection;
 
 pub fn migrate(conn: &Connection) -> Result<()> {
+    let pool_caps_missing = !conn.prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='swarm_pool_caps'",
+    )?.exists([])?;
     conn.execute_batch(
         r#"
         CREATE TABLE IF NOT EXISTS swarm_runs(
@@ -78,6 +81,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           additional_ms INTEGER NOT NULL,
           old_deadline_at_ms INTEGER NOT NULL,
           new_deadline_at_ms INTEGER NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,request_id)
+        );
+        CREATE TABLE IF NOT EXISTS swarm_target_changes(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          request_id TEXT NOT NULL,
+          request_sha256 TEXT NOT NULL,
+          result_json TEXT NOT NULL,
           created_ms INTEGER NOT NULL,
           PRIMARY KEY(run_id,request_id)
         );
@@ -399,6 +410,15 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           unit TEXT NOT NULL,
           allocation_milli INTEGER NOT NULL,
           reserve_milli INTEGER NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,pool_id,window_id)
+        );
+        CREATE TABLE IF NOT EXISTS swarm_pool_caps(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          pool_id TEXT NOT NULL,
+          window_id TEXT NOT NULL,
+          unit TEXT NOT NULL,
+          allocation_milli INTEGER NOT NULL,
           created_ms INTEGER NOT NULL,
           PRIMARY KEY(run_id,pool_id,window_id)
         );
@@ -775,6 +795,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         conn.execute_batch(
             "ALTER TABLE swarm_director_turns ADD COLUMN pending_review_count INTEGER NOT NULL DEFAULT 0;",
         )?;
+    }
+    if pool_caps_missing {
+        // Existing runs retain only their already committed pool windows. An
+        // unobserved pool cannot gain a fresh allocation during migration.
+        conn.execute_batch("INSERT OR IGNORE INTO swarm_pool_caps
+            (run_id,pool_id,window_id,unit,allocation_milli,created_ms)
+            SELECT run_id,pool_id,window_id,unit,allocation_milli,created_ms
+            FROM swarm_allocations;")?;
     }
     Ok(())
 }

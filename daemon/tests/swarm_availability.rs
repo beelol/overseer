@@ -22,6 +22,126 @@ fn snapshot(at: i64, healthy: bool, remaining: i64) -> Value {
 }
 
 #[test]
+fn confirmed_target_selection_requires_fresh_observation_and_wakes_once() {
+    let mut d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Target selection recovery",
+        "objective":"Audit backend routes","allowed_targets":[]}));
+    let run=made["id"].as_str().unwrap();
+    let at=now();
+    let observe=|d:&Daemon,when:i64|d.call("swarm.availability.observe",json!({
+        "run_id":run,"snapshot":snapshot(when,true,100000),"now_ms":when,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(observe(&d,at)["reason"],"no_allowed_target");
+    let change=json!({"run_id":run,"request_id":"choose-route-a",
+        "expected_control_revision":0,"owner_confirmed":true,
+        "allowed_targets":["route-a"]});
+    let mut unconfirmed=change.clone();
+    unconfirmed["owner_confirmed"]=json!(false);
+    assert!(d.try_call("swarm.targets.set",unconfirmed).is_err());
+    let changed=d.call("swarm.targets.set",change.clone());
+    assert_eq!(changed["control_revision"],1);
+    assert_eq!(changed["allowed_targets"],json!(["route-a"]));
+    assert_eq!(changed["duplicate"],false);
+    let current=d.call("swarm.get",json!({"id":run}));
+    assert_eq!(current["availability"]["reason"],"target_selection_changed");
+    assert_eq!(current["policy"]["effective"]["deadline_ms"],3600000);
+    let held=d.call("swarm.admit",json!({"run_id":run,"generation":1,"revision":0,
+        "job_id":"not-planned","target_id":"route-a","request_id":"before-refresh",
+        "snapshot":snapshot(at,true,100000),"now_ms":at,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(held["reason"],"run_availability_blocked");
+    let fresh=observe(&d,now()+2000);
+    assert_eq!(fresh["state"],"eligible");
+    assert_eq!(fresh["woken"],true);
+    assert_eq!(fresh["wake_count"],1);
+    let refreshed=observe(&d,now()+4000);
+    assert_eq!(refreshed["state"],"eligible");
+    assert_eq!(refreshed["woken"],false);
+    assert_eq!(refreshed["wake_count"],1);
+    let unchanged=d.call("swarm.targets.set",json!({"run_id":run,
+        "request_id":"keep-route-a","expected_control_revision":1,
+        "owner_confirmed":true,"allowed_targets":["route-a"]}));
+    assert_eq!(unchanged["changed"],false);
+    assert_eq!(unchanged["control_revision"],1);
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["availability"]["state"],"eligible");
+    d.kill9(); d.spawn();
+    assert_eq!(d.call("swarm.targets.set",change.clone())["duplicate"],true);
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["availability"]["wake_count"],1);
+    let mut reused=change.clone(); reused["allowed_targets"]=json!([]);
+    assert!(d.try_call("swarm.targets.set",reused).unwrap_err().contains("reused"));
+    let mut stale=change; stale["request_id"]=json!("stale-selection");
+    assert!(d.try_call("swarm.targets.set",stale).unwrap_err().contains("stale"));
+}
+
+#[test]
+fn changing_selected_targets_preserves_admitted_evidence_and_restricts_future_work() {
+    let d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Target change with active work",
+        "objective":"Audit two backend routes","allowed_targets":["route-a","route-b"]}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"first","title":"Inspect first route","acceptance":"evidence","deps":[]},
+        {"id":"second","title":"Inspect second route","acceptance":"evidence","deps":[]}
+    ]}));
+    commit_beneficial_batch(&d,run,&["first".into(),"second".into()]);
+    let at=now();
+    let snap=|when:i64,b_remaining:i64|json!({"version":1,"observed_ms":when-1000,
+        "expires_ms":when+60000,"targets":[
+            {"id":"route-a","account_id":"account-a","pool_ids":["pool-a"],
+                "capabilities":["code"],"health":"up","auth":"ok"},
+            {"id":"route-b","account_id":"account-b","pool_ids":["pool-b"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[
+            {"id":"pool-a","windows":[{"id":"week","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":when+60000}]},
+            {"id":"pool-b","windows":[{"id":"week","unit":"points",
+                "remaining_milli":b_remaining,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":when+60000}]}]});
+    let observe=|when:i64,b_remaining:i64|d.call("swarm.availability.observe",json!({"run_id":run,
+        "snapshot":snap(when,b_remaining),"now_ms":when,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(observe(at,100000)["state"],"eligible");
+    let admit=|job:&str,target:&str,request:&str,when:i64,b_remaining:i64,estimate:i64|d.call("swarm.admit",json!({
+        "run_id":run,"generation":1,"revision":1,"job_id":job,"target_id":target,
+        "request_id":request,"snapshot":snap(when,b_remaining),"now_ms":when,
+        "required_capabilities":["code"],"estimate_milli":{"points":estimate},
+        "purpose":"worker"}));
+    let first=admit("first","route-a","before-selection",at,100000,100);
+    assert_eq!(first["status"],"admitted","{first}");
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"first",
+        "attempt_id":first["attempt_id"],"token":first["token"],
+        "artifact_id":"first-evidence","source_revision":1,"kind":"finding",
+        "content":"Observed route behavior"}));
+    let action=d.call("swarm.targets.set",json!({"run_id":run,
+        "request_id":"switch-to-b","expected_control_revision":0,
+        "owner_confirmed":true,"allowed_targets":["route-b"]}));
+    assert_eq!(action["control_revision"],1);
+    let pending=admit("second","route-b","before-reobserve",at+1000,100000,100);
+    assert_eq!(pending["reason"],"run_availability_blocked");
+    let fresh_at=now()+6000;
+    let available=observe(fresh_at,1000000);
+    assert_eq!(available["eligible_targets"],json!(["route-b"]));
+    assert_eq!(available["woken"],true);
+    let old=admit("second","route-a","old-target",fresh_at,1000000,100);
+    assert_eq!(old["reason"],"not_allowed","{old}");
+    let over_frozen=admit("second","route-b","over-frozen-budget",fresh_at,1000000,9000);
+    assert_eq!(over_frozen["reason"],"finishing_reserve","{over_frozen}");
+    let second=admit("second","route-b","new-target",fresh_at,1000000,100);
+    assert_eq!(second["status"],"admitted","{second}");
+    let current=d.call("swarm.get",json!({"id":run}));
+    assert_eq!(current["allowed_targets"],json!(["route-b"]));
+    assert_eq!(current["registered_attempts"],2);
+    assert_eq!(current["capacity"]["windows"].as_array().unwrap().len(),2);
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let retained:i64=db.query_row("SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1
+        AND id='first-evidence'",[run],|row|row.get(0)).unwrap();
+    assert_eq!(retained,1);
+}
+
+#[test]
 fn director_can_close_a_fresh_target_block_without_claiming_success() {
     let mut d=Daemon::start(&[]);
     let made=d.call("swarm.create",json!({"category":"Unavailable route closeout",

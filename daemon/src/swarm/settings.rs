@@ -3,6 +3,7 @@ use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Map, Value};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
 fn defaults() -> Map<String, Value> {
@@ -76,6 +77,77 @@ fn validate_targets(v: &Value) -> Result<Vec<String>> {
         }
         result.push(id.to_string());
     }
+    Ok(result)
+}
+
+/// Change only future target eligibility. Existing attempts retain their
+/// reservations; explicit account revocation is a separate interrupt path.
+pub fn set_run_targets(store: &mut Store, p: &Value) -> Result<Value> {
+    let run=required(p,"run_id")?;
+    let request_id=required(p,"request_id")?;
+    if request_id.is_empty() || request_id.len()>128 || request_id.chars().any(char::is_control)
+        || crate::redact::redact(request_id)!=request_id {
+        bail!("invalid target-selection request id");
+    }
+    if p["owner_confirmed"]!=true { bail!("target selection requires owner confirmation"); }
+    let expected=p["expected_control_revision"].as_i64()
+        .ok_or_else(||anyhow!("missing expected control revision"))?;
+    if expected<0 { bail!("invalid expected control revision"); }
+    let mut targets=validate_targets(&p["allowed_targets"])?;
+    targets.sort();
+    let request_sha256=format!("{:x}",Sha256::digest(json!({
+        "expected_control_revision":expected,"allowed_targets":targets,
+        "owner_confirmed":true}).to_string().as_bytes()));
+    let tx=store.conn.transaction()?;
+    let replay:Option<(String,String)>=tx.query_row(
+        "SELECT request_sha256,result_json FROM swarm_target_changes WHERE run_id=?1 AND request_id=?2",
+        params![run,request_id],|row|Ok((row.get(0)?,row.get(1)?)),
+    ).optional()?;
+    if let Some((prior_sha,result))=replay {
+        if prior_sha!=request_sha256 { bail!("target-selection request id reused with different input"); }
+        let mut result:Value=serde_json::from_str(&result)?;
+        result["duplicate"]=json!(true);
+        return Ok(result);
+    }
+    let (status,control_revision,old_json,created,policy_json):(String,i64,String,i64,String)=
+        tx.query_row("SELECT status,control_revision,allowed_targets,created_ms,policy
+            FROM swarm_runs WHERE id=?1",[run],|row|Ok((row.get(0)?,row.get(1)?,
+                row.get(2)?,row.get(3)?,row.get(4)?)))
+            .optional()?.ok_or_else(||anyhow!("unknown swarm run"))?;
+    if !["planning","running","paused"].contains(&status.as_str()) {
+        bail!("swarm run cannot change targets in this state");
+    }
+    if control_revision!=expected { bail!("stale control revision"); }
+    let policy:Value=serde_json::from_str(&policy_json)?;
+    let deadline=policy["effective"]["deadline_ms"].as_i64().unwrap_or(3_600_000);
+    let now=crate::daemon::now();
+    if now>=created.saturating_add(deadline) { bail!("run deadline elapsed"); }
+    let old:Vec<String>=serde_json::from_str(&old_json)?;
+    let mut old_sorted=old.clone(); old_sorted.sort();
+    let changed=old_sorted!=targets;
+    let next=control_revision+i64::from(changed);
+    if changed {
+        let prior:Option<(String,i64)>=tx.query_row(
+            "SELECT purpose,wake_count FROM swarm_availability WHERE run_id=?1",[run],
+            |row|Ok((row.get(0)?,row.get(1)?))).optional()?;
+        let (purpose,wakes)=prior.unwrap_or(("worker".to_string(),0));
+        tx.execute("UPDATE swarm_runs SET allowed_targets=?2,control_revision=?3,updated_ms=?4
+            WHERE id=?1",params![run,json!(targets).to_string(),next,now])?;
+        tx.execute("INSERT INTO swarm_availability(run_id,state,reason,eligible_targets,purpose,
+            request_sha256,snapshot_sha256,allowance_windows,allowance_window_count,
+            observed_ms,expires_ms,wake_count,updated_ms)
+            VALUES(?1,'blocked','target_selection_changed','[]',?2,'','','[]',0,?3,?3,?4,?3)
+            ON CONFLICT(run_id) DO UPDATE SET state='blocked',reason='target_selection_changed',
+            eligible_targets='[]',purpose=excluded.purpose,request_sha256='',snapshot_sha256='',
+            allowance_windows='[]',allowance_window_count=0,observed_ms=excluded.observed_ms,
+            expires_ms=excluded.expires_ms,wake_count=excluded.wake_count,
+            updated_ms=excluded.updated_ms",params![run,purpose,now,wakes])?;
+    }
+    let result=json!({"run_id":run,"control_revision":next,"allowed_targets":targets,
+        "previous_allowed_targets":old,"changed":changed,"duplicate":false});
+    tx.execute("INSERT INTO swarm_target_changes(run_id,request_id,request_sha256,result_json,created_ms)
+        VALUES(?1,?2,?3,?4,?5)",params![run,request_id,request_sha256,result.to_string(),now])?;
+    tx.commit()?;
     Ok(result)
 }
 

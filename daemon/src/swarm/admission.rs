@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 fn hash(raw: &str) -> String {
     format!("{:x}", Sha256::digest(raw.as_bytes()))
@@ -14,6 +14,54 @@ fn hash(raw: &str) -> String {
 
 fn blocked(reason: &str) -> Value {
     json!({"status":"blocked","reason":reason})
+}
+
+/// Freeze every currently comparable approved pool with the first successful
+/// admission. Later observations may reduce headroom, never create a new
+/// allocation from a newly selected account.
+pub(super) fn freeze_pool_caps(
+    conn: &rusqlite::Connection, run: &str, snapshot: &Value,
+    allowed: &Value, effective: &Value, now: i64,
+) -> Result<()> {
+    let existing:i64=conn.query_row("SELECT COUNT(*) FROM swarm_pool_caps WHERE run_id=?1",
+        [run],|row|row.get(0))?;
+    if existing>0 || snapshot["expires_ms"].as_i64().is_none_or(|expires|expires<=now) {
+        return Ok(());
+    }
+    let allowed_ids:HashSet<&str>=allowed.as_array().into_iter().flatten()
+        .filter_map(Value::as_str).collect();
+    let mut pool_ids=BTreeSet::new();
+    for target in snapshot["targets"].as_array().into_iter().flatten() {
+        if target["id"].as_str().is_some_and(|id|allowed_ids.contains(id)) {
+            for id in target["pool_ids"].as_array().into_iter().flatten()
+                .filter_map(Value::as_str) { pool_ids.insert(id); }
+        }
+    }
+    let percent=effective["run_allocation_percent"].as_i64().unwrap_or(10);
+    let allow_estimated=effective["allow_estimated_quota"].as_bool().unwrap_or(false);
+    for pool_id in pool_ids {
+        let Some(pool)=snapshot["pools"].as_array().into_iter().flatten()
+            .find(|pool|pool["id"]==pool_id) else {continue};
+        for window in pool["windows"].as_array().into_iter().flatten() {
+            let (Some(window_id),Some(unit),Some(remaining))=(window["id"].as_str(),
+                window["unit"].as_str(),window["remaining_milli"].as_i64()) else {continue};
+            if window["expires_ms"].as_i64().is_none_or(|expires|expires<=now)
+                || window["confidence"]=="unknown"
+                || (window["confidence"]=="estimated" && !allow_estimated) {continue;}
+            let reserved:i64=conn.query_row("SELECT COALESCE(SUM(amount_milli),0)
+                FROM swarm_reservations WHERE pool_id=?1 AND window_id=?2
+                  AND status IN ('active','uncertain')",params![pool_id,window_id],
+                |row|row.get(0))?;
+            let usable=remaining.saturating_sub(window["protected_milli"].as_i64().unwrap_or(0))
+                .saturating_sub(window["reserved_milli"].as_i64().unwrap_or(0))
+                .saturating_sub(reserved).max(0);
+            let cap=usable.saturating_mul(percent)/100;
+            conn.execute("INSERT OR IGNORE INTO swarm_pool_caps
+                (run_id,pool_id,window_id,unit,allocation_milli,created_ms)
+                VALUES(?1,?2,?3,?4,?5,?6)",params![run,pool_id,window_id,unit,cap,now])?;
+        }
+    }
+    Ok(())
 }
 
 fn record_observation(store: &Store, p: &Value, result: &Value) {
@@ -432,6 +480,7 @@ fn admit_inner(
     if count >= effective["growth_per_wave"].as_i64().unwrap_or(4) {
         return Ok(blocked("growth_wave_full"));
     }
+    freeze_pool_caps(&tx,run,&p["snapshot"],&current["allowed_targets"],effective,now)?;
     let windows = candidate["windows"]
         .as_array()
         .ok_or_else(|| anyhow!("qualified target has no quota windows"))?;
@@ -462,6 +511,26 @@ fn admit_inner(
         if estimate > usable.saturating_sub(global_reserved) {
             return Ok(blocked("shared_pool_headroom"));
         }
+        let cap:Option<(String,i64)>=tx.query_row(
+            "SELECT unit,allocation_milli FROM swarm_pool_caps
+             WHERE run_id=?1 AND pool_id=?2 AND window_id=?3",
+            params![run,pool,window_id],|r|Ok((r.get(0)?,r.get(1)?)),
+        ).optional()?;
+        // A quota reset may rename the window. Carry forward this pool's
+        // original ceiling, limited further by the new window's headroom.
+        let cap=if cap.is_some() {cap} else {
+            let prior:Option<i64>=tx.query_row(
+                "SELECT MIN(allocation_milli) FROM swarm_pool_caps
+                 WHERE run_id=?1 AND pool_id=?2 AND unit=?3",
+                params![run,pool,unit],|r|r.get(0))?;
+            prior.map(|ceiling| {
+                let fresh=usable.saturating_sub(global_reserved).max(0)
+                    .saturating_mul(effective["run_allocation_percent"].as_i64().unwrap_or(10))/100;
+                (unit.to_string(),ceiling.min(fresh))
+            })
+        };
+        let Some((cap_unit,run_cap))=cap else {return Ok(blocked("allocation_not_frozen"));};
+        if cap_unit!=unit {return Ok(blocked("quota_unit_changed"));}
         let frozen: Option<(String,i64,i64)> = tx.query_row(
             "SELECT unit,allocation_milli,reserve_milli FROM swarm_allocations WHERE run_id=?1 AND pool_id=?2 AND window_id=?3",
             params![run,pool,window_id], |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
@@ -478,12 +547,7 @@ fn admit_inner(
             }
             (allocation, reserve)
         } else {
-            let fresh_allocation = usable
-                .saturating_sub(global_reserved)
-                .max(0)
-                .saturating_mul(effective["run_allocation_percent"].as_i64().unwrap_or(10))
-                / 100;
-            let allocation = prior_cap.map_or(fresh_allocation, |cap| fresh_allocation.min(cap));
+            let allocation = prior_cap.map_or(run_cap, |cap| run_cap.min(cap));
             let finish = p["finishing_estimate_milli"][unit].as_i64().unwrap_or(0);
             let minimum_reserve = allocation.saturating_mul(
                 effective["finishing_reserve_percent"]
@@ -584,6 +648,8 @@ fn admit_inner(
         )?;
     }
     for (pool, window_id, unit, allocation, reserve, estimate) in &chosen {
+        tx.execute("INSERT OR IGNORE INTO swarm_pool_caps(run_id,pool_id,window_id,unit,allocation_milli,created_ms)
+            VALUES(?1,?2,?3,?4,?5,?6)",params![run,pool,window_id,unit,allocation,now])?;
         tx.execute("INSERT OR IGNORE INTO swarm_allocations(run_id,pool_id,window_id,unit,allocation_milli,reserve_milli,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7)",
             params![run,pool,window_id,unit,allocation,reserve,now])?;
         tx.execute("INSERT INTO swarm_reservations(attempt_id,run_id,pool_id,window_id,unit,amount_milli,status,created_ms) VALUES(?1,?2,?3,?4,?5,?6,'active',?7)",

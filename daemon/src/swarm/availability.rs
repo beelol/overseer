@@ -157,9 +157,12 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
             |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .optional()?;
+    let target_selection_pending = old["reason"] == "target_selection_changed"
+        && prior_hashes.as_ref().is_some_and(|(hash, snapshot)| hash.is_empty() && snapshot.is_empty());
     if prior_hashes
         .as_ref()
         .is_some_and(|(hash, _)| hash != &request_sha256)
+        && !target_selection_pending
     {
         bail!("availability assessment changed");
     }
@@ -190,6 +193,7 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
          VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)
          ON CONFLICT(run_id) DO UPDATE SET state=excluded.state,reason=excluded.reason,
          eligible_targets=excluded.eligible_targets,purpose=excluded.purpose,
+         request_sha256=excluded.request_sha256,
          snapshot_sha256=excluded.snapshot_sha256,allowance_windows=excluded.allowance_windows,
          allowance_window_count=excluded.allowance_window_count,
          observed_ms=excluded.observed_ms,expires_ms=excluded.expires_ms,

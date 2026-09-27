@@ -335,3 +335,23 @@ limit, frozen allocation and existing SWARM-01–64 criteria. When the Gate S an
 Auto implementations land, the joined path must use the same agent slots,
 account allowance, claims and broker while routing Overseer advisories through
 the director. No new acceptance box is verified by this reconciliation.
+
+## Refresh against published main: `b84f9984`
+
+The branch fetched and merged `b84f9984` at `0a71eb52`. Since `dfe0ebc`,
+main changed Gate N and review-page verification records, repaired ledger links,
+and added a guard against stale ledger regeneration. It did not merge the Gate S
+daemon, Auto's shared account transaction, or a Swarm runtime change. The new
+records therefore do not qualify Swarm's live director, worker, or admission
+path. Keep the opt-in toggle, one category director, 8-worker/9-agent default
+ceilings, 10% frozen allocation, and SWARM-01–64 wording unchanged.
+
+The branch's fixture target-selection work is independent of those main
+records. It permits an owner-confirmed change to the approved target set for
+future jobs, invalidates the prior availability assessment, and waits for a
+fresh observation. The first successful admission freezes comparable caps for
+all then-approved pools. A quota-window reset may carry a smaller cap forward;
+an account newly selected after admission cannot add a fresh pool allocation.
+Existing attempts, reservations, artifacts, and the original deadline remain.
+This does not supply a normal owner UI or Auto's live account feed and does not
+make SWARM-59 or the shared Auto contract complete.

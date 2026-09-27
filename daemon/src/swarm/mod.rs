@@ -46,7 +46,7 @@ pub use limits::set as set_run_limit;
 pub use verification::{prepare as prepare_verification, run as run_verification,
     record as record_verification, reconcile_control_verifications, PreparedVerification};
 pub use policy::preview;
-pub use settings::set_policy;
+pub use settings::{set_policy,set_run_targets};
 pub use revision::revise;
 pub use runtime::{interrupt_workers, launch_worker, liveness, reconcile_stopping_runs,
     reconcile_terminal_workers,

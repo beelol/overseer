@@ -108,7 +108,7 @@
         "docs/verification/swarm/milestone-16.md",
         "docs/verification/swarm/SWARM-10.md"
       ],
-      "blocker": "Fixture allocation freezes at first admission and preserves a finishing reserve. Confirmed exit moves a reservation to uncertain while continuing to bind capacity; authoritative actual usage reconciliation and finishing-work draw are not implemented."
+      "blocker": "Fixture allocation freezes comparable approved pools at first successful admission, so a later target change, balance increase or new account cannot enlarge the run cap. Confirmed exit moves a reservation to uncertain while continuing to bind capacity; authoritative actual usage reconciliation and finishing-work draw are not implemented."
     },
     "SWARM-11": {
       "status": "partial",
@@ -119,7 +119,7 @@
         "docs/verification/swarm/milestone-7.md",
         "docs/verification/swarm/SWARM-11.md"
       ],
-      "blocker": "Each fixture quota window is reserved separately, and a new window ID no longer grants an ongoing run a second allocation or forgets prior attempts in the same pool/unit. Live reset detection, native usage reconciliation, unlike-unit end-to-end admission and a full short/long-window run remain unverified."
+      "blocker": "Each fixture quota window is reserved separately; a reset window carries forward the same pool/unit cap, limited by current headroom, and cannot grant a second allocation or forget prior attempts. A new pool selected after first admission cannot mint a cap. Live reset detection, native usage reconciliation, unlike-unit end-to-end admission and a full short/long-window run remain unverified."
     },
     "SWARM-12": {
       "status": "partial",
@@ -725,7 +725,7 @@
         "test/ui/scenario-swarm-allowance.js",
         "docs/verification/evidence/ui/swarm-allowance/result.json"
       ],
-      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. A joined Atlas replay blocks J4 after an injected external allowance reduction while preserving J2 backend evidence; a separate cross-category regression fences an older generous admission snapshot. The daemon preserves selected-window numeric allowance changes and an isolated packaged UI fixture displays a 100-to-0.5-point drop, then unknown without inventing zero. An injected explicit account revocation cancels admitted jobs on every selected route with the same account ID, records one durable revoke operation across replay, preserves an independent account's eligibility, and leaves usage uncertain. Director-wide availability messages remain readable with null job and attempt IDs. The Atlas replay now asserts native-unit before/after/change through status APIs; the packaged UI fixture remains separate. Live Auto Mode updates, verified account identity feeds, user-triggered target changes and live director behavior remain unverified."
+      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. An owner-confirmed fixture target change invalidates the prior assessment, waits for a fresh observation, wakes once, and preserves prior attempts and artifacts; an account newly selected after first admission cannot gain a new pool allocation. A joined Atlas replay blocks J4 after an injected external allowance reduction while preserving J2 backend evidence; a separate cross-category regression fences an older generous admission snapshot. The daemon preserves selected-window numeric allowance changes and an isolated packaged UI fixture displays a 100-to-0.5-point drop, then unknown without inventing zero. An injected explicit account revocation cancels admitted jobs on every selected route with the same account ID, records one durable revoke operation across replay, preserves an independent account's eligibility, and leaves usage uncertain. Director-wide availability messages remain readable with null job and attempt IDs. The Atlas replay now asserts native-unit before/after/change through status APIs; the packaged UI fixture remains separate. Live Auto Mode updates, verified account identity feeds, a normal owner target control and live director behavior remain unverified."
     },
     "SWARM-60": {
       "status": "partial",

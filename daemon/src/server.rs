@@ -505,6 +505,11 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             observation
         }
         "swarm.policy.set" => crate::swarm::set_policy(&mut d.store.lock().unwrap(), p)?,
+        "swarm.targets.set" => {
+            fixture_only()?;
+            let _serial = d.swarm_launch_lock.lock().unwrap();
+            crate::swarm::set_run_targets(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.limit.set" => {
             let _serial = d.swarm_launch_lock.lock().unwrap();
             crate::swarm::set_run_limit(&mut d.store.lock().unwrap(), p)?
