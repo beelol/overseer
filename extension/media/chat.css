@@ -152,6 +152,13 @@ pre.code.error { color: var(--ov-failed); }
 .error-head { display: flex; align-items: center; gap: 6px; color: var(--ov-failed); }
 .error-block .text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ov-text); }
 .sys { display: flex; align-items: center; gap: 6px; font-size: var(--ov-font-sm); color: var(--ov-muted); }
+.auto-decision { display: flex; flex-direction: column; gap: var(--ov-space-2); padding: var(--ov-space-3) var(--ov-space-4); border: 1px solid var(--ov-border); border-radius: var(--ov-radius-card); background: var(--ov-raised); font-size: var(--ov-font-sm); }
+.auto-decision-head { display: flex; align-items: center; gap: var(--ov-space-2); color: var(--ov-text); }
+.auto-decision-head .codicon { color: var(--ov-icon); }
+.auto-decision-detail { color: var(--ov-muted); line-height: var(--ov-line-body); overflow-wrap: anywhere; }
+.auto-decision-alternatives { color: var(--ov-muted); }
+.auto-decision-alternatives > summary { cursor: pointer; }
+.auto-decision-alternatives ul { margin: var(--ov-space-2) 0 0; padding-left: var(--ov-space-4); line-height: var(--ov-line-body); }
 .status-line.status-failed, .status-line.status-disconnected { color: var(--ov-failed); }
 .working { display: flex; align-items: center; gap: var(--ov-space-2); margin-top: var(--ov-space-3); color: var(--ov-muted); font-size: var(--ov-font-sm); min-width: 0; }
 .working-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -8,7 +8,7 @@
       "name": "the UI enabled Auto and the daemon chose one model and effort before the fixture turn",
       "ok": true,
       "detail": {
-        "run": "r-fddc5ad913c34de79db966aed154e209",
+        "run": "r-ffdbcb0e43a34c08acd9a85755f6d13e",
         "status": "completed",
         "model": "gpt-6-sol",
         "effort": "medium",
@@ -21,20 +21,25 @@
       "ok": true
     },
     {
+      "name": "the chat explains the selected model, effort, allowance, and expected-use uncertainty",
+      "ok": true,
+      "detail": "Auto chose gpt-6-sol · mediumCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified."
+    },
+    {
       "name": "Auto parent receives a browser-labelled child result and assigns a stronger diagnosis unit while healthy",
       "ok": true,
       "detail": {
-        "parent": "r-7ca53fc294a14876a6b5696d4b403fde",
+        "parent": "r-317728aec1dd4cf2b5e4bf4fd40f9e39",
         "status": "completed",
         "children": [
           {
-            "id": "r-42387fd50e44",
+            "id": "r-6521d62172a1",
             "model": "gpt-6-sol",
             "effort": "medium",
             "status": "completed"
           },
           {
-            "id": "r-c5dcef3553ef",
+            "id": "r-f884c5bca63b",
             "model": "gpt-6-astra",
             "effort": "high",
             "status": "completed"
@@ -44,13 +49,44 @@
       }
     },
     {
+      "name": "the parent chat records both child route choices and their uncertainty",
+      "ok": true,
+      "detail": [
+        "Auto chose gpt-6-sol · mediumCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.",
+        "Auto chose gpt-6-sol · mediumCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.",
+        "Auto chose gpt-6-astra · highCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.1 alternative excludedgpt-6-sol · medium: below the required capability"
+      ]
+    },
+    {
+      "name": "the diagnosis explanation identifies why another route was excluded",
+      "ok": true,
+      "detail": "1 alternative excludedgpt-6-sol · medium: below the required capability"
+    },
+    {
+      "name": "window reload restores the same child decision history",
+      "ok": true,
+      "detail": [
+        "Auto chose gpt-6-sol · mediumCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.",
+        "Auto chose gpt-6-sol · mediumCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.",
+        "Auto chose gpt-6-astra · highCodex · openai · Allowance: unknown · Expected use: uncalibrated · Selected an eligible default; the account balance has not been verified.1 alternative excludedgpt-6-sol · medium: below the required capability"
+      ]
+    },
+    {
       "name": "window reload keeps the original Auto run and remembers Auto as the next choice",
       "ok": true,
       "detail": {
         "runs": [
-          "r-fddc5ad913c34de79db966aed154e209"
+          "r-ffdbcb0e43a34c08acd9a85755f6d13e"
         ],
         "remembered": "Agent: Auto routing"
+      }
+    },
+    {
+      "name": "the packaged Auto composer explains known exhaustion and launches no root",
+      "ok": true,
+      "detail": {
+        "message": "Auto routing paused: available account allowance is exhausted. Choose a manual agent or wait for a reset.",
+        "launched": []
       }
     }
   ]

@@ -138,7 +138,6 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer/.test(e.textContent))`, 60000, 'status bar');
     await cdp.command('Overseer: Open Overseer View');
     dash = await s.editorView();
-    await cdp.command('Overseer: New Agent'); await delay(800);
     const untrusted = await dash.waitFor(`(() => { const n = document.querySelector('.view-composer .composer-note'); return n && /Trust this workspace/.test(n.textContent) && { note: n.textContent, fix: n.querySelector('.fix')?.textContent, disabled: document.getElementById('start').disabled }; })()`, 20000).catch(() => null);
     check('an untrusted workspace is explained inline with its fix (Trust) and nothing can start', untrusted && untrusted.fix === 'Trust' && untrusted.disabled, untrusted);
     await s.screenshot('untrusted');

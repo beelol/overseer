@@ -159,7 +159,9 @@ class Cdp {
     for (let attempt = 0; ; attempt++) {
       await this.focusWorkbench();
       await this.key('p', { meta: true, shift: true });
-      try { await this.waitFor('!!document.querySelector(".quick-input-widget:not([style*=\\"display: none\\"]) input")', 5000, 'command palette'); break; }
+      try { await this.waitFor(`(() => { const input = document.querySelector('.quick-input-widget input');
+        return !!input && input === document.activeElement && input.getClientRects().length > 0;
+      })()`, 5000, 'focused command palette'); break; }
       catch (error) {
         if (attempt >= 1) throw error;
         // Keyboard focus can stay inside a webview's own frame; click a neutral workbench spot.
@@ -168,8 +170,18 @@ class Cdp {
       }
     }
     await this.type(title);
-    await delay(400);
-    await this.key('Enter');
+    // The palette can still show a previous search while it computes the new
+    // results. Wait for and choose the requested row, rather than pressing
+    // Enter on whichever stale item happens to be selected first.
+    const name = title.includes(':') ? title.slice(title.indexOf(':') + 1).trim() : title;
+    const row = await this.waitFor(`(() => { const w = document.querySelector('.quick-input-widget');
+      const item = [...(w?.querySelectorAll('.monaco-list-row') || [])].find(r =>
+        (r.getAttribute('aria-label') || r.textContent || '').includes(${JSON.stringify(name)}));
+      if (!item) return null;
+      const b = item.getBoundingClientRect();
+      return b.width && b.height ? { x: b.left + b.width / 2, y: b.top + b.height / 2 } : null;
+    })()`, 5000, `command result ${title}`);
+    await this.click(row.x, row.y);
     await delay(300);
   }
 

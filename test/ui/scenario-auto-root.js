@@ -15,16 +15,18 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
   const sys = path.join(s.root, 'desktop-home');
   const next = path.join(s.root, 'next-login');
   const trace = path.join(s.root, 'app-server-trace.txt');
+  const quota = path.join(s.root, 'quota-mode.txt');
   fs.mkdirSync(sys, { recursive: true });
   fs.writeFileSync(next, 'auto-fixture:pro');
+  fs.writeFileSync(quota, 'unknown');
   cp.execFileSync(cli, ['login'], { env: { ...process.env, OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_LOGIN_ACCOUNT_FILE: next } });
   try {
     const repo = makeRepo(path.join(s.root, 'auto-repo'), { dirty: false });
     s.settings({ 'workbench.colorTheme': 'Overseer Dark' });
     s.install(latestVsix());
     s.launch(repo, { OVERSEER_CODEX_PATH: app, OVERSEER_CLAUDE_PATH: '/nonexistent/claude', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode',
-      OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_MODE: 'managed-models', FIXTURE_TRACE_FILE: trace,
-      OVERSEER_HARNESS_ENV_PASSTHROUGH: 'FIXTURE_MODE,FIXTURE_TRACE_FILE,OVERSEER_TEST_SYSTEM_HOME' });
+      OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_MODE: 'managed-models', FIXTURE_TRACE_FILE: trace, FIXTURE_QUOTA_MODE_FILE: quota,
+      OVERSEER_HARNESS_ENV_PASSTHROUGH: 'FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_QUOTA_MODE_FILE,OVERSEER_TEST_SYSTEM_HOME' });
     let cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     check('Auto gate is off before an explicit UI choice', s.ctl('auto.mode.get').enabled === false);
@@ -59,6 +61,10 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       { run: root.id, status: root.status, model: root.model, effort: root.effort, selected, output });
     const shown = await dash.waitFor(`document.body.dataset.mode === 'chat' && document.getElementById('title')?.textContent === 'seed context'`, 20000).then(() => true, () => false);
     check('the selected Auto run opens in the same chat surface as a manual run', shown);
+    const decisionCard = await dash.eval(`document.querySelector('.auto-decision')?.textContent || ''`);
+    check('the chat explains the selected model, effort, allowance, and expected-use uncertainty',
+      /gpt-6-sol/.test(decisionCard) && /medium/.test(decisionCard) && /Allowance: unknown/.test(decisionCard) && /Expected use: uncalibrated/.test(decisionCard),
+      decisionCard);
     await s.screenshot('auto-root-chat');
     // Leaving a webview textarea focused can swallow the command-palette shortcut.
     const statusPoint = await cdp.evalWorkbench(`(() => { const r = document.querySelector('.part.statusbar').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
@@ -92,10 +98,22 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       childModels.includes('gpt-6-sol/medium') && childModels.includes('gpt-6-astra/high') &&
       /browser result: parent context found/.test(parentOutput) && /continued with browser result/.test(parentOutput),
       { parent: parent.id, status: parent.status, children: children.map(r => ({ id: r.id, model: r.model, effort: r.effort, status: r.status })), output: parentOutput });
+    await dash.waitFor(`document.querySelectorAll('.auto-decision').length >= 3`, 10000);
+    const childDecisionCards = await dash.eval(`[...document.querySelectorAll('.auto-decision')].map(e => e.textContent)`);
+    check('the parent chat records both child route choices and their uncertainty',
+      childDecisionCards.some(t => /gpt-6-sol/.test(t) && /medium/.test(t) && /Expected use: uncalibrated/.test(t)) &&
+      childDecisionCards.some(t => /gpt-6-astra/.test(t) && /high/.test(t) && /Expected use: uncalibrated/.test(t)), childDecisionCards);
+    const excludedDetail = await dash.eval(`[...document.querySelectorAll('.auto-decision')].find(e => /gpt-6-astra/.test(e.textContent))?.querySelector('details')?.textContent || ''`);
+    check('the diagnosis explanation identifies why another route was excluded',
+      /gpt-6-sol/.test(excludedDetail) && /capability/i.test(excludedDetail), excludedDetail);
     await s.screenshot('auto-delegation');
     await cdp.command('Developer: Reload Window'); await delay(6000);
     cdp = await s.connect(); s.cdp = cdp;
     dash = await s.editorView();
+    await dash.waitFor(`document.querySelectorAll('.auto-decision').length >= ${childDecisionCards.length}`, 20000);
+    const reloadedCards = await dash.eval(`[...document.querySelectorAll('.auto-decision')].map(e => e.textContent)`);
+    check('window reload restores the same child decision history', reloadedCards.length === childDecisionCards.length &&
+      reloadedCards.every((text, i) => text === childDecisionCards[i]), reloadedCards);
     const after = s.ctl('state').runs.filter(r => !r.parent_run_id && r.title === 'seed context');
     await cdp.command('Overseer: New Agent');
     await dash.waitFor(`document.body.dataset.mode === 'composer' && !document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);
@@ -103,6 +121,18 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     check('window reload keeps the original Auto run and remembers Auto as the next choice', after.length === 1 && after[0].id === root.id && /Auto routing/.test(remembered),
       { runs: after.map(r => r.id), remembered });
     await s.screenshot('auto-remembered');
+    fs.writeFileSync(quota, 'exhausted');
+    const exhaustedPoint = await s.webviewPoint(dash, '#task');
+    await cdp.click(exhaustedPoint.x, exhaustedPoint.y); await cdp.type('quota exhausted fixture');
+    await dash.waitFor(`!document.getElementById('start').disabled`, 5000);
+    await cdp.key('Enter');
+    await dash.waitFor(`[...document.querySelectorAll('.composer-note')].some(e => e.textContent.includes('allowance is exhausted'))`, 20000);
+    const paused = await dash.eval(`[...document.querySelectorAll('.composer-note')].map(e => e.textContent).find(t => t.includes('allowance is exhausted')) || ''`);
+    const launchedOnExhaustion = s.ctl('state').runs.filter(r => !r.parent_run_id && r.title === 'quota exhausted fixture');
+    check('the packaged Auto composer explains known exhaustion and launches no root',
+      /allowance is exhausted/.test(paused) && launchedOnExhaustion.length === 0,
+      { message: paused, launched: launchedOnExhaustion.map(r => r.id) });
+    await s.screenshot('auto-exhausted');
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}
