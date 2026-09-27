@@ -266,9 +266,10 @@
         "daemon/tests/swarm_admission.rs",
         "docs/verification/evidence/ui/swarm-scale/04-capacity-expanded.png",
         "docs/verification/evidence/ui/swarm-status/result.json",
-        "docs/verification/evidence/ui/swarm-status/03-swarm-blocked-capacity.png"
+        "docs/verification/evidence/ui/swarm-status/03-swarm-blocked-capacity.png",
+        "docs/verification/evidence/ui/swarm-status/04-swarm-serial-capacity.png"
       ],
-      "blocker": "Packaged fixtures show aggregate work, nested workers, selected fixture target, frozen allocation and reserve, a three-of-eight scaled planning decision, a blocked no-approved-target eligibility observation, and the last held admission reason. These are past observations, not a continuously current constraint. Live Auto account usage and names, current constraint reconciliation, packaged serial explanation, and joined credential-redaction evidence remain unverified."
+      "blocker": "Packaged fixtures show aggregate work, nested workers, selected fixture target, frozen allocation and reserve, three-of-eight scaled and one-of-eight serial planning decisions, a blocked no-approved-target eligibility observation, and the last held admission reason. These are past observations, not a continuously current constraint. Live Auto account usage and names, current constraint reconciliation, and joined credential-redaction evidence remain unverified."
     },
     "SWARM-24": {
       "status": "partial",

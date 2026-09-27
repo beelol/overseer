@@ -4,14 +4,14 @@ const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay } = require('./harness');
 
-function benefitEstimate(ids) {
+function benefitEstimate(ids, parallelContext = 20) {
   const workers = ids.map(id => ({ id, elapsed_ms: 100, usage_milli: { points: 10 } }));
   const phase = elapsed_ms => ({ elapsed_ms, usage_milli: { points: 1 } });
   const costs = context => ({ planning: phase(10), context: phase(context),
     integration: phase(10), review: phase(10), retries: phase(0), workers });
   return { independent: true, max_workers: 8,
     allocation_milli: { points: 100000 }, finishing_reserve_milli: { points: 20000 },
-    serial: costs(10), parallel: costs(20) };
+    serial: costs(10), parallel: costs(parallelContext) };
 }
 
 (async () => {
@@ -73,6 +73,16 @@ function benefitEstimate(ids) {
       capacity.some(r => /Planning: parallel/i.test(r.label) &&
         /3 of 8 worker ceiling.*beneficial/i.test(r.description)), capacity.slice(0, 12));
     await s.screenshot('swarm-blocked-capacity');
+    const serial = s.ctl('swarm.benefit.commit', { run_id: made.id, generation: 1,
+      revision: 1, estimate: benefitEstimate(jobs.slice(0, 4).map(job => job.id), 1000) });
+    check('expensive coordination records a serial decision',
+      serial.decision === 'serial' && serial.reason === 'no_time_benefit', serial);
+    await cdp.command('Overseer: Refresh');
+    const serialRows = await s.agentRows();
+    check('capacity details explain the serial decision',
+      serialRows.some(r => /Planning: serial/i.test(r.label) &&
+        /no time benefit/i.test(r.description)), serialRows.slice(0, 12));
+    await s.screenshot('swarm-serial-capacity');
 
     const chooseControl = async (title, category = 'Backend audit') => {
       const pt = await cdp.waitFor(`(() => {

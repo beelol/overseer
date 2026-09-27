@@ -26,7 +26,7 @@
         "reason": "beneficial",
         "replay": false,
         "revision": 1,
-        "run_id": "sw-2f73f6b32730",
+        "run_id": "sw-47d165f2e2f4",
         "serial": {
           "affordable": true,
           "elapsed_ms": 440,
@@ -203,7 +203,7 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Recorded 9/27/2026, 9:48:01 AM. This was the last eligibility observation; admission revalidates it."
+          "aria": "Recorded 9/27/2026, 9:50:26 AM. This was the last eligibility observation; admission revalidates it."
         },
         {
           "label": "No admission recorded",
@@ -317,7 +317,161 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Recorded 9/27/2026, 9:48:01 AM. This was the last eligibility observation; admission revalidates it."
+          "aria": "Recorded 9/27/2026, 9:50:26 AM. This was the last eligibility observation; admission revalidates it."
+        },
+        {
+          "label": "No admission recorded",
+          "description": "current limit unknown",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "No admission recorded current limit unknown"
+        },
+        {
+          "label": "Provider usage unknown",
+          "description": "current allowance not reported",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Provider usage unknown current allowance not reported"
+        },
+        {
+          "label": "Check route 0",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 0, ready, 0 attempts"
+        },
+        {
+          "label": "Check route 1",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 1, ready, 0 attempts"
+        },
+        {
+          "label": "Check route 2",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 2, ready, 0 attempts"
+        },
+        {
+          "label": "Check route 3",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 3, ready, 0 attempts"
+        }
+      ]
+    },
+    {
+      "name": "expensive coordination records a serial decision",
+      "ok": true,
+      "detail": {
+        "authoritative_admission": false,
+        "decision": "serial",
+        "expected_time_benefit_ms": -790,
+        "job_ids": [
+          "j000",
+          "j001",
+          "j002",
+          "j003"
+        ],
+        "max_parallel_workers": 1,
+        "parallel": {
+          "elapsed_ms": 1230,
+          "finishing_usage_milli": {
+            "points": 3
+          },
+          "usage_milli": {
+            "points": 45
+          }
+        },
+        "reason": "no_time_benefit",
+        "replay": false,
+        "revision": 1,
+        "run_id": "sw-47d165f2e2f4",
+        "serial": {
+          "affordable": true,
+          "elapsed_ms": 440,
+          "finishing_usage_milli": {
+            "points": 3
+          },
+          "usage_milli": {
+            "points": 45
+          }
+        },
+        "wave": 2
+      }
+    },
+    {
+      "name": "capacity details explain the serial decision",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Swarms",
+          "description": "1",
+          "level": 1,
+          "expanded": "true",
+          "selected": false,
+          "focused": false,
+          "aria": "Swarms 1"
+        },
+        {
+          "label": "Backend audit",
+          "description": "0 working · 100 ready · 0 blocked",
+          "level": 2,
+          "expanded": "true",
+          "selected": false,
+          "focused": false,
+          "aria": "Backend audit swarm, planning, 0 working · 100 ready · 0 blocked"
+        },
+        {
+          "label": "Director",
+          "description": "not started",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Director not started"
+        },
+        {
+          "label": "Capacity",
+          "description": "0 selected · usage unknown",
+          "level": 3,
+          "expanded": "true",
+          "selected": false,
+          "focused": true,
+          "aria": "Swarm capacity, 0 selected · usage unknown"
+        },
+        {
+          "label": "Planning: serial",
+          "description": "1 of 8 worker ceiling · no time benefit",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Latest recorded planning decision. Current admission limit may differ. 1 of 8 worker ceiling · no time benefit"
+        },
+        {
+          "label": "Last eligibility: blocked",
+          "description": "no allowed target",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Recorded 9/27/2026, 9:50:26 AM. This was the last eligibility observation; admission revalidates it."
         },
         {
           "label": "No admission recorded",
@@ -415,7 +569,7 @@
       "name": "confirmed Stop cancels queued work within 2 seconds",
       "ok": true,
       "detail": {
-        "stop_ms": 80
+        "stop_ms": 75
       }
     }
   ]

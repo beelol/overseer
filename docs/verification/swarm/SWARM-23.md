@@ -69,7 +69,15 @@ Stop checks. `node test/unit/run.js` passed 5/5, the extension source check and
 VSIX build passed, and `git diff --check` passed. This is fixture evidence of
 past decisions, not proof of a continuously current account constraint.
 
-Remaining: serial decision needs packaged UI evidence; Auto integration must
-provide selected live account labels and measured/estimated/stale usage with a
-fresh limiting constraint. The combined status/log surface needs credential
-redaction evidence. SWARM-23 remains partial and its RFC box stays unchecked.
+The same packaged fixture then increased the estimated coordination cost for
+the same four jobs. The daemon recorded `serial` with `no_time_benefit` in a
+second wave, and a refreshed Capacity section showed that reason and one of
+eight workers. Its visually inspected screenshot is
+`docs/verification/evidence/ui/swarm-status/04-swarm-serial-capacity.png`;
+`result.json` records both planning inputs and observed UI rows. No model or
+provider account was used.
+
+Remaining: Auto integration must provide selected live account labels and
+measured/estimated/stale usage with a fresh limiting constraint. The combined
+status/log surface needs credential-redaction evidence. SWARM-23 remains
+partial and its RFC box stays unchecked.
