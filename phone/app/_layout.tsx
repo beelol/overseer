@@ -1,43 +1,101 @@
-import { Stack } from 'expo-router';
+import Constants from 'expo-constants';
+import { Stack, useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { GATEWAY_DISCOVERY } from '@/config';
-import { PlatformProvider } from '@/platform';
+import { coldStart, Door, doorEnabled, type DoorSettings } from '@/door';
+import { Notifications } from '@/notifications';
+import { PlatformProvider, useCapabilities, useLive } from '@/platform';
 import { createNativeCapabilities } from '@/platform/native';
+import { routes } from '@/routes';
+import { createSession, SessionProvider, useSessionValue } from '@/session';
 import { useTheme } from '@/theme';
 
-// The one place the device's capabilities are created. Everything below receives them
-// through the provider, exactly as tests receive the fakes.
+// The system's launch screen stays until the door's first frame is drawn, so nothing flashes.
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+// The one place the device's capabilities and the connection are created. Everything below
+// receives them through the providers, exactly as tests receive the fakes.
 const capabilities = createNativeCapabilities({ discovery: GATEWAY_DISCOVERY });
+const session = createSession({ capabilities, app: Constants.expoConfig?.version ?? '0' });
+const door = coldStart() && doorEnabled(capabilities.keyValue.scope<DoorSettings>('test'));
+
+// Started before the first draw: reading what is stored takes a few milliseconds.
+session.start().catch(() => undefined);
 
 export default function RootLayout() {
   return (
-    <PlatformProvider capabilities={capabilities}>
-      <ThemedStack />
-    </PlatformProvider>
+    <GestureHandlerRootView style={styles.fill}>
+      <PlatformProvider capabilities={capabilities}>
+        <SessionProvider session={session}>
+          <App />
+        </SessionProvider>
+      </PlatformProvider>
+    </GestureHandlerRootView>
   );
 }
 
-function ThemedStack() {
+function App() {
   const theme = useTheme();
+  const router = useRouter();
+  const { appState, network, launch } = useCapabilities();
   const background = theme.colors.bg;
+  const ready = useSessionValue((s) => s.ready);
+  const paired = useSessionValue((s) => s.paired);
+  const [closed, setClosed] = useState(door);
 
   // The window behind the screens shows during rotation and transitions; it follows the theme.
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(background).catch(() => undefined);
   }, [background]);
 
+  useEffect(() => {
+    if (!door) SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
+
+  // In front again, or on another network: try the Mac at once. Leaving: store what is known.
+  const phase = useLive(appState);
+  const net = useLive(network);
+  useEffect(() => {
+    if (phase === 'foreground') session.wake();
+    else session.background();
+  }, [phase, net]);
+
+  // The Mac removed this phone, or the owner forgot the Mac: pairing is the only way on.
+  const was = useRef(paired);
+  useEffect(() => {
+    if (ready && was.current && !paired) router.replace(routes.pair);
+    was.current = paired;
+  }, [ready, paired, router]);
+
   const screenOptions = useMemo(
-    () => ({ headerShown: false, contentStyle: { backgroundColor: background } }),
-    [background],
+    () => ({
+      headerShown: false,
+      contentStyle: { backgroundColor: background },
+      animation: launch.info().conventions.screenEnter,
+      animationDuration: theme.phone.motion.screen.push,
+      gestureEnabled: true,
+      fullScreenGestureEnabled: true,
+    }),
+    [background, launch, theme],
   );
+
+  const shown = useCallback(() => void SplashScreen.hideAsync().catch(() => undefined), []);
+  const opened = useCallback(() => setClosed(false), []);
 
   return (
     <>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={screenOptions} />
+      <Notifications />
+      {closed ? <Door ready={ready} onShown={shown} onOpened={opened} /> : null}
     </>
   );
 }
+
+const styles = StyleSheet.create({ fill: { flex: 1 } });

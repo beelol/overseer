@@ -20,8 +20,17 @@ export interface LaunchRuntime {
   readonly newArchitecture: boolean;
 }
 
+/** What each platform does its own way, as values a screen hands on without asking which. */
+export interface LaunchConventions {
+  /** How a screen makes room for the keyboard: iOS pads its bottom, Android resizes the window. */
+  readonly keyboard: 'padding' | 'height';
+  /** How a screen enters: iOS slides in from the side, Android fades up from the bottom. */
+  readonly screenEnter: 'slide_from_right' | 'fade_from_bottom';
+}
+
 export interface LaunchInfo {
   readonly device: LaunchDevice;
+  readonly conventions: LaunchConventions;
   /** An iOS simulator or an Android emulator, not a real phone. */
   readonly isSimulator: boolean;
   /**

@@ -1,6 +1,6 @@
 import type { ColorScheme } from '@/platform';
 
-import { motion, palettes, scale } from './tokens.generated';
+import { motion, palettes, phone, scale } from './tokens.generated';
 
 /** A palette with its colours as plain strings, so dark and light share one type. */
 type Widen<T> = { readonly [K in keyof T]: T[K] extends string ? string : Widen<T[K]> };
@@ -22,6 +22,8 @@ export interface Theme {
   readonly line: typeof scale.line;
   readonly chat: typeof scale.chat;
   readonly motion: typeof motion;
+  /** What the phone adds to the VS Code tokens: touch sizes, the door, springs. */
+  readonly phone: typeof phone;
 }
 
 function build(name: ThemeName, scheme: ColorScheme): Theme {
@@ -36,6 +38,7 @@ function build(name: ThemeName, scheme: ColorScheme): Theme {
     line: scale.line,
     chat: scale.chat,
     motion,
+    phone,
   });
 }
 

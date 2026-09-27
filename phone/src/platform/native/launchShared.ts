@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import { SUPPORTED, defineCapability } from '../capability';
 import type {
   LaunchCapability,
+  LaunchConventions,
   LaunchDevice,
   LaunchInfo,
   LaunchRuntime,
@@ -28,11 +29,13 @@ interface PlatformLaunch {
   readonly platform: LaunchDevice['platform'];
   /** The address of the Mac as seen from this platform's simulator. */
   readonly simulatorHostAddress: string;
+  readonly conventions: LaunchConventions;
 }
 
 export function createLaunchFor({
   platform,
   simulatorHostAddress,
+  conventions,
 }: PlatformLaunch): LaunchCapability {
   const isSimulator = !Device.isDevice;
   const info: LaunchInfo = Object.freeze({
@@ -41,6 +44,7 @@ export function createLaunchFor({
       systemVersion: Device.osVersion ?? 'unknown',
       model: Device.modelName ?? 'unknown',
     }),
+    conventions: Object.freeze(conventions),
     isSimulator,
     hostAddresses: Object.freeze(isSimulator ? [simulatorHostAddress] : []),
     runtime: Object.freeze(runtime()),

@@ -25,6 +25,9 @@ const config: ExpoConfig = {
       NSLocalNetworkUsageDescription:
         'Overseer connects to the Overseer daemon on your Mac over your local network.',
       NSBonjourServices: ['_overseer._tcp'],
+      // The connection to the Mac is a plain WebSocket on the local network; every message in
+      // it is encrypted and authenticated by the app itself (Noise), not by the transport.
+      NSAppTransportSecurity: { NSAllowsLocalNetworking: true },
     },
   },
   android: {
@@ -74,10 +77,18 @@ const config: ExpoConfig = {
       },
     ],
     'expo-notifications',
+    ['expo-font', { fonts: ['./assets/fonts/codicon.ttf'] }],
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Overseer attaches the image you choose to your message to an agent.',
+        cameraPermission: 'Overseer uses the camera to scan the pairing code shown on your Mac.',
+        microphonePermission: false,
+      },
+    ],
+    // See NSAppTransportSecurity above: the same plain WebSocket, on Android.
+    ['expo-build-properties', { android: { usesCleartextTraffic: true } }],
   ],
-  experiments: {
-    typedRoutes: true,
-  },
 };
 
 export default config;
