@@ -1856,11 +1856,12 @@ fn ac194_a_watch_that_checks() {
     // The watch ended with its subject; once the watcher is idle the copy is removed.
     let deadline = std::time::Instant::now() + Duration::from_secs(40);
     loop {
-        let plan = d.call("workspace.cleanup_plan", json!({"workspace_id": ws}));
-        if plan["workspace"]["removed_ms"].is_number() {
+        // The daemon may be removing the copy this very moment: the state says when it is gone.
+        let removed = d.call("state", json!({}))["workspaces"].as_array().unwrap().iter().any(|w| w["id"] == ws && w["removed_ms"].is_number());
+        if removed {
             break;
         }
-        assert!(std::time::Instant::now() < deadline, "the copy was not removed: {plan}");
+        assert!(std::time::Instant::now() < deadline, "the copy was not removed");
         std::thread::sleep(Duration::from_millis(300));
     }
     assert!(!Path::new(&copy).exists(), "the copy is gone");

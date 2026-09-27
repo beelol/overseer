@@ -109,6 +109,22 @@ impl Daemon {
             ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)),
             coord: crate::overseer::conflicts::Coordination::default() });
         daemon.ensure_system_profiles()?;
+        // Test settings (AC-201): the suites run with briefings and the channel, and check-ins,
+        // off and on. OVERSEER_CHANNEL_DEFAULT is auto, on or off; OVERSEER_CHECK_INS is off,
+        // done or every:N. Only set when the variable is present; the owner's settings otherwise.
+        {
+            let store = daemon.store.lock().unwrap();
+            if let Ok(v) = std::env::var("OVERSEER_CHANNEL_DEFAULT") {
+                if ["auto", "on", "off"].contains(&v.as_str()) {
+                    store.conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.channel', ?1)", [&v])?;
+                }
+            }
+            if let Ok(v) = std::env::var("OVERSEER_CHECK_INS") {
+                if crate::overseer::checkin::Cadence::parse(&v).is_ok() {
+                    store.conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.check_ins', ?1)", [&v])?;
+                }
+            }
+        }
         Ok(daemon)
     }
 
