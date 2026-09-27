@@ -131,7 +131,12 @@ fn which(name: &str) -> Option<PathBuf> {
 /// ChatGPT app bundle because stale package-manager installs are common.
 pub fn resolve_program(harness: &str) -> Option<PathBuf> {
     // codex-app is a transport of the Codex binary: it shares OVERSEER_CODEX_PATH.
-    let family = if harness == "codex-app" { "codex" } else { harness };
+    // opencode-serve is a transport of the OpenCode binary: it shares OVERSEER_OPENCODE_PATH.
+    let family = match harness {
+        "codex-app" => "codex",
+        "opencode-serve" => "opencode",
+        h => h,
+    };
     let env_key = format!("OVERSEER_{}_PATH", family.to_ascii_uppercase());
     if let Ok(p) = std::env::var(&env_key) {
         // An explicit path wins, and never falls back to PATH; a missing file is "not installed".
@@ -147,7 +152,7 @@ pub fn resolve_program(harness: &str) -> Option<PathBuf> {
             which("codex")
         }
         "claude" => which("claude"),
-        "opencode" => which("opencode"),
+        "opencode" | "opencode-serve" => which("opencode"),
         _ => None,
     }
 }
@@ -209,6 +214,17 @@ pub fn capabilities(harness: &str) -> Value {
             "model": "supported (-m, per turn)", "effort": "unsupported", "permission_mode": "unsupported", "images": "unsupported",
             "quota": "unknown", "account_login": "opencode auth login (XDG_DATA_HOME per profile); login itself untested",
             "verification": "verified through the real OpenCode runtime with a mock provider and with local Ollama models; no account login verified"
+        }),
+        "opencode-serve" => json!({
+            "transport": "opencode serve (HTTP and an event stream on loopback, through overseerd opencode-bridge; one process per turn)",
+            "launch": "supported", "output": "supported", "follow_up": "supported (the same session, continued by a new server)",
+            "interrupt": "supported (POST /session/{id}/abort, then SIGINT)", "resume": "supported",
+            "approvals": "supported (permission.asked events answered Allow once or Deny in Overseer; never remembered)",
+            "file_activity": "supported (edit/write tool parts)", "children": "supported (session.created with a parent; child output on the same stream)",
+            "usage": "supported (tokens per assistant message; cost 0 for local models)", "quota": "not applicable (local model)",
+            "model": "supported (a local Ollama tag, per turn)", "effort": "unsupported", "permission_mode": "supported (plan, manual, acceptEdits, auto as session rules)", "images": "unsupported",
+            "account_login": "none: Overseer's own OpenCode profile with the local Ollama provider only",
+            "verification": "transport verified by the AC-139 spike with OpenCode 1.15.13 and a local model"
         }),
         _ => json!({
             "transport": "generic process (stdin/stdout)", "launch": "supported", "output": "supported (raw lines)",
@@ -320,6 +336,11 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             args.push(req.prompt.to_string());
             (args, None, true)
         }
+        "opencode-serve" => {
+            let title: String = req.prompt.lines().next().unwrap_or_default().chars().take(60).collect();
+            let (_, args, start) = crate::opencode_bridge::launch_parts(&program, req.prompt, model, req.permission_mode, req.resume_session, &title)?;
+            (args, Some(start), false)
+        }
         "generic" => {
             let args = req.args_override.map(|a| a.to_vec()).unwrap_or_default();
             let stdin = if req.prompt.is_empty() { None } else { Some(format!("{}\n", req.prompt)) };
@@ -333,6 +354,8 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
         let extra: Vec<String> = req.extra_args.to_vec();
         args.splice(at..at, extra);
     }
+    // The opencode-serve harness runs `overseerd opencode-bridge`, which starts OpenCode itself.
+    let program_str = if harness == "opencode-serve" { std::env::current_exe()?.display().to_string() } else { program_str };
     Ok(Launch { program: program_str, args, env, initial_stdin, close_stdin })
 }
 
@@ -341,6 +364,7 @@ pub fn check_turn_options(harness: &str, effort: Option<&str>, mode: Option<&str
     let (efforts, modes, can_images): (&[&str], &[&str], bool) = match harness {
         "claude" => (&["low", "medium", "high", "xhigh", "max"], &["acceptEdits", "plan", "auto", "manual"], true),
         "codex" => (&["minimal", "low", "medium", "high", "xhigh"], &["read-only", "workspace-write"], true),
+        "opencode-serve" => (&[], crate::opencode_bridge::MODES, false),
         _ => (&[], &[], false),
     };
     if let Some(e) = effort {
@@ -361,6 +385,7 @@ pub fn check_turn_options(harness: &str, effort: Option<&str>, mode: Option<&str
 
 pub fn interrupt_plan(harness: &str) -> InterruptPlan {
     match harness {
+        "opencode-serve" => InterruptPlan::StdinThenSignal(crate::opencode_bridge::abort_line()),
         "claude" => InterruptPlan::StdinThenSignal(format!("{}\n", json!({"type": "control_request", "request_id": format!("overseer-int-{}", uuid::Uuid::new_v4().simple()), "request": {"subtype": "interrupt"}}))),
         _ => InterruptPlan::Signal,
     }
@@ -381,6 +406,7 @@ pub fn permission_reply(harness: &str, request_id: &str, allow: bool, input: &Va
             let decision = if allow { "accept" } else { "decline" };
             Some(format!("{}\n", json!({"id": id, "result": {"decision": decision}})))
         }
+        "opencode-serve" => Some(crate::opencode_bridge::permission_line(request_id, allow, message)),
         "claude" => {
             let response = if allow { json!({"behavior": "allow", "updatedInput": input}) } else { json!({"behavior": "deny", "message": message}) };
             Some(format!("{}\n", json!({"type": "control_response", "response": {"subtype": "success", "request_id": request_id, "response": response}})))
@@ -439,7 +465,7 @@ pub fn parse(harness: &str, stream: &str, line: &str) -> Vec<Norm> {
     }
     if stream == "e" {
         let class = classify_error(line);
-        if class != "other" && harness != "opencode" && harness != "codex-app" {
+        if class != "other" && harness != "opencode" && harness != "codex-app" && harness != "opencode-serve" {
             return vec![Norm::Error { class: class.into(), message: truncate(line, 2000) }];
         }
         return vec![Norm::Text { role: "stderr".into(), text: truncate(line, 8192) }];
@@ -452,6 +478,7 @@ pub fn parse(harness: &str, stream: &str, line: &str) -> Vec<Norm> {
         "codex-app" => parse_codex_app(&v),
         "claude" => parse_claude(&v),
         "opencode" => parse_opencode(&v),
+        "opencode-serve" => crate::opencode_bridge::parse(&v),
         _ => vec![Norm::Unparsed(truncate(line, 8192))],
     }
 }

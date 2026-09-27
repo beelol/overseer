@@ -6,100 +6,17 @@
 mod common;
 #[path = "common/ollama.rs"]
 mod ollama;
+#[path = "common/world.rs"]
+mod world;
 
 use common::*;
-use ollama::{Ollama, GIB};
+use ollama::Ollama;
 use serde_json::{json, Value};
-use std::path::PathBuf;
-use std::time::{Duration, Instant};
-
-struct World {
-    dir: tempfile::TempDir,
-}
-
-impl World {
-    fn new() -> World {
-        let w = World { dir: tmp() };
-        w.net(json!({"system": "connected", "baseline": {"by_name": true, "by_ip": true}, "providers": {"openai": true, "anthropic": true}}));
-        w.memory(128.0, 115.2, "normal");
-        w
-    }
-    fn file(&self, name: &str) -> PathBuf {
-        self.dir.path().join(name)
-    }
-    /// Rewrites the network the daemon sees.
-    fn net(&self, v: Value) {
-        write_whole(&self.file("net.json"), &v.to_string());
-    }
-    /// Rewrites the machine's memory, in GiB.
-    fn memory(&self, total: f64, available: f64, pressure: &str) {
-        write_whole(&self.file("memory.json"), &json!({"total": (total * GIB as f64) as u64, "available": (available * GIB as f64) as u64, "pressure": pressure}).to_string());
-    }
-    fn replay(&self, transcript: &str) {
-        std::fs::copy(repo_root().join("fixtures/continuity").join(transcript), self.file("replay.jsonl")).unwrap();
-    }
-    fn start(&self, ollama_url: &str, extra: &[(&str, &str)]) -> Daemon {
-        let (net, memory, replay) = (self.file("net.json"), self.file("memory.json"), self.file("replay.jsonl"));
-        let codex = repo_root().join("fixtures/fake-harness/replay.js");
-        let mut env: Vec<(&str, &str)> = vec![
-            ("OVERSEER_TEST_NET", net.to_str().unwrap()),
-            ("OVERSEER_TEST_MEMORY", memory.to_str().unwrap()),
-            ("OVERSEER_OLLAMA_URL", ollama_url),
-            ("OVERSEER_OLLAMA_CANDIDATES", "/nonexistent/ollama"),
-            ("OVERSEER_TEST_CONTINUITY_TICK_MS", "60"),
-            ("OVERSEER_TEST_PROBE_MS", "60"),
-            ("OVERSEER_TEST_PROBE_IDLE_MS", "60"),
-            ("OVERSEER_TEST_WATCH_MS", "40"),
-            ("OVERSEER_CODEX_PATH", codex.to_str().unwrap()),
-            ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"),
-            ("REPLAY_FILE", replay.to_str().unwrap()),
-            ("REPLAY_DELAY_MS", "10"),
-        ];
-        for (k, v) in extra {
-            env.retain(|(name, _)| name != k);
-            env.push((k, v));
-        }
-        Daemon::start(&env)
-    }
-}
-
-/// Written whole and then renamed, so the daemon never reads half a file.
-fn write_whole(path: &std::path::Path, text: &str) {
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, text).unwrap();
-    std::fs::rename(&tmp, path).unwrap();
-}
-
-fn conn(d: &Daemon) -> Value {
-    d.call("connection.status", json!({}))["status"].clone()
-}
-
-fn wait_conn(d: &Daemon, what: &str, pred: impl Fn(&Value) -> bool) -> (Value, Duration) {
-    let started = Instant::now();
-    loop {
-        let s = conn(d);
-        if pred(&s) {
-            return (s, started.elapsed());
-        }
-        if started.elapsed() > Duration::from_secs(10) {
-            panic!("the connection never became {what}; it is {} ({})", s["state"], s["reason"]);
-        }
-        std::thread::sleep(Duration::from_millis(20));
-    }
-}
-
-fn is(state: &'static str, reason: &'static str) -> impl Fn(&Value) -> bool {
-    move |s| s["state"] == state && s["reason"] == reason
-}
+use std::time::Duration;
+use world::*;
 
 fn connection_events(d: &Daemon) -> Vec<Value> {
-    d.call("events.list", json!({"limit": 5000}))["events"].as_array().unwrap().iter().filter(|e| e["kind"] == "connection").cloned().collect()
-}
-
-fn no_ollama() -> String {
-    // A port nothing listens on.
-    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    format!("http://127.0.0.1:{}", l.local_addr().unwrap().port())
+    all_events(d, "connection")
 }
 
 fn codex_turn(d: &Daemon, w: &World, repo: &std::path::Path, transcript: &str) -> Value {
@@ -110,17 +27,14 @@ fn codex_turn(d: &Daemon, w: &World, repo: &std::path::Path, transcript: &str) -
     d.events(&run).into_iter().filter(|e| e["kind"] == "error").next_back().unwrap_or(Value::Null)
 }
 
-fn gib(v: &Value) -> f64 {
-    (v.as_u64().unwrap() as f64 / GIB as f64 * 10.0).round() / 10.0
-}
-
 // ---------------------------------------------------------------- AC-83
 
 #[test]
 fn ac83_offline_is_told_from_an_outage() {
     let w = World::new();
     let d = w.start(&no_ollama(), &[]);
-    let s = conn(&d);
+    // The daemon answers at once from the system's own answer; the probes follow.
+    let (s, _) = wait_conn(&d, "probed", |s| s["providers"]["openai"]["reachable"] == true);
     assert_eq!((s["state"].as_str(), s["reason"].as_str()), (Some("online"), Some("connected")));
     assert_eq!(s["system"]["state"], "connected");
     assert_eq!(s["providers"]["openai"], json!({"reachable": true, "reason": "answered (fixture)", "source": "probe"}));
@@ -197,7 +111,7 @@ fn ac83_rate_limits_and_usage_limits_are_never_offline() {
 
     // A connection error from an agent is its own class and starts a probe round at once. The
     // hosts answer, so one such error does not change the state.
-    let probed = conn(&d)["probed_ms"].as_i64().unwrap();
+    let probed = wait_conn(&d, "probed once", |s| s["probed_ms"].is_i64()).0["probed_ms"].as_i64().unwrap();
     let e = codex_turn(&d, &w, &repo, "codex-network-error.jsonl");
     assert_eq!(e["payload"]["class"], "network");
     let (s, _) = wait_conn(&d, "probed again", |s| s["probed_ms"].as_i64().unwrap() > probed);

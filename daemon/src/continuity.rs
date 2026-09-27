@@ -377,8 +377,15 @@ pub fn is_outage(message: &str) -> bool {
 
 // ------------------------------------------------------------------ the monitor
 
-/// Starts Continuity: loads the settings, takes a first reading, and watches the connection for
-/// as long as the daemon runs.
+/// Probes can be switched off from outside (`OVERSEER_CONTINUITY_PROBES=off`), whatever the
+/// setting says: the automated tests of the rest of the daemon never reach the network.
+fn probes_allowed(settings: &Settings) -> bool {
+    settings.probes && std::env::var("OVERSEER_CONTINUITY_PROBES").map(|v| v != "off").unwrap_or(true)
+}
+
+/// Starts Continuity: loads the settings, asks the system (which is quick and local), and watches
+/// the connection for as long as the daemon runs. The probes, which take the network's time, run
+/// from the watching thread, so the daemon never waits for them to start.
 pub fn start(d: Arc<Daemon>) -> Result<()> {
     {
         let store = d.store.lock().unwrap();
@@ -386,20 +393,25 @@ pub fn start(d: Arc<Daemon>) -> Result<()> {
     }
     let settings = load_settings(&d);
     let system = net::system();
-    let (baseline, probes) = if settings.probes && system.state != SystemNet::NoNetwork { net::probe_round() } else { (None, BTreeMap::new()) };
-    let first = decide(&system, baseline.as_ref(), &probes, settings.probes, &evidence(&d));
+    let probes_on = probes_allowed(&settings);
+    let first = decide(&system, None, &BTreeMap::new(), false, &evidence(&d));
     let at = now();
-    let status = Status { state: first.state, reason: first.reason.clone(), unreachable: first.unreachable.clone(), acts_offline: first.acts_offline, providers: first.providers.clone(), system: system.clone(), baseline: baseline.clone(), probes: settings.probes, since_ms: at, checked_ms: at, probed_ms: settings.probes.then_some(at) };
-    let shared = Shared { settings, status: status.clone(), pending: None, baseline, probes, last_probe: Some(Instant::now()), last_system: system.state, newest_error_ms: 0, force: false };
+    let status = Status { state: first.state, reason: first.reason.clone(), unreachable: first.unreachable.clone(), acts_offline: first.acts_offline, providers: first.providers.clone(), system: system.clone(), baseline: None, probes: probes_on, since_ms: at, checked_ms: at, probed_ms: None };
+    let shared = Shared { settings, status: status.clone(), pending: None, baseline: None, probes: BTreeMap::new(), last_probe: None, last_system: system.state, newest_error_ms: 0, force: true };
     if SHARED.set(Mutex::new(shared)).is_err() {
         bail!("Continuity was started twice");
     }
     crate::log(&format!("continuity: {:?} ({}); system: {}", status.state, status.reason, status.system.detail));
     d.emit(None, None, "connection", "daemon", "exact", json!({"status": status, "previous": Value::Null, "first": true}))?;
-    std::thread::Builder::new().name("continuity".into()).spawn(move || loop {
-        std::thread::sleep(millis("OVERSEER_TEST_CONTINUITY_TICK_MS", 5000));
-        if let Err(e) = tick(&d) {
-            crate::log(&format!("continuity: check failed: {e:#}"));
+    std::thread::Builder::new().name("continuity".into()).spawn(move || {
+        let mut first = true;
+        loop {
+            if !std::mem::take(&mut first) {
+                std::thread::sleep(millis("OVERSEER_TEST_CONTINUITY_TICK_MS", 5000));
+            }
+            if let Err(e) = tick(&d) {
+                crate::log(&format!("continuity: check failed: {e:#}"));
+            }
         }
     })?;
     Ok(())
@@ -416,7 +428,7 @@ pub fn tick(d: &Arc<Daemon>) -> Result<Status> {
         let busy = !agents.in_use.is_empty() || s.status.state != Conn::Online;
         let every = if busy { millis("OVERSEER_TEST_PROBE_MS", 30_000) } else { millis("OVERSEER_TEST_PROBE_IDLE_MS", 300_000) };
         let due = s.force || system.state != s.last_system || agents.newest_ms > s.newest_error_ms || s.last_probe.is_none_or(|t| t.elapsed() >= every);
-        (s.settings.probes, due)
+        (probes_allowed(&s.settings), due)
     };
     let fresh = (probes_on && due && system.state != SystemNet::NoNetwork).then(net::probe_round);
     let mut s = shared()?;
@@ -536,6 +548,62 @@ fn load(d: &Daemon, tag: &str, context: u64) -> Result<Value> {
     let outcome = json!({"tag": tag, "run_tag": run_tag, "context": context, "approved": approved, "memory_before": before, "memory_after": after, "measured": measured, "error": loaded.as_ref().err().map(|e| e.to_string())});
     d.emit(None, None, "local_load", "daemon", "exact", outcome.clone())?;
     loaded.map(|l| json!({"loaded": l, "detail": outcome}))
+}
+
+/// Before a local turn is launched: the model is chosen if none was, given a context, passed
+/// through the guard, loaded under the watchdog, and named in Overseer's own OpenCode profile.
+/// A refusal is an error with its reason, and nothing is launched.
+pub fn prepare_local_run(d: &Daemon, run: &mut crate::store::Run, profile_env: &BTreeMap<String, String>) -> Result<()> {
+    let config_home = std::path::PathBuf::from(crate::opencode_bridge::env_for(profile_env)?);
+    let settings = settings();
+    let l = gather(d);
+    if !l.inventory.ollama.running {
+        bail!("{}; a local model cannot run", l.inventory.ollama.detail);
+    }
+    let opts = settings.pick_options(false);
+    // The model: the one asked for, or the pick.
+    let (tag, base, context) = match run.model.as_deref().map(crate::opencode_bridge::tag_of).filter(|t| !t.is_empty()) {
+        Some(tag) => {
+            let model = l.inventory.models.iter().find(|m| m.tag == tag).ok_or_else(|| anyhow!("{tag} is not installed in Ollama"))?;
+            let context = match model.configured_context {
+                Some(c) => c,
+                // A tag that sets no context gets the longest one that fits.
+                None => local::context_steps(opts.context_target, opts.context_floor, model.max_context.unwrap_or(local::COMFORTABLE_CONTEXT))
+                    .into_iter()
+                    .find(|c| local::approve(tag, *c, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts).is_ok())
+                    .ok_or_else(|| local::approve(tag, opts.context_floor, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts).unwrap_err())?,
+            };
+            (tag.to_string(), model.base.clone(), context)
+        }
+        None => {
+            let memory = l.inventory.memory.clone().ok_or_else(|| anyhow!("memory cannot be read, so no model is picked"))?;
+            let pick = local::pick(&memory, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts);
+            let c = pick.chosen.ok_or_else(|| anyhow!("no local model that is installed and verified fits the memory budget of {} GiB{}", sys::gib(pick.budget.budget), pick.rejected.first().map(|r| format!(" ({}: {})", r.tag, r.reason)).unwrap_or_default()))?;
+            (c.tag.clone(), c.tag, c.context)
+        }
+    };
+    let approved = local::approve(&tag, context, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts)?;
+    let run_tag = local::ensure_tag(&l.inventory.models, &tag, &base, context)?;
+    let already = l.inventory.loaded.iter().any(|x| x.tag == run_tag && x.context.unwrap_or(0) >= context);
+    if !already {
+        let memory = sys::memory()?;
+        let loaded = local::load_guarded(&run_tag, context, local::headroom(memory.total, opts.headroom), &format!("{}m", settings.ollama_idle_minutes));
+        let after = gather(d);
+        d.emit(Some(&run.task_id), Some(&run.id), "local_load", "daemon", "exact", json!({"tag": tag, "run_tag": run_tag, "context": context, "approved": approved, "memory_before": {"available": memory.available, "pressure": memory.pressure}, "memory_after": after.inventory.memory.as_ref().map(|m| json!({"available": m.available, "pressure": m.pressure})), "measured": after.inventory.loaded.iter().find(|x| x.tag == run_tag), "error": loaded.as_ref().err().map(|e| e.to_string())}))?;
+        loaded?;
+    }
+    let mut tags: Vec<String> = l.inventory.models.iter().filter(|m| m.capabilities.iter().any(|c| c == "tools")).map(|m| m.tag.clone()).collect();
+    if !tags.contains(&run_tag) {
+        tags.push(run_tag.clone());
+    }
+    crate::opencode_bridge::write_config(&config_home, &tags, &run_tag, &local::ollama_url()?)?;
+    let model = format!("ollama/{run_tag}");
+    if run.model.as_deref() != Some(model.as_str()) {
+        d.store.lock().unwrap().conn.execute("UPDATE runs SET model=?2 WHERE id=?1", rusqlite::params![run.id, model])?;
+        run.model = Some(model.clone());
+    }
+    d.emit(Some(&run.task_id), Some(&run.id), "local_model", "daemon", "exact", json!({"model": model, "base": base, "context": context, "bytes": approved["bytes"], "measured": approved["measured"], "already_loaded": already, "budget": approved["budget"]}))?;
+    Ok(())
 }
 
 // ------------------------------------------------------------------ protocol

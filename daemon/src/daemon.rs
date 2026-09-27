@@ -330,7 +330,7 @@ impl Daemon {
     pub fn create_task(self: &Arc<Self>, p: &Value) -> Result<Value> {
         let repo_in = p["repo"].as_str().ok_or_else(|| anyhow!("repo is required"))?;
         let harness = p["harness"].as_str().unwrap_or("codex");
-        if !["codex", "codex-app", "claude", "opencode", "generic"].contains(&harness) {
+        if !["codex", "codex-app", "claude", "opencode", "opencode-serve", "generic"].contains(&harness) {
             bail!("unknown harness {harness}");
         }
         let prompt = p["prompt"].as_str().unwrap_or_default().to_string();
@@ -343,6 +343,8 @@ impl Daemon {
         let common = git::common_dir(&repo)?;
         let profile = match p["profile_id"].as_str() {
             Some(id) => Some(self.profile(id)?),
+            // Local runs use Overseer's own OpenCode profile, never the user's own configuration.
+            None if harness == "opencode-serve" => Some(crate::opencode_bridge::local_profile(self)?),
             None if harness != "generic" => Some(self.profile(&format!("system-{}", profile_harness(harness)))?),
             None => None,
         };
@@ -556,6 +558,14 @@ impl Daemon {
         let resume = if follow_up { run.native_id.clone() } else { None };
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
+        }
+        if run.harness == "opencode-serve" {
+            // The guard, the context and the profile of a local run (Continuity, AC-138 and AC-140).
+            if let Err(e) = crate::continuity::prepare_local_run(self, &mut run, &profile_env) {
+                // A refused local run ends with its reason; it is never left waiting to launch.
+                self.mark_ended(&run, "failed", &format!("not launched: {e}"))?;
+                return Err(e);
+            }
         }
         let launch = adapters::launch(
             &run.harness,
@@ -1493,7 +1503,11 @@ fn find_in_tree(store: &Store, root: &str, native: &str) -> Result<Option<Run>> 
 
 /// Account profiles belong to the harness family (codex-app shares Codex logins).
 fn profile_harness(harness: &str) -> &str {
-    if harness == "codex-app" { "codex" } else { harness }
+    match harness {
+        "codex-app" => "codex",
+        "opencode-serve" => "opencode",
+        h => h,
+    }
 }
 
 fn classify(msg: &str) -> String {

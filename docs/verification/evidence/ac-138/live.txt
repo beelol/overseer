@@ -1,0 +1,51 @@
+overseerd 0.1.0; OpenCode 1.15.13; Ollama 0.34.2; memory 34.3 GiB available of 128 GiB, budget 21.5 GiB
+PASS  the opencode-serve harness is installed and says what it supports
+
+== Plan only
+    model: ollama/qwen3-coder:30b-64k at a 64k context, 23.7 GiB of a 45.9 GiB budget (already loaded)
+PASS  the model was picked by the daemon and passed the guard  — ollama/qwen3-coder:30b-64k
+PASS  Plan only: the turn ends and no file is changed  — completed; tools: none; asked 0
+PASS  the run is a local one
+
+== Ask first, allowed
+    asked: edit: asked.txt → Allow
+    asked: command: ls -la → Allow
+PASS  Ask first: the write asks before anything is written  — edit: asked.txt; request per_0e0c…
+PASS  Ask first: the request carries the path and the diff
+PASS  Ask first: Allow lets the write through  — completed; 2 request(s): edit: asked.txt, command: ls -la
+PASS  Ask first: the file activity and the reply are in the conversation  — done
+PASS  the run's OpenCode server holds files of Overseer's profile open, and none of the user's own OpenCode folders  — 1 server, 17 open files, 5 in the profile, 0 in the user's folders
+PASS  usage is tokens with cost 0, marked local  — 10595 tokens
+
+== Ask first, denied
+    asked: edit: denied.txt → Deny
+PASS  Ask first: Deny blocks the write  — completed; 1 request(s) denied; reply: refused
+PASS  Ask first: a denied write is not reported as file activity
+
+== Accept edits
+    asked: command: ls → Allow
+PASS  Accept edits: the edit is made without asking  — requests: command: ls
+PASS  Accept edits: a command asks first, after the edit was already made  — completed; tools: write running, write completed, bash running, bash completed
+
+== Auto
+PASS  Auto: the edit and the command both run without asking  — completed; tools: write running, write completed, bash running, bash completed; asked 0
+
+== Interrupt
+PASS  Interrupt: the turn ends long before the 45 s command would, as interrupted  — interrupted after 563 ms (interrupted by user (exit code 0))
+PASS  Interrupt: no OpenCode server is left running
+
+== Follow-up in the same session, with another mode
+    asked: edit: second.txt → Allow
+    asked: command: ls -la → Allow
+    asked: command: cat first.txt → Allow
+    asked: command: ls -la → Allow
+PASS  Follow-up: the same session continues with its history  — session ses_f1f324b6…; first.txt | first.txt
+done
+PASS  Follow-up: the new mode applies to the continued session  — asked: edit: second.txt, command: ls -la, command: cat first.txt, command: ls -la
+PASS  the user's own ~/.config/opencode is byte-identical before and after  — 3427 files, sha256 86b6ac873dd6f257…
+PASS  the servers' own logs and sessions are in Overseer's profile  — 8 log files
+PASS  Overseer's own profile names only the local provider and holds no rules  — 8 local models listed
+PASS  memory pressure stayed normal  — level 47%, available 32.4 GiB
+PASS  the model is unloaded again
+
+24 passed, 0 failed

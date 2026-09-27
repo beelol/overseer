@@ -600,7 +600,10 @@ pub fn approve_with(mem: &Memory, tag: &str, context: u64, models: &[Model], loa
     let geometry = model.and_then(|m| m.geometry.clone()).or_else(|| entry.and_then(|e| e.geometry.clone()));
     let known = measured.get(&(base.clone(), context)).copied();
     let bytes = known.or_else(|| estimate(weights, geometry.as_ref(), context)).ok_or_else(|| anyhow!("the size of {tag} cannot be estimated, so it is not loaded"))?;
-    let held = loaded.iter().filter(|l| l.tag == tag && l.context.unwrap_or(0) >= context).map(|l| l.size).max().unwrap_or(0);
+    // A copy of this model that is already loaded at this context or more, under this tag or any
+    // other tag of the same base, costs nothing to use again.
+    let same_base = |l: &Loaded| l.tag == tag || l.tag == base || models.iter().any(|m| m.tag == l.tag && m.base == base);
+    let held = loaded.iter().filter(|l| same_base(l) && l.context.unwrap_or(0) >= context).map(|l| l.size).max().unwrap_or(0);
     let b = budget(mem, opts, held);
     if bytes > b.budget {
         bail!("{tag} is too big to load: {} GiB at a {}k context is over the budget of {} GiB ({}% of {} GiB is {} GiB; {} GiB available minus {} GiB headroom is {} GiB){}", gib(bytes), context / 1024, gib(b.budget), b.ceiling_percent, gib(b.total), gib(b.ceiling_share), gib(b.available + held), gib(b.headroom), gib(b.ceiling_now), b.note.as_ref().map(|n| format!("; {n}")).unwrap_or_default());
@@ -873,6 +876,15 @@ mod tests {
         assert!(approve_with(&mem(128, 30.0), "qwen3-coder:30b", 65536, &models, &[], &cat, &Measured::new(), &o).is_err());
         let held = [Loaded { tag: "qwen3-coder:30b".into(), size: 25_411_736_042, size_vram: None, context: Some(65536), expires_at: None }];
         assert_eq!(approve_with(&mem(128, 30.0), "qwen3-coder:30b", 65536, &models, &held, &cat, &Measured::new(), &o).unwrap()["already_loaded"], true);
+        // The loaded copy may carry another tag of the same base (a tag that sets the context).
+        let mut tagged = installed("qwen3-coder:30b-64k", e30);
+        tagged.configured_context = Some(65536);
+        let both = vec![installed("qwen3-coder:30b", e30), tagged];
+        let held = [Loaded { tag: "qwen3-coder:30b-64k".into(), size: 25_411_736_042, size_vram: None, context: Some(65536), expires_at: None }];
+        assert_eq!(approve_with(&mem(128, 30.0), "qwen3-coder:30b", 65536, &both, &held, &cat, &Measured::new(), &o).unwrap()["already_loaded"], true);
+        // A copy loaded with a shorter context does not count: the longer one needs more memory.
+        let short = [Loaded { tag: "qwen3-coder:30b-64k".into(), size: 20_000_000_000, size_vram: None, context: Some(16384), expires_at: None }];
+        assert!(approve_with(&mem(128, 30.0), "qwen3-coder:30b", 65536, &both, &short, &cat, &Measured::new(), &o).is_err());
         // Unknown size: refused, never assumed small.
         let err = approve_with(&idle(128), "mystery:latest", 16384, &models, &[], &cat, &Measured::new(), &o).unwrap_err().to_string();
         assert!(err.contains("its size is unknown"), "{err}");

@@ -9,6 +9,7 @@ mod git;
 mod local;
 mod merge;
 mod net;
+mod opencode_bridge;
 mod paths;
 mod pr;
 mod redact;
@@ -56,6 +57,8 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        // The bridge between a run's supervisor and `opencode serve` (the opencode-serve harness).
+        Some("opencode-bridge") => std::process::exit(opencode_bridge::main(&args[2..])),
         Some("serve") => {
             if let Err(e) = paths::ensure_private_dir(&paths::data_dir()) {
                 eprintln!("cannot create data dir: {e}");

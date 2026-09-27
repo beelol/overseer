@@ -400,13 +400,22 @@ What the adapter must do, learned the hard way:
 - **Interrupting is a request, not a signal.** The run's process stays up between turns and after
   an interrupt, as with `codex-app` and Claude Code.
 
-**How it fits the daemon.** A new harness id, `opencode-serve`, beside the unchanged one-shot
+**How it fits the daemon (as built).** A new harness id, `opencode-serve`, beside the unchanged one-shot
 `opencode`. The run's supervisor starts a small bridge, a subcommand of `overseerd`
 (`overseerd opencode-bridge`), which starts `opencode serve` on a loopback port of its own, prints
 every server event as one JSON line on its standard output, and turns lines on its standard input
 (prompt, permission answer, interrupt) into requests. The daemon's existing tail, parser and
 control path stay as they are; the bridge needs only a plain HTTP client for loopback. One bridge
-and one server per run, so a run's process tree is stopped as a unit and a crash affects one run.
+and one server per turn, like every other harness, so a turn's process tree is stopped as a unit
+and a crash affects one run; the session itself lives in the profile and is continued by the next
+turn's server. The bridge picks a free port itself and puts the server behind a password only it
+knows, so no other process on the machine can drive the agent. It also does the remembering the
+daemon's line parser cannot: which messages are the user's own, which sessions are this run's
+children, and which belong to something else on the same server.
+
+Before a local turn is launched the daemon chooses the model if none was named, gives it a context,
+passes it through the memory guard, loads it under the watchdog, and writes the profile's
+configuration. A refusal ends the run as failed with its reason; nothing is launched.
 
 Fixtures recorded from the chosen transport, for the adapter tests:
 `fixtures/transcripts/opencode-1.15.13-serve-{allow,deny,interrupt,children}-local.jsonl`.
