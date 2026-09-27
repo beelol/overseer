@@ -20,6 +20,12 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const BASELINES = path.join(here, 'baselines.json');
 /** How far a later run may be above its baseline. */
 const ALLOWED = 1.1;
+/**
+ * One frame at 60 Hz, in milliseconds. The door and the first screen mark themselves shown in
+ * the same commit, in tree order, so the door's mark may follow the screen's by a fraction of a
+ * millisecond; a door that came a whole frame later was seen later.
+ */
+const FRAME = 17;
 /** Budgets that hold whatever the baseline says, in milliseconds (the RFC's numbers). */
 const LIMITS = {
   ios: { 'agents.interactive.p95': 1000, 'door.opening.low': 540, 'door.opening.high': 660 },
@@ -94,6 +100,8 @@ function figures(records) {
     'javascript.loaded': summary(ok.map((r) => r.startup['javascript.loaded'])),
     'door.shown': mark('door.shown'),
     'agents.shown': mark('screen.agents.shown'),
+    // Per launch: how long after the first screen's mark the door's came; negative when the door came first.
+    'door.late': summary(ok.map((r) => (r.marks['door.shown'] !== undefined && r.marks['screen.agents.shown'] !== undefined ? r.marks['door.shown'] - r.marks['screen.agents.shown'] : undefined))),
     'agents.interactive': mark('screen.agents.interactive'),
     'door.opening': measure('door.opening'),
     'door.frames': measure('door.frames'),
@@ -117,9 +125,8 @@ export function verdicts(platform, withDoor, withoutDoor, baseline) {
     const allowed = round(baseline['agents.interactive.p95'] * ALLOWED);
     say('agents list interactive against the baseline, p95 (ms)', p95, allowed, p95 !== null && p95 <= allowed, `baseline ${baseline['agents.interactive.p95']} ms + 10%`);
   }
-  const first = withDoor['agents.shown'].max;
-  const door = withDoor['door.shown'].max;
-  say('the door is on screen before the first screen, every launch (ms)', door, first, door !== null && first !== null && door <= first);
+  const late = withDoor['door.late'].max;
+  say('the door is on screen with the first screen or before it, worst launch (ms after the first screen)', late, FRAME, late !== null && late <= FRAME, `${withDoor['door.late'].count} of ${withDoor.launches} launches marked both`);
   const opening = withDoor['door.opening'];
   say('the door opens in 600 ms within 60 ms, shortest (ms)', opening.min, limits['door.opening.low'], opening.min !== null && opening.min >= limits['door.opening.low']);
   say('the door opens in 600 ms within 60 ms, longest (ms)', opening.max, limits['door.opening.high'], opening.max !== null && opening.max <= limits['door.opening.high']);

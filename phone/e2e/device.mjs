@@ -96,7 +96,8 @@ function android() {
     installed: () => shell(`pm list packages ${BUNDLE}`).includes(BUNDLE),
     install: (apk) => void adb('-s', serial, 'install', '-r', apk),
     uninstall: () => void quiet(ADB, ['-s', serial, 'uninstall', BUNDLE]),
-    launch: () => void shell(`monkey -p ${BUNDLE} -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1`),
+    // `monkey` reports failure (exit 251) on this emulator image and starts nothing; the activity is started by name.
+    launch: () => void shell(`am start -n ${BUNDLE}/.MainActivity >/dev/null 2>&1`),
     stop: () => void shell(`am force-stop ${BUNDLE}`),
     appearance: (mode) => void shell(`cmd uimode night ${mode === 'dark' ? 'yes' : 'no'}`),
     textSize: (size) => void shell(`settings put system font_scale ${{ small: '0.85', standard: '1.0', large: '1.3' }[size]}`),
