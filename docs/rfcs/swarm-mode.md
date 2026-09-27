@@ -1,7 +1,8 @@
 # RFC: category-directed adaptive Swarm mode
 
-Status: draft RFC with a fixture-only implementation in draft PR #3. All SWARM
-criteria remain partial or unverified; live behavior is not certified.
+Status: approved RFC with a fixture-only implementation in draft PR #3. SWARM-38
+is verified as a documentation criterion; the other SWARM criteria remain partial
+or unverified. Live behavior is not certified.
 Date: 2026-09-25
 Scope: product behavior, integration boundaries, and acceptance criteria only.
 Revision: director-led many-worker scope, continuous coordination, usable defaults, and
@@ -171,6 +172,13 @@ owner's yes before the daemon commits the run or enlarged limit. This is one sta
 not a settings form or a confirmation per worker; S0's defaults remain automatic. Route
 picking (the separate Auto Mode feature) and Overseer's Auto permission level never imply
 each other or permission to fan out.
+
+Gate S's confirmed limit of 100 Overseer-self-started turns per day counts its own
+check-ins and responses to findings, conflicts and agent questions. It does not count
+the category director's turns or halt an already approved Swarm run. Director turns,
+including review and synthesis, still consume the run's frozen account allocation and
+obey its deadline and no-progress limit. At Gate S's cap, deterministic Swarm controls
+and the director continue; an advisory needing a new Overseer turn waits for the owner.
 
 Swarm's broker, area claims and conflicts must become the same daemon records used by
 ordinary agents and Gate S, with stable sender identities and message ids. An ordinary
@@ -543,18 +551,18 @@ integration, and category-run/worker controls. Existing account-only authenticat
 
 Out of scope: new harness adapters, new quota collectors, API-key fallback, purchases, account
 creation, automatic publishing/merging, speculative races, continuous background work, TUI,
-and VS Code production-readiness fixes. Separate future authorization is needed for implementation
-and live model tests. Do not inherit an earlier agent's time/token budget as product policy.
+and VS Code production-readiness fixes. Live model tests need separate authorization. Do not
+inherit an earlier agent's time/token budget as product policy.
 
-Implement later in dependency order: agree automode contract and control capabilities; verify
+Continue implementation in dependency order: agree automode contract and control capabilities; verify
 deterministic scheduler/reservations with fixtures; add isolated execution/recovery; add UI;
 qualify actual target/account combinations with minimal live runs. Missing telemetry/control
 capabilities block the affected acceptance claim, not an excuse to create competing adapters.
 
 ## Acceptance criteria
 
-All criteria are initially unchecked. Use the `SWARM-` namespace so this checklist cannot be
-confused with the base product or automode. Each row is a required observable scenario; a
+Use the `SWARM-` namespace so this checklist cannot be confused with the base product or
+automode. Each row is a required observable scenario; a
 fixture proves policy behavior, not live provider compatibility.
 
 | ID | Required outcome and verification |
@@ -582,7 +590,7 @@ fixture proves policy behavior, not live provider compatibility.
 | SWARM-21 | [ ] Change user requirements during execution. Invalidate incompatible queued jobs, retain revision provenance, and reject stale worker results from automatic acceptance into the revised plan. In the S3 24-to-12 scope change, accept and integrate only retained jobs, reject completion with an unintegrated retained patch, and verify excluded routes still work under the shared contract. |
 | SWARM-22 | [ ] Close/reopen VS Code and crash/restart the daemon before launch, after launch but before acknowledgement, and after result receipt. Reconcile without duplicate workers, lost accepted results, or freed reservations for surviving work. |
 | SWARM-23 | [ ] UI evidence shows active/queued counts, selected targets/accounts, limiting constraint, measured/estimated/unknown usage, finishing reserve, and an explanation for serial, scaled-down, and blocked decisions. Logs omit credentials and unnecessary raw account output. |
-| SWARM-24 | [ ] Consume the agreed automode interface and single shared admission authority for ordinary, Overseer-started and Swarm work. Contract tests cover expired snapshots and changed eligibility between routing and launch; no duplicate health/quota collector is introduced. A Gate S request cannot bypass the shared slot, account, workspace or launch-intent transaction. |
+| SWARM-24 | [ ] Consume the agreed automode interface and single shared admission authority for ordinary, Overseer-started and Swarm work. Contract tests cover expired snapshots and changed eligibility between routing and launch; no duplicate health/quota collector is introduced. A Gate S request cannot bypass the shared slot, account, workspace or launch-intent transaction. At Gate S's 100 self-started turns/day cap, an already approved Swarm director can continue within its allocation; its turns are metered to that allocation and do not count as Overseer turns. |
 | SWARM-25 | [ ] Publish version-pinned evidence per supported harness/account/platform for a minimal two-worker task, one-agent fallback, cancellation, and recovery. Keep unsupported or credential-blocked combinations explicitly unverified; do not represent fixture coverage as live coverage. |
 | SWARM-26 | [ ] Compare serial and swarm on a fixed suite containing serial, independent, conflicting, and constrained-budget tasks. Record acceptance pass rate, elapsed time, usage in native units, and overhead. All deterministic budget/safety scenarios pass; at least one suitable parallel case improves elapsed time at equal acceptance quality within its approved allocation. Do not require every task to benefit or claim universal savings. |
 | SWARM-27 | [ ] Start a named category swarm from an objective and from a supplied backlog. Show the effective pool, allocation and ceiling in one compact read-back and record the owner's start confirmation; require another confirmation before raising the limit, even at Overseer's Auto level. Changing AC-107's Talk to Overseer harness setting does not silently change the director route or approved pool. One director decomposes, assigns, reviews, and synthesizes without per-worker user launches or Overseer job decisions. All jobs retain category/run identity, scope, plan revision and acceptance checks. Completion requires the objective's checks, not an empty active list. |

@@ -27,6 +27,10 @@ allowance, though that coordinating run does not occupy an `agents.max_active` s
 Overseer's Auto permission level does not grant a route, a Swarm allocation or a
 worker launch; starting a swarm and raising its limit require the owner's recorded
 confirmation before the transaction can admit additional work.
+Gate S's 100-per-day cap applies only to Overseer-self-started turns. A category
+director's turns are not Overseer turns and keep running inside the already confirmed
+Swarm allocation and deadline if Overseer reaches that cap. This does not exempt
+Overseer's own turns, director turns, or watchers from account metering.
 Auto's run-bound child bridge is a transport for an Auto-enabled ordinary parent,
 not delegation authority for a Swarm worker or a second category director. A Swarm
 director may request a job only through the category plan, approved pool and shared

@@ -1,7 +1,7 @@
 {
   "base_commit": "19edf57ca4c30b0b4788b5416bb5d949a2cdff6c",
   "rfc_sha256": {
-    "swarm-mode.md": "0e3e5a92858e21cb2494d56c746324bf5034f1aa62b31bf2dd894d8091599ea0",
+    "swarm-mode.md": "5c3a4c328982491c4629f79487998fdf7f19fa799c3b98dc4f9d5c15f2591b22",
     "swarm-mode-scenarios.md": "857ee07916d6d60b57435125dfc3547ecd37024a3948e6343a95a63cb972bbdf",
     "swarm-mode-goal.md": "fb1bcf183e39e2edeb27b6d5f641eb8daf639bbaf271f5a4afbc15bcb01de08a"
   },
@@ -256,9 +256,10 @@
         "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-7.md",
         "docs/rfcs/swarm-auto-contract.md",
-        "docs/verification/swarm/SWARM-24.md"
+        "docs/verification/swarm/SWARM-24.md",
+        "docs/verification/swarm/main-reconciliation-2026-09-27.md"
       ],
-      "blocker": "The fixture admission revalidates a target snapshot, fences admissions against the latest persisted availability observation, and shares the app agent-slot lock; the proposed contract specifies job identity, attempts, category allocation and common proofs. The actual Auto Mode producer and shared account-quota authority are not integrated."
+      "blocker": "The fixture admission revalidates a target snapshot, fences admissions against the latest persisted availability observation, and shares the app agent-slot lock; the proposed contract specifies job identity, attempts, category allocation and common proofs. The actual Auto Mode producer and shared account-quota authority are not integrated. Gate S's 100-self-started-turn cap has not been replayed alongside an approved Swarm director."
     },
     "SWARM-25": {
       "status": "unverified",
