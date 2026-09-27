@@ -189,3 +189,26 @@ explicit disposition path for an integrated patch after conflict resolution,
 including a branch with later acknowledged commits, still needs design and
 fixtures. The real director's semantic choice, unresolved partial reporting,
 and qualified live review remain unverified. SWARM-47 remains partial.
+
+Single-patch repair path at `223db2d` (2026-09-27): the same fixture revises
+the invalidated dependent job after the in-flight intent is reconciled. Before
+this change, revision cleared its `evidence_conflict` stop reason and an
+unrelated accepted patch could immediately integrate on top of the still-open
+contradiction. The branch hold now follows unresolved conflict ancestry and
+the integrated job's current plan revision, rather than relying only on the
+temporary stop reason. After an independent accepted reproduction resolves the
+conflict, unrelated integration remains held until the dependent's second
+attempt submits a fresh accepted repair patch. That patch integrates as a new
+commit whose parent is the old acknowledged commit; the historical artifact is
+not silently erased. The unrelated patch can then integrate, and the user's
+source checkout stays unchanged. A three-run focused replay passed after the
+test stopped generating its patch by briefly editing the private worktree;
+that fixture edit had caused an occasional Git index timing mismatch.
+
+The affected integration (23), conflict (8), plan (11), and state (19) suites
+passed with `--offline -- --test-threads=1`, followed by the focused parent-
+commit assertion and `git diff --check`. This proves one resolved conflict,
+one invalidated integrated job, and one fresh patch repair in the local fixture.
+Multiple invalidated integrated jobs, exhausted attempt budget, an explicit
+no-code-change disposition, director semantic judgment, unresolved partial
+reporting, and qualified live review remain unverified; SWARM-47 is partial.
