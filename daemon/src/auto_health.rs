@@ -169,9 +169,9 @@ pub fn evaluate(route: &Route, observations: &[Observation], now_ms: i64) -> Hea
     }
 }
 
-/// Read only bounded, normalized local run outcomes. Message text is not used
+/// Read scoped, normalized local run outcomes. Message text is not used
 /// to infer allowance or persisted in this health view. Public status and
-/// A direct kernel network-down error is the only host-wide connectivity
+/// a direct kernel network-down error are the only host-wide connectivity
 /// signal accepted here; destination-specific failures stay endpoint-scoped.
 pub fn recent_local_observations(
     store: &crate::store::Store,
@@ -183,10 +183,28 @@ pub fn recent_local_observations(
     const MAX_RETRY_AFTER_MS: i64 = 24 * 60 * 60 * 1000;
     let since = now_ms.saturating_sub(MAX_RETRY_AFTER_MS);
     let mut observations = Vec::new();
+    // Keep the newest still-active failure for each observed route/class,
+    // rather than the newest N failures globally. A burst on another route
+    // must not hide an older, longer structured cooldown.
     let mut errors = store.conn.prepare(
-        "SELECT e.ts,e.payload,r.profile_id,r.harness,r.model,r.launch FROM events e JOIN runs r ON r.id=e.run_id \
-         WHERE e.kind='error' AND e.source='harness' AND e.ts>=?1 AND e.ts<=?2 \
-         ORDER BY e.seq DESC LIMIT 100",
+        "WITH candidates AS (
+            SELECT e.seq,e.ts,e.payload,r.profile_id,r.harness,r.model,r.launch,
+                CASE WHEN json_valid(e.payload) THEN json_extract(e.payload,'$.class') END AS class,
+                CASE WHEN json_valid(e.payload) THEN json_extract(e.payload,'$.retry_after_ms') END AS retry_ms,
+                CASE WHEN json_valid(r.launch) THEN json_extract(r.launch,'$.auto_local_endpoint') END AS local_endpoint
+            FROM events e JOIN runs r ON r.id=e.run_id
+            WHERE e.kind='error' AND e.source='harness' AND e.ts>=?1 AND e.ts<=?2
+        ), ranked AS (
+            SELECT ts,payload,profile_id,harness,model,launch,
+                ROW_NUMBER() OVER (PARTITION BY profile_id,harness,model,local_endpoint,class
+                    ORDER BY ts DESC,seq DESC) AS n
+            FROM candidates
+            WHERE class IN ('rate_limit','auth','service_unavailable','network','host_offline')
+              AND ts + CASE WHEN class IN ('rate_limit','service_unavailable','network')
+                    AND typeof(retry_ms)='integer' AND retry_ms BETWEEN 1 AND 86400000
+                    THEN retry_ms ELSE 60000 END > ?2
+        )
+        SELECT ts,payload,profile_id,harness,model,launch FROM ranked WHERE n=1",
     )?;
     let rows = errors.query_map(params![since, now_ms], |row| {
         Ok((
@@ -243,8 +261,13 @@ pub fn recent_local_observations(
     // Keep completed turns for the maximum failure window so an expired
     // Healthy signal can still cancel an earlier active cooldown.
     let mut successes = store.conn.prepare(
-        "SELECT ended_ms,profile_id,model,effort FROM runs WHERE status='completed' \
-         AND ended_ms>=?1 AND ended_ms<=?2 ORDER BY ended_ms DESC LIMIT 100",
+        "WITH ranked AS (
+            SELECT ended_ms,profile_id,model,effort,
+                ROW_NUMBER() OVER (PARTITION BY profile_id,model,effort
+                    ORDER BY ended_ms DESC,id DESC) AS n
+            FROM runs WHERE status='completed' AND ended_ms>=?1 AND ended_ms<=?2
+        )
+        SELECT ended_ms,profile_id,model,effort FROM ranked WHERE n=1",
     )?;
     let rows = successes.query_map(params![since, now_ms], |row| {
         Ok((
@@ -380,6 +403,52 @@ mod tests {
             "an older retry delay must not reblock a route after a successful turn");
         let recovered = recent_local_observations(&store, 1000 + 300_000).unwrap();
         assert_eq!(evaluate(&route, &recovered, 1000 + 300_000), Health::Unknown);
+    }
+
+    #[test]
+    fn unrelated_error_burst_cannot_hide_an_active_structured_cooldown() {
+        let store = crate::store::Store::open(std::path::Path::new(":memory:")).unwrap();
+        store.conn.execute_batch("INSERT INTO workspaces(id,path,repo_root,common_dir,kind,initial_dirty,created_ms) VALUES('w','/tmp','/tmp','/tmp','current','{}',0);
+            INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms) VALUES('t','t','p','/tmp','w',0);
+            INSERT INTO runs(id,task_id,harness,profile_id,model,effort,workspace_id,status,created_ms,title,capabilities)
+                VALUES('target','t','codex-app','acct-a','general','medium','w','failed',1000,'target','{}');
+            INSERT INTO runs(id,task_id,harness,profile_id,model,effort,workspace_id,status,created_ms,title,capabilities)
+                VALUES('noise','t','claude','acct-b','sonnet','medium','w','failed',1000,'noise','{}');").unwrap();
+        store.conn.execute("INSERT INTO events(ts,task_id,run_id,kind,source,confidence,payload)
+            VALUES(1000,'t','target','error','harness','exact',?1)",
+            [serde_json::json!({"class":"rate_limit","retry_after_ms":300_000}).to_string()]).unwrap();
+        for at in 119_000..119_101 {
+            store.conn.execute("INSERT INTO events(ts,task_id,run_id,kind,source,confidence,payload)
+                VALUES(?1,'t','noise','error','harness','exact',?2)",
+                params![at, serde_json::json!({"class":"service_unavailable"}).to_string()]).unwrap();
+        }
+        let route = route("acct-a/general/medium", "codex-app", "openai", "codex", "acct-a");
+        let observations = recent_local_observations(&store, 120_000).unwrap();
+        assert_eq!(evaluate(&route, &observations, 120_000), Health::Unavailable,
+            "unrelated recent errors must not erase an active account cooldown");
+    }
+
+    #[test]
+    fn unrelated_completions_cannot_restore_a_cooldown_cleared_by_success() {
+        let store = crate::store::Store::open(std::path::Path::new(":memory:")).unwrap();
+        store.conn.execute_batch("INSERT INTO workspaces(id,path,repo_root,common_dir,kind,initial_dirty,created_ms) VALUES('w','/tmp','/tmp','/tmp','current','{}',0);
+            INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms) VALUES('t','t','p','/tmp','w',0);
+            INSERT INTO runs(id,task_id,harness,profile_id,model,effort,workspace_id,status,created_ms,title,capabilities)
+                VALUES('target','t','codex-app','acct-a','general','medium','w','failed',1000,'target','{}');
+            INSERT INTO runs(id,task_id,harness,profile_id,model,effort,workspace_id,status,created_ms,ended_ms,title,capabilities)
+                VALUES('recovered','t','codex-app','acct-a','general','medium','w','completed',2000,31000,'recovered','{}');").unwrap();
+        store.conn.execute("INSERT INTO events(ts,task_id,run_id,kind,source,confidence,payload)
+            VALUES(1000,'t','target','error','harness','exact',?1)",
+            [serde_json::json!({"class":"rate_limit","retry_after_ms":300_000}).to_string()]).unwrap();
+        for n in 0..101 {
+            store.conn.execute("INSERT INTO runs(id,task_id,harness,profile_id,model,effort,workspace_id,status,created_ms,ended_ms,title,capabilities)
+                VALUES(?1,'t','claude','acct-b','sonnet','medium','w','completed',2000,?2,'noise','{}')",
+                params![format!("noise-{n}"), 32_000+n]).unwrap();
+        }
+        let route = route("acct-a/general/medium", "codex-app", "openai", "codex", "acct-a");
+        let observations = recent_local_observations(&store, 120_000).unwrap();
+        assert_eq!(evaluate(&route, &observations, 120_000), Health::Unknown,
+            "unrelated completions must not restore a cleared older cooldown");
     }
 
     #[test]
