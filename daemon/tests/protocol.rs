@@ -3922,12 +3922,15 @@ fn auto_cold_start_discloses_unknown_allowance_and_rejects_invented_inference() 
     std::fs::write(&quota, "unknown").unwrap();
     std::fs::write(&tools, "available").unwrap();
     let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
-        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_QUOTA_MODE_FILE,FIXTURE_TOOL_MODE_FILE"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_QUOTA_MODE_FILE,FIXTURE_TOOL_MODE_FILE,FIXTURE_EMIT_USAGE"),
         ("FIXTURE_MODE", "managed-models"), ("FIXTURE_QUOTA_MODE_FILE", quota.to_str().unwrap()),
-        ("FIXTURE_TOOL_MODE_FILE", tools.to_str().unwrap())]);
+        ("FIXTURE_TOOL_MODE_FILE", tools.to_str().unwrap()), ("FIXTURE_EMIT_USAGE", "1")]);
     let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
         "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    // The parent seeds a real workspace, but Auto begins without any local
+    // learning history. Its own first completed work unit must add a sample.
+    d.call("auto.usage.clear", json!({}));
     assert!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().is_empty(),
         "the cold-start decision must have no learned usage history");
 
@@ -3946,9 +3949,34 @@ fn auto_cold_start_discloses_unknown_allowance_and_rejects_invented_inference() 
     assert_eq!(event["payload"]["selected_route"]["quota"], "unknown");
     assert_eq!(event["payload"]["selected_route"]["fit"], "unknown");
     assert_eq!(event["payload"]["inference"]["state"], "not_used");
-    assert_eq!(d.wait_done(&run_id(&selected), 15)["status"], "completed");
+    let browser_id = run_id(&selected);
+    assert_eq!(d.wait_done(&browser_id, 15)["status"], "completed");
+    let result = d.call("run.result", json!({"run_id":browser_id}));
+    assert_eq!(result["state"], "ready", "{result}");
+    assert_eq!(result["text"], "browser result: parent context found");
+    let learned = d.call("auto.usage.list", json!({}));
+    assert_eq!(learned["measurements"].as_array().unwrap().len(), 1, "{learned}");
+    assert_eq!(learned["measurements"][0]["run_id"], browser_id);
+    assert_eq!(d.call("auto.usage.summary", json!({}))["aggregates"][0]["samples"], 1);
+    let work = d.call("auto.usage.work.list", json!({}));
+    assert_eq!(work["work_units"].as_array().unwrap().len(), 1, "{work}");
+    assert_eq!(work["work_units"][0]["run_id"], browser_id);
+    assert_eq!(work["work_units"][0]["usage"]["input_tokens"], 42);
+    assert_eq!(work["work_units"][0]["subscription_window_draw"], "unverified",
+        "observed tokens must not become a fabricated subscription charge");
+    assert_eq!(d.events(&parent).iter().filter(|event|
+        event["kind"] == "managed_child_result_available").count(), 1);
+
+    std::fs::write(&quota, "exhausted").unwrap();
+    let exhausted = d.call("auto.dispatch", json!({"work_unit_id":"cold-start-exhausted",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "prompt":"next bounded unit"}));
+    assert_eq!(exhausted["state"], "paused", "{exhausted}");
+    assert!(exhausted["decision"]["selected"].is_null());
+    assert_eq!(d.runs().len(), 2, "exhaustion must not launch another child");
 
     std::fs::write(&tools, "missing").unwrap();
+    std::fs::write(&quota, "unknown").unwrap();
     let paused = d.call("auto.dispatch", json!({"work_unit_id":"cold-start-no-browser",
         "parent_run_id":parent,"min_tier":"general","required_tools":["browser/navigate"],
         "prompt":"another browser check"}));
