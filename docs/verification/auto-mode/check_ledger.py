@@ -36,10 +36,13 @@ def collect_duplicates(ids):
 
 def changed_release_files(base):
     changed = set()
-    # Compare the branch's net changes with the main revision it contains.
-    # A three-dot diff from the original fork point would incorrectly count
-    # authorized changes that arrived through a later main merge as Auto edits.
-    for args in (["git", "diff", "--name-only", base, "HEAD"],
+    # Compare against the latest main revision actually merged into this
+    # branch. Main may advance while verification is running.
+    ancestor = subprocess.run(["git", "merge-base", "HEAD", base],
+        capture_output=True, text=True, check=False)
+    if ancestor.returncode or not ancestor.stdout.strip():
+        raise ValueError(f"cannot find merged main revision: {ancestor.stderr.strip()}")
+    for args in (["git", "diff", "--name-only", ancestor.stdout.strip(), "HEAD"],
                  ["git", "diff", "--name-only"],
                  ["git", "diff", "--cached", "--name-only"]):
         result = subprocess.run(args, capture_output=True, text=True, check=False)
