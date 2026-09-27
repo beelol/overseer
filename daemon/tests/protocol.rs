@@ -4590,7 +4590,7 @@ fn auto_simultaneous_unknown_draw_units_admit_only_one_shared_account_child() {
 }
 
 #[test]
-fn auto_child_does_not_start_while_a_manual_run_uses_its_profile() {
+fn auto_claim_during_git_preparation_refuses_a_later_manual_run_on_its_profile() {
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::fs::PermissionsExt;
     use std::os::unix::net::UnixStream;
@@ -4632,19 +4632,19 @@ fn auto_child_does_not_start_while_a_manual_run_uses_its_profile() {
         assert!(Instant::now() < deadline, "Auto did not reach Git preparation");
         std::thread::sleep(Duration::from_millis(20));
     }
-    let manual = run_id(&d.call("task.create", json!({"repo":manual_repo,"harness":"codex-app",
-        "model":"gpt-6-astra","effort":"high","prompt":"browser check"})));
-    d.wait_status(&manual, |status| status == "running", 10);
+    let error = d.try_call("task.create", json!({"repo":manual_repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"browser check"})).unwrap_err();
+    assert!(error.contains("automatic account pool is in use"), "{error}");
     std::fs::write(&release, "go").unwrap();
     let response = auto.join().unwrap();
-    assert_eq!(response["state"], "paused", "Auto must not overlap the active manual profile run: {response}");
-    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 0,
-        "the Auto child must not start a model turn while manual work is active");
-    assert_eq!(d.wait_done(&manual, 15)["status"], "completed");
+    assert_eq!(response["state"], "dispatched", "the claimed Auto child must retain its slot: {response}");
+    assert_eq!(d.wait_done(&run_id(&response), 15)["status"], "completed");
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 1,
+        "the claimed Auto child should execute once after Git preparation");
 }
 
 #[test]
-fn auto_child_rechecks_a_manual_run_on_another_profile_of_its_account_before_turn() {
+fn auto_claim_during_git_preparation_refuses_a_later_manual_alias_of_its_account() {
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::fs::PermissionsExt;
     use std::os::unix::net::UnixStream;
@@ -4695,15 +4695,124 @@ fn auto_child_rechecks_a_manual_run_on_another_profile_of_its_account_before_tur
         assert!(Instant::now() < deadline, "Auto did not reach Git preparation");
         std::thread::sleep(Duration::from_millis(20));
     }
-    let manual = run_id(&d.call("task.create", json!({"repo":manual_repo,"harness":"codex-app",
-        "profile_id":profiles[1],"model":"gpt-6-astra","effort":"high","prompt":"browser check"})));
-    d.wait_status(&manual, |status| status == "running", 10);
+    let error = d.try_call("task.create", json!({"repo":manual_repo,"harness":"codex-app",
+        "profile_id":profiles[1],"model":"gpt-6-astra","effort":"high","prompt":"browser check"})).unwrap_err();
+    assert!(error.contains("automatic account pool is in use"), "{error}");
     std::fs::write(&release, "go").unwrap();
     let response = auto.join().unwrap();
-    assert_eq!(response["state"], "paused", "Auto must not start while the shared account has manual work: {response}");
-    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 0,
-        "the selected child must not start a model turn on a shared account");
-    assert_eq!(d.wait_done(&manual, 15)["status"], "completed");
+    assert_eq!(response["state"], "dispatched", "the claimed Auto child must retain its account slot: {response}");
+    assert_eq!(d.wait_done(&run_id(&response), 15)["status"], "completed");
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 1,
+        "the selected child should execute once on the shared account");
+}
+
+#[test]
+fn manual_create_after_auto_claim_is_rejected_before_workspace_effects() {
+    let r = tmp();
+    let parent_repo = repo(&r.path().join("parent"));
+    let manual_repo = repo(&r.path().join("manual"));
+    let accounts = r.path().join("account-ids");
+    std::fs::create_dir_all(&accounts).unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS,FIXTURE_ACCOUNT_IDS_DIR"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "4000"),
+        ("FIXTURE_ACCOUNT_IDS_DIR", accounts.to_str().unwrap())]);
+    let auto_profile = d.call("profile.create", json!({"name":"Auto account","harness":"codex"}))["id"]
+        .as_str().unwrap().to_string();
+    let manual_profile = d.call("profile.create", json!({"name":"Manual alias","harness":"codex"}))["id"]
+        .as_str().unwrap().to_string();
+    for profile in [&auto_profile, &manual_profile] {
+        std::fs::write(accounts.join(profile), "shared-after-claim-account").unwrap();
+    }
+    d.call("auto.models.refresh", json!({"profile_id":manual_profile}));
+    let parent = run_id(&d.call("task.create", json!({"repo":parent_repo,
+        "harness":"codex-app","model":"gpt-6-astra","effort":"high",
+        "prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let auto = d.call("auto.dispatch", json!({"work_unit_id":"manual-after-auto-claim",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[auto_profile],"prompt":"browser check"}));
+    assert_eq!(auto["state"], "dispatched", "{auto}");
+    let child = run_id(&auto);
+    d.wait_status(&child, |status| status == "running", 10);
+    let before = d.call("state", json!({}));
+    for profile in [&auto_profile, &manual_profile] {
+        let error = d.try_call("task.create", json!({"repo":manual_repo,
+            "harness":"codex-app","profile_id":profile,
+            "model":"gpt-6-astra","effort":"high",
+            "prompt":format!("manual competing turn {profile}")})).unwrap_err();
+        assert!(error.contains("automatic account pool is in use"), "{error}");
+    }
+    let after = d.call("state", json!({}));
+    assert_eq!(after["runs"].as_array().unwrap().len(), before["runs"].as_array().unwrap().len());
+    assert_eq!(after["workspaces"].as_array().unwrap().len(),
+        before["workspaces"].as_array().unwrap().len(),
+        "an already claimed pool should be refused before creating a workspace");
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    let later = run_id(&d.call("task.create", json!({"repo":manual_repo,
+        "harness":"codex-app","profile_id":manual_profile,
+        "model":"gpt-6-astra","effort":"high",
+        "prompt":"manual after settlement"})));
+    assert_eq!(d.wait_done(&later, 15)["status"], "completed");
+}
+
+#[test]
+fn manual_create_delayed_after_precheck_settles_if_auto_claims_first() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::net::UnixStream;
+    use std::time::Instant;
+    let r = tmp();
+    let parent_repo = repo(&r.path().join("parent"));
+    let manual_repo = repo(&r.path().join("manual"));
+    let bin = r.path().join("bin");
+    std::fs::create_dir(&bin).unwrap();
+    let marker = r.path().join("manual-git-stalled");
+    let release = r.path().join("release-manual-git");
+    let wrapper = bin.join("git");
+    std::fs::write(&wrapper, format!("#!/bin/sh\nif [ \"$1\" = worktree ] && [ \"$2\" = add ] && [ \"$3\" = -b ]; then\n  case \"$4\" in overseer/manual-wait*)\n    printf x > '{}'\n    while [ ! -e '{}' ]; do /bin/sleep 0.05; done;;\n  esac\nfi\nexec /usr/bin/git \"$@\"\n", marker.display(), release.display())).unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap());
+    let d = Daemon::start(&[("PATH", &path),
+        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "4000")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":parent_repo,
+        "harness":"codex-app","model":"gpt-6-astra","effort":"high",
+        "prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let socket = d.socket();
+    let manual = std::thread::spawn(move || {
+        let mut conn = UnixStream::connect(socket).unwrap();
+        conn.set_read_timeout(Some(Duration::from_secs(15))).unwrap();
+        conn.write_all(format!("{}\n", json!({"id":1,"method":"task.create","params":{
+            "repo":manual_repo,"harness":"codex-app","model":"gpt-6-astra",
+            "effort":"high","title":"manual wait","prompt":"manual competing turn"}})).as_bytes()).unwrap();
+        let mut line = String::new();
+        BufReader::new(conn).read_line(&mut line).unwrap();
+        let reply: serde_json::Value = serde_json::from_str(&line).unwrap();
+        assert!(reply.get("error").is_none(), "{reply}");
+        reply["result"].clone()
+    });
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !marker.exists() {
+        assert!(Instant::now() < deadline, "manual create did not reach Git after precheck");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let auto = d.call("auto.dispatch", json!({"work_unit_id":"manual-git-race",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-codex"],"prompt":"browser check"}));
+    assert_eq!(auto["state"], "dispatched", "{auto}");
+    let child = run_id(&auto);
+    d.wait_status(&child, |status| status == "running", 10);
+    std::fs::write(&release, "go").unwrap();
+    let competing = manual.join().unwrap();
+    let competing_id = run_id(&competing);
+    assert_eq!(competing["run"]["status"], "failed", "{competing}");
+    assert!(competing["launch_error"].as_str().unwrap_or_default()
+        .contains("automatic account pool is in use"), "{competing}");
+    assert!(!d.events(&competing_id).iter().any(|event| event["kind"] == "turn_started"));
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
 }
 
 #[test]
@@ -5704,6 +5813,7 @@ fn auto_replay_does_not_claim_a_committed_but_unstarted_child_was_dispatched() {
 
 #[test]
 fn auto_managed_result_notice_failure_rolls_back_settlement_and_recovers_once() {
+    use std::time::Instant;
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
@@ -5719,9 +5829,16 @@ fn auto_managed_result_notice_failure_rolls_back_settlement_and_recovers_once() 
     db.execute_batch("CREATE TRIGGER fail_result_notice BEFORE INSERT ON events
         WHEN NEW.kind='managed_child_result_available'
         BEGIN SELECT RAISE(FAIL, 'fixture notice failure'); END;").unwrap();
-    std::thread::sleep(Duration::from_secs(7));
+    let deadline = Instant::now() + Duration::from_secs(15);
+    let current = loop {
+        let current = d.call("state", json!({}));
+        if current["turns"][&child].as_array().and_then(|turns| turns.last())
+            .is_some_and(|turn| turn["status"] == "completed") { break current; }
+        assert!(Instant::now() < deadline, "child turn did not complete before settlement");
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    std::thread::sleep(Duration::from_millis(500));
     assert_eq!(d.run(&child)["status"], "running", "failed notice must not leave a completed child without delivery");
-    let current = d.call("state", json!({}));
     assert_eq!(current["turns"][&child].as_array().unwrap().last().unwrap()["status"], "completed",
         "the turn-completion signal was durable before settlement failed");
     assert!(d.events(&parent).iter().all(|event| event["kind"] != "managed_child_result_available"));

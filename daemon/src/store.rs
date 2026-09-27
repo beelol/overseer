@@ -895,6 +895,22 @@ impl Store {
         Ok(claimed || self.active_run_on_known_account_pool(pool_id, None, None)?)
     }
 
+    /// A manual top-level turn must not enter an account already committed to
+    /// an Auto launch. A selected Auto root owns its own claim, and a parent
+    /// may coordinate the child it explicitly admitted under its budget.
+    pub fn auto_claim_conflicts_with_run(&self, profile_id: &str, run_id: &str) -> Result<bool> {
+        let Some(pool_id) = self.auto_account_pool_id(profile_id)? else { return Ok(false) };
+        Ok(self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM auto_pool_claims c
+                WHERE (c.pool_id=?1 OR c.pool_id='legacy/unresolved')
+                  AND c.state IN ('active','uncertain')
+                  AND NOT EXISTS(SELECT 1 FROM auto_root_intents i
+                    WHERE i.work_unit_id=c.work_unit_id AND i.run_id=?2)
+                  AND NOT EXISTS(SELECT 1 FROM auto_launch_intents i
+                    WHERE i.work_unit_id=c.work_unit_id AND i.parent_run_id=?2))",
+            params![pool_id, run_id], |row| row.get(0))?)
+    }
+
     /// Recognize active manual or automatic runs on another profile with a
     /// previously verified account identity. Unknown profile identities need
     /// separate admission treatment; this method never guesses equivalence.

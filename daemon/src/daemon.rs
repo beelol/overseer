@@ -21,6 +21,7 @@ pub const ACTIVE: &[&str] = &["queued", "starting", "running", "waiting_for_user
 const RAW_SEGMENTS_KEPT: u64 = 4;
 pub const DEFAULT_AUTO_EXECUTION_BUDGET_MS: u64 = 300_000;
 pub const DEFAULT_AUTO_PARENT_BUDGET_MS: u64 = 1_800_000;
+const MANUAL_POOL_CONFLICT: &str = "automatic account pool is in use; retry the manual turn after it settles";
 
 pub fn now() -> i64 {
     shim::now_ms() as i64
@@ -532,6 +533,11 @@ impl Daemon {
             }
             0
         };
+        if let Some(profile) = &profile {
+            if self.store.lock().unwrap().auto_claim_conflicts_with_run(&profile.id, "")? {
+                bail!("{MANUAL_POOL_CONFLICT}");
+            }
+        }
         let target_ref = p["target_ref"].as_str().filter(|s| !s.is_empty()).map(str::to_string);
         if let Some(t) = &target_ref {
             if git::rev_parse(&repo, t).is_none() {
@@ -1193,6 +1199,22 @@ impl Daemon {
         let workspace_gate = self.workspace_gate(&initial.workspace_id);
         let _workspace_guard = workspace_gate.lock().unwrap();
         let mut run = self.run(run_id)?;
+        if run.relation_source.is_none() {
+            if let Some(profile_id) = run.profile_id.as_deref() {
+                let claim_conflict = {
+                    let store = self.store.lock().unwrap();
+                    store.auto_claim_conflicts_with_run(profile_id, &run.id)?
+                };
+                if claim_conflict {
+                    if !follow_up {
+                        // The task/worktree already exists. Settle its unstarted run
+                        // so it does not remain a queued writer or a phantom pool user.
+                        self.mark_ended(&run, "failed", MANUAL_POOL_CONFLICT)?;
+                    }
+                    bail!("{MANUAL_POOL_CONFLICT}");
+                }
+            }
+        }
         if run.relation_source.as_deref() == Some("managed-delegation") {
             let store = self.store.lock().unwrap();
             let launch: Option<String> = store.conn.query_row(
