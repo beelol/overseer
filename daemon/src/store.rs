@@ -920,8 +920,10 @@ impl Store {
         Ok(self.conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM runs r
                 JOIN auto_account_identity a ON a.profile_id=r.profile_id
-                WHERE a.fingerprint=?1 AND r.status IN
+                WHERE a.fingerprint=?1 AND (r.status IN
                     ('queued','starting','running','waiting_for_user')
+                    OR EXISTS(SELECT 1 FROM turns t WHERE t.run_id=r.id
+                        AND t.status='running' AND t.ended_ms IS NULL))
                   AND (?2 IS NULL OR r.id<>?2)
                   AND (?3 IS NULL OR r.id<>?3))",
             params![fingerprint, except_run_id, except_parent_run_id], |row| row.get(0))?)
@@ -1146,6 +1148,29 @@ impl Store {
             params![t.id, t.run_id, t.n, t.prompt, t.snapshot_id, t.started_ms, t.ended_ms, t.status],
         )?;
         Ok(())
+    }
+
+    /// A completed manual run may prepare a follow-up while Auto is selecting
+    /// on another profile of the same account. Check the claim and make the
+    /// new open turn visible to Auto in one transaction; the old run status
+    /// alone cannot reserve that pool during follow-up preparation.
+    pub fn insert_turn_if_no_auto_claim(&self, t: &Turn, profile_id: &str) -> Result<bool> {
+        if t.status != "running" || t.ended_ms.is_some() {
+            return Err(anyhow!("manual turn admission requires an open turn"));
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        let saved_profile: Option<String> = self.conn.query_row(
+            "SELECT profile_id FROM runs WHERE id=?1", [&t.run_id], |row| row.get(0))
+            .optional()?.flatten();
+        if saved_profile.as_deref() != Some(profile_id) {
+            return Err(anyhow!("manual turn profile changed before admission"));
+        }
+        if self.auto_claim_conflicts_with_run(profile_id, &t.run_id)? {
+            return Ok(false);
+        }
+        self.insert_turn(t)?;
+        tx.commit()?;
+        Ok(true)
     }
 
     fn map_turn(row: &Row) -> rusqlite::Result<Turn> {
@@ -2496,6 +2521,17 @@ mod schema_migration_tests {
         store.conn.execute("UPDATE runs SET status='completed',ended_ms=1 WHERE id='manual'", []).unwrap();
         assert!(!store.auto_pool_claimed(&pool).unwrap(),
             "settlement releases the manual run's occupied pool");
+        let follow_up = Turn { id:"manual-follow-up".into(), run_id:"manual".into(), n:2,
+            prompt:"continue".into(), snapshot_id:None, started_ms:2, ended_ms:None,
+            status:"running".into() };
+        assert!(store.insert_turn_if_no_auto_claim(&follow_up, "manual-profile").unwrap());
+        assert!(store.auto_pool_claimed(&pool).unwrap(),
+            "the follow-up's open turn reserves the pool even while its run still says completed");
+        assert!(!store.auto_pool_claimed(&other).unwrap());
+        store.finish_open_turns("manual", "failed", 3).unwrap();
+        assert!(!store.auto_pool_claimed(&pool).unwrap(),
+            "a confirmed failed prelaunch turn releases that reservation");
+        store.conn.execute("DELETE FROM turns WHERE id='manual-follow-up'", []).unwrap();
         store.conn.execute("UPDATE runs SET id='parent',profile_id='auto-profile',status='running',ended_ms=NULL WHERE id='manual'", []).unwrap();
         assert!(store.auto_pool_claimed(&pool).unwrap());
         assert!(!store.auto_pool_claimed_for_child(&pool, "parent", Some(1)).unwrap(),

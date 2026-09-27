@@ -4816,6 +4816,106 @@ fn manual_create_delayed_after_precheck_settles_if_auto_claims_first() {
 }
 
 #[test]
+fn completed_manual_follow_up_rechecks_shared_pool_when_auto_claims_during_snapshot() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::net::UnixStream;
+    use std::time::Instant;
+    let r = tmp();
+    let parent_repo = repo(&r.path().join("parent"));
+    let manual_repo = repo(&r.path().join("manual"));
+    let accounts = r.path().join("account-ids");
+    let bin = r.path().join("bin");
+    std::fs::create_dir_all(&accounts).unwrap();
+    std::fs::create_dir_all(&bin).unwrap();
+    let active = r.path().join("stall-follow-up");
+    let marker = r.path().join("manual-follow-up-stalled");
+    let release = r.path().join("release-manual-follow-up");
+    let wrapper = bin.join("git");
+    std::fs::write(&wrapper, format!("#!/bin/sh\nif [ \"$1\" = commit-tree ] && [ -e '{}' ]; then\n  case \"$PWD:$4\" in *manual-followup*:overseer\\ run-start\\ snapshot*)\n    printf x > '{}'\n    while [ ! -e '{}' ]; do /bin/sleep 0.05; done;;\n  esac\nfi\nexec /usr/bin/git \"$@\"\n", active.display(), marker.display(), release.display())).unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap());
+    let d = Daemon::start(&[("PATH", &path),
+        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS,FIXTURE_ACCOUNT_IDS_DIR"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "8000"),
+        ("FIXTURE_ACCOUNT_IDS_DIR", accounts.to_str().unwrap())]);
+    let manual_profile = d.call("profile.create", json!({"name":"Manual","harness":"codex"}))["id"]
+        .as_str().unwrap().to_string();
+    let auto_profile = d.call("profile.create", json!({"name":"Auto alias","harness":"codex"}))["id"]
+        .as_str().unwrap().to_string();
+    for id in [&manual_profile, &auto_profile] {
+        std::fs::write(accounts.join(id), "shared-followup-account").unwrap();
+        d.call("auto.models.refresh", json!({"profile_id":id}));
+    }
+    let parent = run_id(&d.call("task.create", json!({"repo":parent_repo,
+        "harness":"codex-app","model":"gpt-6-astra","effort":"high",
+        "prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let manual = run_id(&d.call("task.create", json!({"repo":manual_repo,
+        "harness":"codex-app","profile_id":manual_profile,"model":"gpt-6-sol",
+        "effort":"medium","title":"manual-followup","prompt":"first manual turn"})));
+    assert_eq!(d.wait_done(&manual, 15)["status"], "completed");
+    let before = d.events(&manual).iter().filter(|event| event["kind"] == "turn_started").count();
+    std::fs::write(&active, "go").unwrap();
+    let socket = d.socket();
+    let manual_id = manual.clone();
+    let follow_up = std::thread::spawn(move || {
+        let mut conn = UnixStream::connect(socket).unwrap();
+        conn.set_read_timeout(Some(Duration::from_secs(30))).unwrap();
+        conn.write_all(format!("{}\n", json!({"id":1,"method":"run.follow_up",
+            "params":{"run_id":manual_id,"prompt":"second manual turn"}})).as_bytes()).unwrap();
+        let mut line = String::new();
+        BufReader::new(conn).read_line(&mut line).unwrap();
+        serde_json::from_str::<serde_json::Value>(&line).unwrap()
+    });
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !marker.exists() {
+        assert!(Instant::now() < deadline, "manual follow-up never reached its snapshot");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let auto = d.call("auto.dispatch", json!({"work_unit_id":"followup-account-race",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[auto_profile],"prompt":"browser check"}));
+    assert_eq!(auto["state"], "dispatched", "{auto}");
+    let child = run_id(&auto);
+    d.wait_status(&child, |status| status == "running", 10);
+    assert_eq!(d.run(&child)["status"], "running");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let active_claims: i64 = db.query_row("SELECT COUNT(*) FROM auto_pool_claims
+        WHERE state='active'", [], |row| row.get(0)).unwrap();
+    assert!(active_claims > 0, "the Auto child must still hold its durable account claim");
+    let manual_identity: String = db.query_row("SELECT fingerprint FROM auto_account_identity
+        WHERE profile_id=?1", [&manual_profile], |row| row.get(0)).unwrap();
+    let auto_identity: String = db.query_row("SELECT fingerprint FROM auto_account_identity
+        WHERE profile_id=?1", [&auto_profile], |row| row.get(0)).unwrap();
+    let claim_pool: String = db.query_row("SELECT pool_id FROM auto_pool_claims
+        WHERE state='active' LIMIT 1", [], |row| row.get(0)).unwrap();
+    assert_eq!(manual_identity, auto_identity, "the two profiles must share a verified account");
+    assert_eq!(claim_pool, format!("account/{manual_identity}"),
+        "the child claim must occupy the manual follow-up's account pool");
+    std::fs::write(&release, "go").unwrap();
+    let reply = follow_up.join().unwrap();
+    assert!(reply["error"]["message"].as_str().unwrap_or_default()
+        .contains("automatic account pool is in use"), "{reply}");
+    assert_eq!(d.events(&manual).iter().filter(|event| event["kind"] == "turn_started").count(), before,
+        "the rejected follow-up cannot start another turn");
+    assert_eq!(d.wait_done(&child, 20)["status"], "completed");
+    db.execute("UPDATE runs SET native_id=NULL WHERE id=?1", [&manual]).unwrap();
+    let error = d.try_call("run.follow_up", json!({"run_id":manual,
+        "prompt":"manual turn without a resumable session"})).unwrap_err();
+    assert!(error.contains("no native session id"), "{error}");
+    let open_turns: i64 = db.query_row("SELECT COUNT(*) FROM turns WHERE run_id=?1
+        AND status='running' AND ended_ms IS NULL", [&manual], |row| row.get(0)).unwrap();
+    assert_eq!(open_turns, 0, "a confirmed prelaunch failure cannot keep the pool reserved");
+    let after = d.call("auto.dispatch", json!({"work_unit_id":"followup-after-prelaunch-failure",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[auto_profile],"prompt":"browser check"}));
+    assert_eq!(after["state"], "dispatched", "{after}");
+    assert_eq!(d.wait_done(&run_id(&after), 20)["status"], "completed");
+}
+
+#[test]
 fn auto_recent_429_excludes_only_its_route_without_inventing_quota_exhaustion() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

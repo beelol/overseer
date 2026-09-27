@@ -1360,15 +1360,27 @@ impl Daemon {
                 let snap = self.take_snapshot(&ws, "run-start")?;
                 let n = self.store.lock().unwrap().turns(run_id)?.len() as i64 + 1;
                 let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt.into(), snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
-                self.store.lock().unwrap().insert_turn(&turn)?;
+                {
+                    let store = self.store.lock().unwrap();
+                    if let (None, Some(profile_id)) = (run.relation_source.as_deref(), run.profile_id.as_deref()) {
+                        if !store.insert_turn_if_no_auto_claim(&turn, profile_id)? {
+                            bail!("{MANUAL_POOL_CONFLICT}");
+                        }
+                    } else {
+                        store.insert_turn(&turn)?;
+                    }
+                }
                 self.emit(Some(&run.task_id), Some(run_id), "turn_started", "daemon", "exact", json!({"turn": turn, "snapshot": snap.commit_sha}))?;
                 turn
             }
         };
+        let mut external_effect_attempted = false;
+        let launch_result = (|| -> Result<()> {
         if follow_up && !continuity && ACTIVE.contains(&run.status.as_str()) {
             if let Some(line) = adapters::follow_up_via_stdin(&run.harness, prompt) {
+                external_effect_attempted = true;
                 self.send_stdin(&run, &line)?;
-                return Ok(turn);
+                return Ok(());
             }
         }
         let mut profile_env = match &run.profile_id {
@@ -1474,7 +1486,22 @@ impl Daemon {
             "sandbox":sandbox,
             "required_tools":generic_meta["required_tools"], "auto_selected":generic_meta["auto_selected"],
             "expected_account_generation":generic_meta["expected_account_generation"]});
+        external_effect_attempted = true;
         self.spawn_process(&run, &ws, launch, json!({"generic": generic_meta, "app": app}))?;
+        Ok(())
+        })();
+        if let Err(error) = launch_result {
+            if !external_effect_attempted && opts.retry_of.is_none() {
+                // Only a proven pre-effect failure may release this manual
+                // follow-up's temporary account occupancy. Once stdin or a
+                // supervisor launch was attempted, its outcome may be unknown.
+                self.store.lock().unwrap().conn.execute(
+                    "UPDATE turns SET status='failed',ended_ms=?3
+                     WHERE id=?1 AND run_id=?2 AND ended_ms IS NULL",
+                    rusqlite::params![turn.id, run.id, now()])?;
+            }
+            return Err(error);
+        }
         Ok(turn)
     }
 
