@@ -3720,6 +3720,51 @@ fn auto_running_parent_refreshes_stale_discovery_in_its_own_app_server_without_l
 }
 
 #[test]
+fn auto_running_parent_refreshes_expired_quota_even_with_fresh_model_and_tools() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("quota-only-refresh-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "9000"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"hold parent",
+        "approval_policy":"never","auto_routing":true})));
+    assert_eq!(d.wait_status(&parent, |status| status == "running", 10)["status"], "running");
+    let (_, launch_dir) = launch_info(&d, &parent);
+    let capability = std::fs::read_to_string(launch_dir.join("auto-bridge.cap")).unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let (seq, encoded): (i64, String) = db.query_row(
+        "SELECT event_seq,snapshot FROM auto_quota_observations WHERE pool_id='system-codex' \
+         ORDER BY observed_ms DESC,event_seq DESC LIMIT 1", [],
+        |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    let mut snapshot: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+    snapshot["expires_ms"] = json!(1);
+    for window in snapshot["windows"].as_array_mut().unwrap() {
+        window["expires_ms"] = json!(1);
+    }
+    db.execute("UPDATE auto_quota_observations SET snapshot=?2 WHERE event_seq=?1",
+        rusqlite::params![seq, snapshot.to_string()]).unwrap();
+    let before = std::fs::read_to_string(&trace).unwrap();
+    let selected = d.call("auto.bridge.submit", json!({"run_id":parent,
+        "capability":capability.trim(),"work_unit_id":"expired-parent-quota-browser",
+        "min_tier":"general","required_tools":["browser/navigate"],
+        "prompt":"bounded browser audit","title":"browser audit"}));
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    assert_eq!(selected["run"]["model"], "gpt-6-sol");
+    assert_eq!(d.run(&parent)["status"], "running");
+    let after = std::fs::read_to_string(&trace).unwrap();
+    assert!(after.matches("metadata_done").count() > before.matches("metadata_done").count(),
+        "expired allowance must trigger a bounded same-session refresh");
+    let refreshed: i64 = db.query_row(
+        "SELECT COUNT(*) FROM auto_quota_observations WHERE source='codex-app/active-parent-metadata' AND event_seq>?1",
+        [seq], |row| row.get(0)).unwrap();
+    assert_eq!(refreshed, 1, "the parent session must save exactly one new allowance observation");
+    assert_eq!(d.wait_done(&run_id(&selected), 15)["status"], "completed");
+}
+
+#[test]
 fn auto_running_parent_refresh_refuses_changed_account_without_child() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

@@ -58,6 +58,16 @@ pub enum QuotaBlockScope {
 }
 
 impl QuotaSnapshot {
+    /// A retained observation can authorize capacity only until its own or
+    /// any bucket's expiry/reset. Clock rollback also requires a new read.
+    /// The caller decides whether its source supports a bounded refresh.
+    pub fn needs_refresh(&self, now_ms: i64) -> bool {
+        now_ms < self.observed_ms || now_ms >= self.expires_ms
+            || self.windows.iter().any(|window| now_ms < window.observed_ms
+                || now_ms >= window.expires_ms
+                || window.reset_ms.is_some_and(|reset| reset <= now_ms))
+    }
+
     /// Only a single, reported plan across every retained bucket can scope a
     /// cumulative thread sample. Missing or conflicting plans remain unknown.
     pub fn reported_plan_type(&self) -> Option<&str> {
@@ -617,6 +627,7 @@ mod tests {
             "primary":{"usedPercent":100,"resetsAt":1800000060,"windowDurationMins":300}}});
         let snapshot = parse_codex_rate_limits(&payload, "pool-1", now).unwrap();
         assert_eq!(snapshot.state_for("gpt-6-sol", now), QuotaState::Exhausted);
+        assert!(!snapshot.needs_refresh(now + 59_999));
         assert_eq!(
             snapshot.state_for("gpt-6-sol", now + 59_999),
             QuotaState::Exhausted
@@ -625,6 +636,7 @@ mod tests {
             snapshot.state_for("gpt-6-sol", now + 60_000),
             QuotaState::Unknown
         );
+        assert!(snapshot.needs_refresh(now + 60_000));
         let early_reset = parse_codex_rate_limits(
             &json!({"ordinaryUsageAllowed":true,"rateLimits":{
             "primary":{"usedPercent":100,"resetsAt":1800000030,"windowDurationMins":300}}}),
@@ -636,6 +648,7 @@ mod tests {
             early_reset.state_for("gpt-6-sol", now + 30_000),
             QuotaState::Unknown
         );
+        assert!(early_reset.needs_refresh(now + 30_000));
         let denied = parse_codex_rate_limits(
             &json!({"ordinaryUsageAllowed":false,"rateLimits":null}),
             "pool-1",
@@ -661,6 +674,7 @@ mod tests {
             "primary":{"usedPercent":30,"resetsAt":1800003600}}}), "pool-1", observed).unwrap();
         assert_eq!(available.state_for("gpt-6-sol", observed - 1), QuotaState::Unknown,
             "clock rollback must not carry a capacity claim into the past");
+        assert!(available.needs_refresh(observed - 1));
     }
 
     #[test]

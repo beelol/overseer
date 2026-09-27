@@ -644,15 +644,16 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
             let tools: crate::auto_route::ToolCatalog =
                 serde_json::from_value(saved["tool_catalog"].clone())?;
             let now_ms = crate::daemon::now();
+            let observations = store.auto_account_quota_observations(profile_id)?;
+            let observation = observations.iter().find(|value| value.pool_id == profile_id).cloned();
             if now_ms < catalog.observed_ms || now_ms >= catalog.expires_ms
-                || now_ms < tools.observed_ms || now_ms >= tools.expires_ms {
+                || now_ms < tools.observed_ms || now_ms >= tools.expires_ms
+                || observation.as_ref().is_some_and(|value| value.snapshot.needs_refresh(now_ms)) {
                 let parent = active[0].clone();
                 drop(store);
                 return refresh_active_parent_discovery(d, &parent, profile_id,
                     workspace_id, generation, deadline);
             }
-            let observations = store.auto_account_quota_observations(profile_id)?;
-            let observation = observations.iter().find(|value| value.pool_id == profile_id).cloned();
             let pool_id = store.auto_account_pool_id(profile_id)?
                 .ok_or_else(|| anyhow!("Codex account pool identity unavailable"))?;
             let mut routes = crate::auto_route::codex_auto_routes(&catalog, &tools,
