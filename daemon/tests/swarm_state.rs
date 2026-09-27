@@ -311,6 +311,48 @@ fn large_plan_pages_without_loading_every_job() {
 }
 
 #[test]
+fn large_run_readout_counts_states_without_inventing_live_workers() {
+    let mut d = Daemon::start(&[]);
+    let made = d.call("swarm.create", json!({"category":"Large readout",
+        "objective":"Audit one hundred modules","allowed_targets":["system-codex"]}));
+    let id = made["id"].as_str().unwrap();
+    let jobs: Vec<_> = (0..100).map(|n| json!({"id":format!("job-{n:03}"),
+        "title":format!("Module {n}"),"acceptance":"evidence","deps":[]})).collect();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":jobs}));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute("UPDATE swarm_jobs SET status='running' WHERE run_id=?1 AND id<'job-032'",[id]).unwrap();
+    db.execute("UPDATE swarm_jobs SET status='submitted' WHERE run_id=?1 AND id>='job-032' AND id<'job-040'",[id]).unwrap();
+    db.execute("UPDATE swarm_jobs SET status='blocked' WHERE run_id=?1 AND id>='job-040' AND id<'job-044'",[id]).unwrap();
+    let state = d.call("swarm.get",json!({"id":id}));
+    assert_eq!(state["job_counts"]["total"],100);
+    assert_eq!(state["job_counts"]["by_status"]["running"],32);
+    assert_eq!(state["job_counts"]["by_status"]["submitted"],8);
+    assert_eq!(state["job_counts"]["by_status"]["blocked"],4);
+    assert_eq!(state["job_counts"]["by_status"]["ready"],56);
+    assert_eq!(state["active_worker_processes"],0);
+    assert_eq!(state["registered_attempts"],0);
+    let first = d.call("swarm.jobs",json!({"id":id,"status":"running","limit":20}));
+    assert_eq!(first["jobs"].as_array().unwrap().len(),20);
+    let second = d.call("swarm.jobs",json!({"id":id,"status":"running","limit":20,
+        "cursor":first["next_cursor"]}));
+    assert_eq!(second["jobs"].as_array().unwrap().len(),12);
+    assert!(second["next_cursor"].is_null());
+    assert_eq!(d.call("swarm.jobs",json!({"id":id,"status":"blocked"}))["jobs"]
+        .as_array().unwrap().len(),4);
+    assert!(d.try_call("swarm.jobs",json!({"id":id,"status":"unknown"})).is_err());
+    let owner = d.call("swarm.director.owner.begin",json!({"run_id":id,"generation":1}));
+    let readout = d.call("swarm.get",json!({"id":id}));
+    assert_eq!(readout["director"]["owner_status"],"active");
+    assert!(readout["director"]["overseer_run_id"].is_null());
+    assert!(!readout.to_string().contains(owner["owner_token"].as_str().unwrap()));
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["job_counts"],state["job_counts"]);
+    assert_eq!(d.call("swarm.jobs",json!({"id":id,"status":"submitted"}))["jobs"]
+        .as_array().unwrap().len(),8);
+}
+
+#[test]
 fn ready_window_materializes_only_one_hundred_jobs_and_refills_after_admission() {
     let mut d = Daemon::start(&[]);
     let made = d.call("swarm.create", json!({"category":"Ready window",

@@ -56,6 +56,7 @@ use anyhow::{anyhow, bail, Result};
 use plan::JobSpec;
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 
 fn required<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
     p[key]
@@ -243,6 +244,34 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
     run["completion"] = completion::get(store, id)?;
     run["availability"] = availability::get(store, id)?;
     run["benefit"] = benefit::get_state(store, id, run["revision"].as_i64().unwrap_or(0))?;
+    let mut job_counts = BTreeMap::<String, i64>::new();
+    let mut stmt = store.conn.prepare(
+        "SELECT status,COUNT(*) FROM swarm_jobs WHERE run_id=?1 GROUP BY status",
+    )?;
+    for row in stmt.query_map([id], |row| Ok((row.get::<_,String>(0)?,row.get::<_,i64>(1)?)))? {
+        let (status, count) = row?;
+        job_counts.insert(status, count);
+    }
+    run["job_counts"] = json!({"total":job_counts.values().sum::<i64>(),
+        "by_status":job_counts});
+    run["registered_attempts"] = json!(store.conn.query_row(
+        "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND status='registered'",
+        [id], |row| row.get::<_,i64>(0))?);
+    // A job marked running or an attempt still registered does not prove a
+    // supervised process is running. Count only linked runs reported running
+    // by the daemon, separately from job and attempt states.
+    run["active_worker_processes"] = json!(store.conn.query_row(
+        "SELECT COUNT(*) FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+         WHERE l.run_id=?1 AND r.ended_ms IS NULL AND r.status IN
+         ('running','waiting_for_user')",
+        [id], |row| row.get::<_,i64>(0))?);
+    run["director"] = store.conn.query_row(
+        "SELECT o.status,o.overseer_run_id,r.status FROM swarm_director_owners o
+         LEFT JOIN runs r ON r.id=o.overseer_run_id WHERE o.run_id=?1",
+        [id], |row| Ok(json!({"owner_status":row.get::<_,String>(0)?,
+            "overseer_run_id":row.get::<_,Option<String>>(1)?,
+            "process_status":row.get::<_,Option<String>>(2)?})),
+    ).optional()?.unwrap_or(Value::Null);
     if run["status"] == "stopping" {
         let count: i64 = store.conn.query_row(
             "SELECT COUNT(*) FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
@@ -386,10 +415,18 @@ pub fn jobs(store: &Store, p: &Value) -> Result<Value> {
     get(store, id)?;
     let cursor = p["cursor"].as_str().unwrap_or("");
     let limit = p["limit"].as_i64().unwrap_or(50).clamp(1, 100);
+    let status = match p.get("status") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(status)) if ["planned","ready","reserved","launching",
+            "running","submitted","blocked","accepted","rejected","failed","cancel_requested",
+            "cancelled"].contains(&status.as_str()) => Some(status.as_str()),
+        _ => bail!("invalid job status filter"),
+    };
     let mut stmt = store
         .conn
-        .prepare("SELECT * FROM swarm_jobs WHERE run_id=?1 AND id>?2 ORDER BY id LIMIT ?3")?;
-    let rows = stmt.query_map(params![id,cursor,limit+1], |r| {
+        .prepare("SELECT * FROM swarm_jobs WHERE run_id=?1 AND id>?2
+            AND (?3 IS NULL OR status=?3) ORDER BY id LIMIT ?4")?;
+    let rows = stmt.query_map(params![id,cursor,status,limit+1], |r| {
         let deps: String = r.get("deps")?;
         let resource_claims: String = r.get("resource_claims")?;
         Ok(json!({

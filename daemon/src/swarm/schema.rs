@@ -88,6 +88,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           PRIMARY KEY(run_id,id)
         );
         CREATE INDEX IF NOT EXISTS swarm_jobs_page ON swarm_jobs(run_id,id);
+        CREATE INDEX IF NOT EXISTS swarm_jobs_status_page ON swarm_jobs(run_id,status,id);
         CREATE TABLE IF NOT EXISTS swarm_attempts(
           id TEXT PRIMARY KEY,
           run_id TEXT NOT NULL,
