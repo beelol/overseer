@@ -41,9 +41,9 @@
         "agents": [
           "Dashboard demo",
           "Dashboard demo",
-          "codex (existing login)",
-          "claude (existing login)",
-          "opencode (existing login)"
+          "Your login",
+          "Your login",
+          "Your login"
         ]
       }
     },

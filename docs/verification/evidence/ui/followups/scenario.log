@@ -1,0 +1,24 @@
+[2026-09-27T00:21:04.732Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T00:21:10.114Z] PASS the composer says "What's next?" beside the Overseer mark, with "Send off a task" in the field {"title":"What's next?","mark":"Overseer","svg":true,"codicon":false,"placeholder":"Send off a task"}
+[2026-09-27T00:21:11.979Z] screenshot docs/verification/evidence/ui/followups/01-composer-overseer-dark.png
+[2026-09-27T00:21:13.849Z] screenshot docs/verification/evidence/ui/followups/02-composer-overseer-light.png
+[2026-09-27T00:21:15.693Z] screenshot docs/verification/evidence/ui/followups/03-composer-default-high-contrast.png
+[2026-09-27T00:21:20.310Z] screenshot docs/verification/evidence/ui/followups/04-composer-360.png
+[2026-09-27T00:21:21.561Z] screenshot docs/verification/evidence/ui/followups/05-composer-480.png
+[2026-09-27T00:21:22.815Z] screenshot docs/verification/evidence/ui/followups/06-composer-640.png
+[2026-09-27T00:21:24.083Z] screenshot docs/verification/evidence/ui/followups/07-composer-900.png
+[2026-09-27T00:21:24.085Z] composer widths [{"target":360,"editor":358,"composer":310,"inside":[],"rows":2,"overflow":0,"docOverflow":false},{"target":480,"editor":478,"composer":430,"inside":[],"rows":2,"overflow":0,"docOverflow":false},{"target":640,"editor":638,"composer":590,"inside":[],"rows":2,"overflow":0,"docOverflow":false},{"target":900,"editor":898,"composer":720,"inside":[],"rows":1,"overflow":0,"docOverflow":false}]
+[2026-09-27T00:21:24.085Z] PASS at editor widths 360, 480, 640 and 900 px no choice sits inside the text field, at most two rows of choices, nothing overflows [{"target":360,"editor":358,"composer":310,"inside":[],"rows":2,"overflow":0,"docOverflow":false},{"target":480,"editor":478,"composer":430,"inside":[],"rows":2,"overflow":0,"docOverflow":false},{"target":640,"editor":638,"composer":590,"inside":[],"rows":2,"overflow":0,"docOverflow":false},{"target":900,"editor":898,"composer":720,"inside":[],"rows":1,"overflow":0,"docOverflow":false}]
+[2026-09-27T00:21:31.888Z] screenshot docs/verification/evidence/ui/followups/08-names.png
+[2026-09-27T00:21:31.888Z] PASS account names say the harness once (chat header, agent chip and menu, Accounts view); the machine's own login reads "Your login" {"chatHeader":"Your login\n·\nname-check","agentChip":"Codex · Your login","agentMenu":["Your login pro","Your login max","Your login signed out","Run a program"],"accounts":["ChatGPT","Your loginpro · 55b9da0f · desktop","Claude","Your loginmax · 49d8e90c · desktop"]}
+[2026-09-27T00:21:36.695Z] screenshot docs/verification/evidence/ui/followups/09-search-row.png
+[2026-09-27T00:21:36.695Z] PASS ⌥⌘F from the editor starts a search; the query is the first row of the Agents list with its match count, within 200 ms {"openedFromEditor":true,"first":{"label":"“beta”","description":"1 match","icon":"search"},"ms":37,"labels":["“beta”","followups-repo","Beta docs"]}
+[2026-09-27T00:21:43.461Z] PASS ⌥⌘F also works from the side bar; Escape and the row's ✕ each clear the search and bring the list back {"openedFromSide":true,"clearedByKey":true,"clearedByMouse":true}
+[2026-09-27T00:21:45.988Z] screenshot docs/verification/evidence/ui/followups/10-grid-with-nothing.png
+[2026-09-27T00:21:45.988Z] PASS with no agent working or pinned, the grid command goes to the home composer with a one-line note (no empty grid screen) {"mode":"composer","note":"No agent is working or pinned yet, so the grid has nothing to show. Start one here.","emptyText":false}
+[2026-09-27T00:21:49.915Z] PASS when the last tile goes, the grid gives way to the home composer {"back":true,"backNote":"The grid is empty: no agent is working or pinned. Start one here."}
+[2026-09-27T00:22:05.145Z] screenshot docs/verification/evidence/ui/followups/11-grid-nine-dark.png
+[2026-09-27T00:22:12.092Z] screenshot docs/verification/evidence/ui/followups/12-dashboard-nine-dark.png
+[2026-09-27T00:22:21.393Z] screenshot docs/verification/evidence/ui/followups/13-grid-nine-light.png
+[2026-09-27T00:22:28.343Z] screenshot docs/verification/evidence/ui/followups/14-dashboard-nine-light.png
+[2026-09-27T00:22:33.091Z] PASS the grid and dashboard mode are captured with nine working agents in both Overseer themes (nine tiles each time) {"counts":[9,9]}

@@ -1,0 +1,131 @@
+{
+  "checks": [
+    {
+      "name": "the composer says \"What's next?\" beside the Overseer mark, with \"Send off a task\" in the field",
+      "ok": true,
+      "detail": {
+        "title": "What's next?",
+        "mark": "Overseer",
+        "svg": true,
+        "codicon": false,
+        "placeholder": "Send off a task"
+      }
+    },
+    {
+      "name": "at editor widths 360, 480, 640 and 900 px no choice sits inside the text field, at most two rows of choices, nothing overflows",
+      "ok": true,
+      "detail": [
+        {
+          "target": 360,
+          "editor": 358,
+          "composer": 310,
+          "inside": [],
+          "rows": 2,
+          "overflow": 0,
+          "docOverflow": false
+        },
+        {
+          "target": 480,
+          "editor": 478,
+          "composer": 430,
+          "inside": [],
+          "rows": 2,
+          "overflow": 0,
+          "docOverflow": false
+        },
+        {
+          "target": 640,
+          "editor": 638,
+          "composer": 590,
+          "inside": [],
+          "rows": 2,
+          "overflow": 0,
+          "docOverflow": false
+        },
+        {
+          "target": 900,
+          "editor": 898,
+          "composer": 720,
+          "inside": [],
+          "rows": 1,
+          "overflow": 0,
+          "docOverflow": false
+        }
+      ]
+    },
+    {
+      "name": "account names say the harness once (chat header, agent chip and menu, Accounts view); the machine's own login reads \"Your login\"",
+      "ok": true,
+      "detail": {
+        "chatHeader": "Your login\n·\nname-check",
+        "agentChip": "Codex · Your login",
+        "agentMenu": [
+          "Your login pro",
+          "Your login max",
+          "Your login signed out",
+          "Run a program"
+        ],
+        "accounts": [
+          "ChatGPT",
+          "Your loginpro · 55b9da0f · desktop",
+          "Claude",
+          "Your loginmax · 49d8e90c · desktop"
+        ]
+      }
+    },
+    {
+      "name": "⌥⌘F from the editor starts a search; the query is the first row of the Agents list with its match count, within 200 ms",
+      "ok": true,
+      "detail": {
+        "openedFromEditor": true,
+        "first": {
+          "label": "“beta”",
+          "description": "1 match",
+          "icon": "search"
+        },
+        "ms": 37,
+        "labels": [
+          "“beta”",
+          "followups-repo",
+          "Beta docs"
+        ]
+      }
+    },
+    {
+      "name": "⌥⌘F also works from the side bar; Escape and the row's ✕ each clear the search and bring the list back",
+      "ok": true,
+      "detail": {
+        "openedFromSide": true,
+        "clearedByKey": true,
+        "clearedByMouse": true
+      }
+    },
+    {
+      "name": "with no agent working or pinned, the grid command goes to the home composer with a one-line note (no empty grid screen)",
+      "ok": true,
+      "detail": {
+        "mode": "composer",
+        "note": "No agent is working or pinned yet, so the grid has nothing to show. Start one here.",
+        "emptyText": false
+      }
+    },
+    {
+      "name": "when the last tile goes, the grid gives way to the home composer",
+      "ok": true,
+      "detail": {
+        "back": true,
+        "backNote": "The grid is empty: no agent is working or pinned. Start one here."
+      }
+    },
+    {
+      "name": "the grid and dashboard mode are captured with nine working agents in both Overseer themes (nine tiles each time)",
+      "ok": true,
+      "detail": {
+        "counts": [
+          9,
+          9
+        ]
+      }
+    }
+  ]
+}

@@ -49,7 +49,7 @@
       "ok": true,
       "detail": {
         "showcase": {
-          "aria": "Refresh sessions once, done, claude, claude (existing login)",
+          "aria": "Refresh sessions once, done, claude, Your login",
           "level": 2,
           "label": "Refresh sessions once",
           "description": "now",
@@ -220,8 +220,8 @@
         "Migration dry-run, Failed: exit code 1",
         "Refresh sessions once, Review: 2 files changed",
         "web-app, 2 agents, 1 active",
-        "Add a changelog entry, needs you, claude, claude (existing login)",
-        "Refresh sessions once, done, claude, claude (existing login)",
+        "Add a changelog entry, needs you, claude, Your login",
+        "Refresh sessions once, done, claude, Your login",
         "api-server, 2 agents, 1 active",
         "Watch the build, working, generic",
         "Migration dry-run, failed, generic"
