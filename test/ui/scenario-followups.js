@@ -126,6 +126,22 @@ const { auditExpression } = require('./audit');
     const clearedByMouse = afterX.value === '' && shown.includes('Alpha refactor');
     check('⌥⌘F also works from the side bar; Escape and the field\'s ✕ each clear the search and bring the list back', openedFromSide && narrowed && clearedByKey && clearedByMouse, { openedFromSide, narrowed, clearedByKey, clearedByMouse });
 
+    // The space under the field holds the status filters (VS Code gives a webview pane a minimum height).
+    const clickFilter = async value => { const f = await s.searchFrame(); const at = await s.webviewPoint(f, `[data-filter="${value}"]`); await cdp.click(at.x, at.y); await delay(900); return f; };
+    s.ctl('task.archive', { task_id: state().tasks.find(t => t.title === 'Alpha refactor').id, archived: true }); await delay(800);
+    const running = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'sleep 60'], prompt: '', title: 'Still working' }); loops.push(running.run.id); await delay(1500);
+    let ff = await clickFilter('working'); const onlyWorking = await agentLabels(); const workingCount = await ff.eval(`window.__overseerSearch.count()`);
+    await s.screenshot('filter-working');
+    ff = await clickFilter('done'); const onlyDone = await agentLabels();
+    ff = await clickFilter('archived'); const onlyArchived = await agentLabels();
+    ff = await clickFilter('all'); const everything = await agentLabels();
+    check('the status filters under the field narrow the list (Working, Done, Archived) and All brings it back; the field says how many are shown',
+      onlyWorking.includes('Still working') && !onlyWorking.includes('Beta docs') && workingCount === '1 agent' && onlyDone.includes('Beta docs') && !onlyDone.includes('Still working') &&
+      onlyArchived.includes('Alpha refactor') && !onlyArchived.includes('Beta docs') && everything.includes('Beta docs') && everything.includes('Still working') && !everything.includes('Alpha refactor'),
+      { onlyWorking, workingCount, onlyDone, onlyArchived, everything });
+    await theme('Overseer Light'); await s.screenshot('search-field-light'); await theme('Overseer Dark');
+    s.ctl('run.interrupt', { run_id: running.run.id }); await delay(1500);
+
     // AC-113: no empty grid. Nothing working and nothing pinned: the grid command goes home with a note.
     for (let i = 0; i < 40 && state().runs.some(r => ACTIVE.includes(r.status)); i++) await delay(300);
     await cdp.command('Overseer: Toggle Agent Grid'); await delay(1500);

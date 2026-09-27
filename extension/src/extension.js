@@ -35,7 +35,14 @@ async function activate(context) {
   const accounts = new AccountsProvider(model, context.extensionUri);
   const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true, dragAndDropController: agentDrag() });
   // The search field above the Agents list (AC-112): typing filters the list through the daemon's search.
-  const searchView = new SearchView(context.extensionUri, { onQuery: q => runAgentSearch(q) });
+  const searchView = new SearchView(context.extensionUri, { onQuery: q => runAgentSearch(q), onFilter: kind => setStatusFilter(kind) });
+  /** The search field's filters: All, Working, Needs you, Done, Failed, Archived. */
+  function setStatusFilter(kind) {
+    agents.showArchived = kind === 'archived';
+    agents.statusFilter = ['working', 'needs', 'done', 'failed'].includes(kind) ? kind : 'all';
+    vscode.commands.executeCommand('setContext', 'overseer.showArchived', agents.showArchived);
+    setAgentFilter(agents.filter);
+  }
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('overseer.search', searchView, { webviewOptions: { retainContextWhenHidden: true } }));
   const accountsView = vscode.window.createTreeView('overseer.accounts', { treeDataProvider: accounts });
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(agents.decorations));
@@ -203,9 +210,11 @@ async function activate(context) {
     agents.refresh();
     // The match count sits beside the view title (not the debounced tree message).
     // Matches in the list shown (active agents, or archived ones under Show Archived).
-    const shown = filter ? [...filter.taskIds].filter(id => { const t = model.task(id); return t && !!t.archived_ms === !!agents.showArchived; }).length : 0;
+    // How many agents the list shows, said in the search field while a search or a filter is on.
+    const narrowed = filter || agents.statusFilter !== 'all' || agents.showArchived;
+    const shown = narrowed ? agents.visibleTasks().length : 0;
     agentsView.description = undefined;
-    searchView.setCount(filter ? `${shown} match${shown === 1 ? '' : 'es'}` : '');
+    searchView.setCount(narrowed ? `${shown} ${filter ? `match${shown === 1 ? '' : 'es'}` : `agent${shown === 1 ? '' : 's'}`}` : '');
     vscode.commands.executeCommand('setContext', 'overseer.agentsFiltered', !!filter);
     // Keep the selected agent in view (and selected) when the list changes shape.
     if (selectedRun && (!filter || filter.taskIds.has(model.run(selectedRun)?.task_id))) setTimeout(() => revealInTree(selectedRun), 150);
@@ -609,8 +618,8 @@ async function activate(context) {
     })),
     vscode.commands.registerCommand('overseer.searchAgents', guard(searchAgents)),
     vscode.commands.registerCommand('overseer.clearAgentSearch', guard(async () => { searchSeq++; setAgentFilter(undefined); searchView.clear(); })),
-    vscode.commands.registerCommand('overseer.showArchived', guard(async () => { agents.showArchived = true; setAgentFilter(undefined); vscode.commands.executeCommand('setContext', 'overseer.showArchived', true); })),
-    vscode.commands.registerCommand('overseer.hideArchived', guard(async () => { agents.showArchived = false; agents.refresh(); vscode.commands.executeCommand('setContext', 'overseer.showArchived', false); })),
+    vscode.commands.registerCommand('overseer.showArchived', guard(async () => { searchView.setFilter('archived'); setStatusFilter('archived'); vscode.commands.executeCommand('setContext', 'overseer.showArchived', true); })),
+    vscode.commands.registerCommand('overseer.hideArchived', guard(async () => { searchView.setFilter('all'); setStatusFilter('all'); vscode.commands.executeCommand('setContext', 'overseer.showArchived', false); })),
     // Delete on an archived row (Show Archived) restores it, as it did in the Gate J rail.
     vscode.commands.registerCommand('overseer.archiveAgent', guard(async arg => { const task = agentTask(arg); if (task) { await client.request('task.archive', { task_id: task.id, archived: !task.archived_ms }); await model.refresh(); } })),
     vscode.commands.registerCommand('overseer.restoreAgent', guard(async arg => { const task = agentTask(arg); if (task) { await client.request('task.archive', { task_id: task.id, archived: false }); await model.refresh(); } })),

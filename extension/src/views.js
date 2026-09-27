@@ -71,6 +71,7 @@ class AgentsProvider {
     this.collapsed = new Set(memento?.get('overseer.collapsed', []) || []);
     this.filter = undefined; // { query, taskIds: Set }
     this.showArchived = false;
+    this.statusFilter = 'all'; // 'all' | 'working' | 'needs' | 'done' | 'failed' (the search field's filters)
     this.emitter = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.emitter.event;
     // Redraw only when something the list shows changed: a redraw between a click's mouse-down and
@@ -132,15 +133,25 @@ class AgentsProvider {
   kidsOf(runId) { return this.index().kids.get(runId) || []; }
   visibleTasks() {
     const ix = this.index();
-    const key = `${this.showArchived}|${this.filter ? this.filter.query + ':' + this.filter.taskIds.size : ''}`;
+    const key = `${this.showArchived}|${this.statusFilter}|${this.filter ? this.filter.query + ':' + this.filter.taskIds.size : ''}`;
     if (ix.visible.has(key)) return ix.visible.get(key);
     const archived = t => !!t.archived_ms;
     const list = this.model.state.tasks.filter(t => ix.roots.has(t.id))
       // Search looks within the list shown: active agents, or archived ones under Show Archived.
-      .filter(t => (!this.filter || this.filter.taskIds.has(t.id)) && (this.showArchived ? archived(t) : !archived(t)))
+      .filter(t => (!this.filter || this.filter.taskIds.has(t.id)) && (this.showArchived ? archived(t) : !archived(t)) && this.statusMatches(t))
       .map(t => ({ t, at: this.lastActivity(t) })).sort((a, b) => b.at - a.at).map(x => x.t);
     ix.visible.set(key, list);
     return list;
+  }
+  /** The search field's status filter, on the task's root run. */
+  statusMatches(task) {
+    if (this.statusFilter === 'all') return true;
+    const r = this.rootOf(task); if (!r) return false;
+    if (this.statusFilter === 'needs') return (this.handlers.attention?.() || []).some(a => a.run_id === r.id);
+    if (this.statusFilter === 'working') return ACTIVE.has(r.status) && r.status !== 'waiting_for_user';
+    if (this.statusFilter === 'done') return r.status === 'completed' || r.status === 'interrupted';
+    if (this.statusFilter === 'failed') return r.status === 'failed' || r.status === 'disconnected';
+    return true;
   }
   lastActivity(task) {
     const r = this.rootOf(task);
@@ -161,7 +172,7 @@ class AgentsProvider {
     if (!node) {
       if (m.error) return [{ item: Object.assign(new vscode.TreeItem(`Daemon unavailable: ${m.error}`), { iconPath: new vscode.ThemeIcon('warning') }) }];
       const out = [];
-      const needs = this.filter || this.showArchived ? [] : (this.handlers.attention?.() || []);
+      const needs = this.filter || this.showArchived || this.statusFilter !== 'all' ? [] : (this.handlers.attention?.() || []);
       if (needs.length) out.push(this.needsSection(needs));
       const repos = [...new Set(this.visibleTasks().map(t => t.repo_root))];
       for (const repo of repos) out.push(this.repoNode(repo));
