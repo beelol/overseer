@@ -40,10 +40,10 @@ const rss = pattern => { const out = cp.spawnSync('ps', ['-axo', 'rss=,command='
     const main = tasks[0];
     const ws = main.workspace.path;
     await delay(45000); // all 100 files changed at least once
-    const icon = await cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.activitybar .action-item a, .activitybar .action-label')].find(a => /^Overseer/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const b = a.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000);
-    await cdp.click(icon.x, icon.y);
-    const row = await cdp.waitFor(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top); const i = rows.findIndex(r => r.textContent.includes('load run 0')); const r = rows[i + 1]; if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 20000);
-    await cdp.click(row.x, row.y);
+    // Gate K and later: select the agent in the Overseer side bar; its review opens beside the chat.
+    await s.selectAgent('load run 0', { settle: 3000 });
+    const reviewProbe = `document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(ws)})`;
+    if (!(await cdp.webview(reviewProbe, 15000).then(() => true, () => false))) await cdp.command('Overseer: Open Review');
     const review = await cdp.webview(`document.getElementById('workspace-note')?.textContent.includes(${JSON.stringify(ws)})`, 60000);
     await review.waitFor(`document.querySelectorAll('.diff-file').length >= 100`, 60000);
     check('review lists the 100 changed files of the selected run (10k tracked)', true, await review.eval(`document.querySelectorAll('.diff-file').length`));
