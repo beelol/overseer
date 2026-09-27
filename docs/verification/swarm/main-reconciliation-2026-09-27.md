@@ -113,3 +113,18 @@ current Gate K chat and adds live Codex UI evidence. Future Swarm launch/readout
 qualification should use that current surface, not legacy panel selectors.
 It does not exercise a Swarm launch or change daemon scheduling. SWARM-01/25/39/63
 remain unverified; no fixture result is promoted to live evidence by this merge.
+
+## Subsequent published main: `b55f558`
+
+The branch merged main through `b55f558`. Gate P now records AC-151 as partial:
+in its live Claude Code 2.1.246 rerun, a background native subagent answered but
+the parent did not finish the requested file and remained running until
+interrupted. This is base-product evidence of a child/session lifecycle gap,
+not a Swarm descendant-control qualification. It reinforces SWARM-17's existing
+fail-closed rule: Claude cannot become an enabled Swarm target merely because
+its children are visible; the selected launch must either disable native
+delegation or enforce and recover every descendant within the run's limit.
+No worker ceiling, budget default or acceptance box changes. Main's tracker
+also now names the separate Gate S and Auto Mode PRs; those still need a joined
+authority before live Swarm launch. This merge changes documentation and live
+evidence only, so it does not invalidate the offline Start replay suite.
