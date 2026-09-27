@@ -7,383 +7,1151 @@
     "control": "Changes something. Full control devices only, with a request id.",
     "mac_only": "Never from a device."
   },
+  "shapes": "How shapes are written: string, number, boolean, null, json (anything); T? may be null or absent; T[] is a list; record<T> is an object with any keys; 'a'|'b' is one of these texts; a name is a type from `types`; an object lists its fields. A daemon test checks real results and events against these shapes, and the app's types are generated from them.",
+  "types": {
+    "RunStatus": "'queued'|'starting'|'running'|'waiting_for_user'|'completed'|'failed'|'interrupted'|'disconnected'|'unknown'",
+    "Scope": "'full'|'watch'",
+    "Task": {
+      "id": "string",
+      "title": "string",
+      "prompt": "string",
+      "repo_root": "string",
+      "target_ref": "string?",
+      "workspace_id": "string",
+      "start_snapshot": "string?",
+      "fork_commit": "string?",
+      "fork_provenance": "string?",
+      "created_ms": "number",
+      "archived_ms": "number?"
+    },
+    "Workspace": {
+      "id": "string",
+      "path": "string",
+      "repo_root": "string",
+      "common_dir": "string",
+      "kind": "'worktree'|'current'",
+      "branch": "string?",
+      "owner_run_id": "string?",
+      "initial_dirty": "json",
+      "created_ms": "number",
+      "removed_ms": "number?"
+    },
+    "Attention": {
+      "kind": "string",
+      "request_id": "string",
+      "tool": "string?",
+      "input": "json"
+    },
+    "Run": {
+      "id": "string",
+      "task_id": "string",
+      "parent_run_id": "string?",
+      "harness": "string",
+      "harness_version": "string?",
+      "profile_id": "string?",
+      "model": "string?",
+      "workspace_id": "string",
+      "native_id": "string?",
+      "status": "RunStatus",
+      "exit_reason": "string?",
+      "created_ms": "number",
+      "ended_ms": "number?",
+      "title": "string",
+      "relation_source": "string?",
+      "relation_confidence": "string?",
+      "capabilities": "json",
+      "process_generation": "number",
+      "attention": "Attention?"
+    },
+    "Turn": {
+      "id": "string",
+      "run_id": "string",
+      "n": "number",
+      "prompt": "string",
+      "snapshot_id": "string?",
+      "started_ms": "number",
+      "ended_ms": "number?",
+      "status": "string"
+    },
+    "Profile": {
+      "id": "string",
+      "name": "string",
+      "harness": "string",
+      "home": "string?",
+      "is_system": "boolean",
+      "created_ms": "number"
+    },
+    "Event": {
+      "seq": "number",
+      "ts": "number",
+      "task_id": "string?",
+      "run_id": "string?",
+      "kind": "string",
+      "source": "string",
+      "confidence": "string",
+      "payload": "json"
+    },
+    "Change": {
+      "status": "string",
+      "path": "string",
+      "old_path": "string?"
+    },
+    "GitStatus": {
+      "branch": "string?",
+      "head": "string?",
+      "staged": "Change[]",
+      "unstaged": "Change[]",
+      "untracked": "string[]",
+      "conflicted": "string[]"
+    },
+    "State": {
+      "cursor": "number",
+      "tasks": "Task[]",
+      "runs": "Run[]",
+      "workspaces": "Workspace[]",
+      "profiles": "Profile[]",
+      "turns": "record<Turn[]>",
+      "daemon": {
+        "pid": "number",
+        "started_ms": "number",
+        "version": "string",
+        "parser_version": "string"
+      }
+    },
+    "Harness": {
+      "harness": "string",
+      "program": "string?",
+      "version": "string?",
+      "installed": "boolean",
+      "capabilities": "json"
+    },
+    "Comparison": {
+      "mode": "string",
+      "label": "string",
+      "base": "string?",
+      "available": "boolean",
+      "default": "boolean?",
+      "detail": "string?",
+      "inherited": "boolean?",
+      "provenance": "string?",
+      "branch": "string?",
+      "snapshot": "json?"
+    },
+    "FileSide": {
+      "exists": "boolean",
+      "size": "number",
+      "kind": "'text'|'missing'|'binary'|'too_large'|'link'|'directory'|'special'",
+      "text": "string?",
+      "note": "string?"
+    },
+    "Hunk": {
+      "key": "string",
+      "base_start": "number",
+      "base_lines": "string[]",
+      "modified_start": "number",
+      "modified_lines": "string[]",
+      "reviewed": "boolean"
+    },
+    "Mark": {
+      "key": "string",
+      "path": "string",
+      "at_ms": "number",
+      "by": "string"
+    },
+    "TreeEntry": {
+      "name": "string?",
+      "path": "string",
+      "dir": "boolean",
+      "symlink": "boolean?",
+      "status": "string?",
+      "changes_inside": "number",
+      "deleted": "boolean?"
+    },
+    "NotificationSettings": {
+      "enabled": "boolean",
+      "kinds": {
+        "permission": "boolean",
+        "question": "boolean",
+        "failure": "boolean",
+        "finished": "boolean"
+      },
+      "show_text": "boolean",
+      "token": "string?",
+      "environment": "string",
+      "bundle": "string?"
+    },
+    "KnownRepo": {
+      "root": "string",
+      "name": "string",
+      "last_used_ms": "number",
+      "exists": "boolean",
+      "branch": "string?",
+      "default_branch": "string?"
+    }
+  },
+  "events": {
+    "task_created": {
+      "task": "Task",
+      "run": "Run",
+      "workspace": "Workspace"
+    },
+    "task_archived": {
+      "archived": "boolean"
+    },
+    "turn_started": {
+      "turn": "Turn",
+      "snapshot": "string?"
+    },
+    "turn_done": {
+      "ok": "boolean",
+      "summary": "string?"
+    },
+    "status": {
+      "status": "RunStatus",
+      "reason": "string?",
+      "why": "string?",
+      "evidence": "json?",
+      "generation": "number?",
+      "program": "string?"
+    },
+    "session": {
+      "native_id": "string"
+    },
+    "output": {
+      "role": "string",
+      "text": "string"
+    },
+    "tool": {
+      "id": "string?",
+      "name": "string",
+      "summary": "string?"
+    },
+    "tool_result": {
+      "id": "string?",
+      "input": "json?",
+      "is_error": "boolean?",
+      "output": "json?",
+      "status": "string?"
+    },
+    "file_activity": {
+      "paths": "string[]",
+      "kind": "string",
+      "attribution": "string"
+    },
+    "permission": "Attention",
+    "permission_answered": {
+      "request_id": "string",
+      "allow": "boolean",
+      "by": "string?"
+    },
+    "usage": "json",
+    "error": {
+      "class": "string",
+      "message": "string",
+      "request": "json?"
+    },
+    "retention": "json",
+    "review_mark": {
+      "key": "string",
+      "path": "string",
+      "reviewed": "boolean"
+    },
+    "review_reject": {
+      "path": "string",
+      "key": "string",
+      "base": "string",
+      "lines_restored": "number",
+      "lines_removed": "number",
+      "file_removed": "boolean"
+    },
+    "pull_request": {
+      "url": "string",
+      "number": "number",
+      "branch": "string?"
+    },
+    "remote_command": {
+      "method": "string",
+      "device": "string",
+      "request_id": "string?"
+    },
+    "gateway_state": {
+      "state": "'on'|'off'",
+      "port": "number?",
+      "fingerprint": "string?",
+      "closed": "number?"
+    },
+    "gateway_sessions": {
+      "sessions": "number",
+      "device": "string",
+      "name": "string",
+      "change": "'connected'|'disconnected'"
+    },
+    "power": {
+      "awake": "boolean",
+      "why": "string",
+      "runs": "string[]?"
+    },
+    "push": {
+      "device": "string",
+      "name": "string",
+      "kind": "string",
+      "route": "string",
+      "outcome": "'sent'|'not_sent'",
+      "why": "string",
+      "fields": "string[]"
+    },
+    "profile": "json",
+    "child": {
+      "child": "Run",
+      "evidence": "json",
+      "workspace": "string"
+    },
+    "child_reparented": {
+      "child_run_id": "string",
+      "parent_run_id": "string"
+    },
+    "raw_unparsed": {
+      "text": "string",
+      "parser_version": "string"
+    }
+  },
   "methods": {
     "hello": {
       "class": "self",
       "summary": "Say who is connecting; returns protocol, version and, for a device, its scope",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "client": "string?"
+      },
+      "result": "json"
     },
     "ping": {
       "class": "self",
       "summary": "Keep the session alive; returns the daemon's time",
-      "phone": "available"
+      "phone": "available",
+      "params": {},
+      "result": {
+        "now_ms": "number"
+      }
     },
     "events.subscribe": {
       "class": "self",
       "summary": "Replay events after a cursor, then stream live events",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "after": "number?",
+        "run_id": "string?"
+      },
+      "result": {
+        "subscribed": "boolean",
+        "after": "number",
+        "history_truncated": "boolean"
+      }
     },
     "device.notifications": {
       "class": "self",
       "summary": "Read or change this device's notification switches and push token",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "enabled": "boolean?",
+        "show_text": "boolean?",
+        "kinds": "json?",
+        "token": "string?",
+        "environment": "string?",
+        "bundle": "string?"
+      },
+      "result": "NotificationSettings"
     },
     "state": {
       "class": "read",
       "summary": "Every task, run, workspace and account profile",
-      "phone": "available"
+      "phone": "available",
+      "params": {},
+      "result": "State"
     },
     "harness.list": {
       "class": "read",
       "summary": "Installed harnesses with versions and capabilities",
-      "phone": "available"
+      "phone": "available",
+      "params": {},
+      "result": "Harness[]"
     },
     "profile.list": {
       "class": "read",
       "summary": "Account profiles",
-      "phone": "available"
+      "phone": "available",
+      "params": {},
+      "result": "Profile[]"
     },
     "profile.status": {
       "class": "read",
       "summary": "Sign-in state of one account profile",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "id": "string"
+      },
+      "result": {
+        "profile_id": "string",
+        "installed": "boolean",
+        "logged_in": "boolean",
+        "program": "string?",
+        "version": "string?",
+        "method": "string?",
+        "identity": "json?",
+        "detail": "string?",
+        "account": "json?",
+        "expires_ms": "number?",
+        "note": "string?"
+      }
     },
     "repo.inspect": {
       "class": "read",
       "summary": "Branches, head and status of a repository Overseer knows",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "path": "string"
+      },
+      "result": {
+        "root": "string",
+        "head": "string?",
+        "branch": "string?",
+        "default_branch": "string?",
+        "branches": "string[]",
+        "status": "GitStatus"
+      }
     },
     "repo.known": {
       "class": "read",
       "summary": "The repositories Overseer has used",
-      "phone": "available"
+      "phone": "available",
+      "params": {},
+      "result": {
+        "repos": "KnownRepo[]"
+      }
     },
     "repo.files": {
       "class": "read",
       "summary": "Files of a worktree or repository, for mentions",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string?",
+        "repo": "string?",
+        "query": "string?",
+        "limit": "number?"
+      },
+      "result": {
+        "root": "string",
+        "files": "string[]"
+      }
     },
     "run.raw_output": {
       "class": "read",
       "summary": "The end of a run's raw output",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "run_id": "string",
+        "max_bytes": "number?"
+      },
+      "result": {
+        "lines": "json[]",
+        "truncated": "boolean",
+        "note": "string?"
+      }
     },
     "run.turns": {
       "class": "read",
       "summary": "The turns of a run",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "run_id": "string"
+      },
+      "result": "Turn[]"
     },
     "run.active": {
       "class": "read",
       "summary": "Runs that are active now",
-      "phone": "available"
+      "phone": "available",
+      "params": {},
+      "result": "Run[]"
     },
     "events.list": {
       "class": "read",
       "summary": "A page of events",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "run_id": "string?",
+        "after": "number?",
+        "limit": "number?"
+      },
+      "result": {
+        "events": "Event[]",
+        "oldest_retained": "number?"
+      }
     },
     "comparison.options": {
       "class": "read",
       "summary": "The comparisons a run offers",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "run_id": "string",
+        "branch": "string?"
+      },
+      "result": {
+        "run_id": "string",
+        "workspace": "Workspace",
+        "head": "string?",
+        "branch": "string?",
+        "branches": "string[]",
+        "options": "Comparison[]"
+      }
     },
     "workspace.diff": {
       "class": "read",
       "summary": "The diff of a workspace against a comparison",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string",
+        "base": "string",
+        "status": "boolean?"
+      },
+      "result": {
+        "workspace_id": "string",
+        "root": "string",
+        "base": "string",
+        "current_tree": "string",
+        "index_tree": "string",
+        "head": "string?",
+        "changes": "Change[]",
+        "status": "GitStatus?"
+      }
     },
     "workspace.status": {
       "class": "read",
       "summary": "Git status of a workspace",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string"
+      },
+      "result": "GitStatus"
     },
     "workspace.changes": {
       "class": "read",
       "summary": "Changed files of a workspace since the task started",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string"
+      },
+      "result": {
+        "files": "number",
+        "added": "number",
+        "removed": "number",
+        "names": "string[]",
+        "base": "string?"
+      }
     },
     "workspace.tree": {
       "class": "read",
       "summary": "One directory of a worktree",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string",
+        "dir": "string?"
+      },
+      "result": {
+        "workspace_id": "string",
+        "root": "string",
+        "dir": "string",
+        "base": "string?",
+        "entries": "TreeEntry[]",
+        "total": "number",
+        "truncated": "boolean",
+        "changed_total": "number"
+      }
     },
     "workspace.file": {
       "class": "read",
       "summary": "One file of a workspace, at a comparison and in the working copy",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string",
+        "path": "string",
+        "base": "string?"
+      },
+      "result": {
+        "workspace_id": "string",
+        "path": "string",
+        "base": "string?",
+        "before": "FileSide",
+        "now": "FileSide"
+      }
     },
     "workspace.hunks": {
       "class": "read",
       "summary": "The changes of one file as hunks, with their keys and reviewed marks",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string",
+        "path": "string",
+        "base": "string",
+        "run_id": "string?"
+      },
+      "result": {
+        "workspace_id": "string",
+        "path": "string",
+        "base": "string",
+        "shown": "boolean",
+        "why": "string?",
+        "hunks": "Hunk[]",
+        "before": {
+          "exists": "boolean",
+          "kind": "string",
+          "lines": "number?"
+        },
+        "now": {
+          "exists": "boolean",
+          "kind": "string",
+          "lines": "number?"
+        }
+      }
     },
     "workspace.cleanup_plan": {
       "class": "read",
       "summary": "What cleaning up a worktree would remove",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string"
+      },
+      "result": {
+        "workspace": "Workspace",
+        "active_runs": "json[]",
+        "dirty": "GitStatus?",
+        "removable": "boolean",
+        "reason": "string"
+      }
     },
     "workspace.pr_plan": {
       "class": "read",
       "summary": "What opening a pull request would do",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string"
+      },
+      "result": "json"
     },
     "workspace.merge_plan": {
       "class": "read",
       "summary": "What merging back would do",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string"
+      },
+      "result": "json"
     },
     "review.marks": {
       "class": "read",
       "summary": "The hunks marked reviewed for a run",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "run_id": "string"
+      },
+      "result": {
+        "run_id": "string",
+        "keys": "string[]",
+        "marks": "Mark[]"
+      }
     },
     "account.list": {
       "class": "read",
       "summary": "Accounts with sign-in state and plan",
-      "phone": "available"
+      "phone": "available",
+      "params": {},
+      "result": {
+        "accounts": "json[]",
+        "providers": "json[]"
+      }
     },
     "account.usage": {
       "class": "read",
       "summary": "Usage and limits of one account",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "id": "string"
+      },
+      "result": "json"
     },
     "search": {
       "class": "read",
       "summary": "Search tasks and runs",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "query": "string?",
+        "limit": "number?"
+      },
+      "result": {
+        "task_ids": "string[]",
+        "ms": "number"
+      }
     },
     "daemon.last_notice": {
       "class": "read",
       "summary": "The last background notice",
-      "phone": "available"
+      "phone": "available",
+      "params": {},
+      "result": {
+        "notice": "json?"
+      }
     },
     "daemon.clients": {
       "class": "read",
       "summary": "How many watching UIs are connected",
-      "phone": "available"
+      "phone": "available",
+      "params": {},
+      "result": {
+        "vscode": "number",
+        "ui": "number"
+      }
     },
     "task.create": {
       "class": "control",
       "summary": "Start an agent",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "repo": "string",
+        "harness": "string",
+        "prompt": "string",
+        "title": "string?",
+        "workspace_mode": "'worktree'|'current'?",
+        "profile_id": "string?",
+        "target_ref": "string?",
+        "model": "string?",
+        "effort": "string?",
+        "permission_mode": "string?",
+        "images": "json[]?"
+      },
+      "result": {
+        "task": "Task",
+        "run": "Run",
+        "workspace": "Workspace"
+      }
     },
     "task.archive": {
       "class": "control",
       "summary": "Archive or restore a task",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "task_id": "string",
+        "archived": "boolean?"
+      },
+      "result": {
+        "task_id": "string",
+        "archived_ms": "number?"
+      }
     },
     "run.follow_up": {
       "class": "control",
       "summary": "Send a message to an agent",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "run_id": "string",
+        "prompt": "string",
+        "model": "string?",
+        "effort": "string?",
+        "permission_mode": "string?",
+        "images": "json[]?"
+      },
+      "result": "Turn"
     },
     "run.interrupt": {
       "class": "control",
       "summary": "Stop an agent's turn",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "run_id": "string"
+      },
+      "result": "json"
     },
     "run.permission": {
       "class": "control",
       "summary": "Allow or deny a permission request",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "run_id": "string",
+        "request_id": "string",
+        "allow": "boolean",
+        "message": "string?"
+      },
+      "result": {
+        "ok": "boolean"
+      }
     },
     "runs.stop_all": {
       "class": "control",
       "summary": "Stop every active agent; the daemon keeps running",
-      "phone": "available"
+      "phone": "available",
+      "params": {},
+      "result": {
+        "interrupted": "string[]",
+        "failed": "json[]"
+      }
     },
     "workspace.cleanup": {
       "class": "control",
       "summary": "Remove a finished agent's worktree",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string",
+        "discard_dirty": "boolean?"
+      },
+      "result": "json"
     },
     "workspace.pr_prepare": {
       "class": "control",
       "summary": "Commit and prepare the branch for a pull request",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string"
+      },
+      "result": "json"
     },
     "workspace.pr_open": {
       "class": "control",
       "summary": "Open the pull request with the Mac's Git and GitHub credentials",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string",
+        "title": "string?",
+        "body": "string?",
+        "draft": "boolean?"
+      },
+      "result": {
+        "url": "string",
+        "number": "number",
+        "reused": "boolean",
+        "branch": "string",
+        "target": "string",
+        "repo": "string",
+        "committed": "json",
+        "head": "string"
+      }
     },
     "workspace.pr_opened": {
       "class": "control",
       "summary": "Record a pull request that was opened",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string",
+        "url": "string",
+        "number": "number?"
+      },
+      "result": {
+        "recorded": "boolean"
+      }
     },
     "workspace.merge_prepare": {
       "class": "control",
       "summary": "Prepare merging back",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string",
+        "handoff": "boolean?"
+      },
+      "result": "json"
     },
     "workspace.merge_resolved": {
       "class": "control",
       "summary": "Say conflicts are resolved",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string"
+      },
+      "result": "json"
     },
     "workspace.merge_complete": {
       "class": "control",
       "summary": "Complete merging back",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string"
+      },
+      "result": "json"
     },
     "workspace.merge_abort": {
       "class": "control",
       "summary": "Abort merging back",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string"
+      },
+      "result": "json"
     },
     "review.accept": {
       "class": "control",
       "summary": "Mark a hunk reviewed",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "run_id": "string",
+        "path": "string",
+        "key": "string",
+        "modified_start": "number?",
+        "modified_lines": "string[]?",
+        "base_lines": "string[]?",
+        "anchor": "string?"
+      },
+      "result": {
+        "key": "string",
+        "reviewed": "boolean"
+      }
     },
     "review.unaccept": {
       "class": "control",
       "summary": "Remove a hunk's reviewed mark",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "run_id": "string",
+        "key": "string"
+      },
+      "result": {
+        "key": "string",
+        "reviewed": "boolean",
+        "changed": "boolean"
+      }
     },
     "review.import": {
       "class": "control",
       "summary": "Hand the daemon marks a surface kept before",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "run_id": "string",
+        "marks": "json[]"
+      },
+      "result": {
+        "added": "number"
+      }
     },
     "review.reject": {
       "class": "control",
       "summary": "Revert a hunk in the worktree",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "workspace_id": "string",
+        "path": "string",
+        "base": "string",
+        "key": "string"
+      },
+      "result": {
+        "path": "string",
+        "rejected": "boolean",
+        "file_removed": "boolean"
+      }
     },
     "profile.create": {
       "class": "control",
       "summary": "Add an account profile",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "name": "string",
+        "harness": "string"
+      },
+      "result": "Profile"
     },
     "profile.rename": {
       "class": "control",
       "summary": "Rename an account profile",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "id": "string",
+        "name": "string"
+      },
+      "result": {
+        "ok": "boolean"
+      }
     },
     "profile.logout": {
       "class": "control",
       "summary": "Sign an account profile out",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "id": "string"
+      },
+      "result": "json"
     },
     "profile.device_login": {
       "class": "control",
       "summary": "Sign in with the provider's device code, in the phone's browser",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "id": "string"
+      },
+      "result": {
+        "profile_id": "string",
+        "finished": "boolean",
+        "url": "string?",
+        "code": "string?",
+        "valid_ms": "number?",
+        "exit": "number?",
+        "logged_in": "json?",
+        "output": "string?"
+      }
     },
     "account.create": {
       "class": "control",
       "summary": "Add an account",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "provider": "string",
+        "name": "string"
+      },
+      "result": {
+        "account": "Profile",
+        "provider": "string"
+      }
     },
     "account.remove": {
       "class": "control",
       "summary": "Remove an account",
-      "phone": "available"
+      "phone": "available",
+      "params": {
+        "id": "string"
+      },
+      "result": {
+        "removed": "string"
+      }
     },
     "daemon.shutdown": {
       "class": "mac_only",
       "summary": "Stop the daemon",
       "phone": "mac_only",
-      "reason": "A phone that stopped the daemon could not start it again"
+      "reason": "A phone that stopped the daemon could not start it again",
+      "params": "json",
+      "result": "json"
     },
     "daemon.stop_all": {
       "class": "mac_only",
       "summary": "Stop every agent and the daemon",
       "phone": "mac_only",
-      "reason": "It stops the daemon; a phone uses runs.stop_all"
+      "reason": "It stops the daemon; a phone uses runs.stop_all",
+      "params": "json",
+      "result": "json"
     },
     "daemon.background_notice": {
       "class": "mac_only",
       "summary": "Post the background notice",
       "phone": "mac_only",
-      "reason": "It belongs to the Mac's own notifications"
+      "reason": "It belongs to the Mac's own notifications",
+      "params": "json",
+      "result": "json"
     },
     "daemon.test_notice": {
       "class": "mac_only",
       "summary": "Post a test notification on the Mac",
       "phone": "mac_only",
-      "reason": "It belongs to the Mac's own notifications"
+      "reason": "It belongs to the Mac's own notifications",
+      "params": "json",
+      "result": "json"
     },
     "profile.login_command": {
       "class": "mac_only",
       "summary": "The sign-in command for a terminal",
       "phone": "mac_only",
-      "reason": "It needs a terminal on the Mac; a phone uses profile.device_login"
+      "reason": "It needs a terminal on the Mac; a phone uses profile.device_login",
+      "params": "json",
+      "result": "json"
     },
     "gateway.status": {
       "class": "mac_only",
       "summary": "Phone access: on or off, port, connected phones",
       "phone": "mac_only",
-      "reason": "Phone access is managed on the Mac"
+      "reason": "Phone access is managed on the Mac",
+      "params": "json",
+      "result": "json"
     },
     "gateway.enable": {
       "class": "mac_only",
       "summary": "Turn phone access on",
       "phone": "mac_only",
-      "reason": "Phone access is switched on the desktop only"
+      "reason": "Phone access is switched on the desktop only",
+      "params": "json",
+      "result": "json"
     },
     "gateway.disable": {
       "class": "mac_only",
       "summary": "Turn phone access off",
       "phone": "mac_only",
-      "reason": "Phone access is switched on the desktop only"
+      "reason": "Phone access is switched on the desktop only",
+      "params": "json",
+      "result": "json"
     },
     "gateway.settings": {
       "class": "mac_only",
       "summary": "Read or change gateway settings",
       "phone": "mac_only",
-      "reason": "Phone access is managed on the Mac"
+      "reason": "Phone access is managed on the Mac",
+      "params": "json",
+      "result": "json"
     },
     "gateway.pair_start": {
       "class": "mac_only",
       "summary": "Open pairing and return the pairing code",
       "phone": "mac_only",
-      "reason": "Pairing starts on the Mac"
+      "reason": "Pairing starts on the Mac",
+      "params": "json",
+      "result": "json"
     },
     "gateway.pair_cancel": {
       "class": "mac_only",
       "summary": "Close pairing",
       "phone": "mac_only",
-      "reason": "Pairing starts on the Mac"
+      "reason": "Pairing starts on the Mac",
+      "params": "json",
+      "result": "json"
     },
     "gateway.pair_confirm": {
       "class": "mac_only",
       "summary": "Accept or decline a phone that asked to pair",
       "phone": "mac_only",
-      "reason": "The owner confirms on the Mac"
+      "reason": "The owner confirms on the Mac",
+      "params": "json",
+      "result": "json"
     },
     "gateway.devices": {
       "class": "mac_only",
       "summary": "Paired devices",
       "phone": "mac_only",
-      "reason": "Devices are managed on the Mac"
+      "reason": "Devices are managed on the Mac",
+      "params": "json",
+      "result": "json"
     },
     "gateway.device_revoke": {
       "class": "mac_only",
       "summary": "Revoke a device",
       "phone": "mac_only",
-      "reason": "A phone that could manage devices could let another one in"
+      "reason": "A phone that could manage devices could let another one in",
+      "params": "json",
+      "result": "json"
     },
     "gateway.device_scope": {
       "class": "mac_only",
       "summary": "Change a device's scope",
       "phone": "mac_only",
-      "reason": "A phone could raise its own scope"
+      "reason": "A phone could raise its own scope",
+      "params": "json",
+      "result": "json"
     },
     "gateway.device_rename": {
       "class": "mac_only",
       "summary": "Rename a device",
       "phone": "mac_only",
-      "reason": "Devices are managed on the Mac"
+      "reason": "Devices are managed on the Mac",
+      "params": "json",
+      "result": "json"
     },
     "ui.focus": {
       "class": "mac_only",
       "summary": "Which agent a window on the Mac is looking at",
       "phone": "mac_only",
-      "reason": "It describes the Mac's own windows"
+      "reason": "It describes the Mac's own windows",
+      "params": "json",
+      "result": "json"
     }
   }
 }
