@@ -631,6 +631,14 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
 }
 
 pub(super) fn record_planning_failure(store: &mut Store, id: &str) -> Result<()> {
+    record_planning_failure_request(store, id, None)
+}
+
+pub(super) fn record_planning_failure_request(
+    store: &mut Store,
+    id: &str,
+    request: Option<(&str, &str, &str)>,
+) -> Result<()> {
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
     tx.execute("UPDATE swarm_runs SET failed_planning_turns=failed_planning_turns+1,
@@ -638,6 +646,11 @@ pub(super) fn record_planning_failure(store: &mut Store, id: &str) -> Result<()>
     tx.execute("UPDATE swarm_runs SET stalled_from=status,status='stalled',
         stall_reason='planning_failed',updated_ms=?2 WHERE id=?1 AND failed_planning_turns>=2",
         params![id,now])?;
+    if let Some((request_id, request_sha256, error)) = request {
+        tx.execute("INSERT INTO swarm_revision_requests(run_id,request_id,request_sha256,
+            result_json,created_ms) VALUES(?1,?2,?3,?4,?5)",
+            params![id,request_id,request_sha256,json!({"error":error}).to_string(),now])?;
+    }
     tx.commit()?;
     Ok(())
 }

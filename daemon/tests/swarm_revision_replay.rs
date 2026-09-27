@@ -81,3 +81,44 @@ fn replay_does_not_bypass_director_owner_identity() {
     assert!(error.contains("invalid director owner identity"),"{error}");
     assert_eq!(d.call("swarm.revise",request)["duplicate"],true);
 }
+
+#[test]
+fn rejected_repair_request_replays_without_consuming_a_second_turn() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Rejected repair replay",
+        "objective":"Audit","allowed_targets":["fixture"]}))["id"]
+        .as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"keep","title":"Keep","acceptance":"proof"},
+        {"id":"retire","title":"Retire","acceptance":"proof"}
+    ]}));
+    d.call("swarm.revise", json!({"id":run,"generation":1,"expected_revision":1,
+        "reason":"Narrow scope","jobs":[
+            {"id":"keep","title":"Keep","acceptance":"proof"}
+        ]}));
+    let request = json!({"id":run,"generation":1,"expected_revision":2,
+        "request_id":"failed-repair-1","reason":"Restore retired ID","jobs":[
+            {"id":"keep","title":"Keep","acceptance":"proof"},
+            {"id":"retire","title":"Retire again","acceptance":"proof"}
+        ]});
+    assert!(d.try_call("swarm.revise", request.clone()).unwrap_err()
+        .contains("superseded job id"));
+    assert_eq!(d.call("swarm.get", json!({"id":run}))["failed_planning_turns"], 1);
+    d.kill9();
+    d.spawn();
+    assert!(d.try_call("swarm.revise", request.clone()).unwrap_err()
+        .contains("superseded job id"));
+    assert_eq!(d.call("swarm.get", json!({"id":run}))["failed_planning_turns"], 1);
+    let mut changed = request.clone();
+    changed["reason"] = json!("Different repair under reused ID");
+    assert!(d.try_call("swarm.revise", changed).unwrap_err()
+        .contains("reused with different input"));
+    assert_eq!(d.call("swarm.get", json!({"id":run}))["failed_planning_turns"], 1);
+    let mut second_turn = request;
+    second_turn["request_id"] = json!("failed-repair-2");
+    assert!(d.try_call("swarm.revise", second_turn).unwrap_err()
+        .contains("superseded job id"));
+    let state = d.call("swarm.get", json!({"id":run}));
+    assert_eq!(state["failed_planning_turns"], 2);
+    assert_eq!(state["status"], "stalled");
+}

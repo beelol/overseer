@@ -1,4 +1,4 @@
-use super::{get, plan, record_planning_failure, required};
+use super::{get, plan, record_planning_failure, record_planning_failure_request, required};
 use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
@@ -58,6 +58,9 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
                 bail!("revision request id reused with different input");
             }
             let mut result: Value = serde_json::from_str(&result_json)?;
+            if let Some(error) = result["error"].as_str() {
+                bail!("{error}");
+            }
             result["duplicate"] = json!(true);
             return Ok(result);
         }
@@ -153,8 +156,10 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         previous.status == "superseded"
         || (previous.status == "cancel_requested" && previous.stop_reason.as_deref() == Some("scope_narrowed")))) {
         drop(tx);
-        record_planning_failure(store, id)?;
-        bail!("superseded job id cannot be reused in a later plan");
+        let error = "superseded job id cannot be reused in a later plan";
+        record_planning_failure_request(store, id,
+            request_id.map(|request_id| (request_id, request_sha256.as_str(), error)))?;
+        bail!("{error}");
     }
     let mut omitted: Vec<String> = old.iter().filter_map(|(job, previous)| {
         (!new_ids.contains(job.as_str()) && previous.status != "superseded"
