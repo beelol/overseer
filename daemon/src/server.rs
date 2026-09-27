@@ -924,14 +924,19 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     allowed_profiles:allowed_profiles.clone(),
                     pinned_route, preferred_harness, task_class:None,
                     execution_budget_ms:Some(execution_budget_ms) };
-                let fit_evidence = if d.learning_is_paused() {
-                    routes.iter().map(|route| json!({"route_id":route.id,"fit":"unknown",
+                let fit_now_ms = crate::daemon::now();
+                let (fit_inputs, fit_evidence) = if d.learning_is_paused() {
+                    let inputs = routes.iter().map(|_| crate::auto_fit::FitEvidenceInput::Unavailable {
+                        reason:"learning_paused".into(),
+                    }).collect::<Vec<_>>();
+                    let evidence = routes.iter().map(|route| json!({"route_id":route.id,"fit":"unknown",
                         "reason":"learning_paused","source":null,"observed_ms":null,
-                        "expected_windows":[]})).collect::<Vec<_>>()
+                        "expected_windows":[]})).collect::<Vec<_>>();
+                    (inputs, evidence)
                 } else {
                     let store = d.store.lock().unwrap();
-                    crate::auto_fit::apply_scoped_fit(&store, &work, &mut routes,
-                        &account_generations, crate::daemon::now())
+                    crate::auto_fit::apply_scoped_fit_with_inputs(&store, &work, &mut routes,
+                        &account_generations, fit_now_ms)
                 };
                 let mut decision = crate::auto_select::select(&work, &routes);
                 let mut pre_effect_failures = Vec::new();
@@ -1003,9 +1008,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         "profile_id":route.profile_id,"model":route.model,"effort":route.effort,
                         "quota":route.quota,"fit":route.fit,"health":route.health,
                     }));
-                let trace = json!({"selector_version":"multi-harness-preflight-v6","decision":decision,
+                let trace = json!({"selector_version":"multi-harness-preflight-v7","decision":decision,
                     "selected_route":selected_route,
-                    "estimator":{"state":"scoped_fit","version":"v1","routes":fit_evidence},
+                    "estimator":{"state":"scoped_fit","version":"v2","now_ms":fit_now_ms,
+                        "inputs":fit_inputs,"routes":fit_evidence},
                     "inference":{"state":"not_used","output":null},
                     "selection_input":{"work":&work,"routes":&routes,
                         "attempt_limit_reached":attempt_limit_reached,
@@ -1133,16 +1139,45 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 .ok_or_else(|| anyhow!("automatic selector version is missing"))?;
             let input = &payload["selection_input"];
             let work: crate::auto_select::WorkUnit = serde_json::from_value(input["work"].clone())?;
-            let routes: Vec<crate::auto_select::Route> = serde_json::from_value(input["routes"].clone())?;
+            let mut routes: Vec<crate::auto_select::Route> = serde_json::from_value(input["routes"].clone())?;
             if routes.len() > 128 { return Err(anyhow!("automatic decision replay exceeded its candidate bound")); }
+            let estimator_matches_recorded = if selector_version == "multi-harness-preflight-v7" {
+                let estimator = &payload["estimator"];
+                if estimator["state"] != "scoped_fit" || estimator["version"] != "v2"
+                    || payload["inference"]["state"] != "not_used"
+                    || !payload["inference"]["output"].is_null() {
+                    return Err(anyhow!("unsupported automatic estimator or inference replay"));
+                }
+                let now_ms = estimator["now_ms"].as_i64()
+                    .ok_or_else(|| anyhow!("automatic estimator observation time is missing"))?;
+                let inputs: Vec<crate::auto_fit::FitEvidenceInput> =
+                    serde_json::from_value(estimator["inputs"].clone())?;
+                let saved_results = estimator["routes"].as_array()
+                    .ok_or_else(|| anyhow!("automatic estimator results are missing"))?;
+                if inputs.len() != routes.len() || saved_results.len() != routes.len()
+                    || !crate::auto_fit::fit_inputs_within_bounds(&inputs) {
+                    return Err(anyhow!("automatic estimator replay inputs are incomplete or oversized"));
+                }
+                let mut matches = true;
+                for (index, route) in routes.iter_mut().enumerate() {
+                    let evaluated = crate::auto_fit::evaluate_fit(&work, route, &inputs[index], now_ms);
+                    let recomputed = json!({"route_id":route.id,"fit":evaluated.fit,
+                        "reason":evaluated.reason,"source":evaluated.source,
+                        "observed_ms":evaluated.observed_ms,
+                        "expected_windows":evaluated.expected_windows});
+                    matches &= route.fit == evaluated.fit && saved_results[index] == recomputed;
+                    route.fit = evaluated.fit;
+                }
+                Some(matches)
+            } else { None };
             let decision = match selector_version {
                 "codex-cold-start-v1" => crate::auto_select::select_legacy_v1(&work, &routes),
                 "codex-cold-start-v2" | "multi-harness-cold-start-v1" =>
                     crate::auto_select::select_pre_status_v1(&work, &routes),
-                "multi-harness-preflight-v1" | "multi-harness-preflight-v2" | "multi-harness-preflight-v3" | "multi-harness-preflight-v4" | "multi-harness-preflight-v5" | "multi-harness-preflight-v6" => {
+                "multi-harness-preflight-v1" | "multi-harness-preflight-v2" | "multi-harness-preflight-v3" | "multi-harness-preflight-v4" | "multi-harness-preflight-v5" | "multi-harness-preflight-v6" | "multi-harness-preflight-v7" => {
                     let mut decision = if selector_version == "multi-harness-preflight-v1" {
                         crate::auto_select::select_pre_status_v1(&work, &routes)
-                    } else if matches!(selector_version, "multi-harness-preflight-v4" | "multi-harness-preflight-v5" | "multi-harness-preflight-v6") {
+                    } else if matches!(selector_version, "multi-harness-preflight-v4" | "multi-harness-preflight-v5" | "multi-harness-preflight-v6" | "multi-harness-preflight-v7") {
                         crate::auto_select::select(&work, &routes)
                     } else { crate::auto_select::select_pre_scoped_pool_v1(&work, &routes) };
                     if input["attempt_limit_reached"] == true {
@@ -1153,7 +1188,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         decision.selected = None;
                         decision.reason = "collection_deadline_elapsed".into();
                     }
-                    if matches!(selector_version, "multi-harness-preflight-v5" | "multi-harness-preflight-v6") {
+                    if matches!(selector_version, "multi-harness-preflight-v5" | "multi-harness-preflight-v6" | "multi-harness-preflight-v7") {
                         if let Some(route_id) = input["admission_pool_conflict"].as_str() {
                             decision.selected = None;
                             decision.reason = "pool_in_flight_unknown_draw".into();
@@ -1166,9 +1201,22 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 }
                 _ => return Err(anyhow!("unsupported automatic selector version")),
             };
-            let matches_recorded = serde_json::to_value(&decision)? == payload["decision"];
+            let selected_route_matches = if selector_version == "multi-harness-preflight-v7" {
+                let selected = decision.selected.as_deref().and_then(|id|
+                    routes.iter().find(|route| route.id == id)).map(|route| json!({
+                        "harness":route.harness,"provider":route.provider,
+                        "profile_id":route.profile_id,"model":route.model,"effort":route.effort,
+                        "quota":route.quota,"fit":route.fit,"health":route.health,
+                    }));
+                json!(selected) == payload["selected_route"]
+            } else { true };
+            let matches_recorded = serde_json::to_value(&decision)? == payload["decision"]
+                && estimator_matches_recorded.unwrap_or(true) && selected_route_matches;
             json!({"event_seq":event_seq,"matches_recorded":matches_recorded,
-                "replay_scope":"selector_only","estimator_recomputed":false,
+                "replay_scope":if estimator_matches_recorded.is_some() {
+                    "selector_and_estimator" } else { "selector_only" },
+                "estimator_recomputed":estimator_matches_recorded.is_some(),
+                "estimator_matches_recorded":estimator_matches_recorded,
                 "decision":decision})
         }
         "run.result" => d.delegated_result(s(p, "run_id")?)?,

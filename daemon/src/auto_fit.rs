@@ -96,11 +96,11 @@ pub(crate) fn evaluate_fit(
     result
 }
 
-pub(crate) fn bound_fit_inputs(inputs: &mut [FitEvidenceInput]) {
+pub(crate) fn fit_inputs_within_bounds(inputs: &[FitEvidenceInput]) -> bool {
     const MAX_TRACE_BYTES: usize = 128 * 1024;
     const MAX_SNAPSHOTS: usize = 16;
     const MAX_WINDOWS: usize = 16;
-    let too_large = inputs.len() > 128
+    !(inputs.len() > 128
         || inputs.iter().any(|input| match input {
             FitEvidenceInput::Unavailable { reason } => reason.len() > 80,
             FitEvidenceInput::Observed {
@@ -116,8 +116,11 @@ pub(crate) fn bound_fit_inputs(inputs: &mut [FitEvidenceInput]) {
                         .is_some_and(|estimate| estimate.windows.len() > MAX_WINDOWS)
             }
         })
-        || serde_json::to_vec(inputs).map_or(true, |bytes| bytes.len() > MAX_TRACE_BYTES);
-    if too_large {
+        || serde_json::to_vec(inputs).map_or(true, |bytes| bytes.len() > MAX_TRACE_BYTES))
+}
+
+pub(crate) fn bound_fit_inputs(inputs: &mut [FitEvidenceInput]) {
+    if !fit_inputs_within_bounds(inputs) {
         for input in inputs {
             *input = FitEvidenceInput::Unavailable {
                 reason: "fit_trace_budget_exceeded".into(),

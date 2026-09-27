@@ -3084,7 +3084,8 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
     }
     assert_eq!(d.runs().len(), 1, "invalid constraints must fail before launching a child");
     let browser_request = json!({"work_unit_id":"auto-browser-1","parent_run_id":parent,
-        "min_tier":"general","required_tools":["browser/navigate"],"prompt":"browser check","title":"browser check"});
+        "min_tier":"general","required_tools":["browser/navigate"],
+        "prompt":"browser check private-prompt-sentinel","title":"browser check"});
     let browser = d.call("auto.dispatch", browser_request.clone());
     assert_eq!(browser["state"], "dispatched", "{browser}");
     assert_eq!(browser["decision"]["selected"], "system-codex/gpt-6-sol/medium");
@@ -3092,8 +3093,9 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
         .find(|event| event["kind"] == "auto_decision").unwrap();
     let replay = d.call("auto.decision.replay", json!({"event_seq":decision_event["seq"]}));
     assert_eq!(replay["matches_recorded"], true, "{replay}");
-    assert_eq!(replay["replay_scope"], "selector_only", "{replay}");
-    assert_eq!(replay["estimator_recomputed"], false, "{replay}");
+    assert_eq!(replay["replay_scope"], "selector_and_estimator", "{replay}");
+    assert_eq!(replay["estimator_recomputed"], true, "{replay}");
+    assert_eq!(replay["estimator_matches_recorded"], true, "{replay}");
     assert_eq!(replay["decision"]["selected"], browser["decision"]["selected"]);
     let recorded = &decision_event["payload"];
     assert_eq!(recorded["selected_route"]["harness"], "codex-app");
@@ -3101,16 +3103,53 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
     assert_eq!(recorded["selected_route"]["effort"], "medium");
     assert_eq!(recorded["selected_route"]["fit"], "unknown");
     assert_eq!(recorded["estimator"]["state"], "scoped_fit");
-    assert_eq!(recorded["estimator"]["version"], "v1");
-    assert_eq!(recorded["selector_version"], "multi-harness-preflight-v6");
+    assert_eq!(recorded["estimator"]["version"], "v2");
+    assert_eq!(recorded["selector_version"], "multi-harness-preflight-v7");
     assert_eq!(recorded["estimator"]["routes"].as_array().unwrap().len(), 2);
+    assert_eq!(recorded["estimator"]["inputs"].as_array().unwrap().len(), 2);
+    assert!(recorded["estimator"]["now_ms"].as_i64().is_some());
     assert_eq!(recorded["inference"]["state"], "not_used");
     assert!(recorded["inference"]["output"].is_null());
     assert!(!decision_event["payload"].to_string().contains("browser check"),
         "the decision trace must not store the work prompt or title");
+    assert!(!decision_event["payload"].to_string().contains("private-prompt-sentinel"));
     let browser_id = run_id(&browser);
     assert_eq!(d.wait_done(&browser_id, 15)["status"], "completed");
     assert_eq!(d.call("run.result", json!({"run_id":browser_id}))["state"], "ready");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let original_trace = recorded.clone();
+    let seq = decision_event["seq"].as_i64().unwrap();
+    let mut changed_fit = original_trace.clone();
+    changed_fit["selection_input"]["routes"].as_array_mut().unwrap()
+        .iter_mut().find(|route| route["id"] == browser["decision"]["selected"])
+        .unwrap()["fit"] = json!("fits");
+    db.execute("UPDATE events SET payload=?1 WHERE seq=?2",
+        rusqlite::params![changed_fit.to_string(), seq]).unwrap();
+    let tampered = d.call("auto.decision.replay", json!({"event_seq":seq}));
+    assert_eq!(tampered["estimator_matches_recorded"], false, "{tampered}");
+    assert_eq!(tampered["matches_recorded"], false, "{tampered}");
+    let mut changed_selection = original_trace.clone();
+    changed_selection["selected_route"]["model"] = json!("wrong-model");
+    db.execute("UPDATE events SET payload=?1 WHERE seq=?2",
+        rusqlite::params![changed_selection.to_string(), seq]).unwrap();
+    let wrong_model = d.call("auto.decision.replay", json!({"event_seq":seq}));
+    assert_eq!(wrong_model["matches_recorded"], false,
+        "the displayed selected model must agree with the replayed route: {wrong_model}");
+    let mut missing_inputs = original_trace.clone();
+    missing_inputs["estimator"]["inputs"] = serde_json::Value::Null;
+    db.execute("UPDATE events SET payload=?1 WHERE seq=?2",
+        rusqlite::params![missing_inputs.to_string(), seq]).unwrap();
+    assert!(d.try_call("auto.decision.replay", json!({"event_seq":seq})).is_err(),
+        "v7 replay must not trust saved fit when estimator inputs are missing");
+    let mut legacy = original_trace.clone();
+    legacy["selector_version"] = json!("multi-harness-preflight-v6");
+    db.execute("UPDATE events SET payload=?1 WHERE seq=?2",
+        rusqlite::params![legacy.to_string(), seq]).unwrap();
+    let legacy_replay = d.call("auto.decision.replay", json!({"event_seq":seq}));
+    assert_eq!(legacy_replay["replay_scope"], "selector_only");
+    assert_eq!(legacy_replay["estimator_recomputed"], false);
+    db.execute("UPDATE events SET payload=?1 WHERE seq=?2",
+        rusqlite::params![original_trace.to_string(), seq]).unwrap();
     d.kill9();
     d.spawn();
     let repeated = d.call("auto.dispatch", browser_request);

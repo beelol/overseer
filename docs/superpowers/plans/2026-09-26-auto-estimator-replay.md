@@ -45,10 +45,10 @@
 
 **Interfaces:** New dispatches record selector version `multi-harness-preflight-v7`, `estimator.version`, `estimator.now_ms`, and the complete bounded inputs. `auto.decision.replay` recomputes each v7 fit and then runs the v7 selector; it reports `replay_scope: "selector_and_estimator"` and whether both match the recorded decision. v1–v6 remain `selector_only`.
 
-- [ ] Add a red daemon protocol test that a v7 cold-start decision replays with estimator recomputed and no prompt or secret sentinel in the trace.
-- [ ] Add a red tamper test: altered saved fit or normalized quota evidence makes v7 replay report a mismatch; v6 still reports selector-only.
-- [ ] Wire v7 trace and replay; reject missing or oversized replay inputs rather than trusting stored fit.
-- [ ] Run focused and full serial workspace tests, four ledger mutation tests, criterion audit, and diff check; update AUTO-AC-15 evidence without promoting it until the full Verify clause is proved, then commit.
+- [x] Add a red daemon protocol test that a v7 cold-start decision replays with estimator recomputed and no prompt or secret sentinel in the trace.
+- [x] Add a red tamper test: altered saved fit or normalized quota evidence makes v7 replay report a mismatch; v6 still reports selector-only.
+- [x] Wire v7 trace and replay; reject missing or oversized replay inputs rather than trusting stored fit.
+- [x] Run focused and full serial workspace tests, four ledger mutation tests, criterion audit, and diff check; update AUTO-AC-15 evidence without promoting it until the full Verify clause is proved, then commit.
 
 ## Self-review
 
