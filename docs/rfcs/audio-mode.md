@@ -92,6 +92,14 @@ palette. It never plays sound itself.
 | Reactor cache | at most the 12 bundled files, owner-only, under the daemon's data folder; written on first play and rewritten when the content differs from the bundled cue |
 | While off | no player process, no cache folder |
 
+## Open question for the owner
+
+The owner's cue ledger lists *disconnected* under **Agent stopped**, which is silent by
+default. The daemon plays the attention cue when a top-level run's status becomes
+`disconnected` (its session was lost and it cannot continue), as it did before this pass.
+That behaviour is unchanged and untested by a live run; the owner decides whether a lost
+session should sound or stay silent.
+
 ## Out of scope for this pull request
 
 Streaming or online voices, per-event customization, controls in the terminal UI (pull

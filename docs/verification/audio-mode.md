@@ -89,5 +89,9 @@ The seven checks the owner's cue ledger asks of this pull request:
 - The owner's Commander recordings were not read; the live check used three generated beeps
   in a temporary private folder.
 - Nobody listened. The checks prove which files are played, not how they sound.
+- A top-level run that becomes `disconnected` plays the attention cue. The owner's ledger
+  lists *disconnected* under **Agent stopped**, silent by default. The behaviour is as it was
+  before this pass and is an open question in the [side RFC](../rfcs/audio-mode.md); only the
+  unit test `core_transitions_are_broad_and_attention_is_deduped` touches it.
 - The in-flight pull requests #2 (Auto Mode), #3 (Swarm) and #6 (terminal UI controls) were
   not rechecked against this branch in this pass.
