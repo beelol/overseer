@@ -495,6 +495,121 @@ fn apply_account_pool(routes: &mut [crate::auto_select::Route], pool_id: &str,
     }
 }
 
+fn active_parent_metadata(socket: &std::path::Path, method: &str, params: Value,
+    deadline: Instant) -> Result<Value> {
+    let timeout_ms = remaining_metadata_ms(deadline)?.min(4000);
+    let reply = crate::shim::control(socket, &json!({"op":"metadata_rpc",
+        "method":method,"params":params,"timeout_ms":timeout_ms}))?;
+    if reply["ok"] != true {
+        return Err(anyhow!("active parent metadata unavailable"));
+    }
+    Ok(reply["result"].clone())
+}
+
+fn active_parent_pages(socket: &std::path::Path, method: &str, tool_detail: bool,
+    limit: usize, deadline: Instant) -> Result<Value> {
+    let mut data = Vec::new();
+    let mut cursor: Option<String> = None;
+    let mut seen = std::collections::BTreeSet::new();
+    for _ in 0..8 {
+        let params = match (&cursor, tool_detail) {
+            (None, false) => json!({}),
+            (Some(cursor), false) => json!({"cursor":cursor}),
+            (None, true) => json!({"detail":"toolsAndAuthOnly"}),
+            (Some(cursor), true) => json!({"cursor":cursor,"detail":"toolsAndAuthOnly"}),
+        };
+        let page = active_parent_metadata(socket, method, params, deadline)?;
+        let items = page["data"].as_array()
+            .ok_or_else(|| anyhow!("active parent metadata page unavailable"))?;
+        if items.len() > limit || data.len() + items.len() > limit {
+            return Err(anyhow!("active parent metadata exceeded its bound"));
+        }
+        data.extend(items.iter().cloned());
+        cursor = match page.get("nextCursor") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(value)) if !value.is_empty() && value.len() <= 512
+                && value.bytes().all(|byte| byte.is_ascii_graphic()) => Some(value.clone()),
+            _ => return Err(anyhow!("active parent metadata cursor invalid")),
+        };
+        let Some(next) = &cursor else {
+            return Ok(json!({"data":data,"nextCursor":null}));
+        };
+        if !seen.insert(next.clone()) {
+            return Err(anyhow!("active parent metadata pagination repeated"));
+        }
+    }
+    Err(anyhow!("active parent metadata pagination exceeded its bound"))
+}
+
+fn refresh_active_parent_discovery(d: &Arc<Daemon>, parent: &crate::store::Run,
+    profile_id: &str, workspace_id: &str, expected_generation: i64,
+    deadline: Instant) -> Result<AutoProfileDiscovery> {
+    let socket = d.control_socket(parent)?;
+    let account = active_parent_metadata(&socket, "account/read",
+        json!({"refreshToken":false}), deadline)?;
+    if account["requiresOpenaiAuth"] != true || account["account"]["type"] != "chatgpt" {
+        return Err(anyhow!("active parent subscription authentication unavailable"));
+    }
+    let rate_limits = active_parent_metadata(&socket, "account/rateLimits/read", json!({}), deadline)?;
+    let quota_observed_ms = crate::daemon::now();
+    let fingerprint = crate::auto_quota::account_fingerprint(&rate_limits)?;
+    let snapshot = crate::auto_quota::parse_codex_rate_limits(&rate_limits,
+        profile_id, quota_observed_ms)?;
+    let models = active_parent_pages(&socket, "model/list", false, 128, deadline)?;
+    let model_observed_ms = crate::daemon::now();
+    let tools = active_parent_pages(&socket, "mcpServerStatus/list", true, 64, deadline)?;
+    let tool_observed_ms = crate::daemon::now();
+    let catalog = crate::auto_route::parse_codex_catalog(&models, model_observed_ms)?;
+    let tool_catalog = crate::auto_route::parse_codex_tools(&tools, tool_observed_ms)?;
+    let store = d.store.lock().unwrap();
+    let current = store.run(&parent.id)?
+        .ok_or_else(|| anyhow!("active parent disappeared during metadata refresh"))?;
+    if current.process_generation != parent.process_generation
+        || current.profile_id.as_deref() != Some(profile_id)
+        || current.workspace_id != workspace_id
+        || !ACTIVE.contains(&current.status.as_str())
+        || store.auto_account_generation(profile_id)? != Some(expected_generation) {
+        return Err(anyhow!("active parent changed during metadata refresh"));
+    }
+    store.record_auto_account_identity(profile_id, &fingerprint)?;
+    if store.auto_account_generation(profile_id)? != Some(expected_generation) {
+        return Err(anyhow!("active parent account changed during metadata refresh"));
+    }
+    let saved: Option<String> = store.conn.query_row("SELECT launch FROM runs WHERE id=?1",
+        [&parent.id], |row| row.get(0))?;
+    let mut launch: Value = saved.as_deref().and_then(|text| serde_json::from_str(text).ok())
+        .ok_or_else(|| anyhow!("active parent launch metadata unavailable"))?;
+    let generic = if launch.get("generic").is_some() { &mut launch["generic"] } else { &mut launch };
+    if generic["auto_routing"] != true
+        || generic["auto_parent_discovery"]["account_generation"].as_i64() != Some(expected_generation)
+        || generic["auto_parent_discovery"]["workspace_id"].as_str() != Some(workspace_id) {
+        return Err(anyhow!("active parent preflight changed during metadata refresh"));
+    }
+    generic["auto_parent_discovery"] = json!({"workspace_id":workspace_id,
+        "account_generation":expected_generation,"model_catalog":catalog,
+        "tool_catalog":tool_catalog});
+    let event = store.insert_event(quota_observed_ms, None, None, "quota",
+        "codex-app/active-parent-metadata", "reported",
+        &json!({"profile_id":profile_id,"snapshot":snapshot}))?;
+    store.insert_auto_quota(event.seq, profile_id, "codex-app/active-parent-metadata", &snapshot)?;
+    store.put_auto_model_catalog(profile_id, &catalog)?;
+    store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1",
+        rusqlite::params![parent.id, launch.to_string()])?;
+    let observations = store.auto_account_quota_observations(profile_id)?;
+    let pool_id = store.auto_account_pool_id(profile_id)?
+        .ok_or_else(|| anyhow!("Codex account pool identity unavailable"))?;
+    let now_ms = crate::daemon::now();
+    let mut routes = crate::auto_route::codex_auto_routes(&catalog, &tool_catalog,
+        Some(&snapshot), profile_id, now_ms);
+    apply_account_pool(&mut routes, &pool_id, &observations, now_ms);
+    Ok(AutoProfileDiscovery { routes, generation:Some(expected_generation),
+        evidence:json!({"profile_id":profile_id,
+            "source":"parent/codex-app/active-session-metadata",
+            "model_observed_ms":model_observed_ms,"tool_observed_ms":tool_observed_ms,
+            "quota_observed_ms":quota_observed_ms,
+            "account_generation":expected_generation}) })
+}
+
 fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
     parent_run_id: &str,
     budget: Duration) -> Result<AutoProfileDiscovery> {
@@ -531,7 +646,10 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
             let now_ms = crate::daemon::now();
             if now_ms < catalog.observed_ms || now_ms >= catalog.expires_ms
                 || now_ms < tools.observed_ms || now_ms >= tools.expires_ms {
-                return Err(anyhow!("parent Auto route preflight expired"));
+                let parent = active[0].clone();
+                drop(store);
+                return refresh_active_parent_discovery(d, &parent, profile_id,
+                    workspace_id, generation, deadline);
             }
             let observations = store.auto_account_quota_observations(profile_id)?;
             let observation = observations.iter().find(|value| value.pool_id == profile_id).cloned();

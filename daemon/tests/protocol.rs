@@ -3586,6 +3586,16 @@ fn auto_running_parent_can_delegate_to_suitable_model_on_its_own_profile() {
     assert_eq!(d.wait_status(&parent, |s| s == "running", 10)["status"], "running");
     let (_, launch_dir) = launch_info(&d, &parent);
     let capability = std::fs::read_to_string(launch_dir.join("auto-bridge.cap")).unwrap();
+    let shim_launch: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(launch_dir.join("launch.json")).unwrap()).unwrap();
+    let socket = shim_launch["control_socket"].as_str().unwrap();
+    let mut control = std::os::unix::net::UnixStream::connect(socket).unwrap();
+    std::io::Write::write_all(&mut control,
+        b"{\"op\":\"metadata_rpc\",\"method\":\"turn/start\",\"params\":{},\"timeout_ms\":1000}\n").unwrap();
+    let mut rejected = String::new();
+    std::io::BufRead::read_line(&mut std::io::BufReader::new(control), &mut rejected).unwrap();
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&rejected).unwrap()["ok"], false,
+        "the metadata bridge must not start a model turn");
     let selected = d.call("auto.bridge.submit", json!({"run_id":parent,
         "capability":capability.trim(),"work_unit_id":"same-profile-browser",
         "min_tier":"general","required_tools":["browser/navigate"],
@@ -3665,6 +3675,83 @@ fn auto_parent_follow_up_refuses_a_changed_account_before_starting_a_turn() {
     assert!(!d.home.path().join("runs").join(&parent).join("p2").join("auto-bridge.cap").exists());
     let events = serde_json::to_string(&d.events(&parent)).unwrap();
     assert!(!events.contains("account-A") && !events.contains("account-B"));
+}
+
+#[test]
+fn auto_running_parent_refreshes_stale_discovery_in_its_own_app_server_without_logging_metadata() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("active-refresh-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "9000"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"hold parent",
+        "approval_policy":"never","auto_routing":true})));
+    assert_eq!(d.wait_status(&parent, |status| status == "running", 10)["status"], "running");
+    let (_, launch_dir) = launch_info(&d, &parent);
+    let capability = std::fs::read_to_string(launch_dir.join("auto-bridge.cap")).unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let saved: String = db.query_row("SELECT launch FROM runs WHERE id=?1", [&parent],
+        |row| row.get(0)).unwrap();
+    let mut launch: serde_json::Value = serde_json::from_str(&saved).unwrap();
+    for catalog in ["model_catalog", "tool_catalog"] {
+        launch["generic"]["auto_parent_discovery"][catalog]["expires_ms"] = json!(1);
+    }
+    db.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![parent, launch.to_string()]).unwrap();
+    let initial_trace = std::fs::read_to_string(&trace).unwrap();
+    let selected = d.call("auto.bridge.submit", json!({"run_id":parent,
+        "capability":capability.trim(),"work_unit_id":"active-parent-browser",
+        "min_tier":"general","required_tools":["browser/navigate"],
+        "prompt":"bounded browser audit","title":"browser audit"}));
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    assert_eq!(selected["run"]["profile_id"], "system-codex");
+    assert_eq!(selected["run"]["model"], "gpt-6-sol");
+    assert_eq!(d.run(&parent)["status"], "running");
+    assert_eq!(d.wait_done(&run_id(&selected), 15)["status"], "completed");
+    let updated_trace = std::fs::read_to_string(&trace).unwrap();
+    assert!(updated_trace.matches("model_read").count() > initial_trace.matches("model_read").count());
+    assert!(updated_trace.matches("tool_preflight:available").count()
+        > initial_trace.matches("tool_preflight:available").count());
+    let raw = d.call("run.raw_output", json!({"run_id":parent,"max_bytes":262144}));
+    assert!(!raw.to_string().contains("secret-credit-sentinel"),
+        "same-session account metadata must not enter the parent transcript");
+}
+
+#[test]
+fn auto_running_parent_refresh_refuses_changed_account_without_child() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let account = r.path().join("account-id.txt");
+    std::fs::write(&account, "account-A").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS,FIXTURE_ACCOUNT_ID_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "9000"),
+        ("FIXTURE_ACCOUNT_ID_FILE", account.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"hold parent",
+        "approval_policy":"never","auto_routing":true})));
+    assert_eq!(d.wait_status(&parent, |status| status == "running", 10)["status"], "running");
+    let (_, launch_dir) = launch_info(&d, &parent);
+    let capability = std::fs::read_to_string(launch_dir.join("auto-bridge.cap")).unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let saved: String = db.query_row("SELECT launch FROM runs WHERE id=?1", [&parent],
+        |row| row.get(0)).unwrap();
+    let mut launch: serde_json::Value = serde_json::from_str(&saved).unwrap();
+    for catalog in ["model_catalog", "tool_catalog"] {
+        launch["generic"]["auto_parent_discovery"][catalog]["expires_ms"] = json!(1);
+    }
+    db.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![parent, launch.to_string()]).unwrap();
+    std::fs::write(&account, "account-B").unwrap();
+    let selected = d.call("auto.bridge.submit", json!({"run_id":parent,
+        "capability":capability.trim(),"work_unit_id":"changed-active-parent-browser",
+        "min_tier":"general","required_tools":["browser/navigate"],
+        "prompt":"bounded browser audit","title":"browser audit"}));
+    assert_eq!(selected["state"], "paused", "{selected}");
+    assert_eq!(d.runs().len(), 1, "changed account cannot authorize a child");
+    assert!(!d.call("run.raw_output", json!({"run_id":parent,"max_bytes":262144}))
+        .to_string().contains("account-B"));
 }
 
 #[test]
