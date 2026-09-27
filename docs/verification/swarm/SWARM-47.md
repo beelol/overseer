@@ -59,3 +59,36 @@ assertion passed in a later focused rerun. `git diff --check` passed. Already
 running or accepted dependent work is not yet interrupted/re-reviewed solely
 because a conflict opens; that remains a separate safety gap, along with live
 director behavior and semantic choice. The criterion remains partial.
+
+Active-dependent follow-up at `a7c6c9b` (2026-09-27), after merging main at
+`639dfcb`: the first fixture registered a dependent attempt after an accepted
+route finding, then opened a later conflict against that finding. Before the
+change the dependent stayed `reserved`. The conflict transaction now records a
+checkpoint request and `cancel_requested` with `evidence_conflict` for registered
+downstream attempts, including transitive dependents. Restart and duplicate
+conflict registration leave one checkpoint. Confirmed exit leaves the job blocked
+for director replan, rather than treating the old attempt as accepted or silently
+retrying it. The fixture passed after the change.
+
+A second fixture admitted a real linked `/bin/sleep` worker for the dependent
+and another for unrelated work. Opening the conflict interrupted only the
+dependent. Its attempt reconciled to blocked; the unrelated worker remained
+running. A failed first fixture setup exposed the existing `benefit_unproven`
+admission requirement, which was satisfied by recording a beneficial batch.
+The next run observed process interruption before asynchronous attempt
+reconciliation, so the fixture now waits for the durable blocked state. The
+focused linked-worker test and the seven-test conflict suite passed. Before the
+linked fixture was added, the affected admission, conflict, context, plan,
+runtime, and state suites passed 35 + 6 + 5 + 11 + 24 + 19 tests. The final
+seven-test conflict suite, `git diff --check`, JSON validation, and the
+repository link check also passed.
+
+Main's Gate S update clarified AC-195's pending joined contract tests and its
+settled briefing, watch, hold, and permission-denial behavior. The RFC now
+applies those rules to the single director without giving workers a second
+instruction channel. No worker-count, account-allocation, or routing policy
+changed. The main update brought five broken README links to its live-probe
+evidence; this branch corrected them, and the link check found zero broken
+links. Accepted dependent work still needs automatic invalidation/re-review;
+autonomous semantic judgment, unresolved partial reporting, and a qualified
+live director remain unverified. SWARM-47 stays partial.
