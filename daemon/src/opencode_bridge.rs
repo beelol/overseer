@@ -94,11 +94,28 @@ pub fn write_config(config_home: &Path, tags: &[String], model: &str, ollama_url
 
 /// Does this OpenCode have the headless server? An older one does not; then a local run cannot
 /// ask before it edits or runs a command, and is only ever offered, never started on its own.
-pub fn server_available(opencode: &Path) -> bool {
+/// It is asked once per program file, in Overseer's own profile (`env`), never in the user's.
+pub fn server_available(opencode: &Path, env: &std::collections::BTreeMap<String, String>) -> bool {
     if std::env::var_os("OVERSEER_TEST_OPENCODE_NO_SERVE").is_some() {
         return false;
     }
-    std::process::Command::new(opencode).args(["serve", "--help"]).stdin(std::process::Stdio::null()).stderr(std::process::Stdio::null()).output().is_ok_and(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).contains("serve"))
+    static KNOWN: std::sync::Mutex<Vec<(std::path::PathBuf, Option<std::time::SystemTime>, bool)>> = std::sync::Mutex::new(Vec::new());
+    let changed = std::fs::metadata(opencode).and_then(|m| m.modified()).ok();
+    if let Some((_, _, has)) = KNOWN.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(p, at, _)| p == opencode && *at == changed) {
+        return *has;
+    }
+    let out = std::process::Command::new(opencode).args(["serve", "--help"]).envs(env).stdin(std::process::Stdio::null()).output();
+    // The help of the command itself names it; the general help of a build without it does not.
+    let has = out.is_ok_and(|o| o.status.success() && serves(&format!("{}\n{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr))));
+    let mut known = KNOWN.lock().unwrap_or_else(|e| e.into_inner());
+    known.retain(|(p, _, _)| p != opencode);
+    known.push((opencode.to_path_buf(), changed, has));
+    has
+}
+
+/// Is this the help of `opencode serve`? (OpenCode 1.15 prints it on the error stream.)
+fn serves(help: &str) -> bool {
+    help.lines().any(|l| l.trim() == "opencode serve") && help.contains("--port")
 }
 
 /// `ollama/<tag>` or a bare tag, as the tag.
@@ -720,6 +737,16 @@ pub fn env_for(profile_env: &BTreeMap<String, String>) -> Result<&String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_server_is_recognised_from_its_own_help() {
+        // OpenCode 1.15.13, `opencode serve --help`, as printed on the error stream.
+        let help = "opencode serve\n\nstarts a headless opencode server\n\nOptions:\n  -h, --help         show help  [boolean]\n      --port         port to listen on  [number] [default: 0]\n      --hostname     hostname to listen on  [string] [default: \"127.0.0.1\"]\n";
+        assert!(serves(help));
+        // The general help of a build without the command lists other commands only.
+        assert!(!serves("opencode [project]\n\nCommands:\n  opencode run [message..]  run opencode with a message\n  opencode auth             manage credentials\n\nOptions:\n  --port  port\n"));
+        assert!(!serves(""));
+    }
 
     fn fixture(name: &str) -> Vec<Value> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("fixtures/transcripts").join(format!("opencode-1.15.13-serve-{name}-local.jsonl"));

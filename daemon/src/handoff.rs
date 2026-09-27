@@ -287,7 +287,7 @@ pub fn local_target(d: &Daemon, run: &Run) -> Result<Target> {
     let Some(opencode) = crate::adapters::resolve_program(opencode_bridge::HARNESS) else {
         bail!("OpenCode is not installed, so no local model can take over");
     };
-    let served = opencode_bridge::server_available(&opencode);
+    let served = opencode_bridge::server_available(&opencode, &Daemon::profile_env(&opencode_bridge::local_profile(d)?));
     let picked = continuity::pick_value(d)?;
     if picked["ollama"]["running"] != true {
         bail!("{}", picked["ollama"]["detail"].as_str().unwrap_or("Ollama is not running"));
