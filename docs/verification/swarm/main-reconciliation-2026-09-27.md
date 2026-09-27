@@ -355,3 +355,21 @@ an account newly selected after admission cannot add a fresh pool allocation.
 Existing attempts, reservations, artifacts, and the original deadline remain.
 This does not supply a normal owner UI or Auto's live account feed and does not
 make SWARM-59 or the shared Auto contract complete.
+
+## Refresh against published main: `7692f4fe`
+
+The branch merged `7692f4fe` at `5aeab8d5`. Main's two new commits update the
+Gate S tracker and Gate R voice design, owner decisions, goal, and ledger. They
+do not add daemon or extension runtime changes. Gate S PR #14 is marked ready,
+but its UI fixes and joined Swarm checks are still outside main. Voice Mode is
+planned around Overseer's session and the owner's chosen Star mark; its goal is
+prepared but has not started. Spoken redirects and permissions must use the
+same owner-authorized control path when Voice lands. They do not create a new
+worker-command route or change Swarm's authority boundary.
+
+Decision: the existing Swarm RFC already treats Gate S as seeing one director
+and leaves worker coordination with the director. Keep the opt-in toggle,
+allocation and worker-count defaults, and SWARM-01–64 wording unchanged. The
+normal start, shared Auto account transaction, Gate S advisories, and eventual
+Voice integration remain open; the published documentation verifies none of
+those joined paths.
