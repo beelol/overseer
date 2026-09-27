@@ -38,7 +38,8 @@ fn hundred_job_summary_and_scoped_large_artifact_context() {
     let id = run["id"].as_str().unwrap();
     let mut jobs = vec![
         json!({"id":"parent","title":"Inspect API contract","acceptance":"Save checked evidence","deps":[]}),
-        json!({"id":"child-a","title":"Check client A","acceptance":"Verify parent contract","deps":["parent"]}),
+        json!({"id":"child-a","title":"Check client A","acceptance":"Verify parent contract","deps":["parent"],
+            "resource_claims":[{"resource":"db:client-a","mode":"write"}]}),
         json!({"id":"child-b","title":"Check client B","acceptance":"Verify parent contract","deps":["parent"]}),
     ];
     for n in 0..97 {
@@ -87,6 +88,14 @@ fn hundred_job_summary_and_scoped_large_artifact_context() {
     );
     assert!(brief.to_string().len() <= 4096, "{brief}");
     assert_eq!(brief["job"]["acceptance"], "Verify parent contract");
+    assert_eq!(brief["job"]["resource_claims"],json!([{"resource":"db:client-a","mode":"write"}]));
+    assert_eq!(brief["target_constraints"]["assigned_target"],"account-a");
+    assert_eq!(brief["target_constraints"]["allowed_targets"],json!(["account-a","account-b"]));
+    assert_eq!(brief["budget"][0]["pool_id"],"pool-a");
+    assert_eq!(brief["budget"][0]["unit"],"points");
+    assert_eq!(brief["budget"][0]["allocation_milli"],10000);
+    assert_eq!(brief["budget"][0]["reserve_milli"],2000);
+    assert_eq!(brief["budget"][0]["attempt_reserved_milli"],100);
     assert_eq!(brief["artifacts"][0]["id"], "contract-v1");
     assert_eq!(brief["artifacts"].as_array().unwrap().len(), 1);
     assert!(!brief.to_string().contains("Independent 42"));
@@ -179,6 +188,8 @@ fn hundred_job_summary_and_scoped_large_artifact_context() {
         .unwrap();
     assert!(saved_prompt.contains("contract-v1"));
     assert!(saved_prompt.contains("Verify parent contract"));
+    assert!(saved_prompt.contains("db:client-a"));
+    assert!(saved_prompt.contains("attempt_reserved_milli"));
     assert!(!saved_prompt.contains(&evidence));
     assert!(saved_prompt.len() <= 32 * 1024);
     d.call("swarm.report", json!({"run_id":id,"job_id":"parent",

@@ -408,18 +408,38 @@ pub fn worker_brief(store: &Store, p: &Value) -> Result<Value> {
     let job = required(p, "job_id")?;
     let (target, attempt_revision) = attempt_target(store, p)?;
     let current = get(store, run)?;
-    let (title,acceptance,deps,status,job_revision): (String,String,String,String,i64) = store.conn.query_row(
-        "SELECT title,acceptance,deps,status,plan_revision FROM swarm_jobs WHERE run_id=?1 AND id=?2",
-        params![run,job], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+    let (title,acceptance,deps,claims,status,job_revision): (String,String,String,String,String,i64) = store.conn.query_row(
+        "SELECT title,acceptance,deps,resource_claims,status,plan_revision FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+        params![run,job], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?)),
     )?;
     if attempt_revision != job_revision || status == "superseded" || status == "cancelled" {
         bail!("stale worker assignment");
     }
     let deps: Value = serde_json::from_str(&deps)?;
+    let claims: Value = serde_json::from_str(&claims)?;
+    let attempt = required(p, "attempt_id")?;
+    let mut budget_stmt = store.conn.prepare(
+        "SELECT r.pool_id,r.window_id,r.unit,a.allocation_milli,a.reserve_milli,
+                r.amount_milli,r.status
+         FROM swarm_reservations r JOIN swarm_allocations a
+           ON a.run_id=r.run_id AND a.pool_id=r.pool_id AND a.window_id=r.window_id
+         WHERE r.run_id=?1 AND r.attempt_id=?2 ORDER BY r.pool_id,r.window_id"
+    )?;
+    let budget = budget_stmt.query_map(params![run,attempt], |r| {
+        Ok(json!({"pool_id":r.get::<_,String>(0)?,"window_id":r.get::<_,String>(1)?,
+            "unit":r.get::<_,String>(2)?,"allocation_milli":r.get::<_,i64>(3)?,
+            "reserve_milli":r.get::<_,i64>(4)?,"attempt_reserved_milli":r.get::<_,i64>(5)?,
+            "reservation_status":r.get::<_,String>(6)?}))
+    })?.collect::<rusqlite::Result<Vec<_>>>()?;
+    if budget.is_empty() {
+        bail!("worker reservation or allocation is missing");
+    }
     let mut result = json!({"run_id":run,"category":current["category"],"objective":current["objective"],
         "source_change_permission":current["source_change_permission"],
-        "plan_revision":job_revision,"target_id":target,"job":{"id":job,"title":title,
-        "acceptance":acceptance,"deps":deps},"artifacts":[]});
+        "plan_revision":job_revision,"target_id":target,
+        "target_constraints":{"assigned_target":target,"allowed_targets":current["allowed_targets"]},
+        "job":{"id":job,"title":title,"acceptance":acceptance,"deps":deps,
+            "resource_claims":claims},"budget":budget,"artifacts":[]});
     if result.to_string().len() > limit {
         bail!("required worker brief exceeds inline context limit");
     }
