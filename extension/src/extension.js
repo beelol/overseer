@@ -114,6 +114,7 @@ async function activate(context) {
     // The grid takes the editor area and gives it back as it was (AC-79).
     onMode: async (mode, was) => { if (mode === 'grid') await arrangement.enterGrid(); else if (was === 'grid') await arrangement.leaveGrid(); },
     // No empty grid (AC-113): when its last tile goes, the grid gives way to the home composer.
+    track: runId => arrangement.track(runId), untrack: () => arrangement.untrack(),
     gridEmpty: () => goHome('The grid is empty: no agent is working or pinned. Start one here.') });
   centerRef = center;
   const arrangement = new Arrangement({ context, center, review, model, client, log: say });
@@ -125,6 +126,28 @@ async function activate(context) {
     agentsVisible: () => agentsView.visible, immersive });
   // Another dashboard window may have put the immersive settings back on its exit: apply them again here.
   context.subscriptions.push(vscode.window.onDidChangeWindowState(s => { if (s.focused && dashboard.inDashboard) immersive.apply().catch(() => {}); }));
+  // AC-104: an agent dragged from the side bar onto the grid. VS Code's editor drop opens the agent's
+  // chat editor (AC-71) in the grid's group, or in a group split off beside it; while the grid is shown
+  // that editor (and a group the drop created) is closed again and the agent is placed on the grid's
+  // edge on that side instead.
+  outputs.intercept = async (runId, panel, uri) => {
+    if (center.mode !== 'grid' || !center.panel) return false;
+    const gridColumn = center.panel.viewColumn, column = panel.viewColumn;
+    let layout; try { layout = await vscode.commands.executeCommand('vscode.getEditorLayout'); } catch { layout = undefined; }
+    const vertical = layout && layout.orientation === 1;
+    const edge = column === gridColumn ? 'right' : column > gridColumn ? (vertical ? 'bottom' : 'right') : (vertical ? 'top' : 'left');
+    setTimeout(async () => {
+      for (const group of vscode.window.tabGroups.all) {
+        const tabs = group.tabs.filter(t => t.input instanceof vscode.TabInputCustom && t.input.uri.toString() === uri.toString());
+        if (!tabs.length) continue;
+        const alone = group.tabs.length === tabs.length && group.viewColumn !== gridColumn;
+        await vscode.window.tabGroups.close(alone ? group : tabs).then(undefined, () => {});
+      }
+      center.panel?.reveal(gridColumn, false);
+      center.panel?.webview.postMessage({ type: 'gridPlace', runId, edge });
+    }, 0);
+    return true;
+  };
   const pullRequests = new PullRequests(client, model, say);
   const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => vscode.ViewColumn.Beside });
   // An agent dragged from the side bar into the editor opens its chat there (AC-71): a read-only
@@ -639,6 +662,7 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.toggleDashboard', guard(async () => { if (dashboard.inDashboard) await dashboard.exit(); else { await model.refresh(); await dashboard.enter(); } })),
     vscode.commands.registerCommand('overseer.openDashboardWindow', guard(() => dashboard.openWindow())),
     vscode.commands.registerCommand('overseer.newAgent', guard(async () => { requireTrust(); await arrangement.chatOnly(); center.setMode('composer'); center.focus('composer'); })),
+    vscode.commands.registerCommand('overseer.resetGridLayout', guard(() => center.panel?.webview.postMessage({ type: 'gridReset' }))),
     vscode.commands.registerCommand('overseer.toggleGrid', guard(async () => {
       if (center.mode === 'grid') { center.setMode(selectedRun ? 'chat' : 'composer'); return; }
       // The grid opens only with something to show (AC-113); otherwise home, with a one-line note.

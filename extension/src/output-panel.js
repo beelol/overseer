@@ -72,6 +72,8 @@ class OutputPanels {
         const runId = document.uri.path.split('/').filter(Boolean)[0] || '';
         await this.client.waitConnected(20000).catch(() => {});
         if (!this.model.run(runId)) await this.model.refresh();
+        // AC-104: dropped on the agent grid, the agent becomes a tile instead of a chat editor.
+        if (this.model.run(runId) && this.intercept && await this.intercept(runId, panel, document.uri)) return;
         if (!this.model.run(runId)) { panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Agent unavailable', body: '<div class="empty-state"><span class="codicon codicon-debug-disconnect"></span><div>This agent is no longer in Overseer.</div></div>' }); return; }
         await this.attach(runId, panel);
       },

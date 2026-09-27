@@ -59,6 +59,7 @@
       { "command": "overseer.openDashboardWindow", "title": "Open Dashboard in New Window", "category": "Overseer", "icon": "$(empty-window)" },
       { "command": "overseer.newAgent", "title": "New Agent", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.toggleGrid", "title": "Toggle Agent Grid", "category": "Overseer", "icon": "$(layout)" },
+      { "command": "overseer.resetGridLayout", "title": "Reset Grid Layout", "category": "Overseer" },
       { "command": "overseer.switchAgent", "title": "Switch Agent…", "category": "Overseer", "icon": "$(list-selection)" },
       { "command": "overseer.nextNeedsYou", "title": "Go to Next Agent That Needs You", "category": "Overseer", "icon": "$(bell-dot)" },
       { "command": "overseer.allowPermission", "title": "Allow Pending Request", "category": "Overseer", "icon": "$(check)", "enablement": "isWorkspaceTrusted" },
@@ -161,7 +162,7 @@
     "configuration": {
       "title": "Overseer",
       "properties": {
-        "overseer.grid.maxTiles": { "type": "integer", "minimum": 1, "maximum": 9, "default": 6, "markdownDescription": "Most agents shown at once in the agent grid (1–9)." },
+        "overseer.grid.maxTiles": { "type": "integer", "minimum": 1, "maximum": 16, "default": 6, "markdownDescription": "How many running or pinned agents fill the agent grid on their own (1–16). Agents you drag in can fill it up to 16." },
         "overseer.dashboard.openOnStartup": { "type": "boolean", "default": false, "markdownDescription": "Open the Overseer dashboard when VS Code starts." },
         "overseer.sideBar.openOnStartup": { "type": ["boolean", "null"], "default": null, "markdownDescription": "Show Overseer in the side bar instead of Explorer when VS Code opens (Explorer stays one click away in the activity bar). Overseer asks once while this is not set." },
         "overseer.dashboard.immersive": { "type": "boolean", "default": true, "markdownDescription": "In the dashboard, hide VS Code's chrome above Overseer's views. While the dashboard is open Overseer sets these user settings, and puts back exactly what was there when you leave it: `workbench.editor.showTabs` = `none`, `breadcrumbs.enabled` = `false`, `workbench.editor.editorActionsLocation` = `hidden`." },

@@ -3,6 +3,7 @@
 // the review opens beside this view when the agent has changes. State survives reloads.
 (function () {
   const vscode = acquireVsCodeApi();
+  window.overseerApi = vscode; // UI tests post messages as the dashboard does
   const ui = window.OverseerUI, el = ui.el;
   const post = m => vscode.postMessage(m);
   const saved = vscode.getState() || {};
@@ -46,7 +47,8 @@
   const composer = window.OverseerComposer.create(composerHost, { post, onStarted: runId => { selected = runId; setMode('chat'); } });
 
   // ---------- Grid (AC-58) ----------
-  const grid = window.OverseerGrid.create(gridHost, { post, open: runId => selectRun(runId, { focusChat: true }), getState: () => state });
+  const grid = window.OverseerGrid.create(gridHost, { post, open: runId => selectRun(runId, { focusChat: true }), getState: () => state,
+    loadLayout: () => saved.gridLayout, saveLayout: layout => vscode.setState({ ...(vscode.getState() || {}), gridLayout: layout }) });
 
   // ---------- Messages ----------
   window.addEventListener('message', e => {
@@ -59,6 +61,9 @@
         break;
       case 'selected': if (m.runId && (m.runId !== selected || mode !== 'chat')) selectRun(m.runId, { fromHost: true }); break;
       case 'mode': setMode(m.mode, m); break;
+      case 'gridPlace': grid.place(m.runId, m.edge); break;
+      case 'gridReset': grid.reset(); break;
+      case 'tracked': grid.setTracked(m.runId); break;
       case 'run': if (m.channel === 'grid') grid.run(m); else if (m.run.id === selected) chat.setRun(m); break;
       case 'history': if (m.channel === 'grid') grid.history(m); else if (m.root === selected) chat.history(m.events, m.truncated, saved.chat && saved.chat.runId === selected ? saved.chat : undefined); break;
       case 'events': if (m.channel === 'grid') grid.events(m.items); else chat.events(m.items.filter(x => x.root === selected)); break;
@@ -75,7 +80,8 @@
 
   // Keyboard: ⌘. stops, Escape leaves the grid; arrows handled per region.
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && mode === 'grid' && !e.target.closest('input, textarea')) { setMode(selected ? 'chat' : 'composer'); e.preventDefault(); }
+    // Escape while tracking returns to the grid alone (AC-105); otherwise it leaves the grid.
+    if (e.key === 'Escape' && mode === 'grid' && !e.target.closest('input, textarea')) { if (grid.tracked()) post({ type: 'untrack' }); else setMode(selected ? 'chat' : 'composer'); e.preventDefault(); }
   });
 
   // Read-only view of the dashboard's state for UI tests.

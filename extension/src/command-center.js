@@ -72,6 +72,8 @@ class CommandCenter {
       case 'mode': { const was = this.mode; this.mode = m.mode; if (was !== m.mode) await this.handlers.onMode?.(m.mode, was); return; }
       case 'focusComposer': post({ type: 'mode', mode: 'composer' }); return;
       case 'gridEmpty': if (this.mode === 'grid') await this.handlers.gridEmpty?.(); return;
+      case 'track': if (typeof m.runId === 'string') await this.handlers.track?.(m.runId); return;
+      case 'untrack': await this.handlers.untrack?.(); return;
       case 'gridSubscribe': {
         const ids = (m.runIds || []).filter(id => this.model.run(id));
         // Metadata first: the tile needs its root run id before history arrives.
@@ -133,7 +135,7 @@ class CommandCenter {
     if (!this.panel) return;
     const { tasks, runs, workspaces, profiles } = this.model.state;
     const state = { tasks, runs, workspaces, profiles, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), pinned: this.handlers.pinned(),
-      gridMax: Math.max(1, Math.min(9, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
+      gridMax: Math.max(1, Math.min(16, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
     await this.panel.webview.postMessage({ type: 'state', state, selected: this.handlers.selected() });
     if (this.chatRun) { const msg = runMessage(this.model, this.chatRun, this.handlers.steering); if (msg) { this.chatFeed.refreshDescendants(); this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg }); } }
     for (const id of this.gridFeed?.roots.keys() || []) { const msg = runMessage(this.model, id, this.handlers.steering); if (msg) this.panel.webview.postMessage({ type: 'run', channel: 'grid', ...msg }); }

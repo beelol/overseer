@@ -61,7 +61,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       (function tick() { const t0 = performance.now(); if (window.__lag.length < 400) setTimeout(() => { window.__lag.push(performance.now() - t0 - 25); tick(); }, 25); })();
       return true; })()`);
     await delay(9000);
-    const layout = await dash.eval(`(() => { const g = document.querySelector('.grid'); return { tiles: document.querySelectorAll('.grid .tile').length, cols: g.style.getPropertyValue('--cols'), rows: g.style.getPropertyValue('--rows') }; })()`);
+    // Columns and rows as tiles sit on screen (AC-104 builds the grid from splits).
+    const layout = await dash.eval(`(() => { const ts = [...document.querySelectorAll('.grid .tile')].map(t => t.getBoundingClientRect()); const distinct = xs => new Set(xs.map(x => Math.round(x / 4))).size; return { tiles: ts.length, cols: String(distinct(ts.map(r => r.left))), rows: String(distinct(ts.map(r => r.top))) }; })()`);
     await s.screenshot('grid-9-dark');
     const perf = await dash.eval(`(() => { const p = (a, q) => { const x = a.slice().sort((m, n) => m - n); return Math.round(x[Math.floor(x.length * q)] || 0); }; return { lines: window.__lat.length, latP95: p(window.__lat, .95), latMax: Math.max(...window.__lat), lagN: window.__lag.length, lagP95: p(window.__lag, .95), lagMax: Math.round(Math.max(...window.__lag)) }; })()`);
     const stages = await dash.eval(`(() => { const p = (a, q) => { const x = a.slice().sort((m, n) => m - n); return Math.round(x[Math.floor(x.length * q)] || 0); };
@@ -92,7 +93,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await setSetting('overseer.grid.maxTiles', 4);
     for (let i = 0; i < 3; i++) runs.push(s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'for i in 1 2 3 4 5 6 7 8 9 10; do echo "working $i"; sleep 1; done'], prompt: '', title: `Short ${i + 1}` }));
     await dash.waitFor(`document.querySelectorAll('.grid .tile').length === 4`, 20000);
-    const four = await dash.eval(`({ tiles: document.querySelectorAll('.grid .tile').length, cols: document.querySelector('.grid').style.getPropertyValue('--cols') })`);
+    const four = await dash.eval(`(() => { const ts = [...document.querySelectorAll('.grid .tile')].map(t => t.getBoundingClientRect()); const distinct = xs => new Set(xs.map(x => Math.round(x / 4))).size; return { tiles: ts.length, cols: String(distinct(ts.map(r => r.left))), rows: String(distinct(ts.map(r => r.top))) }; })()`);
     check('with a maximum of 4, the grid shows 2×2', four.tiles === 4 && four.cols === '2', four);
     await s.screenshot('grid-4-light');
     await setSetting('workbench.colorTheme', 'Overseer');

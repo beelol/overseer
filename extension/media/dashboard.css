@@ -25,8 +25,24 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .composer-note .fix { margin-left: 4px; }
 
 /* ---- Grid ---- */
-.view-grid { display: flex; min-height: 0; }
-.grid { flex: 1; display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr)); gap: var(--ov-space-2); padding: var(--ov-space-2); height: 100vh; min-height: 0; }
+.view-grid { position: relative; display: flex; min-height: 0; }
+/* AC-104: the grid is a tree of splits; every split halves its space between two parts. */
+.grid { flex: 1; display: flex; gap: var(--ov-space-2); padding: var(--ov-space-2); height: 100vh; min-width: 0; min-height: 0; }
+.grid > .split, .grid > .cell { flex: 1 1 0; }
+.split { display: flex; flex: 1 1 0; gap: var(--ov-space-2); min-width: 0; min-height: 0; }
+.split-row { flex-direction: row; }
+.split-col { flex-direction: column; }
+.cell { display: flex; flex: 1 1 0; min-width: 0; min-height: 0; }
+.cell > .tile { flex: 1; }
+.tile-head[draggable="true"] { cursor: grab; }
+.tile.dragging { opacity: .45; }
+.grid-drop { position: absolute; z-index: 30; pointer-events: none; border: 2px solid var(--ov-focus); border-radius: var(--ov-radius-card); background: var(--ov-accent-soft); opacity: .85; transition: left var(--ov-motion-fast) var(--ov-ease), top var(--ov-motion-fast) var(--ov-ease), width var(--ov-motion-fast) var(--ov-ease), height var(--ov-motion-fast) var(--ov-ease); }
+.grid-full { position: absolute; z-index: 31; top: var(--ov-space-4); left: 50%; transform: translateX(-50%); padding: var(--ov-space-2) var(--ov-space-4); border-radius: var(--ov-radius-pill); background: var(--ov-raised); border: 1px solid var(--ov-border); box-shadow: 0 4px 16px var(--ov-shadow); font-size: var(--ov-font-sm); pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .grid-drop { transition: none; } }
+.tile { cursor: pointer; }
+.tile.tracked { border-color: var(--ov-accent); box-shadow: 0 0 0 1px var(--ov-accent); }
+.grid-track { position: absolute; z-index: 29; bottom: var(--ov-space-4); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--ov-space-2); padding: var(--ov-space-1) var(--ov-space-1) var(--ov-space-1) var(--ov-space-3); border-radius: var(--ov-radius-pill); background: var(--ov-raised); border: 1px solid var(--ov-border); box-shadow: 0 4px 16px var(--ov-shadow); font-size: var(--ov-font-sm); }
+.grid-track .codicon { color: var(--ov-accent); }
 .tile { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-radius: var(--ov-radius-card); border: 1px solid var(--ov-border); background: var(--ov-bg); background-image: var(--ov-surface); overflow: hidden; transition: border-color var(--ov-motion-fast); }
 .tile:focus-visible, .tile:focus-within { border-color: var(--ov-focus); outline: none; }
 .tile.needs { border-color: var(--ov-waiting); }
@@ -50,7 +66,6 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .tile-input input { flex: 1; min-width: 0; height: 26px; border: none; background: transparent; padding: 0; }
 .tile-input input:focus-visible { outline: none; }
 
-/* ---- Files panel ---- */
 /* AC-109: choices sit in a row under the field (wrapping below it, never inside it). */
 /* AC-154: the choices share the full width under the field, one row; a narrow row shortens labels (ellipsis). */
 .composer-hero > .composer-choices { display: flex; flex-wrap: nowrap; gap: 6px; margin-top: calc(var(--ov-space-2) * -0.5); }
