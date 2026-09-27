@@ -47,14 +47,12 @@ impl Run {
             .collect()
     }
     fn spoke(&self) -> Vec<String> {
+        // Overseer's voice as start, lowered, restored, stopped and done ("phrase" marks are left out).
         self.events
             .iter()
-            .filter_map(|e| {
-                if let Event::Spoke { event, .. } = e {
-                    Some(event.clone())
-                } else {
-                    None
-                }
+            .filter_map(|e| match e {
+                Event::Spoke { event, .. } if event != "phrase" => Some(event.clone()),
+                _ => None,
             })
             .collect()
     }
@@ -76,7 +74,10 @@ fn listen(audio: &[f32], script: Vec<ScriptLine>, timed: Vec<(u64, Command)>, ec
     };
     listener::run(
         opts,
-        Some(Box::new(Scripted { lines: script })),
+        Some(Box::new(Scripted {
+            lines: script,
+            live: None,
+        })),
         sink.clone(),
     )
     .unwrap();

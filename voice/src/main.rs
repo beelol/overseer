@@ -1,7 +1,7 @@
 //! overseer-listener: Overseer's voice listener, started by the daemon (Voice Mode, Gate R).
 //!
 //!     overseer-listener [--input mic|mic-plain|file:<wav>|stdin|feed] [--fast]
-//!                       [--model <ggml.bin> | --script <words.json> | --no-words]
+//!                       [--model <ggml.bin> | --script <words.json> | --script-live | --no-words]
 //!                       [--hint <words>] [--voice <name>] [--rate <wpm>]
 //!                       [--commands <timed.jsonl>] [--echo <gain>] [--no-control]
 //!
@@ -52,7 +52,15 @@ fn run() -> Result<()> {
             "--model" => model = Some(PathBuf::from(value()?)),
             "--script" => {
                 let lines: Vec<ScriptLine> = serde_json::from_slice(&std::fs::read(value()?)?)?;
-                recognizer = Some(Box::new(Scripted { lines }));
+                recognizer = Some(Box::new(Scripted { lines, live: None }));
+            }
+            "--script-live" => {
+                let live = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+                opts.script = Some(live.clone());
+                recognizer = Some(Box::new(Scripted {
+                    lines: Vec::new(),
+                    live: Some(live),
+                }));
             }
             "--no-words" => words = false,
             "--hint" => opts.hint = value()?,

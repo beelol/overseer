@@ -64,7 +64,8 @@ pub enum Event {
         stop_word: bool,
         t_ms: u64,
     },
-    /// Overseer's voice: "start", "lowered", "restored", "stopped", "done".
+    /// Overseer's voice: "start", "phrase" (one phrase ended, the next begins), "lowered",
+    /// "restored", "stopped", "done".
     Spoke {
         line: u64,
         event: String,
@@ -111,5 +112,10 @@ pub enum Command {
     },
     /// Feed mode: the simulated input has ended.
     FeedEnd,
+    /// Simulated voice: the words that go with audio being fed, for a listener started with
+    /// `--script-live`.
+    Script {
+        lines: Vec<crate::recognize::ScriptLine>,
+    },
     Quit,
 }

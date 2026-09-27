@@ -111,7 +111,7 @@ pub fn clean(text: &str) -> String {
 }
 
 /// A line of the script: these words are spoken from `start_ms` to `end_ms` in the stream.
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct ScriptLine {
     pub start_ms: u64,
     pub end_ms: u64,
@@ -122,10 +122,15 @@ pub struct ScriptLine {
 /// the audio's time, and for a line only partly covered, the share of its words said by then.
 pub struct Scripted {
     pub lines: Vec<ScriptLine>,
+    /// Lines added while the listener runs (the daemon's simulated voice says what it feeds).
+    pub live: Option<std::sync::Arc<std::sync::Mutex<Vec<ScriptLine>>>>,
 }
 
 impl Recognizer for Scripted {
     fn words(&mut self, samples: &[f32], start_ms: u64, _hint: &str) -> Result<String> {
+        if let Some(live) = &self.live {
+            self.lines.append(&mut live.lock().unwrap());
+        }
         let end_ms = start_ms + samples.len() as u64 * 1000 / 16_000;
         let mut out = Vec::new();
         for l in &self.lines {
@@ -165,6 +170,7 @@ mod tests {
     #[test]
     fn the_script_says_its_words_as_time_passes() {
         let mut s = Scripted {
+            live: None,
             lines: vec![ScriptLine {
                 start_ms: 1000,
                 end_ms: 3000,

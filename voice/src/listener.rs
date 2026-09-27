@@ -58,6 +58,8 @@ pub struct Options {
     pub level_every: usize,
     /// Tests: Overseer's voice from this function instead of `say`.
     pub synth: Option<fn(&str) -> Vec<f32>>,
+    /// The live script's lines, when the recognizer is `Scripted` with a live part.
+    pub script: Option<std::sync::Arc<std::sync::Mutex<Vec<crate::recognize::ScriptLine>>>>,
 }
 
 impl Default for Options {
@@ -75,6 +77,7 @@ impl Default for Options {
             control: true,
             level_every: 2,
             synth: None,
+            script: None,
         }
     }
 }
@@ -161,6 +164,7 @@ struct State<W: Write> {
     output: Option<std::sync::Arc<std::sync::Mutex<VecDeque<f32>>>>,
     /// Phrases already made (the common lines), by text.
     made: std::collections::HashMap<String, Vec<f32>>,
+    script: Option<std::sync::Arc<std::sync::Mutex<Vec<crate::recognize::ScriptLine>>>>,
 }
 
 fn ms(samples: u64) -> u64 {
@@ -308,6 +312,7 @@ impl<W: Write> State<W> {
             SpeakEvent::Lowered { line, phrase } => (line, "lowered", phrase),
             SpeakEvent::Restored { line, phrase } => (line, "restored", phrase),
             SpeakEvent::Stopped { line, phrase } => (line, "stopped", phrase),
+            SpeakEvent::Phrase { line, phrase } => (line, "phrase", phrase),
             SpeakEvent::Done { line } => (line, "done", 0),
         };
         if matches!(event, "stopped" | "done") {
@@ -377,6 +382,13 @@ impl<W: Write> State<W> {
             Command::FeedEnd => {
                 let _ = tx.send(Msg::InputEnded);
             }
+            Command::Script { lines } => match &self.script {
+                Some(s) => s.lock().unwrap().extend(lines),
+                None => self.out.send(&Event::Error {
+                    message: "this listener was not started with --script-live".into(),
+                    t_ms: self.now_ms(),
+                }),
+            },
             Command::Quit => return false,
         }
         true
@@ -561,6 +573,7 @@ pub fn run<W: Write + Send + 'static>(
         starts: Default::default(),
         output: None,
         made: Default::default(),
+        script: opts.script.clone(),
     };
     // Recognition: inline for a deterministic fast run, otherwise on its own thread.
     if let Some(r) = recognizer {

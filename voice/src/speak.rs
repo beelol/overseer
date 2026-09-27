@@ -122,11 +122,29 @@ pub fn phrases(text: &str) -> Vec<String> {
 /// What the speaker reports.
 #[derive(Clone, Debug, PartialEq)]
 pub enum SpeakEvent {
-    Start { line: u64 },
-    Lowered { line: u64, phrase: usize },
-    Restored { line: u64, phrase: usize },
-    Stopped { line: u64, phrase: usize },
-    Done { line: u64 },
+    Start {
+        line: u64,
+    },
+    Lowered {
+        line: u64,
+        phrase: usize,
+    },
+    Restored {
+        line: u64,
+        phrase: usize,
+    },
+    Stopped {
+        line: u64,
+        phrase: usize,
+    },
+    /// A phrase ended and the next one begins: a moment a cue may play (AC-172).
+    Phrase {
+        line: u64,
+        phrase: usize,
+    },
+    Done {
+        line: u64,
+    },
 }
 
 struct Line {
@@ -340,6 +358,10 @@ impl Speaker {
                     self.lowered = false;
                     self.stop_after_phrase = false;
                 } else {
+                    events.push(SpeakEvent::Phrase {
+                        line: p.line.id,
+                        phrase: p.phrase,
+                    });
                     p.phrase += 1;
                     p.pos = 0;
                 }
