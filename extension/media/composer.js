@@ -10,9 +10,8 @@
     let data, form = {}, starting = false, requested = false;
     const wrap = el('div', 'composer-view');
     const hero = el('div', 'composer-hero');
-    // The Overseer mark (the same eye as the activity bar icon) and a short question.
-    const mark = el('div', 'hero-mark'); mark.setAttribute('role', 'img'); mark.setAttribute('aria-label', 'Overseer');
-    mark.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><path d="M12 2v2M12 20v2"/></svg>';
+    // Overseer's mark in full colour (AC-142) and a short question.
+    const mark = ui.mark('xl hero-mark', 'Overseer');
     const h = el('h1', 'hero-title', "What's next?");
     const box = el('div', 'composer big');
     const task = el('textarea'); task.id = 'task'; task.rows = 3; task.placeholder = 'Send off a task'; task.setAttribute('aria-label', 'Task for the new agent');

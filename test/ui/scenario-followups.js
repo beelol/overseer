@@ -37,8 +37,8 @@ const { auditExpression } = require('./audit');
     await cdp.command('Overseer: New Agent'); await delay(1500);
     const dash = await s.editorView(`document.body.dataset.mode === 'composer' && !document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`);
     const hero = await dash.eval(`({ title: document.querySelector('.view-composer .hero-title')?.textContent, mark: document.querySelector('.view-composer .hero-mark')?.getAttribute('aria-label'),
-      svg: !!document.querySelector('.view-composer .hero-mark svg'), codicon: !!document.querySelector('.view-composer .hero-mark .codicon'), placeholder: document.getElementById('task').placeholder })`);
-    check("the composer says \"What's next?\" beside the Overseer mark, with \"Send off a task\" in the field", hero.title === "What's next?" && hero.mark === 'Overseer' && hero.svg && !hero.codicon && hero.placeholder === 'Send off a task', hero);
+      logo: /overseer-logo\\.png/.test(getComputedStyle(document.querySelector('.view-composer .hero-mark')).backgroundImage), codicon: !!document.querySelector('.view-composer .hero-mark .codicon'), placeholder: document.getElementById('task').placeholder })`);
+    check("the composer says \"What's next?\" beside the Overseer mark, with \"Send off a task\" in the field", hero.title === "What's next?" && hero.mark === 'Overseer' && hero.logo && !hero.codicon && hero.placeholder === 'Send off a task', hero);
     for (const t of ['Overseer Dark', 'Overseer Light', 'Default High Contrast']) { await theme(t); await s.screenshot('composer-' + t.toLowerCase().replace(/ /g, '-')); }
     await theme('Overseer Dark');
 

@@ -15,7 +15,7 @@ class NewTaskPanel {
     if (this.panel) { this.panel.reveal(); return; }
     const panel = vscode.window.createWebviewPanel('overseer.newTask', 'New Task', { viewColumn: this.column() || vscode.ViewColumn.Active, preserveFocus: false }, { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri), retainContextWhenHidden: true });
     this.panel = panel;
-    panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer.svg');
+    panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer-logo.png');
     panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'New Task', css: ['new-task.css'], js: ['new-task.js'], body: `
 <main class="form" data-audit-view="new-task">
 <h1>New task</h1>

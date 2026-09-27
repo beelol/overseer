@@ -211,7 +211,7 @@ async function activate(context) {
     const runs = model.state.runs || [];
     const active = runs.filter(r => ACTIVE.has(r.status)).length;
     const needs = client.connected ? attention().length : 0;
-    status.text = client.connected ? `$(eye) Overseer ${active} active${needs ? `  $(bell-dot) ${needs}` : ''}` : client.stopped ? '$(circle-slash) Overseer stopped' : '$(debug-disconnect) Overseer disconnected';
+    status.text = client.connected ? `$(overseer-mark) Overseer ${active} active${needs ? `  $(bell-dot) ${needs}` : ''}` : client.stopped ? '$(circle-slash) Overseer stopped' : '$(debug-disconnect) Overseer disconnected';
     status.tooltip = client.connected ? `${active} agent${active === 1 ? '' : 's'} running${needs ? ` · ${needs} need${needs === 1 ? 's' : ''} you` : ''}\nAgents keep running when VS Code closes.\nClick to open the dashboard.` : client.stopped ? 'Agents and daemon were stopped. Click to start the daemon again.' : 'Reconnecting to overseerd…';
     status.command = client.stopped && !client.connected ? 'overseer.startDaemon' : 'overseer.openCenter';
     status.show();

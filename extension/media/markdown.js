@@ -78,7 +78,7 @@
     let actions;
     try { actions = JSON.parse(text); if (!Array.isArray(actions)) actions = [actions]; } catch { actions = null; }
     const card = ui.el('div', 'proposal'); card.setAttribute('role', 'group'); card.setAttribute('aria-label', 'Overseer proposes');
-    const head = ui.el('div', 'proposal-head'); head.append(ui.icon('eye', 'sm'), ui.el('span', null, 'Overseer will'));
+    const head = ui.el('div', 'proposal-head'); head.append(ui.mark('sm'), ui.el('span', null, 'Overseer will'));
     const list = ui.el('ul', 'proposal-list');
     const say = a => a.action === 'follow_up' ? `Send ${a.title || a.agent}: “${a.text}”` : a.action === 'stop' ? `Stop ${a.title || a.agent}` : a.action === 'pin' ? `Pin ${a.title || a.agent} to the grid` : a.action === 'start' ? `Start “${a.title || a.prompt}” in ${a.repo}` : JSON.stringify(a);
     for (const a of actions || []) list.append(ui.el('li', null, say(a)));

@@ -98,8 +98,9 @@ class Cdp {
     return result.result?.value;
   }
 
-  async screenshot(file) {
-    const { data } = await this.call('Page.captureScreenshot', { format: 'png' }, this.workbench);
+  /** clip (optional): { x, y, width, height } in page pixels. */
+  async screenshot(file, clip) {
+    const { data } = await this.call('Page.captureScreenshot', { format: 'png', ...(clip ? { clip: { ...clip, scale: 1 } } : {}) }, this.workbench);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, Buffer.from(data, 'base64'));
     return file;

@@ -102,7 +102,7 @@
         if (state) { prompt = prompt.slice(state[0].length); shared = (state[0].match(/"id":/g) || []).length; }
         if (prompt.startsWith('From Overseer: ')) { prompt = prompt.slice('From Overseer: '.length); fromOverseer = true; }
         const p = el('div', 'msg user' + (fromOverseer ? ' from-overseer' : '')); p.setAttribute('aria-label', fromOverseer ? 'Overseer' : 'You');
-        if (fromOverseer) { const who = el('div', 'msg-from'); who.append(ui.icon('eye', 'sm'), el('span', null, 'From Overseer')); p.append(who); }
+        if (fromOverseer) { const who = el('div', 'msg-from'); who.append(ui.mark('sm'), el('span', null, 'From Overseer')); p.append(who); }
         const text = el('div', 'text', prompt);
         p.append(text);
         if (state) p.append(el('div', 'msg-context', `Shared the state of ${shared} agent${shared === 1 ? '' : 's'}`));

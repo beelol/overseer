@@ -46,7 +46,7 @@ class OutputPanels {
     const entry = { panel, feed };
     this.panels.set(runId, entry);
     // A panel view (Talk to Overseer) has no tab icon.
-    if (!('onDidChangeVisibility' in panel)) panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer.svg');
+    if (!('onDidChangeVisibility' in panel)) panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer-logo.png');
     panel.onDidDispose(() => { feed.dispose(); if (this.panels.get(runId) === entry) this.panels.delete(runId); });
     panel.webview.onDidReceiveMessage(message => this.receive(runId, message).catch(error => panel.webview.postMessage({ type: 'notice', message: error.message })));
     panel.webview.options = { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri) };
