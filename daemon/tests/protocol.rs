@@ -3098,8 +3098,10 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
     assert_eq!(recorded["selected_route"]["model"], "gpt-6-sol");
     assert_eq!(recorded["selected_route"]["effort"], "medium");
     assert_eq!(recorded["selected_route"]["fit"], "unknown");
-    assert_eq!(recorded["estimator"]["state"], "unavailable");
-    assert!(recorded["estimator"]["version"].is_null());
+    assert_eq!(recorded["estimator"]["state"], "scoped_fit");
+    assert_eq!(recorded["estimator"]["version"], "v1");
+    assert_eq!(recorded["selector_version"], "multi-harness-preflight-v6");
+    assert_eq!(recorded["estimator"]["routes"].as_array().unwrap().len(), 2);
     assert_eq!(recorded["inference"]["state"], "not_used");
     assert!(recorded["inference"]["output"].is_null());
     assert!(!decision_event["payload"].to_string().contains("browser check"),

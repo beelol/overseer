@@ -923,6 +923,15 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     max_sandbox:sandbox,
                     allowed_profiles:allowed_profiles.clone(),
                     pinned_route, preferred_harness };
+                let fit_evidence = if d.learning_is_paused() {
+                    routes.iter().map(|route| json!({"route_id":route.id,"fit":"unknown",
+                        "reason":"learning_paused","source":null,"observed_ms":null,
+                        "expected_windows":[]})).collect::<Vec<_>>()
+                } else {
+                    let store = d.store.lock().unwrap();
+                    crate::auto_fit::apply_scoped_fit(&store, &work, &mut routes,
+                        &account_generations, crate::daemon::now())
+                };
                 let mut decision = crate::auto_select::select(&work, &routes);
                 let mut pre_effect_failures = Vec::new();
                 let mut attempt_limit_reached = false;
@@ -993,9 +1002,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         "profile_id":route.profile_id,"model":route.model,"effort":route.effort,
                         "quota":route.quota,"fit":route.fit,"health":route.health,
                     }));
-                let trace = json!({"selector_version":"multi-harness-preflight-v5","decision":decision,
+                let trace = json!({"selector_version":"multi-harness-preflight-v6","decision":decision,
                     "selected_route":selected_route,
-                    "estimator":{"state":"unavailable","version":null},
+                    "estimator":{"state":"scoped_fit","version":"v1","routes":fit_evidence},
                     "inference":{"state":"not_used","output":null},
                     "selection_input":{"work":&work,"routes":&routes,
                         "attempt_limit_reached":attempt_limit_reached,
@@ -1129,10 +1138,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "codex-cold-start-v1" => crate::auto_select::select_legacy_v1(&work, &routes),
                 "codex-cold-start-v2" | "multi-harness-cold-start-v1" =>
                     crate::auto_select::select_pre_status_v1(&work, &routes),
-                "multi-harness-preflight-v1" | "multi-harness-preflight-v2" | "multi-harness-preflight-v3" | "multi-harness-preflight-v4" | "multi-harness-preflight-v5" => {
+                "multi-harness-preflight-v1" | "multi-harness-preflight-v2" | "multi-harness-preflight-v3" | "multi-harness-preflight-v4" | "multi-harness-preflight-v5" | "multi-harness-preflight-v6" => {
                     let mut decision = if selector_version == "multi-harness-preflight-v1" {
                         crate::auto_select::select_pre_status_v1(&work, &routes)
-                    } else if matches!(selector_version, "multi-harness-preflight-v4" | "multi-harness-preflight-v5") {
+                    } else if matches!(selector_version, "multi-harness-preflight-v4" | "multi-harness-preflight-v5" | "multi-harness-preflight-v6") {
                         crate::auto_select::select(&work, &routes)
                     } else { crate::auto_select::select_pre_scoped_pool_v1(&work, &routes) };
                     if input["attempt_limit_reached"] == true {
@@ -1143,7 +1152,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         decision.selected = None;
                         decision.reason = "collection_deadline_elapsed".into();
                     }
-                    if selector_version == "multi-harness-preflight-v5" {
+                    if matches!(selector_version, "multi-harness-preflight-v5" | "multi-harness-preflight-v6") {
                         if let Some(route_id) = input["admission_pool_conflict"].as_str() {
                             decision.selected = None;
                             decision.reason = "pool_in_flight_unknown_draw".into();

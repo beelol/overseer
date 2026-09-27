@@ -52,15 +52,15 @@
 
 ### Task 3: Dispatch and replay integration
 
-**Files:** Modify `daemon/src/server.rs` and `daemon/tests/protocol.rs`; update `docs/verification/auto-mode/README.md`.
+**Files:** Create `daemon/src/auto_fit.rs`; modify `daemon/src/server.rs` and `daemon/src/main.rs`; update `docs/verification/auto-mode/README.md`. Test the same shared helper dispatch calls with controlled versioned routes, plus the existing daemon cold-start protocol fixture.
 
 **Interfaces:** After discovery, dispatch reads the live normalized quota snapshot and same-generation local estimate for each candidate, calls `assess_fit`, and records source/version/uncertainty in the decision trace. Selector replay uses the saved scoped inputs and exact selector version. No estimate or failed learning read means `Fit::Unknown` and cold-start behavior.
 
-- [ ] Write a controlled daemon test: an expensive candidate exceeds one applicable window while a suitable efficient candidate fits, and no provider ordering file is supplied.
-- [ ] Write tests for unknown/locked learning, reset, account switch, and replay of the saved decision.
-- [ ] Run targeted tests and observe failure.
-- [ ] Connect the bounded estimator read and fit check; keep launch admission's existing unknown-draw pool claim until credible reservations are implemented.
-- [ ] Run focused and complete serial tests, then the RFC ledger audit; commit and update criterion status without claiming live subscription-cost accuracy.
+- [x] Write a controlled shared-dispatch-helper test: an expensive candidate exceeds one applicable window while a suitable efficient candidate fits, and no provider ordering file is supplied.
+- [x] Write tests for unknown/locked learning, reset, account switch, and the saved selector inputs needed for replay.
+- [x] Run targeted tests and observe failure.
+- [x] Connect the bounded estimator read and fit check; keep launch admission's existing unknown-draw pool claim until credible reservations are implemented.
+- [x] Run focused and complete serial tests, then the RFC ledger audit; commit and update criterion status without claiming live subscription-cost accuracy.
 
 ## Self-review
 

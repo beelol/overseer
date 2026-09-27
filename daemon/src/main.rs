@@ -5,6 +5,7 @@ mod auto_route;
 mod auto_opencode;
 mod auto_collect;
 mod auto_consumption;
+mod auto_fit;
 mod auto_select;
 mod auto_health;
 mod auto_maintenance;
