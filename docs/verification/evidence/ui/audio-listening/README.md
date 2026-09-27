@@ -39,4 +39,25 @@ say what was played.
 The owner's confirmation, given in the conversation with the agent after the second of these
 sessions (2026-09-27 UTC): "ok yes it all worked as you described."
 
-Still to hear: the owner's own Commander folder. No session was given a folder.
+## Off, the other tracks, and the owner's Commander recordings
+
+Two more sessions run by the agent at the owner's request, the owner listening, on the same
+build. From these sessions on, the record lists the player processes the daemon started in
+each step (`players`), with the Commander folder's path left out.
+
+| Record | Steps | Players the daemon started | The owner, in the conversation |
+| --- | --- | --- | --- |
+| `marks-20260927-054128.json` | off, Reactor, System voice | off: none. Reactor: `afplay` four times (start, complete, start, attention). System voice: `say -v Daniel` four times, with the four phrases | "that worked" |
+| `marks-20260927-055821.json` | Commander, off, Reactor, System voice | Commander: `afplay` four times on `<commander folder>/<key>/transmission/commander.wav`. Off: none. Reactor and System voice as above | "worked" |
+
+The two `say -v ?` entries in the System voice steps are the daemon listing the installed
+voices, not speech.
+
+**The Commander folder.** macOS does not let a process started by the agent open files in the
+folder the voice lab is in, so the owner copied the three recordings into a private folder in
+the home directory (readable by the owner only, outside the repository), and that folder was
+given to the session. The daemon played the recordings where they are. Afterwards the files
+were unchanged, no WAV was under the session's daemon folder, and none was in the repository.
+The record holds a flag that a folder was set, never its path.
+
+Nothing is left to hear.
