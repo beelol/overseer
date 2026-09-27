@@ -4,6 +4,7 @@
   "description": "Launch and supervise account-authenticated agent harnesses, follow their native children, and review/edit their worktrees live (review built on Branch Diff).",
   "version": "0.1.0",
   "publisher": "beelol",
+  "icon": "media/overseer-app-icon.png",
   "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/beelol/overseer.git" },
   "engines": { "vscode": "^1.136.0" },
@@ -37,6 +38,9 @@
     "customEditors": [
       { "viewType": "overseer.chatEditor", "displayName": "Overseer Agent Chat", "selector": [{ "filenamePattern": "*.overseer-chat" }], "priority": "default" }
     ],
+    "icons": {
+      "overseer-mark": { "description": "Overseer mark", "default": { "fontPath": "media/overseer-mark.woff", "fontCharacter": "\\E001" } }
+    },
     "viewsContainers": {
       "activitybar": [{ "id": "overseer", "title": "Overseer", "icon": "media/overseer.svg" }],
       "panel": [{ "id": "overseer-talk", "title": "Overseer", "icon": "media/overseer.svg" }]

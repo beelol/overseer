@@ -37,7 +37,7 @@ extension/bin/Overseer Notifier.app/
   Contents/Info.plist        CFBundleIdentifier = com.beelol.overseer.notifier
                              CFBundleName = Overseer, LSUIElement = true (no Dock icon)
   Contents/MacOS/notifier    Swift, ~100 lines
-  Contents/Resources/AppIcon.icns   Overseer's eye icon
+  Contents/Resources/AppIcon.icns   Overseer's app icon (AC-142)
 ```
 
 - **Posting.** `overseerd` runs `notifier --title T --body B --open <url>` instead of `osascript`.

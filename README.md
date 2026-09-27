@@ -259,7 +259,7 @@ code --install-extension extension/overseer-0.1.0.vsix
 `package.js` builds the review bundle, builds `overseerd` in release mode
 (`target/release/overseerd`; a few dead-code warnings are expected), copies it into the
 extension as `bin/overseerd-darwin-arm64` (or your platform/arch), and writes the VSIX.
-Reload VS Code; an **Overseer** (eye) icon appears in the activity bar. The extension starts
+Reload VS Code; the **Overseer** mark appears in the activity bar. The extension starts
 the daemon on demand (detached), so agents keep running after you close VS Code.
 
 Run the checks:

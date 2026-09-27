@@ -11,6 +11,11 @@ body { font-family: var(--ov-font); font-size: var(--ov-font-md); line-height: v
 .codicon { font-size: 16px; line-height: 1; }
 .codicon.sm { font-size: 14px; }
 .codicon.xs { font-size: 12px; }
+/* Overseer's mark in full colour (AC-142): the owner's transparent logo, never recoloured. */
+.overseer-mark { display: inline-block; flex: none; width: 16px; height: 16px; background: url('overseer-logo.png') center / contain no-repeat; }
+.overseer-mark.sm { width: 14px; height: 14px; }
+.overseer-mark.lg { width: 32px; height: 32px; }
+.overseer-mark.xl { width: 48px; height: 48px; }
 .logo { flex: none; display: block; }
 
 /* Focus: one visible ring, inside the control so it never gets clipped. */

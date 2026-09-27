@@ -12,8 +12,7 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .view-composer { overflow-y: auto; }
 .composer-view { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: var(--ov-space-10) var(--ov-chat-gutter); }
 .composer-hero { width: 100%; max-width: var(--ov-chat-column); display: flex; flex-direction: column; align-items: stretch; gap: var(--ov-space-3); }
-.hero-mark { align-self: center; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--ov-radius-card); background: var(--ov-accent-soft); color: var(--ov-accent); }
-.hero-mark .codicon { font-size: 22px; }
+.hero-mark { align-self: center; }
 .hero-title { margin: 0 0 var(--ov-space-2); text-align: center; font-size: var(--ov-font-xxl); font-weight: var(--ov-weight-semibold); letter-spacing: -.01em; }
 .composer.big { padding: 14px 12px 10px 16px; }
 .composer.big textarea { min-height: 66px; font-size: var(--ov-font-lg); }
@@ -77,4 +76,3 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .composer-hero > .composer-choices .chip[hidden] { display: none; }
 .composer-hero > .composer-choices .chip .chip-label { flex: 1; text-align: left; white-space: nowrap; }
 .composer.big .composer-row .spacer { flex: 1; }
-.hero-mark svg { color: var(--ov-accent); }
