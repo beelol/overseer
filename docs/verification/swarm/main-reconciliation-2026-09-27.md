@@ -251,3 +251,27 @@ This published change includes no Swarm runtime or Auto route implementation.
 In particular, AC-196's account sharing is still partial, so SWARM-08/24 and
 the common admission contract remain open. The merged ledger does not change
 Swarm's one-director authority, worker count defaults or acceptance boxes.
+
+## Refresh against main and director-first admission
+
+A fresh `git fetch origin main` on 2026-09-27 still resolves to `dc21391`,
+already an ancestor of this draft. There is no additional main commit to
+merge. AC-193/194's watch and checked detached copy remain partial fixture
+evidence on Gate S's separate draft; neither gives a watcher authority to
+direct a Swarm worker. A finding about a worker must reach the category
+director through Overseer, and a separate watcher must compete for the same
+app slot and account allowance. AC-196's shared launch transaction is still
+deferred pending Auto; AC-197's ordinary handoff must keep the existing Swarm
+fence until one logical-job failover is implemented. These boundaries are
+already in the Swarm RFC and shared Auto contract, so no default, criterion or
+route policy changes are warranted by the latest main ledger.
+
+The runtime review did find an independent SWARM-07 gap: when a supervised
+director starts before its first worker under a two-agent cap, planning-stage
+admission counted its process and a virtual director slot, blocking the free
+worker slot. `running_director_can_dispatch_first_worker_into_second_app_slot`
+reproduced `global_agent_limit` before the fix and now launches the worker,
+observes two occupied slots, refuses a third agent, and stops both processes.
+The virtual slot remains necessary before any director process exists. The
+affected admission, dispatch, scheduler and director-process suites passed
+(35 + 7 + 4 + 13 tests). SWARM-07 and joined Gate S/Auto checks remain partial.

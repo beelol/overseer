@@ -387,11 +387,17 @@ fn admit_inner(
     if workers >= effective["max_workers"].as_i64().unwrap_or(8) {
         return Ok(blocked("worker_limit"));
     }
-    let new_director = if current["status"] == "planning" {
+    // A planning run reserves a director slot until its supervised director
+    // exists. Once launched, that process already appears in app_active.
+    let active_director_process = tx.prepare(
+        "SELECT 1 FROM swarm_director_owners o JOIN runs r ON r.id=o.overseer_run_id
+         WHERE o.run_id=?1 AND o.generation=?2 AND o.status='active'
+         AND o.supervised_launch=1 AND r.parent_run_id IS NULL
+         AND r.status IN ('queued','starting','running','waiting_for_user')",
+    )?.exists(params![run,generation])?;
+    let new_director = if current["status"] == "planning" && !active_director_process {
         1
-    } else {
-        0
-    };
+    } else { 0 };
     let director_process_id = if director_self {
         if app_limit != 1 || app_active != 1 || pending_slots != 0 {
             return Ok(blocked("director_self_requires_one_slot"));

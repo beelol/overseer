@@ -12,6 +12,59 @@ fn now() -> i64 {
 }
 
 #[test]
+fn running_director_can_dispatch_first_worker_into_second_app_slot() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":2}));
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("director-first-source"));
+    let swarm = d.call("swarm.create", json!({"category":"Director-first dispatch",
+        "objective":"Audit the backend","allowed_targets":["fixture"]}));
+    let id = swarm["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect backend","acceptance":"Evidence","deps":[]}
+    ]}));
+    let launched = d.call("swarm.director.launch", json!({"run_id":id,
+        "generation":1,"repo":checkout,"program":"/bin/sleep","args":["30"],
+        "prompt":"Direct the audit","title":"Director-first process"}));
+    assert_eq!(launched["status"], "launched", "{launched}");
+    let director = launched["overseer_run_id"].as_str().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while d.run(director)["status"] != "running" {
+        assert!(Instant::now() < deadline, "director did not start");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["status"], "planning");
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"], 1);
+
+    let at = now();
+    let dispatched = d.call("swarm.dispatch.next", json!({"request_id":"director-first-worker",
+        "target_id":"fixture","repo":checkout,"program":"/bin/sleep","args":["30"],
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,
+            "expires_ms":at+60000,"targets":[{"id":"fixture","account_id":"fixture",
+                "pool_ids":["pool"],"capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    let active_after_dispatch = d.call("agents.limit.get",json!({}))["active"].clone();
+    let third_refused = if dispatched["status"] == "launched" {
+        d.try_call("task.create", json!({"repo":checkout,"harness":"generic",
+            "workspace_mode":"worktree","program":"/bin/sleep","args":["30"],
+            "prompt":"","title":"third agent"})).unwrap_err().contains("agent limit reached")
+    } else { false };
+    d.call("swarm.stop", json!({"run_id":id}));
+    d.wait_done(director, 8);
+    if let Some(worker) = dispatched["overseer_run_id"].as_str() {
+        d.wait_done(worker, 8);
+    }
+
+    assert_eq!(dispatched["status"], "launched", "{dispatched}");
+    assert_eq!(active_after_dispatch, 2);
+    assert!(third_refused, "a third process must not exceed the two-slot cap");
+}
+
+#[test]
 fn worker_spawn_record_failure_keeps_one_attempt_and_reattaches_after_restart() {
     let mut d = Daemon::start(&[]);
     let temp = tmp();
