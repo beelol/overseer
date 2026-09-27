@@ -240,9 +240,11 @@
         "daemon/tests/swarm_state.rs",
         "docs/verification/swarm/SWARM-37.md",
         "test/unit/swarm-view.js",
-        "test/ui/scenario-swarm-status.js"
+        "test/ui/scenario-swarm-status.js",
+        "test/ui/scenario-swarm-scale.js",
+        "docs/verification/evidence/ui/swarm-scale/result.json"
       ],
-      "blocker": "Background notifications group active workers under their category and show queued Swarms with zero workers. The extension consumes bounded run summaries and an isolated packaged-UI scenario displays a compact 100-ready-job category and its director/jobs when expanded. No UI scenario establishes account usage, limiting constraint, finishing reserve or decision explanation."
+      "blocker": "Background notifications group category work. A packaged VS Code fixture now displays one 100-job category with 32 live supervised local workers, 68 ready jobs, and a nested worker drilldown without duplicate ordinary agent rows. Account usage, limiting constraint, finishing reserve and decision explanation are not yet shown."
     },
     "SWARM-24": {
       "status": "partial",
@@ -378,9 +380,11 @@
         "daemon/tests/swarm_state.rs",
         "docs/verification/swarm/SWARM-37.md",
         "test/unit/swarm-view.js",
-        "test/ui/scenario-swarm-status.js"
+        "test/ui/scenario-swarm-status.js",
+        "test/ui/scenario-swarm-scale.js",
+        "docs/verification/evidence/ui/swarm-scale/result.json"
       ],
-      "blocker": "Daemon and JavaScript fixtures cover bounded 100-job summaries, filtered pages and a synthetic 32-active readout. An isolated packaged VS Code scenario shows 100 ready jobs compact and expanded, and measures Pause/confirmed Stop acknowledgement at 591/69 ms. It does not launch 32 supervised workers or display account usage, limiting constraints, unconfirmed exits and worker detail; that joined UI case remains unverified."
+      "blocker": "The packaged VS Code scenario now confirms 32 live supervised local workers among 100 jobs, bounded pages, category grouping and worker run drilldown; all 32 exit during teardown. A separate 100-queued-job scenario measured Pause/confirmed Stop at 591/69 ms. The 32-worker fixture has no running director or blocked job and does not show account usage, limiting constraint or unconfirmed exits; packaged filtering and Pause/Stop latency under active load remain unverified."
     },
     "SWARM-38": {
       "status": "partial",
@@ -607,9 +611,11 @@
         "daemon/tests/swarm_admission.rs",
         "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/milestone-7.md",
-        "docs/verification/swarm/SWARM-56.md"
+        "docs/verification/swarm/SWARM-56.md",
+        "test/ui/scenario-swarm-scale.js",
+        "docs/verification/evidence/ui/swarm-scale/result.json"
       ],
-      "blocker": "Local fixtures enforce review pressure, preserve ten already-admitted results across the eight-result threshold and daemon restart, and launch 32 live supervised workers with explicit ceilings. Live account usage, director/reviewer operation at scale and versioned qualification remain unverified."
+      "blocker": "Local fixtures enforce review pressure, preserve ten already-admitted results across restart, and launch 32 supervised workers with explicit ceilings. A packaged VS Code scenario now observes 32 live local worker PIDs in one 100-job category and proves all exit after teardown. Live account usage, machine limits and director/reviewer operation at 32-worker scale remain unverified."
     },
     "SWARM-57": {
       "status": "partial",

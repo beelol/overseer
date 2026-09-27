@@ -1,6 +1,6 @@
 # SWARM-37 — large-run status and controls
 
-Status: partial. Code revision: `e773082`.
+Status: partial. Latest evidence revision: `a9232f2`.
 
 Input: a local daemon fixture plans 100 independent jobs, then sets 32 job records to `running`, 8 to `submitted`, 4 to `blocked`, and leaves 56 `ready`. It creates a director owner without a linked process, pages filtered jobs, and restarts the daemon. The fixture deliberately does not launch 32 workers.
 
@@ -27,3 +27,9 @@ Remaining: this UI scenario has 100 queued jobs and no worker process. It does n
 Control follow-up (`a1d9104`): the same packaged UI scenario now exercises Pause, Resume, Swarm off and confirmed Stop through the Swarm row. It measured Pause acknowledgement at 591 ms and confirmed Stop at 69 ms, each below two seconds. The Stop confirmation appears before the daemon changes state. The scenario's 100 jobs are still queued, with zero active workers; it therefore measures the control path, not interruption latency for 32 live workers. The daemon's `swarm.list` summary now includes generation as well as revision, checked by `swarm_list_pages_run_summaries_without_loading_job_rows`. `node test/unit/run.js`, `npm run check --prefix extension`, `node extension/scripts/package.js`, the packaged UI scenario, and the full serialized offline Rust workspace suite passed.
 
 Remaining: 32 supervised workers in the packaged UI, account usage and limiting constraint, unconfirmed exits, and worker detail remain unverified. SWARM-37 stays partial.
+
+Packaged 32-worker follow-up (`0561034`, final teardown evidence `a9232f2`): `node test/ui/scenario-swarm-scale.js` creates 100 jobs under explicit 32-worker/33-agent ceilings, commits a synthetic beneficial batch, and admits 32 local `/bin/sleep` workers across bounded waves. It verified 32 distinct live child PIDs, 32 active supervisor runs, 32 durable job reservations and 68 ready jobs. In isolated packaged VS Code, the Agents sidebar shows one Swarm category with “32 working · 68 ready,” a bounded job page, a nested working worker, and a click through to that worker's run view. Linked Swarm workers no longer appear again as 32 ordinary agent rows. The first run exposed the defect: the category showed 32 working while its job rows said reserved and the ordinary list duplicated the workers. The daemon now returns linked worker summaries with each paged job and marks Swarm membership on ordinary run state; the extension renders the actual process state in the job row and groups the run under its category. Screenshots, installation log and checks are in `docs/verification/evidence/ui/swarm-scale/`; all 32 fixture child processes were gone after cleanup.
+
+Validation: the focused 32-worker Rust test first failed for missing `worker_runs`, then passed after the read API change; a state-membership assertion likewise failed before the daemon annotation and passed after it. `test/unit/swarm-view.js` failed before the grouping/rendering change and passed after. The affected `protocol` (51), `swarm_runtime` (18) and `swarm_state` (18) Rust suites passed serially; `node test/unit/run.js`, extension syntax check, VSIX packaging, the existing packaged sidebar and 100-queued-job control scenarios, and the new packaged 32-worker scenario passed.
+
+Remaining: the fixture has no running director or blocked job, and uses synthetic quota. Account usage, the limiting constraint, unconfirmed exits, packaged blocked-state filtering and Pause/Stop timing under 32 active workers remain unverified. SWARM-37 stays partial.
