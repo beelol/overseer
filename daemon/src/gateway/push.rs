@@ -54,9 +54,10 @@ fn harness_name(harness: &str) -> &str {
 pub fn payload(kind: &str, run: &crate::store::Run, repo: &str, request_id: Option<&str>, device: &Device, settings: &Value, last_line: Option<&str>) -> Value {
     let repo_name = std::path::Path::new(repo).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
     let show_text = settings["show_text"].as_bool() == Some(true);
-    let title = if show_text && !run.title.is_empty() { run.title.chars().take(80).collect::<String>() } else { format!("{} · {repo_name}", harness_name(&run.harness)) };
+    // Text the owner asked for still goes through the daemon's redaction of secrets.
+    let title = if show_text && !run.title.is_empty() { crate::redact::redact(&run.title).chars().take(80).collect::<String>() } else { format!("{} · {repo_name}", harness_name(&run.harness)) };
     let body = match (show_text, last_line) {
-        (true, Some(line)) if !line.trim().is_empty() => format!("{}: {}", sentence(kind), line.trim().chars().take(140).collect::<String>()),
+        (true, Some(line)) if !line.trim().is_empty() => format!("{}: {}", sentence(kind), crate::redact::redact(line.trim()).chars().take(140).collect::<String>()),
         _ => sentence(kind).to_string(),
     };
     let mut overseer = json!({"v": 1, "kind": kind, "run_id": run.id, "task_id": run.task_id, "device": device.id});

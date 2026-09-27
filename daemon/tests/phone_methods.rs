@@ -241,3 +241,332 @@ async fn ac126_a_large_repository_lists_quickly() {
     println!("10,000 files, 200 changed, through the gateway: list p50 {} ms, max {} ms; tree {tree_ms} ms; one file's hunks {hunk_ms} ms", timings[2], timings[4]);
     assert!(timings[4] < 3000 && tree_ms < 3000 && hunk_ms < 1000, "{timings:?} {tree_ms} {hunk_ms}");
 }
+
+// ---------------------------------------------------------------- AC-127
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac127_everything_else_overseer_has() {
+    let t = tmp();
+    let sys = t.path().join("desktop-home");
+    std::fs::create_dir_all(&sys).unwrap();
+    let next = t.path().join("next-login");
+    let approval = t.path().join("approved-in-the-browser");
+    let cli = fixture("fake-harness/account-cli.js");
+    // A fake GitHub CLI that records its arguments, and a local repository that stands in for github.com.
+    let gh_log = t.path().join("gh-args.json");
+    let gh = t.path().join("gh");
+    std::fs::write(&gh, format!("#!/bin/sh\nnode -e 'require(\"fs\").writeFileSync(process.argv[1], JSON.stringify(process.argv.slice(2)))' '{}' \"$@\"\necho 'https://github.com/test-owner/pr-demo/pull/7'\n", gh_log.display())).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&gh, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &cli), ("OVERSEER_CLAUDE_PATH", &cli), ("OVERSEER_TEST_SYSTEM_HOME", sys.to_str().unwrap()), ("OVERSEER_GATEWAY_MDNS", "off"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_LOGIN_ACCOUNT_FILE,OVERSEER_TEST_SYSTEM_HOME,FIXTURE_DEVICE_APPROVAL_FILE"), ("FIXTURE_LOGIN_ACCOUNT_FILE", next.to_str().unwrap()),
+        ("FIXTURE_DEVICE_APPROVAL_FILE", approval.to_str().unwrap()), ("OVERSEER_GH", gh.to_str().unwrap())]);
+    phone::enable(&d);
+    let (mut p, _) = pair(&d, "Everything Phone").await;
+    p.send(&json!({"id": 5, "method": "events.subscribe", "params": {"after": 0}})).await.unwrap();
+
+    // Accounts: sign-in state and plan, as the Mac shows them.
+    let accounts = p.call("account.list", json!({})).await;
+    assert_eq!(accounts, d.call("account.list", json!({})), "the phone's accounts are the daemon's");
+    let openai = p.act("account.create", json!({"provider": "openai", "name": "From the phone"})).await;
+    assert!(openai.get("error").is_none(), "{openai}");
+    let account = openai["result"]["account"]["id"].as_str().unwrap().to_string();
+    assert_eq!(p.call("profile.status", json!({"id": account})).await["logged_in"], false);
+
+    // Sign-in with the provider's device code: the address and the code reach the phone, the
+    // person approves in a browser, and the account is signed in. No credential reaches the phone.
+    std::fs::write(&next, "phone-user:pro").unwrap();
+    let login = p.act("profile.device_login", json!({"id": account})).await;
+    assert!(login.get("error").is_none(), "{login}");
+    assert_eq!(login["result"]["url"], "https://auth.example.invalid/codex/device");
+    assert_eq!(login["result"]["code"], "FXTR-C0DE1");
+    assert_eq!(login["result"]["finished"], false);
+    assert_eq!(d.call("profile.status", json!({"id": account}))["logged_in"], false, "not signed in before the person approves");
+    std::fs::write(&approval, "yes").unwrap();
+    wait_until("the sign-in", 15, || d.call("profile.status", json!({"id": account}))["logged_in"] == true);
+    wait_until("the sign-in event", 10, || events_of(&d, "profile").iter().any(|e| e["payload"]["action"] == "login" && e["payload"]["logged_in"] == true));
+    let status = p.call("profile.status", json!({"id": account})).await;
+    assert_eq!(status["logged_in"], true);
+    assert_eq!(status["identity"]["plan"], "pro");
+    let usage = p.ask("account.usage", json!({"id": account}), None).await.unwrap();
+    assert!(usage.get("error").is_none() || Phone::code(&usage) == "failed", "{usage}");
+    // A provider without a code flow is signed in on the Mac, and says so.
+    let claude = p.act("account.create", json!({"provider": "anthropic", "name": "Claude from the phone"})).await;
+    let claude_id = claude["result"]["account"]["id"].as_str().unwrap().to_string();
+    let on_mac = p.act("profile.device_login", json!({"id": claude_id})).await;
+    assert_eq!(Phone::code(&on_mac), "mac_only");
+    assert!(on_mac["error"]["message"].as_str().unwrap().starts_with("Sign in on the Mac"), "{on_mac}");
+    assert_eq!(Phone::code(&p.act("profile.login_command", json!({"id": claude_id})).await), "mac_only");
+
+    // An agent's work: a worktree with changes.
+    let repo = repo(&t.path().join("repo"));
+    let bare = t.path().join("github-standin.git");
+    assert!(std::process::Command::new("git").args(["init", "-q", "--bare"]).arg(&bare).status().unwrap().success());
+    git(&repo, &["remote", "add", "origin", "https://github.com/test-owner/pr-demo.git"]);
+    git(&repo, &["config", &format!("url.{}.insteadOf", bare.display()), "https://github.com/test-owner/pr-demo.git"]);
+    let (created, ws, _) = edited(&d, &repo, "printf 'notes\\n' > NOTES.md; echo wrote notes");
+    let wsid = created["workspace"]["id"].as_str().unwrap().to_string();
+
+    // A pull request, opened by the daemon with the Mac's Git and GitHub CLI.
+    let plan = p.call("workspace.pr_plan", json!({"workspace_id": wsid})).await;
+    assert_eq!(plan["ok"], true, "{plan}");
+    assert_eq!(plan["uncommitted"], json!(["NOTES.md"]));
+    let main_before = git(&repo, &["rev-parse", "main"]);
+    let opened = p.act("workspace.pr_open", json!({"workspace_id": wsid, "title": "Add notes (from the phone)"})).await;
+    assert!(opened.get("error").is_none(), "{opened}");
+    assert_eq!(opened["result"]["url"], "https://github.com/test-owner/pr-demo/pull/7");
+    assert_eq!(opened["result"]["number"], 7);
+    let args: Vec<String> = serde_json::from_str(&std::fs::read_to_string(&gh_log).unwrap()).unwrap();
+    let branch = plan["branch"].as_str().unwrap();
+    assert_eq!(&args[..10], ["pr", "create", "--repo", "test-owner/pr-demo", "--head", branch, "--base", "main", "--title", "Add notes (from the phone)"]);
+    assert!(args[11].contains("Overseer never merges automatically"));
+    let pushed = String::from_utf8(std::process::Command::new("git").arg("-C").arg(&bare).args(["log", "--format=%s", "-1", branch]).output().unwrap().stdout).unwrap();
+    assert!(!pushed.trim().is_empty(), "the branch was pushed");
+    assert_eq!(git(&repo, &["rev-parse", "main"]), main_before, "nothing was merged");
+    let recorded = events_of(&d, "pull_request");
+    assert_eq!(recorded.last().unwrap()["payload"]["url"], "https://github.com/test-owner/pr-demo/pull/7");
+    assert_eq!(recorded.last().unwrap()["source"], "phone:Everything Phone");
+
+    // Merge back, step by step, with its plan first.
+    let (second, second_ws, _) = edited(&d, &repo, "echo merged-from-the-phone > merged.txt");
+    let second_id = second["workspace"]["id"].as_str().unwrap().to_string();
+    let merge_plan = p.call("workspace.merge_plan", json!({"workspace_id": second_id})).await;
+    assert!(merge_plan.is_object());
+    let prepared = p.act("workspace.merge_prepare", json!({"workspace_id": second_id})).await;
+    assert!(prepared.get("error").is_none(), "{prepared}");
+    assert_eq!(prepared["result"]["state"], "ready", "{prepared}");
+    let completed = p.act("workspace.merge_complete", json!({"workspace_id": second_id})).await;
+    assert!(completed.get("error").is_none(), "{completed}");
+    assert_eq!(std::fs::read_to_string(repo.join("merged.txt")).unwrap(), "merged-from-the-phone\n", "merged into the checkout");
+    // Abort is there too.
+    let (third, _, _) = edited(&d, &repo, "echo x > third.txt");
+    let third_id = third["workspace"]["id"].as_str().unwrap().to_string();
+    p.act("workspace.merge_prepare", json!({"workspace_id": third_id})).await;
+    assert!(p.act("workspace.merge_abort", json!({"workspace_id": third_id})).await.get("error").is_none());
+    assert!(!repo.join("third.txt").exists());
+
+    // Cleaning up lists what would be lost first, and keeps it unless told otherwise.
+    std::fs::write(second_ws.join("unsaved-work.txt"), "not committed\n").unwrap();
+    let cleanup_plan = p.call("workspace.cleanup_plan", json!({"workspace_id": second_id})).await;
+    assert_eq!(cleanup_plan["removable"], true);
+    assert!(cleanup_plan["dirty"].to_string().contains("unsaved-work.txt"), "{cleanup_plan}");
+    let refused = p.act("workspace.cleanup", json!({"workspace_id": second_id})).await;
+    assert!(refused.get("error").is_some() && second_ws.exists(), "uncommitted files are kept: {refused}");
+    let cleaned = p.act("workspace.cleanup", json!({"workspace_id": second_id, "discard_dirty": true})).await;
+    assert!(cleaned.get("error").is_none(), "{cleaned}");
+    assert!(!second_ws.exists() && ws.exists());
+
+    // History, search and archive.
+    let found = p.call("search", json!({"query": "wrote notes"})).await;
+    assert!(found.to_string().contains(created["task"]["id"].as_str().unwrap()), "{found}");
+    assert!(p.act("task.archive", json!({"task_id": created["task"]["id"]})).await.get("error").is_none());
+    assert!(!d.call("state", json!({}))["tasks"].as_array().unwrap().iter().find(|t| t["id"] == created["task"]["id"]).unwrap()["archived_ms"].is_null());
+    assert!(p.act("task.archive", json!({"task_id": created["task"]["id"], "archived": false})).await.get("error").is_none());
+    assert_eq!(p.call("harness.list", json!({})).await, d.call("harness.list", json!({})));
+    // Stop all agents; the daemon keeps running.
+    let busy = d.generic(&repo, "worktree", "/bin/sh", &["-c", "sleep 30"]);
+    d.wait_status(&run_id(&busy), |s| s == "running", 10);
+    let stopped = p.act("runs.stop_all", json!({})).await;
+    assert_eq!(stopped["result"]["interrupted"], json!([run_id(&busy)]), "{stopped}");
+    d.wait_done(&run_id(&busy), 20);
+    assert_eq!(d.call("hello", json!({}))["protocol"], 1, "the daemon is still running");
+
+    // No credential ever reached the phone: everything it received, decrypted, is searched.
+    while p.next(Duration::from_millis(300)).await.is_some() {}
+    let received = p.transcript.clone();
+    assert!(received.len() > 20_000, "the audit reads the whole session ({} bytes)", received.len());
+    fn find(dir: &std::path::Path, name: &str) -> Option<std::path::PathBuf> {
+        for entry in std::fs::read_dir(dir).ok()?.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(found) = find(&path, name) {
+                    return Some(found);
+                }
+            } else if path.file_name().is_some_and(|n| n == name) {
+                return Some(path);
+            }
+        }
+        None
+    }
+    let auth = std::fs::read_to_string(find(d.home.path(), "auth.json").expect("the signed-in account's credential file")).unwrap();
+    let stored: Value = serde_json::from_str(&auth).unwrap();
+    let id_token = stored["tokens"]["id_token"].as_str().unwrap();
+    assert!(id_token.starts_with("eyJ") && id_token.len() > 40);
+    for secret in [id_token, &id_token[..40], "refresh_token", "access_token", "id_token", "auth.json", "\"tokens\"", "Bearer ", "gh auth token", ".fixture-login.json"] {
+        assert!(!received.contains(secret), "{secret:?} reached the phone");
+    }
+    assert!(!received.contains("eyJ"), "no token of any kind reached the phone");
+    assert!(received.contains("FXTR-C0DE1") && received.contains("https://auth.example.invalid/codex/device"), "the code and the address did");
+}
+
+// ---------------------------------------------------------------- AC-129
+
+fn pushes(dir: &std::path::Path) -> Vec<Value> {
+    let mut files: Vec<std::path::PathBuf> = std::fs::read_dir(dir).map(|d| d.flatten().map(|e| e.path()).collect()).unwrap_or_default();
+    files.sort();
+    files.iter().map(|f| serde_json::from_slice(&std::fs::read(f).unwrap()).unwrap()).collect()
+}
+
+fn leaves(value: &Value, prefix: &str, out: &mut Vec<String>) {
+    match value {
+        Value::Object(map) => map.iter().for_each(|(k, v)| leaves(v, &if prefix.is_empty() { k.clone() } else { format!("{prefix}.{k}") }, out)),
+        _ => out.push(prefix.to_string()),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac129_needs_you_notifications_you_can_switch() {
+    let sent = tmp();
+    let modes = tmp();
+    let mode_file = modes.path().join("mode");
+    let claude = fixture("fake-harness/claude-fixture.js");
+    // Test-only: notifications are written to a directory instead of being sent.
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE"), ("CLAUDE_FIXTURE_MODE_FILE", mode_file.to_str().unwrap()),
+        ("OVERSEER_GATEWAY_MDNS", "off"), ("OVERSEER_TEST_PUSH_DIR", sent.path().to_str().unwrap())]);
+    phone::enable(&d);
+    let (mut p, paired) = pair(&d, "Notified Phone").await;
+    let r = tmp();
+    let repo = repo(&r.path().join("shop"));
+    let secret_prompt = "Rotate the key sk-live-00000000000000000000 in src/billing.ts";
+    let ask = |mode: &str| {
+        std::fs::write(&mode_file, mode).unwrap();
+        let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": secret_prompt, "title": secret_prompt}));
+        (run_id(&created), created)
+    };
+    let count = || pushes(sent.path()).len();
+    let last_log = |d: &Daemon| events_of(d, "push").last().cloned().unwrap_or(Value::Null);
+
+    // Off until the phone turns them on: nothing is sent, and the log says why.
+    let hello = p.call("hello", json!({"client": "phone"})).await;
+    assert_eq!(hello["notifications"]["enabled"], false);
+    let (quiet, _) = ask("echo");
+    d.wait_done(&quiet, 15);
+    wait_until("the log entry", 5, || !events_of(&d, "push").is_empty());
+    assert_eq!(count(), 0);
+    assert_eq!(last_log(&d)["payload"]["why"], "notifications are off on this phone");
+
+    // On: a permission request reaches the phone within five seconds.
+    let settings = p.call("device.notifications", json!({"enabled": true, "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "environment": "development", "bundle": "com.beelol.overseer.phone"})).await;
+    assert_eq!(settings["enabled"], true);
+    assert_eq!(settings["kinds"], json!({"permission": true, "question": true, "failure": true, "finished": true}));
+    let (run, created) = ask("permission");
+    let asked = Instant::now();
+    let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
+    wait_until("the notification", 5, || count() == 1);
+    assert!(asked.elapsed() < Duration::from_secs(5), "within five seconds: {:?}", asked.elapsed());
+    let note = pushes(sent.path()).pop().unwrap();
+    assert_eq!(note["device"], json!(paired.device));
+    let payload = &note["payload"];
+    assert_eq!(payload["aps"]["alert"]["title"], "Claude · shop");
+    assert_eq!(payload["aps"]["alert"]["body"], "Needs your permission");
+    assert_eq!(payload["aps"]["category"], "OVERSEER_PERMISSION");
+    assert_eq!(payload["overseer"]["run_id"], json!(run));
+    assert_eq!(payload["overseer"]["request_id"], waiting["attention"]["request_id"]);
+    // Only the allowed fields, and nothing of the work: no prompt, no path, no tool input.
+    let allowed = ["aps.alert.title", "aps.alert.body", "aps.category", "aps.thread-id", "aps.sound", "aps.interruption-level", "overseer.v", "overseer.kind", "overseer.run_id", "overseer.task_id", "overseer.request_id", "overseer.device"];
+    let mut got = Vec::new();
+    leaves(payload, "", &mut got);
+    assert!(got.iter().all(|f| allowed.contains(&f.as_str())), "{got:?}");
+    let text = payload.to_string();
+    for private in ["Rotate", "sk-live", "billing", "perm.txt", "allowed", repo.to_str().unwrap(), "Write"] {
+        assert!(!text.contains(private), "{private:?} is in the notification: {text}");
+    }
+    assert_eq!(last_log(&d)["payload"]["outcome"], "sent");
+    assert_eq!(last_log(&d)["payload"]["fields"].as_array().unwrap().len(), got.len());
+
+    // Allow, from the notification: the phone answers with what the notification carries.
+    let answered = p.act("run.permission", json!({"run_id": payload["overseer"]["run_id"], "request_id": payload["overseer"]["request_id"], "allow": true})).await;
+    assert!(answered.get("error").is_none(), "{answered}");
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    assert!(ws_path(&d, &created).join("perm.txt").exists(), "the agent was unblocked");
+    wait_until("the finished notification", 5, || count() == 2);
+    assert_eq!(pushes(sent.path()).pop().unwrap()["payload"]["aps"]["alert"]["body"], "Finished");
+    assert_eq!(pushes(sent.path()).pop().unwrap()["payload"]["aps"]["category"], "OVERSEER_AGENT");
+
+    // One kind off: that kind is not sent, the others are.
+    p.call("device.notifications", json!({"kinds": {"finished": false}})).await;
+    let (run, _) = ask("permission");
+    let w = d.wait_status(&run, |s| s == "waiting_for_user", 15);
+    wait_until("the permission notification", 5, || count() == 3);
+    d.call("run.permission", json!({"run_id": run, "request_id": w["attention"]["request_id"], "allow": false}));
+    d.wait_done(&run, 15);
+    wait_until("the log entry", 5, || last_log(&d)["payload"]["kind"] == "finished");
+    assert_eq!(last_log(&d)["payload"]["why"], "this kind of notification is off on this phone");
+    assert_eq!(count(), 3, "nothing was sent for the kind that is off");
+    // A failure is its own kind.
+    let (failed, _) = ask("auth");
+    d.wait_done(&failed, 15);
+    wait_until("the failure notification", 5, || count() == 4);
+    assert_eq!(pushes(sent.path()).pop().unwrap()["payload"]["aps"]["alert"]["body"], "Stopped with an error");
+
+    // The Mac's switch turns them off for every phone.
+    assert_eq!(d.call("gateway.settings", json!({"notifications": false}))["notifications"], false);
+    let (run, _) = ask("permission");
+    let w = d.wait_status(&run, |s| s == "waiting_for_user", 15);
+    wait_until("the log entry", 5, || last_log(&d)["run_id"] == json!(run));
+    assert_eq!(last_log(&d)["payload"]["why"], "notifications to phones are off on the Mac");
+    assert_eq!(count(), 4);
+    assert_eq!(p.call("hello", json!({"client": "phone"})).await["mac_notifications"], false, "the phone can say why");
+    d.call("run.permission", json!({"run_id": run, "request_id": w["attention"]["request_id"], "allow": false}));
+    d.wait_done(&run, 15);
+    d.call("gateway.settings", json!({"notifications": true}));
+    // A phone cannot change the Mac's switch.
+    assert_eq!(Phone::code(&p.act("gateway.settings", json!({"notifications": true})).await), "mac_only");
+
+    // While a window on the Mac is looking at the agent, no notification is sent for it.
+    p.call("device.notifications", json!({"kinds": {"finished": true}})).await;
+    let (watched, _) = ask("slow");
+    let mut window = std::os::unix::net::UnixStream::connect(d.socket()).unwrap();
+    {
+        use std::io::{BufRead, BufReader, Write};
+        window.write_all(format!("{}\n", json!({"id": 1, "method": "ui.focus", "params": {"run_id": watched, "focused": true}})).as_bytes()).unwrap();
+        let mut line = String::new();
+        BufReader::new(window.try_clone().unwrap()).read_line(&mut line).unwrap();
+        assert!(line.contains("\"ok\":true"), "{line}");
+    }
+    d.wait_done(&watched, 20);
+    wait_until("the log entry", 5, || last_log(&d)["run_id"] == json!(watched) && last_log(&d)["payload"]["kind"] == "finished");
+    assert_eq!(last_log(&d)["payload"]["why"], "the owner is looking at this agent on the Mac");
+    assert_eq!(count(), 4);
+    // The window looks elsewhere (or closes): the next moment is sent again.
+    drop(window);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let (unwatched, _) = ask("echo");
+    d.wait_done(&unwatched, 15);
+    wait_until("the notification", 5, || count() == 5);
+
+    // Text only when the owner asked for it, per phone.
+    p.call("device.notifications", json!({"show_text": true})).await;
+    let (shown, _) = ask("echo");
+    d.wait_done(&shown, 15);
+    wait_until("the notification", 5, || count() == 6);
+    let with_text = pushes(sent.path()).pop().unwrap();
+    assert!(with_text["payload"]["aps"]["alert"]["title"].as_str().unwrap().starts_with("Rotate the key"));
+    assert!(with_text["payload"]["aps"]["alert"]["body"].as_str().unwrap().starts_with("Finished: "), "{with_text}");
+    assert!(!with_text.to_string().contains("sk-live-0000") && with_text.to_string().contains("[redacted]"), "secrets are still redacted: {with_text}");
+    p.call("device.notifications", json!({"show_text": false})).await;
+
+    // All off on the phone, and a revoked phone, get nothing.
+    p.call("device.notifications", json!({"enabled": false})).await;
+    let (run, _) = ask("echo");
+    d.wait_done(&run, 15);
+    wait_until("the log entry", 5, || last_log(&d)["run_id"] == json!(run));
+    assert_eq!(count(), 6);
+    p.call("device.notifications", json!({"enabled": true})).await;
+    // A watch-only phone may still choose its own notifications.
+    d.call("gateway.device_scope", json!({"id": paired.device, "scope": "watch"}));
+    assert_eq!(p.call("device.notifications", json!({"kinds": {"failure": false}})).await["kinds"]["failure"], false);
+    d.call("gateway.device_revoke", json!({"id": paired.device}));
+    let before = events_of(&d, "push").len();
+    let (run, _) = ask("echo");
+    d.wait_done(&run, 15);
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    assert_eq!(count(), 6);
+    assert_eq!(events_of(&d, "push").len(), before, "a revoked phone is not considered at all");
+    // Every payload that was sent held only the allowed fields.
+    for sent in pushes(sent.path()) {
+        let mut got = Vec::new();
+        leaves(&sent["payload"], "", &mut got);
+        assert!(got.iter().all(|f| allowed.contains(&f.as_str())), "{got:?}");
+    }
+}

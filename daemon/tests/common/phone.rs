@@ -70,6 +70,8 @@ pub struct Phone {
     /// Notifications received while waiting for something else, in order.
     pub inbox: Vec<Value>,
     pub hello: Value,
+    /// Everything this phone received, decrypted, as text: what an audit of the traffic reads.
+    pub transcript: String,
 }
 
 pub fn url(port: u16) -> String {
@@ -128,7 +130,7 @@ impl Phone {
         let n = hs.read_message(&reply, &mut payload).map_err(|e| format!("message 2: {e}"))?;
         let hello: Value = serde_json::from_slice(&payload[..n]).map_err(|e| e.to_string())?;
         let transport = hs.into_transport_mode().map_err(|e| e.to_string())?;
-        Ok(Self { ws, transport, opener: noise::Opener::new(64 << 20), next_id: 1000, inbox: Vec::new(), hello })
+        Ok(Self { ws, transport, opener: noise::Opener::new(64 << 20), next_id: 1000, inbox: Vec::new(), hello, transcript: String::new() })
     }
 
     /// The pairing handshake. Waits while the owner decides.
@@ -170,7 +172,11 @@ impl Phone {
         loop {
             let f = frame(&mut self.ws, end.saturating_duration_since(Instant::now())).await?;
             match self.opener.open(&mut self.transport, &f) {
-                Ok(Some(bytes)) => return serde_json::from_slice(&bytes).ok(),
+                Ok(Some(bytes)) => {
+                    self.transcript.push_str(&String::from_utf8_lossy(&bytes));
+                    self.transcript.push('\n');
+                    return serde_json::from_slice(&bytes).ok();
+                }
                 Ok(None) => continue,
                 Err(_) => return None,
             }
