@@ -3127,6 +3127,60 @@ fn auto_simultaneous_unknown_draw_units_admit_only_one_shared_account_child() {
 }
 
 #[test]
+fn auto_child_does_not_start_while_a_manual_run_uses_its_profile() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::net::UnixStream;
+    use std::time::Instant;
+    let r = tmp();
+    let parent_repo = repo(&r.path().join("repo"));
+    let manual_repo = repo(&r.path().join("manual-repo"));
+    let bin = r.path().join("bin");
+    std::fs::create_dir(&bin).unwrap();
+    let marker = r.path().join("auto-git-stalled");
+    let release = r.path().join("release-auto-git");
+    let trace = r.path().join("manual-race-trace.txt");
+    let wrapper = bin.join("git");
+    std::fs::write(&wrapper, format!("#!/bin/sh\nif [ \"$1\" = worktree ] && [ \"$2\" = add ] && [ \"$3\" = -b ]; then\n  case \"$4\" in overseer/delegate-*|overseer/auto-*)\n    printf x > '{}'\n    while [ ! -e '{}' ]; do /bin/sleep 0.05; done;;\n  esac\nfi\nexec /usr/bin/git \"$@\"\n", marker.display(), release.display())).unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap());
+    let d = Daemon::start(&[("PATH", &path),
+        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "6000"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":parent_repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"manual-race-auto-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"prompt":"browser check"});
+    let socket = d.socket();
+    let auto = std::thread::spawn(move || {
+        let mut conn = UnixStream::connect(socket).unwrap();
+        conn.set_read_timeout(Some(Duration::from_secs(15))).unwrap();
+        conn.write_all(format!("{}\n", json!({"id":1,"method":"auto.dispatch","params":request})).as_bytes()).unwrap();
+        let mut line = String::new();
+        BufReader::new(conn).read_line(&mut line).unwrap();
+        let reply: serde_json::Value = serde_json::from_str(&line).unwrap();
+        reply["result"].clone()
+    });
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !marker.exists() {
+        assert!(Instant::now() < deadline, "Auto did not reach Git preparation");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let manual = run_id(&d.call("task.create", json!({"repo":manual_repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"browser check"})));
+    d.wait_status(&manual, |status| status == "running", 10);
+    std::fs::write(&release, "go").unwrap();
+    let response = auto.join().unwrap();
+    assert_eq!(response["state"], "paused", "Auto must not overlap the active manual profile run: {response}");
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 0,
+        "the Auto child must not start a model turn while manual work is active");
+    assert_eq!(d.wait_done(&manual, 15)["status"], "completed");
+}
+
+#[test]
 fn auto_recent_429_excludes_only_its_route_without_inventing_quota_exhaustion() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

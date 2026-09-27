@@ -929,6 +929,18 @@ impl Daemon {
         let workspace_gate = self.workspace_gate(&initial.workspace_id);
         let _workspace_guard = workspace_gate.lock().unwrap();
         let run = self.run(run_id)?;
+        if run.relation_source.as_deref() == Some("managed-delegation") {
+            let store = self.store.lock().unwrap();
+            let launch: Option<String> = store.conn.query_row(
+                "SELECT launch FROM runs WHERE id=?1", [run_id], |row| row.get(0))?;
+            let launch: Value = launch.as_deref().and_then(|text| serde_json::from_str(text).ok())
+                .unwrap_or(Value::Null);
+            if launch["auto_selected"] == true && store.runs()?.iter().any(|other|
+                other.id != run.id && other.profile_id == run.profile_id
+                    && ACTIVE.contains(&other.status.as_str())) {
+                bail!("automatic child profile has another active run");
+            }
+        }
         if follow_up && run.relation_source.as_deref() == Some("managed-delegation") {
             bail!("a managed work unit has one result; delegate a new work unit instead");
         }
