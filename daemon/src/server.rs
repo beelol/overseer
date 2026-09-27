@@ -1361,15 +1361,13 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "auto.usage.list" => {
             let store = d.store.lock().unwrap();
             let rows = store.auto_measurements(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;
-            let paused = d.learning_paused.load(std::sync::atomic::Ordering::Relaxed)
-                || store.auto_learning_is_paused()?;
+            let paused = d.learning_is_paused() || store.auto_learning_is_paused()?;
             json!({"measurements": rows, "learning_paused": paused})
         }
         "auto.usage.work.list" => {
             let store = d.store.lock().unwrap();
             let rows = store.auto_work_observations(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;
-            let paused = d.learning_paused.load(std::sync::atomic::Ordering::Relaxed)
-                || store.auto_learning_is_paused()?;
+            let paused = d.learning_is_paused() || store.auto_learning_is_paused()?;
             json!({"work_units":rows,"learning_paused":paused})
         }
         "auto.usage.thread.refresh" => {
@@ -1408,7 +1406,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 }
             };
             let store = d.store.lock().unwrap();
-            store.record_auto_account_identity(profile_id, &fingerprint)?;
+            let account_recorded = store.record_auto_account_identity(profile_id, &fingerprint);
+            d.learning_account_paused.store(account_recorded.is_err(), std::sync::atomic::Ordering::Relaxed);
+            account_recorded?;
             let generation = store.auto_account_generation(profile_id)?.ok_or_else(|| anyhow!("account generation is unavailable"))?;
             let prior = store.auto_run_pre_turn_quota(&run.id)?;
             // External usage, source precision, and reporting settlement are not
@@ -1429,11 +1429,16 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 estimate.plan_type = snapshot.reported_plan_type().map(str::to_string);
                 let attribution = store.auto_thread_usage_attribution(&run.id, profile_id,
                     generation, estimate.plan_type.as_deref())?;
-                let id = store.insert_auto_thread_usage(&run.id, profile_id, generation, "codex-app/account-usage-read", &estimate)?;
+                let thread_recorded = store.insert_auto_thread_usage(&run.id, profile_id, generation,
+                    "codex-app/account-usage-read", &estimate);
+                d.learning_thread_paused.store(thread_recorded.is_err(), std::sync::atomic::Ordering::Relaxed);
+                let id = thread_recorded?;
                 Some(json!({"id":id,"run_id":run.id,"profile_id":profile_id,"read_account_generation":generation,"attribution":attribution,"subscription_window_relation":"unverified","source":"codex-app/account-usage-read","estimate":estimate}))
             } else { None };
-            if store.refresh_auto_work_observation(&run.id).is_err() {
-                d.learning_paused.store(true, std::sync::atomic::Ordering::Relaxed);
+            match store.refresh_auto_work_observation(&run.id) {
+                Ok(true) => d.learning_work_paused.store(false, std::sync::atomic::Ordering::Relaxed),
+                Err(_) => d.learning_work_paused.store(true, std::sync::atomic::Ordering::Relaxed),
+                Ok(false) => {}
             }
             json!({"state":if observation.is_some() {"estimated"} else {"unavailable"},
                 "observation":observation,"allowance_delta":allowance_delta})

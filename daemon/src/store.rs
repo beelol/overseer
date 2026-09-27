@@ -1434,19 +1434,20 @@ impl Store {
         }
     }
 
-    pub fn refresh_auto_work_observation(&self, run_id: &str) -> Result<()> {
+    pub fn refresh_auto_work_observation(&self, run_id: &str) -> Result<bool> {
         if !self.learning_persistent || self.learning_reset_pending()? {
             return Err(anyhow!("Auto learning storage unavailable"));
         }
         let existing: bool = self.learning_conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM auto_work_observations WHERE run_id=?1)",
             [run_id], |row| row.get(0))?;
-        if !existing { return Ok(()); }
+        if !existing { return Ok(false); }
         if let Some((work_unit_id, _, _, record)) = self.auto_work_observation(run_id)? {
-            self.learning_conn.execute("UPDATE auto_work_observations SET record=?2 WHERE work_unit_id=?1",
+            let updated = self.learning_conn.execute("UPDATE auto_work_observations SET record=?2 WHERE work_unit_id=?1",
                 params![work_unit_id,record.to_string()])?;
+            return Ok(updated == 1);
         }
-        Ok(())
+        Ok(false)
     }
 
     pub fn auto_work_observations(&self, limit: i64) -> Result<Vec<Value>> {

@@ -1705,6 +1705,59 @@ fn auto_learning_samples_live_in_a_separate_capped_local_file() {
 }
 
 #[test]
+fn auto_selection_and_result_survive_physical_learning_file_capacity() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_EMIT_USAGE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_EMIT_USAGE", "1")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let learning_path = d.home.path().join("overseer.sqlite.learning");
+    let learning = rusqlite::Connection::open(&learning_path).unwrap();
+    let page_size: i64 = learning.pragma_query_value(None, "page_size", |row| row.get(0)).unwrap();
+    learning.pragma_update(None, "max_page_count", 128 * 1024 * 1024 / page_size).unwrap();
+    learning.execute_batch("CREATE TABLE physical_pressure(payload BLOB);
+        CREATE TRIGGER pressure_work_summary BEFORE INSERT ON auto_work_observations
+        BEGIN INSERT INTO physical_pressure(payload) VALUES(zeroblob(1048576)); END;").unwrap();
+    let mut filled = 0;
+    while learning.execute("INSERT INTO physical_pressure(payload) VALUES(zeroblob(1048576))", []).is_ok() {
+        filled += 1;
+        assert!(filled < 130, "learning database exceeded its 128 MiB page cap");
+    }
+    assert!(filled > 0);
+    let mut children = Vec::new();
+    for unit in ["physical-pressure-1", "physical-pressure-while-paused-2"] {
+        let selected = d.call("auto.dispatch", json!({"work_unit_id":unit,"parent_run_id":parent,
+            "min_tier":"general","required_tools":[],"prompt":"bounded work"}));
+        assert_eq!(selected["state"], "dispatched", "{selected}");
+        assert_eq!(selected["decision"]["selected"], "system-codex/gpt-6-sol/medium");
+        let child = run_id(&selected);
+        assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+        assert_eq!(d.call("run.result", json!({"run_id":child}))["state"], "ready");
+        assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], true);
+        children.push(child);
+    }
+    assert!(std::fs::metadata(&learning_path).unwrap().len() <= 128 * 1024 * 1024);
+    assert!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().is_empty());
+    learning.execute_batch("DROP TRIGGER pressure_work_summary; DELETE FROM physical_pressure;").unwrap();
+    let recovered = d.call("auto.dispatch", json!({"work_unit_id":"physical-pressure-recovered-3",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],"prompt":"new bounded work"}));
+    assert_eq!(recovered["state"], "dispatched", "{recovered}");
+    let recovered_child = run_id(&recovered);
+    assert_eq!(d.wait_done(&recovered_child, 15)["status"], "completed");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], false);
+    let rows = d.call("auto.usage.work.list", json!({}));
+    assert_eq!(rows["work_units"].as_array().unwrap().len(), 1, "{rows}");
+    assert_eq!(rows["work_units"][0]["run_id"], recovered_child);
+    for child in children.into_iter().chain(std::iter::once(recovered_child)) {
+        assert_eq!(d.events(&child).iter().filter(|event| event["kind"] == "usage").count(), 1,
+            "learning pressure must not replay a child turn");
+    }
+}
+
+#[test]
 fn auto_telemetry_failure_pauses_learning_without_restarting_or_replaying_work() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
@@ -1798,6 +1851,15 @@ fn auto_dispatch_continues_during_local_learning_write_pressure_and_recovers() {
         "failed learning write must not leave a partial sample");
     assert!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().is_empty(),
         "failed work learning must not leave a partial row");
+    let while_paused = d.call("auto.dispatch", json!({"work_unit_id":"learning-pressure-while-paused",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],"prompt":"work despite unavailable learning"}));
+    assert_eq!(while_paused["state"], "dispatched", "{while_paused}");
+    assert_eq!(while_paused["decision"]["selected"], "system-codex/gpt-6-sol/medium");
+    let paused_child = run_id(&while_paused);
+    assert_eq!(d.wait_done(&paused_child, 15)["status"], "completed");
+    assert_eq!(d.call("run.result", json!({"run_id":paused_child}))["state"], "ready");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], true);
+    assert!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().is_empty());
     db.execute_batch("DROP TRIGGER learning_capacity_full; DROP TRIGGER work_capacity_full;").unwrap();
     let second = d.call("auto.dispatch", json!({"work_unit_id":"learning-pressure-2",
         "parent_run_id":parent,"min_tier":"general","required_tools":[],"prompt":"another bounded child"}));
@@ -1811,10 +1873,109 @@ fn auto_dispatch_continues_during_local_learning_write_pressure_and_recovers() {
     let work = d.call("auto.usage.work.list", json!({}));
     assert_eq!(work["work_units"].as_array().unwrap().len(), 1);
     assert_eq!(work["work_units"][0]["work_unit_id"], "learning-pressure-2");
+    assert_eq!(d.runs().len(), 4);
+    assert_eq!(d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count(), 3);
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 3,
+        "learning recovery must not replay any child turn");
+}
+
+#[test]
+fn auto_successful_work_summary_does_not_hide_failed_usage_recording() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_EMIT_USAGE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_EMIT_USAGE", "1")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
+    db.execute_batch("CREATE TRIGGER usage_capacity_full BEFORE INSERT ON auto_measurements
+        BEGIN SELECT RAISE(FAIL, 'simulated usage capacity full'); END;").unwrap();
+    let first = d.call("auto.dispatch", json!({"work_unit_id":"mixed-learning-failure-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],"prompt":"bounded child"}));
+    assert_eq!(first["state"], "dispatched", "{first}");
+    let first_child = run_id(&first);
+    assert_eq!(d.wait_done(&first_child, 15)["status"], "completed");
+    assert_eq!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().len(), 1,
+        "the work summary can succeed even when usage recording fails");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], true,
+        "a successful work summary must not hide the failed usage lane");
+    db.execute_batch("DROP TRIGGER usage_capacity_full;").unwrap();
+    let second = d.call("auto.dispatch", json!({"work_unit_id":"mixed-learning-recovered-2",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],"prompt":"next bounded child"}));
+    assert_eq!(second["state"], "dispatched", "{second}");
+    assert_eq!(d.wait_done(&run_id(&second), 15)["status"], "completed");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], false);
+    assert_eq!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().len(), 2);
+    assert_eq!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().len(), 2,
+        "the missing first child sample must not be reconstructed or duplicated");
+}
+
+#[test]
+fn auto_thread_and_work_refresh_failures_report_pause_until_their_own_recovery() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-delegation")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let child = run_id(&d.call("run.delegate", json!({"work_unit_id":"learning-refresh-child",
+        "parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol",
+        "effort":"medium","prompt":"bounded work"})));
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
+    db.execute_batch("CREATE TRIGGER reject_thread_learning BEFORE INSERT ON auto_thread_usage_observations
+        BEGIN SELECT RAISE(FAIL, 'thread learning unavailable'); END;").unwrap();
+    assert!(d.try_call("auto.usage.thread.refresh", json!({"run_id":child})).is_err());
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], true,
+        "a failed thread-credit learning write must surface paused state");
+    db.execute_batch("DROP TRIGGER reject_thread_learning;").unwrap();
+    assert_eq!(d.call("auto.usage.thread.refresh", json!({"run_id":child}))["state"], "estimated");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], false);
+
+    db.execute_batch("CREATE TRIGGER reject_work_refresh BEFORE UPDATE ON auto_work_observations
+        BEGIN SELECT RAISE(FAIL, 'work refresh unavailable'); END;").unwrap();
+    assert_eq!(d.call("auto.usage.thread.refresh", json!({"run_id":child}))["state"], "estimated");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], true,
+        "a failed work-summary correction must surface paused state");
+    db.execute_batch("DROP TRIGGER reject_work_refresh;").unwrap();
+    assert_eq!(d.call("auto.usage.thread.refresh", json!({"run_id":child}))["state"], "estimated");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], false,
+        "a successful correction must clear only its own failed lane");
+    assert_eq!(d.call("auto.usage.thread.list", json!({}))["observations"].as_array().unwrap().len(), 1);
+    assert_eq!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().len(), 1);
+    assert_eq!(d.run(&child)["status"], "completed");
+}
+
+#[test]
+fn auto_transient_account_evidence_failure_recovers_without_hiding_other_lanes() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER reject_account_evidence BEFORE INSERT ON auto_account_identity
+        BEGIN SELECT RAISE(FAIL, 'account evidence unavailable'); END;").unwrap();
+    let first = run_id(&d.call("run.delegate", json!({"work_unit_id":"account-evidence-fail-1",
+        "parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol",
+        "effort":"medium","prompt":"first turn"})));
+    assert_eq!(d.wait_done(&first, 15)["status"], "completed");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], true);
+    db.execute_batch("DROP TRIGGER reject_account_evidence;").unwrap();
+    let second = run_id(&d.call("run.delegate", json!({"work_unit_id":"account-evidence-recovered-2",
+        "parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol",
+        "effort":"medium","prompt":"second turn"})));
+    assert_eq!(d.wait_done(&second, 15)["status"], "completed");
+    assert_eq!(d.call("auto.usage.list", json!({}))["learning_paused"], false,
+        "a successful later account read must clear the attribution failure");
     assert_eq!(d.runs().len(), 3);
-    assert_eq!(d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count(), 2);
-    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 2,
-        "learning recovery must not replay either child turn");
 }
 
 #[test]

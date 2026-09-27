@@ -65,7 +65,12 @@ pub struct Daemon {
     tails: Mutex<HashSet<String>>,
     exe: PathBuf,
     pub started_ms: i64,
+    /// Storage unavailable at startup; this cannot recover without reopening the store.
     pub learning_paused: std::sync::atomic::AtomicBool,
+    pub learning_usage_paused: std::sync::atomic::AtomicBool,
+    pub learning_work_paused: std::sync::atomic::AtomicBool,
+    pub learning_thread_paused: std::sync::atomic::AtomicBool,
+    pub learning_account_paused: std::sync::atomic::AtomicBool,
     /// Connected VS Code windows (connections that said hello as `client: "vscode"`).
     pub ui_clients: std::sync::atomic::AtomicUsize,
     /// Bumped on every UI connect/disconnect so a pending background notice can tell a reload
@@ -95,9 +100,18 @@ impl Daemon {
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
         let daemon = Arc::new(Self { store: Mutex::new(store), profile_gates: Mutex::new(BTreeMap::new()), workspace_gates: Mutex::new(BTreeMap::new()), work_unit_gates: Mutex::new(BTreeMap::new()), events: tx, tails: Mutex::new(HashSet::new()), exe, started_ms: now(), learning_paused: std::sync::atomic::AtomicBool::new(learning_paused),
+            learning_usage_paused: std::sync::atomic::AtomicBool::new(false), learning_work_paused: std::sync::atomic::AtomicBool::new(false),
+            learning_thread_paused: std::sync::atomic::AtomicBool::new(false), learning_account_paused: std::sync::atomic::AtomicBool::new(false),
             ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0) });
         daemon.ensure_system_profiles()?;
         Ok(daemon)
+    }
+
+    pub fn learning_is_paused(&self) -> bool {
+        use std::sync::atomic::Ordering::Relaxed;
+        self.learning_paused.load(Relaxed) || self.learning_usage_paused.load(Relaxed)
+            || self.learning_work_paused.load(Relaxed) || self.learning_thread_paused.load(Relaxed)
+            || self.learning_account_paused.load(Relaxed)
     }
 
     pub fn emit(&self, task: Option<&str>, run: Option<&str>, kind: &str, source: &str, confidence: &str, payload: Value) -> Result<Event> {
@@ -1494,9 +1508,14 @@ impl Daemon {
                 }
             }
             tx.commit()?;
+            let had_learning = !pending_learning.is_empty();
+            let mut learning_failed = false;
             for (event_seq, measurement) in pending_learning {
                 let recorded = store.insert_auto_measurement(event_seq, &measurement);
-                self.learning_paused.store(recorded.is_err(), std::sync::atomic::Ordering::Relaxed);
+                learning_failed |= recorded.is_err();
+            }
+            if had_learning {
+                self.learning_usage_paused.store(learning_failed, std::sync::atomic::Ordering::Relaxed);
             }
         }
         for e in emitted {
@@ -1808,6 +1827,7 @@ impl Daemon {
                             }
                             Ok(true)
                         })();
+                        self.learning_account_paused.store(recorded.is_err(), std::sync::atomic::Ordering::Relaxed);
                         match recorded {
                             Ok(false) => {
                                 let msg = "automatic child account changed or allowance is exhausted";
@@ -1826,7 +1846,6 @@ impl Daemon {
                                 return Ok(());
                             }
                             Err(_) => {
-                                self.learning_paused.store(true, std::sync::atomic::Ordering::Relaxed);
                                 ev("auto_account_unknown", "daemon", "exact", json!({"reason":"run account evidence unavailable"}), None)?;
                             }
                             Ok(true) => {}
@@ -1923,9 +1942,14 @@ impl Daemon {
                 self.apply_norm(&store, run, norm, state, &mut emitted, &mut pending_learning)?;
             }
             tx.commit()?;
+            let had_learning = !pending_learning.is_empty();
+            let mut learning_failed = false;
             for (event_seq, measurement) in pending_learning {
                 let recorded = store.insert_auto_measurement(event_seq, &measurement);
-                self.learning_paused.store(recorded.is_err(), std::sync::atomic::Ordering::Relaxed);
+                learning_failed |= recorded.is_err();
+            }
+            if had_learning {
+                self.learning_usage_paused.store(learning_failed, std::sync::atomic::Ordering::Relaxed);
             }
         }
         for e in emitted {
@@ -2029,8 +2053,8 @@ impl Daemon {
             && matches!(status, "completed" | "failed" | "interrupted") {
             let recorded = self.store.lock().unwrap().record_auto_work_observation(&run.id);
             match recorded {
-                Ok(true) => self.learning_paused.store(false, std::sync::atomic::Ordering::Relaxed),
-                Err(_) => self.learning_paused.store(true, std::sync::atomic::Ordering::Relaxed),
+                Ok(true) => self.learning_work_paused.store(false, std::sync::atomic::Ordering::Relaxed),
+                Err(_) => self.learning_work_paused.store(true, std::sync::atomic::Ordering::Relaxed),
                 Ok(false) => {}
             }
         }
