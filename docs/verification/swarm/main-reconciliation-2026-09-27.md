@@ -51,3 +51,29 @@ The full offline Rust suite passed before the main merges, which did not touch
 Rust daemon code. The focused deadline fixture, extension source check, unit
 control test, package build and packaged Swarm-status scenario passed after the
 `91c7fc8` merge. No new acceptance box is checked by this reconciliation.
+
+## Subsequent published main: `e01057f`
+
+The branch merged main through `e01057f` after checking the published remote tip.
+The two new commits add AC-159's Command Line Tools Git fallback to the UI
+scenario harness and VSIX packager, and remove completed owner actions from the
+README for AC-160. The fallback changes how qualification can run on a Mac whose
+Xcode license is pending; it does not select a Swarm target, alter a worker's
+environment, or count as a live Swarm run. The README change has no Swarm runtime
+effect. Keep the existing Swarm RFC and SWARM-01–64 criteria unchanged. The
+packaged Swarm-status scenario passed on this merged branch. Main records AC-159
+as verified using its failing-Git fixture; that base-toolchain status does not
+verify Swarm's live launch or account behavior. Neither
+main commit supplies the Auto/Swarm shared admission transaction or resolves the
+normal Swarm launch gap.
+
+## Subsequent published main: `4fb5d60`
+
+Main next recorded Gate Q AC-157–160 as verified, updated the AC-146/156 merge
+and shared-agent-rule evidence, and revised the overall goal's fallback for
+stalled agents. These are process and verification changes. Swarm keeps its
+draft PR in flight, follows the shared `AGENTS.md` rules, and pushes this
+reconciliation with the branch instead of treating a passing fixture as ready
+for merge. No Swarm scheduling, permission, UI, or acceptance criterion changes:
+the missing shared Auto admission path, normal launch, and joined Gate S checks
+remain open. This merge provides no new SWARM verification evidence.
