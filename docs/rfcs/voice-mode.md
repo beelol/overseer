@@ -1,6 +1,6 @@
 # Side RFC: Voice Mode — talk to Overseer, redirect every agent
 
-Status: owner request (2026-09-27). Proposed; nothing is built. Tracked by AC-162 to AC-176 under
+Status: owner request (2026-09-27). Proposed; nothing is built. Tracked by AC-162 to AC-177 under
 [Gate R](../overseer-rfc.md#gate-r--voice-mode-added-by-the-owner-2026-09-27) in the main RFC.
 The defaults below stand until the owner changes them; the
 [questions for the owner](#open-questions-for-the-owner) are at the end.
@@ -26,6 +26,12 @@ In the owner's words (2026-09-27):
 > working on the request and show evidence of what it's saying to all new subagents and all in
 > flight ones that it references for that request.
 
+Added the same day, about what is on screen:
+
+> it should also have the animated logo in the middle while that convo is happening. some effect
+> on the logo from the wave form so you know its getting what you're saying. not sure the best
+> way to animate it
+
 ## Decisions from the owner
 
 | Topic | Requirement |
@@ -38,6 +44,7 @@ In the owner's words (2026-09-27):
 | Quick answer | It quickly answers that it is working on the request. |
 | Evidence | It shows what it is saying to every new agent and every in-flight agent it references for that request. |
 | Audio | Audio is collected on the Rust side (owner, 2026-09-27, added while this RFC was written). No Swift or webview code captures the microphone. |
+| The mark | The animated Overseer logo is in the middle while the conversation is happening. The waveform has an effect on it, so the owner knows Overseer is getting what is said. How to animate it is left open. |
 
 ## Proposed defaults, distinguished from the decisions above
 
@@ -87,7 +94,7 @@ These are this RFC's choices, not the owner's. A change is a recorded revision.
   microphone                    Mac (all Rust)
       │
       ▼
-  ┌────────────────────────┐  words, timings   ┌────────────────────────────────────┐
+  ┌────────────────────────┐  words, levels    ┌────────────────────────────────────┐
   │ listener (Rust)        │ ────────────────► │ overseerd                          │
   │  audio capture         │                   │  ├─ voice session                  │
   │  echo cancellation     │ ◄──────────────── │  │   utterances, requests,         │
@@ -108,7 +115,8 @@ These are this RFC's choices, not the owner's. A change is a recorded revision.
   it can be reached from Rust, for words.
 - The listener plays Overseer's speech itself. It then knows exactly what the speakers are
   playing, which echo cancellation needs, and it can lower or stop the voice within the budget.
-- The listener sends **words**, never audio, over the daemon's owner-only socket (AC-08).
+- The listener sends **words** and **loudness levels**, never audio, over the daemon's owner-only
+  socket (AC-08).
 - The orchestrator never talks to an agent. It writes a plan; the daemon sends through the same
   methods the chat uses, so every message is an ordinary event in the agent's run.
 - UI clients draw what the daemon reports. None of them listens or speaks.
@@ -380,6 +388,8 @@ Each mode works with the other off. Audio Mode's rules and tests do not change.
 - **On the Mac.** Recognition and speech are on-device. The listener opens no network connection.
 - **No recordings.** Audio lives in the listener's memory for at most 30 s and is never written to
   disk.
+- **Levels.** The loudness values that move the mark are numbers, not sound. They are sent at
+  most 30 times a second, cannot be turned back into speech, and are never stored.
 - **What is stored.** The words of requests, redacted like other events, for 30 days or 5,000
   requests. Speech that was not a request lives only in the rolling context (10 minutes, memory).
 - **What reaches a model.** The words of each utterance that passes the gate go to the
@@ -436,14 +446,58 @@ Proposed names. The implementation may change them with the reason recorded.
 | `voice.request` | A request created or changed |
 | `voice.dispatch` | One dispatch's state change, with the run's event id |
 | `voice.spoke` | A line spoken, lowered, stopped or sent to the card alone |
+| `voice.level` | The loudness of the owner's voice or of Overseer's, at most 30 a second; not stored |
 
 | Record | Fields |
 | --- | --- |
 | `VoiceRequest` | id, heard at, words, kind, tier, state, settle until, spoken answers, superseded by |
 | `VoiceDispatch` | request, run or new task, reason, confidence, delivery and its reason, message, hash, state with times, event ids |
 
+## The mark in the middle
+
+While a voice conversation is happening, the Overseer mark (AC-142) is in the middle and moves
+with the voice. It answers one question at a glance: is Overseer getting what I am saying?
+
+| State | What the mark does |
+| --- | --- |
+| Listening | Calm, slow motion. It is on and nobody is speaking. |
+| Hearing you | It moves with the owner's voice, within 100 ms of the sound. |
+| Thinking | Its own steady motion, not tied to any sound. |
+| Speaking | It moves with Overseer's own voice. |
+| Muted, paused for a call | Still and dimmed, with the mute or pause sign. |
+
+- **A still mark means it does not hear.** Noise that does not count as speech leaves the mark
+  calm. So when the owner speaks and the mark does not move, Overseer is not getting it.
+- **Where.** In the centre of the voice view, which takes the middle of the editor area like the
+  home chat (AC-72). Beside a review or the grid the same mark is shown small in the voice strip,
+  so the work is not covered.
+- **Levels, not audio.** The listener sends one loudness value at most 30 times a second. Speech
+  cannot be rebuilt from it, and it is never stored. Every window draws from the same levels.
+- **States without colour alone.** Each state differs in motion and shape, so it reads in
+  grayscale and for colour-blind eyes.
+- **Reduced motion.** With reduced motion on, the mark is still and a small level meter shows the
+  voice.
+- **Cheap.** 60 frames a second without slowing the views beside it. Nothing is drawn while the
+  view is hidden.
+
+The owner is not sure of the best way to animate it. So at least three candidates are built and
+the owner picks on a review page.
+
+| Candidate | The effect |
+| --- | --- |
+| Ring | The mark stays as drawn. A ring around it carries the waveform of the voice. |
+| Orbit | The three swooshes turn around the core, wider and faster with the voice. |
+| Star | The star at the core brightens and the glow behind the mark breathes with the voice. |
+
+*Orbit* needs the mark in layers (swooshes, core, star). If the owner's files are flat images,
+the effects are drawn around and behind the mark and the mark itself is not cut up.
+
+The [brand rules](../design/brand.md) say the mark gets no effects. This is the one exception,
+at the owner's request: only here, only the chosen animation, and never stretched or recoloured.
+
 ## UI
 
+- **Mark.** The animated mark, as above.
 - **Voice strip.** One line with Talk to Overseer, and a status bar item: the state, the words as
   they are heard, mute.
 - **Cards.** In the conversation with Overseer, as above.
@@ -468,6 +522,7 @@ Proposed names. The implementation may change them with the reason recorded.
 | Request records | 5,000 or 30 days |
 | Listener | one per daemon; at most 3 restarts in 10 minutes |
 | Speech model | inside Gate L's memory budget, checked before it is loaded |
+| Loudness levels | 30 a second at most; never stored |
 | While off | no listener process, microphone closed, no recognizer loaded |
 
 ## Working alongside the other gates
@@ -513,6 +568,7 @@ Proposed names. The implementation may change them with the reason recorded.
 | 6. Should Overseer speak up by itself when an agent needs you? | No. Audio Mode's cue does that. Overseer speaks only in answer. |
 | 7. Should the typed chat follow the same tiers? | No change to AC-107 in this gate. |
 | 8. Audio is collected on the Rust side: inside `overseerd` itself, or in a Rust process of its own? | Its own process, started by the daemon, so a fault in audio code cannot stop the agents. |
+| 9. Which animation for the mark, and should the large mark also appear over a review or the grid? | The owner picks from three candidates. The large mark is in the voice view only; beside other work it is small, in the strip. |
 
 ## Order of work
 
@@ -524,9 +580,9 @@ pull request.
 | 0. Find out | AC-162 | The spike: audio capture in Rust, the recognizer, echo cancellation, the microphone permission, the orchestrator's speed. Decisions written here. |
 | 1. Hear | AC-163, AC-164, AC-172, AC-173 | The Rust listener, the voice session in the daemon, the floor rules, the arbiter, privacy and bounds. Nothing is sent to agents yet. |
 | 2. Answer and send | AC-165, AC-166, AC-167, AC-168, AC-171 | The three answers, targets from context, delivery, new agents, the tiers. |
-| 3. Prove | AC-169, AC-170, AC-174, AC-175 | Cards and messages, correcting and cancelling, the UI, failures. |
-| 4. Confirm | AC-176 | The owner's session by voice. |
+| 3. Show and prove | AC-169, AC-170, AC-174, AC-175, AC-177 | Cards and messages, correcting and cancelling, the UI, the animated mark with its candidates, failures. |
+| 4. Confirm | AC-176, the pick of AC-177 | The owner's session by voice, and the owner's choice of animation. |
 
 ## Acceptance
 
-AC-162 to AC-176 in the main RFC are the acceptance criteria. Each has its Verify clause there.
+AC-162 to AC-177 in the main RFC are the acceptance criteria. Each has its Verify clause there.

@@ -1353,6 +1353,9 @@ rec(175, "Keeps working when things fail", "not started", date="—", commit="�
 rec(176, "Voice Mode by voice (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R).",
     actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(177, "The mark shows it is hearing you", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
 
 SHORT_BLOCKERS = {
     154: "not started (Gate Q, added by the owner on 2026-09-27)",
@@ -1470,6 +1473,7 @@ SHORT_BLOCKERS = {
     174: "not started (Gate R, added by the owner on 2026-09-27)",
     175: "not started (Gate R, added by the owner on 2026-09-27)",
     176: "not started (Gate R, added by the owner on 2026-09-27)",
+    177: "not started (Gate R, added by the owner on 2026-09-27)",
 }
 TOTAL = 53
 
