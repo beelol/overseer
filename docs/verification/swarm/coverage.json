@@ -259,7 +259,7 @@
         "fixtures/swarm/evaluation-v1/",
         "docs/verification/swarm/SWARM-26.md"
       ],
-      "blocker": "Evaluation v1 fixes dependency, independent, exclusive-write and constrained-budget cases; the independent pair completes serial and parallel with 2/2 acceptance and 200 scripted fixture work units, with a recorded local parallel elapsed-time improvement. The other cases are policy decisions rather than full paired runs. Native provider usage, supported-harness qualification, and repeated quality/time comparison remain unverified."
+      "blocker": "Evaluation v1 now runs paired one-worker and two-worker local executions for dependency, independent, exclusive-write and constrained-budget cases. All eight runs complete with 2/2 accepted evidence and 200 scripted fixture work units. Only the independent case executes in parallel and improves elapsed time in one machine run. Native provider usage, supported-harness qualification, and repeated quality/time comparison remain unverified."
     },
     "SWARM-27": {
       "status": "partial",
