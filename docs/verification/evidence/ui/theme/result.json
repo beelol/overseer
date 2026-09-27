@@ -4,7 +4,7 @@
       "name": "UI sources use theme tokens only (no hard-coded colors)",
       "ok": true,
       "detail": {
-        "files": 25,
+        "files": 24,
         "hits": []
       }
     },
@@ -53,7 +53,7 @@
             "label": "Start task"
           }
         ],
-        "run": "r-1086cb01f36e"
+        "run": "r-32deada432cf"
       }
     },
     {
@@ -99,15 +99,15 @@
             "bad": []
           },
           "center": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "conversation": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "review": {
-            "checked": 15,
+            "checked": 18,
             "bad": []
           }
         }
@@ -148,15 +148,15 @@
             "bad": []
           },
           "center": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "conversation": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "review": {
-            "checked": 15,
+            "checked": 18,
             "bad": []
           }
         }
@@ -197,15 +197,15 @@
             "bad": []
           },
           "center": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "conversation": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "review": {
-            "checked": 15,
+            "checked": 18,
             "bad": []
           }
         }
@@ -246,15 +246,15 @@
             "bad": []
           },
           "center": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "conversation": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "review": {
-            "checked": 15,
+            "checked": 18,
             "bad": []
           }
         }
@@ -295,15 +295,15 @@
             "bad": []
           },
           "center": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "conversation": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "review": {
-            "checked": 15,
+            "checked": 18,
             "bad": []
           }
         }
