@@ -573,6 +573,7 @@ async fn session(d: Arc<Daemon>, device: Device, transport: snow::TransportState
                     }
                 }
                 Ok(Some(Ok(Message::Ping(_)))) | Ok(Some(Ok(Message::Pong(_)))) => {}
+                Ok(Some(Err(_))) => { why = "the connection was lost"; break }
                 _ => break,
             },
         }

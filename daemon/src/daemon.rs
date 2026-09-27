@@ -707,7 +707,8 @@ impl Daemon {
         // Several surfaces can answer the same request (VS Code, the terminal, a phone). The
         // request is claimed under the store's lock, so exactly one answer reaches the harness;
         // a later one is told what the first one was.
-        let claimed = self.store.lock().unwrap().claim_run_attention(run_id, request_id)?;
+        let by = crate::server::actor().unwrap_or_else(|| "the Mac".to_string());
+        let claimed = self.store.lock().unwrap().claim_run_attention(run_id, request_id, allow, &by, now())?;
         let Some(attention) = claimed else {
             if let Some(first) = self.store.lock().unwrap().permission_answer(run_id, request_id)? {
                 let by = first["by"].as_str().unwrap_or("someone").to_string();
@@ -724,11 +725,10 @@ impl Daemon {
             .and_then(|reply| self.send_stdin(&run, &reply));
         if let Err(e) = sent {
             // Nothing reached the harness: the request is still pending.
-            self.store.lock().unwrap().set_run_attention(run_id, Some(&attention))?;
+            self.store.lock().unwrap().unclaim_run_attention(run_id, request_id, &attention)?;
             return Err(e);
         }
         self.store.lock().unwrap().update_run_status(run_id, "running", None, None)?;
-        let by = crate::server::actor().unwrap_or_else(|| "the Mac".to_string());
         self.emit(Some(&run.task_id), Some(run_id), "permission_answered", "user", "exact", json!({"request_id": request_id, "allow": allow, "by": by}))?;
         self.emit(Some(&run.task_id), Some(run_id), "status", "daemon", "exact", json!({"status": "running"}))?;
         Ok(json!({"ok": true}))

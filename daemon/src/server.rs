@@ -212,11 +212,13 @@ pub(crate) fn subscribe(daemon: Arc<Daemon>, id: Value, params: Value, tx: mpsc:
     tokio::spawn(async move {
         let mut cursor = params["after"].as_i64().unwrap_or(0);
         let run_filter = params["run_id"].as_str().map(str::to_string);
-        let oldest = {
+        // History is gone when the log no longer reaches back to the cursor, or when a run's older
+        // events after the cursor were pruned (each pruning leaves a retention marker).
+        let gap = cursor > 0 && {
             let store = daemon.store.lock().unwrap();
-            store.conn.query_row("SELECT MIN(seq) FROM events", [], |r| r.get::<_, Option<i64>>(0)).ok().flatten()
+            let oldest = store.conn.query_row("SELECT MIN(seq) FROM events", [], |r| r.get::<_, Option<i64>>(0)).ok().flatten();
+            matches!(oldest, Some(o) if o > cursor + 1) || store.pruned_after(cursor, run_filter.as_deref()).unwrap_or(false)
         };
-        let gap = matches!(oldest, Some(o) if o > cursor + 1 && cursor > 0);
         if tx.send(json!({"id": id, "result": {"subscribed": true, "after": cursor, "history_truncated": gap}})).await.is_err() {
             return;
         }

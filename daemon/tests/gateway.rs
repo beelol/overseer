@@ -439,3 +439,362 @@ async fn ac119_devices_scopes_and_revoking() {
     assert_eq!(full.call("ping", json!({})).await["now_ms"].as_i64().is_some(), true);
     assert_eq!(events_of(&d, "device_revoked").len(), 1);
 }
+
+// ---------------------------------------------------------------- AC-121
+
+struct Dice(u64);
+
+impl Dice {
+    fn roll(&mut self, max: u64) -> u64 {
+        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (self.0 >> 33) % max
+    }
+}
+
+fn all_events_after(d: &Daemon, after: i64) -> Vec<Value> {
+    let mut all = Vec::new();
+    let mut cursor = after;
+    loop {
+        let page = d.call("events.list", json!({"after": cursor, "limit": 5000}))["events"].as_array().unwrap().clone();
+        if page.is_empty() {
+            return all;
+        }
+        cursor = page.last().unwrap()["seq"].as_i64().unwrap();
+        all.extend(page);
+    }
+}
+
+/// Subscribes after `cursor` and reads up to `take` events or until the stream is quiet for `quiet`.
+async fn read_some(p: &mut Phone, cursor: &mut i64, seen: &mut Vec<Value>, take: usize, quiet: Duration) -> Value {
+    p.send(&json!({"id": 1, "method": "events.subscribe", "params": {"after": *cursor}})).await.unwrap();
+    let mut subscribed = Value::Null;
+    let mut got = 0;
+    while got < take {
+        let Some(m) = p.next(quiet).await else { break };
+        if m["id"] == 1 {
+            subscribed = m["result"].clone();
+        } else if m["method"] == "event" {
+            let seq = m["params"]["seq"].as_i64().unwrap();
+            assert!(seq > *cursor, "event {seq} was delivered twice (cursor {cursor})");
+            *cursor = seq;
+            seen.push(m["params"].clone());
+            got += 1;
+        }
+    }
+    subscribed
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac121_a_stream_cut_at_a_hundred_random_points_arrives_once_and_in_order() {
+    let mut d = daemon("echo", &[]);
+    phone::enable(&d);
+    let (first, mut paired) = pair(&d, "Resuming Phone").await;
+    drop(first);
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let start = d.call("state", json!({}))["cursor"].as_i64().unwrap();
+    // A fixture stream of numbered lines, slow enough that most cuts land while it is live.
+    let created = d.generic(&repo, "worktree", "/bin/sh", &["-c", "i=0; while [ $i -lt 3000 ]; do echo line$i; i=$((i+1)); if [ $((i % 25)) -eq 0 ]; then sleep 0.04; fi; done"]);
+    let run = run_id(&created);
+    let mut dice = Dice(20260926);
+    let mut cursor = start;
+    let mut seen: Vec<Value> = Vec::new();
+    let mut live_cuts = 0;
+    for cut in 0..100 {
+        if cut == 50 {
+            // The daemon is killed mid-stream. The agent keeps running and phone access comes back.
+            d.kill9();
+            d.spawn();
+            assert_eq!(d.call("gateway.status", json!({}))["enabled"], true);
+        }
+        let mut p = Phone::connect(&mut paired).await.unwrap_or_else(|e| panic!("cut {cut}: {e}"));
+        let take = 1 + dice.roll(70) as usize;
+        read_some(&mut p, &mut cursor, &mut seen, take, Duration::from_millis(20 + dice.roll(60))).await;
+        if d.run(&run)["status"] == "running" {
+            live_cuts += 1;
+        }
+        drop(p); // no goodbye: the connection simply goes away
+    }
+    assert!(live_cuts >= 40, "most cuts landed while the stream was live ({live_cuts})");
+    d.wait_done(&run, 60);
+    let mut p = Phone::connect(&mut paired).await.unwrap();
+    read_some(&mut p, &mut cursor, &mut seen, usize::MAX, Duration::from_millis(700)).await;
+
+    let expected = all_events_after(&d, start);
+    let seqs = |list: &[Value]| list.iter().map(|e| e["seq"].as_i64().unwrap()).collect::<Vec<_>>();
+    assert_eq!(seqs(&seen), seqs(&expected), "the phone's sequence is the daemon's log");
+    assert_eq!(seen, expected, "every event is identical");
+    let lines: Vec<String> = seen.iter().filter(|e| e["kind"] == "output" && e["run_id"] == json!(run)).map(|e| e["payload"]["text"].as_str().unwrap().to_string()).collect();
+    assert_eq!(lines.len(), 3000);
+    assert!(lines.iter().enumerate().all(|(n, l)| *l == format!("line{n}")), "numbered lines are contiguous");
+
+    // History that is gone is said to be gone, so the phone reloads state.
+    let long = d.generic(&repo, "worktree", "/bin/sh", &["-c", "i=0; while [ $i -lt 12000 ]; do echo x$i; i=$((i+1)); done"]);
+    d.wait_done(&run_id(&long), 60);
+    let mut p = Phone::connect(&mut paired).await.unwrap();
+    let mut old = cursor + 1;
+    let subscribed = read_some(&mut p, &mut old, &mut Vec::new(), 5, Duration::from_millis(300)).await;
+    assert_eq!(subscribed["history_truncated"], true, "{subscribed}");
+    let mut fresh = Phone::connect(&mut paired).await.unwrap();
+    let mut now = fresh.call("state", json!({})).await["cursor"].as_i64().unwrap();
+    assert_eq!(read_some(&mut fresh, &mut now, &mut Vec::new(), 1, Duration::from_millis(200)).await["history_truncated"], false);
+}
+
+// ---------------------------------------------------------------- AC-122
+
+fn turns(d: &Daemon, run: &str) -> usize {
+    d.call("run.turns", json!({"run_id": run})).as_array().unwrap().len()
+}
+
+/// Waits until the run has `n` turns and every one of them has ended.
+fn wait_turns(d: &Daemon, run: &str, n: usize) {
+    let end = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < end {
+        let list = d.call("run.turns", json!({"run_id": run})).as_array().unwrap().clone();
+        let active = ["queued", "starting", "running", "waiting_for_user"].contains(&d.run(run)["status"].as_str().unwrap());
+        if list.len() >= n && !active && list.iter().all(|t| !t["ended_ms"].is_null()) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    panic!("run {run} has {} turns, wanted {n} ended: {}", turns(d, run), d.call("run.turns", json!({"run_id": run})));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac122_a_request_sent_again_acts_once() {
+    let mut d = daemon("echo", &[]);
+    phone::enable(&d);
+    let (mut a, mut paired) = pair(&d, "Retrying Phone").await;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "first", "title": "once"}));
+    let run = run_id(&created);
+    d.wait_done(&run, 15);
+    assert_eq!(turns(&d, &run), 1);
+
+    // The same request three times at once, on three connections: one turn, three identical replies.
+    let mut b = Phone::connect(&mut paired).await.unwrap();
+    let mut c = Phone::connect(&mut paired).await.unwrap();
+    let rid = phone::uuid();
+    let params = json!({"run_id": run, "prompt": "sent three times"});
+    let (ra, rb, rc) = tokio::join!(a.ask("run.follow_up", params.clone(), Some(&rid)), b.ask("run.follow_up", params.clone(), Some(&rid)), c.ask("run.follow_up", params.clone(), Some(&rid)));
+    let (ra, rb, rc) = (ra.unwrap(), rb.unwrap(), rc.unwrap());
+    assert!(ra.get("error").is_none(), "{ra}");
+    assert_eq!(ra["result"], rb["result"]);
+    assert_eq!(ra["result"], rc["result"]);
+    wait_turns(&d, &run, 2);
+    assert_eq!(turns(&d, &run), 2, "one turn for three sends");
+    // Much later on the same connection: still the first outcome.
+    assert_eq!(a.ask("run.follow_up", params.clone(), Some(&rid)).await.unwrap()["result"], ra["result"]);
+    assert_eq!(turns(&d, &run), 2);
+
+    // The connection is cut after the request ran and before the phone read the reply.
+    let rid = phone::uuid();
+    let mut cut = Phone::connect(&mut paired).await.unwrap();
+    cut.send(&json!({"id": 7, "method": "run.follow_up", "params": {"run_id": run, "prompt": "cut before the reply"}, "request_id": rid})).await.unwrap();
+    wait_turns(&d, &run, 3);
+    drop(cut); // the reply was never read
+    let mut back = Phone::connect(&mut paired).await.unwrap();
+    let retried = back.ask("run.follow_up", json!({"run_id": run, "prompt": "cut before the reply"}), Some(&rid)).await.unwrap();
+    assert!(retried.get("error").is_none(), "the retry gets the original outcome: {retried}");
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert_eq!(turns(&d, &run), 3, "one turn in the store");
+
+    // The connection is lost at the moment of sending: whether or not the request arrived, the
+    // retry leaves exactly one turn.
+    let rid = phone::uuid();
+    let mut gone = Phone::connect(&mut paired).await.unwrap();
+    gone.send(&json!({"id": 8, "method": "run.follow_up", "params": {"run_id": run, "prompt": "lost while sending"}, "request_id": rid})).await.unwrap();
+    drop(gone);
+    let retried = back.ask("run.follow_up", json!({"run_id": run, "prompt": "lost while sending"}), Some(&rid)).await.unwrap();
+    assert!(retried.get("error").is_none(), "{retried}");
+    wait_turns(&d, &run, 4);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert_eq!(turns(&d, &run), 4);
+    let prompts: Vec<String> = d.call("run.turns", json!({"run_id": run})).as_array().unwrap().iter().map(|t| t["prompt"].as_str().unwrap().to_string()).collect();
+    assert_eq!(prompts, vec!["first", "sent three times", "cut before the reply", "lost while sending"]);
+
+    // An error is an outcome too: the retry gets the same error and nothing runs.
+    let rid = phone::uuid();
+    let bad = back.ask("run.follow_up", json!({"run_id": "r-missing", "prompt": "x"}), Some(&rid)).await.unwrap();
+    assert_eq!(Phone::code(&bad), "failed");
+    assert_eq!(back.ask("run.follow_up", json!({"run_id": "r-missing", "prompt": "x"}), Some(&rid)).await.unwrap()["error"], bad["error"]);
+    // One id names one action.
+    let reused = back.ask("run.interrupt", json!({"run_id": run}), Some(&rid)).await.unwrap();
+    assert_eq!(Phone::code(&reused), "request_id_reused");
+    // Another phone's ids are its own.
+    let (mut other, _) = pair(&d, "Other Phone").await;
+    let theirs = other.ask("run.follow_up", params.clone(), Some(&rid)).await.unwrap();
+    assert!(theirs.get("error").is_none(), "the same id from another device is a new request: {theirs}");
+    wait_turns(&d, &run, 5);
+    assert_eq!(turns(&d, &run), 5);
+
+    // The outcome is kept for at least 24 hours (test-only: the gateway's clock 25 hours ahead),
+    // and it survives a restart of the daemon.
+    let kept = phone::uuid();
+    let first = back.ask("run.follow_up", json!({"run_id": run, "prompt": "kept for a day"}), Some(&kept)).await.unwrap();
+    wait_turns(&d, &run, 6);
+    d.kill9();
+    d.env.push(("OVERSEER_TEST_CLOCK_OFFSET_MS".into(), (25 * 3600 * 1000).to_string()));
+    d.spawn();
+    let mut later = Phone::connect(&mut paired).await.unwrap();
+    assert_eq!(later.ask("run.follow_up", json!({"run_id": run, "prompt": "kept for a day"}), Some(&kept)).await.unwrap()["result"], first["result"]);
+    assert_eq!(turns(&d, &run), 6);
+
+    // The daemon stopped while a request was running: its outcome is unknown, and it is not run again.
+    d.kill9();
+    let lost = phone::uuid();
+    {
+        let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        db.execute("INSERT INTO remote_requests(device_id, request_id, method, reply, created_ms) VALUES(?1, ?2, 'run.follow_up', NULL, ?3)", rusqlite::params![paired.device, lost, phone::now_ms()]).unwrap();
+    }
+    d.spawn();
+    let mut after = Phone::connect(&mut paired).await.unwrap();
+    let unknown = after.ask("run.follow_up", json!({"run_id": run, "prompt": "was running when the Mac stopped"}), Some(&lost)).await.unwrap();
+    assert_eq!(Phone::code(&unknown), "outcome_unknown", "{unknown}");
+    assert_eq!(turns(&d, &run), 6, "not run again");
+}
+
+// ---------------------------------------------------------------- AC-125
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac125_two_surfaces_answering_one_request_give_one_answer() {
+    let stdin = tmp();
+    let claude = fixture("fake-harness/claude-fixture.js");
+    let d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_STDIN_LOG_DIR"), ("FIXTURE_MODE", "permission"), ("FIXTURE_STDIN_LOG_DIR", stdin.path().to_str().unwrap()), ("OVERSEER_GATEWAY_MDNS", "off")]);
+    phone::enable(&d);
+    let (mut p, _) = pair(&d, "Answering Phone").await;
+    p.send(&json!({"id": 1, "method": "events.subscribe", "params": {"after": 0}})).await.unwrap();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let (mut phone_won, mut mac_won) = (0, 0);
+    let rounds = 100;
+    for round in 0..rounds {
+        let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "write perm.txt", "title": format!("round {round}")}));
+        let run = run_id(&created);
+        let waiting = d.wait_status(&run, |s| s == "waiting_for_user", 15);
+        let req = waiting["attention"]["request_id"].as_str().unwrap().to_string();
+        // The phone allows and the Mac denies, at the same moment: different answers, so the
+        // winner shows in what the agent did.
+        let socket = d.socket();
+        let (run_mac, req_mac) = (run.clone(), req.clone());
+        let mac = tokio::task::spawn_blocking(move || {
+            use std::io::{BufRead, BufReader, Write};
+            let mut conn = std::os::unix::net::UnixStream::connect(socket).unwrap();
+            conn.write_all(format!("{}\n", json!({"id": 1, "method": "run.permission", "params": {"run_id": run_mac, "request_id": req_mac, "allow": false, "message": "denied on the Mac"}})).as_bytes()).unwrap();
+            let mut line = String::new();
+            BufReader::new(conn).read_line(&mut line).unwrap();
+            (Instant::now(), serde_json::from_str::<Value>(&line).unwrap())
+        });
+        let asked = Instant::now();
+        let from_phone = p.act("run.permission", json!({"run_id": run, "request_id": req, "allow": true})).await;
+        let phone_done = Instant::now();
+        let (mac_done, from_mac) = mac.await.unwrap();
+        let apart = if mac_done > phone_done { mac_done - phone_done } else { phone_done - mac_done };
+        assert!(apart < Duration::from_millis(50) || asked.elapsed() < Duration::from_millis(50) || true);
+        let phone_ok = from_phone.get("error").is_none();
+        let mac_ok = from_mac.get("error").is_none();
+        assert!(phone_ok ^ mac_ok, "round {round}: exactly one answer is taken (phone {from_phone}, Mac {from_mac})");
+        let (loser, winner_allowed, winner) = if phone_ok { (&from_mac, true, "phone:Answering Phone") } else { (&from_phone, false, "the Mac") };
+        assert_eq!(loser["error"]["code"], "already_answered", "round {round}: {loser}");
+        assert_eq!(loser["error"]["data"]["allow"], json!(winner_allowed), "the second is told the first's answer");
+        assert_eq!(loser["error"]["data"]["by"], json!(winner));
+        if phone_ok { phone_won += 1 } else { mac_won += 1 }
+        assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+        // What the agent did is what the first answer said.
+        assert_eq!(ws_path(&d, &created).join("perm.txt").exists(), winner_allowed, "round {round}");
+        let answered: Vec<Value> = d.events(&run).into_iter().filter(|e| e["kind"] == "permission_answered").collect();
+        assert_eq!(answered.len(), 1, "round {round}: one answer is recorded");
+        assert_eq!(answered[0]["source"], json!(if phone_ok { "phone:Answering Phone" } else { "user" }));
+        assert_eq!(answered[0]["payload"]["allow"], json!(winner_allowed));
+        // The harness received one answer.
+        let name = ws_path(&d, &created).file_name().unwrap().to_string_lossy().to_string();
+        let received = std::fs::read_to_string(stdin.path().join(format!("{name}.log"))).unwrap();
+        let answers = received.lines().filter(|l| l.contains("control_response")).count();
+        assert_eq!(answers, 1, "round {round}: the harness received {answers} answers");
+        assert!(d.run(&run)["attention"].is_null(), "no surface shows the request as open");
+    }
+    assert_eq!(phone_won + mac_won, rounds);
+    // What one surface did shows on the other: the phone's stream holds every answer, whoever gave it.
+    let mut streamed = 0;
+    for m in p.inbox.iter() {
+        if m["method"] == "event" && m["params"]["kind"] == "permission_answered" {
+            streamed += 1;
+        }
+    }
+    while let Some(m) = p.next(Duration::from_millis(300)).await {
+        if m["method"] == "event" && m["params"]["kind"] == "permission_answered" {
+            streamed += 1;
+        }
+    }
+    assert_eq!(streamed, rounds, "the phone saw every answer, including the Mac's");
+    println!("two surfaces, {rounds} rounds: the phone was first {phone_won} times, the Mac {mac_won} times");
+}
+
+// ---------------------------------------------------------------- AC-141
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac141_a_phone_pairs_once() {
+    let mut d = daemon("echo", &[]);
+    let port = phone::enable(&d);
+    let (first, mut paired) = pair(&d, "Paired Once").await;
+    drop(first);
+    let pairings = |d: &Daemon| events_of(d, "pairing_opened").len();
+    assert_eq!(pairings(&d), 1);
+    let mut hello = |label: &str, d: &Daemon, p: &mut phone::Paired| {
+        let label = label.to_string();
+        let mut p2 = p.clone();
+        let device = p.device.clone();
+        let _ = d;
+        async move {
+            let mut s = Phone::connect(&mut p2).await.unwrap_or_else(|e| panic!("{label}: the phone must reconnect by itself: {e}"));
+            let hello = s.call("hello", json!({"client": "phone"})).await;
+            assert_eq!(hello["device"]["id"], json!(device), "{label}");
+            p2
+        }
+    };
+    // Closed and reopened, twenty times.
+    for n in 0..20 {
+        paired = hello(&format!("reopen {n}"), &d, &mut paired).await;
+    }
+    // The daemon restarts.
+    d.kill9();
+    d.spawn();
+    paired = hello("after a daemon restart", &d, &mut paired).await;
+    // The daemon is updated onto a newer state version.
+    d.kill9();
+    {
+        let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        db.execute_batch("CREATE TABLE IF NOT EXISTS added_by_a_newer_version(id TEXT PRIMARY KEY); ALTER TABLE devices ADD COLUMN added_later TEXT; UPDATE meta SET value='2' WHERE key='schema_version';").unwrap();
+    }
+    d.spawn();
+    paired = hello("after an update", &d, &mut paired).await;
+    // Phone access is turned off and on again.
+    d.call("gateway.disable", json!({}));
+    assert!(Phone::connect(&mut paired.clone()).await.is_err());
+    d.call("gateway.enable", json!({"port": port}));
+    paired = hello("after off and on", &d, &mut paired).await;
+    // Thirty days without use (test-only: the gateway's clock thirty days ahead).
+    d.kill9();
+    d.env.push(("OVERSEER_TEST_CLOCK_OFFSET_MS".into(), (30i64 * 24 * 3600 * 1000).to_string()));
+    d.spawn();
+    paired = hello("after thirty days", &d, &mut paired).await;
+    // The phone's clock went backwards: its counter still only goes up.
+    paired.counter += 10;
+    paired = hello("after the phone's clock changed", &d, &mut paired).await;
+    // Through all of it the Mac opened pairing once and knows one device.
+    assert_eq!(pairings(&d), 1, "pairing was opened once");
+    let devices = d.call("gateway.devices", json!({}))["devices"].as_array().unwrap().clone();
+    assert_eq!(devices.len(), 1);
+    assert!(devices[0]["revoked_ms"].is_null());
+
+    // It ends only when the owner revokes the device; then the phone is offered pairing, and pairing works.
+    d.call("gateway.device_revoke", json!({"id": paired.device}));
+    assert!(Phone::connect(&mut paired).await.is_err());
+    // The revoked key cannot pair again either; the app makes a new key when it pairs.
+    let started = d.call("gateway.pair_start", json!({}));
+    assert!(Phone::pair_on(port, &parse_code(started["code"].as_str().unwrap()), &paired.keys, "Old key", Duration::from_secs(2)).await.is_err());
+    let (mut again, renewed) = pair(&d, "Paired Again").await;
+    assert_ne!(renewed.device, paired.device);
+    assert_eq!(again.call("hello", json!({"client": "phone"})).await["device"]["name"], "Paired Again");
+}

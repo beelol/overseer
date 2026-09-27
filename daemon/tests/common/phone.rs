@@ -128,7 +128,7 @@ impl Phone {
         let n = hs.read_message(&reply, &mut payload).map_err(|e| format!("message 2: {e}"))?;
         let hello: Value = serde_json::from_slice(&payload[..n]).map_err(|e| e.to_string())?;
         let transport = hs.into_transport_mode().map_err(|e| e.to_string())?;
-        Ok(Self { ws, transport, opener: noise::Opener::new(64 << 20), next_id: 1, inbox: Vec::new(), hello })
+        Ok(Self { ws, transport, opener: noise::Opener::new(64 << 20), next_id: 1000, inbox: Vec::new(), hello })
     }
 
     /// The pairing handshake. Waits while the owner decides.
