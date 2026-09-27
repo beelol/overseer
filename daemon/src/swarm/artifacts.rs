@@ -304,12 +304,12 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
     if current["revision"] != revision {
         bail!("stale plan revision");
     }
-    let (attempt_status, attempt_revision): (String, i64) = store
+    let (attempt_status, attempt_revision, executor): (String, i64, String) = store
         .conn
         .query_row(
-            "SELECT status,revision FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3",
+            "SELECT status,revision,executor FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3",
             params![attempt, run, job],
-            |r| Ok((r.get(0)?, r.get(1)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )
         .optional()?
         .ok_or_else(|| anyhow!("unknown attempt"))?;
@@ -318,6 +318,15 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
     }
     if attempt_status != "registered" {
         bail!("attempt cannot finish in this state");
+    }
+    if executor == "director" {
+        super::owner::require(store,run,p)?;
+        let reviewed = store.conn.prepare(
+            "SELECT 1 FROM swarm_decisions WHERE run_id=?1 AND job_id=?2 AND attempt_id=?3",
+        )?.exists(params![run,job,attempt])?;
+        if !reviewed {
+            bail!("director job has not been accepted or rejected");
+        }
     }
     let linked: Option<(Option<String>,Option<String>,Option<i64>)> = store.conn.query_row(
         "SELECT l.overseer_run_id,r.status,r.ended_ms FROM swarm_worker_launches l

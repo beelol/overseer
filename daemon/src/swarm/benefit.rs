@@ -318,8 +318,12 @@ pub fn commit(store: &mut Store, p: &Value) -> Result<Value> {
     }
     let mut result = preview(&estimate)?;
     if concurrent_cap == 0 {
-        result["decision"] = json!("blocked");
-        result["reason"] = json!("global_agent_limit");
+        if result["decision"] == "serial" {
+            result["reason"] = json!("director_self_only");
+        } else {
+            result["decision"] = json!("blocked");
+            result["reason"] = json!("global_agent_limit");
+        }
     } else if concurrent_cap == 1 && result["reason"] == "worker_limit" {
         result["reason"] = json!("global_agent_limit");
     }

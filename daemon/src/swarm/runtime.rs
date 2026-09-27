@@ -257,6 +257,12 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
     {
         let store = d.store.lock().unwrap();
         attempt_revision = broker::check_attempt(&store, run, job, attempt, token)?;
+        let executor: String = store.conn.query_row(
+            "SELECT executor FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3",
+            params![attempt,run,job], |r| r.get(0))?;
+        if executor != "worker" {
+            bail!("director-executed attempt cannot launch a worker");
+        }
         let current = get(&store, run)?;
         let prior: Option<(String,Option<String>,Option<String>)> = store.conn.query_row(
             "SELECT l.request_sha256,l.overseer_run_id,

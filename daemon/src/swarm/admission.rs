@@ -48,6 +48,15 @@ fn admit_inner(
     let run = required(p, "run_id")?;
     let job = required(p, "job_id")?;
     let target = required(p, "target_id")?;
+    let director_self = p["purpose"] == "director_self";
+    if director_self {
+        // A director-executed job is the one-slot serial path, not a way for
+        // the scheduler to create an uncounted worker process.
+        if scheduled.is_some() {
+            bail!("scheduled admission cannot execute inside the director");
+        }
+        super::owner::require(store,run,p)?;
+    }
     let request_id = required(p, "request_id")?;
     if request_id.is_empty() || request_id.len() > 128 {
         bail!("invalid admission request id");
@@ -329,7 +338,22 @@ fn admit_inner(
     } else {
         0
     };
-    if app_active + pending_slots + new_director >= app_limit {
+    if director_self {
+        if app_limit != 1 || app_active != 1 || pending_slots != 0 {
+            return Ok(blocked("director_self_requires_one_slot"));
+        }
+        let linked_harness: Option<String> = tx.query_row(
+            "SELECT r.harness FROM swarm_director_owners o JOIN runs r ON r.id=o.overseer_run_id
+             WHERE o.run_id=?1 AND o.generation=?2 AND o.status='active'
+             AND o.supervised_launch=1 AND r.run_dir IS NOT NULL
+             AND r.status IN ('queued','starting','running','waiting_for_user')
+             AND r.ended_ms IS NULL",
+            params![run,generation], |r| r.get(0),
+        ).optional()?;
+        if linked_harness.as_deref() != candidate["harness"].as_str() {
+            return Ok(blocked("director_route_not_linked"));
+        }
+    } else if app_active + pending_slots + new_director >= app_limit {
         return Ok(blocked("global_agent_limit"));
     }
     let growth: Option<(i64, i64)> = tx
@@ -451,7 +475,9 @@ fn admit_inner(
         if decision == "blocked" {
             return Ok(blocked("benefit_no_affordable_plan"));
         }
-        if workers >= cap {
+        let serial_in_director = director_self && decision == "serial"
+            && cap == 0 && workers == 0;
+        if workers >= cap && !serial_in_director {
             return Ok(blocked(if decision == "serial" {
                 "benefit_serial"
             } else {
@@ -479,8 +505,9 @@ fn admit_inner(
     }
     let attempt_id = format!("att-{}", &uuid::Uuid::new_v4().simple().to_string()[..16]);
     let token = uuid::Uuid::new_v4().simple().to_string();
-    tx.execute("INSERT INTO swarm_attempts(id,run_id,job_id,revision,token_sha256,status,created_ms) VALUES(?1,?2,?3,?4,?5,'registered',?6)",
-        params![attempt_id,run,job,job_revision,hash(&token),now])?;
+    tx.execute("INSERT INTO swarm_attempts(id,run_id,job_id,revision,token_sha256,status,executor,created_ms) VALUES(?1,?2,?3,?4,?5,'registered',?6,?7)",
+        params![attempt_id,run,job,job_revision,hash(&token),
+            if director_self { "director" } else { "worker" },now])?;
     if let Some((wave, estimate_elapsed_ms, estimate_usage_milli)) = benefit_assignment {
         tx.execute("INSERT INTO swarm_benefit_attempt_outcomes(attempt_id,run_id,revision,wave,job_id,estimate_elapsed_ms,estimate_usage_milli)
             VALUES(?1,?2,?3,?4,?5,?6,?7)",
@@ -533,6 +560,7 @@ fn admit_inner(
     tx.commit()?;
     Ok(
         json!({"status":"admitted","attempt_id":attempt_id,"token":token,"target_id":target,
+        "executor":if director_self { "director" } else { "worker" },
         "allocation_milli":chosen.first().map(|w|w.3),"reservation_windows":chosen.len()}),
     )
 }

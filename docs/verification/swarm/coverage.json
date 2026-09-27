@@ -67,9 +67,11 @@
         "docs/verification/swarm/SWARM-08.md",
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/swarm_director_process.rs",
-        "test/ui/scenario-swarm-scale.js"
+        "test/ui/scenario-swarm-scale.js",
+        "daemon/tests/swarm_director_loop.rs",
+        "fixtures/swarm/director-loop-v1/serial.py"
       ],
-      "blocker": "The app setting is the total-agent ceiling; fixtures cover manual reservations, native-child exclusion, lower-limit drain, a supervised director plus 32 live workers at a 33-slot cap, and a supervised director plus two live workers at a three-slot cap with slot reuse only after confirmed exit. Separate reviewer/watch execution, Overseer-started admission and metering, and max=1 serial director work remain unverified."
+      "blocker": "The app setting is the total-agent ceiling; fixtures cover manual reservations, native-child exclusion, lower-limit drain, a supervised director plus 32 live workers at a 33-slot cap, a supervised director plus two live workers at a three-slot cap with confirmed-exit reuse, and a one-slot scripted director completing its own metered job without a worker launch. Separate reviewer/watch and Overseer-started admission, coordinating-run allowance accounting, live-harness qualification, and director-self crash/Stop recovery remain unverified."
     },
     "SWARM-08": {
       "status": "partial",

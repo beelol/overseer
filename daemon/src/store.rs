@@ -146,9 +146,9 @@ impl Store {
         Ok(())
     }
 
-    /// App slots: one per active top-level run, one per registered Swarm attempt
-    /// without an active run, and one per active director. Native children are
-    /// already represented by their parent run and never consume another slot.
+    /// App slots: one per active top-level run, one per registered Swarm worker
+    /// attempt, and one per active director. A director-executed serial attempt
+    /// shares the director's slot; native children share their parent's slot.
     pub fn active_agent_count(&self) -> Result<i64> {
         Ok(self.conn.query_row(
             "SELECT
@@ -160,7 +160,7 @@ impl Store {
                AND NOT EXISTS (SELECT 1 FROM swarm_director_owners o
                  JOIN swarm_runs s ON s.id=o.run_id
                  WHERE o.overseer_run_id=r.id AND s.status IN ('running','paused','stalled','stopping')))
-              + (SELECT COUNT(*) FROM swarm_attempts WHERE status='registered')
+              + (SELECT COUNT(*) FROM swarm_attempts WHERE status='registered' AND executor='worker')
               + (SELECT COUNT(*) FROM swarm_runs
                  WHERE status IN ('running','paused','stalled','stopping'))",
             [], |row| row.get(0)
@@ -179,7 +179,7 @@ impl Store {
                JOIN swarm_runs s ON s.id=o.run_id
                WHERE o.overseer_run_id=r.id AND s.status IN ('running','paused','stalled','stopping'))
              UNION ALL SELECT id,job_id,status,'swarm_worker' FROM swarm_attempts
-               WHERE status='registered'
+               WHERE status='registered' AND executor='worker'
              UNION ALL SELECT id,category,status,'swarm_director' FROM swarm_runs
                WHERE status IN ('running','paused','stalled','stopping')"
         )?;

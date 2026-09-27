@@ -113,6 +113,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           revision INTEGER NOT NULL,
           token_sha256 TEXT NOT NULL,
           status TEXT NOT NULL,
+          executor TEXT NOT NULL DEFAULT 'worker' CHECK(executor IN ('worker','director')),
           created_ms INTEGER NOT NULL,
           FOREIGN KEY(run_id,job_id) REFERENCES swarm_jobs(run_id,id)
         );
@@ -479,6 +480,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         conn.execute_batch("ALTER TABLE swarm_worker_launches ADD COLUMN launch_phase TEXT CHECK(launch_phase IN ('reserved','linked','spawn_requested'));
             UPDATE swarm_worker_launches SET launch_phase='reserved' WHERE overseer_run_id IS NULL;")?;
     }
+    let has_attempt_executor = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_attempts') WHERE name='executor'")?
+        .exists([])?;
+    if !has_attempt_executor {
+        conn.execute_batch("ALTER TABLE swarm_attempts ADD COLUMN executor TEXT NOT NULL DEFAULT 'worker' CHECK(executor IN ('worker','director'));")?;
+    }
     let has_source_change_permission = conn
         .prepare(
             "SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='source_change_permission'",
@@ -633,6 +640,23 @@ pub fn migrate(conn: &Connection) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn existing_registered_attempts_remain_worker_attempts_after_upgrade() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE swarm_attempts(
+            id TEXT PRIMARY KEY,run_id TEXT NOT NULL,job_id TEXT NOT NULL,
+            revision INTEGER NOT NULL,token_sha256 TEXT NOT NULL,status TEXT NOT NULL,
+            created_ms INTEGER NOT NULL);
+            INSERT INTO swarm_attempts VALUES('old-attempt','old-run','old-job',1,'digest','registered',1);")
+            .unwrap();
+        migrate(&conn).unwrap();
+        let (executor,status): (String,String) = conn.query_row(
+            "SELECT executor,status FROM swarm_attempts WHERE id='old-attempt'",
+            [],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+        assert_eq!((executor.as_str(),status.as_str()),("worker","registered"));
+        migrate(&conn).unwrap();
+    }
 
     #[test]
     fn old_admission_has_no_launchable_harness_binding_after_migration() {

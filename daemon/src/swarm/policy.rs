@@ -79,8 +79,9 @@ pub fn preview(p: &Value) -> Result<Value> {
     if snapshot.version == 0 || snapshot.observed_ms > request.now_ms {
         bail!("invalid snapshot version or observation time");
     }
-    if request.purpose != "worker" && request.purpose != "finishing" {
-        bail!("purpose must be worker or finishing");
+    if request.purpose != "worker" && request.purpose != "finishing"
+        && request.purpose != "director_self" {
+        bail!("purpose must be worker, director_self or finishing");
     }
     if !(1..=100).contains(&request.allocation_percent)
         || !(1..=100).contains(&request.finishing_reserve_percent)
