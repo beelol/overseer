@@ -1,34 +1,34 @@
 {
   "claude": {
     "model": "haiku",
-    "run": "r-f8558c8de899",
-    "status": "completed",
+    "run": "r-05b25e67ecbd",
+    "status": "failed",
     "turns": [
       {
-        "ended_ms": 1790412948714,
-        "id": "u-0177f062507d",
+        "ended_ms": 1790467473848,
+        "id": "u-1ee016025fe7",
         "n": 1,
         "prompt": "Reply with exactly: hi from claude",
-        "run_id": "r-f8558c8de899",
-        "snapshot_id": "s-f47fa6ce1d34",
-        "started_ms": 1790412946111,
-        "status": "completed"
+        "run_id": "r-05b25e67ecbd",
+        "snapshot_id": "s-46402fd4a043",
+        "started_ms": 1790467472889,
+        "status": "failed"
       },
       {
-        "ended_ms": 1790412952428,
-        "id": "u-c65d9ab90ec2",
+        "ended_ms": 1790467475048,
+        "id": "u-582886152caf",
         "n": 2,
         "prompt": "Reply with exactly: follow-up received",
-        "run_id": "r-f8558c8de899",
-        "snapshot_id": "s-b14264ea8788",
-        "started_ms": 1790412949485,
-        "status": "completed"
+        "run_id": "r-05b25e67ecbd",
+        "snapshot_id": "s-8cc542b000fd",
+        "started_ms": 1790467474661,
+        "status": "failed"
       }
     ]
   },
   "codex": {
     "model": "gpt-5.6-luna",
-    "run": "r-9c8dcfa92696",
-    "status": "completed"
+    "run": "r-e00c66bfdb49",
+    "status": "running"
   }
 }

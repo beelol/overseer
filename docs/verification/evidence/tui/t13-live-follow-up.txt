@@ -1,11 +1,23 @@
- ◆ Overseer  page 1/1 · 2 agents                                                                                                                    ● connected 
-╭ 1 ✓ Live Codex hello ───────────────────────────── codex · gpt-5.6-luna · 4s ╮┏ 2 ✓ Live Claude hello ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ claude · haiku · 6s ┓
+ ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                       ● connected 
+╭ 1 ● Live Codex hello ───────────────────────────── codex · gpt-5.6-luna · 3s ╮┏ 2 ✗ Live Claude hello ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ claude · haiku · 2s ┓
 │ › Reply with exactly: hi from codex                                          │┃ › Reply with exactly: hi from claude                                         ┃
-│ Reading additional input from stdin...                                       │┃ hi from claude                                                               ┃
-│ hi from codex                                                                │┃ ■ done · 10 in / 43 out / $0.02                                              ┃
-│ ■ done · 17.4k in / 8 out                                                    │┃ › Reply with exactly: follow-up received                                     ┃
-│                                                                              │┃ follow-up received                                                           ┃
-│                                                                              │┃ ■ done · 10 in / 45 out / $0.06                                              ┃
+│ hi from codex                                                                │┃ ✖ auth: Failed to authenticate: OAuth session expired and could not be       ┃
+│                                                                              │┃   refreshed                                                                  ┃
+│                                                                              │┃ ✖ auth: Failed to authenticate: OAuth session expired and could not be       ┃
+│                                                                              │┃   refreshed                                                                  ┃
+│                                                                              │┃ ■ failed: Failed to authenticate: OAuth session expired and could not be     ┃
+│                                                                              │┃   refreshed · 0 in / 0 out / $0.00                                           ┃
+│                                                                              │┃ · failed: exit code 1; last error [auth]: Failed to authenticate: OAuth      ┃
+│                                                                              │┃   session expired and could not be refreshed                                 ┃
+│                                                                              │┃ › Reply with exactly: follow-up received                                     ┃
+│                                                                              │┃ ✖ auth: Failed to authenticate: OAuth session expired and could not be       ┃
+│                                                                              │┃   refreshed                                                                  ┃
+│                                                                              │┃ ✖ auth: Failed to authenticate: OAuth session expired and could not be       ┃
+│                                                                              │┃   refreshed                                                                  ┃
+│                                                                              │┃ ■ failed: Failed to authenticate: OAuth session expired and could not be     ┃
+│                                                                              │┃   refreshed · 0 in / 0 out / $0.00                                           ┃
+│                                                                              │┃ · failed: exit code 1; last error [auth]: Failed to authenticate: OAuth      ┃
+│                                                                              │┃   session expired and could not be refreshed                                 ┃
 │                                                                              │┃                                                                              ┃
 │                                                                              │┃                                                                              ┃
 │                                                                              │┃                                                                              ┃
@@ -28,17 +40,5 @@
 │                                                                              │┃                                                                              ┃
 │                                                                              │┃                                                                              ┃
 │                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-│                                                                              │┃                                                                              ┃
-╰ completed ───────────────────────────────────────────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+╰──────────────────────────────────────────────────────────────────────────────╯┗ failed · exit code 1; last error [auth]: Failed … ━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
  Sent to Live Claude hello                                                                                                                                      
