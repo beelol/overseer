@@ -1098,7 +1098,239 @@ rec(114, "Gate K in the owner's VS Code (owner-confirmed)", "not started", date=
     expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
     actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
 
+# Gate N, phone remote on the same network (added by the owner on 2026-09-26; docs/rfcs/phone-remote.md). Not started; built in its own worktree and pull request.
+rec(115, "Feasibility and reuse before lock-in", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(116, "A gateway switched on and off on the desktop", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(117, "Pairing needs the Mac", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(118, "Encrypted and mutually authenticated", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(119, "Devices, scopes and revoking", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(120, "Found on the network", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(121, "Never lose the session", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(122, "Sent exactly once", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(123, "The Mac stays awake while it matters", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(124, "See every agent", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(125, "Control every agent", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(126, "Review on the phone", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(127, "Everything else Overseer has", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(128, "Talk to Overseer from the phone", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(129, "Needs-you notifications you can switch", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(130, "Safe without friction", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(131, "One app, iOS and Android, that looks like Overseer", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(132, "Regression coverage for the phone", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(133, "Phone session (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(134, "Platform behaviour behind generic interfaces", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(135, "Hyper fast", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(136, "The door", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(137, "Motion throughout", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+
+# Gate L addition (Continuity): permission modes on handoff.
+rec(138, "Permission modes carry over", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#permission-modes-carry-over-ac-138).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(139, "OpenCode session transport spike", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(140, "Memory safety guard", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+# Gate N addition: pair once (the owner's decision of 2026-09-26).
+rec(141, "Pair once", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+
+# Brand (added by the owner on 2026-09-26; docs/design/brand.md). Not started: waits for the owner's image files.
+rec(142, "One Overseer mark everywhere", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
+    actual="Not started.", live="—", blocker="Not started: the owner's two images need to be added to docs/design/brand/ as files; then the single-colour glyph is drawn for VS Code and approved.")
+
+# Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code are built in pull
+# request #5 and the terminal UI (T-23, T-24) in pull request #6. Neither is merged yet, so the evidence links point at
+# the commits on their branches.
+rec(143, "Opt-in audio cues owned by the daemon", "verified", date="2026-09-26",
+    commit="106d3e8 (branch codex/reactor-audio-mode, pull request #5, not merged yet)",
+    harness="Fixture harnesses only (Claude fixture, Codex app-server fixture, generic programs); no paid tokens. Live playback through macOS `afplay` and `say`",
+    fixture="Real Git repositories created per test; isolated OVERSEER_HOME; isolated VS Code profile for the UI scenario. The owner-approved pack was read through a copy the owner made of it, because the agent's tools cannot read the folder the voice lab is in",
+    steps="""1. `CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline -- --test-threads=1` (unit tests in `daemon/src/audio.rs`, protocol tests in `daemon/tests/audio.rs` and `daemon/tests/protocol.rs`).
+2. `npm run check --prefix extension` and `git diff --check origin/main HEAD`.
+3. `python3 docs/verification/evidence/audio-mode/check-pack.py --approved <owner-approved folder>`: decodes every MP3 with ffmpeg, measures it, compares it with the manifest, the pack's README and the approved folder, and lists the audio files Git tracks.
+4. `node docs/verification/evidence/audio-mode/live-playback.js`: a release `overseerd` with its own home and no test sink; the script watches the daemon's child processes while agents run and previews are requested. It plays real sound.
+5. `node extension/scripts/package.js`, then `node test/ui/scenario-audio.js`: the packaged VSIX in VS Code with two Claude fixture agents that ask for permission at the same moment; cues go to a log instead of the speakers so they can be counted.
+6. `git merge-tree --write-tree origin/main HEAD`.""",
+    expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
+    actual="""- **Tests:** 81 passed, 0 failed: 16 unit, 15 audio protocol, 50 protocol.
+- **Off until asked:** off on a new install and kept across a daemon kill; while off a finished agent starts no player and no `audio` folder exists (test, live and in VS Code).
+- **Daemon-owned:** with no UI client a root's start and completion play once each; with two clients attached its failure plays once; with VS Code closed a new agent's start and completion play once each.
+- **What makes a sound:** a nested Codex child completes while its root waits and makes no sound; the run plays start, attention and completion, three cues in all. A permission request and its waiting status play one cue. An authentication failure plays one attention cue and no completion cue.
+- **Simultaneous needs:** two permission requests released together play one cue; `state` holds two waiting roots; VS Code shows 2 on *Needs you*, on the Overseer icon and in the status bar.
+- **Bounds:** routine queue 4, urgent queue 2, attention history at most 1,024 runs. Live: of 40 preview requests in a burst 5 were accepted (one playing, four queued) and 35 refused; never more than one player process; the daemon's resident size was 8,528 KB before the burst and 8,528 KB after.
+- **Reactor:** 12 MP3s, 31,488 bytes, longest 0.365 s, all decode; each is byte-identical to the approved file and to its SHA-256 in the manifest, which a unit test compares with the bytes built into the daemon. Live: `afplay` plays from an owner-only cache (folder 700, files 600) holding only the cues played, identical to the bundled files; a cached cue from another pack is replaced.
+- **System voice:** `say -v Daniel "Agent started."` ran on the Mac (185 installed voices listed); a voice that is not installed is refused.
+- **Commander:** refused before a folder is chosen; a folder that is not a pack is refused with the reason (the missing file is named); then `afplay` played `<private folder>/agent_complete/transmission/commander.wav` where it is; no WAV under the daemon's folder or in the repository; the private files unchanged. Git tracks 12 audio files, all in the pack, and no Commander path.
+- **Failing quietly:** with the cache blocked, or the Commander folder removed, the agent completes and the failure is in the daemon log; an unknown cue key is refused.
+- **Other platforms:** with the players taken away by a test switch the daemon reports `available: false`, refuses to turn on, to preview and to list voices, and an agent completes in silence even when the setting was already on.
+- **VS Code:** the Agents title bar is unchanged from main (New Agent, Search Agents, Toggle Agent Grid, VS Code's Collapse All); *Audio Mode and Reactor Cues…* is in the overflow menu; turning on, choosing a track and a preview go through the daemon. 10 of 10 checks.
+- **Merge:** the virtual merge of the branch into main is clean.""",
+    evidence="[requirement by requirement](https://github.com/beelol/overseer/blob/0d01397/docs/verification/audio-mode.md), [daemon tests](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/cargo-test-overseerd.txt), [extension and whitespace checks](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/extension-check.txt), [pack check](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/pack-check.txt), [live playback](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/live-playback.txt), [VS Code scenario](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/ui/audio/result.json)",
+    live="Live macOS playback (`afplay`, `say`) and the packaged VSIX in VS Code; agents are fixtures.",
+    limits="Not merged: the feature is on the branch of pull request #5. macOS only; no other platform was run (the unavailable path is exercised on macOS through a test switch; Linux belongs to AC-41). The Commander check used three generated beeps in a temporary private folder; the owner's recordings were not read. The pack was compared with the owner's copy of the approved folder. Nobody listened: that is AC-145.")
+rec(144, "A lost session asks for attention", "verified", date="2026-09-26",
+    commit="106d3e8 (branch codex/reactor-audio-mode, pull request #5, not merged yet)",
+    harness="Generic fixture programs; no accounts, no paid tokens",
+    fixture="Real Git repositories created per test; isolated OVERSEER_HOME; the daemon writes each cue it would play to a log",
+    steps="""`CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline --test audio -- --test-threads=1`, three protocol tests:
+1. `a_lost_session_plays_one_attention_cue`: Audio Mode on; a top-level agent runs; its supervisor is killed.
+2. `an_agent_stopped_on_request_stays_silent`: a running agent is interrupted.
+3. `a_session_lost_while_the_daemon_was_down_makes_no_sound`: the daemon, the agent and its supervisor are killed; the daemon starts again.""",
+    expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
+    actual="""- **Lost while the daemon runs:** the run becomes `disconnected`; the log holds the start cue and exactly one `agent_needs_attention`, also 500 ms after the agent itself is gone.
+- **Stopped on request:** `interrupted`; the log holds the start cue only.
+- **Lost while the daemon was down:** after the restart the run reads `disconnected` with "lost" as its reason, Audio Mode is still on, and 800 ms later the log still holds the start cue only.
+- The daemon already behaved this way; nothing in it changed for this criterion.""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/cargo-test-overseerd.txt), [requirement by requirement](https://github.com/beelol/overseer/blob/0d01397/docs/verification/audio-mode.md)",
+    live="Fixtures with a real daemon.",
+    limits="Not merged: the tests are on the branch of pull request #5. A lost child agent staying silent is covered by AC-143's nested-child test, not by a test of its own here.")
+rec(145, "Audio Mode by ear (owner-confirmed)", "partial", date="2026-09-27 (the owner's session)",
+    commit="106d3e8 (branch codex/reactor-audio-mode, pull request #5, not merged yet)",
+    proven="in the owner's session of 2026-09-27 the owner marked all twelve Reactor cues Right, heard start, completion and attention from fixture agents with Audio Mode on and VS Code open, and heard nothing from the same agents with Audio Mode off",
+    deferred="four steps the session did not do: start, completion and attention with VS Code closed; two agents at the same moment; System voice; the owner's own Commander folder. The record says yes to them, but the session's log shows that the window was never quit, that `t` and `v` were not pressed and that no folder was set",
+    harness="Fixture agents only (generic programs and the Claude fixture); no accounts, no paid tokens",
+    fixture="`node test/ui/listen-audio.js` on the branch of pull request #5: VS Code with its own profile and its own Overseer home, so the owner's VS Code, daemon and agents are not touched",
+    steps="""The owner's listening session, about ten minutes, on the branch of pull request #5. What is still to do is steps 4 to 6.
+1. `node extension/scripts/package.js`, then `node test/ui/listen-audio.js`. A VS Code window opens; the keys below are typed in the terminal. Set the volume to what you work with.
+2. `o` turns Audio Mode on. `1` to `9`, `a`, `b`, `c` preview the twelve Reactor cues.
+3. `s`: an agent starts and completes 3 s later (start, then complete). `n`: an agent asks for permission (start, then attention). `t`: two agents ask at the same moment (one attention cue; VS Code counts 2).
+4. For your Commander folder, choose *Audio Mode and Reactor Cues…* in the Agents view's menu of that window, then *Import private Commander pack…* and your folder. `p` selects the track; press `s` and `n`. The files stay where they are.
+5. `v` switches to System voice; press `s` and `n`. `r` goes back to Reactor.
+6. Quit that VS Code window (Cmd+Q in it) and press `s` and `n` again: the cues still play.
+7. `f` turns Audio Mode off; `s` and `n` must be silent.
+8. `m` plays each cue again and asks for its mark (Right or Needs work), then asks what you heard, only for the steps this session did, and writes the session's record to `docs/verification/evidence/ui/audio-listening/`. `q` closes the window, the agents and the session's daemon.""",
+    expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
+    actual="""- **The twelve cues:** each was played and marked; all twelve are *Right*. Nothing needs replacing.
+- **With Audio Mode on, VS Code open:** the session turned it on, started an agent that completed and one that asked for permission; the owner heard start, completion and attention.
+- **With Audio Mode off:** the session turned it off and started an agent that completed and two that asked for permission; the owner heard nothing.
+- **Not done in the session:** VS Code closed (the window stayed open until the session quit), two agents at the same moment (`t` was not pressed), System voice (`v` was not pressed), the Commander folder (none was set). The script of that session asked about every step, done or not, and the record holds a yes for these four; the evidence sets each answer beside the session's log.
+- The script has since been changed to ask only about the steps a session did and to keep each session's record.""",
+    evidence="[the owner's record and what its session did](https://github.com/beelol/overseer/blob/2ec98c9/docs/verification/evidence/ui/audio-listening/README.md), [marks.json](https://github.com/beelol/overseer/blob/2ec98c9/docs/verification/evidence/ui/audio-listening/marks.json), [the session script](https://github.com/beelol/overseer/blob/2ec98c9/test/ui/listen-audio.js)",
+    live="Real sound on the owner's Mac; agents are fixtures.",
+    limits="A cue marked Needs work is replaced only by a file the owner selects in the voice lab; nothing is regenerated here.",
+    blocker="Waits for the owner to hear the four remaining steps (4 to 6 above, and `t`), in a session of a few minutes.")
+
+# Gate P, follow-through (added by the owner on 2026-09-27). Not started.
+rec(146, "Reconcile and merge the work in flight", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(147, "One command runs every test", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(148, "Checks on every pull request", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(149, "A steady UI suite", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(150, "The first click always lands", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(151, "Every live scenario rerun on the current build", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(152, "Performance re-measured", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(153, "A ledger that stays true", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+
+# Gate Q, cover everything and oversee the agents (added by the owner on 2026-09-27). Not started.
+rec(154, "Composer choices fill the row", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(155, "One-line search with a filter menu", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(156, "Every agent works from the same rules", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(157, "Oversee the other agents", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(158, "Gate M's theme and immersive look are back in scope", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(159, "The toolchain works without Xcode's license", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(160, "Owner actions in one place", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(161, "Everything merged into one main", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+
 SHORT_BLOCKERS = {
+    154: "not started (Gate Q, added by the owner on 2026-09-27)",
+    155: "not started (Gate Q, added by the owner on 2026-09-27)",
+    156: "not started (Gate Q, added by the owner on 2026-09-27)",
+    157: "not started (Gate Q, added by the owner on 2026-09-27)",
+    158: "not started (Gate Q, added by the owner on 2026-09-27)",
+    159: "not started (Gate Q, added by the owner on 2026-09-27)",
+    160: "not started (Gate Q, added by the owner on 2026-09-27)",
+    161: "not started (Gate Q, added by the owner on 2026-09-27)",
+    146: "not started (Gate P, added by the owner on 2026-09-27)",
+    147: "not started (Gate P, added by the owner on 2026-09-27)",
+    148: "not started (Gate P, added by the owner on 2026-09-27)",
+    149: "not started (Gate P, added by the owner on 2026-09-27)",
+    150: "not started (Gate P, added by the owner on 2026-09-27)",
+    151: "not started (Gate P, added by the owner on 2026-09-27)",
+    152: "not started (Gate P, added by the owner on 2026-09-27)",
+    153: "not started (Gate P, added by the owner on 2026-09-27)",
+    142: "not started: waits for the owner\'s logo files",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
     41: "deferred: no Linux environment",
@@ -1155,6 +1387,33 @@ SHORT_BLOCKERS = {
     112: "not started (Gate K follow-up from the owner's marks)",
     113: "not started (Gate K follow-up from the owner's marks)",
     114: "not started (Gate K follow-up from the owner's marks)",
+    115: "not started (Gate N, added by the owner on 2026-09-26)",
+    116: "not started (Gate N, added by the owner on 2026-09-26)",
+    117: "not started (Gate N, added by the owner on 2026-09-26)",
+    118: "not started (Gate N, added by the owner on 2026-09-26)",
+    119: "not started (Gate N, added by the owner on 2026-09-26)",
+    120: "not started (Gate N, added by the owner on 2026-09-26)",
+    121: "not started (Gate N, added by the owner on 2026-09-26)",
+    122: "not started (Gate N, added by the owner on 2026-09-26)",
+    123: "not started (Gate N, added by the owner on 2026-09-26)",
+    124: "not started (Gate N, added by the owner on 2026-09-26)",
+    125: "not started (Gate N, added by the owner on 2026-09-26)",
+    126: "not started (Gate N, added by the owner on 2026-09-26)",
+    127: "not started (Gate N, added by the owner on 2026-09-26)",
+    128: "not started (Gate N, added by the owner on 2026-09-26)",
+    129: "not started (Gate N, added by the owner on 2026-09-26)",
+    130: "not started (Gate N, added by the owner on 2026-09-26)",
+    131: "not started (Gate N, added by the owner on 2026-09-26)",
+    132: "not started (Gate N, added by the owner on 2026-09-26)",
+    133: "not started (Gate N, added by the owner on 2026-09-26)",
+    134: "not started (Gate N, added by the owner on 2026-09-26)",
+    135: "not started (Gate N, added by the owner on 2026-09-26)",
+    136: "not started (Gate N, added by the owner on 2026-09-26)",
+    137: "not started (Gate N, added by the owner on 2026-09-26)",
+    138: "not started (Gate L, added by the owner on 2026-09-26)",
+    139: "not started (Gate L, added by the owner on 2026-09-26; the goal's first step)",
+    140: "not started (Gate L, added by the owner on 2026-09-26)",
+    141: "not started (Gate N, added by the owner on 2026-09-26)",
 }
 TOTAL = 53
 

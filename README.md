@@ -5,11 +5,25 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **76 / 114** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-81, AC-82, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97, AC-98, AC-99, AC-100, AC-101, AC-102, AC-103, AC-104, AC-105, AC-106, AC-107, AC-108, AC-109, AC-110, AC-111, AC-112, AC-113, AC-114. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
-with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), fixed Claude accounts (AC-53, partial;
+criteria: **78 / 161** · **5** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-81, AC-82, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97, AC-98, AC-99, AC-100, AC-101, AC-102, AC-103, AC-104, AC-105, AC-106, AC-107, AC-108, AC-109, AC-110, AC-111, AC-112, AC-113, AC-114, AC-115, AC-116, AC-117, AC-118, AC-119, AC-120, AC-121, AC-122, AC-123, AC-124, AC-125, AC-126, AC-127, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-134, AC-135, AC-136, AC-137, AC-138, AC-139, AC-140, AC-141, AC-142, AC-145, AC-146, AC-147, AC-148, AC-149, AC-150, AC-151, AC-152, AC-153, AC-154, AC-155, AC-156, AC-157, AC-158, AC-159, AC-160, AC-161. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
+
+## Owner actions
+
+Only the owner can do these (AC-160). Each is one step; the criterion it unblocks is in brackets. The everything goal (`docs/goals/everything.md`) keeps this list current.
+
+- Mark round 4 of the Gate K design review (one-line search, pills filling the row): [review page](https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv) [AC-82, then PR #8 merges].
+- Decide where the one-line search should live: VS Code keeps every extension side-bar pane at least 120 px tall, so a separate search pane is never one line [AC-155].
+- Add the two logo images to `docs/design/brand/` as `overseer-icon.png` (full colour) and `overseer-mark.png` (transparent); an agent then draws the single-colour version and puts the mark on every surface [AC-142].
+- Sign in to Claude Code again (`claude`, then `/login`) [the Claude half of AC-81, AC-45].
+- Try the Gate K build in your own VS Code [AC-114].
+- Let the GitHub CLI push workflow files: `gh auth refresh -s workflow` (the checks for every pull request are written and waiting) [AC-148].
+- Say whether the Gate J design review still needs marks or the Gate K review replaces it [AC-66].
+- Work an hour using only Overseer [AC-64].
+- Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed sessions of Continuity, the phone app and Audio Mode when their agents finish [AC-97, AC-133, AC-145].
 
 ## Acceptance criteria
 
@@ -133,6 +147,53 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-112** Search you can see — not started (Gate K follow-up from the owner's marks) — [evidence](docs/verification/AC-112.md)
 - [ ] **AC-113** No empty grid — not started (Gate K follow-up from the owner's marks) — [evidence](docs/verification/AC-113.md)
 - [ ] **AC-114** Gate K in the owner's VS Code (owner-confirmed) — not started (Gate K follow-up from the owner's marks) — [evidence](docs/verification/AC-114.md)
+- [ ] **AC-115** Feasibility and reuse before lock-in — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-115.md)
+- [ ] **AC-116** A gateway switched on and off on the desktop — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-116.md)
+- [ ] **AC-117** Pairing needs the Mac — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-117.md)
+- [ ] **AC-118** Encrypted and mutually authenticated — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-118.md)
+- [ ] **AC-119** Devices, scopes and revoking — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-119.md)
+- [ ] **AC-120** Found on the network — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-120.md)
+- [ ] **AC-121** Never lose the session — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-121.md)
+- [ ] **AC-122** Sent exactly once — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-122.md)
+- [ ] **AC-123** The Mac stays awake while it matters — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-123.md)
+- [ ] **AC-124** See every agent — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-124.md)
+- [ ] **AC-125** Control every agent — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-125.md)
+- [ ] **AC-126** Review on the phone — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-126.md)
+- [ ] **AC-127** Everything else Overseer has — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-127.md)
+- [ ] **AC-128** Talk to Overseer from the phone — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-128.md)
+- [ ] **AC-129** Needs-you notifications you can switch — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-129.md)
+- [ ] **AC-130** Safe without friction — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-130.md)
+- [ ] **AC-131** One app, iOS and Android, that looks like Overseer — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-131.md)
+- [ ] **AC-132** Regression coverage for the phone — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-132.md)
+- [ ] **AC-133** Phone session (owner-confirmed) — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-133.md)
+- [ ] **AC-134** Platform behaviour behind generic interfaces — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-134.md)
+- [ ] **AC-135** Hyper fast — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-135.md)
+- [ ] **AC-136** The door — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-136.md)
+- [ ] **AC-137** Motion throughout — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-137.md)
+- [ ] **AC-138** Permission modes carry over — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-138.md)
+- [ ] **AC-139** OpenCode session transport spike — not started (Gate L, added by the owner on 2026-09-26; the goal's first step) — [evidence](docs/verification/AC-139.md)
+- [ ] **AC-140** Memory safety guard — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-140.md)
+- [ ] **AC-141** Pair once — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-141.md)
+- [ ] **AC-142** One Overseer mark everywhere — not started: waits for the owner's logo files — [evidence](docs/verification/AC-142.md)
+- [x] **AC-143** Opt-in audio cues owned by the daemon — [evidence](docs/verification/AC-143.md)
+- [x] **AC-144** A lost session asks for attention — [evidence](docs/verification/AC-144.md)
+- [ ] **AC-145** Audio Mode by ear (owner-confirmed) — ◐ partial: in the owner's session of 2026-09-27 the owner marked all twelve Reactor cues Right, heard start, completion and attention from fixture agents with Audio Mode on and VS Code open, and heard nothing from the same agents with Audio Mode off / deferred: four steps the session did not do: start, completion and attention with VS Code closed; two agents at the same moment; System voice; the owner's own Commander folder. The record says yes to them, but the session's log shows that the window was never quit, that `t` and `v` were not pressed and that no folder was set — [evidence](docs/verification/AC-145.md)
+- [ ] **AC-146** Reconcile and merge the work in flight — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-146.md)
+- [ ] **AC-147** One command runs every test — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-147.md)
+- [ ] **AC-148** Checks on every pull request — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-148.md)
+- [ ] **AC-149** A steady UI suite — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-149.md)
+- [ ] **AC-150** The first click always lands — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-150.md)
+- [ ] **AC-151** Every live scenario rerun on the current build — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-151.md)
+- [ ] **AC-152** Performance re-measured — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-152.md)
+- [ ] **AC-153** A ledger that stays true — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-153.md)
+- [ ] **AC-154** Composer choices fill the row — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-154.md)
+- [ ] **AC-155** One-line search with a filter menu — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-155.md)
+- [ ] **AC-156** Every agent works from the same rules — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-156.md)
+- [ ] **AC-157** Oversee the other agents — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-157.md)
+- [ ] **AC-158** Gate M's theme and immersive look are back in scope — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-158.md)
+- [ ] **AC-159** The toolchain works without Xcode's license — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-159.md)
+- [ ] **AC-160** Owner actions in one place — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-160.md)
+- [ ] **AC-161** Everything merged into one main — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-161.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -239,6 +300,27 @@ node test/ui/scenario-main.js
 6. Agents keep running when VS Code closes (you get a notification). **Stop Agents and
    Daemon** (Agents view menu) stops them all after confirmation.
 
+### In a terminal: `overseer-tui`
+
+A keyboard-first view of the same agents, live from the same daemon ([design](docs/rfcs/tui.md)):
+nine per page (page 1 is the newest nine), each tile streaming its agent's conversation.
+
+```bash
+cargo build --release -p overseer-tui
+```
+
+```bash
+target/release/overseer-tui
+```
+
+It finds the daemon VS Code uses (or pass `--daemon PATH`), starts it if needed, and quitting
+leaves every agent running. Keys: arrows or `hjkl` move, `1`–`9` jump, `]`/`[` page, `i` or
+Enter messages the focused agent, `z` zooms with scrollback, `a`/`d` answer a permission, `w`
+jumps to the next agent waiting for you, `x` interrupts, `n` starts a new agent, `f` filters,
+`/` searches, `v` shows an agent's changes and diffs, `M` merges it back (one confirmation per
+step), `P` opens a GitHub pull request with your `gh`, `C` removes a finished worktree, `A` lists accounts and signs them in, `X` stops every
+agent and the daemon, `?` lists every key, `q` quits.
+
 ## Recovery
 
 - State lives in `~/Library/Application Support/Overseer` (`overseer.sqlite`, per-run
@@ -297,6 +379,51 @@ the owner action or decision each one needs.
 - [ ] [AC-112](docs/verification/AC-112.md) (Search you can see): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
 - [ ] [AC-113](docs/verification/AC-113.md) (No empty grid): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
 - [ ] [AC-114](docs/verification/AC-114.md) (Gate K in the owner's VS Code (owner-confirmed)): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
+- [ ] [AC-115](docs/verification/AC-115.md) (Feasibility and reuse before lock-in): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-116](docs/verification/AC-116.md) (A gateway switched on and off on the desktop): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-117](docs/verification/AC-117.md) (Pairing needs the Mac): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-118](docs/verification/AC-118.md) (Encrypted and mutually authenticated): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-119](docs/verification/AC-119.md) (Devices, scopes and revoking): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-120](docs/verification/AC-120.md) (Found on the network): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-121](docs/verification/AC-121.md) (Never lose the session): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-122](docs/verification/AC-122.md) (Sent exactly once): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-123](docs/verification/AC-123.md) (The Mac stays awake while it matters): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-124](docs/verification/AC-124.md) (See every agent): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-125](docs/verification/AC-125.md) (Control every agent): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-126](docs/verification/AC-126.md) (Review on the phone): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-127](docs/verification/AC-127.md) (Everything else Overseer has): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-128](docs/verification/AC-128.md) (Talk to Overseer from the phone): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-129](docs/verification/AC-129.md) (Needs-you notifications you can switch): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-130](docs/verification/AC-130.md) (Safe without friction): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-131](docs/verification/AC-131.md) (One app, iOS and Android, that looks like Overseer): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-132](docs/verification/AC-132.md) (Regression coverage for the phone): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-133](docs/verification/AC-133.md) (Phone session (owner-confirmed)): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-134](docs/verification/AC-134.md) (Platform behaviour behind generic interfaces): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-135](docs/verification/AC-135.md) (Hyper fast): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-136](docs/verification/AC-136.md) (The door): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-137](docs/verification/AC-137.md) (Motion throughout): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-138](docs/verification/AC-138.md) (Permission modes carry over): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-139](docs/verification/AC-139.md) (OpenCode session transport spike): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-140](docs/verification/AC-140.md) (Memory safety guard): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-141](docs/verification/AC-141.md) (Pair once): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-142](docs/verification/AC-142.md) (One Overseer mark everywhere): Not started: the owner's two images need to be added to docs/design/brand/ as files; then the single-colour glyph is drawn for VS Code and approved.
+- [ ] [AC-145](docs/verification/AC-145.md) (Audio Mode by ear (owner-confirmed)): Waits for the owner to hear the four remaining steps (4 to 6 above, and `t`), in a session of a few minutes.
+- [ ] [AC-146](docs/verification/AC-146.md) (Reconcile and merge the work in flight): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-147](docs/verification/AC-147.md) (One command runs every test): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-148](docs/verification/AC-148.md) (Checks on every pull request): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-149](docs/verification/AC-149.md) (A steady UI suite): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-150](docs/verification/AC-150.md) (The first click always lands): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-151](docs/verification/AC-151.md) (Every live scenario rerun on the current build): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-152](docs/verification/AC-152.md) (Performance re-measured): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-153](docs/verification/AC-153.md) (A ledger that stays true): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-154](docs/verification/AC-154.md) (Composer choices fill the row): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-155](docs/verification/AC-155.md) (One-line search with a filter menu): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-156](docs/verification/AC-156.md) (Every agent works from the same rules): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-157](docs/verification/AC-157.md) (Oversee the other agents): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-158](docs/verification/AC-158.md) (Gate M's theme and immersive look are back in scope): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-159](docs/verification/AC-159.md) (The toolchain works without Xcode's license): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-160](docs/verification/AC-160.md) (Owner actions in one place): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-161](docs/verification/AC-161.md) (Everything merged into one main): Not started (Gate Q, added by the owner on 2026-09-27).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
@@ -312,7 +439,10 @@ the owner action or decision each one needs.
 - [Side RFC: Overseer-managed Claude credentials](docs/rfcs/claude-credentials.md)
 - [Side RFC: daily-driver orchestrator UI](docs/rfcs/orchestrator-ui.md)
 - [Side RFC: Continuity — offline mode and local models](docs/rfcs/offline-mode.md)
+- [Side RFC: terminal UI (`overseer-tui`)](docs/rfcs/tui.md)
+- [Side RFC: Audio Mode — opt-in cues from the daemon](docs/rfcs/audio-mode.md) and its [prepared goal](docs/rfcs/audio-mode-goal.md)
+- [Side RFC: phone remote on the same network](docs/rfcs/phone-remote.md) and its [prepared goal](docs/rfcs/phone-remote-goal.md)
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 
-Design targets macOS and Linux; only macOS is verified. Auto routing beyond the offline fallback ([Gate L](docs/rfcs/offline-mode.md)), a TUI, VSCodium,
+Design targets macOS and Linux; only macOS is verified. Auto routing beyond the offline fallback ([Gate L](docs/rfcs/offline-mode.md)), a relay for phone access away from the local network (after [Gate N](docs/rfcs/phone-remote.md)), VSCodium,
 Windows/Remote SSH and review comments sent to agents are later milestones.
