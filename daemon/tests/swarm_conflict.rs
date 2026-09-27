@@ -289,3 +289,113 @@ fn late_conflict_holds_a_ready_transitive_dependent_before_admission() {
         .iter().find(|job|job["id"]=="leaf").unwrap().clone();
     assert_eq!(leaf_restored["status"],"ready");
 }
+
+#[test]
+fn late_conflict_checkpoints_an_active_dependent_until_replanned() {
+    let mut d = Daemon::start(&[]);
+    let made = d.call("swarm.create",json!({"category":"Active conflict dependent",
+        "objective":"Audit route consumer","allowed_targets":["fixture"]}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"Left probe","acceptance":"response proof"},
+        {"id":"right","title":"Right probe","acceptance":"response proof"},
+        {"id":"consumer","title":"Use right result","acceptance":"consumer proof","deps":["right"]},
+        {"id":"repro","title":"Independent probe","acceptance":"fresh proof"}
+    ]}));
+    let right = submit(&d,run,"right","finding","foreign request returned 403");
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"right","decision":"accept","evidence":["right-evidence"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"right","attempt_id":right["id"]}));
+    let active = d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"consumer"}));
+    submit(&d,run,"left","finding","foreign request returned 200");
+    let conflict = json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"consumer-disagreement","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"Route results disagree"});
+    d.call("swarm.conflict.open",conflict.clone());
+    let consumer = d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|job|job["id"]=="consumer").unwrap().clone();
+    assert_eq!(consumer["status"],"cancel_requested");
+    assert_eq!(consumer["stop_reason"],"evidence_conflict");
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.conflict.open",conflict)["duplicate"],true);
+    let messages = d.call("swarm.messages",json!({"run_id":run,
+        "recipient":active["id"],"token":active["token"]}));
+    let checkpoints: Vec<_> = messages["messages"].as_array().unwrap().iter()
+        .filter(|m|m["type"]=="checkpoint").collect();
+    assert_eq!(checkpoints.len(),1);
+    assert_eq!(checkpoints[0]["payload"]["reason"],"evidence_conflict");
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"consumer","attempt_id":active["id"]}));
+    let after_exit = d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|job|job["id"]=="consumer").unwrap().clone();
+    assert_eq!(after_exit["status"],"blocked");
+}
+
+#[test]
+fn late_conflict_interrupts_only_the_linked_dependent_worker() {
+    let d=Daemon::start(&[]);
+    let temp=tmp();
+    let checkout=repo(&temp.path().join("late-conflict-source"));
+    let made=d.call("swarm.create",json!({"category":"Linked conflict dependent",
+        "objective":"Audit route consumer","allowed_targets":["fixture-local"]}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"Left probe","acceptance":"response proof"},
+        {"id":"right","title":"Right probe","acceptance":"response proof"},
+        {"id":"consumer","title":"Use right result","acceptance":"consumer proof","deps":["right"]},
+        {"id":"unrelated","title":"Unrelated work","acceptance":"separate proof"}
+    ]}));
+    let right=submit(&d,run,"right","finding","foreign request returned 403");
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"right","decision":"accept","evidence":["right-evidence"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"right","attempt_id":right["id"]}));
+    commit_beneficial_batch(&d,run,&["consumer".into(),"unrelated".into()]);
+    let at=now();
+    let mut workers=Vec::new();
+    for job in ["consumer","unrelated"] {
+        let admitted=d.call("swarm.admit",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":job,"target_id":"fixture-local","request_id":format!("conflict-{job}"),
+            "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+                "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["pool"],
+                    "capabilities":["code"],"health":"up","auth":"ok"}],
+                "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                    "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+                    "confidence":"exact","expires_ms":at+60000}]}]},
+            "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+        assert_eq!(admitted["status"],"admitted","{admitted}");
+        let launched=d.call("swarm.worker.launch",json!({"run_id":run,"job_id":job,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],"repo":checkout,
+            "program":"/bin/sleep","args":["30"],"prompt":"Inspect",
+            "title":format!("Worker {job}")}));
+        workers.push((job.to_string(),admitted,launched["overseer_run_id"].as_str().unwrap().to_string()));
+    }
+    for (_,_,worker) in &workers { d.wait_status(worker,|s|s=="running",5); }
+    submit(&d,run,"left","finding","foreign request returned 200");
+    d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"linked-disagreement","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"Route results disagree"}));
+    assert_eq!(d.wait_done(&workers[0].2,8)["status"],"interrupted");
+    assert_eq!(d.run(&workers[1].2)["status"],"running");
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(3);
+    loop {
+        let jobs=d.call("swarm.jobs",json!({"id":run}));
+        let consumer=jobs["jobs"].as_array().unwrap().iter()
+            .find(|j|j["id"]=="consumer").unwrap();
+        assert_eq!(consumer["stop_reason"],"evidence_conflict");
+        if consumer["status"]=="blocked" { break; }
+        assert!(std::time::Instant::now()<until,"dependent exit did not reconcile: {consumer}");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let signal_count:i64=db.query_row("SELECT COUNT(*) FROM swarm_stop_signals
+        WHERE run_id=?1 AND overseer_run_id=?2",
+        rusqlite::params![run,workers[0].2],|r|r.get(0)).unwrap();
+    assert_eq!(signal_count,1);
+    d.call("swarm.stop",json!({"run_id":run}));
+}

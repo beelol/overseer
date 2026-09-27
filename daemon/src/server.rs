@@ -450,7 +450,11 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "swarm.conflict.open" => {
             fixture_only()?;
-            crate::swarm::open_conflict(&mut d.store.lock().unwrap(), p)?
+            let opened = crate::swarm::open_conflict(&mut d.store.lock().unwrap(), p)?;
+            if let Err(error) = crate::swarm::retry_targeted_interrupts(d) {
+                crate::log(&format!("swarm evidence conflict interrupt failed: {error}"));
+            }
+            opened
         }
         "swarm.conflict.resolve" => {
             fixture_only()?;

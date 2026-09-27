@@ -174,6 +174,14 @@ ordinary agent also works in that repository, but cross-agent information still
 enters the category plan through the director. Neither Overseer nor the director
 answers or grants a worker's permission request autonomously. The owner must make
 that decision; a director assignment cannot loosen the worker's permission mode.
+Gate S now specifies that its briefing/channel activates only after the owner has
+spoken to Overseer and another agent works in the repository, and that a finished
+agent remains active through its 30-second idle grace. Apply those rules to the
+director as the single Gate S agent; they do not create a second channel for workers
+or delay the Swarm broker. A watch of a worker may wake on that worker's first actual
+turn, but its finding is still an advisory to the director. A hold on an idle director
+blocks its next turn; a hold on a running director requests interruption without
+claiming exit. Gate S's remembered permission denials bind director proposals too.
 
 Gate S makes starting a swarm or raising its active limit a Confirm action at every
 Overseer level, including its Auto permission level. The launch surface should show the

@@ -103,6 +103,42 @@ pub fn open(store: &mut Store, p: &Value) -> Result<Value> {
                 WHERE run_id=?1 AND id=?2 AND status='ready'",params![run,job,now])?;
         }
     }
+    // A dependent already admitted before the contradiction must stop as well.
+    // Keep the stop intent and checkpoint envelope atomic with the conflict so
+    // restart/replay cannot leave it working from evidence now in dispute.
+    let mut stmt=tx.prepare(
+        "WITH RECURSIVE downstream(job_id) AS (
+             SELECT ?2 UNION SELECT ?3
+             UNION
+             SELECT j.id FROM swarm_jobs j
+             JOIN json_each(j.deps) dep
+             JOIN downstream d ON dep.value=d.job_id
+             WHERE j.run_id=?1
+         )
+         SELECT a.id,a.job_id,a.revision FROM downstream d
+         JOIN swarm_attempts a ON a.run_id=?1 AND a.job_id=d.job_id
+         JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
+         WHERE a.status='registered' AND a.job_id NOT IN (?2,?3)
+           AND j.status IN ('reserved','launching','running','submitted')
+           AND j.stop_reason IS NULL")?;
+    let active=stmt.query_map(params![run,left_job,right_job],|r|
+        Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,i64>(2)?)))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    for (attempt,job,revision) in active {
+        let changed=tx.execute(
+            "UPDATE swarm_jobs SET status='cancel_requested',stop_reason='evidence_conflict',
+             updated_ms=?3 WHERE run_id=?1 AND id=?2 AND stop_reason IS NULL",
+            params![run,job,now])?;
+        if changed>0 {
+            tx.execute(
+                "INSERT OR IGNORE INTO swarm_messages(run_id,message_id,job_id,attempt_id,
+                 sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+                 VALUES(?1,?2,?3,?4,'control',?4,'checkpoint',?5,?6,'queued',?7,?7)",
+                params![run,format!("conflict-checkpoint-{id}-{attempt}"),job,attempt,
+                    revision,json!({"reason":"evidence_conflict","conflict_id":id}).to_string(),now])?;
+        }
+    }
     tx.commit()?;
     Ok(json!({"conflict_id":id,"status":"open","duplicate":false}))
 }
