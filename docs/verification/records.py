@@ -1193,6 +1193,14 @@ rec(142, "One Overseer mark everywhere", "partial", date="2026-09-27", commit="a
     actual="The owner's files are in docs/design/brand/ (app icon, colour logo, flat silhouette). On branch claude/brand-mark: a single-colour SVG fitted to the flat silhouette, exported sizes, the Marketplace icon, the activity bar and status bar mark (a one-glyph icon font), the colour logo on Overseer's tabs, the composer heading and the Overseer chat, and the Mac notification helper's icon; scenario-brand passes 9 of 9 on the packaged VSIX (sizes, VSIX icon, helper icon, no old eye mark left, the activity bar in four themes, the status bar glyph, the tab icon, the composer mark under the CSP).",
     live="—", blocker="Waits for the owner to approve the single-colour silhouette (it reads at 20 to 24 px; at 16 px the centre hole nearly closes, as in the flat PNG) and the Mac helper icon, then merges after the Gate M pull request. The phone app and a menu-bar or Android monochrome icon take their files from docs/design/brand/ when those surfaces are built.")
 
+# Brand, per surface (added by the owner on 2026-09-27): the phone app (Gate N's agent) and the Mac surfaces.
+rec(178, "The phone app uses the owner's mark", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
+    actual="Not started.", live="—", blocker="Not started: the phone app's agent (Gate N) replaces its placeholder marks with the owner's files in docs/design/brand/.")
+rec(179, "The Mac surfaces use the owner's mark", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
+    actual="Not started: the notification helper's icon is done on branch claude/brand-mark (AC-142); a menu-bar item does not exist yet.", live="—", blocker="Not started: verified with AC-142's merge for the helper; the menu-bar part waits for a menu-bar item.")
+
 # Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code came with pull
 # request #5 (merged as e0db692) and the terminal UI (T-23, T-24) with pull request #6 (merged as ea6a6c2).
 rec(143, "Opt-in audio cues owned by the daemon", "verified", date="2026-09-26",
@@ -1477,6 +1485,8 @@ SHORT_BLOCKERS = {
     175: "not started (Gate R, added by the owner on 2026-09-27)",
     176: "not started (Gate R, added by the owner on 2026-09-27)",
     177: "not started (Gate R, added by the owner on 2026-09-27)",
+    178: "not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files",
+    179: "not started (Brand, added by the owner on 2026-09-27): the Mac helper's icon is built with AC-142; a menu-bar item does not exist yet",
 }
 TOTAL = 53
 
