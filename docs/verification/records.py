@@ -1528,9 +1528,12 @@ rec(145, "Audio Mode by ear (owner-confirmed)", "verified", date="2026-09-27 UTC
     limits="The owner's confirmations of the played steps were given in conversation, not written by the script; the record of the owner's own session says yes to steps that session did not do, and the evidence says which answers count. The Commander folder that was played is a copy the owner made of the three recordings, in a private folder in the home directory, because macOS does not let a process started by the agent open files in the folder the voice lab is in.")
 
 # Gate P, follow-through (added by the owner on 2026-09-27). Not started.
-rec(146, "Reconcile and merge the work in flight", "not started", date="—", commit="—",
+rec(146, "Reconcile and merge the work in flight", "partial", commit="e01057f", date="2026-09-27", harness="none (repository and pull-request checks)",
+    proven="merges through a throwaway copy with the full suite, each with a note (pull requests #8, #11 to #13; Audio Mode's #5 and #6 by its agent); no agent's pull request was pushed to or merged while it was in flight",
+    deferred="the hourly monitor running on its own: scheduling it needs the owner's permission, so passes run while the everything goal is working",
     expected="See the RFC criterion (Gate P).",
-    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+    actual="See the merge notes.",
+    evidence="[merge notes](evidence/ac-146/merges.md)", live="—", blocker="The hourly schedule needs the owner's permission.")
 rec(147, "One command runs every test", "verified", commit="fb43c9b (merge of pull request #13)", date="2026-09-27", harness="all fixture tests; no paid tokens",
     steps="`scripts/test-all` on a clean checkout; a deliberate failure; `npm test --prefix extension`.",
     expected="See the RFC criterion (Gate P).",
@@ -1573,21 +1576,32 @@ rec(155, "One-line search with a filter menu", "verified", commit="8d239cb (merg
     expected="Search is one line with a filter icon that opens the status filter; the pane is no taller than VS Code allows (its 120 px minimum body).",
     actual="One-line field with a filter icon (filled while a filter is on) opening Show agents; the pane sits at VS Code's minimum height. The owner asked to merge without waiting for the round 4 marks.",
     evidence="[followups scenario](evidence/ui/followups/), [sidebar-search scenario](evidence/ui/sidebar-search/)", live="—")
-rec(156, "Every agent works from the same rules", "not started", date="—", commit="—",
+rec(156, "Every agent works from the same rules", "partial", commit="80411ba", date="2026-09-27", harness="none (repository and pull-request checks)",
+    proven="AGENTS.md and CLAUDE.md on main cover the brand files per surface, the paid-turn budget, the ledger, pushing after each criterion, never force-pushing, merging, where each gate's design lives and scripts/test-all; the Swarm, Continuity, phone and Gate S branches have them",
+    deferred="Codex Auto's branch, quiet for over a day, has not merged main yet",
     expected="See the RFC criterion (Gate Q).",
-    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
-rec(157, "Oversee the other agents", "not started", date="—", commit="—",
+    actual="See the oversight pass note.",
+    evidence="[AGENTS.md](../../AGENTS.md), [oversight passes](evidence/ac-157/passes.md)", live="—", blocker="Waits for the Auto agent's next merge of main.")
+rec(157, "Oversee the other agents", "verified", commit="e01057f", date="2026-09-27", harness="none (repository and pull-request checks)",
+    steps="Each pass: every agent's last commit, pushed or not, behind main, AGENTS.md, tests, findings; a comment with a concrete ask on each pull request that needs one.",
     expected="See the RFC criterion (Gate Q).",
-    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
-rec(158, "Gate M's theme and immersive look are back in scope", "not started", date="—", commit="—",
+    actual="The pass note lists each agent; comments were posted on #2, #3, #9 and #10 (merge main; push; the phone agent flagged for seven hours unpushed); Swarm and Continuity merged main after the ask.",
+    evidence="[oversight passes](evidence/ac-157/passes.md)", live="—")
+rec(158, "Gate M's theme and immersive look are back in scope", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses; no paid tokens",
+    steps="Gate M built and merged: the Overseer theme (AC-103) and the immersive editor area (AC-102) first, then the rest.",
     expected="See the RFC criterion (Gate Q).",
-    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
-rec(159, "The toolchain works without Xcode's license", "not started", date="—", commit="—",
+    actual="All ten Gate M criteria are verified in the ledger; every view has screenshots in the Overseer theme (gallery); the owner accepted the Gate M review on 2026-09-27.",
+    evidence="[gallery](evidence/ui/gallery/), [theme scenario](evidence/ui/theme/)", live="—")
+rec(159, "The toolchain works without Xcode's license", "verified", commit="0b9b085", date="2026-09-27", harness="a stand-in git that fails like an unaccepted Xcode license (fixtures/xcode-license-git)",
+    steps="`scripts/test-all --only=sidebar`, `node test/ui/scenario-sidebar.js` and `node extension/scripts/package.js` with the stand-in git first on the PATH.",
     expected="See the RFC criterion (Gate Q).",
-    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
-rec(160, "Owner actions in one place", "not started", date="—", commit="—",
+    actual="Each says in one line that it uses the Command Line Tools' git, then passes: the suite 6 of 6 (Rust 121 passed), the scenario, the VSIX build.",
+    evidence="[AC-159 notes](evidence/ac-159/notes.md)", live="—", limits="Checked with the stand-in on a machine whose license is accepted; the owner's machine had the real case earlier, when the goal used the same fallback by hand.")
+rec(160, "Owner actions in one place", "verified", commit="e01057f", date="2026-09-27", harness="none",
+    steps="The README's Owner actions list compared with the ledger's owner-blocked criteria after this pass.",
     expected="See the RFC criterion (Gate Q).",
-    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+    actual="The list names each owner-only step with its criterion (AC-148's workflow scope, AC-114, AC-66, AC-64, Voice Mode's choices, and the later ones); the done items (the search decision, the Claude sign-in, the logo files, the review marks) left it.",
+    evidence="[README](../../README.md#owner-actions)", live="—")
 rec(161, "Everything merged into one main", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate Q).",
     actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
@@ -1714,13 +1728,13 @@ rec(202, "Orchestration session (owner-confirmed)", "not started", date="—", c
 SHORT_BLOCKERS = {
     154: "verified",
     155: "verified",
-    156: "not started (Gate Q, added by the owner on 2026-09-27)",
-    157: "not started (Gate Q, added by the owner on 2026-09-27)",
-    158: "not started (Gate Q, added by the owner on 2026-09-27)",
-    159: "not started (Gate Q, added by the owner on 2026-09-27)",
-    160: "not started (Gate Q, added by the owner on 2026-09-27)",
+    156: "partial: Auto's branch has not merged main yet",
+    157: "verified",
+    158: "verified",
+    159: "verified",
+    160: "verified",
     161: "not started (Gate Q, added by the owner on 2026-09-27)",
-    146: "not started (Gate P, added by the owner on 2026-09-27)",
+    146: "partial: merges run through the throwaway copy; the hourly schedule needs the owner's permission",
     147: "verified",
     148: "not started (Gate P, added by the owner on 2026-09-27)",
     149: "partial: the causes are fixed; three clean runs in a row need a machine where no other agent runs UI tests",

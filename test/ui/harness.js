@@ -8,6 +8,7 @@ const { Cdp, delay } = require('./cdp');
 const repoRoot = path.resolve(__dirname, '../..');
 const CODE = process.env.OVERSEER_CODE || '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
 
+require('../../scripts/git-fallback').ensureGit('ui harness'); // AC-159
 function git(cwd, ...args) { return cp.execFileSync('git', args, { cwd, encoding: 'utf8' }).trim(); }
 
 function makeRepo(dir, { dirty = true } = {}) {
