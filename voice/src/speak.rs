@@ -13,17 +13,21 @@ pub const LOWERED: f32 = 0.3;
 
 /// Speaks `text` into samples, in memory: `say` writes a WAV file in a private temporary folder,
 /// which is read and removed at once. This is Overseer's own voice, never the owner's.
+///
+/// `say` takes 100 to 300 ms for a short line on an idle Mac and seconds on a busy one, so the
+/// lines Overseer says most are made when the listener starts (`COMMON`) and play at once.
 pub fn synthesize(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f32>> {
     say(text, voice, rate)
 }
 
 /// Runs `say` into a temporary WAV file and returns its samples. macOS's speech service sometimes
-/// never answers, so `say` gets a time limit that grows with the text (3 s and 50 ms a character),
-/// is killed when it passes it, and is tried once more.
+/// never answers, so `say` gets a time limit that grows with the text (20 s and 100 ms a
+/// character: generous, because a busy Mac makes it slow without making it stuck), is killed when
+/// it passes it, and is tried once more.
 pub fn say(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f32>> {
     let dir = tempfile::Builder::new().prefix("ovs-voice-").tempdir()?;
     let path = dir.path().join("line.wav");
-    let limit = std::time::Duration::from_millis(3000 + 50 * text.chars().count() as u64);
+    let limit = std::time::Duration::from_millis(20_000 + 100 * text.chars().count() as u64);
     for _ in 0..2 {
         let mut cmd = Command::new("say");
         if let Some(v) = voice {
@@ -32,8 +36,14 @@ pub fn say(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f32
         if let Some(r) = rate {
             cmd.args(["-r", &r.to_string()]);
         }
-        cmd.arg("-o").arg(&path).arg("--data-format=LEI16@16000").arg("--").arg(text);
-        cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+        cmd.arg("-o")
+            .arg(&path)
+            .arg("--data-format=LEI16@16000")
+            .arg("--")
+            .arg(text);
+        cmd.stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
         let mut child = cmd.spawn()?;
         let started = std::time::Instant::now();
         loop {
@@ -53,6 +63,21 @@ pub fn say(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f32
     }
     bail!("say did not finish twice in a row")
 }
+
+/// Lines Overseer says often, made in advance.
+pub const COMMON: &[&str] = &[
+    "On it.",
+    "Working on it.",
+    "Sent.",
+    "Cancelled.",
+    "Not sent.",
+    "Allowed.",
+    "Denied.",
+    "Stopped.",
+    "Go on.",
+    "Muted.",
+    "Listening.",
+];
 
 /// Splits a line into phrases at sentence and clause ends; a fragment of one or two words joins
 /// the phrase before it.

@@ -90,6 +90,7 @@ enum Msg {
     Spoken {
         line: u64,
         phrase: usize,
+        text: String,
         audio: Vec<f32>,
     },
     Fail(String),
@@ -158,6 +159,8 @@ struct State<W: Write> {
     synth: Box<dyn FnMut(&str) -> Result<Vec<f32>> + Send>,
     starts: std::collections::HashMap<u64, u64>,
     output: Option<std::sync::Arc<std::sync::Mutex<VecDeque<f32>>>>,
+    /// Phrases already made (the common lines), by text.
+    made: std::collections::HashMap<String, Vec<f32>>,
 }
 
 fn ms(samples: u64) -> u64 {
@@ -322,7 +325,9 @@ impl<W: Write> State<W> {
         match c {
             Command::Speak { line, text } => {
                 for (l, p, phrase) in self.speaker.queue(line, &text) {
-                    if let Some(w) = &self.synth_work {
+                    if let Some(a) = self.made.get(&phrase) {
+                        self.speaker.synthesized(l, p, a.clone());
+                    } else if let Some(w) = &self.synth_work {
                         let _ = w.send((l, p, phrase));
                     } else {
                         match (self.synth)(&phrase) {
@@ -555,6 +560,7 @@ pub fn run<W: Write + Send + 'static>(
         synth,
         starts: Default::default(),
         output: None,
+        made: Default::default(),
     };
     // Recognition: inline for a deterministic fast run, otherwise on its own thread.
     if let Some(r) = recognizer {
@@ -598,6 +604,7 @@ pub fn run<W: Write + Send + 'static>(
                         let _ = back.send(Msg::Spoken {
                             line,
                             phrase,
+                            text,
                             audio,
                         });
                     }
@@ -607,6 +614,10 @@ pub fn run<W: Write + Send + 'static>(
                 }
             }
         });
+        // The common lines, made ahead (line 0 means "keep, do not play").
+        for (i, text) in speak::COMMON.iter().enumerate() {
+            let _ = stx.send((0, i, text.to_string()));
+        }
         st.synth_work = Some(stx);
     }
     // Commands on standard input.
@@ -728,10 +739,24 @@ pub fn run<W: Write + Send + 'static>(
                 st.heard(job, text);
             }
             Msg::Spoken {
+                line: 0,
+                text,
+                audio,
+                ..
+            } => {
+                st.made.insert(text, audio);
+            }
+            Msg::Spoken {
                 line,
                 phrase,
+                text,
                 audio,
-            } => st.speaker.synthesized(line, phrase, audio),
+            } => {
+                if speak::COMMON.contains(&text.as_str()) {
+                    st.made.entry(text).or_insert_with(|| audio.clone());
+                }
+                st.speaker.synthesized(line, phrase, audio);
+            }
             Msg::Fail(m) => {
                 let t_ms = st.now_ms();
                 st.out.send(&Event::Error { message: m, t_ms });

@@ -80,7 +80,11 @@ fn main() -> anyhow::Result<()> {
     for (vi, voice) in VOICES.iter().enumerate() {
         for (si, text) in SENTENCES.iter().enumerate() {
             let _ = (vi, si);
-            clips.push((voice.to_string(), text.to_string(), overseer_listener::speak::say(text, Some(voice), None)?));
+            clips.push((
+                voice.to_string(),
+                text.to_string(),
+                overseer_listener::speak::say(text, Some(voice), None)?,
+            ));
         }
     }
     let before = peak_rss_mib();

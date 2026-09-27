@@ -348,7 +348,11 @@ fn a_suppressed_moment_is_not_heard() {
 
 #[test]
 fn real_speech_from_say_is_heard_as_one_utterance() {
-    let Ok(speech) = overseer_listener::speak::say("Stop the phone agent, and tell Continuity to wait.", Some("Samantha"), None) else {
+    let Ok(speech) = overseer_listener::speak::say(
+        "Stop the phone agent, and tell Continuity to wait.",
+        Some("Samantha"),
+        None,
+    ) else {
         eprintln!("skipped: no `say`");
         return;
     };
