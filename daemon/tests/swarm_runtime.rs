@@ -86,6 +86,86 @@ fn independent_jobs_execute_together_while_conflicting_writer_waits() {
 }
 
 #[test]
+fn supervised_dependency_chain_waits_for_accepted_result_and_exit() {
+    let d=Daemon::start(&[]);
+    let temp=tmp();
+    let checkout=repo(&temp.path().join("serial-source"));
+    let run=d.call("swarm.create",json!({"category":"Serial backend replay",
+        "objective":"Check contract, consumer, then integration",
+        "allowed_targets":["fixture-local"]}));
+    let id=run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"root","title":"Contract","acceptance":"contract evidence","deps":[]},
+        {"id":"child","title":"Consumer","acceptance":"consumer evidence","deps":["root"]},
+        {"id":"leaf","title":"Integration","acceptance":"integration evidence","deps":["child"]}
+    ]}));
+    let at=now();
+    let snapshot=json!({"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+        "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["pool"],
+            "capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+            "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+60000}]}]});
+    let mut previous:Option<&str>=None;
+    for job in ["root","child","leaf"] {
+        let admitted=d.call("swarm.admit",json!({"run_id":id,"generation":1,
+            "revision":1,"job_id":job,"target_id":"fixture-local",
+            "request_id":format!("serial-{job}"),"snapshot":snapshot,"now_ms":at,
+            "required_capabilities":["code"],"estimate_milli":{"points":1000},
+            "purpose":"worker"}));
+        assert_eq!(admitted["status"],"admitted","{job}: {admitted}");
+        let marker=temp.path().join(format!("release-{job}"));
+        let launched=d.call("swarm.worker.launch",json!({"run_id":id,"job_id":job,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "repo":checkout,"program":"/bin/sh",
+            "args":["-c","while [ ! -f \"$1\" ]; do sleep 0.1; done","worker",marker],
+            "prompt":format!("Check {job}"),"title":format!("Worker {job}")}));
+        let worker=launched["overseer_run_id"].as_str().unwrap();
+        d.wait_status(worker,|s|s=="running",5);
+        if let Some(parent)=previous {
+            assert_eq!(d.call("swarm.jobs",json!({"id":id}))["jobs"].as_array().unwrap()
+                .iter().find(|entry|entry["id"]==parent).unwrap()["status"],"accepted");
+        }
+        let artifact=format!("proof-{job}");
+        d.call("swarm.artifact.put",json!({"run_id":id,"job_id":job,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "artifact_id":artifact,"source_revision":1,"kind":"finding",
+            "content":format!("checked {job}")}));
+        d.call("swarm.report",json!({"run_id":id,"job_id":job,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "message_id":format!("result-{job}"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[artifact]}}));
+        if let Some(next)=match job {"root"=>Some("child"),"child"=>Some("leaf"),_=>None} {
+            let before=d.call("swarm.admit",json!({"run_id":id,"generation":1,
+                "revision":1,"job_id":next,"target_id":"fixture-local",
+                "request_id":format!("before-accept-{next}"),"snapshot":snapshot,"now_ms":at,
+                "required_capabilities":["code"],"estimate_milli":{"points":1000},
+                "purpose":"worker"}));
+            assert_eq!((before["reason"].as_str(),before["waiting_on"].clone()),
+                (Some("dependency_pending"),json!([job])));
+        }
+        d.call("swarm.decide",json!({"run_id":id,"generation":1,"revision":1,
+            "job_id":job,"decision":"accept","evidence":[artifact]}));
+        if let Some(next)=match job {"root"=>Some("child"),"child"=>Some("leaf"),_=>None} {
+            let before=d.call("swarm.admit",json!({"run_id":id,"generation":1,
+                "revision":1,"job_id":next,"target_id":"fixture-local",
+                "request_id":format!("before-exit-{next}"),"snapshot":snapshot,"now_ms":at,
+                "required_capabilities":["code"],"estimate_milli":{"points":1000},
+                "purpose":"worker"}));
+            assert_eq!((before["reason"].as_str(),before["waiting_on"].clone()),
+                (Some("dependency_pending"),json!([job])));
+        }
+        std::fs::write(&marker,"release").unwrap();
+        assert_eq!(d.wait_done(worker,8)["status"],"completed");
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":id,"generation":1,
+            "revision":1,"job_id":job,"attempt_id":admitted["attempt_id"]}));
+        previous=Some(job);
+    }
+    assert!(d.call("swarm.jobs",json!({"id":id}))["jobs"].as_array().unwrap()
+        .iter().all(|entry|entry["status"]=="accepted"));
+}
+
+#[test]
 fn repository_scope_blocks_director_and_worker_launch_outside_approved_repo() {
     let d = Daemon::start(&[]);
     let temp = tmp();
