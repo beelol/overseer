@@ -353,8 +353,25 @@ class AgentsProvider {
     if (run.benefit?.decision) {
       const item = new vscode.TreeItem(`Planning: ${run.benefit.decision}`);
       item.iconPath = new vscode.ThemeIcon('lightbulb');
-      item.description = (run.benefit.reason || 'reason unknown').replaceAll('_', ' ');
+      const reason = (run.benefit.reason || 'reason unknown').replaceAll('_', ' ');
+      const planned = run.benefit.max_parallel_workers;
+      const ceiling = run.policy?.effective?.max_workers;
+      item.description = Number.isSafeInteger(planned) && Number.isSafeInteger(ceiling) &&
+        planned < ceiling ? `${planned} of ${ceiling} worker ceiling · ${reason}` : reason;
       item.tooltip = `Latest recorded planning decision. Current admission limit may differ. ${item.description}`;
+      rows.push({ item, parent });
+    }
+    if (run.availability?.state) {
+      const observation = run.availability;
+      const expired = !Number.isSafeInteger(observation.expires_ms) || observation.expires_ms <= Date.now();
+      const item = new vscode.TreeItem(`Last eligibility: ${expired ? 'expired' : observation.state}`);
+      item.iconPath = new vscode.ThemeIcon(expired ? 'question' :
+        observation.state === 'blocked' ? 'warning' : 'check');
+      item.description = (observation.reason ||
+        (expired ? 'refresh needed' : 'eligible when observed')).replaceAll('_', ' ');
+      item.tooltip = `Recorded ${new Date(observation.observed_ms).toLocaleString()}. ` +
+        (expired ? 'This observation has expired; refresh eligibility before admitting work.' :
+          'This was the last eligibility observation; admission revalidates it.');
       rows.push({ item, parent });
     }
     const last = run.capacity?.last_admission;

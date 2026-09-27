@@ -25,7 +25,9 @@ Module._load = originalLoad;
     created_ms: 1, updated_ms: 2, revision: 1, allowed_targets: ['profile-a'], policy: {},
     job_counts: { total: 100, by_status: { running: 32, ready: 56, submitted: 8, blocked: 4 } },
     active_worker_processes: 32, registered_attempts: 32, director: { owner_status: 'active' },
-    availability: null, benefit: { decision: 'serial', reason: 'finishing_unaffordable' },
+    availability: { state: 'blocked', reason: 'no_allowed_target',
+      observed_ms: Date.now() - 1000, expires_ms: Date.now() + 60000 },
+    benefit: { decision: 'serial', reason: 'finishing_unaffordable', max_parallel_workers: 1 },
     capacity: { provider_usage_state: 'unknown', source: 'fixture_admission',
       last_admission: { job_id: 'j032', target_id: 'fixture-a', status: 'blocked',
         reason: 'growth_wave_full', observed_ms: 123 },
@@ -81,6 +83,9 @@ Module._load = originalLoad;
     'show frozen allocation and finishing reserve');
   assert(capacity.some(row => /serial/i.test(row.item.label) && /finishing unaffordable/i.test(row.item.description)),
     'show the recorded planning decision and reason');
+  assert(capacity.some(row => /eligibility.*blocked/i.test(row.item.label) &&
+    /no allowed target/i.test(row.item.description)),
+    'show the recorded blocked eligibility reason');
   assert(capacity.some(row => /usage unknown/i.test(row.item.label)),
     'fixture estimates must not be presented as measured provider usage');
   assert(capacity.some(row => /last admission held/i.test(row.item.label) &&
@@ -88,6 +93,17 @@ Module._load = originalLoad;
     'show the durable held admission as a past observation with its job and reason');
   assert(!capacity.some(row => /current limit/i.test(row.item.label)),
     'a past admission result cannot be mislabeled as the current constraint');
+  run.availability.expires_ms = Date.now() - 1;
+  const staleCapacity = provider.getChildren(firstPage[1]);
+  assert(staleCapacity.some(row => /eligibility.*expired/i.test(row.item.label) &&
+    /no allowed target/i.test(row.item.description)),
+    'an expired eligibility observation must not be presented as current');
+  run.benefit = { decision: 'parallel', reason: 'beneficial', max_parallel_workers: 3 };
+  run.policy = { effective: { max_workers: 8 } };
+  const scaledCapacity = provider.getChildren(firstPage[1]);
+  assert(scaledCapacity.some(row => /planning: parallel/i.test(row.item.label) &&
+    /3 of 8/.test(row.item.description) && /beneficial/.test(row.item.description)),
+    'show why a beneficial batch is scaled below the worker ceiling');
   assert.equal(firstPage[2].item.iconPath.id, 'sync~spin');
   assert.equal(firstPage[2].item.description, 'working', 'a live worker must not be shown as merely reserved');
   assert.equal(firstPage[2].item.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);

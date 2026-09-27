@@ -1,6 +1,59 @@
 {
   "checks": [
     {
+      "name": "the recorded beneficial batch is scaled below the eight-worker ceiling",
+      "ok": true,
+      "detail": {
+        "authoritative_admission": false,
+        "decision": "parallel",
+        "expected_time_benefit_ms": 190,
+        "job_ids": [
+          "j000",
+          "j001",
+          "j002",
+          "j003"
+        ],
+        "max_parallel_workers": 3,
+        "parallel": {
+          "elapsed_ms": 250,
+          "finishing_usage_milli": {
+            "points": 3
+          },
+          "usage_milli": {
+            "points": 45
+          }
+        },
+        "reason": "beneficial",
+        "replay": false,
+        "revision": 1,
+        "run_id": "sw-2f73f6b32730",
+        "serial": {
+          "affordable": true,
+          "elapsed_ms": 440,
+          "finishing_usage_milli": {
+            "points": 3
+          },
+          "usage_milli": {
+            "points": 45
+          }
+        },
+        "wave": 1
+      }
+    },
+    {
+      "name": "no approved target records a blocked eligibility reason",
+      "ok": true,
+      "detail": {
+        "changed": true,
+        "eligible_targets": [],
+        "reason": "no_allowed_target",
+        "revoked_jobs": [],
+        "state": "blocked",
+        "wake_count": 0,
+        "woken": false
+      }
+    },
+    {
       "name": "Agents sidebar shows one Swarms section and a 100-job category summary",
       "ok": true,
       "detail": [
@@ -95,6 +148,234 @@
       ]
     },
     {
+      "name": "capacity details explain the recorded blocked eligibility",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Swarms",
+          "description": "1",
+          "level": 1,
+          "expanded": "true",
+          "selected": false,
+          "focused": false,
+          "aria": "Swarms 1"
+        },
+        {
+          "label": "Backend audit",
+          "description": "0 working · 100 ready · 0 blocked",
+          "level": 2,
+          "expanded": "true",
+          "selected": false,
+          "focused": false,
+          "aria": "Backend audit swarm, planning, 0 working · 100 ready · 0 blocked"
+        },
+        {
+          "label": "Director",
+          "description": "not started",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Director not started"
+        },
+        {
+          "label": "Capacity",
+          "description": "0 selected · usage unknown",
+          "level": 3,
+          "expanded": "true",
+          "selected": false,
+          "focused": true,
+          "aria": "Swarm capacity, 0 selected · usage unknown"
+        },
+        {
+          "label": "Planning: parallel",
+          "description": "3 of 8 worker ceiling · beneficial",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Latest recorded planning decision. Current admission limit may differ. 3 of 8 worker ceiling · beneficial"
+        },
+        {
+          "label": "Last eligibility: blocked",
+          "description": "no allowed target",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Recorded 9/27/2026, 9:48:01 AM. This was the last eligibility observation; admission revalidates it."
+        },
+        {
+          "label": "No admission recorded",
+          "description": "current limit unknown",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "No admission recorded current limit unknown"
+        },
+        {
+          "label": "Provider usage unknown",
+          "description": "current allowance not reported",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Provider usage unknown current allowance not reported"
+        },
+        {
+          "label": "Check route 0",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 0, ready, 0 attempts"
+        },
+        {
+          "label": "Check route 1",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 1, ready, 0 attempts"
+        },
+        {
+          "label": "Check route 2",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 2, ready, 0 attempts"
+        },
+        {
+          "label": "Check route 3",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 3, ready, 0 attempts"
+        }
+      ]
+    },
+    {
+      "name": "capacity details show the scaled-down planning decision",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Swarms",
+          "description": "1",
+          "level": 1,
+          "expanded": "true",
+          "selected": false,
+          "focused": false,
+          "aria": "Swarms 1"
+        },
+        {
+          "label": "Backend audit",
+          "description": "0 working · 100 ready · 0 blocked",
+          "level": 2,
+          "expanded": "true",
+          "selected": false,
+          "focused": false,
+          "aria": "Backend audit swarm, planning, 0 working · 100 ready · 0 blocked"
+        },
+        {
+          "label": "Director",
+          "description": "not started",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Director not started"
+        },
+        {
+          "label": "Capacity",
+          "description": "0 selected · usage unknown",
+          "level": 3,
+          "expanded": "true",
+          "selected": false,
+          "focused": true,
+          "aria": "Swarm capacity, 0 selected · usage unknown"
+        },
+        {
+          "label": "Planning: parallel",
+          "description": "3 of 8 worker ceiling · beneficial",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Latest recorded planning decision. Current admission limit may differ. 3 of 8 worker ceiling · beneficial"
+        },
+        {
+          "label": "Last eligibility: blocked",
+          "description": "no allowed target",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Recorded 9/27/2026, 9:48:01 AM. This was the last eligibility observation; admission revalidates it."
+        },
+        {
+          "label": "No admission recorded",
+          "description": "current limit unknown",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "No admission recorded current limit unknown"
+        },
+        {
+          "label": "Provider usage unknown",
+          "description": "current allowance not reported",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Provider usage unknown current allowance not reported"
+        },
+        {
+          "label": "Check route 0",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 0, ready, 0 attempts"
+        },
+        {
+          "label": "Check route 1",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 1, ready, 0 attempts"
+        },
+        {
+          "label": "Check route 2",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 2, ready, 0 attempts"
+        },
+        {
+          "label": "Check route 3",
+          "description": "ready",
+          "level": 3,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Check route 3, ready, 0 attempts"
+        }
+      ]
+    },
+    {
       "name": "deadline extension from the Swarm row records 30 more minutes",
       "ok": true,
       "detail": {
@@ -106,7 +387,7 @@
       "name": "Pause from the Swarm row changes durable daemon state within 2 seconds",
       "ok": true,
       "detail": {
-        "pause_ms": 594
+        "pause_ms": 597
       }
     },
     {
@@ -134,7 +415,7 @@
       "name": "confirmed Stop cancels queued work within 2 seconds",
       "ok": true,
       "detail": {
-        "stop_ms": 74
+        "stop_ms": 80
       }
     }
   ]

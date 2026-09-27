@@ -4,6 +4,16 @@ const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay } = require('./harness');
 
+function benefitEstimate(ids) {
+  const workers = ids.map(id => ({ id, elapsed_ms: 100, usage_milli: { points: 10 } }));
+  const phase = elapsed_ms => ({ elapsed_ms, usage_milli: { points: 1 } });
+  const costs = context => ({ planning: phase(10), context: phase(context),
+    integration: phase(10), review: phase(10), retries: phase(0), workers });
+  return { independent: true, max_workers: 8,
+    allocation_milli: { points: 100000 }, finishing_reserve_milli: { points: 20000 },
+    serial: costs(10), parallel: costs(20) };
+}
+
 (async () => {
   const s = new Session('swarm-status');
   const result = { checks: [] };
@@ -23,6 +33,19 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     const jobs = Array.from({ length: 100 }, (_, n) => ({ id: `j${String(n).padStart(3, '0')}`,
       title: `Check route ${n}`, acceptance: `Record route ${n} evidence`, deps: [] }));
     s.ctl('swarm.plan', { id: made.id, generation: 1, revision: 0, jobs });
+    s.ctl('agents.limit.set', { max_active: 4 });
+    const planning = s.ctl('swarm.benefit.commit', { run_id: made.id, generation: 1,
+      revision: 1, estimate: benefitEstimate(jobs.slice(0, 4).map(job => job.id)) });
+    check('the recorded beneficial batch is scaled below the eight-worker ceiling',
+      planning.decision === 'parallel' && planning.max_parallel_workers === 3, planning);
+    const at = Date.now();
+    const availability = s.ctl('swarm.availability.observe', { run_id: made.id,
+      now_ms: at, purpose: 'worker', required_capabilities: ['code'],
+      estimate_milli: { points: 100 }, snapshot: {
+        version: 1, observed_ms: at, expires_ms: at + 60000,
+        targets: [], pools: [] } });
+    check('no approved target records a blocked eligibility reason',
+      availability.state === 'blocked' && availability.reason === 'no_allowed_target', availability);
     await cdp.command('Overseer: Refresh');
     await s.openOverseerView();
     const rows = await cdp.waitFor(`(() => {
@@ -41,6 +64,15 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
       expanded.some(r => r.label === 'Director') && expanded.some(r => r.label === 'Check route 0'),
       expanded.slice(0, 8));
     await s.screenshot('swarm-expanded');
+    await s.clickAgentRow('Capacity', { twisty: true });
+    const capacity = await s.agentRows();
+    check('capacity details explain the recorded blocked eligibility',
+      capacity.some(r => /Last eligibility: blocked/i.test(r.label) &&
+        /no allowed target/i.test(r.description)), capacity.slice(0, 12));
+    check('capacity details show the scaled-down planning decision',
+      capacity.some(r => /Planning: parallel/i.test(r.label) &&
+        /3 of 8 worker ceiling.*beneficial/i.test(r.description)), capacity.slice(0, 12));
+    await s.screenshot('swarm-blocked-capacity');
 
     const chooseControl = async (title, category = 'Backend audit') => {
       const pt = await cdp.waitFor(`(() => {
