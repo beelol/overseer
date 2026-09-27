@@ -168,6 +168,13 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
         bail!("job cannot be decided in this state");
     }
     if decision == "accept" {
+        let unresolved_conflict: bool = store.conn.prepare(
+            "SELECT 1 FROM swarm_conflicts WHERE run_id=?1 AND status!='resolved'
+             AND (left_job_id=?2 OR right_job_id=?2)",
+        )?.exists(params![run,job])?;
+        if unresolved_conflict {
+            bail!("open or unresolved evidence conflict blocks acceptance");
+        }
         let uncertain: i64 = store.conn.query_row(
             "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome='unknown'",
             params![run,job], |r| r.get(0),

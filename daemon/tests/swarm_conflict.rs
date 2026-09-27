@@ -1,0 +1,108 @@
+mod common;
+
+use common::*;
+use serde_json::{json, Value};
+
+fn submit(d: &Daemon, run: &str, job: &str, kind: &str, content: &str) -> Value {
+    let attempt = d.call("swarm.attempt.register", json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":job}));
+    let artifact = format!("{job}-evidence");
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":job,
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "artifact_id":artifact,"source_revision":1,"kind":kind,"content":content}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":job,
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "message_id":format!("{job}-result"),"type":"result","revision":1,
+        "payload":{"artifact_ids":[artifact],"audit_outcome":
+            if kind=="reproduction" {"confirmed_defect"} else {"negative"}}}));
+    attempt
+}
+
+#[test]
+fn contradictory_results_require_independent_accepted_reproduction_before_review() {
+    let mut d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Conflicting Atlas evidence",
+        "objective":"Audit tenant isolation","allowed_targets":["fixture"]}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Task mutation","acceptance":"foreign task response","deps":[]},
+        {"id":"j7","title":"Independent task response","acceptance":"repeat task response","deps":[]},
+        {"id":"j8","title":"Resolve middleware discrepancy","acceptance":"independent reproduction","deps":[]}
+    ]}));
+    let _j2=submit(&d,run,"j2","reproduction","foreign PATCH returned 200 and changed Bob's row");
+    let _j7=submit(&d,run,"j7","finding","guarded route returned 403 and left Bob's row unchanged");
+    let conflict=json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"task-route-disagreement","left_job_id":"j2",
+        "left_artifact_id":"j2-evidence","right_job_id":"j7",
+        "right_artifact_id":"j7-evidence","reason":"The probes disagree on foreign task mutation"});
+    assert_eq!(d.call("swarm.conflict.open",conflict.clone())["status"],"open");
+    let coverage=d.call("swarm.coverage",json!({"run_id":run}));
+    let rows=coverage["rows"].as_array().unwrap();
+    for job in ["j2","j7"] {
+        assert_eq!(rows.iter().find(|row|row["job_id"]==job).unwrap()["coverage_state"],
+            "conflict_unresolved");
+    }
+    assert_eq!(d.call("swarm.conflicts",json!({"run_id":run}))["conflicts"][0]["status"],"open");
+    for (job,evidence) in [("j2","j2-evidence"),("j7","j7-evidence")] {
+        let error=d.try_call("swarm.decide",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":job,"decision":"accept","evidence":[evidence]})).unwrap_err();
+        assert!(error.contains("conflict"),"{error}");
+    }
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.conflict.open",conflict)["duplicate"],true);
+    let j8=submit(&d,run,"j8","reproduction","fresh unguarded route returns 200; guarded route returns 403");
+    assert!(d.try_call("swarm.conflict.resolve",json!({"run_id":run,
+        "generation":1,"revision":1,"conflict_id":"task-route-disagreement",
+        "outcome":"supports_left","reproduction_job_id":"j2",
+        "reproduction_artifact_id":"j2-evidence"})).unwrap_err().contains("independent"));
+    assert!(d.try_call("swarm.conflict.resolve",json!({"run_id":run,
+        "generation":1,"revision":1,"conflict_id":"task-route-disagreement",
+        "outcome":"supports_left","reproduction_job_id":"j8",
+        "reproduction_artifact_id":"j8-evidence"})).unwrap_err().contains("accepted"));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"j8","decision":"accept","evidence":["j8-evidence"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j8","attempt_id":j8["id"]}));
+    let resolved=d.call("swarm.conflict.resolve",json!({"run_id":run,
+        "generation":1,"revision":1,"conflict_id":"task-route-disagreement",
+        "outcome":"supports_left","reproduction_job_id":"j8",
+        "reproduction_artifact_id":"j8-evidence"}));
+    assert_eq!(resolved["status"],"resolved");
+    assert_eq!(d.call("swarm.decide",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j2","decision":"accept",
+        "evidence":["j2-evidence"]}))["status"],"accepted");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let count:i64=db.query_row("SELECT COUNT(*) FROM swarm_conflicts WHERE run_id=?1",
+        [run],|row|row.get(0)).unwrap();
+    assert_eq!(count,1);
+}
+
+#[test]
+fn explicitly_unresolved_conflict_remains_visible_and_blocks_acceptance() {
+    let d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Unresolved disagreement",
+        "objective":"Audit a disputed path","allowed_targets":["fixture"]}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"a","title":"First path","acceptance":"first evidence","deps":[]},
+        {"id":"b","title":"Second path","acceptance":"second evidence","deps":[]}
+    ]}));
+    submit(&d,run,"a","finding","request returned 200");
+    submit(&d,run,"b","finding","same request returned 403");
+    d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"different-responses","left_job_id":"a",
+        "left_artifact_id":"a-evidence","right_job_id":"b",
+        "right_artifact_id":"b-evidence","reason":"Incompatible responses"}));
+    assert_eq!(d.call("swarm.conflict.resolve",json!({"run_id":run,
+        "generation":1,"revision":1,"conflict_id":"different-responses",
+        "outcome":"unresolved"}))["status"],"unresolved");
+    assert_eq!(d.call("swarm.conflicts",json!({"run_id":run}))["conflicts"][0]["status"],
+        "unresolved");
+    let error=d.try_call("swarm.decide",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"a","decision":"accept",
+        "evidence":["a-evidence"]})).unwrap_err();
+    assert!(error.contains("conflict"),"{error}");
+    assert_eq!(d.call("swarm.coverage",json!({"run_id":run}))["rows"][0]["coverage_state"],
+        "conflict_unresolved");
+}

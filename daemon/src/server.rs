@@ -440,6 +440,15 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             crate::swarm::decide(&mut d.store.lock().unwrap(), p)?
         }
+        "swarm.conflict.open" => {
+            fixture_only()?;
+            crate::swarm::open_conflict(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.conflict.resolve" => {
+            fixture_only()?;
+            crate::swarm::resolve_conflict(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.conflicts" => crate::swarm::list_conflicts(&d.store.lock().unwrap(), p)?,
         "swarm.complete" => {
             fixture_only()?;
             crate::swarm::complete(&mut d.store.lock().unwrap(), p)?

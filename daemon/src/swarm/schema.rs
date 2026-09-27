@@ -263,6 +263,26 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           UNIQUE(run_id,job_id,attempt_id,decision)
         );
+        CREATE TABLE IF NOT EXISTS swarm_conflicts(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          conflict_id TEXT NOT NULL,
+          generation INTEGER NOT NULL,
+          revision INTEGER NOT NULL,
+          left_job_id TEXT NOT NULL,
+          left_artifact_id TEXT NOT NULL,
+          right_job_id TEXT NOT NULL,
+          right_artifact_id TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('open','resolved','unresolved')),
+          outcome TEXT,
+          reproduction_job_id TEXT,
+          reproduction_artifact_id TEXT,
+          created_ms INTEGER NOT NULL,
+          updated_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,conflict_id)
+        );
+        CREATE INDEX IF NOT EXISTS swarm_conflicts_by_status
+          ON swarm_conflicts(run_id,status);
         CREATE TABLE IF NOT EXISTS swarm_completions(
           run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id),
           request_sha256 TEXT NOT NULL,

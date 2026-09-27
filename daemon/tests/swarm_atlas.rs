@@ -287,7 +287,7 @@ fn atlas_s1_faults_quarantine_stale_and_missing_evidence() {
 
 #[test]
 #[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
-fn atlas_s1_contradictory_j7_retracts_claim_pending_environment_review() {
+fn atlas_s5_contradictory_j7_requires_bounded_j8_reproduction() {
     assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
     let d=Daemon::start(&[]);
     let created=d.call("swarm.create",json!({"category":"Atlas contradiction",
@@ -296,7 +296,8 @@ fn atlas_s1_contradictory_j7_retracts_claim_pending_environment_review() {
     d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
         {"id":"j2","title":"Task finding","acceptance":"foreign mutation evidence","deps":[]},
         {"id":"j4","title":"Attachment boundary","acceptance":"independent path","deps":[]},
-        {"id":"j7","title":"Independent reproduction","acceptance":"reproduce J2","deps":[]}
+        {"id":"j7","title":"Independent reproduction","acceptance":"reproduce J2","deps":[]},
+        {"id":"j8","title":"Resolve task route difference","acceptance":"compare fresh guarded and unguarded routes","deps":[]}
     ]}));
     let at=now();
     let snapshot=json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
@@ -305,7 +306,7 @@ fn atlas_s1_contradictory_j7_retracts_claim_pending_environment_review() {
         "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
             "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
             "confidence":"exact","expires_ms":at+120000}]}]});
-    commit_wave(&d,run,1,&["j2","j4","j7"]);
+    commit_wave(&d,run,1,&["j2","j4","j7","j8"]);
     let a2=admit(&d,run,1,"j2","fixture",&snapshot,at);
     let a4=admit(&d,run,1,"j4","fixture",&snapshot,at);
     let a7=admit(&d,run,1,"j7","fixture",&snapshot,at);
@@ -320,6 +321,16 @@ fn atlas_s1_contradictory_j7_retracts_claim_pending_environment_review() {
     let j7_artifact=submit(&d,run,"j7",&a7,1,&j7,"negative");
     let j4=atlas_probe("j4");
     let j4_artifact=submit(&d,run,"j4",&a4,1,&j4,"confirmed_defect");
+    let conflict=json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"foreign-task-response","left_job_id":"j2",
+        "left_artifact_id":j2_artifact,"right_job_id":"j7",
+        "right_artifact_id":j7_artifact,
+        "reason":"J2 changed Bob's task, while J7's guarded route denied the same request"});
+    assert_eq!(d.call("swarm.conflict.open",conflict.clone())["status"],"open");
+    assert_eq!(d.call("swarm.conflict.open",conflict)["duplicate"],true);
+    let early_accept=d.try_call("swarm.decide",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j2","decision":"accept","evidence":[j2_artifact]})).unwrap_err();
+    assert!(early_accept.contains("conflict"),"{early_accept}");
     let batch=d.call("swarm.director.claim_batch",json!({"run_id":run,
         "generation":1,"revision":1,"now_ms":now()+6000}));
     assert_eq!(batch["status"],"claimed","{batch}");
@@ -340,18 +351,44 @@ fn atlas_s1_contradictory_j7_retracts_claim_pending_environment_review() {
     }
     d.call("swarm.director.complete_batch",json!({"run_id":run,"generation":1,
         "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"progress"}));
-    let jobs=d.call("swarm.jobs",json!({"id":run}));
-    assert!(jobs["jobs"].as_array().unwrap().iter()
-        .all(|job| job["status"] != "accepted"));
-    let checks=json!([
-        {"job_id":"j2","outcome":"passed","evidence":[j2_artifact]},
-        {"job_id":"j4","outcome":"passed","evidence":[j4_artifact]},
-        {"job_id":"j7","outcome":"passed","evidence":[j7_artifact]}
-    ]);
-    let completion_error=d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
-        "revision":1,"request_id":"contradicted-atlas","summary":"Task finding",
-        "verification":"Contradictory fixture variants","checks":checks})).unwrap_err();
-    assert!(completion_error.contains("requires every planned job to be accepted"),"{completion_error}");
+    assert_eq!(d.call("swarm.conflicts",json!({"run_id":run}))["conflicts"][0]["status"],"open");
+    let a8=admit(&d,run,1,"j8","fixture",&snapshot,now());
+    assert_eq!(a8["status"],"admitted","{a8}");
+    let j8=atlas_probe("j8");
+    assert_eq!(j8["unguarded"]["foreignPatchStatus"],200);
+    assert_eq!(j8["guarded"]["foreignPatchStatus"],403);
+    assert_ne!(j8["unguarded"]["namespace"],j8["guarded"]["namespace"]);
+    let j8_artifact=submit(&d,run,"j8",&a8,1,&j8,"confirmed_defect");
+    let final_batch=d.call("swarm.director.claim_batch",json!({"run_id":run,
+        "generation":1,"revision":1,"now_ms":now()+6000}));
+    assert_eq!(final_batch["status"],"claimed","{final_batch}");
+    assert!(final_batch["messages"].as_array().unwrap().iter()
+        .any(|message|message["message_id"]=="atlas-j8-result"));
+    accept_and_exit(&d,run,1,"j8",&a8,&j8_artifact);
+    let resolved=d.call("swarm.conflict.resolve",json!({"run_id":run,
+        "generation":1,"revision":1,"conflict_id":"foreign-task-response",
+        "outcome":"supports_left","reproduction_job_id":"j8",
+        "reproduction_artifact_id":j8_artifact}));
+    assert_eq!(resolved["status"],"resolved","{resolved}");
+    assert_eq!(d.call("swarm.conflicts",json!({"run_id":run}))["conflicts"][0]["reproduction_artifact_id"],j8_artifact);
+    for (job,attempt,artifact) in [("j2",&a2,&j2_artifact),
+        ("j7",&a7,&j7_artifact),("j4",&a4,&j4_artifact)] {
+        accept_and_exit(&d,run,1,job,attempt,artifact);
+    }
+    let applied=d.call("swarm.director.complete_batch",json!({"run_id":run,"generation":1,
+        "turn_id":final_batch["turn_id"],"token":final_batch["token"],"outcome":"progress"}));
+    assert_eq!(applied["material_progress"],true,"{applied}");
+    let completed=d.call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"contradicted-atlas-resolved",
+        "summary":"The unguarded task route permits foreign mutation; the guarded J7 variant is a different fixture configuration. Attachment finding remains separate.",
+        "verification":"J8 independently repeated both task route variants in separate PostgreSQL namespaces",
+        "checks":[
+            {"job_id":"j2","outcome":"passed","evidence":[j2_artifact]},
+            {"job_id":"j4","outcome":"passed","evidence":[j4_artifact]},
+            {"job_id":"j7","outcome":"passed","evidence":[j7_artifact]},
+            {"job_id":"j8","outcome":"passed","evidence":[j8_artifact]}
+        ]}));
+    assert_eq!(completed["status"],"completed","{completed}");
 }
 
 #[test]

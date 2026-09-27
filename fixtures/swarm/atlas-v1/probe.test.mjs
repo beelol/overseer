@@ -58,6 +58,21 @@ test('the guarded J7 variant contradicts the seeded J2 finding without changing 
   }
 });
 
+test('J8 reproduces both task routes from fresh isolated namespaces', async () => {
+  const root = new pg.Pool({ connectionString: process.env.ATLAS_DATABASE_URL });
+  try {
+    const j8 = await probeJob(root, 'j8');
+    assert.equal(j8.unguarded.foreignPatchStatus, 200);
+    assert.equal(j8.unguarded.taskAfter, 'changed-by-alice');
+    assert.equal(j8.guarded.foreignPatchStatus, 403);
+    assert.equal(j8.guarded.taskAfter, 'Bob task');
+    assert.notEqual(j8.unguarded.namespace, j8.guarded.namespace);
+    assert.equal(j8.discrepancy, 'taskOwnershipGuard fixture option');
+  } finally {
+    await root.end();
+  }
+});
+
 test('missing J5 queue is an environment blocker rather than a passing export check', async () => {
   const root = new pg.Pool({ connectionString: process.env.ATLAS_DATABASE_URL });
   try {

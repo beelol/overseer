@@ -104,6 +104,13 @@ const probes = {
 export async function probeJob(root, job: string, { variant } = {}) {
   const databaseUrl = process.env.ATLAS_DATABASE_URL;
   if (!databaseUrl) throw new Error('ATLAS_DATABASE_URL is required');
+  if (job === 'j8') {
+    if (variant) throw new Error(`unknown Atlas variant ${variant} for ${job}`);
+    const unguarded = await withWorker(root, databaseUrl, 'j8_unguarded', probes.j2);
+    const guarded = await withWorker(root, databaseUrl, 'j8_guarded', probes.j7,
+      { taskOwnershipGuard: true });
+    return { unguarded, guarded, discrepancy: 'taskOwnershipGuard fixture option' };
+  }
   if (!Object.hasOwn(probes, job)) throw new Error(`unknown Atlas job ${job}`);
   const variants = { j7: 'task-guarded', j5: 'export-queue-missing' };
   if (variant && variants[job] !== variant) {

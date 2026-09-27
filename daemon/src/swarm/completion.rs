@@ -117,6 +117,10 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
     if current.2 != "running" {
         bail!("swarm run is not running");
     }
+    if tx.prepare("SELECT 1 FROM swarm_conflicts WHERE run_id=?1 AND status!='resolved'")?
+        .exists([run])? {
+        bail!("open or unresolved evidence conflict blocks completion");
+    }
     let mut stmt = tx.prepare("SELECT id,plan_revision,status FROM swarm_jobs WHERE run_id=?1")?;
     let jobs = stmt
         .query_map(params![run], |r| {

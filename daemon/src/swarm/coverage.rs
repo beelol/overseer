@@ -82,7 +82,13 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
         } else {
             false
         };
-        let state = if contaminated { "contaminated" } else { match outcome {
+        let conflict_unresolved=store.conn.prepare(
+            "SELECT 1 FROM swarm_conflicts WHERE run_id=?1 AND status!='resolved'
+             AND (left_job_id=?2 OR right_job_id=?2)")?
+            .exists(params![run,job])?;
+        let state = if contaminated { "contaminated" }
+        else if conflict_unresolved { "conflict_unresolved" }
+        else { match outcome {
             Some("environment_failure") => "environment_blocked",
             _ if review_stale => "review_stale",
             Some("negative") if status == "accepted" => "checked_negative",
