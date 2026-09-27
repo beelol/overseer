@@ -40,7 +40,31 @@ Made from the sources with `sips -z N N <source> --out <export>`; the macOS icon
 ## Rules
 
 - Full colour wherever a surface allows colour; the single-colour glyph only where a surface tints one colour.
-- Do not recolour, stretch, add effects or put the full-colour mark on a busy background; on light grounds use the transparent mark as is.
+- Keep the mark's shape and proportions: do not stretch it, redraw it or swap in another mark. On light grounds use the transparent mark as is.
+- Effects are welcome (owner, 2026-09-27: "we do have effects"): motion, light and gradients moving through the mark, as on the phone's door (AC-136) and in Voice Mode (AC-177). An earlier version of this file forbade effects; that was not the owner's rule.
 - Provider logos (Claude, Codex, OpenCode and the rest in `extension/media/logos/`) are other companies' marks and stay as they are.
 - The old eye glyph is retired: no Overseer surface uses the eye any more. The codicon `eye` still means "watch" or "read only" where it is not Overseer's logo (following an agent's edits, tracking an agent in the grid, the read-only workspace).
-- One exception (owner, 2026-09-27, [AC-177](../overseer-rfc.md)): in Voice Mode the mark is animated and moves with the voice. Only there, only the animation the owner picks, and never stretched or recoloured. Design: [Voice Mode RFC](../rfcs/voice-mode.md#the-mark-in-the-middle).
+
+## The mark in layers (`docs/design/brand/layers/`)
+
+The owner's mark is one transparent image. For animation (Voice Mode, AC-177) a copy is cut into
+three layers on the same canvas, so they stack without offsets. The owner's file is not changed.
+
+| File | What |
+| --- | --- |
+| `overseer-logo-core.png` | The dark core with its rim and glow, as a whole disc. The part hidden behind the swooshes is rebuilt. |
+| `overseer-logo-swooshes.png` | The three swooshes as one ring. It turns around the core's centre. |
+| `overseer-logo-star.png` | The star and its light, lifted off the core. |
+| `split.py` | Makes the three from `overseer-logo.png`: `python3 docs/design/brand/layers/split.py`. Standard library only. |
+
+Stack them core, swooshes, star. On the 1254 px canvas the swooshes turn around 632.8, 642.8 and
+the star grows around 637.4, 640.6.
+
+Limits, stated plainly:
+
+- Stacked again they match the original closely, not exactly: the largest difference is 31 of 255,
+  and 50 pixels of 1.57 million differ by more than 8.
+- The three swooshes are not separated from each other. They overlap, and the hidden parts are not
+  in the image.
+- The inner edge of the swooshes has small flaws that can show in a slow full turn.
+- A layered file from whoever drew the mark would remove all three limits and replaces these files.

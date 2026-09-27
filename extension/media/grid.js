@@ -80,13 +80,14 @@
     empty.append(startBtn);
     // AC-106: the grid names itself in its own header, with the map of open views and the reset.
     const head = el('header', 'grid-head');
-    const headTitle = el('span', 'grid-head-title', 'Agent grid');
-    const headCount = el('span', 'grid-head-count');
     const whereBtn = ui.iconButton('location', 'Where am I', { cls: 'sm', shortcut: '⌥⌘M' }); whereBtn.id = 'grid-where';
     whereBtn.addEventListener('click', () => post({ type: 'command', command: 'overseer.whereAmI' }));
     const resetBtn = ui.iconButton('discard', 'Reset grid layout', { cls: 'sm' }); resetBtn.id = 'grid-reset';
     resetBtn.addEventListener('click', () => post({ type: 'command', command: 'overseer.resetGridLayout' }));
-    head.append(ui.icon('layout', 'sm'), headTitle, headCount, el('span', 'spacer'), whereBtn, resetBtn);
+    // The name and count are the header's label and tooltip: the grid's visible text stays within
+    // the AC-54 budget (the tiles already name every agent).
+    head.setAttribute('role', 'toolbar'); head.setAttribute('aria-label', 'Agent grid');
+    head.append(ui.icon('layout', 'sm'), el('span', 'spacer'), whereBtn, resetBtn);
     host.append(head, board, preview, full, trackBar, empty);
 
     /** Pinned (placed) agents always, up to 16; running agents fill up to the configured maximum. */
@@ -209,7 +210,7 @@
       }
       render();
       board.dataset.count = String(order.length);
-      headCount.textContent = `${order.length} of ${MAX}`;
+      head.title = `Agent grid: ${order.length} of ${MAX} tiles`; head.setAttribute('aria-label', head.title);
       empty.hidden = true; board.hidden = order.length === 0;
       saveLayout?.({ tree, custom });
       // No empty grid (AC-113): the host takes the user home instead.
