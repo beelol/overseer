@@ -227,7 +227,7 @@
       if (this.labels.has(ev.seq)) return;
       this.labels.set(ev.seq, label || '');
       this.all.push(ev); if (this.all.length > 20000) this.all.splice(0, this.all.length - 20000);
-      this.conversation.add(ev);
+      try { this.conversation.add(ev); } catch (error) { console.error('overseer: event not shown', ev && ev.kind, error); }
       if (this.logBuilt) this.logLine(ev);
       if (this.restored) this.scheduleBottom();
     }

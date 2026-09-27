@@ -333,6 +333,7 @@
           break;
         }
         case 'permission': {
+          if (p.auto_allowed) break; // Overseer's own tools: the daemon answered already (Gate S)
           const card = { el: el('div', 'perm-card'), tool: p.tool, input: p.input, run: ev.run_id || this.rootId };
           this.perms.set(p.request_id, card);
           this.container(ev).append(card.el);
@@ -409,15 +410,15 @@
 
     proposal(ev, p) {
       if (!this.proposals) this.proposals = new Map();
-      const card = ui.el('div', 'proposal'); card.setAttribute('role', 'group'); card.setAttribute('aria-label', 'Overseer proposes'); card.dataset.id = p.id;
-      const head = ui.el('div', 'proposal-head'); head.append(ui.mark('sm'), ui.el('span', null, 'Overseer will'));
-      const list = ui.el('ul', 'proposal-list');
-      for (const line of p.lines || []) list.append(ui.el('li', null, line));
-      if (p.note) list.append(ui.el('li', 'muted', p.note));
-      const status = ui.el('div', 'proposal-status'); status.setAttribute('role', 'status');
-      const yes = ui.el('button', 'btn primary sm', 'Yes'); yes.type = 'button'; yes.dataset.proposal = 'yes';
-      const no = ui.el('button', 'btn sm', 'No'); no.type = 'button'; no.dataset.proposal = 'no';
-      const row = ui.el('div', 'proposal-actions'); row.append(yes, no);
+      const card = el('div', 'proposal'); card.setAttribute('role', 'group'); card.setAttribute('aria-label', 'Overseer proposes'); card.dataset.id = p.id;
+      const head = el('div', 'proposal-head'); head.append(ui.mark('sm'), el('span', null, 'Overseer will'));
+      const list = el('ul', 'proposal-list');
+      for (const line of p.lines || []) list.append(el('li', null, line));
+      if (p.note) list.append(el('li', 'muted', p.note));
+      const status = el('div', 'proposal-status'); status.setAttribute('role', 'status');
+      const yes = el('button', 'btn primary sm', 'Yes'); yes.type = 'button'; yes.dataset.proposal = 'yes';
+      const no = el('button', 'btn sm', 'No'); no.type = 'button'; no.dataset.proposal = 'no';
+      const row = el('div', 'proposal-actions'); row.append(yes, no);
       card.append(head, list, row, status);
       const entry = { el: card, row, status, yes, no };
       this.proposals.set(p.id, entry);
