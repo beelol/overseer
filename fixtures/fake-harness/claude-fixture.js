@@ -293,6 +293,10 @@ async function mcpClient() {
     const actOnFindings = async (list, level) => {
       const lines = [];
       for (const f of list) {
+        if (/approve|owner/i.test(f.text)) {
+          // Words in a finding that ask for more than the level allows: the daemon, not the fixture, says no.
+          try { lines.push(await call('propose', { actions: [{ action: 'archive', agent: f.subject }] })); } catch (e) { lines.push('refused: ' + e.message); }
+        }
         if (f.result === 'stop') {
           lines.push(await call('propose', { actions: [{ action: 'hold', agent: f.subject, reason: 'stop finding from ' + f.watcher_title + ': ' + f.text }] }));
           if (level !== 'ask_first') lines.push(await call('propose', { actions: [{ action: 'redirect', agent: f.subject, text: 'Stop: put the tests back and make them pass instead of deleting them.' }] }));
