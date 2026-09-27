@@ -521,7 +521,7 @@
         "docs/verification/swarm/milestone-13.md",
         "docs/verification/swarm/SWARM-53.md"
       ],
-      "blocker": "Fixture late observations now survive worker exit and daemon restart, quarantine conflicting active or historically accepted attempts, invalidate coverage, interrupt affected supervised workers, retry within attempt/budget bounds on a fresh resource identity, and allow shared read-only access. Live tool/resource discovery, alias canonicalization, completed-run verdict revocation, unobserved planned-owner handling, external contamination proof, and full Atlas replay remain unavailable."
+      "blocker": "Fixture late observations survive worker exit and daemon restart, quarantine conflicting active or historically accepted attempts, invalidate coverage and even a prior completed-run verdict, interrupt affected supervised workers, retry within attempt/budget bounds on a fresh resource identity, and allow shared read-only access. Live tool/resource discovery, alias canonicalization, unobserved planned-owner handling, external contamination proof, and full Atlas replay remain unavailable."
     },
     "SWARM-54": {
       "status": "partial",
@@ -729,7 +729,7 @@
         "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Atlas v1 J2 replays lost-result-receipt and director death after dispatch admission: restart deduplicates the result retry, while startup recovers one supervised worker, retains its database-backed result and rejects old-generation commands. Separate daemon fixtures cover SQLite-full replay and synthetic late shared-database contamination with targeted interrupts, bounded retries, and historical observation over restart. Both one-job Atlas audits complete with accepted evidence; the other named S5 faults, Atlas-backed contamination/full storage, and full S1-sized ordered replay remain unverified. Live harness communication is absent."
+      "blocker": "Atlas v1 J2 replays lost-result-receipt and director death after dispatch admission: restart deduplicates the result retry, while startup recovers one supervised worker, retains its database-backed result and rejects old-generation commands. Separate daemon fixtures cover SQLite-full replay and synthetic late shared-database contamination with targeted interrupts, bounded retries, historical observation over restart, and completed-run verdict invalidation. Both one-job Atlas audits complete with accepted evidence; the other named S5 faults, Atlas-backed contamination/full storage, and full S1-sized ordered replay remain unverified. Live harness communication is absent."
     }
   }
 }
