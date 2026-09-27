@@ -23,17 +23,20 @@ Since then the script asks only about the steps a session did, records the setti
 window's state with every event, and writes each session's record to its own file
 (`marks-<date>-<time>.json`) beside the earlier ones.
 
-## The second session: three steps played for the owner
+## Three steps played for the owner, and the owner's confirmation
 
-`marks-20260927-050914.json` is a session the agent ran at the owner's request on 2026-09-27
-(05:09 UTC), with `--play once,system,closed`, on the same build. Each step was said aloud
-before it was played.
+At the owner's request the agent ran two more sessions on the same build on 2026-09-27 UTC
+(05:09 and 05:23), with `--play once,system,closed`. Each step was said aloud before it was
+played. The records are `marks-20260927-050914.json` and `marks-20260927-052324.json`; they
+say what was played.
 
-| Step | What the session did |
-| --- | --- |
-| Two agents at the same moment | two Claude fixture agents asked for permission together; Audio Mode on, Reactor, VS Code open |
-| System voice | track System voice (Daniel): an agent that completed, then one that asked for permission |
-| VS Code closed | the window was quit; then an agent that completed and one that asked for permission; Reactor |
+| Step | What the sessions did | Heard by the owner |
+| --- | --- | --- |
+| Two agents at the same moment | two Claude fixture agents asked for permission together; Audio Mode on, Reactor, VS Code open | yes |
+| System voice | track System voice (Daniel): an agent that completed, then one that asked for permission | yes |
+| VS Code closed | the window was quit; then an agent that completed and one that asked for permission; Reactor | yes |
 
-The record says what was played. What was heard is the owner's to say, and is not in it.
-The owner's Commander folder was not played: the session was not given a folder.
+The owner's confirmation, given in the conversation with the agent after the second of these
+sessions (2026-09-27 UTC): "ok yes it all worked as you described."
+
+Still to hear: the owner's own Commander folder. No session was given a folder.
