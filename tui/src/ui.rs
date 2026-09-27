@@ -500,7 +500,7 @@ fn audio_mode(f: &mut Frame, app: &App, area: Rect) {
     let h = 14.min(area.height.saturating_sub(2));
     let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
     let a = &app.audio;
-    let mode = if !a.loaded { "loading" } else if a.enabled { "ON" } else { "OFF" };
+    let mode = if !a.known { "unknown" } else if a.enabled { "ON" } else { "OFF" };
     let signal = if a.available { "ready" } else { "unavailable" };
     let commander = if a.commander_imported { "private folder ready" } else { "no private folder" };
     let voice = if a.voice.is_empty() { "system default" } else { a.voice.as_str() };

@@ -15,6 +15,11 @@ pub const PAGE: usize = 9;
 /// Pages of history fetched per run (5,000 events each), newest kept by the feed cap.
 const HISTORY_PAGES: usize = 10;
 const MAX_AUDIO_IMPORT_PATH: usize = 4096;
+/// How often the daemon is asked for its audio settings while connected, so a change made in
+/// another client counts within 2 s (T-23, T-24).
+const AUDIO_REFRESH: Duration = Duration::from_millis(1000);
+/// The same after an error (a daemon without audio methods): rarely.
+const AUDIO_RETRY: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Filter {
@@ -136,7 +141,7 @@ enum Pending {
     PrPrepare { run: String, plan: Value },
     PrPublish { run: String },
     PrOpened,
-    AudioGet { bell: bool },
+    AudioGet,
     AudioSet,
     AudioPreview,
     AudioVoices,
@@ -206,10 +211,13 @@ pub struct ChangesView {
     pub loading: bool,
 }
 
-/// The TUI only holds settings; the daemon owns playback and persistence.
+/// What the daemon last said about Audio Mode. The TUI keeps no audio setting of its own: the
+/// daemon owns the settings and the playback.
 #[derive(Debug, Clone)]
 pub struct AudioSettings {
-    pub loaded: bool,
+    /// The daemon's latest answer is in the fields below. False before the first answer, after an
+    /// answer with an error and while disconnected.
+    pub known: bool,
     pub enabled: bool,
     pub available: bool,
     pub track: String,
@@ -222,7 +230,7 @@ pub struct AudioSettings {
 
 impl Default for AudioSettings {
     fn default() -> Self {
-        Self { loaded: false, enabled: false, available: false, track: "reactor".into(),
+        Self { known: false, enabled: false, available: false, track: "reactor".into(),
             voice: String::new(), commander_imported: false, voices: Vec::new(), preview: 0,
             import_path: String::new() }
     }
@@ -231,13 +239,22 @@ impl Default for AudioSettings {
 impl AudioSettings {
     pub const CORE_KEYS: [&'static str; 3] = ["agent_started", "agent_complete", "agent_needs_attention"];
 
-    fn update(&mut self, value: &Value) {
-        self.loaded = true;
+    /// Takes the daemon's answer; true when it differs from what was known.
+    fn update(&mut self, value: &Value) -> bool {
+        let before = (self.known, self.enabled, self.available, self.track.clone(), self.voice.clone(), self.commander_imported);
+        self.known = true;
         self.enabled = value["enabled"].as_bool().unwrap_or(false);
         self.available = value["available"].as_bool().unwrap_or(false);
         self.track = value["track"].as_str().unwrap_or("reactor").to_string();
         self.voice = value["voice"].as_str().unwrap_or_default().to_string();
         self.commander_imported = value["commander_imported"].as_bool().unwrap_or(false);
+        before != (self.known, self.enabled, self.available, self.track.clone(), self.voice.clone(), self.commander_imported)
+    }
+
+    /// The daemon plays the cue for an agent that needs you, so the terminal bell stays quiet
+    /// (T-24). Only when its latest answer says so: in every other case the bell rings.
+    pub fn plays(&self) -> bool {
+        self.known && self.enabled && self.available
     }
 
     pub fn preview_key(&self) -> &'static str {
@@ -299,6 +316,11 @@ pub struct App {
     pub accounts: Vec<AccountRow>,
     pub account_sel: usize,
     pub audio: AudioSettings,
+    /// When to ask the daemon for its audio settings again.
+    audio_due: Option<Instant>,
+    audio_inflight: bool,
+    /// `S` was pressed before the daemon's first answer: open the panel when it arrives.
+    audio_wanted: bool,
     /// Set when a program must run with the terminal (the event loop suspends the TUI for it).
     pub exec: Option<Exec>,
     /// Zoom shows tool inputs and results under each tool call.
@@ -359,6 +381,9 @@ impl App {
             accounts: Vec::new(),
             account_sel: 0,
             audio: AudioSettings::default(),
+            audio_due: None,
+            audio_inflight: false,
+            audio_wanted: false,
             exec: None,
             expand_tools: false,
             waiting: HashSet::new(),
@@ -565,7 +590,10 @@ impl App {
     // ---------------------------------------------------------------- daemon messages
 
     pub fn handle_msg(&mut self, msg: Msg) {
-        self.dirty = true;
+        // The periodic audio question redraws only when its answer changes something.
+        if !matches!(&msg, Msg::Reply { id, .. } if matches!(self.pending.get(id), Some(Pending::AudioGet))) {
+            self.dirty = true;
+        }
         match msg {
             Msg::Connected => {
                 self.connected = true;
@@ -577,12 +605,20 @@ impl App {
                 self.connect_generation += 1;
                 self.state_inflight = false;
                 self.request_state();
+                // What the last connection said about audio may no longer hold.
+                self.audio.known = false;
+                self.audio_inflight = false;
+                self.request_audio();
             }
             Msg::Disconnected(why) => {
                 self.connected = false;
                 // Replies to requests on the old connection never come.
                 self.pending.clear();
                 self.state_inflight = false;
+                self.audio.known = false;
+                self.audio_inflight = false;
+                self.audio_due = None;
+                self.audio_wanted = false;
                 self.history_requested.retain(|r| self.feeds.get(r).is_some_and(|f| f.history_loaded));
                 if self.stopped {
                     self.say("Agents and daemon stopped. Press r to start the daemon again.", false);
@@ -610,13 +646,25 @@ impl App {
         self.request("state", json!({}), Pending::State);
     }
 
-    /// Timers: the debounced state reload. Returns true when something changed.
+    fn request_audio(&mut self) {
+        if self.audio_inflight {
+            return;
+        }
+        self.audio_inflight = true;
+        self.audio_due = None;
+        self.request("audio.get", json!({}), Pending::AudioGet);
+    }
+
+    /// Timers: the debounced state reload and the audio settings. Returns true when something changed.
     pub fn tick(&mut self, now: Instant) -> bool {
         let mut changed = false;
         if let Some(due) = self.state_due {
             if now >= due && self.connected {
                 self.request_state();
             }
+        }
+        if self.connected && self.audio_due.is_some_and(|due| now >= due) {
+            self.request_audio();
         }
         if let Some((_, at, _)) = &self.notice {
             if now.duration_since(*at) > Duration::from_secs(6) {
@@ -682,8 +730,11 @@ impl App {
                         self.waiting = now_waiting;
                         self.state = state;
                         if !first_load && !new.is_empty() {
-                            // Ask the daemon before ringing: Audio Mode may have changed in VS Code.
-                            self.request("audio.get", json!({}), Pending::AudioGet { bell: true });
+                            // Someone needs you: one signal (T-24). The daemon's cue when its latest
+                            // answer says it plays; in every other case the bell, in this same pass.
+                            if !self.audio.plays() {
+                                self.bell = true;
+                            }
                             if new.iter().all(|id| Some(id.as_str()) != self.focus.as_deref()) {
                                 let name = self.state.run(&new[0]).map(|r| r.title.clone()).unwrap_or_default();
                                 let more = if new.len() > 1 { format!(" and {} more", new.len() - 1) } else { String::new() };
@@ -711,15 +762,29 @@ impl App {
                 self.state_inflight = false;
                 self.say(format!("state: {e}"), true);
             }
-            (Pending::AudioGet { bell }, Ok(v)) => {
-                self.audio.update(&v);
-                if bell && !self.audio.enabled { self.bell = true; }
-                self.dirty = true;
+            (Pending::AudioGet, Ok(v)) => {
+                self.audio_inflight = false;
+                self.audio_due = Some(Instant::now() + AUDIO_REFRESH);
+                if self.audio.update(&v) {
+                    self.dirty = true;
+                }
+                if std::mem::take(&mut self.audio_wanted) {
+                    self.open_audio();
+                }
             }
-            (Pending::AudioGet { bell }, Err(e)) => {
-                // Old daemons still keep the TUI's existing attention bell.
-                if bell { self.bell = true; }
-                else { self.say(format!("Audio Mode is unavailable: {e}"), true); }
+            (Pending::AudioGet, Err(e)) => {
+                // A daemon without audio methods: nothing is known, so the bell keeps ringing.
+                self.audio_inflight = false;
+                self.audio_due = Some(Instant::now() + AUDIO_RETRY);
+                let asked = std::mem::take(&mut self.audio_wanted) || matches!(self.mode, Mode::Audio | Mode::AudioImport);
+                if self.audio.known || asked {
+                    self.audio.known = false;
+                    self.dirty = true;
+                }
+                if asked {
+                    self.mode = Mode::Grid;
+                    self.say(format!("Audio Mode is unavailable: {e}"), true);
+                }
             }
             (Pending::AudioSet, Ok(v)) => {
                 self.audio.update(&v);
@@ -1204,9 +1269,17 @@ impl App {
         }
     }
 
+    /// `S`: the panel opens on what the daemon said; without an answer yet it waits for one, and
+    /// a daemon without audio methods changes nothing.
     fn open_audio(&mut self) {
+        if !self.audio.known {
+            self.audio_wanted = true;
+            self.audio_inflight = false;
+            self.request_audio();
+            return;
+        }
         self.mode = Mode::Audio;
-        self.request("audio.get", json!({}), Pending::AudioGet { bell: false });
+        self.request_audio();
         self.request("audio.voices", json!({}), Pending::AudioVoices);
     }
 
@@ -1237,7 +1310,7 @@ impl App {
                 }
             }
             KeyCode::Char('i') => self.mode = Mode::AudioImport,
-            KeyCode::Char('r') => self.request("audio.get", json!({}), Pending::AudioGet { bell: false }),
+            KeyCode::Char('r') => self.request_audio(),
             _ => self.dirty = false,
         }
     }
