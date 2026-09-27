@@ -728,9 +728,18 @@ impl Daemon {
         }
         if let Err(error) = self.start_turn(&run.id, prompt, false) {
             // A supervisor recorded during start_turn may still be running
-            // even though a later database/event write failed. Recovery must
-            // inspect it before settling the child or releasing its pool.
-            if self.store.lock().unwrap().run_process(&run.id)?.is_none() {
+            // even though a later database/event write failed. Observe that
+            // same supervisor now; only its eventual settlement releases
+            // the pool claim. A pre-spawn failure has no process to observe.
+            let process = self.store.lock().unwrap().run_process(&run.id)?;
+            if let Some((dir, _, _)) = process {
+                self.spawn_tail(&run.id);
+                let current = self.run(&run.id)?;
+                if current.harness == "codex-app" && current.native_id.is_none() {
+                    self.watch_managed_codex_handshake(run.id.clone(),
+                        current.process_generation, PathBuf::from(dir));
+                }
+            } else {
                 self.mark_ended(&run, "failed", &format!("delegated launch failed: {error}"))?;
             }
             return Ok(json!({"work_unit_id":work_unit_id,"run":self.run(&run.id)?,"workspace":ws,"launch_error":error.to_string()}));

@@ -3889,6 +3889,34 @@ fn auto_post_spawn_write_failure_keeps_unknown_draw_claim_until_supervisor_settl
 }
 
 #[test]
+fn auto_post_spawn_write_failure_reattaches_without_a_daemon_restart() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "1000")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER reject_child_start_status BEFORE UPDATE OF status ON runs
+        WHEN NEW.status='starting' AND NEW.parent_run_id IS NOT NULL
+        BEGIN SELECT RAISE(FAIL, 'injected post-spawn status failure'); END;").unwrap();
+    let response = d.call("auto.dispatch", json!({"work_unit_id":"post-spawn-recover-local",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "prompt":"browser check"}));
+    assert_eq!(response["state"], "paused", "{response}");
+    let child = d.runs().into_iter().find(|run| run["parent_run_id"] == parent).unwrap();
+    let child_id = child["id"].as_str().unwrap();
+    db.execute_batch("DROP TRIGGER reject_child_start_status;").unwrap();
+    assert_eq!(d.wait_done(child_id, 10)["status"], "completed",
+        "the original supervisor should settle without requiring a daemon restart");
+    let claim: String = db.query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id='post-spawn-recover-local'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(claim, "released");
+}
+
+#[test]
 fn auto_supervisor_is_not_spawned_before_its_durable_identity_is_written() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
