@@ -617,9 +617,11 @@
         "daemon/src/swarm/availability.rs",
         "docs/verification/swarm/SWARM-59.md",
         "daemon/tests/swarm_dispatch_incident.rs",
-        "docs/verification/swarm/S4.md"
+        "docs/verification/swarm/S4.md",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. Live Auto Mode updates, a normal status UI, user-triggered target changes and live director behavior remain unverified."
+      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. A joined Atlas replay now blocks J4 after an injected external allowance reduction while preserving and accepting J2 backend evidence; an older generous admission snapshot cannot bypass the block. Live Auto Mode updates, numeric before/after allowance display, a normal status UI, user-triggered target changes and live director behavior remain unverified."
     },
     "SWARM-60": {
       "status": "partial",
@@ -687,7 +689,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins nine named Atlas v1 faults, adding SQLite-full artifact rejection, blocked admissions across restart and exactly-once evidence replay after recovery. Other named faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins ten named Atlas v1 faults, adding an injected external allowance drop that holds new admission while an active job retains accepted PostgreSQL evidence. Other named faults are not all replayed. Autonomous director/routing, real account outage and usage feed, complete fault/report traces, live communication and S0 remain unverified."
     }
   },
   "scenarios": {
@@ -752,7 +754,7 @@
         "docs/verification/swarm/S5.md",
         "fixtures/swarm/atlas-v1/probe-shared.mjs"
       ],
-      "blocker": "Atlas v1 joins nine named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, two scripted clients sharing one mutable PostgreSQL schema before isolated retries, 2,000 duplicate progress messages during Stop, both scripted last-result/Stop orderings, and full SQLite storage during an Atlas artifact write followed by recovery and replay. Separate daemon fixtures cover SQLite-full result/dispatch failures and completed-run contamination. Other named S5 faults, a full S1-sized ordered replay, and live provider communication remain unverified; automatic resource alias discovery is absent."
+      "blocker": "Atlas v1 joins ten named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, two scripted clients sharing one mutable PostgreSQL schema before isolated retries, 2,000 duplicate progress messages during Stop, both scripted last-result/Stop orderings, full SQLite storage during an Atlas artifact write followed by recovery and replay, and an injected external allowance reduction that holds J4 while J2 evidence survives. Separate daemon fixtures cover SQLite-full result/dispatch failures and completed-run contamination. Other named S5 faults, a full S1-sized ordered replay, numeric allowance history and live provider communication remain unverified; automatic resource alias discovery is absent."
     }
   }
 }
