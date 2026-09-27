@@ -5,10 +5,11 @@
 
 use crate::daemon::{Daemon, ACTIVE};
 use crate::paths;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use serde_json::{json, Value};
 use std::os::unix::io::AsRawFd;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
@@ -268,7 +269,29 @@ fn fixture_only() -> Result<()> {
     }
 }
 
+fn storage_fault(error: &anyhow::Error) -> bool {
+    error.chain().filter_map(|cause| cause.downcast_ref::<rusqlite::Error>())
+        .any(|error| matches!(error, rusqlite::Error::SqliteFailure(code, _)
+            if matches!(code.code, rusqlite::ErrorCode::DiskFull |
+                rusqlite::ErrorCode::SystemIoFailure | rusqlite::ErrorCode::ReadOnly)))
+}
+
+fn require_swarm_storage(d: &Daemon) -> Result<()> {
+    if d.swarm_storage_blocked.load(Ordering::SeqCst) {
+        bail!("swarm storage is blocked; recover write capacity before launching new work");
+    }
+    Ok(())
+}
+
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
+    let result = dispatch_inner(d, method, p);
+    if method.starts_with("swarm.") && result.as_ref().is_err_and(storage_fault) {
+        d.swarm_storage_blocked.store(true, Ordering::SeqCst);
+    }
+    result
+}
+
+fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
         "state" => d.state()?,
@@ -299,7 +322,30 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "swarm.director.launch" => {
             fixture_only()?;
+            require_swarm_storage(d)?;
             crate::swarm::launch_director(d,p)?
+        }
+        "swarm.storage.status" => json!({"state":if d.swarm_storage_blocked.load(Ordering::SeqCst) { "blocked" } else { "ready" }}),
+        "swarm.storage.recover" => {
+            let _serial = d.swarm_launch_lock.lock().unwrap();
+            let mut store = d.store.lock().unwrap();
+            let tx = store.conn.transaction()?;
+            tx.execute("INSERT INTO meta(key,value) VALUES(?1,?2)",
+                rusqlite::params![format!("swarm.storage.probe.{}", uuid::Uuid::new_v4()), "x".repeat(32 * 1024)])?;
+            tx.rollback()?;
+            d.swarm_storage_blocked.store(false, Ordering::SeqCst);
+            json!({"state":"ready"})
+        }
+        "swarm.storage.limit_pages" => {
+            fixture_only()?;
+            let store = d.store.lock().unwrap();
+            let pages: i64 = match p["mode"].as_str() {
+                Some("current") => store.conn.pragma_query_value(None, "page_count", |r| r.get(0))?,
+                Some("unlimited") => 4_294_967_294,
+                _ => bail!("invalid storage limit mode"),
+            };
+            store.conn.pragma_update(None, "max_page_count", pages)?;
+            json!({"max_page_count":pages})
         }
         "swarm.get" => crate::swarm::get(&d.store.lock().unwrap(), s(p, "id")?)?,
         "swarm.plan" => {
@@ -310,6 +356,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.coverage" => crate::swarm::coverage_report(&d.store.lock().unwrap(), p)?,
         "swarm.attempt.register" => {
             fixture_only()?;
+            require_swarm_storage(d)?;
             crate::swarm::register(&mut d.store.lock().unwrap(), p)?
         }
         "swarm.report" => crate::swarm::report(&mut d.store.lock().unwrap(), p)?,
@@ -402,21 +449,25 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.admit" => {
             fixture_only()?;
             let _serial = d.swarm_launch_lock.lock().unwrap();
+            require_swarm_storage(d)?;
             let pending = d.pending_agent_slots.lock().unwrap();
             crate::swarm::admit(&mut d.store.lock().unwrap(), p, *pending)?
         }
         "swarm.schedule.next" => {
             fixture_only()?;
             let _serial = d.swarm_launch_lock.lock().unwrap();
+            require_swarm_storage(d)?;
             let pending = d.pending_agent_slots.lock().unwrap();
             crate::swarm::schedule_next(&mut d.store.lock().unwrap(), p, *pending)?
         }
         "swarm.dispatch.next" => {
             fixture_only()?;
+            require_swarm_storage(d)?;
             crate::swarm::dispatch_next(d, p)?
         }
         "swarm.worker.launch" => {
             fixture_only()?;
+            require_swarm_storage(d)?;
             crate::swarm::launch_worker(d, p)?
         }
         "swarm.effect.begin" => {

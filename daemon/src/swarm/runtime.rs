@@ -9,6 +9,7 @@ use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 const UNKNOWN_AFTER_MS: i64 = 60_000;
@@ -21,6 +22,9 @@ const STOP_RETRY_MS: i64 = 5_000;
 /// private 0600 launch file and process environment.
 pub fn launch_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let _serial = d.swarm_launch_lock.lock().unwrap();
+    if d.swarm_storage_blocked.load(Ordering::SeqCst) {
+        bail!("swarm storage is blocked; recover write capacity before launching new work");
+    }
     let run = required(p,"run_id")?;
     let generation = p["generation"].as_i64().ok_or_else(|| anyhow!("missing generation"))?;
     let repo = required(p,"repo")?;
@@ -160,6 +164,9 @@ pub fn sample_due_workers(d: &Arc<Daemon>, now: i64) -> Result<usize> {
 
 pub fn launch_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let _serial = d.swarm_launch_lock.lock().unwrap();
+    if d.swarm_storage_blocked.load(Ordering::SeqCst) {
+        bail!("swarm storage is blocked; recover write capacity before launching new work");
+    }
     launch_worker_locked(d,p)
 }
 

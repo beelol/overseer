@@ -9,9 +9,13 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 pub fn next(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let _serial = d.swarm_launch_lock.lock().unwrap();
+    if d.swarm_storage_blocked.load(Ordering::SeqCst) {
+        bail!("swarm storage is blocked; recover write capacity before launching new work");
+    }
     let id = required(p, "request_id")?;
     let repo = required(p, "repo")?;
     let program = required(p, "program")?;

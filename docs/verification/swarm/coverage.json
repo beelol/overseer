@@ -491,7 +491,7 @@
         "docs/verification/swarm/milestone-9.md",
         "docs/verification/swarm/SWARM-50.md"
       ],
-      "blocker": "Injected SQLite failures during result state update and reservation insertion roll back atomically; live launch intent, disk-full recovery, and persisted blocked-state UX remain unimplemented."
+      "blocker": "Injected SQLite failures roll back result and reservation writes. A real SQLITE_FULL now blocks admissions and scripted launches until a write probe succeeds; same-ID result replay commits once. Discovery and dispatch-intent fault replay, restart-time storage re-probe, in-flight process creation under full storage, and live paths remain unverified."
     },
     "SWARM-51": {
       "status": "partial",

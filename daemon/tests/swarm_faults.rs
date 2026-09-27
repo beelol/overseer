@@ -67,6 +67,40 @@ fn failed_result_write_is_not_acknowledged_or_partially_submitted() {
 }
 
 #[test]
+fn full_storage_blocks_new_admissions_until_write_capacity_recovers() {
+    let d = Daemon::start(&[]);
+    let run = planned(&d, "Full storage");
+    let attempt = d.call("swarm.attempt.register",
+        json!({"run_id":run,"job_id":"audit","generation":1,"revision":1}));
+    let other = planned(&d, "Waiting category");
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
+    let admission = json!({"run_id":other,"generation":1,"revision":1,"job_id":"audit",
+        "target_id":"codex-a","request_id":"after-full","now_ms":now,
+        "snapshot":{"version":1,"observed_ms":now-1000,"expires_ms":now+60000,
+            "targets":[{"id":"codex-a","account_id":"account-a","pool_ids":["shared"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"shared","windows":[{"id":"week","unit":"points",
+                "remaining_milli":60000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":now+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":1000},"purpose":"worker"});
+    d.call("swarm.storage.limit_pages", json!({"mode":"current"}));
+    let report = json!({"run_id":run,"job_id":"audit","attempt_id":attempt["id"],
+        "token":attempt["token"],"message_id":"full-result","type":"result",
+        "revision":1,"payload":{"artifact_ids":[],"note":"x".repeat(28_000)}});
+    assert!(d.try_call("swarm.report", report.clone()).is_err());
+    assert_eq!(d.call("swarm.storage.status", json!({}))["state"], "blocked");
+    assert_eq!(d.call("state", json!({}))["daemon"]["swarm_storage"], "blocked");
+    assert!(d.try_call("swarm.admit", admission.clone()).unwrap_err().contains("storage"));
+    assert!(d.try_call("swarm.storage.recover", json!({})).is_err());
+    assert_eq!(d.call("swarm.storage.status", json!({}))["state"], "blocked");
+    d.call("swarm.storage.limit_pages", json!({"mode":"unlimited"}));
+    assert_eq!(d.call("swarm.storage.recover", json!({}))["state"], "ready");
+    assert_eq!(d.call("swarm.report", report.clone())["duplicate"], false);
+    assert_eq!(d.call("swarm.report", report)["duplicate"], true);
+    assert_eq!(d.call("swarm.admit", admission)["status"], "admitted");
+}
+
+#[test]
 fn failed_reservation_rolls_back_attempt_and_retry_succeeds_once() {
     let mut d = Daemon::start(&[]);
     let run = planned(&d, "Reservation write fault");
