@@ -5,7 +5,7 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **110 / 202** · **14** partial (see [ledger](docs/verification/README.md)). Unverified:
+criteria: **110 / 202** · **15** partial (see [ledger](docs/verification/README.md)). Unverified:
 AC-41, AC-53, AC-64, AC-66, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97, AC-98, AC-114, AC-115, AC-116, AC-117, AC-118, AC-119, AC-120, AC-121, AC-122, AC-123, AC-124, AC-125, AC-126, AC-127, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-134, AC-135, AC-136, AC-137, AC-138, AC-139, AC-140, AC-141, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-165, AC-166, AC-167, AC-168, AC-169, AC-170, AC-171, AC-172, AC-173, AC-174, AC-175, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
@@ -23,6 +23,7 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 - Answer the nine questions at the end of the [Voice Mode RFC](docs/rfcs/voice-mode.md#open-questions-for-the-owner); its defaults stand until then [Gate R, AC-162 to AC-177].
 - Turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-83].
 - Work a short session offline: `node test/local/owner-session.js start` opens an isolated VS Code and prints the steps; `node test/local/owner-session.js report` records it [AC-97].
+- Run *Overseer: Test Notification* in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder [AC-179].
 - Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed session of the phone app when its agent finishes [AC-133].
 
 ## Acceptance criteria
@@ -211,7 +212,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-176** Voice Mode by voice (owner-confirmed) — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-176.md)
 - [ ] **AC-177** The mark shows it is hearing you — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-177.md)
 - [ ] **AC-178** The phone app uses the owner's mark — not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files — [evidence](docs/verification/AC-178.md)
-- [ ] **AC-179** The Mac surfaces use the owner's mark — not started (Brand, added by the owner on 2026-09-27): the Mac helper's icon is built with AC-142; a menu-bar item does not exist yet — [evidence](docs/verification/AC-179.md)
+- [ ] **AC-179** The Mac surfaces use the owner's mark — ◐ partial: the notification helper's `.icns` is built from `docs/design/brand/exports/overseer-app-icon-macos-1024.png` by `extension/notifier/build.js` (sips for every macOS size, iconutil); the brand scenario unpacks the installed helper's icon and finds every size, the owner's violet tile (`node test/ui/scenario-brand.js`); Overseer has no menu-bar item and no other Mac app, so those parts do not apply yet / deferred: a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission; the menu-bar image when a menu-bar item exists — [evidence](docs/verification/AC-179.md)
 - [x] **AC-180** Spikes before lock-in — [evidence](docs/verification/AC-180.md)
 - [x] **AC-181** Overseer lives in the daemon — [evidence](docs/verification/AC-181.md)
 - [ ] **AC-182** One conversation, from home — not started (Gate S, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-182.md)
@@ -463,7 +464,7 @@ the owner action or decision each one needs.
 - [ ] [AC-176](docs/verification/AC-176.md) (Voice Mode by voice (owner-confirmed)): Not started (Gate R, added by the owner on 2026-09-27).
 - [ ] [AC-177](docs/verification/AC-177.md) (The mark shows it is hearing you): Not started (Gate R, added by the owner on 2026-09-27).
 - [ ] [AC-178](docs/verification/AC-178.md) (The phone app uses the owner's mark): Not started: the phone app's agent (Gate N) replaces its placeholder marks with the owner's files in docs/design/brand/.
-- [ ] [AC-179](docs/verification/AC-179.md) (The Mac surfaces use the owner's mark): Not started: verified with AC-142's merge for the helper; the menu-bar part waits for a menu-bar item.
+- [ ] [AC-179](docs/verification/AC-179.md) (The Mac surfaces use the owner's mark): Owner: run Overseer: Test Notification in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder.
 - [ ] [AC-182](docs/verification/AC-182.md) (One conversation, from home): Not started (Gate S, added by the owner on 2026-09-27).
 - [ ] [AC-183](docs/verification/AC-183.md) (A digest of every agent): The remaining fields fill in with AC-185 to AC-193; the handed-off case waits for Continuity on main.
 - [ ] [AC-185](docs/verification/AC-185.md) (A fixed set of actions, on one agent or all, each with its card): The card rows in the UI come with AC-199.
