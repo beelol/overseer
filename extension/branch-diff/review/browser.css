@@ -124,3 +124,18 @@ button.open-native { min-width: 26px; }
 .file-header { flex-wrap: nowrap; }
 .file-header > * { flex: none; }
 .file-header .file-path { flex: 0 1 auto; }
+/* Overseer (AC-99): the navigator covers the whole worktree. Changes only / All files toggle,
+   counts beside changed files, folders holding changes marked, unchanged files opened as plain text. */
+#nav-head { display: flex; align-items: center; gap: 4px; margin: 0 4px 10px; }
+#nav-head #filter { flex: 1; min-width: 0; width: auto; margin: 0; }
+#changes-only { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 3px; background: transparent; border: 1px solid transparent; color: var(--vscode-icon-foreground); }
+#changes-only[aria-pressed="true"] { background: var(--vscode-inputOption-activeBackground, var(--vscode-list-inactiveSelectionBackground)); border-color: var(--vscode-inputOption-activeBorder, transparent); color: var(--vscode-inputOption-activeForeground, var(--vscode-foreground)); }
+.file .counts { display: flex; gap: 4px; margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; }
+.file .counts:empty { display: none; }
+.file .counts + .status { margin-left: 0; }
+.folder summary.has-changes::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--vscode-gitDecoration-modifiedResourceForeground); vertical-align: middle; }
+.tree-note { padding: 5px 7px; color: var(--vscode-descriptionForeground); font-size: 12px; }
+.tree-more { margin: 4px 7px; font-size: 12px; }
+.close-file { display: flex; align-items: center; justify-content: center; padding: 3px; }
+.close-file[hidden] { display: none; }
+.diff-file.browsed .stats { display: none; }

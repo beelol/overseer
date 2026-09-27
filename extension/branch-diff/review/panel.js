@@ -8,6 +8,22 @@ const vscode = require('vscode');
 const { randomBytes } = require('crypto');
 const { Comparison, contains } = require('./comparison');
 const { Editing } = require('./editing');
+const path = require('path');
+const fsp = require('fs').promises;
+
+/** One folder of the worktree for the file navigator: folders first, then files; .git is left out. */
+async function listDir(root, relPath) {
+  const parts = relPath.split('/').filter(Boolean);
+  if (parts.includes('..')) return { error: 'Invalid folder.' };
+  const dir = path.join(root.fsPath, ...parts);
+  if (path.relative(root.fsPath, dir).split(path.sep).includes('..')) return { error: 'Invalid folder.' };
+  try {
+    const items = await fsp.readdir(dir, { withFileTypes: true });
+    const entries = items.filter(d => !(parts.length === 0 && d.name === '.git')).map(d => ({ name: d.name, dir: d.isDirectory() }))
+      .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1));
+    return { entries };
+  } catch (error) { return { error: error.code === 'ENOENT' ? 'This folder no longer exists.' : error.message }; }
+}
 const escapeAttribute = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 class ReviewManager {
@@ -62,7 +78,7 @@ class ReviewManager {
     const panel = this.panels.get(session);
     if (panel) {
       const o = session.overseer || {};
-      panel.title = `Review: ${o.runTitle || 'run'} (${snapshot.entries.length})`;
+      panel.title = `Review: ${o.runTitle || 'run'} (${snapshot.entries.filter(e => !e.browsed).length})`;
       panel.webview.postMessage(this.message(session, snapshot));
     }
   }
@@ -77,7 +93,7 @@ class ReviewManager {
     return { type: 'snapshot', version: snapshot.version, description: snapshot.description, mode: snapshot.mode,
       repository: session.repo.rootUri.toString(), target: session.target || '', overseer: this.overseerInfo(session),
       checking: !!snapshot.checking, warning: snapshot.warning, error: snapshot.error, settings: this.settings(session.repo),
-      entries: snapshot.entries.map(e => ({ id: e.id, path: e.relPath, status: this.host.statusLetter(e.status),
+      entries: snapshot.entries.map(e => ({ id: e.id, path: e.relPath, status: e.browsed ? '' : this.host.statusLetter(e.status), browsed: !!e.browsed,
         pending: !!e.pending, unsaved: !!e.unsaved, conflicted: !!e.conflicted, readOnly: !!e.readOnly, revision: e.revision, problem: e.problem })) };
   }
 
@@ -128,6 +144,11 @@ class ReviewManager {
             send({ type: 'hunkReviewed', key: message.key, reviewed: !!message.reviewed });
             return;
           }
+          // AC-99: the navigator's All files view lists the worktree one folder at a time, and any
+          // file opens in the review (an unchanged one joins the comparison as a browsed file).
+          if (message.type === 'listDir') { send({ type: 'dir', path: String(message.path || ''), ...await listDir(session.repo.rootUri, String(message.path || '')) }); return; }
+          if (message.type === 'browse') { if (!session.browse(String(message.path || ''))) send({ type: 'notice', message: 'That file cannot be opened in the review.' }); return; }
+          if (message.type === 'unbrowse') { session.unbrowse(String(message.path || '')); return; }
           if (message.type === 'followResume') { this.host.setFollow(session.overseer?.runId, 'following'); this.postOverseer(session); return; }
           if (!['body', 'open', 'openFile'].includes(message.type) || typeof message.id !== 'string' || !Number.isSafeInteger(message.version)) return;
           if (message.type === 'open' || message.type === 'openFile') {
@@ -176,7 +197,7 @@ class ReviewManager {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${panel.webview.cspSource} 'unsafe-inline'; font-src ${panel.webview.cspSource}; img-src ${panel.webview.cspSource} data:; worker-src blob:; connect-src 'none';">
 <link rel="stylesheet" href="${escapeAttribute(panel.webview.asWebviewUri(vscode.Uri.joinPath(codicons, 'codicon.css')))}"><link rel="stylesheet" href="${asset('review.css')}"><title>Overseer Review</title></head>
 <body data-home="${escapeAttribute(require('os').homedir())}" data-run-id="${escapeAttribute(session.overseer?.runId || '')}" data-monaco="${asset('monaco.js')}" data-monaco-css="${asset('monaco.css')}" data-repository="${escapeAttribute(session.repo.rootUri.toString())}" data-mode="${escapeAttribute(session.mode)}" data-target="${escapeAttribute(session.target || '')}"><header id="toolbar"><button id="toggle-navigator" class="icon" aria-label="Toggle file navigator" title="Toggle file list" aria-expanded="true"><span class="codicon codicon-list-tree" aria-hidden="true"></span></button><button id="base" class="base" title="Comparison base">${baseIcon}<span id="base-label">Comparison</span></button><select id="scope" aria-label="Changes to show" title="Changes to show"><option value="all">All changes</option><option value="staged">Staged</option><option value="unstaged">Unstaged</option><option value="untracked">Untracked</option></select><strong id="comparison">Review</strong><span id="total"></span><span id="loading-stage" role="status"></span><span class="spacer"></span><button id="follow" class="icon" aria-pressed="false" aria-label="Follow the agent" title="Follow the agent's edits"><span class="codicon codicon-eye-closed" aria-hidden="true"></span></button><span id="follow-state" class="visually-hidden" role="status"></span><select id="layout" aria-label="Diff layout" title="Diff layout"><option value="unified">Unified</option><option value="split">Split</option></select><button id="refresh" class="icon" aria-label="Refresh" title="Refresh"><span class="codicon codicon-refresh" aria-hidden="true"></span></button></header>
-<div id="notice" role="status" hidden></div><div id="workspace-note" role="note"></div><main id="review"><nav id="navigator" aria-label="Changed files"><input id="filter" placeholder="Filter files…" aria-label="Filter changed files"><div id="tree" role="tree" aria-label="Changed file tree"></div></nav><div id="resize" role="separator" tabindex="0" aria-label="Resize file navigator" aria-orientation="vertical"></div><section id="diffs" aria-label="All file diffs" tabindex="0"><p class="empty" role="status">Finding changed files…</p></section></main>
+<div id="notice" role="status" hidden></div><div id="workspace-note" role="note"></div><main id="review"><nav id="navigator" aria-label="Files"><div id="nav-head"><input id="filter" placeholder="Filter files…" aria-label="Filter files"><button id="changes-only" aria-pressed="true" title="Changes only: show only changed files. Click to browse every file in the worktree." aria-label="Changes only"><span class="codicon codicon-diff" aria-hidden="true"></span></button></div><div id="tree" role="tree" aria-label="File tree"></div></nav><div id="resize" role="separator" tabindex="0" aria-label="Resize file navigator" aria-orientation="vertical"></div><section id="diffs" aria-label="All file diffs" tabindex="0"><p class="empty" role="status">Finding changed files…</p></section></main>
 <script type="module" nonce="${nonce}" src="${asset('review.js')}"></script></body></html>`;
     if (waitForComparison) await session.ready(); else session.ready().catch(() => {});
     return panel;

@@ -1,7 +1,9 @@
 // Modified for Overseer from Branch Diff (Local) review/browser.js (MIT): adds the
 // comparison/base control, Follow (off/following/paused), agent-edit reveal, restores
 // the saved scroll anchor once the rows above it have rendered (after reload/restart), and
-// per-hunk Accept (mark reviewed) / Reject (restore the base text through the native edit path).
+// per-hunk Accept (mark reviewed) / Reject (restore the base text through the native edit path),
+// and (AC-99) a file navigator over the whole worktree: Changes only or All files, where any file
+// opens inside the review (an unchanged one as plain editable text).
 import './browser.css';
 import { StatisticsWorker } from './statistics-client';
 import { EditingClient, replaceText } from './editing-client';
@@ -27,6 +29,12 @@ let requestId = 0, clicked, classifying = false, renderFrame, stopped = false;
 let snapshot, settings = {}, selected = saved.selected, initialized = false, restoring = true;
 let rendering = false, nextSnapshot, pendingJump, hierarchy = saved.hierarchy;
 let frame, resizeFrame, persistTimer, progressTimer, pendingState;
+// AC-99: 'changes' or 'all' once the user picks; until then Changes only while the agent has changes.
+let navMode = saved.navMode === 'all' || saved.navMode === 'changes' ? saved.navMode : undefined;
+const openDirs = new Set(saved.openDirs || []);
+const dirCache = new Map(); // folder path -> { loading } | { entries } | { error }
+let pendingBrowse;
+const changesOnlyButton = document.getElementById('changes-only');
 const editing = new EditingClient({ vscode, saved, repository: identity.repository, snapshot: () => snapshot, settings: () => settings, notice: stickyMessage, changed: row => { if (!rows.has(row.entry.id)) release(row); else { if (row.largeWhileEditing && !row.editor?.getModifiedEditor().hasTextFocus()) { row.largeWhileEditing = false; row.renderedRevision = undefined; } ensure(row); updateViewport(); } } });
 filter.value = saved.filter || '';
 layout.value = saved.layout === 'split' ? 'split' : 'unified';
@@ -51,7 +59,8 @@ function persist() {
   if (document.visibilityState === 'hidden' || !diffs.clientHeight) return;
   pendingState = { ...identity, layout: layout.value, closedFiles: [...closedFiles], closedFolders: [...closedFolders],
     navWidth, navCollapsed: document.body.classList.contains('nav-collapsed'), filter: filter.value,
-    selected, scrollTop: diffs.scrollTop, anchor: restoreGoal ? { id: restoreGoal.id, offset: restoreGoal.offset } : anchor(), hierarchy };
+    selected, scrollTop: diffs.scrollTop, anchor: restoreGoal ? { id: restoreGoal.id, offset: restoreGoal.offset } : anchor(), hierarchy,
+    navMode, openDirs: [...openDirs] };
   persistTimer = setTimeout(flushState, 100);
 }
 function flushState() {
@@ -119,10 +128,60 @@ function jump(id) {
   diffs.scrollTop = row.element.offsetTop;
   select(id); row.header.focus({ preventScroll: true }); updateViewport(); persist();
 }
+function changedEntries() { return (snapshot?.entries || []).filter(e => !e.browsed); }
+function changesOnly() { return navMode ? navMode === 'changes' : changedEntries().length > 0; }
+function countsText(id) {
+  const data = id && rows.get(id)?.element.dataset;
+  return data && data.additions !== undefined ? [data.additions, data.deletions] : undefined;
+}
+function fileButton(relPath, entry) {
+  const changed = !!entry && !entry.browsed;
+  const button = node('button', 'file' + (entry && entry.id === selected ? ' active' : '') + (changed ? ' changed' : ''));
+  if (entry) button.dataset.id = entry.id;
+  button.dataset.path = relPath;
+  button.title = relPath + (entry?.unsaved ? ' (unsaved)' : '') + (entry?.conflicted ? ' (conflicted)' : '') + (entry?.readOnly ? ' (staged: read-only)' : '');
+  button.setAttribute('role', 'treeitem'); button.setAttribute('aria-selected', String(!!entry && entry.id === selected));
+  button.setAttribute('aria-label', [relPath, changed && entry.status, entry?.unsaved && 'unsaved', entry?.conflicted && 'conflicted'].filter(Boolean).join(', '));
+  // Codicon per file, plus markers: conflicted (warning) and unsaved (filled dot).
+  const icon = node('span', 'codicon codicon-' + (entry?.conflicted ? 'warning' : 'file')); icon.setAttribute('aria-hidden', 'true');
+  button.append(icon, node('span', 'file-name', relPath.split('/').pop()));
+  if (entry?.unsaved) { const m = node('span', 'marker codicon codicon-circle-filled'); m.title = 'Unsaved edits'; m.setAttribute('aria-hidden', 'true'); button.append(m); }
+  if (changed) {
+    const counts = node('span', 'counts'); const c = countsText(entry.id);
+    if (c) counts.replaceChildren(node('span', 'additions', '+' + c[0]), node('span', 'deletions', '−' + c[1]));
+    button.append(counts, node('span', 'status status-' + entry.status, entry.status));
+  }
+  if (entry?.conflicted) button.classList.add('conflicted');
+  button.addEventListener('click', () => openPath(relPath));
+  return button;
+}
+/** Opens any worktree file in the review: jump to its row, or ask for it as a browsed file. */
+function openPath(relPath) {
+  const entry = snapshot?.entries.find(e => e.path === relPath);
+  if (entry) { jump(entry.id); return; }
+  pendingBrowse = relPath;
+  vscode.postMessage({ type: 'browse', path: relPath });
+}
+function listDir(dirPath) {
+  if (!dirCache.has(dirPath)) { dirCache.set(dirPath, { loading: true }); vscode.postMessage({ type: 'listDir', path: dirPath }); }
+  return dirCache.get(dirPath);
+}
 function renderTree() {
+  const only = changesOnly();
+  changesOnlyButton.setAttribute('aria-pressed', String(only));
+  changesOnlyButton.title = only ? 'Changes only: showing changed files. Click to browse every file in the worktree.' : 'All files: showing the whole worktree. Click to show only changed files.';
+  changesOnlyButton.setAttribute('aria-label', only ? 'Changes only' : 'All files');
+  document.body.dataset.nav = only ? 'changes' : 'all';
+  const fragment = document.createDocumentFragment();
+  if (only) populateChanges(fragment); else populateAll('', fragment);
+  const navigator = document.getElementById('navigator');
+  const scrollTop = navigator.scrollTop;
+  tree.replaceChildren(fragment); navigator.scrollTop = scrollTop;
+}
+function populateChanges(fragment) {
   const root = { dirs: new Map(), files: [] };
   const query = filter.value.toLocaleLowerCase();
-  for (const entry of snapshot?.entries || []) {
+  for (const entry of changedEntries()) {
     if (!entry.path.toLocaleLowerCase().includes(query)) continue;
     const parts = entry.path.split('/'); parts.pop(); let dir = root;
     for (const part of parts) { if (!dir.dirs.has(part)) dir.dirs.set(part, { dirs: new Map(), files: [] }); dir = dir.dirs.get(part); }
@@ -137,25 +196,46 @@ function renderTree() {
       group.addEventListener('toggle', () => { if (group.open) closedFolders.delete(key); else closedFolders.add(key); persist(); });
       populate(child, children, key); parent.append(group);
     }
-    for (const entry of dir.files) {
-      const button = node('button', 'file' + (entry.id === selected ? ' active' : ''));
-      button.dataset.id = entry.id; button.title = entry.path + (entry.unsaved ? ' (unsaved)' : '') + (entry.conflicted ? ' (conflicted)' : '') + (entry.readOnly ? ' (staged: read-only)' : '');
-      button.setAttribute('role', 'treeitem'); button.setAttribute('aria-selected', String(entry.id === selected));
-      button.setAttribute('aria-label', [entry.path, entry.status, entry.unsaved && 'unsaved', entry.conflicted && 'conflicted'].filter(Boolean).join(', '));
-      // Codicon per file, plus markers: conflicted (warning) and unsaved (filled dot).
-      const icon = node('span', 'codicon codicon-' + (entry.conflicted ? 'warning' : 'file')); icon.setAttribute('aria-hidden', 'true');
-      button.append(icon, node('span', 'file-name', entry.path.split('/').pop()));
-      if (entry.unsaved) { const m = node('span', 'marker codicon codicon-circle-filled'); m.title = 'Unsaved edits'; m.setAttribute('aria-hidden', 'true'); button.append(m); }
-      button.append(node('span', 'status status-' + entry.status, entry.status));
-      if (entry.conflicted) button.classList.add('conflicted');
-      button.addEventListener('click', () => jump(entry.id)); parent.append(button);
-    }
+    for (const entry of dir.files) parent.append(fileButton(entry.path, entry));
   };
-  const navigator = document.getElementById('navigator');
-  const scrollTop = navigator.scrollTop;
-  const fragment = document.createDocumentFragment(); populate(root, fragment, '');
-  tree.replaceChildren(fragment); navigator.scrollTop = scrollTop;
+  populate(root, fragment, '');
 }
+// All files: the worktree one folder at a time (listed when opened); changed files keep their
+// status and counts, and folders holding changes are marked.
+function populateAll(dirPath, parent) {
+  const listing = listDir(dirPath);
+  if (listing.loading) { parent.append(node('div', 'tree-note', 'Loading…')); return; }
+  if (listing.error) { parent.append(node('div', 'tree-note', listing.error)); return; }
+  const byPath = new Map((snapshot?.entries || []).map(e => [e.path, e]));
+  const changedDirs = new Set();
+  for (const e of changedEntries()) { const parts = e.path.split('/'); for (let i = 1; i < parts.length; i++) changedDirs.add(parts.slice(0, i).join('/')); }
+  const query = filter.value.toLocaleLowerCase();
+  const limit = listing.limit || 500;
+  let shown = 0;
+  for (const item of listing.entries) {
+    const rel = dirPath ? dirPath + '/' + item.name : item.name;
+    if (query && !item.dir && !item.name.toLocaleLowerCase().includes(query)) continue;
+    if (shown++ >= limit) {
+      const more = node('button', 'tree-more', `Show more (${listing.entries.length - limit} left)`);
+      more.addEventListener('click', () => { listing.limit = limit + 500; renderTree(); });
+      parent.append(more); break;
+    }
+    if (!item.dir) { parent.append(fileButton(rel, byPath.get(rel))); continue; }
+    const group = node('details', 'folder'); group.open = openDirs.has(rel);
+    const summary = node('summary', changedDirs.has(rel) ? 'has-changes' : '', item.name); summary.title = rel + '/';
+    group.append(summary);
+    const children = node('div', 'folder-children'); children.setAttribute('role', 'group'); group.append(children);
+    group.addEventListener('toggle', () => {
+      if (group.open) { openDirs.add(rel); if (!children.childElementCount) populateAll(rel, children); }
+      else openDirs.delete(rel);
+      persist();
+    });
+    if (group.open) populateAll(rel, children);
+    parent.append(group);
+  }
+  if (!listing.entries.length && !dirPath) parent.append(node('div', 'tree-note', 'The worktree is empty.'));
+}
+changesOnlyButton.addEventListener('click', () => { navMode = changesOnly() ? 'all' : 'changes'; renderTree(); persist(); });
 filter.addEventListener('input', () => { renderTree(); persist(); });
 for (const type of ['wheel', 'pointermove', 'pointerdown', 'keydown']) document.getElementById('navigator').addEventListener(type, () => { navigatorTouched = Date.now(); }, { passive: true });
 function fold(row) {
@@ -177,11 +257,15 @@ function makeRow(entry) {
   const stats = node('span', 'stats', '…');
   const open = node('button', 'open-native', '↗'); open.title = 'Open in native diff (undo, redo, Git gutters)'; open.setAttribute('aria-label', 'Open ' + entry.path + ' in native diff');
   const save = node('button', 'save-file', 'Save'); save.disabled = true; save.title = 'Save this file (Cmd+S)';
+  // An unchanged file opened from the navigator can be closed again (AC-99).
+  const close = node('button', 'close-file'); close.title = 'Close this file (it has no changes)'; close.setAttribute('aria-label', 'Close ' + entry.path);
+  const closeIcon = node('span', 'codicon codicon-close'); closeIcon.setAttribute('aria-hidden', 'true'); close.append(closeIcon);
+  close.addEventListener('click', () => vscode.postMessage({ type: 'unbrowse', path: row.entry.path }));
   const editStatus = node('span', 'edit-status'); editStatus.setAttribute('role', 'status');
   const host = node('div', 'diff-body'); host.style.height = '220px';
-  header.append(toggle, status, title, unsaved, editStatus, stats, save, open); element.append(header, host);
+  header.append(toggle, status, title, unsaved, editStatus, stats, save, open, close); element.append(header, host);
   const progress = node('span', 'file-loading'); progress.setAttribute('role', 'status'); progress.hidden = true; header.insertBefore(progress, stats);
-  const row = { entry, element, header, toggle, title, status, unsaved, stats, host, progress, open, save, editStatus, nearby: false };
+  const row = { entry, element, header, toggle, title, status, unsaved, stats, host, progress, open, save, close, editStatus, nearby: false };
   loading(row, true);
   save.addEventListener('click', () => editing.save(row));
   title.addEventListener('click', event => {
@@ -280,12 +364,18 @@ async function prepare(job) {
 }
 function showCounts(row, stats) {
   row.stats.title = stats?.reason || "";
-  if (!stats || stats.reason) {
+  if (row.entry.browsed) {
+    row.stats.textContent = ''; delete row.element.dataset.additions; delete row.element.dataset.deletions;
+  } else if (!stats || stats.reason) {
     row.stats.textContent = '—'; delete row.element.dataset.additions; delete row.element.dataset.deletions;
   } else {
     row.stats.replaceChildren(node('span', 'additions', '+' + stats.additions), node('span', 'deletions', '−' + stats.deletions));
     row.element.dataset.additions = stats.additions; row.element.dataset.deletions = stats.deletions;
   }
+  // The navigator shows the same counts beside the file (AC-99).
+  const counts = tree.querySelector(`[data-id="${row.entry.id}"] .counts`);
+  const c = countsText(row.entry.id);
+  if (counts) counts.replaceChildren(...(c ? [node('span', 'additions', '+' + c[0]), node('span', 'deletions', '−' + c[1])] : []));
 }
 function showCard(row, body, stats) {
   if (editing.held(row)) return;
@@ -318,11 +408,13 @@ function language(file) {
 }
 function options(row) {
   const readonly = !row || !editing.enabled(row);
-  return { readOnly: readonly, domReadOnly: readonly, originalEditable: false, renderSideBySide: layout.value === 'split',
+  // A browsed (unchanged) file is plain editable text: the whole file, one column (AC-99).
+  const plain = !!row?.entry.browsed;
+  return { readOnly: readonly, domReadOnly: readonly, originalEditable: false, renderSideBySide: layout.value === 'split' && !plain,
     useInlineViewWhenSpaceIsLimited: false, renderSideBySideInlineBreakpoint: 0,
     renderOverviewRuler: false, renderMarginRevertIcon: false, renderGutterMenu: false,
     diffAlgorithm: 'advanced', ignoreTrimWhitespace: false, maxComputationTime: 5000,
-    hideUnchangedRegions: { enabled: true, contextLineCount: 3, minimumLineCount: 8, revealLineCount: 20 },
+    hideUnchangedRegions: { enabled: !plain, contextLineCount: 3, minimumLineCount: 8, revealLineCount: 20 },
     minimap: { enabled: false }, scrollBeyondLastLine: false, lineNumbersMinChars: 3,
     automaticLayout: false, links: false, hover: { enabled: false }, contextmenu: false,
     fontFamily: settings.fontFamily, fontSize: settings.fontSize || 14, fontLigatures: settings.fontLigatures || false,
@@ -526,7 +618,7 @@ async function reconcile() {
         manual.clear(); queued.clear();
         for (const row of rows.values()) { release(row); row.renderedRevision = undefined; row.classification = undefined; }
       }
-      const oldStructure = snapshot?.entries.map(e => [e.id, e.path, e.status, e.unsaved, e.conflicted]);
+      const oldStructure = snapshot?.entries.map(e => [e.id, e.path, e.status, e.unsaved, e.conflicted, !!e.browsed]);
       snapshot = next;
       Object.assign(identity, { repository: next.repository, mode: next.mode, target: next.target, runId: next.overseer?.runId || identity.runId });
       updateSettings(next.settings);
@@ -534,9 +626,10 @@ async function reconcile() {
       const description = next.description;
       if (!next.overseer) document.getElementById('comparison').textContent = description ? `${description.headName || 'HEAD'} → ${description.base}` : 'Branch Diff';
       if (!next.overseer) document.getElementById('comparison').title = description ? `Merge-base ${description.mergeBase} → ${next.mode === 'workingTree' ? 'working tree + unsaved edits' : description.headSha}` : '';
-      total.textContent = `${next.entries.length} ${next.entries.length === 1 ? 'file' : 'files'}${next.checking ? '…' : ''}`;
+      const changedCount = next.entries.filter(e => !e.browsed).length;
+      total.textContent = `${changedCount} ${changedCount === 1 ? 'file' : 'files'}${next.checking ? '…' : ''}`;
       total.title = next.checking ? 'Still looking for changed files' : 'Changed files in this comparison';
-      total.dataset.count = next.entries.length;
+      total.dataset.count = changedCount;
       document.body.dataset.checking = String(!!next.checking);
       document.body.dataset.cached = String(!!next.cached);
       document.getElementById('loading-stage').textContent = next.cached ? 'Checking for changes…' : next.checking ? 'Checking files…' : '';
@@ -544,13 +637,20 @@ async function reconcile() {
       for (const [id, row] of rows) if (!ids.has(id)) { release(row); row.element.remove(); rows.delete(id); }
       diffs.querySelector('.empty')?.remove();
       // Metadata-only validation updates reuse the existing navigator DOM.
-      if (JSON.stringify(oldStructure) !== JSON.stringify(next.entries.map(e => [e.id, e.path, e.status, e.unsaved, e.conflicted]))) renderTree();
+      if (JSON.stringify(oldStructure) !== JSON.stringify(next.entries.map(e => [e.id, e.path, e.status, e.unsaved, e.conflicted, !!e.browsed]))) {
+        // Files may have come or gone: list the folders shown again (the answers re-render the tree).
+        if (oldStructure) for (const [dirPath, listing] of dirCache) if (!listing.loading) vscode.postMessage({ type: 'listDir', path: dirPath });
+        renderTree();
+      }
       let previous = null, batchStart = performance.now();
       for (let index = 0; index < next.entries.length; index++) {
         const entry = next.entries[index];
         let row = rows.get(entry.id);
         if (!row) { row = makeRow(entry); rows.set(entry.id, row); }
+        const wasBrowsed = !!row.entry.browsed;
         row.entry = entry;
+        row.element.classList.toggle('browsed', !!entry.browsed); row.close.hidden = !entry.browsed;
+        if (row.editor && wasBrowsed !== !!entry.browsed) row.editor.updateOptions(options(row));
         if (row.editor) editing.update(row);
         if (row.title.textContent !== entry.path) row.title.textContent = entry.path;
         if (row.status.textContent !== entry.status) { row.status.textContent = entry.status; row.status.className = 'status status-' + entry.status; }
@@ -571,16 +671,17 @@ async function reconcile() {
           batchStart = performance.now();
         }
       }
-      if (!next.entries.length) diffs.append(node('p', 'empty', next.error ? 'Comparison unavailable: ' + next.error : next.checking ? 'Checking files…' : 'No changes for this comparison. Pre-existing dirty work stays listed in the Workspace Dirty view.'));
+      if (!changedCount && !next.entries.length) diffs.append(node('p', 'empty', next.error ? 'Comparison unavailable: ' + next.error : next.checking ? 'Checking files…' : 'No changes for this comparison. Pre-existing dirty work stays listed in the Workspace Dirty view.'));
       if (restoring) {
         diffs.scrollTop = saved.scrollTop || 0; restoreAnchor(saved.anchor); pursueRestore(); restoring = false;
       } else { restoreAnchor(previousAnchor); pursueRestore(); }
       if (pendingJump && rows.has(pendingJump)) { const id = pendingJump; pendingJump = undefined; jump(id); }
+      if (pendingBrowse) { const opened = next.entries.find(e => e.path === pendingBrowse && !e.pending); if (opened) { pendingBrowse = undefined; jump(opened.id); } }
       if (pendingReveal) applyReveal(pendingReveal);
       document.body.dataset.version = next.version;
       document.body.dataset.hierarchyReady ||= String(performance.now());
       if (!next.cached && !next.checking && !next.error) {
-        const cached = { description: next.description, entries: next.entries.map(e => ({ id: e.id, path: e.path, status: e.status, unsaved: e.unsaved })) };
+        const cached = { description: next.description, entries: next.entries.filter(e => !e.browsed).map(e => ({ id: e.id, path: e.path, status: e.status, unsaved: e.unsaved })) };
         hierarchy = cached.entries.length <= 10000 && JSON.stringify(cached).length <= 2 * 1024 * 1024 ? cached : undefined;
       }
       updateViewport(); trackScroll();
@@ -703,6 +804,7 @@ window.addEventListener('message', event => {
     if (!value.stage) for (const row of rows.values()) if (row.renderedRevision === row.entry.revision) loading(row, false);
   }
   else if (value.type === 'settings') { updateSettings(value.settings); updateViewport(); }
+  else if (value.type === 'dir') { dirCache.set(value.path, value.error ? { error: value.error } : { entries: value.entries || [], limit: dirCache.get(value.path)?.limit }); if (!changesOnly()) renderTree(); }
   else if (value.type === 'hunkReviewed') { if (value.reviewed) reviewedHunks.add(value.key); else reviewedHunks.delete(value.key); for (const row of rows.values()) if (row.hunks?.some(h => h.key === value.key)) renderHunks(row); }
   else if (value.type === 'notice') stickyMessage(value.message);
 });
