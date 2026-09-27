@@ -1,12 +1,13 @@
-[2026-09-27T00:12:19.754Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T00:12:38.521Z] screenshot docs/verification/evidence/ui/grid/01-grid-9-dark.png
-[2026-09-27T00:12:38.523Z] grid latency by stage (ms) {"n":313,"toDaemonP50":31,"toDaemonP95":60,"daemonToWebviewP50":39,"daemonToWebviewP95":43,"arriveP95":99}
-[2026-09-27T00:12:38.523Z] PASS nine agents tile as 3×3 {"tiles":9,"cols":"3","rows":"3"}
-[2026-09-27T00:12:38.523Z] PASS nine concurrent streams: each tile shows a line within 250 ms (p95) and event-loop lag p95 stays under 50 ms {"lines":313,"latP95":99,"latMax":106,"lagN":350,"lagP95":2,"lagMax":3,"stages":{"n":313,"toDaemonP50":31,"toDaemonP95":60,"daemonToWebviewP50":39,"daemonToWebviewP95":43,"arriveP95":99}}
-[2026-09-27T00:12:40.091Z] screenshot docs/verification/evidence/ui/grid/02-grid-9-light.png
-[2026-09-27T00:12:40.497Z] PASS a permission request is answered from its tile (Allow → the agent continues and writes the file) {"status":"completed","permFile":true}
-[2026-09-27T00:12:41.999Z] PASS a pinned finished run stays on the grid {"pinnedTile":true,"pressed":"true"}
-[2026-09-27T00:12:50.864Z] PASS with a maximum of 4, the grid shows 2×2 {"tiles":4,"cols":"2"}
-[2026-09-27T00:12:50.916Z] screenshot docs/verification/evidence/ui/grid/03-grid-4-light.png
-[2026-09-27T00:12:52.487Z] screenshot docs/verification/evidence/ui/grid/04-grid-4-dark.png
-[2026-09-27T00:12:54.610Z] PASS arrow keys move between tiles and Enter opens the agent in the chat {"first":"r-34f8fd73d8f3","second":"r-0b99ed5ca295","opened":{"mode":"chat","title":"Short 2","selected":"r-0b99ed5ca295"}}
+[2026-09-27T02:15:58.951Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T02:16:17.015Z] screenshot docs/verification/evidence/ui/grid/01-grid-9-dark.png
+[2026-09-27T02:16:17.017Z] grid latency by stage (ms) {"n":308,"toDaemonP50":34,"toDaemonP95":61,"daemonToWebviewP50":30,"daemonToWebviewP95":45,"arriveP95":97}
+[2026-09-27T02:16:17.017Z] PASS nine agents tile as 3×3 {"tiles":9,"cols":"3","rows":"3"}
+[2026-09-27T02:16:17.017Z] PASS nine concurrent streams: each tile shows a line within 250 ms (p95) and event-loop lag p95 stays under 50 ms {"lines":308,"latP95":97,"latMax":110,"lagN":347,"lagP95":2,"lagMax":4,"stages":{"n":308,"toDaemonP50":34,"toDaemonP95":61,"daemonToWebviewP50":30,"daemonToWebviewP95":45,"arriveP95":97}}
+[2026-09-27T02:16:18.631Z] screenshot docs/verification/evidence/ui/grid/02-grid-9-light.png
+[2026-09-27T02:16:19.037Z] PASS a permission request is answered from its tile (Allow → the agent continues and writes the file) {"status":"completed","permFile":true}
+[2026-09-27T02:16:20.540Z] PASS a pinned finished run stays on the grid {"pinnedTile":true,"pressed":"true"}
+[2026-09-27T02:16:29.299Z] PASS with a maximum of 4, the grid shows 2×2 {"tiles":4,"cols":"2"}
+[2026-09-27T02:16:29.364Z] screenshot docs/verification/evidence/ui/grid/03-grid-4-light.png
+[2026-09-27T02:16:30.941Z] screenshot docs/verification/evidence/ui/grid/04-grid-4-overseer.png
+[2026-09-27T02:16:32.512Z] screenshot docs/verification/evidence/ui/grid/05-grid-4-dark.png
+[2026-09-27T02:16:34.636Z] PASS arrow keys move between tiles and Enter opens the agent in the chat {"first":"r-7a82b7fdf0cc","second":"r-05dc085e4bf0","opened":{"mode":"chat","title":"Short 2","selected":"r-05dc085e4bf0"}}
