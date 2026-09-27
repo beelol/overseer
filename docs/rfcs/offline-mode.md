@@ -825,8 +825,12 @@ own worktree and lands through a pull request.
 
 Written on 2026-09-26 at the owner's request. Built on 2026-09-26 and 2026-09-27 in pull request
 [#9](https://github.com/beelol/overseer/pull/9), marked ready for review once every criterion that does not
-wait for the owner was verified; what waits for the owner is the Wi-Fi step of AC-83, the live
-failover check of AC-84 (Claude Code's login) and the offline session of AC-97.
+wait for the owner was verified; what waits for the owner is the Wi-Fi step of AC-83 and the offline
+session of AC-97. (AC-84's live check ran on 2026-09-27 once Claude Code was signed in; it found and
+fixed the reconnecting-in-vain gap above.) Both owner steps are scripted so that the daemon's own record
+becomes the evidence: `node test/local/wifi-live.js` watches a real daemon while the owner turns Wi-Fi
+off and on and measures the gap; `node test/local/owner-session.js start` opens an isolated VS Code with
+the branch's VSIX for the owner's session, and `report` writes what the daemon recorded afterwards.
 
 > Implement Continuity (Gate L) in `beelol/overseer`: AC-139 first, then AC-83 to AC-98, AC-138 and
 > AC-140, as written in `docs/overseer-rfc.md` (Gate L) and designed in `docs/rfcs/offline-mode.md`.
@@ -929,7 +933,8 @@ Not granted: purchases, login changes, automatic merges, editing the user's own 
 configuration, and **turning the network off**. The implementing session needs the network itself,
 so the Wi-Fi steps of AC-83 and AC-97 are the owner's: the session asks the exact question, ends
 its turn, continues independent work, and reads the daemon's event log afterwards. It never blocks
-on a foreground wait.
+on a foreground wait. As built, the two scripts above only read Wi-Fi power and the daemon's events;
+neither changes the network.
 
 ## Acceptance
 
