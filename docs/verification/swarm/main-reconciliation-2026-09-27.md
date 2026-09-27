@@ -275,3 +275,16 @@ observes two occupied slots, refuses a third agent, and stops both processes.
 The virtual slot remains necessary before any director process exists. The
 affected admission, dispatch, scheduler and director-process suites passed
 (35 + 7 + 4 + 13 tests). SWARM-07 and joined Gate S/Auto checks remain partial.
+
+## Subsequent published main: `e7d616f`
+
+Main adds Gate S ledger evidence for AC-182 and AC-198–200, plus a tracker
+handoff for Gate N and AC-178. It changes no Swarm daemon or UI implementation.
+AC-198's quiet, bounded Overseer turns do not count director turns; director
+batching and its own allocation remain under SWARM-33/40. AC-199's shared
+Overseer surfaces do not supply the missing normal Swarm launch controls or
+qualify a watcher as another director. AC-200's source-authenticated reports
+and prompt-injection boundary agree with Swarm's rule that worker/source text
+cannot issue director commands or grant scope. None of the Gate S partial
+records verifies joined SWARM-24/27/60 or the shared account authority.
+The Swarm RFC and its acceptance boxes therefore remain unchanged.
