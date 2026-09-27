@@ -16,6 +16,7 @@ which is out of scope for now. The full list is under [Acceptance criteria](#acc
 Only the owner can do these (AC-160). Each is one step; the criterion it unblocks is in brackets. The everything goal (`docs/goals/everything.md`) keeps this list current.
 
 - Mark round 4 of the Gate K design review (one-line search, pills filling the row): [review page](https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv) [AC-82, then PR #8 merges].
+- Mark the Gate M design review (files in the review, the Overseer theme, the immersive dashboard, the grid you build by dragging, Where am I, Talk to Overseer): [review page](https://claude.ai/artifact/Ec1XJy74iyKfMPFoiVRiiX) [AC-108, then the Gate M pull request].
 - Decide where the one-line search should live: VS Code keeps every extension side-bar pane at least 120 px tall, so a separate search pane is never one line [AC-155].
 - Add the two logo images to `docs/design/brand/` as `overseer-icon.png` (full colour) and `overseer-mark.png` (transparent); an agent then draws the single-colour version and puts the mark on every surface [AC-142].
 - Sign in to Claude Code again (`claude`, then `/login`) [the Claude half of AC-81, AC-45].
@@ -177,7 +178,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-142** One Overseer mark everywhere — not started: waits for the owner's logo files — [evidence](docs/verification/AC-142.md)
 - [x] **AC-143** Opt-in audio cues owned by the daemon — [evidence](docs/verification/AC-143.md)
 - [x] **AC-144** A lost session asks for attention — [evidence](docs/verification/AC-144.md)
-- [ ] **AC-145** Audio Mode by ear (owner-confirmed) — ◐ partial: in the owner's session of 2026-09-27 the owner marked all twelve Reactor cues Right, heard start, completion and attention from fixture agents with Audio Mode on and VS Code open, and heard nothing from the same agents with Audio Mode off / deferred: four steps the session did not do: start, completion and attention with VS Code closed; two agents at the same moment; System voice; the owner's own Commander folder. The record says yes to them, but the session's log shows that the window was never quit, that `t` and `v` were not pressed and that no folder was set — [evidence](docs/verification/AC-145.md)
+- [ ] **AC-145** Audio Mode by ear (owner-confirmed) — ◐ partial: the owner marked all twelve Reactor cues Right; heard start, completion and attention with VS Code open and with it closed; heard one attention cue for two agents that asked at the same moment; heard System voice with an installed voice; and heard nothing with Audio Mode off / deferred: the owner's own Commander folder has not been played: no session was given a folder — [evidence](docs/verification/AC-145.md)
 - [ ] **AC-146** Reconcile and merge the work in flight — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-146.md)
 - [ ] **AC-147** One command runs every test — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-147.md)
 - [ ] **AC-148** Checks on every pull request — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-148.md)
@@ -402,7 +403,7 @@ the owner action or decision each one needs.
 - [ ] [AC-140](docs/verification/AC-140.md) (Memory safety guard): Next: the catalogue verification (AC-87) writes the log this criterion asks for.
 - [ ] [AC-141](docs/verification/AC-141.md) (Pair once): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
 - [ ] [AC-142](docs/verification/AC-142.md) (One Overseer mark everywhere): Not started: the owner's two images need to be added to docs/design/brand/ as files; then the single-colour glyph is drawn for VS Code and approved.
-- [ ] [AC-145](docs/verification/AC-145.md) (Audio Mode by ear (owner-confirmed)): Waits for the owner to hear the four remaining steps (4 to 6 above, and `t`), in a session of a few minutes.
+- [ ] [AC-145](docs/verification/AC-145.md) (Audio Mode by ear (owner-confirmed)): Waits for the owner's Commander folder to be played and heard (step 3), or for the owner to decide that the criterion does not need it.
 - [ ] [AC-146](docs/verification/AC-146.md) (Reconcile and merge the work in flight): Not started (Gate P, added by the owner on 2026-09-27).
 - [ ] [AC-147](docs/verification/AC-147.md) (One command runs every test): Not started (Gate P, added by the owner on 2026-09-27).
 - [ ] [AC-148](docs/verification/AC-148.md) (Checks on every pull request): Not started (Gate P, added by the owner on 2026-09-27).
