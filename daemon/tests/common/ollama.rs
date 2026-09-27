@@ -207,6 +207,13 @@ fn handle(conn: TcpStream, state: Arc<Mutex<State>>) -> std::io::Result<()> {
     conn.flush()
 }
 
+fn latest(name: &str) -> String {
+    match name.rsplit('/').next() {
+        Some(last) if !last.contains(':') => format!("{name}:latest"),
+        _ => name.to_string(),
+    }
+}
+
 fn respond(method: &str, path: &str, body: &Value, state: &Arc<Mutex<State>>) -> (u16, Value) {
     match (method, path) {
         ("GET", "/api/version") => (200, json!({"version": "0.34.2"})),
@@ -218,7 +225,8 @@ fn respond(method: &str, path: &str, body: &Value, state: &Arc<Mutex<State>>) ->
         },
         ("POST", "/api/create") => {
             let mut s = state.lock().unwrap();
-            let (name, from) = (body["model"].as_str().unwrap_or_default().to_string(), body["from"].as_str().unwrap_or_default().to_string());
+            // As Ollama does, a name without a tag is kept as `<name>:latest`.
+            let (name, from) = (latest(body["model"].as_str().unwrap_or_default()), body["from"].as_str().unwrap_or_default().to_string());
             let Some(base) = s.tags.iter().find(|t| t["name"] == from.as_str()).cloned() else { return (404, json!({"error": "model not found"})) };
             let mut entry = base;
             entry["name"] = json!(name);
@@ -234,7 +242,7 @@ fn respond(method: &str, path: &str, body: &Value, state: &Arc<Mutex<State>>) ->
             (200, json!({"status": "success"}))
         }
         ("POST", "/api/generate") => {
-            let tag = body["model"].as_str().unwrap_or_default().to_string();
+            let tag = latest(body["model"].as_str().unwrap_or_default());
             if body["keep_alive"] == 0 {
                 let mut s = state.lock().unwrap();
                 s.loaded.retain(|m| m["name"] != tag.as_str());

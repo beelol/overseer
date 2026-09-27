@@ -432,6 +432,7 @@ pub fn tick(d: &Arc<Daemon>) -> Result<Status> {
     if let Err(e) = crate::handoff::tick(d) {
         crate::log(&format!("continuity: the waiting runs could not be looked after: {e:#}"));
     }
+    crate::ollama_install::maintain(d);
     Ok(status)
 }
 
@@ -590,12 +591,16 @@ pub fn is_local(run: &crate::store::Run) -> bool {
 /// Memory is looked at again for every turn. A copy that is loaded and no longer fits is
 /// replaced by a smaller context or a smaller model, but only a copy Overseer loaded itself and
 /// no other agent is working on; any other copy is shared as it is, which loads nothing.
-pub fn prepare_local_run(d: &Daemon, run: &mut crate::store::Run, profile_env: &BTreeMap<String, String>) -> Result<()> {
+pub fn prepare_local_run(d: &Arc<Daemon>, run: &mut crate::store::Run, profile_env: &BTreeMap<String, String>) -> Result<()> {
     let config_home = std::path::PathBuf::from(crate::opencode_bridge::env_for(profile_env)?);
     let settings = settings();
-    let l = gather(d);
+    let mut l = gather(d);
     if !l.inventory.ollama.running {
-        bail!("{}; a local model cannot run", l.inventory.ollama.detail);
+        // Allowed to, Overseer starts Ollama itself (AC-90); otherwise the run says what is missing.
+        if let Err(e) = crate::ollama_install::ensure_running(d) {
+            bail!("{e}; a local model cannot run");
+        }
+        l = gather(d);
     }
     let opts = settings.pick_options(false);
     let memory = l.inventory.memory.clone().ok_or_else(|| anyhow!("memory cannot be read ({}), so no model is loaded", l.inventory.memory_error.clone().unwrap_or_default()))?;
@@ -649,7 +654,9 @@ pub fn prepare_local_run(d: &Daemon, run: &mut crate::store::Run, profile_env: &
     };
     // The model: the one asked for, or the pick.
     let mut again = false;
-    let (tag, base, mut context) = match named.as_deref().map(crate::opencode_bridge::tag_of) {
+    // A name without a tag is `latest`, as Ollama lists it.
+    let asked = named.as_deref().map(|m| local::canonical(crate::opencode_bridge::tag_of(m)));
+    let (tag, base, mut context) = match asked.as_deref() {
         Some(tag) => {
             let model = l.inventory.models.iter().find(|m| m.tag == tag).ok_or_else(|| anyhow!("{tag} is not installed in Ollama"))?;
             let context = match model.configured_context {
@@ -751,7 +758,7 @@ pub fn prepare_local_run(d: &Daemon, run: &mut crate::store::Run, profile_env: &
 // ------------------------------------------------------------------ protocol
 
 pub fn handles(method: &str) -> bool {
-    crate::downloads::handles(method) || crate::handoff::handles(method) || matches!(method, "connection.status" | "connection.check" | "continuity.status" | "continuity.notice" | "settings.get" | "settings.set" | "local.inventory" | "local.pick" | "local.approve" | "local.catalogue" | "local.load" | "local.unload")
+    crate::downloads::handles(method) || crate::handoff::handles(method) || crate::ollama_install::handles(method) || matches!(method, "connection.status" | "connection.check" | "continuity.status" | "continuity.notice" | "settings.get" | "settings.set" | "local.inventory" | "local.pick" | "local.approve" | "local.catalogue" | "local.load" | "local.unload")
 }
 
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
@@ -760,6 +767,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     }
     if crate::handoff::handles(method) {
         return crate::handoff::dispatch(d, method, p);
+    }
+    if crate::ollama_install::handles(method) {
+        return crate::ollama_install::dispatch(d, method, p);
     }
     Ok(match method {
         "connection.status" => json!({"status": status(), "enabled": settings().enabled}),

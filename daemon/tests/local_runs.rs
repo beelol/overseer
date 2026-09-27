@@ -317,8 +317,8 @@ fn ac140_a_local_run_passes_the_guard_before_it_starts() {
     let c = l.d.call("task.create", task(json!({"model": "ollama/qwen2.5-coder:14b"})));
     let run = run_id(&c);
     assert_eq!(l.d.wait_done(&run, 30)["status"], "completed");
-    assert_eq!(l.d.run(&run)["model"], "ollama/overseer/qwen2.5-coder-14b-32k");
-    assert_eq!(l.o.asked("/api/create"), vec![json!({"model": "overseer/qwen2.5-coder-14b-32k", "from": "qwen2.5-coder:14b", "parameters": {"num_ctx": 32768}, "stream": false})]);
+    assert_eq!(l.d.run(&run)["model"], "ollama/overseer/qwen2.5-coder-14b:32k");
+    assert_eq!(l.o.asked("/api/create"), vec![json!({"model": "overseer/qwen2.5-coder-14b:32k", "from": "qwen2.5-coder:14b", "parameters": {"num_ctx": 32768}, "stream": false})]);
 
     // Without Ollama nothing local can run, and the run says so.
     let w = World::new();

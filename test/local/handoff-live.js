@@ -28,7 +28,7 @@ const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ovs-handoff-'));
 const G = 2 ** 30;
 const gib = b => Math.round((b / G) * 10) / 10;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const redact = s => s.split(fs.realpathSync(home)).join('/OVERSEER_HOME').split(home).join('/OVERSEER_HOME').split(os.homedir()).join('~').replace(new RegExp(`(?<![A-Za-z0-9])${os.userInfo().username}(?![A-Za-z0-9])`, 'g'), 'USER').replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/g, 'EMAIL');
+const redact = s => s.split(fs.realpathSync(home)).join('/OVERSEER_HOME').split(home).join('/OVERSEER_HOME').split(os.homedir()).join('~').replace(new RegExp(`(?<![A-Za-z0-9])${os.userInfo().username}(?![A-Za-z0-9])`, 'g'), 'USER').replace(/(\/private)?\/var\/folders\/[A-Za-z0-9_]+\/[A-Za-z0-9_]+\/T\//g, '/TMP/').replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/g, 'EMAIL');
 
 function session(name, extra) {
   const env = { ...process.env, OVERSEER_HOME: home, ...extra };

@@ -694,8 +694,8 @@ fn ac96_several_local_agents_share_one_model() {
     assert_eq!(beside["launch_error"], Value::Null, "{beside}");
     let small = run_id(&beside);
     let m = l.kinds(&small, "local_model")[0].clone();
-    assert_eq!((m["model"].as_str(), m["context"].as_u64()), (Some("ollama/overseer/qwen2.5-coder-14b-16k"), Some(16384)), "at 32k the two together would be over the share");
-    assert_eq!(l.o.loaded(), ["qwen3-coder:30b-64k", "overseer/qwen2.5-coder-14b-16k"]);
+    assert_eq!((m["model"].as_str(), m["context"].as_u64()), (Some("ollama/overseer/qwen2.5-coder-14b:16k"), Some(16384)), "at 32k the two together would be over the share");
+    assert_eq!(l.o.loaded(), ["qwen3-coder:30b-64k", "overseer/qwen2.5-coder-14b:16k"]);
     assert!(queued(&small).is_empty(), "it has its own model");
     std::fs::write(&go, "").unwrap();
     for ((r, c), name) in runs.iter().zip(&started).zip(["a", "b", "c"]) {
@@ -703,13 +703,13 @@ fn ac96_several_local_agents_share_one_model() {
         assert_eq!(std::fs::read_to_string(l.workspace(c).join(format!("{name}.txt"))).unwrap(), format!("{name}\n"));
     }
     l.status(&small, "completed");
-    assert_eq!(l.loads(), ["qwen3-coder:30b-64k", "overseer/qwen2.5-coder-14b-16k"], "nothing was loaded twice");
+    assert_eq!(l.loads(), ["qwen3-coder:30b-64k", "overseer/qwen2.5-coder-14b:16k"], "nothing was loaded twice");
 }
 
 #[test]
 fn ac96_a_memory_squeeze_shrinks_the_next_pick_and_leaves_the_turn_alone() {
     let l = lab();
-    l.o.state.lock().unwrap().loaded_size.insert("overseer/qwen3-coder-30b-32k".into(), 22_000_000_000);
+    l.o.state.lock().unwrap().loaded_size.insert("overseer/qwen3-coder-30b:32k".into(), 22_000_000_000);
     l.o.machine(&l.w.file("memory.json"), 128.0, 12.8);
     let c = l.local("write one.txt 1; sleep 2; write two.txt 2; say done", None);
     assert_eq!(c["launch_error"], Value::Null, "{c}");
@@ -725,19 +725,19 @@ fn ac96_a_memory_squeeze_shrinks_the_next_pick_and_leaves_the_turn_alone() {
 
     // The next turn: the same model at a shorter context, the old copy unloaded first, one note.
     let next = l.follow_up(&run, "write three.txt 3; say done");
-    assert_eq!((next["status"].as_str(), next["model"].as_str()), (Some("completed"), Some("ollama/overseer/qwen3-coder-30b-32k")));
+    assert_eq!((next["status"].as_str(), next["model"].as_str()), (Some("completed"), Some("ollama/overseer/qwen3-coder-30b:32k")));
     assert!(l.workspace(&c).join("three.txt").exists());
-    assert_eq!(l.o.loaded(), ["overseer/qwen3-coder-30b-32k"]);
+    assert_eq!(l.o.loaded(), ["overseer/qwen3-coder-30b:32k"]);
     let picked = l.kinds(&run, "local_model");
     assert_eq!((picked[1]["context"].as_u64(), picked[1]["replaced"].clone(), picked[1]["auto"].clone()), (Some(32768), json!(["qwen3-coder:30b-64k"]), json!(true)));
     let asked: Vec<Value> = l.o.asked("/api/generate");
     let order: Vec<(String, bool)> = asked.iter().map(|b| (b["model"].as_str().unwrap().to_string(), b["keep_alive"] == 0)).collect();
-    assert_eq!(order, [("qwen3-coder:30b-64k".to_string(), false), ("qwen3-coder:30b-64k".to_string(), true), ("overseer/qwen3-coder-30b-32k".to_string(), false)], "unloaded before the smaller copy was loaded");
+    assert_eq!(order, [("qwen3-coder:30b-64k".to_string(), false), ("qwen3-coder:30b-64k".to_string(), true), ("overseer/qwen3-coder-30b:32k".to_string(), false)], "unloaded before the smaller copy was loaded");
     let notes = |l: &Lab| -> Vec<String> { l.said(&run, "system").into_iter().filter(|t| t.starts_with("Memory is tighter")).collect() };
     assert_eq!(notes(&l), ["Memory is tighter now (11.3 GiB available). This turn uses qwen3-coder:30b at a 32k context instead of a 64k context."]);
     // The same memory at the turn after that: the same copy, and no second note.
     let third = l.follow_up(&run, "write four.txt 4; say done");
-    assert_eq!((third["status"].as_str(), third["model"].as_str()), (Some("completed"), Some("ollama/overseer/qwen3-coder-30b-32k")));
+    assert_eq!((third["status"].as_str(), third["model"].as_str()), (Some("completed"), Some("ollama/overseer/qwen3-coder-30b:32k")));
     assert_eq!((notes(&l).len(), l.loads().len()), (1, 2));
 
     // A copy the user loaded in their own Ollama is never unloaded to make room.

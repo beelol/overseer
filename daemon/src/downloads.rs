@@ -46,6 +46,11 @@ pub fn list() -> Vec<Download> {
     downloads().values().cloned().collect()
 }
 
+/// Is a download going on?
+pub fn busy() -> bool {
+    active().is_some()
+}
+
 fn active() -> Option<Download> {
     downloads().values().find(|d| d.status == "starting" || d.status == "downloading").cloned()
 }
@@ -100,7 +105,8 @@ pub fn may_pull(d: &Daemon, tag: &str, by: &str, confirm: bool) -> Result<Value>
     }
     let ollama = local::ollama_status();
     if !ollama.running {
-        bail!("{}; a model cannot be downloaded", ollama.detail);
+        // Allowed to, Overseer starts Ollama (or installs it first); otherwise it says what is missing.
+        bail!("{}; a model cannot be downloaded{}", ollama.detail, if settings.allow_ollama_install { " yet" } else { "" });
     }
     if local::installed_models()?.iter().any(|m| m.tag == tag) {
         bail!("{tag} is already installed");
@@ -129,6 +135,9 @@ pub fn may_pull(d: &Daemon, tag: &str, by: &str, confirm: bool) -> Result<Value>
 
 /// Starts a pull and returns at once; progress comes as `local_download` events.
 pub fn pull(d: &Arc<Daemon>, tag: &str, by: &str, confirm: bool) -> Result<Value> {
+    if continuity::settings().allow_model_downloads && continuity::settings().allow_ollama_install && !local::ollama_status().running {
+        crate::ollama_install::ensure_running(d)?;
+    }
     if let Some(a) = active().filter(|a| a.tag == tag) {
         return Ok(json!({"download": a, "already": true}));
     }

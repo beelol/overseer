@@ -858,7 +858,7 @@ mod tests {
 
     #[test]
     fn the_profile_names_only_the_local_provider() {
-        let c = config(&["qwen3-coder:30b-64k".into(), "overseer/qwen2.5-coder-14b-16k".into()], "qwen3-coder:30b-64k", "http://127.0.0.1:11434");
+        let c = config(&["qwen3-coder:30b-64k".into(), "overseer/qwen2.5-coder-14b:16k".into()], "qwen3-coder:30b-64k", "http://127.0.0.1:11434");
         assert_eq!(c["enabled_providers"], json!(["ollama"]));
         assert_eq!((c["model"].as_str(), c["small_model"].as_str()), (Some("ollama/qwen3-coder:30b-64k"), Some("ollama/qwen3-coder:30b-64k")));
         assert_eq!(c["provider"]["ollama"]["options"]["baseURL"], "http://127.0.0.1:11434/v1");

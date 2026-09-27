@@ -283,10 +283,14 @@ pub fn failover_targets(d: &Daemon, run: &Run, status: &Status) -> Vec<Target> {
 }
 
 /// The local model that would take the work, or why none can.
-pub fn local_target(d: &Daemon, run: &Run) -> Result<Target> {
+pub fn local_target(d: &Arc<Daemon>, run: &Run) -> Result<Target> {
     let Some(opencode) = crate::adapters::resolve_program(opencode_bridge::HARNESS) else {
         bail!("OpenCode is not installed, so no local model can take over");
     };
+    // Ollama is started, or installed first, when the owner allowed that (AC-90).
+    if continuity::settings().allow_ollama_install && !crate::local::ollama_status().running {
+        crate::ollama_install::ensure_running(d)?;
+    }
     let served = opencode_bridge::server_available(&opencode, &Daemon::profile_env(&opencode_bridge::local_profile(d)?));
     let picked = continuity::pick_value(d)?;
     if picked["ollama"]["running"] != true {

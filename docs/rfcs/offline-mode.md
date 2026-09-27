@@ -294,7 +294,8 @@ exactly as on a 32 GiB machine.
 
 Ollama's default context is small and per model. Overseer sets the context it picked by creating a
 derived tag with a two-line Modelfile (`FROM qwen3-coder:30b` / `PARAMETER num_ctx 65536`), named
-`overseer/qwen3-coder-30b-64k`. `ollama create` shares the weight blobs, takes no extra disk and is
+`overseer/qwen3-coder-30b:64k` (the context is the tag itself: Ollama turns a name without a tag
+into `<name>:latest`, which the first live run showed). `ollama create` shares the weight blobs, takes no extra disk and is
 instant; the owner's own `-64k` and `-32k` tags were made the same way. Derived tags are listed under
 the base model in the UI and removed with **Clean up local models**. When Overseer starts the Ollama
 server itself, `OLLAMA_CONTEXT_LENGTH` is the fallback.
@@ -477,6 +478,12 @@ gate it, both off by default and both offered in the first-use notice.
 - Overseer starts `ollama serve` itself only when nothing answers on `127.0.0.1:11434`, as a
   supervised child bound to loopback, and stops it after `continuity.ollamaIdleMinutes` (default 30)
   without local runs. An Ollama the user runs (the menu-bar app) is used as is and never stopped.
+- As built: the archive is unpacked into Overseer's own folder (`<data>/ollama/Ollama.app`), never
+  into `/Applications`; the user's own copy is preferred when there is one. Starting the server
+  needs the same setting as installing. The server is kept by its process id in the daemon's store
+  and outlives a restart of the daemon, as the agents do; before it is stopped the process is
+  checked to be that program still. An install that a waiting run needs happens in the background,
+  and the run looks again when it is due.
 - Linux uses the distribution package or the official install script, behind the same setting
   (AC-41 remains deferred).
 
@@ -528,6 +535,21 @@ workspace. It is the one mechanism behind failover, going local, and switching b
 
 Failover reads *OpenAI is unreachable; continuing with **Claude Code** (account "Work") because it is
 the best working option.* A handoff never reuses the failed provider's credentials for anything.
+
+As built (2026-09-26):
+
+- A failed turn does not end its run. The run is **parked** (`waiting_for_connection`, or
+  `waiting_for_memory` after the critical-pressure valve) with its message kept, and one scheduler
+  looks at every parked run when it is due, and at once when the connection state has changed.
+- A sign-in failure (`auth` class) while the state is offline is treated as the connection's
+  failure: a sign-in cannot be checked without a connection.
+- `run.targets` says where a run's work could go now without moving anything; `run.handoff` moves
+  it (`to`: `local`, `back` or a provider). A move whose permission mode would be looser needs
+  `accept_mode` with the mode named, so the difference is accepted knowingly.
+- An OpenCode without the headless server (`opencode serve --help` does not describe the command)
+  can only run one-shot, where nothing can be asked. That is looser than every mode but Auto, so
+  such a move is offered with the difference stated and is automatic only for a run already in
+  Auto. It passes the memory guard like every local run.
 
 ## Wait and retry (Continuity off, or no target)
 
@@ -594,6 +616,10 @@ agent is started with Continuity on, while the user is looking, not at the momen
 - If available memory falls under the headroom while a model is loaded, no turn is stopped for it
   (only the critical-pressure valve in [Memory safety](#memory-safety-ac-140) pauses runs); the next
   turn's pick shrinks (smaller context first, then a smaller model) with one note in the chat.
+- A smaller copy can only be loaded after the larger one is unloaded. Overseer unloads a copy only
+  when it loaded that copy itself (it keeps a record of its own loads) and no other local agent is
+  working on it. Any other copy, one the user loaded in their own Ollama or one another agent is
+  working on, is shared as it is, which loads nothing.
 - Local runs report usage as tokens with cost 0 and the provider mark **Local**; no quota windows.
 
 ## Settings

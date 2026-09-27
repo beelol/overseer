@@ -11,6 +11,7 @@ mod handoff;
 mod local;
 mod merge;
 mod net;
+mod ollama_install;
 mod opencode_bridge;
 mod paths;
 mod pr;

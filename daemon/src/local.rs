@@ -181,8 +181,8 @@ pub fn model_from(tag_entry: &Value, show: &Value) -> Model {
 
 /// Where the Ollama program would be. `OVERSEER_OLLAMA_CANDIDATES` (colon-separated) replaces the
 /// list, so a test can describe a machine without it.
-fn ollama_program() -> Option<PathBuf> {
-    let candidates: Vec<PathBuf> = match std::env::var("OVERSEER_OLLAMA_CANDIDATES") {
+pub fn ollama_program() -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = match std::env::var("OVERSEER_OLLAMA_CANDIDATES") {
         Ok(list) => list.split(':').filter(|s| !s.is_empty()).map(PathBuf::from).collect(),
         Err(_) => {
             let mut c: Vec<PathBuf> = vec!["/Applications/Ollama.app/Contents/Resources/ollama".into(), "/usr/local/bin/ollama".into(), "/opt/homebrew/bin/ollama".into(), "/usr/bin/ollama".into()];
@@ -190,6 +190,8 @@ fn ollama_program() -> Option<PathBuf> {
             c
         }
     };
+    // Overseer's own copy (installed when the owner allowed it) comes last: the user's is preferred.
+    candidates.push(crate::ollama_install::own_program());
     candidates.into_iter().find(|p| p.is_file())
 }
 
@@ -377,7 +379,7 @@ pub struct Choice {
     /// The catalogue's tag (the base model).
     pub tag: String,
     /// The tag to run: an installed one that already sets this context, or the derived tag
-    /// Overseer creates (`overseer/<model>-<n>k`, which shares the weights and takes no disk).
+    /// Overseer creates (`overseer/<model>:<n>k`, which shares the weights and takes no disk).
     pub run_tag: String,
     pub run_tag_exists: bool,
     pub context: u64,
@@ -407,8 +409,18 @@ pub struct Pick {
     pub budget: Budget,
 }
 
+/// The name of Overseer's own tag for `base` at `context`. The context is the tag itself, so
+/// that Ollama keeps the name as it is (a name without a tag becomes `<name>:latest`).
 pub fn derived_tag(base: &str, context: u64) -> String {
-    format!("overseer/{}-{}k", base.replace([':', '/'], "-"), context / 1024)
+    format!("overseer/{}:{}k", base.replace([':', '/'], "-"), context / 1024)
+}
+
+/// A model's name as Ollama lists it: a name without a tag means `latest`.
+pub fn canonical(tag: &str) -> String {
+    match tag.rsplit('/').next() {
+        Some(last) if !last.contains(':') => format!("{tag}:latest"),
+        _ => tag.to_string(),
+    }
 }
 
 /// The contexts tried for a model: the target (or the model's own maximum when that is smaller),
@@ -875,7 +887,7 @@ mod tests {
         assert_eq!(gib(c.bytes), 23.7);
         assert_eq!((c.run_tag.as_str(), c.run_tag_exists), ("qwen3-coder:30b-64k", true));
         let c = pick(&idle(128), &models[..1], &[], &cat, &Measured::new(), &PickOptions::default()).chosen.unwrap();
-        assert_eq!((c.run_tag.as_str(), c.run_tag_exists, c.measured), ("overseer/qwen3-coder-30b-64k", false, false));
+        assert_eq!((c.run_tag.as_str(), c.run_tag_exists, c.measured), ("overseer/qwen3-coder-30b:64k", false, false));
     }
 
     #[test]
@@ -955,7 +967,8 @@ mod tests {
     fn tags_and_parameters_are_read() {
         assert_eq!(configured_context("stop \"<|im_end|>\"\nnum_ctx                        65536\ntemperature 0.7"), Some(65536));
         assert_eq!(configured_context("temperature 0.7"), None);
-        assert_eq!(derived_tag("qwen3-coder:30b", 65536), "overseer/qwen3-coder-30b-64k");
+        assert_eq!(derived_tag("qwen3-coder:30b", 65536), "overseer/qwen3-coder-30b:64k");
+        assert_eq!((canonical("llama3"), canonical("qwen3-coder:30b"), canonical("overseer/x"), canonical("overseer/qwen3-coder-30b:64k")), ("llama3:latest".to_string(), "qwen3-coder:30b".to_string(), "overseer/x:latest".to_string(), "overseer/qwen3-coder-30b:64k".to_string()));
         let entry = json!({"name": "qwen3-coder:30b-64k", "size": 18556700444u64, "details": {"parent_model": "qwen3-coder:30b", "family": "qwen3moe", "parameter_size": "30.5B", "quantization_level": "Q4_K_M", "context_length": 262144}, "capabilities": ["completion", "tools"]});
         let show = json!({"parameters": "num_ctx 65536", "capabilities": ["completion", "tools"], "model_info": {"general.architecture": "qwen3moe", "general.parameter_count": 30532122624u64, "qwen3moe.block_count": 48, "qwen3moe.context_length": 262144, "qwen3moe.attention.head_count_kv": 4, "qwen3moe.attention.key_length": 128, "qwen3moe.attention.value_length": 128}});
         let m = model_from(&entry, &show);

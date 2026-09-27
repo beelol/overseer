@@ -233,7 +233,7 @@ fn ac86_the_pick_follows_the_machines_memory() {
     let p = d.call("local.pick", json!({}));
     let c = &p["pick"]["chosen"];
     assert_eq!((c["tag"].as_str(), c["context"].as_u64(), gib(&c["bytes"]), gib(&c["budget"]["budget"])), (Some("qwen2.5-coder:14b"), Some(16384), 12.4, 15.2));
-    assert_eq!(c["run_tag"], "overseer/qwen2.5-coder-14b-16k");
+    assert_eq!(c["run_tag"], "overseer/qwen2.5-coder-14b:16k");
     let big = p["pick"]["rejected"].as_array().unwrap().iter().find(|r| r["tag"] == "qwen3-coder:30b").unwrap();
     assert_eq!(big["reason"], "too big: 19.8 GiB at a 16k context is over the budget of 15.2 GiB");
 
@@ -259,7 +259,7 @@ fn ac86_the_pick_follows_the_machines_memory() {
     assert_eq!(gib(&d.call("local.pick", json!({}))["pick"]["budget"]["ceiling_share"]), 51.2, "a refused change changes nothing");
     d.call("settings.set", json!({"values": {"ramCeilingPercent": 50, "contextTarget": 131072}}));
     let c = d.call("local.pick", json!({}))["pick"]["chosen"].clone();
-    assert_eq!((c["context"].as_u64(), gib(&c["bytes"]), gib(&c["budget"]["ceiling_share"]), c["run_tag"].as_str()), (Some(131072), 30.3, 64.0, Some("overseer/qwen3-coder-30b-128k")));
+    assert_eq!((c["context"].as_u64(), gib(&c["bytes"]), gib(&c["budget"]["ceiling_share"]), c["run_tag"].as_str()), (Some(131072), 30.3, 64.0, Some("overseer/qwen3-coder-30b:128k")));
     // Even at the widest setting, with unverified models allowed, the 122B model is only ever rejected.
     d.call("settings.set", json!({"values": {"allowUnverifiedModels": true}}));
     let p = d.call("local.pick", json!({}));
