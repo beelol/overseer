@@ -1698,21 +1698,36 @@ rec(184, "Overseer reads on demand, and only reads", "verified", commit="e9daa88
     actual="Both pass. The live spike of AC-180 showed the same run on Claude Code with no Bash, Write or Edit tool and on Codex in its read-only sandbox.",
     evidence="`daemon/tests/overseer.rs`; [AC-180's transcripts](evidence/ac-180/README.md)", live="Fixtures here; the live read-only runs are AC-180's.",
     limits="Codex keeps its shell inside the read-only sandbox (no switch exists); recorded in AC-180.")
-rec(185, "A fixed set of actions, on one agent or all, each with its card", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
-rec(186, "Ask first, Steer, Auto", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
-rec(187, "Rein in: hold, release and guardrails", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
-rec(188, "Change direction", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
-rec(189, "Overseer keeps agents on task", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(185, "A fixed set of actions, on one agent or all, each with its card", "partial", commit="48b3214 (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="fixture harnesses; no paid tokens",
+    proven="every daemon method has a class in one table (`daemon/src/overseer/control.rs`) and the test reads the dispatcher's source so a method left out fails; Overseer's actions carry their class; a Confirm action proposed when the owner did not ask is refused, so is an action on a native child and an action Overseer does not have; stop everyone over four agents is one card with four rows and four interrupts within a second; a message's row holds the text that was sent, byte for byte, and the agent's turn carries it from Overseer; cards are the same after a restart; the proposal card and the turn in the agent's chat are in the talk scenario's screenshots",
+    deferred="the packaged-UI screenshots of the new card rows (delivery, state, times) once the surfaces step (AC-199) draws them; the Confirm actions merge back, pull request and permission are refused for now (not yet reachable from the conversation)",
+    steps="""`cargo test -p overseerd --test overseer ac185_actions_have_classes_and_cards`; `node test/ui/scenario-talk.js` for the card in the chat.""",
+    expected="See the RFC criterion (Gate S).", actual="The test passes; the scenario's screenshots show a proposal card and the turn in the agent's chat.",
+    evidence="`daemon/tests/overseer.rs`; [talk scenario](evidence/ui/talk/)", live="Fixtures only.", blocker="The card rows in the UI come with AC-199.")
+rec(186, "Ask first, Steer, Auto", "partial", commit="48b3214 (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="fixture harnesses; no paid tokens",
+    proven="at Ask first no action happens before its yes (AC-181's test); at Steer what the owner asked for settles for 2 s and then goes, a cancel inside the window sends nothing, a hold Overseer starts by itself happens at once and a redirect it starts waits; at Auto a redirect Overseer starts happens at once with its card and cause, and a Confirm action still waits for the owner; a proposal whose agent changed state is not carried out and says to ask again; VS Code and a second client answering one proposal within 50 ms of each other, 100 times, get one outcome each time and the loser reads the winner's; the level survives a restart and an unknown level is refused",
+    deferred="turning route picking on leaving the level where it was (route picking is on pull request #2's branch); a phone's request to change the level refused (the phone gateway is on pull request #10's branch; the class table already marks overseer.level as never from a device); the screenshots of a proposal, its yes, its no and the Auto switch with its text (AC-199)",
+    steps="""`cargo test -p overseerd --test overseer ac186_levels_decide_how_steer_actions_happen`.""",
+    expected="See the RFC criterion (Gate S).", actual="The test passes.",
+    evidence="`daemon/tests/overseer.rs`", live="Fixtures only.", blocker="Route picking and the phone are on their branches; the switch's screenshots come with AC-199.")
+rec(187, "Rein in: hold, release and guardrails", "partial", commit="48b3214 (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="fixture harnesses (Claude fixture, generic programs); no paid tokens",
+    proven="a held agent starts no turn from a queued message, from Overseer or from the owner (whose message offers Release and send), and starts one after release with what waited; each release condition (a release, another agent finishing, a time; a conflict closed by the same mechanism); hold everything over three agents from one proposal; a generic program's write inside a forbidden path is found by the sweep and holds the agent; a Claude fixture's write inside a forbidden path is reported within 2 s of its own file event; the words go at the start of the next turn and Claude Code's deny rules go on its command line; a restart keeps holds and guardrails; the label reads watched for a generic program and enforced for Claude Code with deny rules",
+    deferred="the probe of what each harness refuses, which needs one tiny live turn per harness (Claude Code with the deny rules, Codex, OpenCode); the screenshots of a held agent in the side bar, its chat and the grid (AC-199); a hold from a watch (AC-193)",
+    steps="""`cargo test -p overseerd --test overseer ac187_holds_and_guardrails`.""",
+    expected="See the RFC criterion (Gate S).", actual="The test passes.",
+    evidence="`daemon/tests/overseer.rs`", live="Fixtures only; the live probe of the labels is still to run.", blocker="The live label probe and the UI (AC-199).")
+rec(188, "Change direction", "partial", commit="48b3214 (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="Claude fixture (slow, echo), generic programs; the parity scenario on the packaged VSIX; no paid tokens",
+    proven="a redirect of a Claude fixture busy mid-turn keeps a snapshot, stops the turn, and the next turn carries the direction from Overseer; nothing uncommitted is lost (a draft written during the turn is still there); the review offers `Since the change of direction` from that snapshot, and an edit after the redirect shows against it while the earlier draft does not; a message's card row reads delivered when its turn starts and answered when it ends, with both times; a message queued for a Claude fixture busy for eight seconds survives a daemon restart and is delivered exactly once; a redirect to a generic program (which cannot pick a message up) is delivered once; VS Code's composer queues through `run.queue` and stops-then-sends through `run.redirect`, and AC-60's parity scenario passes on them (queued shown, sent when the turn ends; ⌥Enter stops and sends)",
+    deferred="`picked up` as its own state needs the agents' channel (AC-190): until then a delivered direction reads answered when the turn ends; one tiny live redirect each on Claude Code and Codex",
+    steps="""`cargo test -p overseerd --test overseer ac188_redirect_and_the_queue`; `node test/ui/scenario-parity.js` ([evidence](evidence/ui/parity/)).""",
+    expected="See the RFC criterion (Gate S).", actual="The test and the scenario pass.",
+    evidence="`daemon/tests/overseer.rs`; [parity scenario](evidence/ui/parity/result.json)", live="Fixtures; the live redirects are still to run.", blocker="Picked up comes with AC-190; the live redirects are one tiny paid turn each.")
+rec(189, "Overseer keeps agents on task", "partial", commit="97fecce (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="Claude fixture (echo, slow, showcase, circles), a generic program; no paid tokens",
+    proven="a fixture agent on task through seven turns gets check-ins after turns 3 and 6 and one at the end, its check-ins read on task or done, and no turn of its own carries a word from Overseer; told every turn, it gets one after each turn; told only when done, only the one at the end; one that writes outside its area is found by the free check within 2 s of its own file event (`outside_area`) and the check-in that follows reads drifting, with a proposal to redirect at Ask first, a hold at Steer and a redirect at Auto with its cause; one that finishes with part of the task left out gets a done card that names it; the same command failing three times in a row (`going_in_circles`) trips a check-in; with check-ins off none runs and the free checks still do; four agents finishing together cause one Overseer turn that checks all four; an agent that started no turn causes none; a question after agents finished is answered from their current digests (the envelope is built when the owner asks); turns that answer the owner are not counted and self-started turns are (`overseer.cap`)",
+    deferred="the hour of no request is not literally waited (the envelope is composed at request time, which is what the clause checks); one tiny live check-in on Claude Code; a swarm's director without its workers (Swarm is on its own branch, AC-195); the check-in and done cards in the packaged UI (AC-199)",
+    steps="""`cargo test -p overseerd --test overseer ac189_overseer_keeps_agents_on_task`.""",
+    expected="See the RFC criterion (Gate S).", actual="The test passes (about 90 s: it waits out the 5-second batch windows). The daemon queues each check-in with its reason, folds those due within 5 s or twenty of them into one turn, starts none while Overseer is busy, and drops them all with one message at the daily cap; an agent is finished when it stays idle for 30 s after completing (`overseer.grace_ms`).",
+    evidence="`daemon/tests/overseer.rs`", live="Fixtures only; the live check-in is one tiny paid turn, still to run.", blocker="The live check-in, the swarm case (AC-195) and the cards in the UI (AC-199).")
 rec(190, "Agents that know about each other", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
@@ -1873,11 +1888,11 @@ SHORT_BLOCKERS = {
     182: "not started (Gate S, added by the owner on 2026-09-27)",
     183: "partial: the daemon half is built on pull request #14; the rest comes with its later steps",
     184: "verified",
-    185: "not started (Gate S, added by the owner on 2026-09-27)",
-    186: "not started (Gate S, added by the owner on 2026-09-27)",
-    187: "not started (Gate S, added by the owner on 2026-09-27)",
-    188: "not started (Gate S, added by the owner on 2026-09-27)",
-    189: "not started (Gate S, added by the owner on 2026-09-27)",
+    185: "partial: built on pull request #14; the UI parts come with AC-199",
+    186: "partial: built on pull request #14; the UI parts come with AC-199",
+    187: "partial: built on pull request #14; the UI parts come with AC-199",
+    188: "partial: the queue and redirect are in the daemon (pull request #14); picked up comes with AC-190, the live redirects are still to run",
+    189: "partial: check-ins on cadence, when done and on the free checks are in the daemon (pull request #14); the live check-in, the swarm case and the UI cards remain",
     190: "not started (Gate S, added by the owner on 2026-09-27)",
     191: "not started (Gate S, added by the owner on 2026-09-27)",
     192: "partial: the daemon half is built on pull request #14; the rest comes with its later steps",
