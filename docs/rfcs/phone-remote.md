@@ -504,23 +504,23 @@ the owner's Apple account.
 
 ### Now, so the iOS simulator can run
 
-Checked on this Mac on 2026-09-26: Xcode 27.0 is installed, its license has not been accepted,
-and the active developer directory is the command line tools. The Android tools and an Android 35
-system image are installed and need nothing from the owner.
+Done by the owner on 2026-09-26: the Xcode 27.0 license is accepted and the developer tools point
+at Xcode. Verified afterwards: the iOS 26.5 simulator runtime is installed, with iPhone 17,
+iPhone 17 Pro, iPhone 17 Pro Max, iPhone 17e and iPhone Air simulators available. The Android
+tools and an Android 35 system image are installed. Nothing more is needed for the simulator
+milestone.
 
-1. Accept the Xcode license:
+An Xcode update asks for its license again and can reset the developer directory. If the
+simulator tools stop working after an update, point the tools at Xcode first, then accept the
+license, in that order:
 
-   ```bash
-   sudo xcodebuild -license
-   ```
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
 
-2. Point the developer tools at Xcode:
-
-   ```bash
-   sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-   ```
-
-3. Open Xcode once and let it install the iOS simulator, if it offers to.
+```bash
+sudo xcodebuild -license
+```
 
 ### Later, for the real iPhone
 
