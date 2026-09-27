@@ -1511,21 +1511,33 @@ rec(192, "Conflicts between agents in flight", "partial", commit="cfda50b (branc
     actual="Both tests pass. Scans run after an agent's events settle (2 s) and on an 8-second sweep for harnesses that report no file activity; `overseer.scan` runs one now.",
     evidence="`daemon/tests/overseer.rs`", live="Fixtures only.",
     blocker="assign, sequence and Auto follow with AC-185 and AC-186; area crossed with AC-190.")
-rec(193, "One agent watches another", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
-rec(194, "A watch that checks", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(193, "One agent watches another", "partial", commit="b46de8e (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="Claude fixture (slow, echo, watcher); no paid tokens",
+    proven="a subject with three turns, watched from its first: the watcher (a new read-only run of its own, created on the first wake) wakes three times, once per turn end, and once when the subject has stayed idle past the grace period, each wake carrying only what is new since the last (the end of turn 1 in the first, turn 2 without a word of turn 3 in the second, within 32 KiB) and answered with a finding of fine that is recorded and stays out of the conversation; the watch ends with its subject and says so; an idle subject causes no wake; a stop finding with hold on stop holds the subject within 2 s of the finding, by the daemon, with no Overseer turn in between; the same finding without it leads to a proposal to hold at Ask first, a hold at once and a redirect proposed at Steer, and a hold and a redirect at Auto, each from Overseer's turn caused by the finding; a watcher's tools have no propose, its reads are held to its subject, and a read of another agent is refused; a watch on a watcher, a circle (A watches B, B asked to watch A) and a third watcher on one subject are refused; an idle agent the owner names is woken as the watcher and files through its channel; twelve wakes in an hour cap the watch (`watch_capped`) until the hour turns",
+    deferred="the ten idle minutes are not literally waited (a wake needs an event of the subject); the wake of a native child or a swarm worker as subject (allowed by the code, not exercised); route picking's preference for a different model or provider (pull request #2); the agent limit a watcher counts toward (none on main yet); the screenshots of the watch on both agents and of a finding (AC-199); one tiny live watch, Claude Code watching a Codex agent",
+    steps="""`cargo test -p overseerd --test overseer ac193_one_agent_watches_another`.""",
+    expected="See the RFC criterion (Gate S).", actual="The test passes (about 90 s). The daemon wakes a watcher from the subject's events, never from a clock; the finding tool is the watcher's only way to speak; Overseer acts on concern and stop at its level through the same turn that serves check-ins, questions and reports.",
+    evidence="`daemon/tests/overseer.rs`", live="Fixtures only; the live watch is one tiny paid turn on each side, still to run.", blocker="The live watch, the neighbours (AC-195, AC-196) and the UI (AC-199).")
+rec(194, "A watch that checks", "partial", commit="b46de8e (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="a generic program as subject, the Claude fixture as watcher; no paid tokens",
+    proven="a subject that writes a failing test.sh and says its tests pass: the watcher's copy is a detached worktree of the subject's repository at the subject's latest snapshot (uncommitted changes included), made at the start of the watch and reset at each wake; the watcher runs the tests there and its finding is concern, names the failing test and the snapshot, which is the watch's latest; the subject's worktree is byte-identical before and after the check; the copy is a labelled worktree that cleanup lists while the watcher works and removes when the watch has ended and nothing runs in it",
+    deferred="the watcher's own permission mode on a live harness (the fixture has no permissions); the screenshots (AC-199)",
+    steps="""`cargo test -p overseerd --test overseer ac194_a_watch_that_checks`.""",
+    expected="See the RFC criterion (Gate S).", actual="The test passes. The copy is removed through the same cleanup as any worktree (AC-24's rules), once the watcher's run is idle.",
+    evidence="`daemon/tests/overseer.rs`", live="Fixtures only.", blocker="The UI (AC-199).")
 rec(195, "With Swarm: one decision-maker per swarm", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
-rec(196, "With route picking: routes, admission and metering", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
-rec(197, "Handoffs and offline", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(196, "With route picking: routes, admission and metering", "partial", commit="b46de8e (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="Claude fixture (permission, echo); no paid tokens",
+    proven="a permission the owner denied (a write of perm.txt) is remembered by the daemon, and a proposal to have another agent do the same thing, by a message or by starting an agent, is refused naming the denial; a different message goes through; Overseer's own run reports usage like any run (its turns are metered)",
+    deferred="everything that needs pull request #2 on main: the one admission (allowance, agent slot, workspace, launch intent) that two starts from Overseer and one by hand compete for, the watcher's route differing from its subject's with the decision trace, a pinned harness kept, and Overseer's turns in the usage views",
+    steps="""`cargo test -p overseerd --test overseer ac196_a_denied_permission_is_never_worked_around`.""",
+    expected="See the RFC criterion (Gate S).", actual="The test passes. The rule matches the denied command or path (or a file's name) in the words an action would send, for a day.",
+    evidence="`daemon/tests/overseer.rs`", live="Fixtures only.", blocker="Partial until pull request #2 (route picking) and this gate are both on main.")
+rec(197, "Handoffs and offline", "partial", commit="b46de8e (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="Claude fixture (its auth failure as Overseer's harness), generic programs; no paid tokens",
+    proven="with Overseer's harness failing (an authentication error, as when every provider fails and no local model runs), the conversation says Overseer cannot answer and why, and what keeps working: a same-lines conflict between two generic agents is still found and assigned from its card (the other agent gets its guardrail), a hold and a release work, and stop everyone stops four agents from one proposal's yes; a message queued for a busy agent survives a restart and arrives once (AC-188's test)",
+    deferred="everything that needs Continuity on main: a handed-off held, watched agent with an area whose successor is held, watched and owns the area; a redirect sent while an agent waits for a connection arriving once when it returns; Overseer's own run following Continuity",
+    steps="""`cargo test -p overseerd --test overseer ac197_without_a_model_the_daemon_half_keeps_working`.""",
+    expected="See the RFC criterion (Gate S).", actual="The test passes.",
+    evidence="`daemon/tests/overseer.rs`", live="Fixtures only.", blocker="Partial until Continuity (pull request #9) and this gate are both on main.")
 rec(198, "Quiet and bounded", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
@@ -1674,11 +1686,11 @@ SHORT_BLOCKERS = {
     190: "partial: briefings, the channel and rally are in the daemon (pull request #14); the live reports, OpenCode's channel and the UI remain",
     191: "partial: shares are in the daemon (pull request #14); Swarm's permissions, the branch form and the UI remain",
     192: "partial: the daemon half is built on pull request #14; the rest comes with its later steps",
-    193: "not started (Gate S, added by the owner on 2026-09-27)",
-    194: "not started (Gate S, added by the owner on 2026-09-27)",
+    193: "partial: watches, wakes and findings are in the daemon (pull request #14); the live watch and the UI remain",
+    194: "partial: the checking watch's copy is in the daemon (pull request #14); the UI remains",
     195: "not started (Gate S, added by the owner on 2026-09-27)",
-    196: "not started (Gate S, added by the owner on 2026-09-27)",
-    197: "not started (Gate S, added by the owner on 2026-09-27)",
+    196: "partial: a denied permission is never worked around (pull request #14); admission and routes wait for pull request #2 on main",
+    197: "partial: without a model the daemon half keeps working (pull request #14); handoffs wait for Continuity on main",
     198: "not started (Gate S, added by the owner on 2026-09-27)",
     199: "not started (Gate S, added by the owner on 2026-09-27)",
     200: "not started (Gate S, added by the owner on 2026-09-27)",
