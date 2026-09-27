@@ -1,3 +1,4 @@
+// (In the immersive dashboard, AC-102, the tab strips are hidden: the groups are compared by their shares.)
 // Packaged-UI scenario for AC-79 (grid and dashboard mode in the new layout), fixture runs only.
 // From the chat-only arrangement (an agent without changes) and the review-and-chat arrangement
 // (an agent with changes): the grid opens in the editor area and closing it returns to the same
@@ -53,7 +54,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
       await cdp.command('Overseer: Exit Dashboard'); await delay(3000);
       const after = await arrangement();
       check(`${label}: dashboard mode hides the panel and secondary side bar, keeps the side bar on Overseer, and Exit returns to the same arrangement`,
-        !during.panel && !during.auxiliary && during.sidebar && /Overseer/i.test(during.sidebarTitle) && JSON.stringify(during.groups.map(g => g.active)) === JSON.stringify(before.groups.map(g => g.active)) && same(before, after), { before, during, after });
+        !during.panel && !during.auxiliary && during.sidebar && /Overseer/i.test(during.sidebarTitle) && (during.groups.every(g => g.active === '') ? JSON.stringify(during.groups.map(g => g.share)) === JSON.stringify(before.groups.map(g => g.share)) : JSON.stringify(during.groups.map(g => g.active)) === JSON.stringify(before.groups.map(g => g.active))) && same(before, after), { before, during, after });
     };
 
     // Chat only.
