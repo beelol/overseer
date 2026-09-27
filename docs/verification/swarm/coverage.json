@@ -414,7 +414,7 @@
         "docs/verification/swarm/SWARM-42.md",
         "daemon/tests/swarm_atlas.rs"
       ],
-      "blocker": "Stable-ID dedupe, terminal exact-receipt replay after restart, stale generation checks, late finished-attempt result isolation and requeued undecided-result review pass; the joined S1 replay includes duplicate D1, and joined S5 collapses 2,000 J2 progress replays to one director envelope during Stop. Live dispatch/accounting and broader delayed/reordered message traces remain untested."
+      "blocker": "Stable-ID dedupe, terminal exact-receipt replay after restart, stale generation checks, late finished-attempt result isolation and requeued undecided-result review pass; the joined S1 replay includes duplicate D1, and joined S5 collapses 2,000 J2 progress replays to one director envelope during Stop. Worker-inbox reads now require the recipient's attempt token; absent and wrong credentials fail in a red-first broker test. Live dispatch/accounting and broader delayed/reordered message traces remain untested."
     },
     "SWARM-43": {
       "status": "partial",
@@ -633,7 +633,7 @@
         "docs/verification/swarm/milestone-1.md",
         "docs/verification/swarm/SWARM-60.md"
       ],
-      "blocker": "Worker discoveries reach a durable director inbox and fixture director advisories reach only selected peers with applied receipts; live peer delivery, automatic relevance selection and artifact permissions are not implemented."
+      "blocker": "Worker discoveries reach a durable director inbox and fixture director advisories reach only selected peers with applied receipts. Worker-inbox reads now require the recipient's attempt token, so a peer cannot read a targeted directive using its attempt ID alone. Live peer delivery, automatic relevance selection and artifact permissions are not implemented."
     },
     "SWARM-61": {
       "status": "partial",
