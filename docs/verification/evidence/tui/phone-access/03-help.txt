@@ -26,12 +26,12 @@
                                          │  A                 accounts and sign-in                │                                         
                                          │  O                 phone access on / off               │                                         
                                          │  D                 devices: pair a phone, revoke, scope│                                         
+                                         │  S                 Audio Mode: settings and preview    │                                         
                                          │  r                 reload (after X: start the daemon)  │                                         
                                          │  X                 stop all agents and the daemon      │                                         
                                          │  q                 quit (agents keep running)          │                                         
                                          │                                                        │                                         
                                          ╰──────────────────────────────────────── any key closes ╯                                         
-                                                                                                                                            
                                                                                                                                             
                                                                                                                                             
                                                                                                                                             

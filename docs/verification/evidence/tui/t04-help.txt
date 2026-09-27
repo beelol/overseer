@@ -1,4 +1,4 @@
- ◆ Overseer  page 1/2 · 12 agents                                                                                                                                       ● connected 
+ ◆ Overseer  page 1/2 · 12 agents                                                                                                                                       ● connected
 ┏ 1 ✓ agent 12 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ generic · 0s ┓╭ 2 ✓ agent 11 ────────────────────────────── generic · 0s ╮╭ 3 ✓ agent 10 ────────────────────────────── generic · 0s ╮
 ┃ hi                                                       ┃│ hi                                                       ││ hi                                                       │
 ┃                                                          ┃│                                                          ││                                                          │
@@ -32,10 +32,11 @@
 │                                                          │││  f                 filter: all → active → needs you    │││                                                          │
 │                                                          │││  /                 search agents (esc clears)          │││                                                          │
 │                                                          │││  A                 accounts and sign-in                │││                                                          │
-│                                                          │││  r                 reload (after X: start the daemon)  │││                                                          │
-╰ completed ───────────────────────────────────────────────╯╰│  X                 stop all agents and the daemon      │╯╰ completed ───────────────────────────────────────────────╯
-╭ 7 ✓ agent 06 ────────────────────────────── generic · 0s ╮╭│  q                 quit (agents keep running)          │╮╭ 9 ✓ agent 04 ────────────────────────────── generic · 0s ╮
-│ hi                                                       │││                                                        │││ hi                                                       │
+│                                                          │││  S                 Audio Mode: settings and preview    │││                                                          │
+╰ completed ───────────────────────────────────────────────╯╰│  r                 reload (after X: start the daemon)  │╯╰ completed ───────────────────────────────────────────────╯
+╭ 7 ✓ agent 06 ────────────────────────────── generic · 0s ╮╭│  X                 stop all agents and the daemon      │╮╭ 9 ✓ agent 04 ────────────────────────────── generic · 0s ╮
+│ hi                                                       │││  q                 quit (agents keep running)          │││ hi                                                       │
+│                                                          │││                                                        │││                                                          │
 │                                                          ││╰──────────────────────────────────────── any key closes ╯││                                                          │
 │                                                          ││                                                          ││                                                          │
 │                                                          ││                                                          ││                                                          │
@@ -49,6 +50,5 @@
 │                                                          ││                                                          ││                                                          │
 │                                                          ││                                                          ││                                                          │
 │                                                          ││                                                          ││                                                          │
-│                                                          ││                                                          ││                                                          │
 ╰ completed ───────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────╯╰ completed ───────────────────────────────────────────────╯
- ←↑↓→ move   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                                       
+ ←↑↓→ move   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit

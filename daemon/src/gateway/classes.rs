@@ -143,6 +143,16 @@ mod tests {
                 names.push(cap[1].to_string());
             }
         }
+        // Continuity's methods are dispatched in their own modules (a match arm is a method only
+        // when its name has a dot: those modules also match on plain words such as "local").
+        for file in ["src/continuity.rs", "src/downloads.rs", "src/handoff.rs", "src/ollama_install.rs"] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
+            let text = std::fs::read_to_string(&path).unwrap_or_else(|_| panic!("{file}"));
+            let re = regex::Regex::new(r#"(?m)^\s*"([a-z_]+(?:\.[a-z_]+)+)"\s*=>"#).unwrap();
+            for cap in re.captures_iter(&text) {
+                names.push(cap[1].to_string());
+            }
+        }
         names.sort();
         names.dedup();
         names

@@ -14,7 +14,7 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 - Do not change another agent's area without saying so in your pull request.
 
 ## Brand
-- One Overseer mark everywhere (AC-142): see `docs/design/brand.md`. The files live in `docs/design/brand/`: the full-colour icon, the transparent mark and the single-colour glyph. Use nothing else, on VS Code, the Mac, the phone or anywhere.
+- One Overseer mark everywhere (AC-142): see `docs/design/brand.md`. The files live in `docs/design/brand/`: `overseer-app-icon.png` (the full app icon: Marketplace, any Mac app icon, the phone's home screen), `overseer-logo.png` (the colour mark: Overseer's own views, marks inside the apps, Android's adaptive foreground) and `overseer-icon-flat.png` (the single-colour silhouette: surfaces that tint one colour, the phone's door and launch screen, Android's themed icon, a Mac menu-bar template); `overseer-mark.svg` is the silhouette as SVG. Use nothing else, on VS Code, the Mac, the phone or anywhere (AC-178, AC-179).
 - Themes: Overseer Dark and Overseer Light, plus the bold "Overseer" theme of Gate M (AC-103). Colours come from the design tokens (`extension/design/tokens.js`), never hard-coded.
 
 ## Paid turns
@@ -22,12 +22,15 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 - Never touch the owner's checkouts, logins or credentials; never sign anything out. Restart or reinstall on the owner's daemon only when no runs are active.
 
 ## Tests
-- `cargo test --workspace` (daemon and TUI); `node test/unit/*.js`; `node extension/scripts/package.js`, then `node test/ui/scenario-<name>.js` (isolated VS Code profiles). `scripts/test-all` runs everything (AC-147).
+- `scripts/test-all` runs everything and prints one summary (AC-147): Rust (daemon and TUI), the extension's unit tests and source check, the ledger's link check, the VSIX build and every packaged-UI fixture scenario. `--jobs=3` runs UI scenarios three at a time; `--only=a,b` picks scenarios; `--no-ui` skips them; `--live` and `--perf` add the paid and load scenarios. Run it before asking for a merge, and run at least one UI scenario before pushing extension changes to `main` (a change that stops the extension activating breaks every agent's build).
+- Several agents run VS Code scenarios on the same machine: a timing check that fails under that load is rerun alone before it is called a regression.
 - Leave no test windows, daemons, shims or runs going.
 
 ## Where the designs are
 - Orchestrator UI (Gates J, K, M): `docs/rfcs/orchestrator-ui.md`
 - Continuity, offline mode (Gate L): `docs/rfcs/offline-mode.md`
-- Phone remote (Gate N): `docs/rfcs/` (see Gate N in the RFC)
+- Phone remote (Gate N): `docs/rfcs/phone-remote.md`, its wire format `docs/rfcs/phone-remote-protocol.md` and its goal `docs/rfcs/phone-remote-goal.md`; the work is in pull request #10
 - Audio Mode (Gate O), TUI (`docs/rfcs/tui.md`), Auto and Swarm: their RFCs under `docs/rfcs/`
+- Voice Mode (Gate R): `docs/rfcs/voice-mode.md`; audio is collected on the Rust side
+- Overseer itself (Gate S): `docs/rfcs/orchestrator.md`, its goal `docs/rfcs/orchestrator-goal.md`; one Overseer session in the daemon, shared with Voice Mode and Talk to Overseer (AC-107)
 - Follow-through and agent oversight (Gates P and Q): `docs/overseer-rfc.md`; the goal is `docs/goals/everything.md` and what it tracks is `docs/verification/tracker.md`

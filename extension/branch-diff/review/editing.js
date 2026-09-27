@@ -12,6 +12,12 @@ const stamp = stat => [stat.size, stat.mtimeMs, stat.ctimeMs, stat.mode].join(':
 const textValid = text => typeof text === 'string' && !text.includes('\0') && Buffer.byteLength(text, 'utf8') <= LIMIT;
 
 /** Writes belong to real VS Code documents, independently of a webview's lifetime. */
+/** Plain text-editor tabs showing this file (not diffs or other views). */
+function textTabs(uri) {
+  const key = uri.toString();
+  return vscode.window.tabGroups.all.flatMap(g => g.tabs).filter(t => t.input && t.input.uri && !t.input.original && t.input.uri.toString() === key);
+}
+
 class Editing {
   constructor(context) {
     this.context = context;
@@ -174,7 +180,7 @@ class Editing {
     // the file (VS Code reloads it asynchronously), so a clean document is checked against disk.
     const disk = doc.isDirty ? undefined : new TextDecoder('utf-8').decode(bytes);
     if (doc.getText() !== message.before || (disk !== undefined && disk !== message.before) || !textValid(doc.getText()) || snapshot.inputs !== session.inputs() || diskStamp !== await this.writable(session, entry.uri)) throw new Error('The file changed before editing began. Your draft has been retained.');
-    return { token: message.stream, repository: message.repository, id: message.id, uri: entry.uri, doc,
+    return { token: message.stream, repository: message.repository, id: message.id, uri: entry.uri, doc, hadTab: textTabs(entry.uri).length > 0,
       version: doc.version, sequence: 0, text: doc.getText(), before: doc.getText(), baseline, diskStamp, inputs: session.inputs(), session };
   }
 
@@ -271,6 +277,7 @@ class Editing {
         // No await between the final document-version check and applyEdit:
         // VS Code also carries that version into its main-thread bulk edit.
         if (!await vscode.workspace.applyEdit(edit) || stream.doc.getText() !== patch.text) throw new Error('The edit could not be applied safely. Your draft has been retained.');
+
       } else if (!await stream.doc.save()) {
         stream.sequence = message.sequence;
         await this.handoff(stream); await this.clearJournal(stream);
@@ -283,6 +290,12 @@ class Editing {
         stream.diskStamp = await this.writable(session, stream.uri);
         stream.baseline = digest(await fs.readFile(stream.uri.fsPath));
         if (stream.doc.getText() !== before) stream.failed = 'Saving changed the document (for example, formatting). Your newer review draft has been retained.';
+        // VS Code opens a background tab for a file a workspace edit makes dirty. Overseer (AC-99):
+        // when the file had no tab as review editing began, that tab goes again once it is saved.
+        if (!stream.hadTab && !stream.doc.isDirty) {
+          const tabs = textTabs(stream.uri);
+          if (tabs.length) await vscode.window.tabGroups.close(tabs, true).then(undefined, () => {});
+        }
       }
       await this.handoff(stream);
       await this.clearJournal(stream);

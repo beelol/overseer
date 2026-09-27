@@ -1,0 +1,9 @@
+[2026-09-27T13:59:07.788Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T13:59:24.218Z] PASS composer: after focus in the side bar, one click on the agent choice opens its menu {"label":"composer agent chip","ok":true}
+[2026-09-27T13:59:28.517Z] PASS chat: after focus in the review (another editor group), one click on More opens its menu {"label":"chat more","ok":true}
+[2026-09-27T13:59:29.580Z] PASS review: after focus in the side bar, one click on Changes only flips it {"label":"review toggle","ok":true}
+[2026-09-27T13:59:30.395Z] PASS review: after focus in the chat (another editor group), one click flips it back {"label":"review toggle back","ok":true}
+[2026-09-27T13:59:31.912Z] PASS search field: after focus in the chat, one click puts the cursor there and typing filters {"focused":true,"typed":"Busy"}
+[2026-09-27T13:59:36.060Z] PASS grid: after focus in the side bar, one click on a tile's pin toggles it {"label":"grid pin","ok":true}
+[2026-09-27T13:59:45.734Z] PASS dashboard: after focus in the side bar, one click on the chat's More opens its menu {"label":"dashboard chat more","ok":true}
+[2026-09-27T13:59:48.303Z] screenshot docs/verification/evidence/ui/first-click/01-after.png

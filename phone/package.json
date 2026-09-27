@@ -16,14 +16,15 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "check:platform-rule": "node scripts/check-platform-rule.mjs",
-    "check": "npm run tokens:check && npm run icons:check && npm run lint && npm run typecheck && npm test && npm run check:platform-rule && npm run check:token-rule",
+    "check": "npm run tokens:check && npm run icons:check && npm run assets:check && npm run lint && npm run typecheck && npm test && npm run check:platform-rule && npm run check:token-rule",
     "assets": "node scripts/gen-assets.mjs",
     "format": "prettier --write app src scripts \"*.{js,ts,json,md}\"",
     "icons": "node scripts/gen-icons.mjs",
     "icons:check": "node scripts/gen-icons.mjs --check",
     "check:token-rule": "node scripts/check-token-rule.mjs",
     "e2e": "node e2e/run.mjs",
-    "measure": "node e2e/measure.mjs"
+    "measure": "node e2e/measure.mjs",
+    "assets:check": "node scripts/gen-assets.mjs --check"
   },
   "dependencies": {
     "@noble/ciphers": "2.4.0",

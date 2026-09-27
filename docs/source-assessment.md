@@ -70,3 +70,28 @@ RFC bounds including a deliberately missed watcher event. One upstream behaviour
 change for agent workloads: under continuous writes the comparison restarted on every
 change and never published; it now publishes after one restart and catches up.
 Agetor, Parallel Code, Pane (AGPL) and XCB were inspected at pinned commits and skipped.
+
+## Happy, for the phone remote (AC-115, 2026-09-26)
+
+[Happy](https://github.com/slopus/happy) is a phone and web client for Claude Code and Codex,
+MIT licensed. It was inspected at revision `8517ab232528a6046271d6010aaed663e1187dfc`
+(2026-09-22), read only: nothing was built, installed or run.
+
+**Decision: nothing of Happy is adopted as code.** No license text or notice is owed.
+
+| What Happy has | Where | Why Overseer does not take it |
+| --- | --- | --- |
+| A server every message passes through (`https://api.cluster-fluster.com`, or a self-hosted one), reached with socket.io | `packages/happy-server`, `packages/happy-app/sources/sync/apiSocket.ts`, `serverConfig.ts`, `packages/happy-cli/src/configuration.ts` | The owner's rule for this gate: the phone talks to Overseer's daemon only, with no relay, no server and no account. No direct mode on the local network was found in the app or the CLI. |
+| Accounts: a challenge signed by the phone, tokens, a QR code that links a terminal to an account (`happy://terminal?<public key>`), a backup of the secret key | `packages/happy-app/sources/auth/`, `packages/happy-cli/src/ui/auth.ts` | Overseer pairs a phone with one Mac and has no account. The pairing code carries the Mac's key, a secret valid once, and its addresses. |
+| End-to-end encryption through the relay: libsodium `crypto_box` and `crypto_secretbox`, AES-256-GCM for content keys | `packages/happy-app/sources/encryption/`, `sources/sync/encryption/`, `packages/happy-cli/src/api/encryption.ts` | It protects stored messages from the server. Overseer needs a live session authenticated in both directions with forward secrecy (Noise IK, AC-118). Taking Happy's would add a second design of security code, not remove one. |
+| Its own wrapper around Claude Code and Codex, with its own message schema | `packages/happy-cli`, `packages/happy-wire` | Overseer's daemon already runs the agents and has its protocol (`protocol/protocol.json`). |
+| The app: Expo 55, React Native 0.83, FlashList 2, Reanimated 4, its own Markdown parser, MMKV, Unistyles, LiveKit, RevenueCat, PostHog | `packages/happy-app/package.json`, `sources/components/markdown/` | The screens are bound to its sync layer and its accounts. Overseer's conversation must read like VS Code's, so its view models are ported from the extension instead (`phone/model`), with parity tests. |
+
+What the inspection did confirm: a shipping app of the same kind holds long conversations on
+the stack chosen for this gate (Expo, the New Architecture, FlashList, Reanimated), and parses
+Markdown itself instead of using a web view. Both match the choices in
+[the phone remote RFC](rfcs/phone-remote.md).
+
+For the later relay RFC, two parts are worth reading again: `packages/happy-server-self-host`
+(a relay one person can run) and `packages/expo-tailcat` (an app-scoped WireGuard connection
+with no system VPN; experimental, with its own `THIRD_PARTY_NOTICES.md`).

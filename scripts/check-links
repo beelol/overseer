@@ -1,0 +1,22 @@
+#!/usr/bin/env node
+// Checks every relative link in the README and the verification ledger (AC-153): each points at a
+// file or folder that exists. Prints the broken ones and exits 1 when there are any.
+const fs = require('fs');
+const path = require('path');
+const root = path.resolve(__dirname, '..');
+const files = ['README.md', ...fs.readdirSync(path.join(root, 'docs/verification')).filter(f => f.endsWith('.md')).map(f => 'docs/verification/' + f)];
+let checked = 0; const broken = [];
+for (const f of files) {
+  const text = fs.readFileSync(path.join(root, f), 'utf8');
+  for (const m of text.matchAll(/\]\(([^)\s]+)\)/g)) {
+    const href = m[1];
+    if (/^(https?:|mailto:|#)/.test(href)) continue;
+    const target = decodeURIComponent(href.split('#')[0]);
+    if (!target) continue;
+    checked++;
+    if (!fs.existsSync(path.resolve(path.dirname(path.join(root, f)), target))) broken.push(`${f}: ${href}`);
+  }
+}
+console.log(`${checked} links checked in ${files.length} files; ${broken.length} broken`);
+for (const b of broken) console.log('  ' + b);
+process.exit(broken.length ? 1 : 0);

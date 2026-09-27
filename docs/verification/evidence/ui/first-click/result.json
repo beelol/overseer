@@ -1,0 +1,90 @@
+{
+  "checks": [
+    {
+      "name": "composer: after focus in the side bar, one click on the agent choice opens its menu",
+      "ok": true,
+      "detail": {
+        "label": "composer agent chip",
+        "ok": true
+      }
+    },
+    {
+      "name": "chat: after focus in the review (another editor group), one click on More opens its menu",
+      "ok": true,
+      "detail": {
+        "label": "chat more",
+        "ok": true
+      }
+    },
+    {
+      "name": "review: after focus in the side bar, one click on Changes only flips it",
+      "ok": true,
+      "detail": {
+        "label": "review toggle",
+        "ok": true
+      }
+    },
+    {
+      "name": "review: after focus in the chat (another editor group), one click flips it back",
+      "ok": true,
+      "detail": {
+        "label": "review toggle back",
+        "ok": true
+      }
+    },
+    {
+      "name": "search field: after focus in the chat, one click puts the cursor there and typing filters",
+      "ok": true,
+      "detail": {
+        "focused": true,
+        "typed": "Busy"
+      }
+    },
+    {
+      "name": "grid: after focus in the side bar, one click on a tile's pin toggles it",
+      "ok": true,
+      "detail": {
+        "label": "grid pin",
+        "ok": true
+      }
+    },
+    {
+      "name": "dashboard: after focus in the side bar, one click on the chat's More opens its menu",
+      "ok": true,
+      "detail": {
+        "label": "dashboard chat more",
+        "ok": true
+      }
+    }
+  ],
+  "clicks": [
+    {
+      "label": "composer agent chip",
+      "ok": true
+    },
+    {
+      "label": "chat more",
+      "ok": true
+    },
+    {
+      "label": "review toggle",
+      "ok": true
+    },
+    {
+      "label": "review toggle back",
+      "ok": true
+    },
+    {
+      "label": "search field",
+      "ok": true
+    },
+    {
+      "label": "grid pin",
+      "ok": true
+    },
+    {
+      "label": "dashboard chat more",
+      "ok": true
+    }
+  ]
+}

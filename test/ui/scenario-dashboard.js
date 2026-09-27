@@ -3,7 +3,10 @@
 // bar, panel and secondary side bar for this window, the dashboard fills the editor area and works
 // (agents from repositories not open anywhere); it survives a window reload (AC-49); Exit Dashboard
 // restores the previous layout exactly (parts and editor groups); no settings file changes; the
-// optional open-on-startup setting opens it after a reload.
+// optional open-on-startup setting opens it after a reload. AC-102: in the dashboard VS Code's tab
+// strip, breadcrumbs and editor actions are gone above Overseer's views (the immersive settings are
+// applied), screenshots of chat, review and grid; on exit the user settings are exactly as before
+// (an explicit value is put back, an unset one removed again).
 const fs = require('fs');
 const path = require('path');
 const { Session, makeRepo, latestVsix, delay } = require('./harness');
@@ -14,7 +17,8 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
   const check = (name, ok, detail) => { result.checks.push({ name, ok: !!ok, detail }); s.note(`${ok ? 'PASS' : 'FAIL'} ${name}`, detail); };
   try {
     const repo = makeRepo(path.join(s.root, 'dash-repo'), { dirty: false });
-    s.settings({ 'workbench.colorTheme': 'Overseer Dark' });
+    // breadcrumbs.enabled is set by the user (put back as true); showTabs is not set (removed again).
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'breadcrumbs.enabled': true });
     s.install(latestVsix());
     // No folder: an empty window.
     s.launch('', {});
@@ -53,6 +57,37 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     check('dashboard mode hides the panel and secondary side bar and keeps the side bar on the Overseer agents list (Gate K, AC-79); it works in a window without a folder',
       during.sidebar && /Overseer/i.test(during.sidebarTitle) && !during.panel && !during.auxiliary && agents.includes('Dashboard demo') && await dash.eval(`document.body.dataset.dashboard === '1'`), { during, agents });
 
+    // AC-102: the immersive editor area. No tab strip, breadcrumbs or editor actions above Overseer's views.
+    const chrome = () => cdp.evalWorkbench(`(() => {
+      const shown = e => !!e && e.offsetWidth > 0 && e.offsetHeight > 0 && getComputedStyle(e).display !== 'none';
+      const groups = [...document.querySelectorAll('.editor-group-container')];
+      return { groups: groups.length, tabs: groups.filter(g => shown(g.querySelector('.tabs-and-actions-container, .tabs-container'))).length,
+        breadcrumbs: groups.filter(g => shown(g.querySelector('.breadcrumbs-below-tabs, .breadcrumbs-control'))).length,
+        titles: groups.map(g => Math.round(g.querySelector(':scope > .title')?.getBoundingClientRect().height || 0)) };
+    })()`);
+    const userSettings = () => JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+    const applied = userSettings();
+    const chat = await chrome();
+    await s.screenshot('immersive-chat');
+    check('AC-102: in the dashboard the immersive settings are applied and no editor group shows a tab strip or breadcrumbs',
+      applied['workbench.editor.showTabs'] === 'none' && applied['breadcrumbs.enabled'] === false && applied['workbench.editor.editorActionsLocation'] === 'hidden' && chat.tabs === 0 && chat.breadcrumbs === 0,
+      { applied: { showTabs: applied['workbench.editor.showTabs'], breadcrumbs: applied['breadcrumbs.enabled'], actions: applied['workbench.editor.editorActionsLocation'] }, chat });
+    // The agent has changes: its review beside the chat, then the grid.
+    await s.selectRun(t.run.id);
+    await cdp.webview(`!!document.getElementById('diffs') && document.querySelectorAll('.diff-file').length > 0`, 20000).catch(() => null);
+    await delay(1500);
+    const split = await chrome();
+    await s.screenshot('immersive-review-and-chat');
+    await cdp.command('Overseer: Pin to Grid'); await delay(800);
+    await cdp.command('Overseer: Toggle Agent Grid'); await delay(2000);
+    const grid = await chrome();
+    await s.screenshot('immersive-grid');
+    await cdp.command('Overseer: Toggle Agent Grid'); await delay(1500);
+    await cdp.command('Overseer: Unpin from Grid'); await delay(500);
+    const named = await cdp.webview(`!!document.getElementById('comparison')`, 5000).then(f => f.eval(`(() => { const e = document.getElementById('comparison'); return { text: e.textContent, shown: e.offsetWidth > 0 }; })()`)).catch(() => null);
+    check('AC-102: with no tab strip the review names its agent in its own header', named && named.shown && named.text === 'Dashboard demo', named);
+    check('AC-102: review beside the chat and the grid have no tab strip or breadcrumbs either', split.tabs === 0 && split.breadcrumbs === 0 && grid.tabs === 0 && grid.breadcrumbs === 0, { split, grid });
+
     // Reload: the dashboard is restored and still in dashboard mode.
     await cdp.command('Developer: Reload Window');
     await delay(6000);
@@ -70,6 +105,9 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     await s.screenshot('after-exit');
     check('Exit Dashboard restores the previous layout (side bar, panel, secondary side bar and editor groups)',
       after.sidebar === before.sidebar && after.panel === before.panel && after.auxiliary === before.auxiliary && after.groups === before.groups, { before, after });
+    const restored = userSettings();
+    check('AC-102: leaving the dashboard puts the user settings back exactly (breadcrumbs.enabled true again; showTabs and editorActionsLocation unset again)',
+      restored['breadcrumbs.enabled'] === true && !('workbench.editor.showTabs' in restored) && !('workbench.editor.editorActionsLocation' in restored), restored);
     check('no setting changed (user settings identical apart from VS Code\'s own migration)', norm(fs.readFileSync(settingsFile, 'utf8')) === norm(settingsBefore), { before: norm(settingsBefore), after: norm(fs.readFileSync(settingsFile, 'utf8')) });
 
     // Optional: open the dashboard when VS Code starts.

@@ -1,6 +1,6 @@
 // Builds bin/Overseer Notifier.app (AC-52, macOS only): a universal Swift binary, Info.plist,
-// an .icns rendered from AppIcon.svg, and an ad-hoc signature. Requires the Xcode command-line
-// tools (swiftc, lipo, codesign) and the system qlmanage/sips/iconutil.
+// an .icns made from AppIcon.png (Overseer's app icon on the macOS grid, AC-142), and an ad-hoc
+// signature. Requires the Xcode command-line tools (swiftc, lipo, codesign) and the system sips/iconutil.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -27,15 +27,8 @@ try {
   fs.mkdirSync(path.join(app, 'Contents/Resources'), { recursive: true });
   run('lipo', ['-create', path.join(tmp, 'notifier-arm64'), path.join(tmp, 'notifier-x86_64'), '-output', path.join(app, 'Contents/MacOS/notifier')]);
   fs.copyFileSync(path.join(here, 'Info.plist'), path.join(app, 'Contents/Info.plist'));
-  // Icon: render the SVG once at 1024 px, then every size macOS asks for.
-  // Transparent 1024 px master via AppKit; qlmanage (fallback) flattens onto white.
-  const master = path.join(tmp, 'AppIcon.svg.png');
-  try {
-    run('swiftc', ['-O', ...flags, path.join(here, 'render-icon.swift'), '-o', path.join(tmp, 'render-icon')]);
-    run(path.join(tmp, 'render-icon'), [path.join(here, 'AppIcon.svg'), master]);
-  } catch {
-    run('qlmanage', ['-t', '-s', '1024', '-o', tmp, path.join(here, 'AppIcon.svg')]);
-  }
+  // Icon: every size macOS asks for, from the 1024 px master (docs/design/brand/exports/overseer-app-icon-macos-1024.png).
+  const master = path.join(here, 'AppIcon.png');
   const set = path.join(tmp, 'AppIcon.iconset'); fs.mkdirSync(set);
   for (const size of [16, 32, 128, 256, 512]) {
     run('sips', ['-z', String(size), String(size), master, '--out', path.join(set, `icon_${size}x${size}.png`)]);

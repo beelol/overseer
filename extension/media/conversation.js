@@ -78,6 +78,7 @@
       this.active = ['queued', 'starting', 'running'].includes(msg.run.status);
       this.attention = msg.run.attention && msg.run.attention.kind === 'permission' ? msg.run.attention.request_id : undefined;
       for (const c of msg.children || []) this.childInfo.set(c.id, c);
+      if (window.OverseerContinuity) window.OverseerContinuity.run(this, msg);
       for (const [id, card] of this.perms) this.renderPermission(id, card);
       for (const [id, block] of this.children) this.renderChildHeader(id, block);
       this.updateWorking();
@@ -98,9 +99,18 @@
       const done = el('span', 'done'); const dur = el('span', 'dur'); const usage = el('span', 'usage');
       foot.append(done, dur, usage);
       if (t.prompt) {
-        const p = el('div', 'msg user'); p.setAttribute('aria-label', 'You');
-        const text = el('div', 'text', t.prompt);
-        p.append(text); box.append(p);
+        // Talk to Overseer (AC-107): the agents' state sent with a message is summarized, not shown;
+        // a message Overseer sent to an agent says so.
+        let prompt = t.prompt, shared = 0, fromOverseer = false;
+        const state = /^<overseer-state>[\s\S]*?<\/overseer-state>\s*/.exec(prompt);
+        if (state) { prompt = prompt.slice(state[0].length); shared = (state[0].match(/"id":/g) || []).length; }
+        if (prompt.startsWith('From Overseer: ')) { prompt = prompt.slice('From Overseer: '.length); fromOverseer = true; }
+        const p = el('div', 'msg user' + (fromOverseer ? ' from-overseer' : '')); p.setAttribute('aria-label', fromOverseer ? 'Overseer' : 'You');
+        if (fromOverseer) { const who = el('div', 'msg-from'); who.append(ui.mark('sm'), el('span', null, 'From Overseer')); p.append(who); }
+        const text = el('div', 'text', prompt);
+        p.append(text);
+        if (state) p.append(el('div', 'msg-context', `Shared the state of ${shared} agent${shared === 1 ? '' : 's'}`));
+        box.append(p);
       }
       box.append(body, foot);
       this.list.append(box);
@@ -269,6 +279,8 @@
       this.seen.add(ev.seq);
       const p = ev.payload || {};
       const child = ev.run_id && ev.run_id !== this.rootId;
+      // Continuity (Gate L) draws its own events: transitions, waiting, the way back.
+      if (window.OverseerContinuity && window.OverseerContinuity.event(this, ev)) return;
       switch (ev.kind) {
         case 'turn_started': if (!child) { this.stopping = false; this.newTurn(p.turn || { n: this.turns.length + 1, prompt: '' }, false, ev); this.active = true; this.updateWorking('Working…'); } break;
         case 'interrupt_requested': if (!child) this.stopping = true; break;

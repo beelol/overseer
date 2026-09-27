@@ -1,6 +1,8 @@
 // The phone's scenarios, in the order they run. Each drives the app with a flow (e2e/flows) and
 // then asks the daemon what happened, as the Mac sees it: a scenario passes only when both agree.
 
+import net from 'node:net';
+
 const ALLOWED_FIELDS = ['aps.alert.title', 'aps.alert.body', 'aps.category', 'aps.thread-id', 'aps.sound', 'aps.interruption-level', 'overseer.v', 'overseer.kind', 'overseer.run_id', 'overseer.task_id', 'overseer.request_id', 'overseer.device', 'Simulator Target Bundle'];
 const ACTIVE = ['queued', 'starting', 'running', 'waiting_for_user'];
 /** How long a flow takes to start watching the screen. */
@@ -9,6 +11,16 @@ const WATCH_FIRST_MS = 12_000;
 const me = (c) => c.lab.call('gateway.devices').devices.find((d) => d.id === c.deviceId);
 const run = (c, id) => c.lab.call('state').runs.find((r) => r.id === id);
 const events = (c, runId) => c.lab.call('events.list', { run_id: runId, after: 0, limit: 5000 }).events;
+/** A port nothing on this Mac listens on now: another lab or daemon may hold any fixed one. */
+const freePort = () =>
+  new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, '0.0.0.0', () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
+    });
+  });
 const expect = (ok, what) => {
   if (!ok) throw new Error(what);
 };
@@ -226,7 +238,8 @@ export const scenarios = [
     criteria: ['AC-125', 'AC-130'],
     says: 'Stop all agents names how many will stop, asks once, and stops them',
     async run(c) {
-      // Two agents that wait for the owner: they stay going until stopped.
+      // Two agents that stay going until they are stopped: each waits for the owner's answer.
+      // (The lab's slow agent is done in 400 ms, often before it was seen going.)
       const one = c.lab.agent('showcase-permission', 'Count the stock', 'count');
       const two = c.lab.agent('showcase-permission', 'Price the returns', 'price');
       await c.until('two agents going', () => ACTIVE.includes(run(c, one).status) && ACTIVE.includes(run(c, two).status));
@@ -314,18 +327,15 @@ export const scenarios = [
     says: 'the Mac answers somewhere else: an address typed by the owner connects, with no pairing again',
     async run(c) {
       const paired = me(c).paired_ms;
+      const moved = await freePort();
       c.lab.call('gateway.disable');
-      let moved = c.port;
-      for (const candidate of [c.port + 10, c.port + 11, c.port + 12, c.port + 13]) {
-        try {
-          c.lab.call('gateway.enable', { port: candidate });
-          moved = candidate;
-          break;
-        } catch (error) {
-          c.log.say(`  port ${candidate} is not free: ${error instanceof Error ? error.message.split('\n')[0].slice(0, 120) : error}`);
-        }
+      try {
+        c.lab.call('gateway.enable', { port: moved });
+      } catch (error) {
+        // The scenarios after this one need phone access on.
+        c.lab.call('gateway.enable', { port: c.port });
+        throw error;
       }
-      expect(moved !== c.port, 'no other port could be used');
       c.port = moved;
       await c.sleep(1500);
       expect(me(c).connected === false, 'the phone is connected although the Mac moved');
@@ -447,6 +457,8 @@ export const scenarios = [
   {
     name: 'revoke',
     criteria: ['AC-119'],
+    // The run measures the budgets before this one: they need the app paired.
+    unpairs: true,
     says: 'removed on the Mac, the phone is back on pairing and holds nothing of the Mac',
     async run(c) {
       c.lab.call('gateway.device_revoke', { id: c.deviceId });

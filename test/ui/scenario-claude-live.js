@@ -19,13 +19,14 @@ const PROMPT = "Use the Agent tool to launch one general-purpose subagent with t
   const runState = id => s.ctl('state').runs.find(r => r.id === id);
   const waitFor = async (id, pred, secs = 240) => { for (let i = 0; i < secs * 2; i++) { const r = runState(id); if (pred(r)) return r; await delay(500); } return runState(id); };
   const allowPending = async (panel, label) => {
-    await panel.waitFor(`!!document.querySelector('.perm button')`, 60000);
-    const tool = await panel.eval(`document.querySelector('.perm div').textContent`);
+    // The Gate K chat pins the pending request above the composer (#perm) and in the conversation.
+    await panel.waitFor(`!!document.querySelector('#perm:not([hidden]) button')`, 60000);
+    const tool = await panel.eval(`document.getElementById('perm').textContent`);
     await s.screenshot('permission-' + label);
     // The card re-renders on every run update; tag and locate the button until it holds still.
     for (let attempt = 0; attempt < 10; attempt++) {
       try {
-        await panel.eval(`(() => { const b = [...document.querySelectorAll('.perm button')].find(b => /Allow/.test(b.textContent)); b.id = 'allow-btn'; b.scrollIntoView({ block: 'center' }); })()`);
+        await panel.eval(`(() => { const b = [...document.querySelectorAll('#perm button')].find(b => /Allow/.test(b.textContent)); b.id = 'allow-btn'; b.scrollIntoView({ block: 'center' }); })()`);
         const p = await s.webviewPoint(panel, '#allow-btn');
         await s.cdp.click(p.x, p.y);
         return tool;
@@ -54,7 +55,7 @@ const PROMPT = "Use the Agent tool to launch one general-purpose subagent with t
     await cdp.command('Overseer: Start Task with Quick Picks');
     await cdp.pick('New task: repository');
     await cdp.pick('New task: harness', 'claude');
-    await cdp.pick('New task: account for', 'claude (existing login)');
+    await cdp.pick('New task: account for', 'Your login');
     await cdp.pick('New task: workspace');
     await cdp.pick('Start the worktree from');
     await cdp.input('Model (optional)', MODEL);

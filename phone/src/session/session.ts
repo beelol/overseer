@@ -13,7 +13,14 @@ export type SessionCache = {
   state: string;
   /** When that state was last confirmed by the Mac. */
   stateAt: number;
+  /** A change of the switches the Mac has not had yet, as JSON (`setNotificationsSoon`). */
+  owedSwitches: string;
 };
+
+type NotificationChange = Params<'device.notifications'>;
+
+/** Errors that say the Mac never answered: the change is still owed. */
+const NOT_ANSWERED = new Set(['not_connected', 'connection_lost', 'request_timeout', 'closed', 'idle', 'unpaired']);
 
 export interface SessionDeps {
   readonly connection: Connection;
@@ -91,10 +98,13 @@ export class Session {
   /** When the daemon stamped the lines that are news and not yet on the display. */
   private fresh: number[] = [];
   private switches: NotificationSwitches = NOT_YET;
+  /** A change of the switches the Mac has not had yet. */
+  private owed: NotificationChange | null = null;
 
   constructor(private readonly deps: SessionDeps) {
     const cached = readCache(deps.cache);
     this.switches = readSwitches(deps.cache);
+    this.owed = readOwed(deps.cache);
     this.snapshot = {
       ready: false,
       connection: deps.connection.state,
@@ -205,6 +215,48 @@ export class Session {
       throw error;
     }
     return this.switches;
+  }
+
+  /**
+   * A change the owner made that must reach the Mac, now or at the next connection: right after
+   * pairing the first connection is still being made, and the app may be closed before it is.
+   * It is shown at once, kept on the phone, and sent every time the phone connects until the
+   * Mac has answered it.
+   */
+  async setNotificationsSoon(change: NotificationChange): Promise<void> {
+    const owed = mergeChange(readOwed(this.deps.cache), change);
+    try {
+      this.deps.cache.set('owedSwitches', JSON.stringify(owed));
+    } catch {
+      // Kept for this launch only.
+    }
+    this.owed = owed;
+    this.setSwitches(applyChange(this.switches, change));
+    if (this.deps.connection.state === 'online') await this.payOwed();
+  }
+
+  /** Sends what the Mac has not had yet. A change made meanwhile stays owed. */
+  private async payOwed(): Promise<void> {
+    const owed = this.owed;
+    if (!owed) return;
+    try {
+      const answered = await this.request('device.notifications', owed);
+      if (this.owed === owed) this.clearOwed();
+      this.setSwitches(this.owed ? applyChange(switchesOf(answered), this.owed) : switchesOf(answered));
+    } catch (error) {
+      const code = (error as { code?: unknown } | null)?.code;
+      // The Mac refused it: asking again would be refused again.
+      if (!(typeof code === 'string' && NOT_ANSWERED.has(code)) && this.owed === owed) this.clearOwed();
+    }
+  }
+
+  private clearOwed(): void {
+    this.owed = null;
+    try {
+      this.deps.cache.delete('owedSwitches');
+    } catch {
+      // Nothing is owed in this launch; a stale copy is answered again, harmlessly.
+    }
   }
 
   private setSwitches(next: NotificationSwitches): void {
@@ -328,9 +380,7 @@ export class Session {
     const hello = c.hello;
     const device = hello && typeof hello['device'] === 'object' && hello['device'] !== null ? (hello['device'] as Record<string, unknown>) : null;
     const scope = device?.['scope'] === 'watch' ? 'watch' : device?.['scope'] === 'full' ? 'full' : (c.gateway?.scope as Scope | undefined) ?? null;
-    if (hello && hello['notifications'] !== undefined) this.setSwitches(switchesOf(hello['notifications']));
-    // Unpaired, however it went (revoked on the Mac, or forgotten here): nothing of the Mac is kept.
-    if (c.gateway === null && this.snapshot.paired) this.onForgotten();
+    if (hello && hello['notifications'] !== undefined) this.setSwitches(this.owed ? applyChange(switchesOf(hello['notifications']), this.owed) : switchesOf(hello['notifications']));
     this.update({
       notifications: this.switches,
       connection: c.state,
@@ -345,11 +395,15 @@ export class Session {
 
   private onConnection(state: ConnectionState): void {
     this.readConnection();
-    if (state === 'online') void this.loadState();
+    if (state === 'online') {
+      void this.payOwed();
+      void this.loadState();
+    }
     else this.writeCache(false);
   }
 
   private onForgotten(): void {
+    // A write of the cache may be waiting: it would store the state again after it is deleted.
     if (this.cacheTimer !== null) {
       clearTimeout(this.cacheTimer);
       this.cacheTimer = null;
@@ -359,6 +413,7 @@ export class Session {
     this.deps.cache.delete('state');
     this.deps.cache.delete('stateAt');
     this.deps.cache.delete('switches');
+    this.clearOwed();
     this.switches = NOT_YET;
     this.update({ state: store.EMPTY, stateAt: null, fromCache: false, historyLost: false, paired: false, gateway: null, scope: null, outbox: [], notifications: NOT_YET });
   }
@@ -488,6 +543,8 @@ export class Session {
     const every = this.deps.cacheEveryMs ?? 5_000;
     const write = (): void => {
       this.cacheTimer = null;
+      // Forgotten while the write waited: the phone keeps nothing of that Mac.
+      if (this.snapshot.stateAt === null) return;
       this.cacheWrittenAt = this.deps.now();
       this.deps.onStream?.(this.stream);
       try {
@@ -536,6 +593,32 @@ function same(a: unknown, b: unknown): boolean {
   } catch {
     return false;
   }
+}
+
+function readOwed(cache: SyncStore<SessionCache>): NotificationChange | null {
+  try {
+    const stored = cache.get('owedSwitches');
+    const value: unknown = typeof stored === 'string' ? JSON.parse(stored) : null;
+    return value !== null && typeof value === 'object' ? (value as NotificationChange) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Two changes as one: the later one wins, kind by kind. */
+function mergeChange(before: NotificationChange | null, after: NotificationChange): NotificationChange {
+  const kinds = { ...(before?.kinds as object | null | undefined), ...(after.kinds as object | null | undefined) };
+  return { ...before, ...after, ...(Object.keys(kinds).length > 0 ? { kinds } : {}) };
+}
+
+/** The switches as they are once a change holds. */
+function applyChange(switches: NotificationSwitches, change: NotificationChange): NotificationSwitches {
+  const kinds = (change.kinds !== null && typeof change.kinds === 'object' ? change.kinds : {}) as Partial<NotificationSwitches['kinds']>;
+  return {
+    enabled: typeof change.enabled === 'boolean' ? change.enabled : switches.enabled,
+    show_text: typeof change.show_text === 'boolean' ? change.show_text : switches.show_text,
+    kinds: { ...switches.kinds, ...kinds },
+  };
 }
 
 function readSwitches(cache: SyncStore<SessionCache>): NotificationSwitches {

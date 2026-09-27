@@ -4,6 +4,7 @@
       "name": "VS Code window registered with the daemon",
       "ok": true,
       "detail": {
+        "ui": 1,
         "vscode": 1
       }
     },
@@ -20,19 +21,19 @@
       "detail": {
         "notice": {
           "body": "claude: tick loop. They keep running with VS Code closed. Reopen VS Code to watch them, or run “Overseer: Stop Agents and Daemon”.",
-          "delivered_via": "osascript (ok)",
+          "delivered_via": "overseer-notifier (ok)",
           "runs": [
             {
               "harness": "claude",
-              "id": "r-f3db6b5dcf85",
+              "id": "r-ad4844316faf",
               "status": "running",
               "title": "tick loop"
             }
           ],
           "title": "Overseer: 1 agent still running"
         },
-        "logLine": "1790361166659 [13630] background notice (osascript (ok)): Overseer: 1 agent still running — claude: tick loop. They keep running with VS Code closed. Reopen VS Code to watch them, or run “Overseer: Stop Agents and Daemon”.",
-        "afterMs": 7770
+        "logLine": "1790491960614 [51290] background notice (overseer-notifier (ok)): Overseer: 1 agent still running — claude: tick loop. They keep running with VS Code closed. Reopen VS Code to watch them, or run “Overseer: Stop Agents and Daemon”.",
+        "afterMs": 8213
       }
     },
     {
@@ -55,7 +56,7 @@
     {
       "name": "reopened Agents view shows the running agent",
       "ok": true,
-      "detail": "clauderunning · claude (existing login) · haiku"
+      "detail": "Source: OverseerShow AgentsStop Agents and DaemonOverseer agents kept running while VS Code was closed: claude: tick loop. 1 still active."
     },
     {
       "name": "stop asks for confirmation and lists the agent",
@@ -71,9 +72,9 @@
       "name": "harness and supervisor processes gone",
       "ok": true,
       "detail": {
-        "shim_pid": 14286,
-        "child_pid": 14288,
-        "started_ms": 1790361155248
+        "shim_pid": 54477,
+        "child_pid": 54479,
+        "started_ms": 1790491947259
       }
     },
     {

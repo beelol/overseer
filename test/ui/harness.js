@@ -16,6 +16,7 @@ function freePort() {
   });
 }
 
+require('../../scripts/git-fallback').ensureGit('ui harness'); // AC-159
 function git(cwd, ...args) { return cp.execFileSync('git', args, { cwd, encoding: 'utf8' }).trim(); }
 
 function makeRepo(dir, { dirty = true } = {}) {
@@ -100,7 +101,7 @@ class Session {
       'telemetry.telemetryLevel': 'off', 'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false,
       'git.autofetch': false, 'git.openRepositoryInParentFolders': 'always', 'workbench.startupEditor': 'none',
       'security.workspace.trust.enabled': false, 'files.autoSave': 'off', 'update.mode': 'none',
-      'workbench.tips.enabled': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
+      'workbench.tips.enabled': false, 'overseer.sideBar.openOnStartup': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
       'editor.minimap.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden', 'window.dialogStyle': 'custom', ...extra,
     }, null, 2));
   }
@@ -126,9 +127,9 @@ class Session {
     return this.cdp;
   }
 
-  async screenshot(label) {
+  async screenshot(label, clip) {
     const file = path.join(this.evidence, `${String(++this.shot).padStart(2, '0')}-${label}.png`);
-    await this.cdp.screenshot(file);
+    await this.cdp.screenshot(file, clip);
     this.note('screenshot ' + path.relative(repoRoot, file));
     return file;
   }
@@ -209,6 +210,11 @@ class Session {
     await delay(settle);
   }
 
+  /** The side bar's search field (a webview view above the Agents list). */
+  searchFrame(ms = 15000) { return this.cdp.webview(`!!window.__overseerSearch`, ms); }
+  /** Waits until the search field has keyboard focus (after Search Agents or ⌥⌘F); returns its frame. */
+  async searchFocused(ms = 8000) { const f = await this.searchFrame(ms); await f.waitFor(`document.activeElement?.id === 'q'`, ms); return f; }
+
   /** Selects an agent by run id (its task's title) in the side bar. */
   async selectRun(runId, opts) {
     const st = this.ctl('state');
@@ -223,8 +229,21 @@ class Session {
     return this.cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.view-chat') && (${extra})`, ms);
   }
 
-  /** Absolute page coordinates of an element inside a webview frame. */
+  /** Absolute page coordinates of an element inside a webview frame, once it has stopped moving:
+   *  a click aimed while a view is still settling (the review arriving, columns resizing, a
+   *  composer rendering its choices) would land where the element was, not where it is (AC-149). */
   async webviewPoint(frame, selector) {
+    let last;
+    for (let i = 0; i < 12; i++) {
+      const p = await this.webviewPointOnce(frame, selector);
+      if (last && Math.abs(p.x - last.x) < 1 && Math.abs(p.y - last.y) < 1) return p;
+      last = p;
+      await delay(120);
+    }
+    return last;
+  }
+
+  async webviewPointOnce(frame, selector) {
     const inner = await frame.eval(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 40), y: r.top + Math.min(r.height / 2, 12), w: innerWidth, h: innerHeight }; })()`);
     if (!inner) throw new Error('element not found ' + selector);
     const frames = await this.cdp.evalWorkbench(`[...document.querySelectorAll('iframe.webview')].map(f => { const r = f.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, src: f.src }; }).filter(r => r.w > 0 && r.h > 0)`);

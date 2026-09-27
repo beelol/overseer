@@ -50,7 +50,8 @@ class TaskLauncher {
     const harnesses = (await this.client.request('harness.list')).map(h => ({ harness: h.harness, installed: h.installed, version: h.version, hints: hints(h.capabilities || {}), install_url: INSTALL[h.harness] }));
     await this.refreshAccounts();
     return { repos: await this.repos(), harnesses, accounts: this.accounts(), trusted: vscode.workspace.isTrusted, defaults: this.defaults(),
-      showAppServer: vscode.workspace.getConfiguration('overseer').get('showCodexAppServer', false) };
+      showAppServer: vscode.workspace.getConfiguration('overseer').get('showCodexAppServer', false),
+      continuity: this.continuity ? this.continuity() : undefined };
   }
 
   async browse() {

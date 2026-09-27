@@ -252,6 +252,23 @@ describe('the session', () => {
     expect(session.getSnapshot().state.runs.byId.size).toBe(0);
   });
 
+  test('revoked on the Mac, a write of the cache that was waiting stores nothing again', async () => {
+    const { session, connection, cache } = make();
+    connection.gateway = GATEWAY;
+    await session.start();
+    connection.go('online');
+    await settle();
+    // The connection says revoked (the cache write is put off), then the pairing is forgotten.
+    connection.go('revoked');
+    connection.gateway = null;
+    connection.emit('forgotten', 'revoked');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(cache.get('state')).toBeNull();
+    expect(cache.get('stateAt')).toBeNull();
+    await session.stop();
+    expect(cache.get('state')).toBeNull();
+  });
+
   test('notification switches show at once and go back when the Mac refuses', async () => {
     const { session, connection } = make();
     connection.gateway = GATEWAY;
@@ -267,6 +284,38 @@ describe('the session', () => {
     connection.answers['device.notifications'] = () => ({ enabled: false, show_text: false, kinds: { permission: true, question: true, failure: false, finished: true }, environment: 'device' });
     await session.setNotifications({ enabled: false, kinds: { failure: false } });
     expect(session.getSnapshot().notifications).toEqual({ enabled: false, show_text: false, kinds: { permission: true, question: true, failure: false, finished: true } });
+  });
+
+  test('a switch changed before the first connection reaches the Mac when it is made, even after a relaunch', async () => {
+    const { session, connection, cache } = make();
+    connection.gateway = GATEWAY;
+    connection.state = 'connecting';
+    await session.start();
+    await session.setNotificationsSoon({ enabled: true });
+    expect(session.getSnapshot().notifications.enabled).toBe(true);
+    expect(connection.asked.filter((a) => a.method === 'device.notifications')).toEqual([]);
+    await session.stop();
+
+    // The app was closed before it connected: the next launch still owes it to the Mac.
+    const again = new Session({ connection, cache, now: () => 1, nextFrame: () => () => undefined, cacheEveryMs: 0 });
+    connection.hello = { notifications: { enabled: false } };
+    await again.start();
+    expect(again.getSnapshot().notifications.enabled).toBe(true);
+    const sent: unknown[] = [];
+    connection.answers['device.notifications'] = (change: unknown) => {
+      sent.push(change);
+      return { enabled: true, show_text: false, kinds: {}, environment: 'device' };
+    };
+    connection.go('online');
+    await settle();
+    expect(sent).toEqual([{ enabled: true }]);
+    expect(again.getSnapshot().notifications.enabled).toBe(true);
+    // Paid: the next connection sends nothing again.
+    connection.go('reconnecting');
+    connection.go('online');
+    await settle();
+    expect(sent).toHaveLength(1);
+    await again.stop();
   });
 
   test('what the Mac lets this phone do changes at once, and only for this phone', async () => {

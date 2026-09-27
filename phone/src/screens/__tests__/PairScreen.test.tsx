@@ -134,10 +134,14 @@ describe('pair with your Mac', () => {
     await fireEvent.press(screen.getByTestId('pair.notifications.allow'));
     await app.settle();
     expect(app.platform.fakes.push.prompts()).toBe(1);
-    // The owner said yes: notifications are on for this phone, and the Mac knows where to send.
+    // The owner said yes: notifications are on for this phone, and the Mac knows where to send,
+    // once the first connection after pairing is made.
+    expect(app.session.getSnapshot().notifications.enabled).toBe(true);
+    expect(app.connection.calls('device.notifications')).toEqual([]);
+    await act(async () => app.connection.go('online'));
+    await app.settle();
     expect(app.connection.calls('device.notifications')).toEqual([
-      { enabled: true },
-      { token: 'booted', environment: 'simulator' },
+      { enabled: true, token: 'booted', environment: 'simulator' },
     ]);
     expect(router.replaced).toEqual([routes.agents]);
   });
@@ -157,6 +161,12 @@ describe('pair with your Mac', () => {
     await typeAndPair(app, CODE);
     expect(screen.queryByTestId('pair.notifications.reason')).toBeNull();
     expect(router.replaced).toEqual([routes.agents]);
+    // The app shows what needs the owner itself: its switch is on, and the Mac learns it at
+    // the first connection after pairing, which is not made yet when pairing ends.
+    expect(app.connection.calls('device.notifications')).toEqual([]);
+    await act(async () => app.connection.go('online'));
+    await app.settle();
+    expect(app.connection.calls('device.notifications')).toEqual([{ enabled: true }]);
   });
 
   test('a phone that answered the system before is not asked again', async () => {

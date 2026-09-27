@@ -9,6 +9,8 @@
 //   background:  interim result while a background Agent runs, then a Write permission request
 //   background-early: the background Agent finishes before the interim result; Claude then
 //                continues with a new turn that asks for Write permission (live 2.1.x order)
+//   overseer:    answers as Talk to Overseer (AC-107) from the agents' state in the prompt: a summary
+//                for "what is everyone doing?", and for "tell <agent> to <task>" a proposal block
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
@@ -50,6 +52,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     const file = path.join(process.cwd(), 'perm.txt');
     // Like the live CLI: the tool_use is reported first, then the permission request.
     assistant([{ type: 'tool_use', id: 'toolu_write', name: 'Write', input: { file_path: file, content: 'allowed\n' } }]);
+    if (process.env.FIXTURE_PERMISSION_BARRIER) {
+      const deadline = Date.now() + 30000;
+      while (!fs.existsSync(process.env.FIXTURE_PERMISSION_BARRIER) && Date.now() < deadline) await sleep(10);
+      if (!fs.existsSync(process.env.FIXTURE_PERMISSION_BARRIER)) throw new Error('permission fixture barrier timed out');
+    }
     out({ type: 'control_request', request_id: 'req-1', request: { subtype: 'can_use_tool', tool_name: 'Write', input: { file_path: file, content: 'allowed\n' } } });
     const reply = await next(m => m.type === 'control_response' || (m.type === 'control_request' && m.request?.subtype === 'interrupt'));
     if (reply.type === 'control_request') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
@@ -88,6 +95,38 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     const reply = await next(m => m.type === 'control_response');
     const decision = reply.response.response;
     if (decision.behavior === 'allow') fs.writeFileSync(file, decision.updatedInput.content);
+    result(false, 'done');
+  } else if (mode === 'background-nested') {
+    // As a live Claude Code 2.1.246 run: a foreground subagent launches its own child in the
+    // background (spawn depth 2), is told when it finishes, and returns; the main agent then
+    // ends its turn. Claude starts no further top-level turn for the grandchild.
+    assistant([{ type: 'tool_use', id: 'toolu_c', name: 'Agent', input: { description: 'child', prompt: 'hi' } }]);
+    out({ type: 'system', subtype: 'task_started', session_id: sid, task_id: 'c1', tool_use_id: 'toolu_c', is_backgrounded: false, spawn_depth: 1 });
+    assistant([{ type: 'tool_use', id: 'toolu_g', name: 'Agent', input: { description: 'grandchild', prompt: 'hi', run_in_background: true } }], 'toolu_c');
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [{ task_id: 'g1', task_type: 'local_agent' }] });
+    out({ type: 'system', subtype: 'task_started', session_id: sid, task_id: 'g1', tool_use_id: 'toolu_g', is_backgrounded: true, spawn_depth: 2 });
+    user([{ type: 'tool_result', tool_use_id: 'toolu_g', content: 'Async agent launched successfully.' }], 'toolu_c');
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [] });
+    out({ type: 'system', subtype: 'task_notification', session_id: sid, task_id: 'g1', tool_use_id: 'toolu_g', status: 'completed', summary: 'hi' });
+    out({ type: 'system', subtype: 'task_notification', session_id: sid, task_id: 'c1', tool_use_id: 'toolu_c', status: 'completed', summary: 'child done' });
+    user([{ type: 'tool_result', tool_use_id: 'toolu_c', content: 'child done' }]);
+    assistant([{ type: 'text', text: 'done' }]);
+    result(false, 'done');
+  } else if (mode === 'background-read-in-turn') {
+    // As a live Claude Code 2.1.246 run: the main agent messages a finished subagent, which runs
+    // again in the background (spawn depth 1) and is reported mid-turn; the main agent reads the
+    // notice in its next model call and ends the turn. No further turn follows.
+    assistant([{ type: 'tool_use', id: 'toolu_msg', name: 'SendMessage', input: { to: 'c1', message: 'Status check' } }]);
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [{ task_id: 'c1', task_type: 'local_agent' }] });
+    out({ type: 'system', subtype: 'task_started', session_id: sid, task_id: 'c1', tool_use_id: 'toolu_c', is_backgrounded: true, spawn_depth: 1 });
+    user([{ type: 'tool_result', tool_use_id: 'toolu_msg', content: 'Message queued.' }]);
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [] });
+    out({ type: 'system', subtype: 'task_notification', session_id: sid, task_id: 'c1', tool_use_id: 'toolu_c', status: 'completed', summary: 'status' });
+    const file = path.join(process.cwd(), 'bg.txt');
+    assistant([{ type: 'tool_use', id: 'toolu_w', name: 'Write', input: { file_path: file, content: 'after notice\n' } }]);
+    fs.writeFileSync(file, 'after notice\n');
+    user([{ type: 'tool_result', tool_use_id: 'toolu_w', content: 'File created successfully at: ' + file }]);
+    assistant([{ type: 'text', text: 'done' }]);
     result(false, 'done');
   } else if (mode === 'showcase' || mode === 'showcase-permission') {
     // A realistic session for UI checks: reads, a search, an edit, a new file, a test run and a
@@ -192,6 +231,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // A failed turn whose reason arrives once, as the result text.
     assistant([{ type: 'text', text: 'Trying the migration…' }]);
     result(true, 'Migration failed: relation users_v2 does not exist');
+  } else if (mode === 'overseer') {
+    const content = first.message.content;
+    const text = Array.isArray(content) ? content.filter(c => c.type === 'text').map(c => c.text).join('\n') : String(content);
+    const state = /Agents \(JSON\):\n([\s\S]*?)\n<\/overseer-state>/.exec(text);
+    const agents = state ? JSON.parse(state[1]) : [];
+    const said = text.replace(/^<overseer-state>[\s\S]*?<\/overseer-state>\s*/, '').trim();
+    let reply;
+    const tell = /tell (.+?) to (.+)/i.exec(said);
+    if (/what is everyone doing/i.test(said)) reply = agents.length ? 'Here is what everyone is doing:\n\n' + agents.map(a => `- **${a.title}**: ${a.status}`).join('\n') : 'No agents are running.';
+    else if (tell) {
+      const who = agents.find(a => a.title.toLowerCase().includes(tell[1].toLowerCase()));
+      const task = tell[2].replace(/[.!?]+$/, '');
+      reply = who ? `I will send ${who.title} this follow-up: "Please ${task}."\n\n\`\`\`overseer-actions\n${JSON.stringify([{ action: 'follow_up', agent: who.id, title: who.title, text: `Please ${task}.` }])}\n\`\`\`` : `I could not find an agent called ${tell[1]}.`;
+    } else reply = 'I can tell you what your agents are doing, or pass a message to one of them.';
+    assistant([{ type: 'text', text: reply }]);
+    result(false, reply);
   } else if (mode === 'prose') {
     assistant([{ type: 'text', text: 'I delegated this to a sub-agent and it finished.' }]);
     result(false, 'I delegated this to a sub-agent and it finished.');

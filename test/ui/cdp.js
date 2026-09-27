@@ -98,8 +98,9 @@ class Cdp {
     return result.result?.value;
   }
 
-  async screenshot(file) {
-    const { data } = await this.call('Page.captureScreenshot', { format: 'png' }, this.workbench);
+  /** clip (optional): { x, y, width, height } in page pixels. */
+  async screenshot(file, clip) {
+    const { data } = await this.call('Page.captureScreenshot', { format: 'png', ...(clip ? { clip: { ...clip, scale: 1 } } : {}) }, this.workbench);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, Buffer.from(data, 'base64'));
     return file;
@@ -150,7 +151,13 @@ class Cdp {
 
   /** Moves keyboard focus out of a webview so workbench shortcuts reach VS Code. */
   async focusWorkbench() {
-    await this.evalWorkbench(`(() => { const a = document.activeElement; if (a && a.tagName === 'IFRAME') a.blur(); return true; })()`).catch(() => {});
+    // Blurring a webview leaves focus on <body>, where the first key press misses VS Code's
+    // keybindings; put it on a real workbench element instead.
+    await this.evalWorkbench(`(() => { const a = document.activeElement; if (a && a.tagName === 'IFRAME') a.blur();
+      if (document.activeElement && document.activeElement !== document.body) return true;
+      for (const sel of ['.part.sidebar .monaco-list[tabindex]', '.part.editor .editor-group-container.active', '.part.activitybar .action-item.checked a', '.part.activitybar .action-item a']) {
+        const el = document.querySelector(sel); if (!el) continue; el.focus(); if (document.activeElement === el) return true; }
+      return false; })()`).catch(() => {});
   }
 
   /** Runs a command through the real command palette. */
@@ -221,6 +228,21 @@ class Cdp {
       await delay(300);
     }
     throw new Error('Webview not found for probe ' + probe);
+  }
+
+  /** Every live webview document that satisfies `probe` (by default: Overseer's views and the review). */
+  async webviews(probe = `!!(document.getElementById('diffs') || document.querySelector('.view-chat, .view-grid, .view-composer'))`) {
+    await this.webview('true', 2000).catch(() => {}); // attaches to every webview target first
+    const frames = [], seen = new Set();
+    for (const context of this.contexts.values()) {
+      try {
+        // One frame per document: a document can be reachable through more than one context.
+        const result = await this.call('Runtime.evaluate', { expression: `(${probe}) ? (window.__cdpDocId ||= Math.random().toString(36).slice(2)) : ''`, contextId: context.id, returnByValue: true }, context.sessionId);
+        const id = result.result?.value;
+        if (id && !seen.has(id)) { seen.add(id); frames.push(new Frame(this, context)); }
+      } catch {}
+    }
+    return frames;
   }
 
   close() { this.socket.close(); }

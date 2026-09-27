@@ -40,7 +40,7 @@ KEYS:
     v               changes (files, diffs)     M     merge back (asks each step)
     /               search agents              A     accounts and sign-in
     O               phone access on / off      D     devices: pair a phone, revoke, scope
-    e               in zoom: expand tool calls
+    S               Audio Mode, track, preview  e     in zoom: expand tool calls
     f               filter all/active/needs you ?     all keys
     q               quit (agents keep running)
 

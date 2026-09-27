@@ -29,6 +29,10 @@ class Comparison {
     this.disposed = false;
     this.cache = new Map();
     this.cacheBytes = 0;
+    // Overseer (AC-99): unchanged files opened from the review's file navigator, most recent last.
+    // They join the entries as `browsed` (no base, never counted as changes) so they are read,
+    // edited and saved through the same path as changed files.
+    this.browsed = [];
     this.emitter = new vscode.EventEmitter();
     this.onDidChange = this.emitter.event;
     this.progressEmitter = new vscode.EventEmitter();
@@ -38,6 +42,7 @@ class Comparison {
     this.subscriptions = [this.emitter, this.progressEmitter, repo.state.onDidChange(() => {
       if (!this.refreshingStatus) this.invalidate(true);
     })];
+    this.watchGitDir();
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(repo.rootUri, '**/*'));
     this.subscriptions.push(watcher, watcher.onDidChange(uri => this.invalidate(true, uri)),
       watcher.onDidCreate(uri => this.invalidate(true, uri)), watcher.onDidDelete(uri => this.invalidate(true, uri)),
@@ -50,6 +55,34 @@ class Comparison {
       vscode.workspace.onDidChangeConfiguration(e => {
         if (e.affectsConfiguration('overseer.review', repo.rootUri) || e.affectsConfiguration('git', repo.rootUri)) this.invalidate(true);
       }));
+  }
+
+  /** Opens an unchanged file (a path relative to the worktree) in the review. */
+  browse(relPath) {
+    if (typeof relPath !== 'string' || !relPath || relPath.startsWith('/') || relPath.split('/').includes('..')) return false;
+    this.browsed = [...this.browsed.filter(p => p !== relPath), relPath].slice(-12);
+    this.invalidate(false);
+    return true;
+  }
+
+  unbrowse(relPath) {
+    const before = this.browsed.length;
+    this.browsed = this.browsed.filter(p => p !== relPath);
+    if (this.browsed.length !== before) this.invalidate(false);
+  }
+
+  /** Staging and commits change the Git index or HEAD, which the file watcher does not see (they
+   *  live in the Git directory). Watch them directly instead of waiting for the Git extension to
+   *  notice (Overseer: staged-scope refresh within 2 s, AC-31). */
+  async watchGitDir() {
+    try {
+      const dir = await new Promise((resolve, reject) => require('child_process').execFile('git', ['rev-parse', '--absolute-git-dir'],
+        { cwd: this.repo.rootUri.fsPath }, (error, out) => (error ? reject(error) : resolve(out.trim()))));
+      if (this.disposed || !dir) return;
+      const watcher = require('fs').watch(dir, (event, name) => { if (/^(index|HEAD)(\.lock)?$/.test(String(name || ''))) this.invalidate(true); });
+      watcher.on('error', () => {});
+      this.subscriptions.push({ dispose: () => watcher.close() });
+    } catch { /* the Git extension's own events still refresh the review */ }
   }
 
   configure(mode, target) {
@@ -192,6 +225,11 @@ class Comparison {
     const ordered = () => [...byPath.values()].sort((a, b) => a.relPath.localeCompare(b.relPath));
     const pending = entry => ({ ...entry, id: digest(keyOf(entry.uri)), pending: true });
     for (const [key, entry] of byPath) byPath.set(key, pending(entry));
+    // A browsed file that has changes since is simply a changed file (same id, so its row stays).
+    if (this.mode === 'workingTree') for (const relPath of this.browsed) {
+      const uri = vscode.Uri.joinPath(this.repo.rootUri, ...relPath.split('/'));
+      if (!byPath.has(keyOf(uri))) byPath.set(keyOf(uri), pending({ uri, relPath, status: -1, left: null, right: uri, browsed: true }));
+    }
     // Git returns a complete array. Publish its paths before per-file validation.
     publish(ordered(), true);
     this.progress('Checking files…');
@@ -248,6 +286,7 @@ class Comparison {
         if (stat.isSymbolicLink()) entry.symbolicLink = true;
         else if (!stat.isFile()) entry.problem = 'Directory or submodule change — open in the native view.';
       } catch (error) {
+        if (error.code === 'ENOENT' && entry.browsed) return null;
         if (error.code === 'ENOENT') { entry.right = null; entry.status = 2; stamp = 'missing'; }
         else entry.problem = `Cannot read file: ${error.message}`;
       }
@@ -310,7 +349,7 @@ class Comparison {
     let body;
     try {
       if (entry.problem) throw new Error(entry.problem);
-      const original = entry.left ? await this.blob(entry.left) : Buffer.alloc(0);
+      let original = entry.left ? await this.blob(entry.left) : Buffer.alloc(0);
       let modified = Buffer.alloc(0);
       if (entry.right) {
         if (entry.unsaved) modified = Buffer.from(entry.dirtyText, 'utf8');
@@ -322,6 +361,7 @@ class Comparison {
           modified = await fs.readFile(entry.uri.fsPath);
         }
       }
+      if (entry.browsed) original = modified;
       if (Math.max(original.length, modified.length) > MAX_PREVIEW_BYTES) throw new Error('File exceeds the 2 MiB preview limit. Open in Native Diff to inspect it.');
       if (original.includes(0) || modified.includes(0)) throw new Error('Binary file — open in the native view.');
       const decode = data => new TextDecoder('utf-8', { fatal: true }).decode(data);

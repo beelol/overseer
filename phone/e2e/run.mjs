@@ -178,6 +178,30 @@ async function platformRun(args, platform, summary) {
   const results = [];
   const context = { log, dev, lab, out, platform, until, sleep, app: APPS[platform], port: args.dev ? lab.info().port : PORTS[platform], flow: (name, env = {}) => flow(log, dev, name, env, args.out), shot: (name) => dev.screenshot(path.join(out, `${name}.png`)) };
   fs.mkdirSync(out, { recursive: true });
+  // The budgets are measured on the paired app, opening on its agents list: before a scenario
+  // that ends the pairing (revoke), or after the last scenario.
+  let measured = false;
+  const budgets = async () => {
+    if (measured) return;
+    measured = true;
+    if (args.measure && results.every((r) => r.ok !== false)) {
+      if (args.slow > 0) {
+        dev.stop();
+        await sleep(300);
+        dev.write('test.slow', args.slow);
+        log.say(`seeded: every start is held for ${args.slow} ms; the budgets must notice`);
+      }
+      const measure = spawnSync('node', [path.join(here, 'measure.mjs'), '--platform', platform, '--runs', String(args.runs), '--out', args.out, ...(args.baseline ? ['--write-baseline'] : ['--check'])], { cwd: phone, encoding: 'utf8' });
+      log.raw(`${measure.stdout}${measure.stderr}`);
+      results.push({ name: 'budgets', criteria: ['AC-135', 'AC-136'], ok: measure.status === 0, note: measure.status === 0 ? '' : 'a budget was missed (see the measurements above)' });
+      log.say(`${measure.status === 0 ? 'ok  ' : 'FAIL'} budgets`);
+      if (args.slow > 0) {
+        dev.stop();
+        await sleep(300);
+        dev.write('test.slow', 0);
+      }
+    }
+  };
   try {
     for (const scenario of scenarios) {
       if (args.only && !args.only.includes(scenario.name) && !scenario.always) continue;
@@ -186,6 +210,7 @@ async function platformRun(args, platform, summary) {
         results.push({ name: scenario.name, criteria: scenario.criteria, ok: null, note: scenario.skipped });
         continue;
       }
+      if (scenario.unpairs) await budgets();
       const started = Date.now();
       try {
         log.say(`scenario ${scenario.name} (${scenario.criteria.join(', ')}): ${scenario.says}`);
@@ -204,23 +229,7 @@ async function platformRun(args, platform, summary) {
         if (scenario.needed) break;
       }
     }
-    if (args.measure && results.every((r) => r.ok !== false)) {
-      if (args.slow > 0) {
-        dev.stop();
-        await sleep(300);
-        dev.write('test.slow', args.slow);
-        log.say(`seeded: every start is held for ${args.slow} ms; the budgets must notice`);
-      }
-      const measure = spawnSync('node', [path.join(here, 'measure.mjs'), '--platform', platform, '--runs', String(args.runs), '--out', args.out, ...(args.baseline ? ['--write-baseline'] : ['--check'])], { cwd: phone, encoding: 'utf8' });
-      log.raw(`${measure.stdout}${measure.stderr}`);
-      results.push({ name: 'budgets', criteria: ['AC-135', 'AC-136'], ok: measure.status === 0, note: measure.status === 0 ? '' : 'a budget was missed (see the measurements above)' });
-      log.say(`${measure.status === 0 ? 'ok  ' : 'FAIL'} budgets`);
-      if (args.slow > 0) {
-        dev.stop();
-        await sleep(300);
-        dev.write('test.slow', 0);
-      }
-    }
+    await budgets();
   } finally {
     if (!args.dev) dev.stop();
     await lab.stop();

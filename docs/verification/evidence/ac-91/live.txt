@@ -1,0 +1,20 @@
+overseerd 0.1.0; OpenCode 1.15.13 (real); Ollama 0.34.2 (real); Codex: fixture that fails on the network; system answer: fixture
+memory before: 59.5 GiB available of 128 GiB, pressure normal, level 73%; budget 46.7 GiB
+loaded in Ollama before: nothing
+the pick (AC-86): qwen3-coder:30b at a 64k context, 24.3 GiB
+connection: offline (no network (system))
+PASS  the local run started within 30 s of the failed turn  — 9782 ms after the turn failed (the model's load included)
+    model: ollama/qwen3-coder:30b-64k at a 64k context, 24.3 GiB of a 46.9 GiB budget, loaded under the watchdog
+PASS  the successor runs the pick, inside the budget  — qwen3-coder:30b; 24.3 ≤ 46.9 GiB
+PASS  the successor is a real OpenCode run on the local model, in the same task and worktree  — opencode-serve 1.15.13, ollama/qwen3-coder:30b-64k
+PASS  it completes the write check in that worktree  — completed; handoff.txt: "hello from the local model"; asked: nothing
+PASS  the predecessor reads handed off, not failed  — handed off to r-358da5456475 (offline)
+PASS  both chats say what happened  — "Transitioning to **qwen3-coder:30b** (local, Ollama) because you've disconnected. Work continues in the same worktree." / "Continued from "live handoff" after the connection was lost at 22:31."
+PASS  the record links predecessor and successor with the reason  — handoff from r-eef8050daa59 (offline)
+PASS  one writer throughout: Codex had ended before OpenCode was started, and was not started again  — Codex started 1 time; worktree owner afterwards: nobody
+PASS  the local turn cost nothing  — {"agent":"build","cost":0,"local":true,"model":"ollama/qwen3-coder:30b-64k","tokens":{"cache":{"read":10421,"write":0},"input":111,"output":2,"reasoning":0,"tot
+memory after: 40.3 GiB available, pressure normal, level 54%
+PASS  memory pressure stayed normal  — level 54%
+PASS  qwen3-coder:30b-64k, which this run loaded, is unloaded again
+
+11 passed, 0 failed
