@@ -19,6 +19,7 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 - Let the GitHub CLI push workflow files: `gh auth refresh -s workflow` (the checks for every pull request are written and waiting) [AC-148].
 - Say whether the Gate J design review still needs marks or the Gate K review replaces it [AC-66].
 - Work an hour using only Overseer [AC-64].
+- Mark the phone's door and motion on the [review page](https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq): *Right* or *Needs work* for each [AC-136, AC-137].
 - Answer the open questions at the end of the [Voice Mode RFC](docs/rfcs/voice-mode.md#open-questions-for-the-owner); its defaults stand until then [Gate R, AC-162 to AC-177].
 - Turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-83].
 - Work a short session offline: `node test/local/owner-session.js start` opens an isolated VS Code and prints the steps; `node test/local/owner-session.js report` records it [AC-97].
