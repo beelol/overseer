@@ -137,6 +137,38 @@ pub fn parse_local_catalog(config: &Value, response: &Value, observed_ms: i64) -
     Ok(LocalCatalog { observed_ms, expires_ms:observed_ms.saturating_add(60_000), models })
 }
 
+/// The installed CLI's resolved configuration and verbose model listing are
+/// independently checked against the explicit project file. Only an exact
+/// effective provider match can become a local route; extra global providers
+/// and the CLI's price/credential fields are discarded.
+pub fn parse_local_cli_catalog(config: &Value, resolved: &Value,
+    listed_models: &[(String, Value)], observed_ms: i64) -> Result<LocalCatalog> {
+    use serde_json::json;
+    let configured = config.get("provider").and_then(Value::as_object)
+        .ok_or_else(|| anyhow!("OpenCode project has no explicit provider map"))?;
+    let effective = resolved.get("provider").and_then(Value::as_object)
+        .ok_or_else(|| anyhow!("OpenCode resolved provider metadata is unavailable"))?;
+    if configured.len() > 128 || listed_models.len() > 2048 {
+        return Err(anyhow!("OpenCode provider metadata exceeded its bound"));
+    }
+    let mut providers = Vec::new();
+    let mut seen_models = BTreeSet::new();
+    for (id, provider) in configured {
+        if effective.get(id) != Some(provider) { continue; }
+        let mut models = serde_json::Map::new();
+        for (full_id, model) in listed_models {
+            let Some(model_id) = full_id.strip_prefix(&format!("{id}/")) else { continue };
+            if !seen_models.insert(full_id) {
+                return Err(anyhow!("duplicate OpenCode model metadata"));
+            }
+            models.insert(model_id.into(), model.clone());
+        }
+        providers.push(json!({"id":id,"source":"config",
+            "options":provider.get("options"),"models":models}));
+    }
+    parse_local_catalog(config, &json!({"providers":providers}), observed_ms)
+}
+
 /// Narrow execution boundary for an explicit local OpenCode profile. The
 /// metadata catalog alone cannot prove which secondary model, plugin, or
 /// credential an actual `opencode run` will use. Recheck the child workspace
@@ -286,6 +318,18 @@ mod tests {
     use std::net::TcpListener;
 
     #[test]
+    fn isolated_opencode_metadata_and_child_use_the_profile_home() {
+        let dir = tempfile::tempdir().unwrap();
+        let profile = crate::store::Profile { id:"isolated".into(), name:"Local".into(),
+            harness:"opencode".into(), home:Some(dir.path().display().to_string()),
+            is_system:false, created_ms:0 };
+        let env = crate::daemon::Daemon::profile_env(&profile);
+        assert_eq!(env.get("HOME").map(String::as_str), dir.path().to_str());
+        assert_eq!(env.get("XDG_CONFIG_HOME").map(String::as_str),
+            dir.path().join("config").to_str());
+    }
+
+    #[test]
     fn structured_discovery_keeps_two_local_providers_separate_and_drops_cloud_and_credentials() {
         let config = json!({"provider":{
             "local_a":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://127.0.0.1:47811/v1"},"models":{"fixture-a":{}}},
@@ -314,6 +358,30 @@ mod tests {
         let smaller_response = json!({"providers":payload["all"],"default":{"local_a":"fixture-a"}});
         assert_eq!(parse_local_catalog(&config, &smaller_response, 1000).unwrap().models.len(), 2,
             "the installed /config/providers interface omits the misleading connected list");
+    }
+
+    #[test]
+    fn resolved_cli_discovery_requires_matching_effective_endpoint_and_model_metadata() {
+        let config = json!({"provider":{
+            "local_a":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://127.0.0.1:47811/v1"},"models":{"fixture-a":{}}},
+            "local_b":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://127.0.0.1:47812/v1"},"models":{"fixture-b":{}}}
+        },"model":"local_a/fixture-a"});
+        let models = vec![
+            ("local_a/fixture-a".into(), json!({"id":"fixture-a","providerID":"local_a","status":"active",
+                "capabilities":{"toolcall":true,"reasoning":false},"limit":{"context":32000},"variants":{}})),
+            ("local_b/fixture-b".into(), json!({"id":"fixture-b","providerID":"local_b","status":"active",
+                "capabilities":{"toolcall":true,"reasoning":true},"limit":{"context":64000},"variants":{"medium":{}}})),
+        ];
+        let catalog = parse_local_cli_catalog(&config, &config, &models, 1000).unwrap();
+        assert_eq!(catalog.models.len(), 2);
+        assert_eq!(catalog.models[1].endpoint, "http://127.0.0.1:47812/v1");
+        assert!(catalog.models[1].reasoning);
+        let mut overridden = config.clone();
+        overridden["provider"]["local_b"]["options"]["baseURL"] = json!("http://127.0.0.1:47813/v1");
+        assert_eq!(parse_local_cli_catalog(&config, &overridden, &models, 1000).unwrap().models.len(), 1);
+        let mut wrong_model = models.clone();
+        wrong_model[0].1["providerID"] = json!("local_b");
+        assert_eq!(parse_local_cli_catalog(&config, &config, &wrong_model, 1000).unwrap().models.len(), 1);
     }
 
     #[test]

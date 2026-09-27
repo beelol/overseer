@@ -1,11 +1,10 @@
 //! Bounded metadata-only reads. This module never starts a model turn.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
-use std::net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream};
 use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -97,95 +96,73 @@ impl std::fmt::Display for OpenCodeReadTimeout {
 
 impl std::error::Error for OpenCodeReadTimeout {}
 
-fn opencode_bounded_read(stream: &mut TcpStream, chunk: &mut [u8], deadline: Instant) -> Result<usize> {
-    loop {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() { return Err(OpenCodeReadTimeout.into()); }
-        stream.set_read_timeout(Some(remaining.max(Duration::from_millis(10))))
-            .context("setting OpenCode metadata read timeout")?;
-        match stream.read(chunk) {
-            Ok(count) => return Ok(count),
-            Err(error) if matches!(error.kind(), std::io::ErrorKind::Interrupted
-                | std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock) => continue,
-            Err(error) => return Err(anyhow!("OpenCode metadata stream failed: {error}")),
-        }
-    }
-}
-
-fn opencode_metadata_response(port: u16, password: &str, deadline: Instant) -> Result<Value> {
-    // An OpenCode server can accept a connection before its first metadata
-    // request is ready. Retry only read timeouts, with one overall deadline.
-    for attempt in 0..3 {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() { return Err(OpenCodeReadTimeout.into()); }
-        let attempt_deadline = match attempt {
-            0 => Instant::now() + remaining.min(Duration::from_millis(750)),
-            1 => Instant::now() + remaining.min(Duration::from_millis(1500)),
-            _ => deadline,
-        };
-        match opencode_metadata_response_once(port, password, attempt_deadline) {
-            Err(error) if error.downcast_ref::<OpenCodeReadTimeout>().is_some() && attempt < 2 => continue,
-            outcome => return outcome,
-        }
-    }
-    Err(OpenCodeReadTimeout.into())
-}
-
-fn opencode_metadata_response_once(port: u16, password: &str, deadline: Instant) -> Result<Value> {
-    use base64::Engine;
-    let address = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
-    let mut stream = loop {
-        if Instant::now() >= deadline { return Err(OpenCodeReadTimeout.into()); }
-        match TcpStream::connect_timeout(&address.into(), Duration::from_millis(100)) {
-            Ok(stream) => break stream,
-            Err(_) => std::thread::sleep(Duration::from_millis(20)),
-        }
-    };
-    let remaining = deadline.saturating_duration_since(Instant::now());
-    if remaining.is_zero() { return Err(OpenCodeReadTimeout.into()); }
-    stream.set_write_timeout(Some(remaining.max(Duration::from_millis(10))))
-        .context("setting OpenCode metadata write timeout")?;
-    let basic = base64::engine::general_purpose::STANDARD.encode(format!("overseer:{password}"));
-    stream.write_all(format!("GET /config/providers HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Basic {basic}\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n").as_bytes())
-        .context("writing OpenCode metadata request")?;
-    let mut bytes = Vec::new();
-    let mut chunk = [0u8; 8192];
-    let header_end = loop {
-        let count = opencode_bounded_read(&mut stream, &mut chunk, deadline)?;
-        if count == 0 { return Err(anyhow!("OpenCode metadata response ended early")); }
-        bytes.extend_from_slice(&chunk[..count]);
-        if bytes.len() > MAX_FRAME + 4096 { return Err(anyhow!("OpenCode metadata response exceeded its bound")); }
-        if let Some(end) = bytes.windows(4).position(|window| window == b"\r\n\r\n") { break end + 4 }
-    };
-    let headers = std::str::from_utf8(&bytes[..header_end])
-        .map_err(|_| anyhow!("invalid OpenCode metadata headers"))?;
-    if !headers.starts_with("HTTP/1.1 200 ") && !headers.starts_with("HTTP/1.0 200 ") {
-        return Err(anyhow!("OpenCode metadata request was rejected"));
-    }
-    let mut content_length = None;
-    for line in headers.lines() {
-        if let Some((name, value)) = line.split_once(':') {
-            if name.eq_ignore_ascii_case("content-length") {
-                content_length = value.trim().parse::<usize>().ok();
+fn opencode_cli_output(program: &Path, env: &BTreeMap<String, String>, cwd: &Path,
+    args: &[&str], deadline: Instant) -> Result<Vec<u8>> {
+    let mut child = Command::new(program).args(args).current_dir(cwd)
+        .env_clear().envs(env).env("OPENCODE_DISABLE_AUTOUPDATE", "1")
+        .env("OPENCODE_DISABLE_MODELS_FETCH", "1")
+        .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
+    let result = (|| -> Result<Vec<u8>> {
+        let mut stdout = child.stdout.take().ok_or_else(|| anyhow!("OpenCode metadata stdout unavailable"))?;
+        let mut bytes = Vec::new();
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() { return Err(OpenCodeReadTimeout.into()); }
+            let mut pollfd = libc::pollfd { fd:stdout.as_raw_fd(), events:libc::POLLIN | libc::POLLHUP, revents:0 };
+            let ready = unsafe { libc::poll(&mut pollfd, 1,
+                remaining.as_millis().min(i32::MAX as u128) as i32) };
+            if ready == 0 { return Err(OpenCodeReadTimeout.into()); }
+            if ready < 0 {
+                if std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted { continue; }
+                return Err(anyhow!("OpenCode metadata stream failed"));
             }
+            let mut chunk = [0u8; 8192];
+            let count = stdout.read(&mut chunk)?;
+            if count == 0 { break; }
+            bytes.extend_from_slice(&chunk[..count]);
+            if bytes.len() > MAX_FRAME { return Err(anyhow!("OpenCode metadata exceeded its output bound")); }
         }
-    }
-    let length = content_length.filter(|len| *len <= MAX_FRAME)
-        .ok_or_else(|| anyhow!("OpenCode metadata response has no bounded length"))?;
-    while bytes.len().saturating_sub(header_end) < length {
-        let count = opencode_bounded_read(&mut stream, &mut chunk, deadline)?;
-        if count == 0 { return Err(anyhow!("OpenCode metadata response ended early")); }
-        bytes.extend_from_slice(&chunk[..count]);
-        if bytes.len() > MAX_FRAME + 4096 { return Err(anyhow!("OpenCode metadata response exceeded its bound")); }
-    }
-    serde_json::from_slice(&bytes[header_end..header_end + length])
-        .map_err(|_| anyhow!("invalid OpenCode metadata response"))
+        loop {
+            if let Some(status) = child.try_wait()? {
+                if !status.success() { return Err(anyhow!("OpenCode metadata command failed")); }
+                break;
+            }
+            if Instant::now() >= deadline { return Err(OpenCodeReadTimeout.into()); }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        Ok(bytes)
+    })();
+    let _ = child.kill();
+    let _ = child.wait();
+    result
 }
 
-/// One authenticated loopback metadata server, no session or prompt. The
-/// server is always killed/reaped; only normalized explicit local providers
-/// leave this function. The random Basic secret protects this temporary server
-/// and is never an account credential or persisted observation.
+fn parse_opencode_models_verbose(bytes: &[u8]) -> Result<Vec<(String, Value)>> {
+    let mut offset = 0;
+    let mut models = Vec::new();
+    while offset < bytes.len() {
+        while offset < bytes.len() && bytes[offset].is_ascii_whitespace() { offset += 1; }
+        if offset == bytes.len() { break; }
+        let end = bytes[offset..].iter().position(|byte| *byte == b'\n')
+            .ok_or_else(|| anyhow!("invalid OpenCode model listing"))? + offset;
+        let id = std::str::from_utf8(&bytes[offset..end])
+            .map_err(|_| anyhow!("invalid OpenCode model identifier"))?;
+        if id.is_empty() || id.len() > 256 || models.len() >= 2048 {
+            return Err(anyhow!("OpenCode model listing exceeded its bound"));
+        }
+        offset = end + 1;
+        let mut stream = serde_json::Deserializer::from_slice(&bytes[offset..]).into_iter::<Value>();
+        let model = stream.next().ok_or_else(|| anyhow!("missing OpenCode model metadata"))?
+            .map_err(|_| anyhow!("invalid OpenCode model metadata"))?;
+        offset += stream.byte_offset();
+        models.push((id.into(), model));
+    }
+    Ok(models)
+}
+
+/// Read resolved configuration and model metadata from the installed OpenCode
+/// CLI without starting a server or model turn. Both reads share one deadline;
+/// only normalized explicit local providers leave this function.
 pub fn opencode_local_catalog(
     program: &Path,
     env: &BTreeMap<String, String>,
@@ -202,25 +179,15 @@ pub fn opencode_local_catalog(
     if !config.get("provider").is_some_and(Value::is_object) {
         return Err(anyhow!("OpenCode project has no explicit provider map"));
     }
-    let listener = TcpListener::bind(("127.0.0.1", 0))?;
-    let port = listener.local_addr()?.port();
-    drop(listener);
-    let password = uuid::Uuid::new_v4().to_string();
-    let mut child = Command::new(program)
-        .args(["serve", "--pure", "--hostname", "127.0.0.1", "--port", &port.to_string()])
-        .current_dir(cwd).env_clear().envs(env)
-        .env("OPENCODE_DISABLE_AUTOUPDATE", "1")
-        .env("OPENCODE_DISABLE_MODELS_FETCH", "1")
-        .env("OPENCODE_SERVER_USERNAME", "overseer")
-        .env("OPENCODE_SERVER_PASSWORD", &password)
-        .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn()?;
-    let result = (|| {
-        let response = opencode_metadata_response(port, &password, Instant::now() + timeout)?;
-        crate::auto_opencode::parse_local_catalog(&config, &response, observed_ms)
-    })();
-    let _ = child.kill();
-    let _ = child.wait();
-    result
+    let deadline = Instant::now() + timeout;
+    let resolved_bytes = opencode_cli_output(program, env, cwd,
+        &["debug", "config", "--pure"], deadline)?;
+    let resolved: Value = serde_json::from_slice(&resolved_bytes)
+        .map_err(|_| anyhow!("invalid OpenCode resolved configuration"))?;
+    let model_bytes = opencode_cli_output(program, env, cwd,
+        &["models", "--pure", "--verbose"], deadline)?;
+    let models = parse_opencode_models_verbose(&model_bytes)?;
+    crate::auto_opencode::parse_local_cli_catalog(&config, &resolved, &models, observed_ms)
 }
 
 /// Public, credential-free status metadata. URLs are fixed in product code;
@@ -280,40 +247,31 @@ pub fn public_status_json(program: &Path, provider: &str, timeout: Duration) -> 
 #[cfg(test)]
 mod opencode_metadata_tests {
     use super::*;
+    use std::os::unix::fs::PermissionsExt;
 
     #[test]
-    fn stalled_first_connection_retries_the_read_only_metadata_request() {
-        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
-        let port = listener.local_addr().unwrap().port();
-        let server = std::thread::spawn(move || {
-            let (first, _) = listener.accept().unwrap();
-            std::thread::sleep(Duration::from_millis(900));
-            drop(first);
-            let (mut second, _) = listener.accept().unwrap();
-            let body = r#"{"providers":[]}"#;
-            write!(second, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
-            second.flush().unwrap();
-            std::thread::sleep(Duration::from_millis(100));
-        });
-        let result = opencode_metadata_response(port, "test-secret", Instant::now() + Duration::from_secs(3)).unwrap();
-        server.join().unwrap();
-        assert_eq!(result, json!({"providers":[]}));
+    fn verbose_model_listing_is_structured_and_fail_closed() {
+        let records = parse_opencode_models_verbose(
+            b"local_a/fixture-a\n{\"id\":\"fixture-a\",\"providerID\":\"local_a\"}\nlocal_b/fixture-b\n{\"id\":\"fixture-b\",\"providerID\":\"local_b\"}\n"
+        ).unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[1].0, "local_b/fixture-b");
+        assert!(parse_opencode_models_verbose(b"local_a/fixture-a\n{bad json}").is_err());
+        assert!(parse_opencode_models_verbose(b"local_a/fixture-a without metadata").is_err());
     }
 
     #[test]
-    fn stalled_local_server_reports_a_bounded_timeout_without_a_secret() {
-        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
-        let port = listener.local_addr().unwrap().port();
-        let server = std::thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
-            std::thread::sleep(Duration::from_millis(120));
-            drop(stream);
-        });
-        let error = opencode_metadata_response(port, "secret-sentinel", Instant::now() + Duration::from_millis(60))
+    fn stalled_cli_metadata_is_killed_within_one_deadline() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("fixture-opencode");
+        std::fs::write(&program, "#!/bin/sh\nexec sleep 2\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let started = Instant::now();
+        let error = opencode_cli_output(&program, &BTreeMap::new(), dir.path(),
+            &["debug", "config", "--pure"], Instant::now() + Duration::from_millis(60))
             .unwrap_err().to_string();
-        server.join().unwrap();
         assert!(error.contains("timed out"), "{error}");
-        assert!(!error.contains("secret-sentinel"));
+        assert!(started.elapsed() < Duration::from_millis(500));
     }
 }
 

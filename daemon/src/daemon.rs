@@ -202,6 +202,9 @@ impl Daemon {
                     env.insert("CLAUDE_CONFIG_DIR".into(), dir.display().to_string());
                 }
                 "opencode" => {
+                    // OpenCode also consults HOME-level configuration paths;
+                    // XDG overrides alone do not isolate a managed profile.
+                    env.insert("HOME".into(), home.display().to_string());
                     for (key, sub) in [("XDG_DATA_HOME", "data"), ("XDG_CONFIG_HOME", "config"), ("XDG_STATE_HOME", "state"), ("XDG_CACHE_HOME", "cache")] {
                         let dir = home.join(sub);
                         let _ = paths::ensure_private_dir(&dir);
