@@ -997,6 +997,8 @@ rec(82, "Gate K design review (owner-confirmed)", "partial", commit=GK, date="20
     blocker="Next: the three Needs work items are AC-109 to AC-113 (after the Gate K merge, #7); show them again on the page and get the owner's confirmation.")
 
 # Gate L, Continuity (added by the owner on 2026-09-26; docs/rfcs/offline-mode.md). Not started; built in its own worktree and pull request.
+HARNESS_L = "Real `overseerd` binary, its real bridge and supervisors. In the protocol tests everything outside the daemon is synthetic: the network and the machine's memory are JSON files, Ollama is a loopback server, and Codex, Claude Code and OpenCode are fixtures that act out a script and fail on command (fixtures/fake-harness/continuity-harness.js, opencode-serve-fixture.js)"
+FIXTURE_L = "An isolated OVERSEER_HOME and a disposable repository per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY`, `OVERSEER_OLLAMA_URL` and `OVERSEER_TEST_SYSTEM_HOME` point the daemon at the fixtures; the backoff is shortened (first look after 100 ms, cap 400 ms)"
 rec(83, "Offline is not an outage", "partial", commit="e16bdaf", date="2026-09-26",
     proven="the daemon keeps one connection state decided from the system's own answer, the probes and the agents' errors, with every change an event; a provider outage gives degraded naming the provider, a failing baseline or the system's no-network gives offline, and a 429 or a usage limit leaves it online; on this machine the system's answer, both baseline probes and both providers are read live",
     deferred="the status bar and the side bar showing each state (the extension work waits for beelol/overseer#8, which changes the same files), and the owner turning Wi-Fi off and on for the 10-second check",
@@ -1013,9 +1015,23 @@ rec(83, "Offline is not an outage", "partial", commit="e16bdaf", date="2026-09-2
     live="Fixtures for every state; the live reading covers the online state only.",
     limits="macOS verified; the Linux answers (NetworkManager, default route) are parsed from fixtures and belong to AC-41. Polling every 5 seconds; change notifications were not needed so far.",
     blocker="Next: the status bar and side bar states after beelol/overseer#8 merges; then ask the owner to turn Wi-Fi off and on while the daemon logs the change.")
-rec(84, "Fail over to the best working provider", "not started", date="—", commit="—",
+rec(84, "Fail over to the best working provider", "partial", commit="0759272", date="2026-09-26",
+    proven="with one provider unreachable and the other working, a run whose turn fails on the connection continues on the other harness in the same task and worktree, the predecessor reads handed off and never failed, both chats say why, and the review shows the successor's work; the owner's provider order is kept; among several accounts the one with the most quota left is taken, never one at its limit, and with equal quota the one used last; with every provider failing nothing fails over and the work goes local; with Continuity off the run waits and is offered the other provider; a move that would loosen the permission mode is offered with the difference and made only when the user accepts the mode",
+    deferred="the live check with Codex's hosts blocked and Claude Code working. It is written (`node test/local/handoff-live.js failover`) and blocked: Claude Code's existing login on this machine is signed out (`claude auth status`: `loggedIn: false`)",
+    harness=HARNESS_L, fixture=FIXTURE_L,
+    steps="""1. `cargo test -p overseerd --test handoff ac84_fail_over_to_the_best_working_provider`.
+2. Unit tests: `handoff::tests::the_owners_order_of_providers_is_kept`, `modes_are_carried_and_never_loosened`, `the_handoff_prompt_is_built_from_the_record_and_bounded`.
+3. Live, blocked: `node test/local/handoff-live.js failover` ([what it said](evidence/ac-84/blocked-2026-09-26.txt)).""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+    actual="""- **Failover (fixtures):** Codex failing on the network with OpenAI's probe failing and Claude's answering: the successor ran on Claude Code (account "claude (existing login)") in the same task and worktree and wrote the file; the predecessor read `handed off to <run> (provider_unreachable:openai)`; the chat said "OpenAI is unreachable; continuing with **Claude Code** (account "claude (existing login)") because it is the best working option."; the task's review listed `failover.txt`. Nothing local was loaded and OpenCode never ran.
+- **Modes:** Codex's sandbox became Accept edits on Claude Code (stricter). Claude Code in Ask first was not moved to Codex, which does not ask: the run waited, the offer said "Codex edits files and runs commands in its sandbox without asking first", `run.handoff` was refused until the mode `workspace-write` was accepted by name. Plan only moved on its own, as read only.
+- **Accounts:** three Codex accounts at 90%, 20% and 70% used: the one at 20% was taken; put at its limit, the one at 70%; with all at 50%, the one used last.
+- **Order:** with both providers working `run.targets` lists OpenAI then Claude, and the reverse after `providerOrder` is set to `["anthropic", "openai"]`; the user may still take the second.
+- **Every provider failing:** no failover; the work went to the local model with "Transitioning to **qwen3-coder:30b** (local, Ollama) because no provider can be reached."
+- **Continuity off:** the run waited and was offered Claude Code; nothing moved.""",
+    evidence="daemon/tests/handoff.rs, daemon/src/handoff.rs, [the blocked live attempt](evidence/ac-84/blocked-2026-09-26.txt)",
+    live="Fixtures only so far. No paid turn was spent: the live check stopped before its first turn.",
+    blocker="Owner: sign Claude Code in (`claude auth login` in a terminal), or name an Overseer Claude profile the check may use. Then: `node test/local/handoff-live.js failover` (two tiny turns on Claude's smallest model; Codex never reaches its provider).")
 rec(85, "Local inventory read from the machine", "verified", commit="e16bdaf", date="2026-09-26",
     harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures; synthetic Codex transcripts replayed through fixtures/fake-harness/replay.js",
     steps="""1. Live: `node test/local/continuity-live.js` on this machine: `local.inventory` from a real daemon, compared with `sysctl -n hw.memsize`, `vm_stat` (read before and after), `sysctl -n kern.memorystatus_level`, `memory_pressure`, and Ollama's own `/api/tags`, `/api/show` (per model) and `/api/ps`.
@@ -1059,30 +1075,86 @@ rec(88, "Settings the daemon enforces", "partial", commit="e16bdaf", date="2026-
     evidence="daemon/tests/continuity.rs, daemon/src/continuity.rs",
     live="Protocol tests against the real daemon; no VS Code yet.",
     blocker="Next: the `overseer.continuity.*` settings in the extension after beelol/overseer#8 merges; then the offline scenario with VS Code closed once the policies exist.")
-rec(89, "Download models only when allowed", "not started", date="—", commit="—",
+rec(89, "Download models only when allowed", "partial", commit="7ba4638", date="2026-09-26",
+    proven="with downloads off a pick that needs a model is reported as not installed and the registry is never asked; with downloads on, the first pull is confirmed once with the model and its size, progress is streamed as events, a pull is cancelled midway and the next one continues from what was downloaded, a disk with too little room refuses it, nothing is pulled offline, and one pull runs at a time; prefetch is off until asked, fetches exactly the model `local.pick` names and nothing else, never during a paid turn, and stops when downloads are switched off; real pulls of four Qwen coders on this machine",
+    deferred="the progress card in the chat and the one-time prefetch offer as the packaged UI shows them (the daemon sends both as events and answers); they arrive with the Continuity UI",
+    harness="Real `overseerd`; the protocol tests use a synthetic Ollama with a registry; the live check uses Ollama 0.34.2 and the real registry (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME; `OVERSEER_TEST_DISK_FREE` describes a disk that is nearly full",
+    steps="""1. `cargo test -p overseerd --test downloads`: `ac89_models_are_downloaded_only_when_allowed`, `ac89_a_full_disk_refuses_the_download`, `ac89_prefetch_fetches_the_pick_and_nothing_else`.
+2. Live: `node test/local/downloads-live.js`: [live.txt](evidence/ac-89/live.txt), [the events](evidence/ac-89/live-events.jsonl).""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+    actual="""- **Live, 14 of 14 checks.** With downloads off the pull was refused ("qwen2.5-coder:1.5b is not installed, and model downloads are off"). The first pull asked once with the size (0.92 GiB) and nothing was downloaded before the answer. `qwen2.5-coder:1.5b` (0.92 GiB, 11 s), `:7b` (4.36 GiB, 45 s) and `:32b` (18.49 GiB, 183 s) were pulled with progress; `:3b` was cancelled at 36% and the next pull continued from 0.7 GiB. 184 progress events. Nothing was loaded into memory.
+- **Fixtures:** a disk with too little room is refused with the numbers; offline nothing is pulled; a second pull waits for the first; a model the registry does not have fails with Ollama's own words.
+- **Prefetch (fixtures):** allowing downloads alone fetches nothing ahead of need; turned on, it waits for the first confirmation, then fetches the pick and only the pick, not while a paid turn runs; with downloads off again it stops.""",
+    evidence="daemon/tests/downloads.rs, daemon/src/downloads.rs, [live.txt](evidence/ac-89/live.txt)",
+    live="Live pulls from the real registry (about 25.6 GiB, granted by the owner).",
+    blocker="Next: the chat card and the one-time offer in the packaged UI.")
 rec(90, "Install and run Ollama only when allowed", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(91, "Transition to local when offline", "not started", date="—", commit="—",
+rec(91, "Transition to local when offline", "partial", commit="9dbf16f", date="2026-09-26",
+    proven="a run whose turn fails on the network while the state is offline is handed off to a local run with the budget's model: the same task and worktree, a bounded prompt built from the record, the predecessor handed off and never failed, both chats saying what happened, one writer throughout; live with the real OpenCode and a real local model; with no eligible model installed the run says why and waits, and moves as soon as one is there; a turn that stalls while offline is interrupted by Overseer, recorded as such, and handed off",
+    deferred="the run tree and the two announcements as the packaged UI draws them (the daemon records the link and sends the announcements as chat events); they arrive with the Continuity UI",
+    harness=HARNESS_L + ". Live: a fixture Codex that fails on the network and a fixture system answer of no network, with the real OpenCode 1.15.13 and `qwen3-coder:30b-64k` through Ollama 0.34.2 (no account, no paid tokens)", fixture=FIXTURE_L,
+    steps="""1. Live: `node test/local/handoff-live.js local`: [live.txt](evidence/ac-91/live.txt), [the two runs' events](evidence/ac-91/live-events.jsonl).
+2. `cargo test -p overseerd --test handoff`: `ac91_transition_to_local_when_offline`, `ac91_without_a_local_model_it_says_why_and_waits`, `ac91_a_turn_that_stalls_while_offline_is_interrupted_and_handed_off`.""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(92, "Wait and retry, never fail (for 36 hours)", "not started", date="—", commit="—",
+    actual="""- **Live, 11 of 11 checks.** The local run started 9.8 s after the turn failed, the model's load included; it ran the pick (`qwen3-coder:30b` at a 64k context, 24.3 GiB of a 46.9 GiB budget), loaded under the watchdog; it wrote `handoff.txt` with the text asked for, in the same worktree, without asking (Codex's sandbox became Accept edits); the predecessor read `handed off to <run> (offline)`; the chats said "Transitioning to **qwen3-coder:30b** (local, Ollama) because you've disconnected. Work continues in the same worktree." and "Continued from "live handoff" after the connection was lost at 22:31."; Codex was started once and had ended before OpenCode was started; the turn cost nothing; memory pressure stayed normal (available 59.5 → 40.3 GiB) and the model was unloaded afterwards.
+- **Found by the live check:** OpenCode prints `serve --help` on the error stream, so the first build took the real OpenCode for one without a server and only offered the move. Fixed, with a unit test on the real help text.
+- **The prompt:** "You are continuing a task another agent started; its model became unreachable.", the task, the worktree and "Do not change branches.", the previous agent's last messages, the files changed, the message not yet answered; bounded to fit a 16k context.
+- **No model:** "no local model is installed that is verified and fits the memory budget of 51.2 GiB (qwen3-coder:30b: not installed, and downloads are off or the registry cannot be reached); downloads need a connection"; the run waited, and moved once the model was installed.
+- **Stall:** silence while online is not a stall; offline, after the limit, the turn was interrupted ("interrupted by Overseer", not a user interrupt) and the work handed off.""",
+    evidence="[live.txt](evidence/ac-91/live.txt), [live-events.jsonl](evidence/ac-91/live-events.jsonl), daemon/tests/handoff.rs, daemon/src/handoff.rs, test/local/handoff-live.js",
+    live="Live with the real OpenCode and a real local model; the failing Codex and the system's answer are fixtures, because this session needs the network itself (the owner's own offline session is AC-97).",
+    blocker="Next: the run tree and the announcements in the packaged UI.")
+rec(92, "Wait and retry, never fail (for 36 hours)", "partial", commit="0759272", date="2026-09-26",
+    proven="with Continuity off, or with nowhere for the work to go, a turn that fails on the network leaves its run waiting with the message kept; nothing is sent while the connection is gone; checks follow the backoff (5 s doubling to the cap, a fifth of jitter) and are recorded; when the connection returns the same turn is sent exactly once through the harness's own resume, with no second turn; a provider that answers the probe while the agent still fails is tried again with the backoff, not at every pass; Stop ends the wait; past 36 hours the run fails with the reason, keeps its message and offers Retry now, which works; Use a local model now makes the AC-91 handoff; new agents started offline are local ones",
+    deferred="the quiet card with its two actions and the one Needs-you item, in both themes (the daemon gives the waiting runs, the offers and the attention record); they arrive with the Continuity UI",
+    harness=HARNESS_L, fixture=FIXTURE_L + "; `continuity.test_age` (refused without a fixture network) ages a wait as a clock would",
+    steps="""1. `cargo test -p overseerd --test handoff ac92_wait_and_retry_never_fail`.
+2. Unit test: `handoff::tests::the_backoff_doubles_to_the_cap`.""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(93, "Back online", "not started", date="—", commit="—",
+    actual="""- **Waiting:** the run read `waiting_for_connection` with "the connection to OpenAI failed: stream disconnected…", no end time, its one turn `waiting` with the prompt kept. Four and more checks in two seconds, each within a fifth of 200, 400, 400… ms, none sending, each naming the 36 hours. Codex was not started again while offline.
+- **Back:** one more start of Codex, `exec resume <the same session>`, with the message that was kept; one turn, one `turn_started`, one check that sent; the file was written.
+- **Failing again:** while online with the agent still failing, the turn was tried again with the next delay each time, and stayed one turn.
+- **Stop:** `interrupted`, "stopped by the user while waiting"; nothing was started afterwards.
+- **36 hours:** five seconds before the limit the run still waited; past it: `failed`, "no connection for 36 hours", attention with `message_kept` and the actions `retry_now` and `use_local`; Retry now completed the turn.
+- **Use a local model now:** offered (`to: local`, Accept edits, no difference), not taken on its own; `run.handoff` moved the work: "Moving to **qwen3-coder:30b** (local, Ollama) as you asked."
+- **Backoff (unit):** 5, 10, 20, 40, 80, 120, 120 s; a fifth more or less with jitter.""",
+    evidence="daemon/tests/handoff.rs, daemon/src/handoff.rs",
+    live="Fixtures (the schedule and the 36 hours cannot be waited for live).",
+    blocker="Next: the card and the Needs-you item in the packaged UI, in both themes.")
+rec(93, "Back online", "partial", commit="0759272", date="2026-09-26",
+    proven="when the state returns to online a run that went local is offered the way back once and nothing moves on its own; the turn that ended is left alone; new agents default to the online harness and account the user last chose; Stay local keeps working locally; Switch back is a handoff that continues in the original harness, in the same worktree and in its own session, and is told what was done locally; when the first agent had no session the local work is summarised to a new one; with `returnOnline: auto` the next message goes back on its own with the announcement, except for a run that chose to stay",
+    deferred="the composer's default and the two buttons in the packaged UI (the daemon gives `new_agents.default`, the `back_online` event and `run.handoff` / `run.stay`); the owner's own session is AC-97",
+    harness=HARNESS_L, fixture=FIXTURE_L,
+    steps="""1. `cargo test -p overseerd --test handoff ac93_back_online`.""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+    actual="""- **Offline:** `continuity.status` gave `new_agents.local_only: true`, the default `opencode-serve`, and Codex as not usable with "offline: no network (system)".
+- **Back online:** one `back_online` event on the local run (`offer: true`, back to Codex), "Back online. This agent is still on a local model.", said once; the default for new agents was Codex with the first run's account again.
+- **Stay local:** the next message ran on the local model; no handoff.
+- **Switch back:** the successor ran on Codex with `exec resume <the first run's session>`, in the same worktree and account; its prompt began "You are continuing a task another agent started; the connection is back and the work returns to its first agent." and listed the local agent's messages and the files changed; the chats said "Back online. Continuing with **Codex**." and "Continued from "…" now that the connection is back."
+- **Auto:** the next message sent to the local run was started on Codex instead (a new session, because the first agent never had one), carrying "The user's last message, not yet answered: …"; the local run read handed off.""",
+    evidence="daemon/tests/handoff.rs, daemon/src/handoff.rs",
+    live="Fixtures.",
+    blocker="Next: the composer's default and the buttons in the packaged UI.")
 rec(94, "Local models as a first-class choice", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
 rec(95, "Honest offline UI", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(96, "Several local agents", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(96, "Several local agents", "verified", commit="0759272", date="2026-09-26",
+    harness=HARNESS_L, fixture=FIXTURE_L + "; the synthetic Ollama keeps the fixture memory in step with what is loaded, as a machine would",
+    steps="""1. `cargo test -p overseerd --test handoff ac96_several_local_agents_share_one_model`: three local agents at work at once, then a second model by name.
+2. `cargo test -p overseerd --test handoff ac96_a_memory_squeeze_shrinks_the_next_pick_and_leaves_the_turn_alone`.""",
+    expected="Three fixture-driven local runs: `/api/ps` shows one loaded model and the queue note appears; a second model is refused when the sum exceeds the budget; a fixture memory squeeze changes the next pick and leaves the running turn alone.",
+    actual="""- **One copy:** with three agents working at once Ollama held one model (`qwen3-coder:30b-64k`), loaded once; the second and third agents found it loaded and said "Queued behind 1 local agent: they share one loaded model." and "Queued behind 2 local agents: …"; all three finished their work.
+- **A second model:** with a 30% ceiling, `qwen2.5-coder:32b` was refused: "qwen2.5-coder:32b does not fit beside qwen3-coder:30b-64k: 23.5 GiB and 23.7 GiB together are over 30% of 128 GiB (38.4 GiB)", and the run ended as failed; `qwen2.5-coder:14b` was loaded beside it at a 16k context, because at 32k the two together would be over the share. Nothing was loaded twice.
+- **A squeeze:** with 11.3 GiB left (under the headroom of 12.8 GiB) the running turn finished and nothing was unloaded under it; the next turn unloaded the 64k copy first, then loaded the same model at a 32k context, with one note: "Memory is tighter now (11.3 GiB available). This turn uses qwen3-coder:30b at a 32k context instead of a 64k context."; the turn after that used the same copy with no second note.
+- **Not Overseer's to unload:** a copy the user had loaded in their own Ollama was shared as it was under the same squeeze: nothing loaded, nothing unloaded. Only copies Overseer loaded itself, and no other agent is working on, are ever replaced.""",
+    evidence="daemon/tests/handoff.rs, daemon/src/continuity.rs (`prepare_local_run`), daemon/tests/common/ollama.rs",
+    live="Fixtures, as the criterion asks. The live runs of AC-91 and AC-138 show one real model loaded and unloaded.",
+    limits="The queue note counts agents on the same tag; how Ollama orders their requests is Ollama's own (`OLLAMA_NUM_PARALLEL`).")
 rec(97, "Offline session (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
@@ -1220,24 +1292,27 @@ rec(137, "Motion throughout", "not started", date="—", commit="—",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
 
 # Gate L addition (Continuity): permission modes on handoff.
-rec(138, "Permission modes carry over", "partial", commit="d2081e1", date="2026-09-26",
-    proven="local runs go through `opencode serve` (the `opencode-serve` harness) and honour all four modes with a real local model: Plan only changes no file, Ask first asks before a write with the path and a diff and Allow lets it through while Deny blocks it, Accept edits edits without asking and asks before a command, Auto does both; the rules travel with the session and Overseer writes none into any file; the user's own `~/.config/opencode` is byte-identical before and after",
-    deferred="the handoff itself (a run in Ask first moved from Claude Code to local keeps asking) and the wait-and-offer fallback when the session transport is not available; both arrive with the handoff work (AC-91)",
+rec(138, "Permission modes carry over", "verified", commit="9dbf16f", date="2026-09-26",
     harness="OpenCode 1.15.13 through `overseerd opencode-bridge`, Ollama 0.34.2, `qwen3-coder:30b-64k` (local model; no account, no paid tokens); the protocol tests use a synthetic OpenCode server and a synthetic Ollama",
     fixture="Live: an isolated OVERSEER_HOME and a disposable repository; Overseer's own OpenCode profile `local-ollama` inside it. Protocol tests: fixtures/fake-harness/opencode-serve-fixture.js, whose prompt is a script",
     steps="""1. Live: `node test/local/opencode-serve-live.js` (plan, manual, deny, acceptEdits, auto, interrupt, followup): [live.txt](evidence/ac-138/live.txt), [the runs' events](evidence/ac-138/live-events.jsonl).
 2. `cargo test -p overseerd --test local_runs`: `ac138_permission_modes_through_opencode`, `ac138_interrupt_and_follow_up_in_the_same_session`, `ac138_a_tool_call_written_as_text_is_retried_once`, `ac138_children_and_failures_of_the_local_model`.
-3. Unit tests: `opencode_bridge::tests::modes_become_an_agent_and_rules`, `the_profile_names_only_the_local_provider`, and the four fixture replays (AC-139).""",
+3. Unit tests: `opencode_bridge::tests::modes_become_an_agent_and_rules`, `the_profile_names_only_the_local_provider`, `the_server_is_recognised_from_its_own_help`, `handoff::tests::modes_are_carried_and_never_loosened`, and the four fixture replays (AC-139).
+4. The handoff: `cargo test -p overseerd --test handoff`: `ac91_transition_to_local_when_offline` (Claude Code in Ask first, Codex read only and Codex in its sandbox, each moved to local), `ac138_without_the_server_a_local_agent_cannot_ask_so_the_move_is_offered`, `ac84_fail_over_to_the_best_working_provider` (between providers).
+5. The spike: [AC-139](AC-139.md).""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#permission-modes-carry-over-ac-138).",
     actual="""- **Live, 24 of 24 checks.** Plan only: completed, no file, nothing asked. Ask first: `edit: asked.txt` asked before anything was written, with the path and the diff (`+hello from ask first`); Allow wrote the file; the model then asked again for `command: ls -la`. Deny: `denied.txt` was not written and no file activity was reported; the model replied "refused". Accept edits: the file was written without a request and `command: ls` asked. Auto: write and command both ran, nothing asked.
 - **Interrupt and follow-up (live):** a 45 s command ended 563 ms after the interrupt, as `interrupted`, with no server left running; a follow-up in Ask first continued the same session (it named `first.txt`) and asked before writing `second.txt`.
 - **The user's own OpenCode:** `~/.config/opencode` (3,427 files) has the same SHA-256 before and after; the run's server held 17 files open, 5 in Overseer's profile and none in the user's OpenCode folders; its logs and sessions are in the profile. Other OpenCode processes were writing to the user's data folder during the run, which is why that folder is not hashed.
 - **What the bridge sends (protocol tests):** per mode the agent and the rules (`plan`; `build` with edit and bash `ask`; edit `allow` and bash `ask`; agent defaults), each with `question: deny`; only `once` and `reject` as answers; the model `ollama/<tag>`; the server behind a password; a profile that enables the `ollama` provider only and holds no rules. A mode that would bypass everything is refused.
-- **Usage:** tokens with cost 0, marked local.""",
-    evidence="[live.txt](evidence/ac-138/live.txt), [live-events.jsonl](evidence/ac-138/live-events.jsonl), daemon/tests/local_runs.rs, daemon/src/opencode_bridge.rs",
+- **Usage:** tokens with cost 0, marked local.
+- **The handoff keeps the mode (fixtures):** a Claude Code run in Ask first, moved to the local model, asked before its write (`edit: asked.txt`), wrote nothing before the answer and wrote the file after Allow. A read-only Codex run became Plan only and changed no file. Codex in its sandbox became Accept edits: edits allowed, commands asked, the `question` tool denied.
+- **With the session transport not available:** the run waited and the move was offered with the difference ("this OpenCode has no server, so the local agent cannot ask before it edits or runs a command"); `run.handoff` was refused until the mode `auto` was accepted by name; a run that was already in Auto moved on its own. Every such run still passes the memory guard.
+- **Between providers:** Ask first on Claude Code is not moved to Codex on its own, because Codex does not ask; Plan only is, as read only.""",
+    evidence="[live.txt](evidence/ac-138/live.txt), [live-events.jsonl](evidence/ac-138/live-events.jsonl), daemon/tests/local_runs.rs, daemon/tests/handoff.rs, daemon/src/opencode_bridge.rs, daemon/src/handoff.rs",
     live="Live with a real local model for every mode, interrupt and follow-up; synthetic server for the protocol tests.",
-    limits="macOS, OpenCode 1.15.13, one model. Images and reasoning effort are not supported by this harness.",
-    blocker="Next: the handoff (AC-91) carries the mode from Claude Code and Codex; then the fixture handoff in Ask first and the fallback complete this criterion.")
+    limits="macOS, OpenCode 1.15.13, one model. Images and reasoning effort are not supported by this harness. The Allow and Deny cards are the chat's own permission cards (AC-16), which the live run drove through the daemon; the Continuity screens of the packaged UI are AC-94 and AC-95.",
+    blocker="—")
 rec(139, "OpenCode session transport spike", "verified (research criterion)", commit="d2081e1", date="2026-09-26",
     harness="OpenCode 1.15.13 with Ollama 0.34.2 and `qwen3-coder:30b-64k` (local model; no account, no paid tokens)",
     fixture="An isolated OpenCode profile (its own XDG folders, `enabled_providers: [\"ollama\"]`, rules `edit: ask`, `bash: ask`) and two disposable Git repositories under the session scratchpad; the user's own OpenCode configuration was neither read nor written",
@@ -1255,22 +1330,24 @@ rec(139, "OpenCode session transport spike", "verified (research criterion)", co
     evidence="[evidence/ac-139/](evidence/ac-139/) (transcripts, results, memory), `fixtures/transcripts/opencode-1.15.13-serve-{allow,deny,interrupt,children}-local.jsonl`, drivers `test/spike/opencode-serve.js` and `test/spike/opencode-acp.js`, daemon/src/opencode_bridge.rs (tests)",
     live="Real OpenCode runtime and a real local model through Ollama; no account and no paid tokens.",
     limits="macOS only; one OpenCode version (1.15.13) and one model. A research criterion: it does not pass AC-138.")
-rec(140, "Memory safety guard", "partial", commit="d2081e1", date="2026-09-26",
-    proven="the guard refuses any model over the budget on the paths that exist (the automatic pick, a local run started with a model named as the composer would, `local.approve`, `local.load`), with no override, on fresh memory readings; a refused run ends as failed with the reason and nothing is loaded or launched; a load is watched once a second and cancelled and unloaded when available memory falls under half the headroom or the system reports critical pressure; on this machine `qwen3.5:122b` cannot be loaded and the pick loaded with pressure staying normal",
-    deferred="the same refusal from prefetch and catalogue verification (built in the later steps), the composer itself in the packaged UI, the critical-pressure valve that pauses a working local run, and the catalogue verification log",
+rec(140, "Memory safety guard", "partial", commit="0759272", date="2026-09-26",
+    proven="the guard refuses any model over the budget on the paths that exist (the automatic pick, a local run started with a model named as the composer would, `local.approve`, `local.load`), with no override, on fresh memory readings; a refused run ends as failed with the reason and nothing is loaded or launched; a load is watched once a second and cancelled and unloaded when available memory falls under half the headroom or the system reports critical pressure; on this machine `qwen3.5:122b` cannot be loaded and the pick loaded with pressure staying normal; prefetch fetches a model and loads nothing; at critical pressure a working local run is paused with its message kept, the model is unloaded, no local turn is started, and the run resumes with one delivery when the pressure is normal",
+    deferred="the catalogue verification log (one model at a time, smallest first, memory before and after), which comes with AC-87; the composer itself in the packaged UI (AC-94)",
     harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures; synthetic Codex transcripts replayed through fixtures/fake-harness/replay.js",
     steps="""1. `cargo test -p overseerd --test continuity`: `ac140_no_model_over_the_budget_is_loaded_by_any_path`; `--test local_runs`: `ac140_a_local_run_passes_the_guard_before_it_starts`.
 2. Unit tests: `local::tests::the_guard_refuses_anything_over_the_budget`, `a_load_is_stopped_when_memory_runs_short`.
-3. Live: `node test/local/continuity-live.js`: the guard asked about all 8 installed models, a load of `qwen3.5:122b` attempted, the pick loaded and unloaded.""",
+3. Live: `node test/local/continuity-live.js`: the guard asked about all 8 installed models, a load of `qwen3.5:122b` attempted, the pick loaded and unloaded.
+4. The valve: `cargo test -p overseerd --test handoff ac140_critical_pressure_pauses_local_runs_and_resumes_them`.""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#memory-safety-ac-140).",
     actual="""- **Refused (live):** "qwen3.5:122b is too big to load: 77.2 GiB at a 16k context is over the budget of 46.2 GiB (40% of 128 GiB is 51.2 GiB; 59 GiB available minus 12.8 GiB headroom is 46.2 GiB)", from the guard and from a load; nothing was loaded. The other 7 models were allowed at 16k, each under the budget.
 - **Refused (fixtures):** the same model at the 50% ceiling with unverified models allowed; a model of unknown size; the pick itself when memory is short now ("23.7 GiB at a 64k context is over the budget of 17.2 GiB"); anything at critical pressure. The fixture Ollama received no load for any refused model.
 - **Local runs (protocol tests):** a run asking for `qwen3.5:122b` by name is refused ("77.2 GiB at a 16k context is over the budget of 51.2 GiB") and ends as `failed` with `not launched: …`; so is the pick when memory is short, anything at critical pressure, a model that is not installed, and a run on the user's own OpenCode profile. For every refused run Ollama received no load and OpenCode was never started. A tag that sets no context is run through a tag that does (`overseer/qwen2.5-coder-14b-32k`), and the model is loaded once under the watchdog and found loaded by later runs. A copy that is already loaded is not counted twice, under whichever tag of the same model it was loaded.
 - **Watchdog (fixtures):** memory dropped to 5 GiB during a load: "the load of qwen3-coder:30b-64k was cancelled and the model unloaded: available memory fell to 5 GiB, under half the headroom of 12.8 GiB", followed by an unload request; a critical-pressure signal stopped a load the same way. Every load is a `local_load` event with memory before and after.
+- **The valve (fixtures):** a critical-pressure signal during a local turn: the run read `waiting_for_memory` with "the system reported critical memory pressure; the local model was unloaded", `/api/ps` showed nothing loaded, the turn was `waiting` with its prompt kept, and it was recorded as Overseer's action, not a user interrupt. While the pressure stayed critical nothing was loaded, nothing was sent, and a new local run was refused. With the pressure normal again the turn was sent once, in the same session, the model loaded again through the guard, and the work finished: one turn, one `turn_started`.
 - **Live load:** `qwen3-coder:30b-64k` loaded in 5.1 s with 5 memory samples; available went from 59.0 to 42.4 GiB; pressure stayed normal (level 64%); the model was unloaded afterwards.""",
-    evidence="daemon/tests/continuity.rs, daemon/src/local.rs, [live.txt](evidence/ac-85/live.txt)",
+    evidence="daemon/tests/continuity.rs, daemon/tests/handoff.rs, daemon/src/local.rs, daemon/src/handoff.rs, [live.txt](evidence/ac-85/live.txt)",
     live="Live on this machine for the refusal and one guarded load; fixtures for the watchdog.",
-    blocker="Next: route the composer, prefetch and catalogue verification through the same guard as they are built; the critical-pressure valve once local runs exist.")
+    blocker="Next: the catalogue verification (AC-87) writes the log this criterion asks for.")
 # Gate N addition: pair once (the owner's decision of 2026-09-26).
 rec(141, "Pair once", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
