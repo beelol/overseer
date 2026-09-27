@@ -48,13 +48,22 @@
           "aria": "Director not started"
         },
         {
+          "label": "Capacity",
+          "description": "0 selected · usage unknown",
+          "level": 3,
+          "expanded": "false",
+          "selected": false,
+          "focused": false,
+          "aria": "Swarm capacity, 0 selected · usage unknown"
+        },
+        {
           "label": "Check route 0",
           "description": "ready",
           "level": 3,
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Record route 0 evidence\nready · 0 attempts"
+          "aria": "Check route 0, ready, 0 attempts"
         },
         {
           "label": "Check route 1",
@@ -63,7 +72,7 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Record route 1 evidence\nready · 0 attempts"
+          "aria": "Check route 1, ready, 0 attempts"
         },
         {
           "label": "Check route 2",
@@ -72,7 +81,7 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Record route 2 evidence\nready · 0 attempts"
+          "aria": "Check route 2, ready, 0 attempts"
         },
         {
           "label": "Check route 3",
@@ -81,16 +90,7 @@
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Record route 3 evidence\nready · 0 attempts"
-        },
-        {
-          "label": "Check route 4",
-          "description": "ready",
-          "level": 3,
-          "expanded": null,
-          "selected": false,
-          "focused": false,
-          "aria": "Record route 4 evidence\nready · 0 attempts"
+          "aria": "Check route 3, ready, 0 attempts"
         }
       ]
     },
@@ -98,7 +98,7 @@
       "name": "Pause from the Swarm row changes durable daemon state within 2 seconds",
       "ok": true,
       "detail": {
-        "pause_ms": 591
+        "pause_ms": 588
       }
     },
     {
@@ -126,7 +126,7 @@
       "name": "confirmed Stop cancels queued work within 2 seconds",
       "ok": true,
       "detail": {
-        "stop_ms": 69
+        "stop_ms": 67
       }
     }
   ]

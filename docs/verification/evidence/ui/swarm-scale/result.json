@@ -54,7 +54,7 @@
         "reason": "beneficial",
         "replay": false,
         "revision": 1,
-        "run_id": "sw-85a8bd6a3fc7",
+        "run_id": "sw-bf0f189fb283",
         "serial": {
           "affordable": true,
           "elapsed_ms": 3240,
@@ -86,6 +86,36 @@
           "reserved": 32
         },
         "total": 100
+      }
+    },
+    {
+      "name": "daemon exposes only fixture commitments, with provider usage unknown",
+      "ok": true,
+      "detail": {
+        "provider_usage_state": "unknown",
+        "selected_targets": [
+          {
+            "attempts": 32,
+            "effort": null,
+            "harness": "generic",
+            "id": "fixture-local",
+            "model": null,
+            "profile_id": null
+          }
+        ],
+        "selected_targets_truncated": false,
+        "source": "fixture_admission",
+        "windows": [
+          {
+            "allocation_milli": 100000,
+            "finishing_reserve_milli": 20000,
+            "outstanding_estimate_milli": 3200,
+            "pool_id": "fixture-pool",
+            "unit": "points",
+            "window_id": "run"
+          }
+        ],
+        "windows_truncated": false
       }
     },
     {
@@ -152,6 +182,15 @@
           "aria": "Director not started"
         },
         {
+          "label": "Capacity",
+          "description": "1 selected · usage unknown",
+          "level": 3,
+          "expanded": "false",
+          "selected": false,
+          "focused": false,
+          "aria": "Swarm capacity, 1 selected · usage unknown"
+        },
+        {
           "label": "Inspect route 0",
           "description": "working",
           "level": 3,
@@ -186,15 +225,57 @@
           "selected": false,
           "focused": false,
           "aria": "Inspect route 3, working, 1 attempts"
-        },
+        }
+      ]
+    },
+    {
+      "name": "expanded capacity names target, reserve and planning decision without claiming live usage",
+      "ok": true,
+      "detail": [
         {
-          "label": "Inspect route 4",
-          "description": "working",
-          "level": 3,
-          "expanded": "false",
+          "label": "Target: fixture-local",
+          "description": "generic · account unknown · 32 attempts",
+          "level": 4,
+          "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Inspect route 4, working, 1 attempts"
+          "aria": "fixture-local · generic · account unknown"
+        },
+        {
+          "label": "Allocation: fixture-pool / run",
+          "description": "100 points · finishing reserve 20 points",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "100 points · finishing reserve 20 points\nOutstanding estimate: 3.2 points. Fixture commitment, not measured provider usage."
+        },
+        {
+          "label": "Planning: parallel",
+          "description": "beneficial",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Latest recorded planning decision. Current admission limit may differ. beneficial"
+        },
+        {
+          "label": "Current limit unknown",
+          "description": "last rejected admission is not recorded",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Current limit unknown last rejected admission is not recorded"
+        },
+        {
+          "label": "Provider usage unknown",
+          "description": "current allowance not reported",
+          "level": 4,
+          "expanded": null,
+          "selected": false,
+          "focused": false,
+          "aria": "Provider usage unknown current allowance not reported"
         }
       ]
     },

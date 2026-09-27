@@ -99,6 +99,10 @@ function ago(ms) {
   return `${Math.floor(s / 86400)}d`;
 }
 
+function nativeAmount(milli, unit) {
+  return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 }).format((milli || 0) / 1000)} ${unit}`;
+}
+
 /** The side bar's agents list (AC-67 to AC-71): Needs you, then agents by repository. */
 class AgentsProvider {
   constructor(model, memento, extensionUri, handlers = {}) {
@@ -135,7 +139,8 @@ class AgentsProvider {
       (st.runs || []).map(r => [r.id, r.status, r.parent_run_id, r.attention?.kind, r.harness, r.model, r.profile_id, r.workspace_id, r.title, r.exit_reason, r.ended_ms ? 1 : 0]),
       (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
       (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [],
-      this.model.swarms.map(s => [s.id, s.status, s.revision, s.active_worker_processes, s.job_counts])]);
+      this.model.swarms.map(s => [s.id, s.status, s.revision, s.active_worker_processes,
+        s.job_counts, s.benefit?.decision, s.benefit?.reason, s.capacity])]);
   }
   getTreeItem(node) { return node.item; }
   getParent(node) { return node.parent; }
@@ -228,6 +233,7 @@ class AgentsProvider {
     if (node.section === 'swarms') return m.swarms.map(run => this.swarmNode(run, node));
     if (node.swarm) return this.swarmPage(node.swarm, undefined, node, true);
     if (node.swarmPage) return this.swarmPage(node.swarmPage.run, node.swarmPage.cursor, node, false);
+    if (node.swarmCapacity) return this.swarmCapacityRows(node.swarmCapacity, node);
     if (node.job) return (node.job.worker_runs || []).map(worker => this.swarmWorkerNode(worker, node));
     if (node.repo) return this.visibleTasks().filter(t => t.repo_root === node.repo).map(t => this.agentNode(t, node));
     if (node.run) return this.kidsOf(node.run.id).map(run => this.childNode(run, node));
@@ -249,7 +255,7 @@ class AgentsProvider {
     item.id = 'swarm:' + run.id;
     item.iconPath = new vscode.ThemeIcon('organization');
     item.description = `${working} working · ${counts.ready || 0} ready · ${counts.blocked || 0} blocked`;
-    item.tooltip = `${run.objective}\n${run.status} · ${run.job_counts?.total || 0} jobs\n${item.description}`;
+    item.tooltip = `${run.objective}\n${run.status} · ${run.job_counts?.total || 0} jobs\n${item.description}\nProvider usage ${run.capacity?.provider_usage_state || 'unknown'}`;
     item.accessibilityInformation = { label: `${run.category} swarm, ${run.status}, ${item.description}` };
     item.contextValue = 'swarm-run-' + run.status;
     return { item, swarm: run, parent };
@@ -265,6 +271,14 @@ class AgentsProvider {
       item.description = run.director?.process_status || run.director?.owner_status || 'not started';
       item.contextValue = 'swarm-director';
       rows.push({ item, parent });
+      const capacity = new vscode.TreeItem('Capacity', vscode.TreeItemCollapsibleState.Collapsed);
+      capacity.id = 'swarm-capacity:' + run.id;
+      capacity.iconPath = new vscode.ThemeIcon('pulse');
+      const selected = run.capacity?.selected_targets?.length || 0;
+      capacity.description = `${selected}${run.capacity?.selected_targets_truncated ? '+' : ''} selected · usage ${run.capacity?.provider_usage_state || 'unknown'}`;
+      capacity.tooltip = 'Selected targets and frozen fixture commitments. Provider usage is not reported.';
+      capacity.accessibilityInformation = { label: `Swarm capacity, ${capacity.description}` };
+      rows.push({ item: capacity, swarmCapacity: run, parent });
     }
     for (const job of page.jobs || []) {
       const workerRuns = job.worker_runs || [];
@@ -286,6 +300,50 @@ class AgentsProvider {
       item.iconPath = new vscode.ThemeIcon('list-unordered');
       rows.push({ item, swarmPage: { run, cursor: page.next_cursor }, parent });
     }
+    return rows;
+  }
+  swarmCapacityRows(run, parent) {
+    const rows = [];
+    for (const target of run.capacity?.selected_targets || []) {
+      const item = new vscode.TreeItem(`Target: ${target.id}`);
+      item.iconPath = this.logo(target.harness);
+      const account = target.profile_id ? this.model.profile(target.profile_id)?.name || target.profile_id : 'account unknown';
+      item.description = `${target.harness || 'harness unknown'} · ${account} · ${target.attempts} attempt${target.attempts === 1 ? '' : 's'}`;
+      item.tooltip = [target.id, target.harness, account, target.model, target.effort].filter(Boolean).join(' · ');
+      rows.push({ item, parent });
+    }
+    if (run.capacity?.selected_targets_truncated) {
+      const item = new vscode.TreeItem('More selected targets');
+      item.description = 'readout capped at 32';
+      rows.push({ item, parent });
+    }
+    for (const window of run.capacity?.windows || []) {
+      const item = new vscode.TreeItem(`Allocation: ${window.pool_id} / ${window.window_id}`);
+      item.iconPath = new vscode.ThemeIcon('graph');
+      item.description = `${nativeAmount(window.allocation_milli, window.unit)} · finishing reserve ${nativeAmount(window.finishing_reserve_milli, window.unit)}`;
+      item.tooltip = `${item.description}\nOutstanding estimate: ${nativeAmount(window.outstanding_estimate_milli, window.unit)}. Fixture commitment, not measured provider usage.`;
+      rows.push({ item, parent });
+    }
+    if (run.capacity?.windows_truncated) {
+      const item = new vscode.TreeItem('More allocation windows');
+      item.description = 'readout capped at 32';
+      rows.push({ item, parent });
+    }
+    if (run.benefit?.decision) {
+      const item = new vscode.TreeItem(`Planning: ${run.benefit.decision}`);
+      item.iconPath = new vscode.ThemeIcon('lightbulb');
+      item.description = (run.benefit.reason || 'reason unknown').replaceAll('_', ' ');
+      item.tooltip = `Latest recorded planning decision. Current admission limit may differ. ${item.description}`;
+      rows.push({ item, parent });
+    }
+    const limit = new vscode.TreeItem('Current limit unknown');
+    limit.iconPath = new vscode.ThemeIcon('question');
+    limit.description = 'last rejected admission is not recorded';
+    rows.push({ item: limit, parent });
+    const usage = new vscode.TreeItem(`Provider usage ${run.capacity?.provider_usage_state || 'unknown'}`);
+    usage.iconPath = new vscode.ThemeIcon('question');
+    usage.description = 'current allowance not reported';
+    rows.push({ item: usage, parent });
     return rows;
   }
   swarmWorkerNode(worker, parent) {

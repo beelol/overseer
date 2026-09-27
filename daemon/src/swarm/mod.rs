@@ -250,6 +250,7 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
     run["completion"] = completion::get(store, id)?;
     run["availability"] = availability::get(store, id)?;
     run["benefit"] = benefit::get_state(store, id, run["revision"].as_i64().unwrap_or(0))?;
+    run["capacity"] = capacity_readout(store, id)?;
     let mut job_counts = BTreeMap::<String, i64>::new();
     let mut stmt = store.conn.prepare(
         "SELECT status,COUNT(*) FROM swarm_jobs WHERE run_id=?1 GROUP BY status",
@@ -307,6 +308,44 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
     Ok(run)
 }
 
+// Only durable Swarm commitments are available here. In particular, an allocation
+// derived from a fixture snapshot is not a current provider balance or measured use.
+fn capacity_readout(store: &Store, id: &str) -> Result<Value> {
+    let mut selected = store.conn.prepare(
+        "SELECT target_id,target_harness,target_profile_id,target_model,target_effort,COUNT(*)
+         FROM swarm_admissions WHERE run_id=?1
+         GROUP BY target_id,target_harness,target_profile_id,target_model,target_effort
+         ORDER BY COUNT(*) DESC,target_id LIMIT 33",
+    )?;
+    let mut targets = selected.query_map([id], |row| Ok(json!({
+        "id":row.get::<_,String>(0)?,"harness":row.get::<_,Option<String>>(1)?,
+        "profile_id":row.get::<_,Option<String>>(2)?,"model":row.get::<_,Option<String>>(3)?,
+        "effort":row.get::<_,Option<String>>(4)?,"attempts":row.get::<_,i64>(5)?
+    })))?.collect::<rusqlite::Result<Vec<_>>>()?;
+    let targets_truncated = targets.len() > 32;
+    targets.truncate(32);
+
+    let mut allocated = store.conn.prepare(
+        "SELECT a.pool_id,a.window_id,a.unit,a.allocation_milli,a.reserve_milli,
+           COALESCE((SELECT SUM(r.amount_milli) FROM swarm_reservations r
+                     WHERE r.run_id=a.run_id AND r.pool_id=a.pool_id
+                       AND r.window_id=a.window_id AND r.status IN ('active','uncertain')),0)
+         FROM swarm_allocations a WHERE a.run_id=?1
+         ORDER BY a.pool_id,a.window_id LIMIT 33",
+    )?;
+    let mut windows = allocated.query_map([id], |row| Ok(json!({
+        "pool_id":row.get::<_,String>(0)?,"window_id":row.get::<_,String>(1)?,
+        "unit":row.get::<_,String>(2)?,"allocation_milli":row.get::<_,i64>(3)?,
+        "finishing_reserve_milli":row.get::<_,i64>(4)?,
+        "outstanding_estimate_milli":row.get::<_,i64>(5)?
+    })))?.collect::<rusqlite::Result<Vec<_>>>()?;
+    let windows_truncated = windows.len() > 32;
+    windows.truncate(32);
+    Ok(json!({"selected_targets":targets,"selected_targets_truncated":targets_truncated,
+        "windows":windows,"windows_truncated":windows_truncated,
+        "provider_usage_state":"unknown","source":"fixture_admission"}))
+}
+
 /// Bounded category summaries for control surfaces. Job rows and transcripts are fetched
 /// only when a user opens a run; a large backlog does not inflate this list response.
 pub fn list(store: &Store, p: &Value) -> Result<Value> {
@@ -339,7 +378,8 @@ pub fn list(store: &Store, p: &Value) -> Result<Value> {
             "active_worker_processes": full["active_worker_processes"],
             "registered_attempts": full["registered_attempts"],
             "director": full["director"], "availability": full["availability"],
-            "benefit": full["benefit"], "unconfirmed_exit_count": full["unconfirmed_exit_count"],
+            "benefit": full["benefit"], "capacity": full["capacity"],
+            "unconfirmed_exit_count": full["unconfirmed_exit_count"],
         }));
     }
     let next_cursor = if has_more { runs.last().and_then(|run| run["id"].as_str()) } else { None };

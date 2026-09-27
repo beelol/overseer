@@ -25,7 +25,12 @@ Module._load = originalLoad;
     created_ms: 1, updated_ms: 2, revision: 1, allowed_targets: ['profile-a'], policy: {},
     job_counts: { total: 100, by_status: { running: 32, ready: 56, submitted: 8, blocked: 4 } },
     active_worker_processes: 32, registered_attempts: 32, director: { owner_status: 'active' },
-    availability: null, benefit: null, unconfirmed_exit_count: 0 };
+    availability: null, benefit: { decision: 'serial', reason: 'finishing_unaffordable' },
+    capacity: { provider_usage_state: 'unknown', source: 'fixture_admission',
+      selected_targets: [{ id: 'fixture-a', harness: 'generic', profile_id: 'profile-a', attempts: 1 }],
+      windows: [{ pool_id: 'fixture-pool', window_id: 'week', unit: 'points',
+        allocation_milli: 6000, finishing_reserve_milli: 1200,
+        outstanding_estimate_milli: 1000 }] }, unconfirmed_exit_count: 0 };
   const jobs = Array.from({ length: 50 }, (_, n) => ({ id: `j${String(n).padStart(3, '0')}`,
     title: `Check route ${n}`, status: n < 32 ? 'reserved' : 'ready', attempt_count: n < 32 ? 1 : 0,
     plan_revision: 1, acceptance: 'Evidence', deps: [], resource_claims: [], run_id: run.id,
@@ -62,27 +67,40 @@ Module._load = originalLoad;
   assert.match(swarm.item.description, /4 blocked/);
   assert.match(swarm.item.tooltip, /4 blocked/,
     'narrow sidebars must still expose the full aggregate on hover');
+  assert.match(swarm.item.tooltip, /usage unknown/i);
   const firstPage = await provider.getChildren(swarm);
-  assert.equal(firstPage.length, 52, 'director, 50 job rows and one next-page control');
+  assert.equal(firstPage.length, 53, 'director, capacity, 50 job rows and one next-page control');
   assert.equal(firstPage[0].item.label, 'Director');
-  assert.equal(firstPage[1].item.iconPath.id, 'sync~spin');
-  assert.equal(firstPage[1].item.description, 'working', 'a live worker must not be shown as merely reserved');
-  assert.equal(firstPage[1].item.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
-  const workerRows = provider.getChildren(firstPage[1]);
+  assert.equal(firstPage[1].item.label, 'Capacity');
+  assert.match(firstPage[1].item.description, /usage unknown/i);
+  const capacity = provider.getChildren(firstPage[1]);
+  assert(capacity.some(row => /fixture-a/.test(row.item.label)), 'show selected target');
+  assert(capacity.some(row => /week/.test(row.item.label) && /finishing reserve/i.test(row.item.description)),
+    'show frozen allocation and finishing reserve');
+  assert(capacity.some(row => /serial/i.test(row.item.label) && /finishing unaffordable/i.test(row.item.description)),
+    'show the recorded planning decision and reason');
+  assert(capacity.some(row => /usage unknown/i.test(row.item.label)),
+    'fixture estimates must not be presented as measured provider usage');
+  assert(capacity.some(row => /current limit unknown/i.test(row.item.label)),
+    'a past planning decision cannot be mislabeled as the current admission constraint');
+  assert.equal(firstPage[2].item.iconPath.id, 'sync~spin');
+  assert.equal(firstPage[2].item.description, 'working', 'a live worker must not be shown as merely reserved');
+  assert.equal(firstPage[2].item.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
+  const workerRows = provider.getChildren(firstPage[2]);
   assert.equal(workerRows.length, 1);
   assert.equal(workerRows[0].item.command.command, 'overseer.selectRun');
   assert.deepEqual(workerRows[0].item.command.arguments, ['worker-0']);
-  assert.equal(firstPage[33].item.iconPath.id, 'clock');
+  assert.equal(firstPage[34].item.iconPath.id, 'clock');
   assert.equal(calls.filter(([method]) => method === 'swarm.jobs').length, 1);
   assert.equal(calls.find(([method]) => method === 'swarm.jobs')[1].limit, 50);
-  const secondPage = await provider.getChildren(firstPage[51]);
+  const secondPage = await provider.getChildren(firstPage[52]);
   assert.equal(secondPage.length, 50);
   assert.equal(secondPage[49].job.id, 'j099');
   assert.equal(calls.filter(([method]) => method === 'swarm.jobs').length, 2);
   provider.setSwarmStatusFilter('blocked');
   const blocked = await provider.getChildren(swarm);
-  assert.equal(blocked.length, 5, 'director plus four blocked jobs');
-  assert(blocked.slice(1).every(row => row.job.status === 'blocked'));
+  assert.equal(blocked.length, 6, 'director, capacity and four blocked jobs');
+  assert(blocked.slice(2).every(row => row.job.status === 'blocked'));
   assert.equal(calls.findLast(([method]) => method === 'swarm.jobs')[1].status, 'blocked');
   swarmRuns = [];
   await model.refresh(true);

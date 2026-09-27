@@ -87,6 +87,14 @@ print(json.dumps([json.loads((pathlib.Path(row[0]) / 'shim.json').read_text())['
     check('remaining 68 jobs stay ready while 32 attempts hold reservations',
       run.job_counts.total === 100 && run.job_counts.by_status.reserved === 32 &&
       run.job_counts.by_status.ready === 68, run.job_counts);
+    check('daemon exposes only fixture commitments, with provider usage unknown',
+      run.capacity?.provider_usage_state === 'unknown' &&
+      run.capacity?.selected_targets?.[0]?.id === 'fixture-local' &&
+      run.capacity?.selected_targets?.[0]?.attempts === 32 &&
+      run.capacity?.windows?.[0]?.allocation_milli === 100000 &&
+      run.capacity?.windows?.[0]?.finishing_reserve_milli === 20000 &&
+      run.capacity?.windows?.[0]?.outstanding_estimate_milli === 3200,
+      run.capacity);
 
     await cdp.command('Overseer: Refresh');
     await s.openOverseerView();
@@ -108,15 +116,27 @@ print(json.dumps([json.loads((pathlib.Path(row[0]) / 'shim.json').read_text())['
     await s.clickAgentRow('Large backend audit', { twisty: true });
     const expanded = await s.agentRows();
     check('expanded category shows director and bounded job page',
-      expanded.some(row => row.label === 'Director') && expanded.some(row => row.label === 'Inspect route 0') &&
+      expanded.some(row => row.label === 'Director') && expanded.some(row => row.label === 'Capacity') &&
+      expanded.some(row => row.label === 'Inspect route 0') &&
       !expanded.some(row => row.label === 'Inspect route 99'), expanded.slice(0, 8));
     await s.screenshot('32-workers-expanded');
+    await s.clickAgentRow('Capacity', { twisty: true });
+    const capacityRows = await s.agentRows();
+    check('expanded capacity names target, reserve and planning decision without claiming live usage',
+      capacityRows.some(row => row.label === 'Target: fixture-local') &&
+      capacityRows.some(row => row.label === 'Allocation: fixture-pool / run' &&
+        /finishing reserve 20 points/.test(row.description)) &&
+      capacityRows.some(row => row.label === 'Planning: parallel') &&
+      capacityRows.some(row => row.label === 'Current limit unknown') &&
+      capacityRows.some(row => row.label === 'Provider usage unknown'),
+      capacityRows.filter(row => row.level === 4).slice(0, 8));
+    await s.screenshot('capacity-expanded');
     await s.clickAgentRow('Inspect route 0', { twisty: true });
     const withWorker = await s.agentRows();
     check('an active job opens its supervised worker without mounting all transcripts',
       withWorker.some(row => row.label === 'Worker' && row.description === 'working') &&
-      withWorker.filter(row => row.level === 4).length === 1,
-      withWorker.filter(row => row.level === 4).slice(0, 3));
+      withWorker.filter(row => row.label === 'Worker').length === 1,
+      withWorker.filter(row => row.label === 'Worker'));
     await s.screenshot('one-worker-open');
     await s.clickAgentRow('Worker');
     const editor = await s.editorView();

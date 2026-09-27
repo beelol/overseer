@@ -1,14 +1,14 @@
-[2026-09-27T10:18:49.200Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T10:18:53.785Z] PASS Agents sidebar shows one Swarms section and a 100-job category summary [{"label":"Swarms","description":"1","level":1},{"label":"Backend audit","description":"0 working · 100 ready · 0 blocked","level":2}]
-[2026-09-27T10:18:53.831Z] screenshot docs/verification/evidence/ui/swarm-status/01-swarm-compact.png
-[2026-09-27T10:18:54.619Z] PASS expanding the category shows its director and first job without opening transcripts [{"label":"Swarms","description":"1","level":1,"expanded":"true","selected":false,"focused":false,"aria":"Swarms 1"},{"label":"Backend audit","description":"0 working · 100 ready · 0 blocked","level":2,"expanded":"true","selected":false,"focused":true,"aria":"Backend audit swarm, planning, 0 working · 100 ready · 0 blocked"},{"label":"Director","description":"not started","level":3,"expanded":null,"selected":false,"focused":false,"aria":"Director not started"},{"label":"Check route 0","description":"ready","level":3,"expanded":null,"selected":false,"focused":false,"aria":"Record route 0 evidence\nready · 0 attempts"},{"label":"Check route 1","description":"ready","level":3,"expanded":null,"selected":false,"focused":false,"aria":"Record route 1 evidence\nready · 0 attempts"},{"label":"Check route 2","description":"ready","level":3,"expanded":null,"selected":false,"focused":false,"aria":"Record route 2 evidence\nready · 0 attempts"},{"label":"Check route 3","description":"ready","level":3,"expanded":null,"selected":false,"focused":false,"aria":"Record route 3 evidence\nready · 0 attempts"},{"label":"Check route 4","description":"ready","level":3,"expanded":null,"selected":false,"focused":false,"aria":"Record route 4 evidence\nready · 0 attempts"}]
-[2026-09-27T10:18:54.680Z] screenshot docs/verification/evidence/ui/swarm-status/02-swarm-expanded.png
-[2026-09-27T10:18:55.174Z] Swarm context menu ["Pause Swarm","Turn Swarm Off","Stop Swarm…"]
-[2026-09-27T10:18:55.271Z] PASS Pause from the Swarm row changes durable daemon state within 2 seconds {"pause_ms":591}
-[2026-09-27T10:18:55.769Z] Swarm context menu ["Resume Swarm","Turn Swarm Off","Stop Swarm…"]
-[2026-09-27T10:18:55.862Z] PASS Resume from the Swarm row restores durable daemon state
-[2026-09-27T10:18:56.370Z] Swarm context menu ["Pause Swarm","Turn Swarm Off","Stop Swarm…"]
-[2026-09-27T10:18:56.465Z] PASS Swarm off cancels the queued backlog {"status":"stopped","counts":{"by_status":{"cancelled":100},"total":100}}
-[2026-09-27T10:18:57.915Z] Swarm context menu ["Pause Swarm","Turn Swarm Off","Stop Swarm…"]
-[2026-09-27T10:18:58.016Z] PASS Stop waits for the owner confirmation
-[2026-09-27T10:18:58.085Z] PASS confirmed Stop cancels queued work within 2 seconds {"stop_ms":69}
+[2026-09-27T10:55:16.392Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T10:55:20.860Z] PASS Agents sidebar shows one Swarms section and a 100-job category summary [{"label":"Swarms","description":"1","level":1},{"label":"Backend audit","description":"0 working · 100 ready · 0 blocked","level":2}]
+[2026-09-27T10:55:20.903Z] screenshot docs/verification/evidence/ui/swarm-status/01-swarm-compact.png
+[2026-09-27T10:55:21.694Z] PASS expanding the category shows its director and first job without opening transcripts [{"label":"Swarms","description":"1","level":1,"expanded":"true","selected":false,"focused":false,"aria":"Swarms 1"},{"label":"Backend audit","description":"0 working · 100 ready · 0 blocked","level":2,"expanded":"true","selected":false,"focused":true,"aria":"Backend audit swarm, planning, 0 working · 100 ready · 0 blocked"},{"label":"Director","description":"not started","level":3,"expanded":null,"selected":false,"focused":false,"aria":"Director not started"},{"label":"Capacity","description":"0 selected · usage unknown","level":3,"expanded":"false","selected":false,"focused":false,"aria":"Swarm capacity, 0 selected · usage unknown"},{"label":"Check route 0","description":"ready","level":3,"expanded":null,"selected":false,"focused":false,"aria":"Check route 0, ready, 0 attempts"},{"label":"Check route 1","description":"ready","level":3,"expanded":null,"selected":false,"focused":false,"aria":"Check route 1, ready, 0 attempts"},{"label":"Check route 2","description":"ready","level":3,"expanded":null,"selected":false,"focused":false,"aria":"Check route 2, ready, 0 attempts"},{"label":"Check route 3","description":"ready","level":3,"expanded":null,"selected":false,"focused":false,"aria":"Check route 3, ready, 0 attempts"}]
+[2026-09-27T10:55:21.763Z] screenshot docs/verification/evidence/ui/swarm-status/02-swarm-expanded.png
+[2026-09-27T10:55:22.257Z] Swarm context menu ["Pause Swarm","Turn Swarm Off","Stop Swarm…"]
+[2026-09-27T10:55:22.351Z] PASS Pause from the Swarm row changes durable daemon state within 2 seconds {"pause_ms":588}
+[2026-09-27T10:55:22.854Z] Swarm context menu ["Resume Swarm","Turn Swarm Off","Stop Swarm…"]
+[2026-09-27T10:55:22.945Z] PASS Resume from the Swarm row restores durable daemon state
+[2026-09-27T10:55:23.445Z] Swarm context menu ["Pause Swarm","Turn Swarm Off","Stop Swarm…"]
+[2026-09-27T10:55:23.538Z] PASS Swarm off cancels the queued backlog {"status":"stopped","counts":{"by_status":{"cancelled":100},"total":100}}
+[2026-09-27T10:55:24.977Z] Swarm context menu ["Pause Swarm","Turn Swarm Off","Stop Swarm…"]
+[2026-09-27T10:55:25.069Z] PASS Stop waits for the owner confirmation
+[2026-09-27T10:55:25.136Z] PASS confirmed Stop cancels queued work within 2 seconds {"stop_ms":67}

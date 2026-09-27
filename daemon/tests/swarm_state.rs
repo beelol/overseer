@@ -107,6 +107,43 @@ fn swarm_list_pages_run_summaries_without_loading_job_rows() {
 }
 
 #[test]
+fn swarm_status_reports_durable_capacity_without_inventing_provider_usage() {
+    let mut d = Daemon::start(&[]);
+    let made = d.call("swarm.create", json!({"category":"Capacity readout",
+        "objective":"Audit one route","allowed_targets":["fixture-a"]}));
+    let id = made["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,
+        "jobs":[{"id":"a","title":"Audit route","acceptance":"Evidence","deps":[]}]}));
+    let at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"a","target_id":"fixture-a","request_id":"capacity-a","now_ms":at,
+        "required_capabilities":["code"],"estimate_milli":{"points":1000},"purpose":"worker",
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+          "targets":[{"id":"fixture-a","account_id":"fixture-account","pool_ids":["pool"],
+            "capabilities":["code"],"health":"up","auth":"ok"}],
+          "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+60000}]}]}}));
+    assert_eq!(admitted["status"], "admitted");
+    let state = d.call("swarm.get", json!({"id":id}));
+    let capacity = &state["capacity"];
+    assert_eq!(capacity["provider_usage_state"], "unknown");
+    assert_eq!(capacity["selected_targets"][0]["id"], "fixture-a");
+    assert_eq!(capacity["selected_targets"][0]["attempts"], 1);
+    assert_eq!(capacity["windows"][0]["allocation_milli"], 10000);
+    assert_eq!(capacity["windows"][0]["finishing_reserve_milli"], 2000);
+    assert_eq!(capacity["windows"][0]["outstanding_estimate_milli"], 1000);
+    assert_eq!(capacity["windows"][0]["unit"], "points");
+    assert!(!state.to_string().contains(admitted["token"].as_str().unwrap()));
+    d.kill9();
+    d.spawn();
+    let listed = d.call("swarm.list",json!({"limit":20}));
+    let again = listed["runs"].as_array().unwrap().iter().find(|run| run["id"] == id).unwrap();
+    assert_eq!(again["capacity"], *capacity);
+}
+
+#[test]
 fn stopped_empty_swarm_is_terminal_and_releases_category() {
     let d = Daemon::start(&[]);
     let made = d.call("swarm.create", json!({"category":"Reusable", "objective":"Audit",
