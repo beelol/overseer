@@ -28,7 +28,7 @@
       case 'finding': return ['eye', `${(p && p.watcher_title) || 'A watcher'}: ${(p && p.result) || ''}${p && p.text ? ' — ' + ui.firstLine(p.text, 140) : ''}`];
       case 'watch_started': return ['eye', `Watched${p && p.mode === 'check' ? ' and checked' : ''}: ${ui.firstLine((p && p.brief) || '', 120)}`];
       case 'watch_ended': return ['eye-closed', `The watch ended: ${(p && p.reason) || ''}`];
-      case 'conflict': return ['warning', `Conflict (${(p && p.kind) || ''}) with ${who === 'an agent' ? 'another agent' : who}`];
+      case 'conflict': return ['warning', `Conflict with ${who === 'an agent' ? 'another agent' : who}${p && p.kind ? ` (${p.kind.replace(/_/g, ' ')})` : ''}`];
       case 'conflict_closed': return ['pass', 'A conflict closed'];
       case 'handoff': return ['arrow-right', 'Handed off'];
       default: return undefined;
@@ -437,7 +437,8 @@
       }
       if (ev.kind === 'status') this.status_(ev, p, child);
       if (ev.kind === 'usage') this.usage_(ev, p, child);
-      const line = oversightLine(ev.kind, p);
+      // A grid tile shows conflicts as the ⚠ mark on its head (AC-199), not as a line of its own.
+      const line = this.opts.compact && (ev.kind === 'conflict' || ev.kind === 'conflict_closed') ? undefined : oversightLine(ev.kind, p);
       if (line) { const s = el('div', `sys oversight oversight-${ev.kind}`); s.append(ui.icon(line[0], 'xs'), el('span', null, line[1])); this.container(ev).append(s); }
       else if (!QUIET.has(ev.kind) && !Conversation.KNOWN.has(ev.kind)) this.container(ev).append(el('div', 'sys', ev.kind.replace(/_/g, ' ')));
     }

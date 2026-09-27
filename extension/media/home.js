@@ -102,6 +102,9 @@
         }
         for (const [id, e] of shown) if (!keep.has(id)) { e.remove(); shown.delete(id); }
         empty.hidden = messages.length > 0 || open.length > 0;
+        // With a conversation, it takes the place of the mark and "What's next?" above the composer,
+        // so the composer and its choices stay in view.
+        host.classList.toggle('has-home', empty.hidden);
         list.scrollTop = list.scrollHeight;
       },
       /** A message came back for a proposal card (an error, a state). */

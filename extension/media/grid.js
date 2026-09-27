@@ -176,7 +176,8 @@
       const o = (state.oversight || {})[run.id] || {};
       const marks = [o.held && ['debug-pause', 'held'], o.watched && ['eye', 'watched'], o.watching && o.watching.length && ['eye', 'watching'], o.conflicts && ['warning', `${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`]].filter(Boolean);
       if (!tile.marks) { tile.marks = el('span', 'tile-marks'); tile.who.after(tile.marks); }
-      tile.marks.replaceChildren(...marks.map(([icon, text]) => { const s = el('span', 'tile-mark'); s.append(ui.icon(icon, 'xs'), el('span', null, text)); return s; }));
+      // Icons only on the tile (the grid's text budget); the words are the tooltip and the label.
+      tile.marks.replaceChildren(...marks.map(([icon, text]) => { const s = el('span', 'tile-mark'); s.title = text; s.setAttribute('role', 'img'); s.setAttribute('aria-label', text); s.append(ui.icon(icon, 'xs')); return s; }));
       tile.el.classList.toggle('held', !!o.held); tile.el.classList.toggle('watched', !!o.watched); tile.el.classList.toggle('conflict', !!o.conflicts);
       const att = run.attention && run.attention.kind === 'permission' ? run.attention : undefined;
       tile.perm.hidden = !att;

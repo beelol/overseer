@@ -15,7 +15,7 @@
   // Gate K: the agents list lives in VS Code's side bar; this view is the chat, composer or grid.
   const main = el('main', 'main');
   const chatHost = el('section', 'view-chat');
-  const composerHost = el('section', 'view-composer'); composerHost.dataset.auditView = 'composer';
+  const composerHost = el('section', 'view-composer');
   const gridHost = el('section', 'view-grid'); gridHost.dataset.auditView = 'grid'; gridHost.setAttribute('aria-label', 'Agent grid');
   // AC-100: an agent's files live in the review (AC-99); the chat has no Files pane of its own.
   main.append(chatHost, composerHost, gridHost);
@@ -48,6 +48,10 @@
   const ACTIVE_STATUS = new Set(['queued', 'starting', 'running', 'waiting_for_user', 'waiting_for_connection', 'waiting_for_memory']);
   const composer = window.OverseerComposer.create(composerHost, { post, agents, onStarted: runId => { selected = runId; if (!(vscode.getState() || {}).stayHome) setMode('chat'); } });
   const home = window.OverseerHome.create(composerHost, { post, startWith: text => composer.startWith(text) });
+  // The text audit (AC-66) measures the composer and the conversation above it as two views: the
+  // composer against its Gate J budget, the conversation as content, like a chat's.
+  composerHost.querySelector('.composer-view').dataset.auditView = 'composer';
+  composerHost.querySelector('.home').dataset.auditView = 'home';
 
   // ---------- Grid (AC-58) ----------
   const grid = window.OverseerGrid.create(gridHost, { post, open: runId => selectRun(runId, { focusChat: true }), getState: () => state,

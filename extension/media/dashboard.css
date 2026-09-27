@@ -82,7 +82,14 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .home-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: var(--ov-space-2); padding: var(--ov-space-1) 0; background: var(--ov-bg, transparent); color: var(--ov-muted); font-size: var(--ov-font-sm); }
 .home-title { font-weight: var(--ov-weight-semibold); color: var(--ov-text); }
 .home-level { padding: 0 6px; border: 1px solid var(--ov-border); border-radius: 999px; }
-.home-list { display: flex; flex-direction: column; gap: var(--ov-space-2); max-height: 45vh; overflow: auto; padding: var(--ov-space-1); }
+.home-list { display: flex; flex-direction: column; gap: var(--ov-space-2); max-height: 35vh; overflow: auto; padding: var(--ov-space-1); }
+.has-home .hero-mark, .has-home .hero-title { display: none; }
+/* With a conversation the view is a column: the conversation fills and scrolls, the composer
+   sits at the bottom in full (not centred in a box of its own the height of the view). */
+.view-composer.has-home:not([hidden]) { display: flex; flex-direction: column; }
+.view-composer.has-home > .home { flex: 1 1 auto; min-height: 0; margin-bottom: 0; padding: var(--ov-space-3) var(--ov-chat-gutter) 0; box-sizing: border-box; }
+.view-composer.has-home > .home .home-list { flex: 1 1 auto; min-height: 0; max-height: none; }
+.view-composer.has-home > .composer-view { flex: 0 0 auto; min-height: 0; padding-top: var(--ov-space-3); padding-bottom: var(--ov-space-4); }
 .home-msg { padding: var(--ov-space-2) var(--ov-space-3); border-radius: var(--ov-radius-card); background: var(--ov-raised); }
 .home-msg.from-owner { align-self: flex-end; max-width: 80%; background: var(--ov-accent-soft, var(--ov-raised)); }
 .home-from { display: flex; align-items: center; gap: 6px; font-size: var(--ov-font-xs); color: var(--ov-muted); margin-bottom: 2px; }
@@ -96,7 +103,7 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .tile.held .tile-head { border-left: 3px solid var(--ov-warning, var(--ov-accent)); }
 .tile.conflict .tile-marks .codicon-warning { color: var(--ov-warning, var(--ov-accent)); }
 .composer { position: relative; }
-.mentions { position: absolute; left: var(--ov-space-3); right: var(--ov-space-3); top: 100%; z-index: 5; display: flex; flex-direction: column; margin-top: 4px; padding: 4px; border: 1px solid var(--ov-border-strong); border-radius: var(--ov-radius-card); background: var(--ov-raised); box-shadow: var(--ov-shadow, 0 4px 16px rgba(0,0,0,.25)); }
+.mentions { position: absolute; left: var(--ov-space-3); right: var(--ov-space-3); top: 100%; z-index: 5; display: flex; flex-direction: column; margin-top: 4px; padding: 4px; border: 1px solid var(--ov-border-strong); border-radius: var(--ov-radius-card); background: var(--ov-raised); box-shadow: var(--ov-shadow); }
 .mention-item { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 0; background: none; color: var(--ov-text); text-align: left; border-radius: 4px; }
-.mention-item.active, .mention-item:hover { background: var(--ov-accent-soft, var(--ov-hover, rgba(127,127,127,.15))); }
+.mention-item.active, .mention-item:hover { background: var(--ov-accent-soft); }
 .mention-hint { margin-left: auto; color: var(--ov-muted); font-size: var(--ov-font-xs); }

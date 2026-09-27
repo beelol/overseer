@@ -262,14 +262,16 @@ class AgentsProvider {
     // Working agents show their badge (●); finished ones say how long ago. Oversight (AC-199):
     // held, watched, watching and in conflict, from the daemon's state.
     const o = (m.state.oversight || {})[run.id] || {};
-    const marks = [o.held && '⏸ held', o.watched && '◉ watched', o.watching && o.watching.length && '◉ watching', o.conflicts && `⚠ ${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`].filter(Boolean);
-    item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), ...marks].filter(Boolean).join(' · ');
+    // The row shows only the glyphs (the Agents view's text budget, AC-66); the words are in the
+    // tooltip and the screen-reader label.
+    const marks = [o.held && ['⏸', 'held'], o.watched && ['◉', 'watched'], o.watching && o.watching.length && ['◎', 'watching'], o.conflicts && [`⚠${o.conflicts}`, `${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`]].filter(Boolean);
+    item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), marks.map(x => x[0]).join(' ')].filter(Boolean).join(' · ');
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;
     const ws = m.workspace(run.workspace_id);
     const status = STATUS_TEXT[run.status] || run.status;
     item.tooltip = new vscode.MarkdownString([`**${task.title}**`, `${status}${run.exit_reason && !ACTIVE.has(run.status) ? ` — ${run.exit_reason}` : ''}`,
       [run.harness, profile?.name, run.model].filter(Boolean).join(' · '), ws ? `${ws.kind === 'current' ? 'current checkout' : ws.branch} · ${path.basename(task.repo_root)}` : ''].filter(Boolean).join('\n\n'));
-    item.accessibilityInformation = { label: `${task.title}, ${status}, ${run.harness}${profile ? ', ' + profile.name : ''}${marks.length ? ', ' + marks.map(x => x.replace(/^\S+ /, '')).join(', ') : ''}` };
+    item.accessibilityInformation = { label: `${task.title}, ${status}, ${run.harness}${profile ? ', ' + profile.name : ''}${marks.length ? ', ' + marks.map(x => x[1]).join(', ') : ''}` };
     if (marks.length) item.tooltip.appendMarkdown(`\n\n${[o.held && `Held: ${o.hold_reason || ''}`, o.watched && 'Watched by another agent', o.watching && o.watching.length && 'Watching another agent', o.conflicts && `${o.conflicts} open conflict${o.conflicts === 1 ? '' : 's'}`, o.area && o.area.length && `Area: ${o.area.join(', ')}`].filter(Boolean).join('\n\n')}`);
     const pinned = (this.handlers.pinned?.() || []).includes(run.id);
     item.contextValue = `agent-${ACTIVE.has(run.status) ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${pinned ? '-pinned' : ''}`;
