@@ -1308,11 +1308,11 @@ rec(147, "One command runs every test", "verified", commit="fb43c9b (merge of pu
 rec(148, "Checks on every pull request", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate P).",
     actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
-rec(149, "A steady UI suite", "partial", commit="91c7fc8", date="2026-09-27", harness="fixture harnesses; no paid tokens",
-    proven="causes fixed on main: the UI harness aims a click only once its target has stopped moving; the review no longer takes keyboard focus while following an agent; ⌥⌘J presses queue; the keyboard scenario waits for each selection; staging refreshes the review in 225 ms (was about 2 s); the hunk scenario's redo passed in every run this session",
+rec(149, "A steady UI suite", "partial", commit="95163bc", date="2026-09-27", harness="fixture harnesses; no paid tokens",
+    proven="causes fixed on main: the UI harness aims a click only once its target has stopped moving; the review no longer takes keyboard focus while following an agent; ⌥⌘J presses queue; the keyboard scenario waits for each selection; staging refreshes the review in 225 ms (was about 2 s); the hunk scenario's redo passed in every run this session; the harness puts focus on a workbench element before key presses (95163bc), so keyboard's first ⌥⌘J lands",
     deferred="three consecutive clean full runs on one build, and the first-edit p95 under 400 ms over ten runs (last single runs: 361 and 466 ms): both need a machine where no other agent is running VS Code scenarios at the same time (the phone and Continuity agents were running theirs throughout)",
     expected="See the RFC criterion (Gate P).",
-    actual="Full run on main plus pull requests #8, #11 to #13: 40 of 48; every failure since fixed on main or passing on rerun except keyboard, whose first ⌥⌘J reading still lags under load.",
+    actual="Full run on main after Continuity (#9) and the keyboard fix: 49 of 51, with other agents running scenarios at the same time; the two failures were timing under load: arrangement's first edit took 517 ms against 500, and audit's review measured 178 characters against 175 (175 when rerun alone).",
     evidence="[AC-147 runs](evidence/ac-147/)", live="—", blocker="Needs a quiet machine (no other agent running UI scenarios) for the three-in-a-row runs and the p95.")
 rec(150, "The first click always lands", "verified", commit="bc358a1", date="2026-09-27", harness="fixture harnesses; no paid tokens",
     steps="`node test/ui/scenario-first-click.js`: focus in the side bar or another editor group, then one click on each view's first control, in the composer, review beside the chat, grid and dashboard arrangements.",
