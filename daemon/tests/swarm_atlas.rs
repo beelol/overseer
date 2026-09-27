@@ -1236,6 +1236,16 @@ fn atlas_s5_external_allowance_drop_holds_new_work_without_losing_evidence() {
     let readout=d.call("swarm.get",json!({"id":run}));
     assert_eq!(readout["availability"]["observed_ms"],at+1000);
     assert_eq!(readout["availability"]["reason"],"finishing_reserve");
+    let window=&readout["availability"]["allowance_windows"][0];
+    assert_eq!(window["pool_id"],"pool");
+    assert_eq!(window["window_id"],"week");
+    assert_eq!(window["unit"],"points");
+    assert_eq!(window["previous_remaining_milli"],100000);
+    assert_eq!(window["remaining_milli"],500);
+    assert_eq!(window["change_milli"],-99500);
+    assert_eq!(readout["availability"]["allowance_window_count"],1);
+    let listed=d.call("swarm.list",json!({}));
+    assert_eq!(listed["runs"][0]["availability"]["allowance_windows"][0],*window);
     let next=admit(&d,run,1,"j4","fixture",&snapshot(at-1000,100000),at+2000);
     assert_eq!(next["status"],"blocked","{next}");
     assert_eq!(next["reason"],"run_availability_blocked");

@@ -71,6 +71,11 @@ fn default_allocation_percent() -> i64 { 10 }
 fn default_finishing_reserve_percent() -> i64 { 20 }
 fn default_fixture_harness() -> String { "generic".to_string() }
 
+fn safe_identity(value: &str) -> bool {
+    !value.is_empty() && value.len() <= 200 && !value.chars().any(char::is_control)
+        && crate::redact::redact(value) == value
+}
+
 pub fn preview(p: &Value) -> Result<Value> {
     let snapshot: Snapshot = serde_json::from_value(p["snapshot"].clone())
         .map_err(|e| anyhow!("invalid target snapshot: {e}"))?;
@@ -95,13 +100,14 @@ pub fn preview(p: &Value) -> Result<Value> {
     }
     let mut pools = HashMap::new();
     for pool in &snapshot.pools {
-        if pool.id.is_empty() || pools.insert(pool.id.as_str(), pool).is_some() {
-            bail!("duplicate or empty quota pool id");
+        if !safe_identity(&pool.id) || pools.insert(pool.id.as_str(), pool).is_some() {
+            bail!("duplicate or invalid quota pool id");
         }
         let mut seen = HashSet::new();
         for window in &pool.windows {
-            if !seen.insert(&window.id) || window.id.is_empty() || window.unit.is_empty() {
-                bail!("duplicate or empty quota window");
+            if !seen.insert(&window.id) || !safe_identity(&window.id)
+                || !safe_identity(&window.unit) {
+                bail!("duplicate or invalid quota window");
             }
             if window.protected_milli < 0
                 || window.reserved_milli < 0
@@ -118,11 +124,12 @@ pub fn preview(p: &Value) -> Result<Value> {
     let mut account_pools: HashMap<&str, (usize, HashSet<&str>)> = HashMap::new();
     let mut revoked_accounts = HashSet::new();
     for target in &snapshot.targets {
-        if target.id.is_empty()
-            || target.account_id.is_empty()
+        if !safe_identity(&target.id)
+            || !safe_identity(&target.account_id)
+            || target.pool_ids.iter().any(|id| !safe_identity(id))
             || !target_ids.insert(target.id.as_str())
         {
-            bail!("duplicate or missing target identity");
+            bail!("duplicate or invalid target identity");
         }
         if !["generic", "codex", "codex-app", "claude", "opencode"]
             .contains(&target.harness.as_str())
@@ -131,7 +138,8 @@ pub fn preview(p: &Value) -> Result<Value> {
         }
         let route_values = [&target.profile_id, &target.model, &target.effort];
         if route_values.iter().filter_map(|value| value.as_deref()).any(|value| value.is_empty()
-            || value.len() > 128 || value.chars().any(char::is_control))
+            || value.len() > 128 || value.chars().any(char::is_control)
+            || crate::redact::redact(value) != value)
             || (target.harness == "generic" && route_values.iter().any(|value| value.is_some()))
             || (target.harness != "generic"
                 && (target.profile_id.is_none() || target.model.is_none()))

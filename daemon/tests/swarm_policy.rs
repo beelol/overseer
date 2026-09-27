@@ -64,6 +64,57 @@ fn preview_preserves_admitted_harness_identity_and_rejects_unknown_harness() {
 }
 
 #[test]
+fn snapshot_and_allowed_target_identifiers_cannot_expose_credentials_in_status() {
+    let d = Daemon::start(&[]);
+    let secret = "sk-abcdefghijklmnopqrstuv";
+    let request = |snapshot: Value| {
+        let mut input = json!({"snapshot":snapshot,"request":{
+            "now_ms":1200,"allowed_targets":["qualified"],
+            "required_capabilities":["write"],"purpose":"worker",
+            "estimate_milli":{"points":1000}}});
+        input["request"]["estimate_milli"][secret] = json!(1000);
+        input
+    };
+    for field in ["target", "account", "pool", "window", "unit", "model"] {
+        let mut candidate = snapshot(Some(60000), true);
+        match field {
+            "target" => candidate["targets"][1]["id"] = json!(secret),
+            "account" => candidate["targets"][1]["account_id"] = json!(secret),
+            "pool" => {
+                candidate["targets"][1]["pool_ids"] = json!([secret]);
+                candidate["pools"][0]["id"] = json!(secret);
+            }
+            "window" => candidate["pools"][0]["windows"][0]["id"] = json!(secret),
+            "unit" => candidate["pools"][0]["windows"][0]["unit"] = json!(secret),
+            "model" => {
+                candidate["targets"][1]["harness"] = json!("claude");
+                candidate["targets"][1]["profile_id"] = json!("profile");
+                candidate["targets"][1]["model"] = json!(secret);
+            }
+            _ => unreachable!(),
+        }
+        let error = d.try_call("swarm.policy.preview", request(candidate)).unwrap_err();
+        assert!(error.contains("invalid") && !error.contains(secret), "{field}: {error}");
+    }
+    let error = d.try_call("swarm.create", json!({"category":"Credential guard",
+        "objective":"Audit backend","allowed_targets":[secret]})).unwrap_err();
+    assert!(error.contains("invalid") && !error.contains(secret), "{error}");
+    assert_eq!(d.call("swarm.list", json!({}))["runs"].as_array().unwrap().len(), 0);
+
+    let created = d.call("swarm.create", json!({"category":"Credential guard",
+        "objective":"Audit backend","allowed_targets":["qualified"]}));
+    let mut contaminated = snapshot(Some(60000), true);
+    contaminated["targets"][1]["pool_ids"] = json!([secret]);
+    contaminated["pools"][0]["id"] = json!(secret);
+    let error = d.try_call("swarm.availability.observe", json!({"run_id":created["id"],
+        "snapshot":contaminated,"now_ms":1200,
+        "required_capabilities":["write"],"purpose":"worker",
+        "estimate_milli":{"points":1000}})).unwrap_err();
+    assert!(error.contains("invalid") && !error.contains(secret), "{error}");
+    assert!(d.call("swarm.get", json!({"id":created["id"]}))["availability"].is_null());
+}
+
+#[test]
 fn policy_uses_capability_allowed_pool_and_finishing_headroom() {
     let d = Daemon::start(&[]);
     let result = preview(

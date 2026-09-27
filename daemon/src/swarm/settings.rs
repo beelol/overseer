@@ -70,7 +70,8 @@ fn validate_targets(v: &Value) -> Result<Vec<String>> {
         let id = item
             .as_str()
             .ok_or_else(|| anyhow!("allowed target must be a string"))?;
-        if id.is_empty() || id.len() > 200 || id.chars().any(char::is_control) || !seen.insert(id) {
+        if id.is_empty() || id.len() > 200 || id.chars().any(char::is_control)
+            || crate::redact::redact(id) != id || !seen.insert(id) {
             bail!("invalid or duplicate allowed target");
         }
         result.push(id.to_string());
