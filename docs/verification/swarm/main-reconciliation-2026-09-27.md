@@ -38,3 +38,16 @@ This preserves one decision-maker and the existing approved account/permission
 scope. SWARM-24/60 and AC-190/195 need joined tests once Gate S lands; this
 read-only design reconciliation verifies none of them. The review/keyboard changes
 do not alter Swarm scheduling defaults or acceptance criteria.
+
+## Subsequent published main: `80411ba`
+
+The branch also merged `80411ba`, which adds AC-150/153 evidence, a link check,
+and updated test/brand guidance in `AGENTS.md`. It changes no Swarm policy,
+admission or worker behavior. `scripts/check-links` reports 612 links in 206
+files with zero broken links on the merged branch. The current Swarm deadline
+extension was exercised through the packaged UI after the preceding `91c7fc8`
+merge; these later commits change no extension source or Swarm scenario code.
+The full offline Rust suite passed before the main merges, which did not touch
+Rust daemon code. The focused deadline fixture, extension source check, unit
+control test, package build and packaged Swarm-status scenario passed after the
+`91c7fc8` merge. No new acceptance box is checked by this reconciliation.
