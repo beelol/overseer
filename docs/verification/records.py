@@ -1184,10 +1184,14 @@ rec(141, "Pair once", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
 
-# Brand (added by the owner on 2026-09-26; docs/design/brand.md). Not started: waits for the owner's image files.
-rec(142, "One Overseer mark everywhere", "not started", date="—", commit="—",
+# Brand (added by the owner on 2026-09-26; docs/design/brand.md). Built on branch claude/brand-mark (stacked on Gate M);
+# the owner approves the single-colour silhouette and the Mac helper icon.
+rec(142, "One Overseer mark everywhere", "partial", date="2026-09-27", commit="a4473ad (branch claude/brand-mark, stacked on Gate M, not merged yet)",
+    proven="the mark on every VS Code surface on the packaged build (Marketplace icon, activity bar, status bar, tabs, composer heading, the Overseer chat) and the Mac helper's icon; scenario-brand 9 of 9",
+    deferred="the owner's approval of the single-colour silhouette and the Mac helper icon; the phone, menu-bar and Android monochrome icons when those surfaces exist",
     expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
-    actual="Not started.", live="—", blocker="Not started: the owner's two images need to be added to docs/design/brand/ as files; then the single-colour glyph is drawn for VS Code and approved.")
+    actual="The owner's files are in docs/design/brand/ (app icon, colour logo, flat silhouette). On branch claude/brand-mark: a single-colour SVG fitted to the flat silhouette, exported sizes, the Marketplace icon, the activity bar and status bar mark (a one-glyph icon font), the colour logo on Overseer's tabs, the composer heading and the Overseer chat, and the Mac notification helper's icon; scenario-brand passes 9 of 9 on the packaged VSIX (sizes, VSIX icon, helper icon, no old eye mark left, the activity bar in four themes, the status bar glyph, the tab icon, the composer mark under the CSP).",
+    live="—", blocker="Waits for the owner to approve the single-colour silhouette (it reads at 20 to 24 px; at 16 px the centre hole nearly closes, as in the flat PNG) and the Mac helper icon, then merges after the Gate M pull request. The phone app and a menu-bar or Android monochrome icon take their files from docs/design/brand/ when those surfaces are built.")
 
 # Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code are built in pull
 # request #5 and the terminal UI (T-23, T-24) in pull request #6. Neither is merged yet, so the evidence links point at
@@ -1367,14 +1371,14 @@ SHORT_BLOCKERS = {
     160: "not started (Gate Q, added by the owner on 2026-09-27)",
     161: "not started (Gate Q, added by the owner on 2026-09-27)",
     146: "not started (Gate P, added by the owner on 2026-09-27)",
-    147: "not started (Gate P, added by the owner on 2026-09-27)",
+    147: "partial: scripts/test-all on branch claude/gate-p-follow-through, with its evidence; merges after PR #8",
     148: "not started (Gate P, added by the owner on 2026-09-27)",
     149: "not started (Gate P, added by the owner on 2026-09-27)",
     150: "not started (Gate P, added by the owner on 2026-09-27)",
     151: "not started (Gate P, added by the owner on 2026-09-27)",
     152: "not started (Gate P, added by the owner on 2026-09-27)",
     153: "not started (Gate P, added by the owner on 2026-09-27)",
-    142: "not started: waits for the owner\'s logo files",
+    142: "partial: built on branch claude/brand-mark; waits for the owner to approve the single-colour mark",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
     41: "deferred: no Linux environment",
