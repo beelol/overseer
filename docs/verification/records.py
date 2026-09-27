@@ -1993,13 +1993,13 @@ rec(162, "Voice spike before lock-in", "not started", date="—", commit="—",
 rec(163, "Owned by the daemon, heard in Rust, off until asked", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R).",
     actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(164, "Holds the floor", "not started", date="—", commit="—",
+rec(164, "Holds the floor; noise never interrupts", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R).",
     actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
 rec(165, "A quick answer that it is working on it", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R).",
     actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(166, "The right agents, from context", "not started", date="—", commit="—",
+rec(166, "The right agents, from context, or the one you chose", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R).",
     actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
 rec(167, "Redirect without trampling", "not started", date="—", commit="—",

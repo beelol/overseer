@@ -20,7 +20,7 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 - Say whether the Gate J design review still needs marks or the Gate K review replaces it [AC-66].
 - Work an hour using only Overseer [AC-64].
 - Mark the phone's door and motion on the [review page](https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq): *Right* or *Needs work* for each [AC-136, AC-137].
-- Answer the open questions at the end of the [Voice Mode RFC](docs/rfcs/voice-mode.md#open-questions-for-the-owner); its defaults stand until then [Gate R, AC-162 to AC-177].
+- Start Voice Mode: paste the goal in [voice-mode-goal.md](docs/rfcs/voice-mode-goal.md) into `/goal`. It builds everything it can with a simulated voice first, on top of Gate S's pull request #14, then sends you one list of live checks [Gate R, AC-162 to AC-177].
 - Turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-83].
 - Work a short session offline: `node test/local/owner-session.js start` opens an isolated VS Code and prints the steps; `node test/local/owner-session.js report` records it [AC-97].
 - Run *Overseer: Test Notification* in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder [AC-179].
@@ -197,9 +197,9 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-161** Everything merged into one main — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-161.md)
 - [ ] **AC-162** Voice spike before lock-in — not started (Gate R, added by the owner on 2026-09-27; the goal's first step) — [evidence](docs/verification/AC-162.md)
 - [ ] **AC-163** Owned by the daemon, heard in Rust, off until asked — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-163.md)
-- [ ] **AC-164** Holds the floor — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-164.md)
+- [ ] **AC-164** Holds the floor; noise never interrupts — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-164.md)
 - [ ] **AC-165** A quick answer that it is working on it — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-165.md)
-- [ ] **AC-166** The right agents, from context — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-166.md)
+- [ ] **AC-166** The right agents, from context, or the one you chose — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-166.md)
 - [ ] **AC-167** Redirect without trampling — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-167.md)
 - [ ] **AC-168** New agents from a request — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-168.md)
 - [ ] **AC-169** Evidence for every word sent — not started (Gate R, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-169.md)
@@ -426,9 +426,9 @@ the owner action or decision each one needs.
 - [ ] [AC-161](docs/verification/AC-161.md) (Everything merged into one main): Not started (Gate Q, added by the owner on 2026-09-27).
 - [ ] [AC-162](docs/verification/AC-162.md) (Voice spike before lock-in): Not started (Gate R, added by the owner on 2026-09-27; the goal's first step).
 - [ ] [AC-163](docs/verification/AC-163.md) (Owned by the daemon, heard in Rust, off until asked): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-164](docs/verification/AC-164.md) (Holds the floor): Not started (Gate R, added by the owner on 2026-09-27).
+- [ ] [AC-164](docs/verification/AC-164.md) (Holds the floor; noise never interrupts): Not started (Gate R, added by the owner on 2026-09-27).
 - [ ] [AC-165](docs/verification/AC-165.md) (A quick answer that it is working on it): Not started (Gate R, added by the owner on 2026-09-27).
-- [ ] [AC-166](docs/verification/AC-166.md) (The right agents, from context): Not started (Gate R, added by the owner on 2026-09-27).
+- [ ] [AC-166](docs/verification/AC-166.md) (The right agents, from context, or the one you chose): Not started (Gate R, added by the owner on 2026-09-27).
 - [ ] [AC-167](docs/verification/AC-167.md) (Redirect without trampling): Not started (Gate R, added by the owner on 2026-09-27).
 - [ ] [AC-168](docs/verification/AC-168.md) (New agents from a request): Not started (Gate R, added by the owner on 2026-09-27).
 - [ ] [AC-169](docs/verification/AC-169.md) (Evidence for every word sent): Not started (Gate R, added by the owner on 2026-09-27).
@@ -480,7 +480,7 @@ the owner action or decision each one needs.
 - [Side RFC: terminal UI (`overseer-tui`)](docs/rfcs/tui.md)
 - [Side RFC: Audio Mode — opt-in cues from the daemon](docs/rfcs/audio-mode.md) and its [prepared goal](docs/rfcs/audio-mode-goal.md)
 - [Side RFC: phone remote on the same network](docs/rfcs/phone-remote.md) and its [prepared goal](docs/rfcs/phone-remote-goal.md)
-- [Side RFC: Voice Mode — talk to Overseer, redirect every agent](docs/rfcs/voice-mode.md)
+- [Side RFC: Voice Mode — talk to Overseer, redirect every agent](docs/rfcs/voice-mode.md), its [prepared goal](docs/rfcs/voice-mode-goal.md) and the [mark's animation](docs/design/voice-mark/index.html)
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 
 Design targets macOS and Linux; only macOS is verified. Auto routing beyond the offline fallback ([Gate L](docs/rfcs/offline-mode.md)), a relay for phone access away from the local network (after [Gate N](docs/rfcs/phone-remote.md)), VSCodium,
