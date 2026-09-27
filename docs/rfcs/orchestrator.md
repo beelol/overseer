@@ -651,6 +651,22 @@ the other builds on them, as the phone remote and Gate M did for the review's me
   sees the write afterwards and holds the agent. The label says which of the two applies.
 - A check-in and a watcher's finding are a model's judgment: evidence for the owner, not a verdict.
 
+## Spike results (AC-180)
+
+Run on 2026-09-27; the evidence is in
+[docs/verification/evidence/ac-180](../verification/evidence/ac-180/README.md). These decisions
+stand for the rest of the gate.
+
+| Question | Decision |
+| --- | --- |
+| How a run is given tools | `overseerd mcp --socket <path>`: an MCP server over stdio that forwards every call to the daemon with the run's token (`OVERSEER_MCP_TOKEN`). Claude Code: `--mcp-config` with a file in the run's folder and `--strict-mcp-config`. Codex: `-c mcp_servers.overseer.{command,args,env}` and `-c mcp_servers.overseer.tools.<tool>.approval_mode="approve"` per tool, without which the exec transport refuses the call; the app-server transport raises an `mcp_tool_call_approval` request that the daemon answers. OpenCode: `mcp.overseer` in the profile's own `opencode.json` (the file Continuity writes), where the tools are named `overseer_<tool>`. Nothing is written into the user's own configuration on any harness. |
+| Who is speaking | The token, never the text. The daemon keeps tokens per run and role (`overseer_tokens`) and gives each role its tools; a call with an unknown token or for a tool outside the role is refused as a tool error the model can read. Every call is an `overseer_tool_call` event on the calling run. |
+| Read-only runs | Claude Code: `--disallowedTools` for every shell, file, web and delegation tool, `--allowedTools` naming Overseer's tools, the default permission mode (plan mode made the model reach for `ExitPlanMode`); Claude still sends `can_use_tool` for an MCP tool, and the daemon answers it (allow for Overseer's own tools, deny anything else). Codex: `-s read-only`; its shell stays available inside the read-only sandbox, which is recorded as a limit. OpenCode: `tools` set to false for bash, write, edit, patch, multiedit, task and webfetch in the same `opencode.json`. |
+| A message at the end of a turn or mid-turn | As today (AC-60): resume at the end of a turn, interrupt then resume mid-turn, per harness. Only the queue moves into the daemon (AC-188). |
+| Picked up | A *report*, *ask*, *claim* or acknowledgement arrives as a tool call through the shim, so the daemon attributes it by token. A harness whose run has no tools gets *delivered*, then *answered*. |
+| Cost of a turn | The roster (one line per agent, 4.2 KB for 16 agents) and the digests (≤ 4 KiB each) are small next to the harness's own baseline: about 57k tokens per model iteration on Claude Code and 69k per turn on Codex exec, mostly cache reads. A check-in reads one digest and answers in one iteration, so it costs about one baseline. Overseer's session is kept warm and resumed, so the baseline stays a cache read. The roster is built from events, not from `git status` per worktree (1.3 s for 16 agents when it was). |
+| A trial merge on 10,000 files | `git merge-tree --write-tree --name-only` between two agents' commits: 15 ms, naming the conflicting files, touching no worktree, index or branch. |
+
 ## Order of work
 
 Built in its own worktree and pull request, like the other gates. The goal text is prepared in
