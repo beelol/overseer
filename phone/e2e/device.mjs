@@ -1,0 +1,155 @@
+// The two simulators, behind one set of functions: what the scenario run and the measurements
+// need of a device. Overseer's own devices only: the iOS simulator named below and the Android
+// virtual device Overseer_API_35. No other project's device is listed, started or changed.
+
+import { execFileSync, spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import process from 'node:process';
+
+export const BUNDLE = 'com.beelol.overseer.phone';
+export const IOS_SIMULATOR = process.env.OVERSEER_IOS_SIMULATOR || 'iPhone 17 Pro';
+export const ANDROID_AVD = 'Overseer_API_35';
+const ANDROID_HOME = process.env.ANDROID_HOME || '/opt/homebrew/share/android-commandlinetools';
+const ADB = path.join(ANDROID_HOME, 'platform-tools', 'adb');
+const KV = 'ExpoSQLiteStorage';
+
+export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function out(command, args, options = {}) {
+  return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...options }).trim();
+}
+
+function quiet(command, args) {
+  try {
+    return out(command, args);
+  } catch {
+    return '';
+  }
+}
+
+const sql = (text) => `'${String(text).replaceAll("'", "''")}'`;
+
+function iosDevice() {
+  const listed = JSON.parse(out('xcrun', ['simctl', 'list', 'devices', 'available', '--json']));
+  const found = Object.entries(listed.devices)
+    .filter(([runtime]) => runtime.includes('iOS'))
+    .flatMap(([, devices]) => devices)
+    .filter((device) => device.name === IOS_SIMULATOR && device.isAvailable)
+    .sort((a, b) => Number(b.state === 'Booted') - Number(a.state === 'Booted'))[0];
+  if (!found) throw new Error(`no available iOS simulator is named "${IOS_SIMULATOR}"`);
+  if (found.state !== 'Booted') throw new Error(`the simulator "${IOS_SIMULATOR}" is not booted. Start it: npm run ios:release`);
+  return found.udid;
+}
+
+function ios() {
+  const udid = iosDevice();
+  const simctl = (...args) => out('xcrun', ['simctl', ...args]);
+  const database = () => path.join(simctl('get_app_container', udid, BUNDLE, 'data'), 'Documents', 'SQLite', KV);
+  return {
+    platform: 'ios',
+    id: udid,
+    /** The Mac, as this device reaches it. */
+    host: '127.0.0.1',
+    installed: () => quiet('xcrun', ['simctl', 'get_app_container', udid, BUNDLE]) !== '',
+    install: (app) => void simctl('install', udid, app),
+    uninstall: () => void quiet('xcrun', ['simctl', 'uninstall', udid, BUNDLE]),
+    launch: () => void simctl('launch', udid, BUNDLE),
+    stop: () => void quiet('xcrun', ['simctl', 'terminate', udid, BUNDLE]),
+    home: () => void quiet('xcrun', ['simctl', 'spawn', udid, 'launchctl', 'kickstart', '-k', 'system/com.apple.SpringBoard.none']),
+    appearance: (mode) => void simctl('ui', udid, 'appearance', mode),
+    read: (key) => quiet('sqlite3', [database(), `select value from storage where key=${sql(key)}`]),
+    write: (key, value) => void out('sqlite3', [database(), `create table if not exists storage (key text primary key not null, value text); insert or replace into storage(key, value) values(${sql(key)}, ${sql(JSON.stringify(value))})`]),
+    remove: (key) => void quiet('sqlite3', [database(), `delete from storage where key=${sql(key)}`]),
+    screenshot: (file) => void simctl('io', udid, 'screenshot', file),
+    push: (payloadFile) => void simctl('push', udid, BUNDLE, payloadFile),
+    /** Records the screen until the returned function is called; resolves with the file. */
+    record(file) {
+      fs.rmSync(file, { force: true });
+      const child = spawn('xcrun', ['simctl', 'io', udid, 'recordVideo', '--codec', 'h264', '--force', file], { stdio: 'ignore' });
+      return async () => {
+        child.kill('SIGINT');
+        await new Promise((resolve) => child.on('exit', resolve));
+        return file;
+      };
+    },
+  };
+}
+
+function android() {
+  const adb = (...args) => out(ADB, args);
+  const devices = adb('devices').split('\n').slice(1).map((line) => line.split('\t')).filter(([, state]) => state === 'device').map(([serial]) => serial);
+  const serial = devices.find((s) => quiet(ADB, ['-s', s, 'emu', 'avd', 'name']).split('\n')[0].trim() === ANDROID_AVD);
+  if (!serial) throw new Error(`the Android virtual device ${ANDROID_AVD} is not running. Start it: npm run android:release`);
+  const shell = (command) => out(ADB, ['-s', serial, 'shell', command]);
+  // The storage of a release build is read as root, which the emulator's image allows.
+  quiet(ADB, ['-s', serial, 'root']);
+  const database = `/data/data/${BUNDLE}/files/SQLite/${KV}`;
+  const owner = () => shell(`stat -c %U:%G /data/data/${BUNDLE}`);
+  return {
+    platform: 'android',
+    id: serial,
+    host: '10.0.2.2',
+    installed: () => shell(`pm list packages ${BUNDLE}`).includes(BUNDLE),
+    install: (apk) => void adb('-s', serial, 'install', '-r', apk),
+    uninstall: () => void quiet(ADB, ['-s', serial, 'uninstall', BUNDLE]),
+    launch: () => void shell(`monkey -p ${BUNDLE} -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1`),
+    stop: () => void shell(`am force-stop ${BUNDLE}`),
+    home: () => void shell('input keyevent KEYCODE_HOME'),
+    appearance: (mode) => void shell(`cmd uimode night ${mode === 'dark' ? 'yes' : 'no'}`),
+    read: (key) => quiet(ADB, ['-s', serial, 'shell', `sqlite3 ${database} "select value from storage where key=${sql(key)}"`]),
+    write(key, value) {
+      const text = JSON.stringify(value).replaceAll('"', '\\"');
+      shell(`mkdir -p /data/data/${BUNDLE}/files/SQLite && sqlite3 ${database} "create table if not exists storage (key text primary key not null, value text); insert or replace into storage(key, value) values(${sql(key)}, '${text}')" && chown -R ${owner()} /data/data/${BUNDLE}/files`);
+    },
+    remove: (key) => void quiet(ADB, ['-s', serial, 'shell', `sqlite3 ${database} "delete from storage where key=${sql(key)}"`]),
+    screenshot(file) {
+      fs.writeFileSync(file, execFileSync(ADB, ['-s', serial, 'exec-out', 'screencap', '-p'], { maxBuffer: 64 * 1024 * 1024 }));
+    },
+    push: () => {
+      throw new Error('Android shows its notifications itself in this gate; nothing is pushed to it');
+    },
+    record(file) {
+      const remote = '/sdcard/overseer-record.mp4';
+      quiet(ADB, ['-s', serial, 'shell', `rm -f ${remote}`]);
+      const child = spawn(ADB, ['-s', serial, 'shell', `screenrecord --bit-rate 8000000 --time-limit 30 ${remote}`], { stdio: 'ignore' });
+      return async () => {
+        quiet(ADB, ['-s', serial, 'shell', 'pkill -INT screenrecord']);
+        await new Promise((resolve) => child.on('exit', resolve));
+        await sleep(500);
+        adb('-s', serial, 'pull', remote, file);
+        return file;
+      };
+    },
+  };
+}
+
+/** The device of a platform, ready to be driven. */
+export function device(platform) {
+  if (platform === 'ios') return ios();
+  if (platform === 'android') return android();
+  throw new Error(`unknown platform: ${platform} (known: ios, android)`);
+}
+
+/** What the app stored under `key`, read as the value it stored, or null. */
+export function stored(dev, key) {
+  const raw = dev.read(key);
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw);
+    return typeof value === 'string' && /^[[{]/.test(value) ? JSON.parse(value) : value;
+  } catch {
+    return null;
+  }
+}
+
+/** Maestro, with the Java it needs and no analytics. */
+export function maestro(args, options = {}) {
+  const java = process.env.JAVA_HOME || path.join(os.homedir(), '.sdkman', 'candidates', 'java', '17.0.19-tem');
+  return spawn('maestro', args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    ...options,
+    env: { ...process.env, JAVA_HOME: java, ANDROID_HOME, PATH: `${path.join(java, 'bin')}:${path.join(ANDROID_HOME, 'platform-tools')}:${process.env.PATH}`, MAESTRO_CLI_NO_ANALYTICS: '1', MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true', ...options.env },
+  });
+}

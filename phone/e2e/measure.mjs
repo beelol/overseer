@@ -1,0 +1,189 @@
+#!/usr/bin/env node
+// Measures the app's speed on a simulator (AC-135, AC-136): cold starts with the door and
+// without it, and the busy-logic test. The app measures itself (src/perf) and leaves each
+// launch's record in its storage; this script starts the app, reads the record and sums up.
+//
+//   node e2e/measure.mjs --platform ios [--runs 20] [--out <dir>] [--check] [--write-baseline]
+//
+// The app must be installed as a release build and paired, so it opens on the agents list from
+// what it has stored. `--check` compares with e2e/baselines.json and fails when a budget is
+// missed; `--write-baseline` records this run as the baseline of its platform.
+
+import fs from 'node:fs';
+import path from 'node:path';
+import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+
+import { device, sleep, stored } from './device.mjs';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const BASELINES = path.join(here, 'baselines.json');
+/** How far a later run may be above its baseline. */
+const ALLOWED = 1.1;
+/** Budgets that hold whatever the baseline says, in milliseconds (the RFC's numbers). */
+const LIMITS = {
+  ios: { 'agents.interactive.p95': 1000, 'door.opening.low': 540, 'door.opening.high': 660 },
+  android: { 'agents.interactive.p95': 2000, 'door.opening.low': 540, 'door.opening.high': 660 },
+};
+
+function parse(argv) {
+  const args = { platform: 'ios', runs: 20, out: null, check: false, writeBaseline: false, settle: 3500 };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--check') args.check = true;
+    else if (arg === '--write-baseline') args.writeBaseline = true;
+    else if (['--platform', '--runs', '--out', '--settle'].includes(arg)) {
+      args[arg.slice(2)] = ['--runs', '--settle'].includes(arg) ? Number(argv[i + 1]) : argv[i + 1];
+      i += 1;
+    } else throw new Error(`unknown argument: ${arg}`);
+  }
+  return args;
+}
+
+const round = (n) => Math.round(n * 10) / 10;
+
+export function summary(values) {
+  const sorted = values.filter((v) => typeof v === 'number' && Number.isFinite(v)).sort((a, b) => a - b);
+  if (sorted.length === 0) return { count: 0, p50: null, p95: null, min: null, max: null };
+  const at = (fraction) => sorted[Math.min(sorted.length, Math.max(1, Math.ceil(fraction * sorted.length))) - 1];
+  return { count: sorted.length, p50: round(at(0.5)), p95: round(at(0.95)), min: round(sorted[0]), max: round(sorted[sorted.length - 1]) };
+}
+
+/** One cold start: the app is stopped, started, given time to open, and its record is read. */
+async function coldStart(dev, settle, before) {
+  dev.stop();
+  await sleep(400);
+  dev.launch();
+  const end = Date.now() + settle + 6000;
+  await sleep(settle);
+  for (;;) {
+    const record = stored(dev, 'perf.last');
+    if (record && record.launch !== before && (record.marks['door.opened'] !== undefined || record.marks['door.shown'] === undefined) && record.marks['screen.agents.interactive'] !== undefined) return record;
+    if (Date.now() > end) return record && record.launch !== before ? record : null;
+    await sleep(250);
+  }
+}
+
+async function series(dev, runs, settle, log) {
+  const records = [];
+  let last = stored(dev, 'perf.last')?.launch ?? -1;
+  for (let i = 0; i < runs; i += 1) {
+    const record = await coldStart(dev, settle, last);
+    if (!record) {
+      log(`  launch ${i + 1}: no record (the app did not reach its first screen)`);
+      records.push(null);
+      continue;
+    }
+    last = record.launch;
+    records.push(record);
+    const m = record.marks;
+    log(`  launch ${i + 1}: first screen ${round(m['screen.agents.shown'] ?? NaN)} ms, interactive ${round(m['screen.agents.interactive'] ?? NaN)} ms, door shown ${round(m['door.shown'] ?? NaN)} ms, opening ${round(record.summary['door.opening']?.max ?? NaN)} ms, dropped ${record.summary['door.dropped']?.max ?? 'n/a'}`);
+  }
+  return records;
+}
+
+function figures(records) {
+  const ok = records.filter(Boolean);
+  const mark = (name) => summary(ok.map((r) => r.marks[name]));
+  const measure = (name) => summary(ok.map((r) => r.summary[name]?.max));
+  return {
+    launches: records.length,
+    reached: ok.length,
+    'javascript.loaded': summary(ok.map((r) => r.startup['javascript.loaded'])),
+    'door.shown': mark('door.shown'),
+    'agents.shown': mark('screen.agents.shown'),
+    'agents.interactive': mark('screen.agents.interactive'),
+    'door.opening': measure('door.opening'),
+    'door.frames': measure('door.frames'),
+    'door.dropped': measure('door.dropped'),
+    'door.longestFrame': measure('door.longestFrame'),
+    'seeded.slow': measure('seeded.slow'),
+  };
+}
+
+export function verdicts(platform, withDoor, withoutDoor, baseline) {
+  const limits = LIMITS[platform];
+  const out = [];
+  const say = (name, value, limit, ok, note = '') => out.push({ name, value, limit, ok, note });
+  const p95 = withDoor['agents.interactive'].p95;
+  say('every launch reaches the agents list', withDoor.reached, withDoor.launches, withDoor.reached === withDoor.launches);
+  say('agents list interactive, p95 (ms)', p95, limits['agents.interactive.p95'], p95 !== null && p95 <= limits['agents.interactive.p95']);
+  if (baseline) {
+    const allowed = round(baseline['agents.interactive.p95'] * ALLOWED);
+    say('agents list interactive against the baseline, p95 (ms)', p95, allowed, p95 !== null && p95 <= allowed, `baseline ${baseline['agents.interactive.p95']} ms + 10%`);
+  }
+  const first = withDoor['agents.shown'].max;
+  const door = withDoor['door.shown'].max;
+  say('the door is on screen before the first screen, every launch (ms)', door, first, door !== null && first !== null && door <= first);
+  const opening = withDoor['door.opening'];
+  say('the door opens in 600 ms within 60 ms, shortest (ms)', opening.min, limits['door.opening.low'], opening.min !== null && opening.min >= limits['door.opening.low']);
+  say('the door opens in 600 ms within 60 ms, longest (ms)', opening.max, limits['door.opening.high'], opening.max !== null && opening.max <= limits['door.opening.high']);
+  const frames = withDoor['door.frames'].min ?? 0;
+  const dropped = withDoor['door.dropped'].max ?? 0;
+  const share = frames + dropped === 0 ? 100 : round((dropped / (frames + dropped)) * 100);
+  say('frames dropped while the door opens, worst launch (%)', share, 1, share <= 1, `${dropped} of ${frames + dropped} frames`);
+  if (withoutDoor) {
+    const without = withoutDoor['agents.interactive'].p50;
+    const withIt = withDoor['agents.interactive'].p50;
+    const allowed = round(without * ALLOWED + 20);
+    say('the door makes the first screen no later, median (ms)', withIt, allowed, withIt !== null && without !== null && withIt <= allowed, `without the door ${without} ms`);
+  }
+  return out;
+}
+
+async function main() {
+  const args = parse(process.argv.slice(2));
+  const dev = device(args.platform);
+  const lines = [];
+  const log = (line) => {
+    lines.push(line);
+    console.log(line);
+  };
+  if (!dev.installed()) throw new Error('the app is not installed on this device');
+  log(`Measuring on ${args.platform} (${dev.id}), ${args.runs} cold starts, ${new Date().toISOString()}`);
+
+  log('With the door:');
+  dev.stop();
+  await sleep(300);
+  dev.write('test.door', 'on');
+  const withDoor = figures(await series(dev, args.runs, args.settle, log));
+
+  log('With the door turned off by the test setting:');
+  dev.stop();
+  await sleep(300);
+  dev.write('test.door', 'off');
+  const withoutDoor = figures(await series(dev, args.runs, args.settle, log));
+  dev.stop();
+  await sleep(300);
+  dev.write('test.door', 'on');
+
+  const baselines = fs.existsSync(BASELINES) ? JSON.parse(fs.readFileSync(BASELINES, 'utf8')) : {};
+  const result = { platform: args.platform, device: dev.id, at: new Date().toISOString(), runs: args.runs, withDoor, withoutDoor };
+  const checks = verdicts(args.platform, withDoor, withoutDoor, args.writeBaseline ? null : baselines[args.platform]);
+  log('');
+  for (const c of checks) log(`${c.ok ? 'ok  ' : 'FAIL'} ${c.name}: ${c.value} (limit ${c.limit})${c.note ? ` — ${c.note}` : ''}`);
+  result.checks = checks;
+
+  if (args.writeBaseline) {
+    baselines[args.platform] = { at: result.at, 'agents.interactive.p95': withDoor['agents.interactive'].p95, 'agents.interactive.p50': withDoor['agents.interactive'].p50, 'door.opening.p50': withDoor['door.opening'].p50, 'javascript.loaded.p50': withDoor['javascript.loaded'].p50 };
+    fs.writeFileSync(BASELINES, `${JSON.stringify(baselines, null, 2)}\n`);
+    log(`Baseline of ${args.platform} written to e2e/baselines.json`);
+  }
+  if (args.out) {
+    fs.mkdirSync(args.out, { recursive: true });
+    fs.writeFileSync(path.join(args.out, `measure-${args.platform}.json`), `${JSON.stringify(result, null, 2)}\n`);
+    fs.writeFileSync(path.join(args.out, `measure-${args.platform}.log`), `${lines.join('\n')}\n`);
+  }
+  const failed = checks.filter((c) => !c.ok);
+  if (args.check && failed.length > 0) {
+    console.error(`${failed.length} budget${failed.length === 1 ? '' : 's'} missed`);
+    process.exit(1);
+  }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(2);
+  });
+}

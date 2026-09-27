@@ -5,7 +5,7 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "prebuild": "node scripts/clean-native.mjs && expo prebuild --clean",
+    "prebuild": "node scripts/clean-native.mjs && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 expo prebuild --clean",
     "ios": "node scripts/run-ios.mjs",
     "ios:release": "node scripts/run-ios.mjs --release",
     "android": "node scripts/run-android.mjs",

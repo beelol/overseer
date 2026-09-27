@@ -2,6 +2,7 @@ import { useCallback, type ReactNode } from 'react';
 import { Pressable, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { perf } from '@/perf';
 import { useCapabilities, type HapticMoment } from '@/platform';
 import { useTheme } from '@/theme';
 
@@ -57,7 +58,10 @@ export function Tap({ testID, accessibilityLabel, children, style, haptic, scale
   const pressedNow = useCallback(
     (event: GestureResponderEvent) => {
       if (haptic) haptics.play(haptic);
+      // From the tap reaching the app's logic to the frame that shows what it did.
+      const tapped = performance.now();
       onPress?.(event);
+      requestAnimationFrame(() => perf.record('tap', performance.now() - tapped));
     },
     [haptic, haptics, onPress],
   );

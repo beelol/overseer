@@ -3,6 +3,7 @@ export const router = {
   pushed: [] as unknown[],
   replaced: [] as unknown[],
   backs: 0,
+  dismissed: 0,
   /** What `useLocalSearchParams` and `useGlobalSearchParams` return. */
   params: {} as Record<string, string>,
   pathname: '/',
@@ -11,6 +12,7 @@ export const router = {
     this.pushed = [];
     this.replaced = [];
     this.backs = 0;
+    this.dismissed = 0;
     this.params = {};
     this.pathname = '/';
     this.canGoBack = true;
@@ -23,6 +25,9 @@ const api = {
   navigate: (href: unknown) => void router.pushed.push(href),
   back: () => void router.backs++,
   canGoBack: () => router.canGoBack,
+  canDismiss: () => router.canGoBack,
+  dismissAll: () => void router.dismissed++,
+  dismissTo: (href: unknown) => void router.replaced.push(href),
   setParams: (params: Record<string, string>) => void Object.assign(router.params, params),
 };
 

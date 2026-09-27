@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, View } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
+import { perf } from '@/perf';
 import { useCapabilities } from '@/platform';
 
 import { IconButton } from './Button';
@@ -49,10 +50,18 @@ export function Screen({ id, title, subtitle, back = true, actions, connection =
   const router = useRouter();
   const { launch } = useCapabilities();
   return (
-    <View style={styles.screen} testID={`${id}.screen`}>
+    <View
+      style={styles.screen}
+      testID={`${id}.screen`}
+      onLayout={() => {
+        // The first time this screen is on the display, and the frame after, when it answers.
+        perf.mark(`screen.${id}.shown`);
+        requestAnimationFrame(() => perf.mark(`screen.${id}.interactive`));
+      }}
+    >
       <SafeAreaView edges={TOP} style={styles.top}>
         <View style={styles.header}>
-          {back ? <IconButton testID={`${id}.back`} accessibilityLabel="Back" icon="chevron-left" onPress={() => (router.canGoBack() ? router.back() : router.replace('/agents'))} /> : null}
+          {back ? <IconButton testID={`${id}.back`} accessibilityLabel="Back" icon="chevron-left" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} /> : null}
           <View style={styles.titles}>
             <Txt testID={`${id}.title`} kind="strong" numberOfLines={1} accessibilityRole="header">
               {title}

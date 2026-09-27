@@ -8,11 +8,11 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { GATEWAY_DISCOVERY } from '@/config';
-import { coldStart, Door, doorEnabled, type DoorSettings } from '@/door';
+import { coldStart, Door, doorEnabled, seededSlowness, type TestSettings } from '@/door';
 import { Notifications } from '@/notifications';
+import { perf, persistPerf, type PerfStored } from '@/perf';
 import { PlatformProvider, useCapabilities, useLive } from '@/platform';
 import { createNativeCapabilities } from '@/platform/native';
-import { routes } from '@/routes';
 import { createSession, SessionProvider, useSessionValue } from '@/session';
 import { useTheme } from '@/theme';
 
@@ -23,7 +23,12 @@ SplashScreen.preventAutoHideAsync().catch(() => undefined);
 // receives them through the providers, exactly as tests receive the fakes.
 const capabilities = createNativeCapabilities({ discovery: GATEWAY_DISCOVERY });
 const session = createSession({ capabilities, app: Constants.expoConfig?.version ?? '0' });
-const door = coldStart() && doorEnabled(capabilities.keyValue.scope<DoorSettings>('test'));
+const test = capabilities.keyValue.scope<TestSettings>('test');
+const door = coldStart() && doorEnabled(test);
+// Nothing unless the scenario run seeded it, to prove the run notices a slower start.
+perf.record('seeded.slow', seededSlowness(test));
+
+const measured = capabilities.keyValue.scope<PerfStored>('perf');
 
 // Started before the first draw: reading what is stored takes a few milliseconds.
 session.start().catch(() => undefined);
@@ -63,13 +68,17 @@ function App() {
   const net = useLive(network);
   useEffect(() => {
     if (phase === 'foreground') session.wake();
-    else session.background();
+    else {
+      session.background();
+      persistPerf(measured);
+    }
   }, [phase, net]);
 
   // The Mac removed this phone, or the owner forgot the Mac: pairing is the only way on.
+  // The first screen shows it; whatever was open above it is closed.
   const was = useRef(paired);
   useEffect(() => {
-    if (ready && was.current && !paired) router.replace(routes.pair);
+    if (ready && was.current && !paired && router.canDismiss()) router.dismissAll();
     was.current = paired;
   }, [ready, paired, router]);
 
@@ -85,8 +94,21 @@ function App() {
     [background, launch, theme],
   );
 
-  const shown = useCallback(() => void SplashScreen.hideAsync().catch(() => undefined), []);
-  const opened = useCallback(() => setClosed(false), []);
+  const shown = useCallback(() => {
+    perf.mark('door.shown');
+    SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
+  const opened = useCallback(() => {
+    perf.mark('door.opened');
+    setClosed(false);
+    persistPerf(measured);
+  }, []);
+
+  // With no door (a test turned it off) the first screen's moments are written a little later.
+  useEffect(() => {
+    const timer = setTimeout(() => persistPerf(measured), theme.phone.motion.test.whole * 2);
+    return () => clearTimeout(timer);
+  }, [theme]);
 
   return (
     <>

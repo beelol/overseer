@@ -283,6 +283,11 @@ export const phone = {
       arrive: 12,
       screen: 24,
     },
+    test: {
+      lead: 200,
+      busy: 500,
+      whole: 900,
+    },
   },
   opacity: {
     pressed: 0.7,

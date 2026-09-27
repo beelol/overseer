@@ -1,0 +1,38 @@
+# Pairing, the way the owner does it on a simulator: the code from the Mac is typed, the Mac
+# confirms, and the app is on the agents list. It asks for notifications once, with the reason.
+appId: ${APP}
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "pair.code"
+    timeout: 60000
+- tapOn:
+    id: "pair.name"
+- eraseText: 40
+- inputText: ${NAME}
+- tapOn:
+    id: "pair.code"
+- inputText: ${CODE}
+- tapOn:
+    id: "pair.submit"
+- extendedWaitUntil:
+    visible:
+      id: "pair.notifications.reason|agents.screen"
+    timeout: 90000
+- runFlow:
+    when:
+      visible:
+        id: "pair.notifications.reason"
+    commands:
+      - tapOn:
+          id: "${NOTIFICATIONS}"
+      - runFlow:
+          when:
+            visible: "Allow"
+          commands:
+            - tapOn: "Allow"
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000

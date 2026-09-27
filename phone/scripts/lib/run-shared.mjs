@@ -97,7 +97,8 @@ export function ensureNativeProject(platform) {
   if (fs.existsSync(path.join(phoneRoot, platform))) return;
   console.log(`${platform}/ is missing: generating it with expo prebuild`);
   run('npx', ['expo', 'prebuild', '--platform', platform], {
-    env: { ...process.env, EXPO_NO_TELEMETRY: '1', CI: '1' },
+    // CocoaPods reads paths as UTF-8 and fails under a locale without an encoding.
+    env: { ...process.env, EXPO_NO_TELEMETRY: '1', CI: '1', LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' },
   });
 }
 

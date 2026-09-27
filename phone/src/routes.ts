@@ -2,8 +2,13 @@ import type { Href } from 'expo-router';
 
 /** The app's routes, as the brief names them (phone/docs/app-spec.md). */
 export const routes = {
-  pair: '/pair' as Href,
-  agents: '/agents' as Href,
+  /**
+   * The first screen: Agents on a paired phone, pairing on one that is not. Both are the same
+   * route, so pairing, being removed and forgetting the Mac change the screen in place.
+   */
+  home: '/' as Href,
+  pair: '/' as Href,
+  agents: '/' as Href,
   agent: (run: string) => `/agent/${encodeURIComponent(run)}` as Href,
   changes: (run: string) => `/agent/${encodeURIComponent(run)}/changes` as Href,
   file: (run: string, path: string, options: { comparison?: string; hunk?: string } = {}) =>
