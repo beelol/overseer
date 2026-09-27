@@ -970,19 +970,18 @@ rec(80, "Remembered place", "verified", commit=GK, date="2026-09-26",
     expected="Reload and quit/relaunch scenarios compare each value (agent, arrangement, follow/manual mode, review scope, scroll positions) before and after.",
     actual="""- **After a reload and after a restart:** the same agent; review left (0.66) and chat right (0.34); scope Unstaged; review scroll 700 → 700 and chat 1,606 → 1,606 px; Follow was on and comes back paused until resumed (AC-49).""",
     evidence="[place scenario](evidence/ui/place/)", live="—")
-rec(81, "Gate J still holds", "partial", commit=GK, date="2026-09-26",
-    proven="every fixture scenario passes against the Gate K build: the Gate J scenarios (Gate K audit with a new baseline, chat, parity, composer, grid, dashboard, keyboard with the shortcuts also from the side bar, history, usage, look, theme) and the earlier ones (review, main, center, conversation, files, hunks, pr, notify, signin, accounts, trust); the text budget re-measured per view is no higher than Gate J (agents 225, chat 1,063, files 59, review 150, grid 993, new agent 133, accounts 189)",
-    deferred="the live Gate J scenario (scenario-live-gatej.js: Claude and both ChatGPT accounts, several paid turns) was not rerun on the Gate K build; its fixture counterparts pass and the Codex usage part was rerun live (AC-62)",
+rec(81, "Gate J still holds", "verified", commit="ff9349c (main, after pull requests #8, #11 to #13)", date="2026-09-27",
     harness=GKFIX,
     steps="""Every fixture scenario rerun against the Gate K VSIX: the Gate J set (audit in Gate K mode, chat, parity, composer, grid, dashboard, keyboard, history, usage, look, theme) and the earlier ones (main, center, conversation, review, files, hunks, notify, signin, accounts, trust, pr), plus the Gate K scenarios. Each scenario that used the dashboard's agent rail was ported to the side bar (the checks keep their meaning).""",
     expected="Every Gate J scenario reruns green against the Gate K build; a new audit baseline is recorded for Gate K.",
-    actual="""- **Rerun:** 34 packaged-VSIX scenarios green on the final build. hunks failed once in the full run (a native-editor redo) and passed on rerun.
+    actual="""- **Live, current main (2026-09-27):** the live Gate J scenario's Claude half on the owner's daemon (Claude Code 2.1.246, haiku): an attached image and a mentioned file reach the agent (reply: Red; first line of README.md is "# fixture"), per-turn model, effort and permission mode reach the harness, a running turn is interrupted and the next answered, a finished run continues after a daemon restart; Claude usage matches its rate_limit_event. The Codex half passed live on the Gate K build ([live-gatek](evidence/ui/live-gatek/)).
+- **Rerun:** 34 packaged-VSIX scenarios green on the final build. hunks failed once in the full run (a native-editor redo) and passed on rerun.
 - **Ported:** scenarios that used the dashboard's rail now select agents in the side bar; Workspace Dirty checks moved to the review's scope picker and markers; the grid's latency measurement now ignores lines already on the tiles.
 - **New audit baseline (Gate K):** agents 225, chat 1,063, files 59, review 150, grid 993, new agent 133, accounts 189 characters; no overflow, no long runs, every icon control named (38 checks).
 - **Regressions found and fixed:** the chat became a preview tab when moved; a stale file covered the next agent's review; staging waited for the poll; the Agents tree redrew so often that clicks were lost; Delete on an archived row now restores it; search now looks within the list shown.""",
-    evidence="[Gate K audit](evidence/ui/audit-gatek/) and each scenario folder under evidence/ui/",
+    evidence="[live Claude half](evidence/ui/live-gatej-claude/), [Gate K audit](evidence/ui/audit-gatek/) and each scenario folder under evidence/ui/",
     live="Fixtures; one live Codex turn for AC-62.",
-    limits="restore (AC-49) opens several reviews at once, which Gate K replaced with one review beside the chat; AC-80's place scenario covers restoring in the new layout. merge and background are live scenarios and perf is the 10-minute AC-35 load test; none was rerun.",
+    limits="Fixture reruns on Gate K: every fixture scenario passes against the Gate K build: the Gate J scenarios (Gate K audit with a new baseline, chat, parity, composer, grid, dashboard, keyboard with the shortcuts also from the side bar, history, usage, look, theme) and the earlier ones (review, main, center, conversation, files, hunks, pr, notify, signin, accounts, trust); the text budget re-measured per view is no higher than Gate J (agents 225, chat 1,063, files 59, review 150, grid 993, new agent 133, accounts 189) restore (AC-49) opens several reviews at once, which Gate K replaced with one review beside the chat; AC-80's place scenario covers restoring in the new layout. merge and background are live scenarios and perf is the 10-minute AC-35 load test; none was rerun.",
     blocker="Next: rerun scenario-live-gatej.js on the Gate K build when paid turns on both ChatGPT accounts are wanted.")
 rec(82, "Gate K design review (owner-confirmed)", "verified", commit="8d239cb (merge of pull request #8)", date="2026-09-27",
     steps="Owner marks recorded on the page: the review page shows every view in Gate J and Gate K in both Overseer themes; the owner marked all 19 views on 2026-09-26: 16 Looks right (editor area and agents list \"gate k looking great\", chat, chat beside a diff, arrangement, review, scopes, follow, endings, grid, new agent, Needs you, take out, remembered place, themes, and Overall) and 3 Needs work",
@@ -1089,12 +1088,10 @@ rec(106, "Never lose track of windows", "verified", commit="10b8f73 (merge of pu
     expected="See the RFC criterion (Gate M).",
     actual="One Overseer view, one review, one chat taken out and one New Task remain; ⌥⌘M lists each (and where you are) and picking one goes there; the chat, review and grid headers have the control; closing views leaves no empty group.",
     evidence="[windows scenario](evidence/ui/windows/)", live="—")
-rec(107, "Talk to Overseer", "partial", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="Claude Code fixture (overseer mode); no paid tokens",
-    proven="the chat in the panel runs as Overseer's own hidden task; What is everyone doing? matches the daemon's state; a proposal on Yes sends the follow-up, shown in the agent's chat as From Overseer; a declined proposal changes nothing",
-    deferred="the one tiny live run on the Claude account (waits for the owner's Claude sign-in)",
+rec(107, "Talk to Overseer", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="Claude Code fixture (overseer mode); no paid tokens",
     expected="See the RFC criterion (Gate M).",
-    actual="Talk scenario 7 of 7.",
-    evidence="[talk scenario](evidence/ui/talk/)", live="Pending: the owner's Claude sign-in.", blocker="The live run waits for the owner to sign in to Claude Code (the new personal plan).")
+    actual="Talk scenario 7 of 7 (fixture). Live on Claude Code 2.1.246 with Haiku (overseer.chat.model), one turn, $0.04: What is everyone doing? was answered with Billing migration (r-…): Running a migration task in the talk-live-repo.",
+    evidence="[talk scenario](evidence/ui/talk/)", live="One live Claude Haiku turn on 2026-09-27 ([talk-live](evidence/ui/talk-live/)); the scenario's status check read the run a moment before it completed and now waits for it.", blocker="not blocked")
 rec(108, "Gate M design review (owner-confirmed)", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
     expected="See the RFC criterion (Gate M).",
     actual="The owner accepted the design and the logo on 2026-09-27 without marking the pages (\"this all sounds good\"; the pages could not be opened where the owner works), after asking to merge first. Published review page with a place to mark each view.",
@@ -1513,7 +1510,7 @@ SHORT_BLOCKERS = {
     64: "owner session after the rest of Gate J",
     65: "not started (added by the owner on 2026-09-26)",
     66: "owner design review after the Gate J build",
-    81: "partial: the live Gate J scenario not rerun on the Gate K build",
+    81: "verified",
     82: "verified",
     83: "not started (Gate L, added by the owner on 2026-09-26)",
     84: "not started (Gate L, added by the owner on 2026-09-26)",
@@ -1539,7 +1536,7 @@ SHORT_BLOCKERS = {
     104: "verified",
     105: "verified",
     106: "verified",
-    107: "partial: the live Claude run waits for the owner's sign-in",
+    107: "verified",
     108: "verified",
     109: "verified",
     110: "verified",
