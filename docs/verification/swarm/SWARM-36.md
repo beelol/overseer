@@ -11,3 +11,18 @@ Actual: admissions alternate A → B → A → B with jobs `j000`, `j000`, `j001
 Verification: the focused scheduler/admission/runtime suites passed 15 tests. `cargo test --workspace --offline` passed 111 tests (5 unit, 43 protocol, 63 Swarm). `git diff --check` passed. Evidence: `daemon/tests/swarm_scheduler.rs`, `daemon/src/swarm/scheduler.rs`, `daemon/src/swarm/admission.rs` and `daemon/src/swarm/schema.rs`.
 
 Remaining: the path is fixture-only and takes an injected target; it does not consume Auto Mode's live route/snapshot, launch the chosen worker, or run a director. The fixture has a logical director slot in admission accounting but no supervised director process. It does not demonstrate cross-category handoffs, per-job requirements, different account eligibility, or independent scope/budget ledgers under a live dispatcher. SWARM-36 stays unchecked.
+
+At implementation revision `3948c47`, a second replay covers a blocked first
+job. Two categories each have a ready job requiring an exclusive `db:shared`
+claim and a separate independent job. The first category acquires the shared
+claim; after daemon restart, the next scheduler request encounters the second
+category's conflicting `j000` and admits its `j001` instead of skipping that
+category's fair turn. Replaying the request returns the same attempt. The
+conflicting job remains ready and consumes no attempt. The new test failed
+before the fix because the scheduler admitted the first category's next job.
+
+Verification: `cargo test --offline -p overseerd --test swarm_scheduler`
+passed 2 tests; `cargo test --offline -p overseerd --test swarm_admission`
+passed 32 tests; `git diff --check` passed. This verifies the fixture scheduler's
+same-category scan and durable fair cursor, not a live Auto route, worker launch
+or autonomous director. Status remains partial.

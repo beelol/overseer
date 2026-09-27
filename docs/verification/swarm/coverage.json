@@ -385,7 +385,7 @@
         "daemon/tests/swarm_scheduler.rs",
         "docs/verification/swarm/SWARM-36.md"
       ],
-      "blocker": "A fixture-only central queue fairly admits a 100-job and two-job backlog through one durable admission transaction. It does not yet start directors/workers automatically, route per-job targets through Auto Mode, reserve an actual director process, or prove cross-category scope and handoff isolation in a live run."
+      "blocker": "A fixture-only central queue fairly admits unequal category backlogs through one durable admission transaction and skips a conflicting first job to admit an independent job in that category after restart. It does not yet start directors/workers automatically, route per-job targets through Auto Mode, reserve an actual director process, or prove cross-category scope and handoff isolation in a live run."
     },
     "SWARM-37": {
       "status": "partial",
