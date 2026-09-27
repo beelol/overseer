@@ -62,7 +62,8 @@ fn delivered_redirect_interrupts_a_long_running_worker_after_restart() {
     let job=&d.call("swarm.jobs",json!({"id":id}))["jobs"][0];
     assert_eq!(job["status"],"cancel_requested");
     assert_eq!(job["stop_reason"],"redirect_ack_timeout");
-    let inbox=d.call("swarm.messages",json!({"run_id":id,"recipient":attempt["attempt_id"]}));
+    let inbox=d.call("swarm.messages",json!({"run_id":id,"recipient":attempt["attempt_id"],
+        "token":attempt["token"]}));
     assert_eq!(inbox["messages"].as_array().unwrap().iter()
         .filter(|m|m["type"]=="checkpoint" && m["payload"]["reason"]=="redirect_ack_timeout").count(),1);
 }

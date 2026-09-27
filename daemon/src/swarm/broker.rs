@@ -309,18 +309,16 @@ pub fn messages(store: &Store, p: &Value) -> Result<Value> {
         super::owner::require(store,run,p)?;
     }
     if recipient != "director" {
-        let exists: bool = store
+        let job: Option<String> = store
             .conn
             .query_row(
-                "SELECT 1 FROM swarm_attempts WHERE id=?1 AND run_id=?2",
+                "SELECT job_id FROM swarm_attempts WHERE id=?1 AND run_id=?2",
                 params![recipient, run],
-                |_| Ok(()),
+                |row| row.get(0),
             )
-            .optional()?
-            .is_some();
-        if !exists {
-            bail!("unknown recipient");
-        }
+            .optional()?;
+        let job = job.ok_or_else(|| anyhow!("unknown recipient"))?;
+        check_attempt(store, run, &job, recipient, required(p,"token")?)?;
     }
     let cursor = p["cursor"].as_i64().unwrap_or(0).max(0);
     let limit = p["limit"].as_i64().unwrap_or(20).clamp(1, 100);

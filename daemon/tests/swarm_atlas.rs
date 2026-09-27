@@ -272,7 +272,7 @@ fn atlas_s1_faults_quarantine_stale_and_missing_evidence() {
         "expected_revision":1,"reason":"J2 owns the shared helper; J4 checks the URL boundary",
         "jobs":revised}))["revision"],2);
     let redirected=d.call("swarm.messages",json!({"run_id":run,
-        "recipient":a4["attempt_id"]}));
+        "recipient":a4["attempt_id"],"token":a4["token"]}));
     assert!(redirected["messages"].as_array().unwrap().iter()
         .any(|message| message["type"] == "redirect"));
     let j4_artifact=submit(&d,run,"j4",&a4,1,&j4,"confirmed_defect");
@@ -662,7 +662,8 @@ fn atlas_s5_redirect_during_long_probe_interrupts_and_holds_review() {
     assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
         "revision":2,"request_id":"s5-redirect-complete","summary":"Attachment audit passed",
         "verification":"J4 probe","checks":[]})).is_err());
-    let messages=d.call("swarm.messages",json!({"run_id":run,"recipient":attempt["attempt_id"]}));
+    let messages=d.call("swarm.messages",json!({"run_id":run,"recipient":attempt["attempt_id"],
+        "token":attempt["token"]}));
     assert!(messages["messages"].as_array().unwrap().iter().any(|message|
         message["type"]=="checkpoint" && message["payload"]["reason"]=="redirect_ack_timeout"));
 }
@@ -1294,7 +1295,7 @@ fn atlas_s5_run_deadline_expires_while_all_targets_are_blocked() {
     assert!(state["status"]=="stopping" || state["status"]=="stopped","{state}");
     assert_eq!(state["availability"]["state"],"blocked");
     let messages=d.call("swarm.messages",json!({"run_id":run,
-        "recipient":attempt["attempt_id"]}));
+        "recipient":attempt["attempt_id"],"token":attempt["token"]}));
     let messages=messages["messages"].as_array().unwrap();
     assert!(messages.iter().any(|m|m["type"]=="checkpoint"
         && m["payload"]["reason"]=="run_deadline"));

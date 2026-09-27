@@ -244,7 +244,7 @@ fn revision_invalidates_affected_work_and_preserves_unrelated_acceptance() {
     assert_eq!(find("unrelated")["plan_revision"], 1);
     let msg = d.call(
         "swarm.messages",
-        json!({"run_id":run_id,"recipient":consumer_id}),
+        json!({"run_id":run_id,"recipient":consumer_id,"token":consumer_token}),
     );
     assert!(msg["messages"]
         .as_array()

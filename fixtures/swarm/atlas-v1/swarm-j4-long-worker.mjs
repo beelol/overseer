@@ -58,7 +58,7 @@ while (exitCode === undefined) {
       type: 'progress', payload: { state: 'working' } });
     lastHeartbeat = Date.now();
   }
-  const page = call('swarm.messages', { run_id: runId, recipient: attemptId,
+  const page = call('swarm.messages', { run_id: runId, recipient: attemptId, token,
     cursor, limit: 20 });
   for (const message of page.messages) {
     cursor = Math.max(cursor, message.seq);

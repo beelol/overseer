@@ -354,9 +354,13 @@ fn directive_delivery_and_application_are_distinct() {
     let sent=d.call("swarm.direct",json!({"run_id":run_id,"job_id":"routes","attempt_id":attempt_id,
         "message_id":"redirect-2","generation":1,"revision":1,"type":"redirect","payload":{"focus":"pagination"}}));
     assert_eq!(sent["phase"], "queued");
+    assert!(d.try_call("swarm.messages",json!({"run_id":run_id,
+        "recipient":attempt_id})).is_err(),"an attempt id alone must not reveal directives");
+    assert!(d.try_call("swarm.messages",json!({"run_id":run_id,
+        "recipient":attempt_id,"token":"wrong"})).is_err());
     let inbox = d.call(
         "swarm.messages",
-        json!({"run_id":run_id,"recipient":attempt_id}),
+        json!({"run_id":run_id,"recipient":attempt_id,"token":token}),
     );
     assert_eq!(inbox["messages"].as_array().unwrap().len(), 1);
     let delivered=d.call("swarm.ack",json!({"run_id":run_id,"message_id":"redirect-2","recipient":attempt_id,"token":token,"phase":"delivered","revision":1}));
@@ -417,7 +421,8 @@ fn unapplied_redirect_times_out_and_holds_dependent_work() {
     assert_eq!(j4["stop_reason"],"redirect_ack_timeout");
     let dependent = jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="dependent").unwrap();
     assert_eq!(dependent["status"],"planned");
-    let inbox = d.call("swarm.messages",json!({"run_id":id,"recipient":attempt["id"]}));
+    let inbox = d.call("swarm.messages",json!({"run_id":id,"recipient":attempt["id"],
+        "token":attempt["token"]}));
     assert!(inbox["messages"].as_array().unwrap().iter()
         .any(|m|m["type"]=="checkpoint" && m["payload"]["reason"]=="redirect_ack_timeout"));
     assert_eq!(d.call("swarm.redirect.persist_due",json!({"now_ms":delivered_at+30_001}))["timed_out"],0);
@@ -462,7 +467,8 @@ fn discovery_can_be_routed_to_only_relevant_peers_with_applied_receipts() {
         d.call("swarm.direct",json!({"run_id":run,"generation":1,"revision":1,
             "job_id":job,"attempt_id":attempt["id"],"message_id":message,
             "type":"advisory","payload":{"discovery_id":"D1","focus":focus}}));
-        let inbox=d.call("swarm.messages",json!({"run_id":run,"recipient":attempt["id"]}));
+        let inbox=d.call("swarm.messages",json!({"run_id":run,"recipient":attempt["id"],
+            "token":attempt["token"]}));
         assert_eq!(inbox["messages"].as_array().unwrap().len(),1);
         assert_eq!(inbox["messages"][0]["type"],"advisory");
         for phase in ["delivered","applied"] {
@@ -472,7 +478,7 @@ fn discovery_can_be_routed_to_only_relevant_peers_with_applied_receipts() {
         }
     }
     assert!(d.call("swarm.messages",json!({"run_id":run,
-        "recipient":attempts["j3"]["id"]}))["messages"].as_array().unwrap().is_empty());
+        "recipient":attempts["j3"]["id"],"token":attempts["j3"]["token"]}))["messages"].as_array().unwrap().is_empty());
     assert_eq!(d.call("swarm.director.complete_batch",json!({"run_id":run,
         "generation":1,"turn_id":batch["turn_id"],"token":batch["token"]}))["applied"],1);
 }
@@ -678,7 +684,7 @@ fn stop_blocks_new_attempts_without_discarding_late_evidence() {
     assert_eq!(jobs["jobs"][0]["status"], "cancel_requested");
     let control = d.call(
         "swarm.messages",
-        json!({"run_id":run_id,"recipient":attempt_id}),
+        json!({"run_id":run_id,"recipient":attempt_id,"token":token}),
     );
     assert_eq!(control["messages"][0]["type"], "stop");
 }

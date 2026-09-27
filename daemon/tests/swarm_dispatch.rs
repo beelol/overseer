@@ -454,7 +454,7 @@ fn supervised_scripted_worker_receives_and_applies_targeted_director_advisory() 
 set -eu
 count=0
 while [ "$count" -lt 100 ]; do
-    inbox=$("$OVERSEER_BIN" ctl swarm.messages "{\"run_id\":\"$OVERSEER_SWARM_RUN_ID\",\"recipient\":\"$OVERSEER_SWARM_ATTEMPT_ID\"}")
+    inbox=$("$OVERSEER_BIN" ctl swarm.messages "{\"run_id\":\"$OVERSEER_SWARM_RUN_ID\",\"recipient\":\"$OVERSEER_SWARM_ATTEMPT_ID\",\"token\":\"$OVERSEER_SWARM_TOKEN\"}")
     case "$inbox" in *'"message_id":"targeted-note"'*) break;; esac
     count=$((count + 1))
     sleep 0.05
@@ -500,13 +500,12 @@ case "$applied" in *'"error"'*) exit 3;; esac
     );
     assert_eq!(sent["phase"], "queued");
     assert_eq!(d.wait_done(worker, 8)["status"], "completed");
-    let messages = d.call(
-        "swarm.messages",
-        json!({"run_id":run_id,"recipient":attempt}),
-    );
-    assert_eq!(messages["messages"][0]["phase"], "applied");
-    assert_eq!(
-        messages["messages"][0]["payload"]["question"],
-        "Check the retry handler"
-    );
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let (phase,payload): (String,String) = db.query_row(
+        "SELECT phase,payload FROM swarm_messages WHERE run_id=?1 AND recipient=?2 AND message_id='targeted-note'",
+        rusqlite::params![run_id,attempt], |row| Ok((row.get(0)?,row.get(1)?)),
+    ).unwrap();
+    assert_eq!(phase,"applied");
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&payload).unwrap()["question"],
+        "Check the retry handler");
 }

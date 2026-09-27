@@ -191,7 +191,7 @@ fn catalog_s3_twenty_four_patches_need_a_combined_cursor_check() {
     let messages = d.call(
         "swarm.messages",
         json!({"run_id":run,
-        "recipient":stale_attempt["id"]}),
+        "recipient":stale_attempt["id"],"token":stale_attempt["token"]}),
     );
     assert!(messages["messages"]
         .as_array()

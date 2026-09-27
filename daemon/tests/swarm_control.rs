@@ -137,7 +137,7 @@ fn pause_resume_and_off_keep_active_evidence_but_stop_new_delegation() {
             json!({"run_id":id,"generation":1,"revision":1,"job_id":"queued"})
         )
         .is_err());
-    let pending = d.call("swarm.messages", json!({"run_id":id,"recipient":aid}));
+    let pending = d.call("swarm.messages", json!({"run_id":id,"recipient":aid,"token":token}));
     assert!(pending["messages"]
         .as_array()
         .unwrap()
@@ -266,7 +266,7 @@ fn deadline_expires_without_another_admission_while_active_or_blocked() {
     assert_eq!(jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="queued").unwrap()["status"],"cancelled");
     assert_eq!(d.call("swarm.jobs",json!({"id":blocked_id}))["jobs"][0]["status"],"cancelled");
     let control_messages=d.call("swarm.messages",json!({"run_id":active_id,
-        "recipient":attempt["id"]}));
+        "recipient":attempt["id"],"token":attempt["token"]}));
     let messages=control_messages["messages"].as_array().unwrap();
     assert!(messages.iter().any(|m|m["type"]=="checkpoint"
         && m["payload"]["reason"]=="run_deadline"));
