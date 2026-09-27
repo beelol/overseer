@@ -162,9 +162,10 @@
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/swarm_director_process.rs",
         "docs/verification/swarm/main-reconciliation-2026-09-27.md",
-        "daemon/tests/swarm_integration.rs"
+        "daemon/tests/swarm_integration.rs",
+        "daemon/tests/swarm_availability.rs"
       ],
-      "blocker": "Two fixture target routes transition a failed supervised launch from ready to failed after the second attempt, retain the cap across revision, and block retry when an effect is unknown. A separate accepted integrated patch with one earlier rejected attempt stays failed at two after a late conflict and revision; its coverage reports attempts_exhausted and no third attempt starts. Live routing and unchanged-state model-planning suppression remain unverified. Gate L generic handoff/retry is refused for linked Swarm runs; same-job Continuity routing remains unimplemented and unverified."
+      "blocker": "Two-attempt cap across routes/revisions and daemon-level blocked-route polling without director turns pass local fixtures. A supervised director must still prove no unrecorded model calls while unchanged, and joined Auto routing/other live failures remain unverified."
     },
     "SWARM-16": {
       "status": "partial",

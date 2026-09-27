@@ -12,7 +12,7 @@ Commands: `cargo test --offline -p overseerd --test swarm_routing -- --nocapture
 
 Evidence: `daemon/tests/swarm_routing.rs`, `daemon/src/swarm/artifacts.rs`, `docs/verification/swarm/SWARM-58.md`.
 
-Remaining: target identities are fixture snapshots, and only a generic supervised process launch was exercised. Live routing and other failure classes remain unqualified. No deterministic proof yet shows that an unchanged blocked/waiting state prevents repeated model-planning calls. The RFC criterion stays unchecked.
+Remaining: target identities are fixture snapshots, and only a generic supervised process launch was exercised. Live routing and other failure classes remain unqualified. The RFC criterion stays unchecked.
 
 Gate L reconciliation at `78befc0`: Continuity's ordinary successor handoff and
 retry lack Swarm job/attempt authority. A linked worker or director now refuses
@@ -33,3 +33,14 @@ resolve the route disagreement, but it does not restore attempt budget or
 qualify the stale integrated branch. This extends fixture evidence for the
 cross-revision cap. Shared Auto Mode routing and unchanged waiting-state
 model wakeups remain unverified, so SWARM-15 stays partial.
+
+Waiting-state replay: `unchanged_waiting_route_does_not_create_director_turns_until_recovery`
+observes the same blocked route three times with advancing snapshots, calls the director's
+batch claim after each observation, restarts the daemon and calls it again. Every claim
+returns `blocked`; the durable director-turn and availability-message counts remain zero.
+A fresh eligible observation then creates exactly one wake message and one claimed turn.
+Commands: `cargo test -p overseerd --offline --test swarm_availability unchanged_waiting_route_does_not_create_director_turns_until_recovery`
+and `cargo test -p overseerd --offline --test swarm_availability -q` (12 passed).
+This is a daemon-level no-churn guarantee, not proof that a live director harness cannot
+make its own unrecorded model call. The criterion remains partial until the supervised
+director and joined Auto route are replayed through an unchanged waiting period.

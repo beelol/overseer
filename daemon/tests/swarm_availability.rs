@@ -22,6 +22,50 @@ fn snapshot(at: i64, healthy: bool, remaining: i64) -> Value {
 }
 
 #[test]
+fn unchanged_waiting_route_does_not_create_director_turns_until_recovery() {
+    let mut d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Waiting route without planning churn",
+        "objective":"Audit backend routes","allowed_targets":["route-a"]}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j","title":"Inspect route","acceptance":"evidence","deps":[]}]}));
+    let at=now();
+    for n in 0..3 {
+        let when=at+n*1000;
+        let observed=d.call("swarm.availability.observe",json!({"run_id":run,
+            "snapshot":snapshot(when,false,100000),"now_ms":when,
+            "required_capabilities":["code"],"estimate_milli":{"points":100},
+            "purpose":"worker"}));
+        assert_eq!(observed["state"],"blocked","{observed}");
+        assert_eq!(observed["woken"],false);
+        let claim=d.call("swarm.director.claim_batch",json!({"run_id":run,
+            "generation":1,"revision":1,"now_ms":when+6000}));
+        assert_eq!(claim["status"],"blocked","{claim}");
+    }
+    d.kill9();d.spawn();
+    let after_restart=d.call("swarm.director.claim_batch",json!({"run_id":run,
+        "generation":1,"revision":1,"now_ms":at+9000}));
+    assert_eq!(after_restart["status"],"blocked","{after_restart}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let turns:i64=db.query_row("SELECT COUNT(*) FROM swarm_director_turns WHERE run_id=?1",
+        [run],|row|row.get(0)).unwrap();
+    let wakes:i64=db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1
+        AND kind='availability'",[run],|row|row.get(0)).unwrap();
+    assert_eq!((turns,wakes),(0,0),"polling a blocked route must not spend model turns");
+    drop(db);
+    let recovered=d.call("swarm.availability.observe",json!({"run_id":run,
+        "snapshot":snapshot(at+4000,true,100000),"now_ms":at+4000,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(recovered["woken"],true,"{recovered}");
+    let claimed=d.call("swarm.director.claim_batch",json!({"run_id":run,
+        "generation":1,"revision":1,"now_ms":at+10000}));
+    assert_eq!(claimed["status"],"claimed","{claimed}");
+    assert_eq!(claimed["messages"].as_array().unwrap().len(),1);
+    assert_eq!(claimed["messages"][0]["type"],"availability");
+}
+
+#[test]
 fn confirmed_target_selection_requires_fresh_observation_and_wakes_once() {
     let mut d=Daemon::start(&[]);
     let made=d.call("swarm.create",json!({"category":"Target selection recovery",
