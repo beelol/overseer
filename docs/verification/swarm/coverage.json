@@ -283,7 +283,7 @@
         "daemon/src/swarm/schema.rs",
         "docs/verification/swarm/SWARM-28.md"
       ],
-      "blocker": "Fixture admission now binds its target harness to worker launch and rejects a mismatch before process intent, including unbound migrated rows. Live Auto target selection and route/account/model binding, mixed qualified job routing, a manual single-target pool and normal-path scope rejection remain unverified."
+      "blocker": "Fixture admission now binds harness, profile, model and optional effort to worker launch, rejects changed or incomplete routes before process intent, and passes a matching route to a synthetic Claude harness. Live Auto account-generation/provider/model-version revalidation, mixed qualified job routing, a manual single-target pool and normal-path scope rejection remain unverified."
     },
     "SWARM-29": {
       "status": "partial",

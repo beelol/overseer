@@ -103,9 +103,12 @@ are observations and UI discovery, not a reservation authority. Swarm's
 snapshots. Auto's `auto.dispatch` persists selected intent and can return
 `launch_pending`, but does not yet commit allowance across all launch paths. The
 fixture path now persists the selected target's harness in its admission and
-refuses a worker launch under another harness; old admissions without that
-binding cannot start a new worker. This does not bind a live Auto route's account,
-provider, model or effort yet. The
+refuses a worker launch under another harness. It also persists an injected
+target's profile, model and optional effort, passing the saved choices to the
+fixture harness and rejecting caller substitutions. Old admissions without a
+complete non-generic route cannot start a new worker. This does not bind or
+revalidate a live Auto route's account generation, provider endpoint or model
+version yet. The
 adapter must translate Auto's account-generation, scoped quota/route observations
 into a versioned snapshot and submit both Auto and Swarm launches to the same
 transaction. It must not infer a balance from `account.usage` tokens or replace
