@@ -219,3 +219,13 @@ account reservation path. SWARM-24/60 and joined AC-195 remain partial until
 both implementations run against one shared daemon authority. The current
 Swarm fixture tests and the 34 admission, 9 benefit and 24 runtime regressions
 pass after the merge. No Swarm default or acceptance criterion changes.
+
+## Subsequent published main: `e892ca5`
+
+Main fixed keyboard focus in the shared packaged-UI test harness and updated
+AC-149 evidence and generated RFC checkboxes. It did not change Swarm daemon
+admission, worker launch or its acceptance criteria. The Swarm VSIX packaged
+successfully and `node test/ui/scenario-swarm-scale.js` passed after this merge:
+32 fixture workers were displayed and Stop confirmed their exits with no live
+process left behind. The generated screenshots and logs were discarded from
+this branch so the main evidence is not overwritten by a local replay.
