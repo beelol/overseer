@@ -36,7 +36,10 @@ def collect_duplicates(ids):
 
 def changed_release_files(base):
     changed = set()
-    for args in (["git", "diff", "--name-only", f"{base}...HEAD"],
+    # Compare the branch's net changes with the main revision it contains.
+    # A three-dot diff from the original fork point would incorrectly count
+    # authorized changes that arrived through a later main merge as Auto edits.
+    for args in (["git", "diff", "--name-only", base, "HEAD"],
                  ["git", "diff", "--name-only"],
                  ["git", "diff", "--cached", "--name-only"]):
         result = subprocess.run(args, capture_output=True, text=True, check=False)

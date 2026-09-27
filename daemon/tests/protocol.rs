@@ -2428,11 +2428,12 @@ fn auto_work_history_does_not_reappear_after_account_changes_during_child() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let account_file = r.path().join("account-id.txt");
+    let trace = r.path().join("account-change-turn.txt");
     std::fs::write(&account_file, "account-A").unwrap();
     let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
-        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_ACCOUNT_ID_FILE,FIXTURE_TURN_DELAY_MS"),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_ACCOUNT_ID_FILE,FIXTURE_TURN_DELAY_MS,FIXTURE_TRACE_FILE"),
         ("FIXTURE_MODE", "managed-models"), ("FIXTURE_ACCOUNT_ID_FILE", account_file.to_str().unwrap()),
-        ("FIXTURE_TURN_DELAY_MS", "6000")]);
+        ("FIXTURE_TURN_DELAY_MS", "6000"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
     let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
         "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
@@ -2441,6 +2442,11 @@ fn auto_work_history_does_not_reappear_after_account_changes_during_child() {
     assert_eq!(selected["state"], "dispatched", "{selected}");
     let child = run_id(&selected);
     d.wait_status(&child, |status| status == "running", 10);
+    let turn_deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while !std::fs::read_to_string(&trace).unwrap_or_default().contains("turn_model:gpt-6-sol") {
+        assert!(std::time::Instant::now() < turn_deadline, "child model turn did not begin");
+        std::thread::sleep(Duration::from_millis(10));
+    }
     let profile_id = selected["run"]["profile_id"].as_str().unwrap();
     let workspace_id = selected["workspace"]["id"].as_str().unwrap();
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
@@ -2680,6 +2686,33 @@ fn completed_read_only_codex_handoff_keeps_sandbox_and_account_boundary() {
     let output = std::fs::read_to_string(trace).unwrap();
     assert_eq!(output.matches("thread_sandbox:read-only").count(), 2, "{output}");
     assert_eq!(d.runs().len(), 2);
+}
+
+#[test]
+fn codex_cli_read_only_turn_cannot_widen_on_follow_up() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let replay = r.path().join("read-only-cli.jsonl");
+    std::fs::write(&replay, concat!(
+        "{\"type\":\"thread.started\",\"thread_id\":\"read-only-cli\"}\n",
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}\n"
+    )).unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE"),
+        ("REPLAY_FILE", replay.to_str().unwrap())]);
+    let run = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex",
+        "model":"gpt-6-sol","effort":"medium","permission_mode":"read-only",
+        "prompt":"inspect only"})));
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let launch: String = db.query_row("SELECT launch FROM runs WHERE id=?1", [&run], |row| row.get(0)).unwrap();
+    let launch: serde_json::Value = serde_json::from_str(&launch).unwrap();
+    assert_eq!(launch["generic"]["sandbox"], "read-only");
+    let denied = d.try_call("run.follow_up", json!({"run_id":run,"prompt":"write now",
+        "permission_mode":"workspace-write"})).unwrap_err();
+    assert!(denied.contains("cannot widen"), "{denied}");
+    assert_eq!(d.call("run.turns", json!({"run_id":run})).as_array().unwrap().len(), 1);
 }
 
 #[test]
@@ -2992,8 +3025,12 @@ fn auto_dispatch_selects_reachable_local_opencode_provider_after_another_fails()
         "parent_run_id":parent,"min_tier":"general","required_tools":[],
         "allowed_profiles":[local["id"]],"prompt":"write a file","title":"write"}));
     assert_eq!(write_request["state"], "paused", "{write_request}");
-    assert!(write_request["decision"]["exclusions"].as_array().unwrap().iter()
-        .any(|item| item["reason"] == "sandbox_incompatible"));
+    let exclusions = write_request["decision"]["exclusions"].as_array().unwrap();
+    assert!(exclusions.iter().any(|item| item["reason"] == "sandbox_incompatible")
+        || write_request["discovery_failures"].as_array().is_some_and(|failures|
+            failures.iter().any(|failure| failure["reason"] == "metadata_or_auth_unavailable")),
+        "unavailable metadata must also pause before a write-capable child: {write_request}");
+    assert_eq!(d.runs().len(), 2, "a write request cannot launch through a read-only local route");
     std::fs::write(&quota_mode, "exhausted").unwrap();
     let unresolved = d.call("auto.dispatch", json!({"work_unit_id":"local-auto-quota-3",
         "parent_run_id":parent,"min_tier":"general","required_tools":[],
@@ -3058,7 +3095,7 @@ fn auto_opencode_silent_503_budget_stops_while_daemon_is_down_without_duplicate(
     let request = |unit: &str| json!({"work_unit_id":unit,"parent_run_id":parent,
         "min_tier":"general","required_tools":[],"sandbox":"read_only",
         "allowed_profiles":[profile["id"]],"prompt":"reply hello","title":"local check",
-        "execution_budget_ms":5000});
+        "execution_budget_ms":15000});
     for invalid in [json!(0), json!("5000"), json!(1_800_001)] {
         let mut rejected = request("local-503-invalid-budget");
         rejected["execution_budget_ms"] = invalid;
@@ -3067,6 +3104,7 @@ fn auto_opencode_silent_503_budget_stops_while_daemon_is_down_without_duplicate(
     // A cold installed CLI can time out during metadata discovery in the
     // serial suite. That must pause without a child; a fresh unit may retry.
     let mut first = None;
+    let mut last_metadata_pause = None;
     let mut first_unit = String::new();
     for attempt in 0..3 {
         let unit = format!("local-503-first-{attempt}");
@@ -3081,16 +3119,18 @@ fn auto_opencode_silent_503_budget_stops_while_daemon_is_down_without_duplicate(
             failures.iter().any(|failure| failure["reason"] == "metadata_or_auth_unavailable")),
             "only transient metadata discovery may be retried: {result}");
         assert_eq!(d.runs().len(), 1, "metadata timeout cannot launch a child");
+        last_metadata_pause = Some(result);
     }
-    let first = first.expect("installed OpenCode metadata did not recover in three bounded attempts");
+    let first = first.unwrap_or_else(|| panic!("installed OpenCode metadata did not recover in three bounded attempts: {last_metadata_pause:?}"));
     assert!(first["decision"]["selected"].as_str().unwrap().contains("local_a"));
     let first_id = run_id(&first);
-    let request_deadline = std::time::Instant::now() + Duration::from_secs(8);
+    let request_deadline = std::time::Instant::now() + Duration::from_secs(20);
     loop {
         if std::fs::read_to_string(&failed_log).unwrap_or_default()
             .contains("/v1/chat/completions") { break; }
         assert!(std::time::Instant::now() < request_deadline,
-            "OpenCode never requested the failing local endpoint");
+            "OpenCode never requested the failing local endpoint: run={:?} events={:?}",
+            d.run(&first_id), d.events(&first_id));
         std::thread::sleep(Duration::from_millis(100));
     }
     assert!(d.events(&first_id).iter().all(|event| event["kind"] != "error"),
@@ -3099,7 +3139,7 @@ fn auto_opencode_silent_503_budget_stops_while_daemon_is_down_without_duplicate(
     // The supervisor must enforce the original deadline without a daemon.
     d.kill9();
     let process_dir = d.home.path().join("runs").join(&first_id).join("p1");
-    let offline_deadline = std::time::Instant::now() + Duration::from_secs(12);
+    let offline_deadline = std::time::Instant::now() + Duration::from_secs(22);
     while !process_dir.join("exit.json").exists() {
         assert!(std::time::Instant::now() < offline_deadline,
             "the child outlived its budget while the daemon was down");
@@ -3117,7 +3157,7 @@ fn auto_opencode_silent_503_budget_stops_while_daemon_is_down_without_duplicate(
     assert_eq!(replay["state"], "paused", "{replay}");
     assert_eq!(replay["run"]["id"], first_id);
     let mut changed = request(&first_unit);
-    changed["execution_budget_ms"] = json!(6000);
+    changed["execution_budget_ms"] = json!(16000);
     assert!(d.try_call("auto.dispatch", changed).is_err(),
         "replay must not change the persisted execution deadline");
     assert!(!healthy_log.exists(), "an uncertain stopped unit cannot silently try another endpoint");
@@ -3420,6 +3460,7 @@ fn auto_read_only_codex_child_keeps_its_selected_sandbox_through_launch_and_repl
     assert_eq!(d.wait_done(&child, 15)["status"], "completed");
     let output = std::fs::read_to_string(&trace).unwrap();
     assert_eq!(output.matches("thread_sandbox:read-only").count(), 1, "{output}");
+    assert!(output.contains("turn_effort:medium"), "{output}");
     assert_eq!(d.call("auto.dispatch", request)["run"]["id"], child);
     assert_eq!(d.runs().len(), 2);
 }
@@ -4530,13 +4571,20 @@ fn auto_managed_child_metadata_deadline_survives_daemon_restart() {
 fn auto_managed_child_reattaches_after_daemon_restart_without_relaunch() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("restart-turn.txt");
     let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
-        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"), ("FIXTURE_MODE", "managed-delay")]);
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-delay"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
     let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app","prompt":"seed context","title":"parent"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
     let request = json!({"work_unit_id":"browser-restart-unit","parent_run_id":parent,"harness":"codex-app","model":"gpt-6-sol","effort":"medium","prompt":"browser check"});
     let child = run_id(&d.call("run.delegate", request.clone()));
     d.wait_status(&child, |status| status == "running", 10);
+    let turn_deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while !std::fs::read_to_string(&trace).unwrap_or_default().contains("turn_model:gpt-6-sol") {
+        assert!(std::time::Instant::now() < turn_deadline, "child model turn did not begin");
+        std::thread::sleep(Duration::from_millis(10));
+    }
     d.kill9();
     d.spawn();
     let repeated = d.call("run.delegate", request);

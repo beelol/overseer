@@ -1116,6 +1116,18 @@ impl Daemon {
         let effort = opts.effort.clone().or_else(|| generic_meta["opts"]["effort"].as_str().map(str::to_string));
         let mode = opts.mode.clone().or_else(|| generic_meta["opts"]["mode"].as_str().map(str::to_string));
         adapters::check_turn_options(&run.harness, effort.as_deref(), mode.as_deref(), opts.images.len())?;
+        let saved_sandbox = generic_meta["sandbox"].as_str().unwrap_or("workspace-write");
+        if !matches!(saved_sandbox, "read-only" | "workspace-write") {
+            bail!("saved run sandbox is unsupported");
+        }
+        if run.harness == "codex" {
+            if saved_sandbox == "read-only" && mode.as_deref() == Some("workspace-write") {
+                bail!("turn cannot widen the saved read-only sandbox");
+            }
+            if mode.as_deref() == Some("read-only") {
+                generic_meta["sandbox"] = json!("read-only");
+            }
+        }
         if let Some(m) = &opts.model {
             if run.model.as_deref() != Some(m.as_str()) {
                 self.store.lock().unwrap().conn.execute("UPDATE runs SET model=?2 WHERE id=?1", rusqlite::params![run_id, m])?;

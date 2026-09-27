@@ -813,7 +813,33 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
         "rate_limit_event" => {
             let mut out = vec![Norm::Quota(v.clone())];
             if let Some(info) = v.get("rate_limit_info") {
-                out.push(Norm::Usage(json!({"rate_limits": {"claude_rate_limit": info}})));
+                // Account usage needs the known meter fields, not arbitrary
+                // provider prose that may accompany the native event.
+                let mut meter = serde_json::Map::new();
+                for key in ["status", "rateLimitType"] {
+                    if let Some(value) = info[key].as_str() {
+                        meter.insert(key.into(), json!(value));
+                    }
+                }
+                if let Some(value) = info["resetsAt"].as_i64() {
+                    meter.insert("resetsAt".into(), json!(value));
+                }
+                let mut windows = serde_json::Map::new();
+                for key in ["five_hour", "seven_day", "seven_day_opus"] {
+                    let window = &info["unifiedWindows"][key];
+                    let mut fields = serde_json::Map::new();
+                    if let Some(value) = window["utilization"].as_f64() {
+                        fields.insert("utilization".into(), json!(value));
+                    }
+                    if let Some(value) = window["resetsAt"].as_i64() {
+                        fields.insert("resetsAt".into(), json!(value));
+                    }
+                    if !fields.is_empty() {
+                        windows.insert(key.into(), Value::Object(fields));
+                    }
+                }
+                meter.insert("unifiedWindows".into(), Value::Object(windows));
+                out.push(Norm::Usage(json!({"rate_limits": {"claude_rate_limit": meter}})));
             }
             out
         },

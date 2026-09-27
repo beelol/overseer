@@ -24,7 +24,7 @@ def audit(rfc=RFC, ledger=LEDGER, *extra):
 
 class LedgerAuditTests(unittest.TestCase):
     def test_current_rfc_tracks_all_core_criteria_and_keeps_release_files_separate(self):
-        result = audit(RFC, LEDGER, "--base", "2c2c7cf")
+        result = audit(RFC, LEDGER, "--base", "origin/main")
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(result.stdout)
         self.assertEqual(report["core_total"], 40)
