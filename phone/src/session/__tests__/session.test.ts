@@ -252,6 +252,23 @@ describe('the session', () => {
     expect(session.getSnapshot().state.runs.byId.size).toBe(0);
   });
 
+  test('revoked on the Mac, a write of the cache that was waiting stores nothing again', async () => {
+    const { session, connection, cache } = make();
+    connection.gateway = GATEWAY;
+    await session.start();
+    connection.go('online');
+    await settle();
+    // The connection says revoked (the cache write is put off), then the pairing is forgotten.
+    connection.go('revoked');
+    connection.gateway = null;
+    connection.emit('forgotten', 'revoked');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(cache.get('state')).toBeNull();
+    expect(cache.get('stateAt')).toBeNull();
+    await session.stop();
+    expect(cache.get('state')).toBeNull();
+  });
+
   test('notification switches show at once and go back when the Mac refuses', async () => {
     const { session, connection } = make();
     connection.gateway = GATEWAY;

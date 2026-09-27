@@ -403,6 +403,11 @@ export class Session {
   }
 
   private onForgotten(): void {
+    // A write of the cache may be waiting: it would store the state again after it is deleted.
+    if (this.cacheTimer !== null) {
+      clearTimeout(this.cacheTimer);
+      this.cacheTimer = null;
+    }
     this.pending = [];
     this.open.clear();
     this.deps.cache.delete('state');
@@ -538,6 +543,8 @@ export class Session {
     const every = this.deps.cacheEveryMs ?? 5_000;
     const write = (): void => {
       this.cacheTimer = null;
+      // Forgotten while the write waited: the phone keeps nothing of that Mac.
+      if (this.snapshot.stateAt === null) return;
       this.cacheWrittenAt = this.deps.now();
       this.deps.onStream?.(this.stream);
       try {
