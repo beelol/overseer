@@ -1,6 +1,6 @@
 //! overseer-listener: Overseer's voice listener, started by the daemon (Voice Mode, Gate R).
 //!
-//!     overseer-listener [--input mic|mic-plain|file:<wav>|stdin|feed] [--fast]
+//!     overseer-listener [--input mic|mic-plain|file:<wav>|stdin|feed|sim] [--fast]
 //!                       [--model <ggml.bin> | --script <words.json> | --script-live | --no-words]
 //!                       [--hint <words>] [--voice <name>] [--rate <wpm>]
 //!                       [--commands <timed.jsonl>] [--echo <gain>] [--no-control]
@@ -42,6 +42,7 @@ fn run() -> Result<()> {
                     },
                     "stdin" => Input::Stdin,
                     "feed" => Input::Feed,
+                    "sim" => Input::Sim,
                     other => match other.strip_prefix("file:") {
                         Some(p) => Input::File(PathBuf::from(p)),
                         None => bail!("unknown input {other}"),
@@ -86,6 +87,13 @@ fn run() -> Result<()> {
         recognizer = Some(Box::new(
             Whisper::load(&path).with_context(|| format!("loading {}", path.display()))?,
         ));
+    }
+    // Tests: a made-up voice for Overseer instead of `say`, so a busy Mac cannot slow them.
+    if std::env::var_os("OVERSEER_LISTENER_TEST_VOICE").is_some() {
+        fn made_up(_text: &str) -> Vec<f32> {
+            overseer_listener::synth::speechlike(1.0, 0.4)
+        }
+        opts.synth = Some(made_up);
     }
     listener::run(opts, recognizer, std::io::stdout())
 }

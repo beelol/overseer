@@ -28,8 +28,11 @@ pub enum Input {
     File(PathBuf),
     /// 16-bit little-endian mono PCM at 16 kHz on standard input.
     Stdin,
-    /// Audio in `feed` commands (the daemon's simulated voice).
+    /// Audio in `feed` commands.
     Feed,
+    /// The simulated voice: a real-time stream of room tone into which `simulate` commands mix
+    /// speech or noise (`OVERSEER_VOICE_SIMULATE=1` in the daemon).
+    Sim,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -165,6 +168,10 @@ struct State<W: Write> {
     /// Phrases already made (the common lines), by text.
     made: std::collections::HashMap<String, Vec<f32>>,
     script: Option<std::sync::Arc<std::sync::Mutex<Vec<crate::recognize::ScriptLine>>>>,
+    /// The simulated voice's queue of sound to mix in.
+    sim: std::sync::Arc<std::sync::Mutex<VecDeque<f32>>>,
+    /// The stream's clock, shared with the simulated voice's workers.
+    clock: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
 fn ms(samples: u64) -> u64 {
@@ -382,6 +389,68 @@ impl<W: Write> State<W> {
             Command::FeedEnd => {
                 let _ = tx.send(Msg::InputEnded);
             }
+            Command::Simulate {
+                speech,
+                voice,
+                speechlike,
+                noise,
+                words,
+                gain,
+            } => {
+                let sim = self.sim.clone();
+                let script = self.script.clone();
+                let clock = self.clock.clone();
+                let back = tx.clone();
+                let make = move || -> Result<()> {
+                    let (samples, default_words) = if let Some(text) = &speech {
+                        (
+                            speak::say(text, voice.as_deref(), None)?,
+                            Some(text.clone()),
+                        )
+                    } else if let Some(secs) = speechlike {
+                        (crate::synth::speechlike(secs, 0.5), None)
+                    } else if let Some(kind) = &noise {
+                        (
+                            crate::synth::noise(kind, 7, 1.0)
+                                .ok_or_else(|| anyhow::anyhow!("unknown noise {kind}"))?,
+                            None,
+                        )
+                    } else {
+                        anyhow::bail!("simulate needs speech, speechlike or noise")
+                    };
+                    let g = gain.unwrap_or(1.0);
+                    let mut q = sim.lock().unwrap();
+                    // It starts now, after what is still queued.
+                    let start_ms =
+                        (clock.load(std::sync::atomic::Ordering::Relaxed) + q.len() as u64) * 1000
+                            / RATE as u64;
+                    let onset = samples.iter().position(|v| v.abs() > 0.02).unwrap_or(0) as u64
+                        * 1000
+                        / RATE as u64;
+                    let dur = samples.len() as u64 * 1000 / RATE as u64;
+                    if let (Some(text), Some(s)) = (words.or(default_words), &script) {
+                        s.lock().unwrap().push(crate::recognize::ScriptLine {
+                            start_ms: start_ms + onset,
+                            end_ms: start_ms + dur,
+                            text,
+                        });
+                    }
+                    q.extend(samples.into_iter().map(|v| v * g));
+                    Ok(())
+                };
+                if self.synth_work.is_some() {
+                    std::thread::spawn(move || {
+                        if let Err(e) = make() {
+                            let _ = back.send(Msg::Fail(format!("could not simulate: {e}")));
+                        }
+                    });
+                } else if let Err(e) = make() {
+                    self.out.send(&Event::Error {
+                        message: format!("could not simulate: {e}"),
+                        t_ms: self.now_ms(),
+                    });
+                }
+            }
             Command::Script { lines } => match &self.script {
                 Some(s) => s.lock().unwrap().extend(lines),
                 None => self.out.send(&Event::Error {
@@ -421,6 +490,8 @@ impl<W: Write> State<W> {
             }
         }
         self.t += FRAME as u64;
+        self.clock
+            .store(self.t, std::sync::atomic::Ordering::Relaxed);
         self.frames += 1;
         let suppressed = self.t <= self.suppress_until;
         let (gate_event, open) = if suppressed {
@@ -574,6 +645,8 @@ pub fn run<W: Write + Send + 'static>(
         output: None,
         made: Default::default(),
         script: opts.script.clone(),
+        sim: Default::default(),
+        clock: Default::default(),
     };
     // Recognition: inline for a deterministic fast run, otherwise on its own thread.
     if let Some(r) = recognizer {
@@ -694,6 +767,35 @@ pub fn run<W: Write + Send + 'static>(
             "stdin".to_string()
         }
         Input::Feed => "feed".to_string(),
+        Input::Sim => {
+            let queue = st.sim.clone();
+            let back = tx.clone();
+            std::thread::spawn(move || {
+                // 20 ms at a time, in real time: queued sound, else quiet room tone.
+                let start = std::time::Instant::now();
+                let mut room = crate::synth::Noise::new(11);
+                for i in 0u64.. {
+                    let due = start + std::time::Duration::from_millis(20 * i);
+                    if let Some(wait) = due.checked_duration_since(std::time::Instant::now()) {
+                        std::thread::sleep(wait);
+                    }
+                    let mut frame: Vec<f32> = (0..FRAME).map(|_| 0.002 * room.next()).collect();
+                    {
+                        let mut q = queue.lock().unwrap();
+                        for s in frame.iter_mut() {
+                            match q.pop_front() {
+                                Some(v) => *s += v,
+                                None => break,
+                            }
+                        }
+                    }
+                    if back.send(Msg::Frame(frame)).is_err() {
+                        return;
+                    }
+                }
+            });
+            "sim".to_string()
+        }
     };
     st.out.send(&Event::Ready {
         input: input_name,

@@ -112,6 +112,24 @@ pub enum Command {
     },
     /// Feed mode: the simulated input has ended.
     FeedEnd,
+    /// The simulated voice (`--input sim`): mixes sound into the stream now, after anything still
+    /// queued. `speech` is said with `say` (in `voice`), `speechlike` is a made-up voice of that many
+    /// seconds, `noise` is one of the noises the gate must reject. `words` are what the recognizer
+    /// should hear for it (default: the speech's text; none for a noise).
+    Simulate {
+        #[serde(default)]
+        speech: Option<String>,
+        #[serde(default)]
+        voice: Option<String>,
+        #[serde(default)]
+        speechlike: Option<f32>,
+        #[serde(default)]
+        noise: Option<String>,
+        #[serde(default)]
+        words: Option<String>,
+        #[serde(default)]
+        gain: Option<f32>,
+    },
     /// Simulated voice: the words that go with audio being fed, for a listener started with
     /// `--script-live`.
     Script {
