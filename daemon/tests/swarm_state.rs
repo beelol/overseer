@@ -153,6 +153,9 @@ fn stopped_empty_swarm_is_terminal_and_releases_category() {
     assert_eq!(stopped["status"],"stopped","{stopped}");
     assert_eq!(d.call("swarm.get",json!({"id":id}))["status"],"stopped");
     assert_eq!(d.call("swarm.get",json!({"id":id}))["stop_reason"],"requested");
+    let coverage=d.call("swarm.coverage",json!({"run_id":id}));
+    assert_eq!(coverage["outcome"],"incomplete","{coverage}");
+    assert_eq!(coverage["rows"].as_array().unwrap().len(),0);
     let again = d.call("swarm.create",json!({"category":"Reusable", "objective":"Next audit",
         "allowed_targets":[]}));
     assert_ne!(again["id"],id);
@@ -276,6 +279,9 @@ fn narrowed_scope_completion_requires_only_retained_jobs() {
     let mut good=base;
     good["checks"]=json!([check]);
     assert_eq!(d.call("swarm.complete",good)["status"],"completed");
+    let coverage=d.call("swarm.coverage",json!({"run_id":run}));
+    assert_eq!(coverage["outcome"],"complete","{coverage}");
+    assert_eq!(coverage["completion"]["valid"],true);
 }
 
 #[test]

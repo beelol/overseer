@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 
 pub fn report(store: &Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
-    get(store, run)?;
+    let current = get(store, run)?;
     let mut stmt = store
         .conn
         .prepare("SELECT id,plan_revision,status,stop_reason,attempt_count
@@ -113,5 +113,23 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
             "artifact_ids":payload["artifact_ids"]
         }));
     }
-    Ok(json!({"run_id":run,"rows":rows}))
+    // The per-job rows are durable evidence, but a stopped run must also give
+    // callers an explicit overall disposition. Only the separately gated
+    // completion record can establish a complete result. In particular, a
+    // stopped run with accepted checks or a director-declared unresolved
+    // conflict remains incomplete after restart.
+    let status = current["status"].as_str().unwrap_or("");
+    let outcome = match status {
+        "completed" if current["completion"]["valid"] == true => "complete",
+        "completed" | "invalidated" => "invalidated",
+        "stopped" => "incomplete",
+        "stopping" | "draining" => "settling",
+        "stalled" => "blocked",
+        _ if current["availability"]["state"] == "blocked" => "blocked",
+        _ => "in_progress",
+    };
+    let conflicts = super::conflicts::list(store, &json!({"run_id":run}))?["conflicts"].clone();
+    Ok(json!({"run_id":run,"run_status":status,"outcome":outcome,
+        "stop_reason":current["stop_reason"],"completion":current["completion"],
+        "conflicts":conflicts,"rows":rows}))
 }

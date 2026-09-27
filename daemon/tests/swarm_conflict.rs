@@ -157,6 +157,63 @@ fn explicitly_unresolved_conflict_remains_visible_and_blocks_acceptance() {
 }
 
 #[test]
+fn stopped_disagreement_reports_incomplete_coverage_after_restart() {
+    let mut d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Partial conflict report",
+        "objective":"Audit disputed task responses","allowed_targets":["fixture"]}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"First path","acceptance":"response proof"},
+        {"id":"right","title":"Second path","acceptance":"response proof"},
+        {"id":"independent","title":"Separate path","acceptance":"separate proof"}
+    ]}));
+    let left=submit(&d,run,"left","finding","foreign request returned 200");
+    let right=submit(&d,run,"right","finding","same request returned 403");
+    let independent=submit(&d,run,"independent","finding","separate path denied request");
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"independent","decision":"accept","evidence":["independent-evidence"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"independent","attempt_id":independent["id"]}));
+    d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"different-responses","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"Incompatible responses"}));
+    d.call("swarm.conflict.resolve",json!({"run_id":run,"generation":1,
+        "revision":1,"conflict_id":"different-responses","outcome":"unresolved"}));
+    assert_eq!(d.call("swarm.stop",json!({"run_id":run}))["status"],"stopping");
+    for (job,attempt) in [("left",left),("right",right)] {
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":job,"attempt_id":attempt["id"]}));
+    }
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["status"],"stopped");
+    d.kill9();
+    d.spawn();
+    let report=d.call("swarm.coverage",json!({"run_id":run}));
+    assert_eq!(report["outcome"],"incomplete","{report}");
+    assert_eq!(report["run_status"],"stopped","{report}");
+    assert_eq!(report["stop_reason"],"requested","{report}");
+    assert_eq!(report["completion"],Value::Null,"{report}");
+    let rows=report["rows"].as_array().unwrap();
+    assert_eq!(rows.iter().find(|r|r["job_id"]=="independent").unwrap()["coverage_state"],
+        "checked_negative");
+    for job in ["left","right"] {
+        assert_eq!(rows.iter().find(|r|r["job_id"]==job).unwrap()["coverage_state"],
+            "conflict_unresolved");
+    }
+    let conflict=&report["conflicts"][0];
+    assert_eq!(conflict["status"],"unresolved","{report}");
+    assert_eq!(conflict["left_artifact_id"],"left-evidence");
+    assert_eq!(conflict["right_artifact_id"],"right-evidence");
+    assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"false-pass","summary":"Done",
+        "verification":"No disagreement","checks":[
+            {"job_id":"left","outcome":"passed","evidence":["left-evidence"]},
+            {"job_id":"right","outcome":"passed","evidence":["right-evidence"]},
+            {"job_id":"independent","outcome":"passed","evidence":["independent-evidence"]}
+        ]})).is_err());
+}
+
+#[test]
 fn late_conflict_holds_accepted_jobs_until_contradicted_review_is_revised() {
     let mut d = Daemon::start(&[]);
     let made = d.call("swarm.create",json!({"category":"Late contradiction",
