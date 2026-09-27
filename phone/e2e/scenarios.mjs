@@ -238,8 +238,9 @@ export const scenarios = [
     criteria: ['AC-125', 'AC-130'],
     says: 'Stop all agents names how many will stop, asks once, and stops them',
     async run(c) {
-      c.lab.mode('slow');
-      const one = c.lab.agent('slow', 'Count the stock', 'count');
+      // Two agents that stay going until they are stopped: each waits for the owner's answer.
+      // (The lab's slow agent is done in 400 ms, often before it was seen going.)
+      const one = c.lab.agent('showcase-permission', 'Count the stock', 'count');
       const two = c.lab.agent('showcase-permission', 'Price the returns', 'price');
       await c.until('two agents going', () => ACTIVE.includes(run(c, one).status) && ACTIVE.includes(run(c, two).status));
       await c.flow('stop-all');
