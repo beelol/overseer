@@ -205,6 +205,15 @@ impl Store {
             CREATE TABLE IF NOT EXISTS queued_messages(
               run_id TEXT NOT NULL, ts INTEGER NOT NULL, source TEXT NOT NULL, text TEXT NOT NULL, detail TEXT,
               delivered_ms INTEGER, turn_id TEXT);
+            CREATE TABLE IF NOT EXISTS channels(run_id TEXT PRIMARY KEY, briefing INTEGER NOT NULL, channel INTEGER NOT NULL, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS briefings(run_id TEXT NOT NULL, ts INTEGER NOT NULL, text TEXT NOT NULL, how TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS agent_messages(
+              id TEXT PRIMARY KEY, run_id TEXT NOT NULL, kind TEXT NOT NULL, ts INTEGER NOT NULL, body TEXT NOT NULL,
+              answer TEXT, answered_ms INTEGER);
+            CREATE TABLE IF NOT EXISTS shares(
+              id TEXT PRIMARY KEY, ts INTEGER NOT NULL, from_run TEXT, to_run TEXT NOT NULL, kind TEXT NOT NULL, source TEXT NOT NULL,
+              bytes INTEGER NOT NULL, inline_bytes INTEGER NOT NULL, file TEXT, proposal TEXT, content_id TEXT NOT NULL, withdrawn_ms INTEGER);
+            CREATE TABLE IF NOT EXISTS share_denials(run_id TEXT PRIMARY KEY, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
             "#,
         )?;
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;

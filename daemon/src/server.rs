@@ -345,6 +345,26 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             None => json!({"run_id": p["run_id"], "cadence": d.cadence_of(p["run_id"].as_str().unwrap_or("")).text()}),
         },
         "agent.check_ins" => d.check_ins_of(s(p, "run_id")?)?,
+        "agent.channel" => match (p["run_id"].as_str(), p["briefing"].as_bool(), p["channel"].as_bool(), p["default"].as_str()) {
+            (Some(run), None, None, None) => {
+                let (b, c) = d.channel_of(run)?;
+                json!({"run_id": run, "briefing": b, "channel": c})
+            }
+            (run, b, c, default) => d.set_channel(run, b, c, default, p["by"].as_str().unwrap_or("owner"))?,
+        },
+        "agent.briefings" => d.briefings_of(s(p, "run_id")?)?,
+        "agent.area" => {
+            let paths: Vec<String> = p["paths"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+            d.set_area(s(p, "run_id")?, &paths, p["by"].as_str().unwrap_or("owner"))?
+        }
+        "channel.messages" => d.channel_messages(p["run_id"].as_str(), p["limit"].as_i64().unwrap_or(200))?,
+        "overseer.rally" => {
+            let agents = p["agents"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect::<Vec<_>>());
+            d.rally(p["repo"].as_str(), agents)?
+        }
+        "share.list" => d.shares_list(p["run_id"].as_str())?,
+        "share.withdraw" => d.share_withdraw(s(p, "id")?, p["by"].as_str().unwrap_or("owner"))?,
+        "agent.share_deny" => d.share_deny(s(p, "run_id")?, p["denied"].as_bool().unwrap_or(true), p["by"].as_str().unwrap_or("owner"))?,
         "overseer.cap" => match p["cap"].as_i64() {
             Some(c) => d.set_cap(c)?,
             None => json!({"cap": d.cap_of(), "self_started_today": d.self_started_today()}),

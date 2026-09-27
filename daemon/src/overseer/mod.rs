@@ -3,6 +3,7 @@
 //! agents) and the conversation with Overseer. The model never touches an agent, a worktree or a
 //! shell directly: it reads through `overseer.tool` and asks the daemon to act.
 
+pub mod channel;
 pub mod checkin;
 pub mod conflicts;
 pub mod control;
@@ -23,6 +24,24 @@ pub(crate) fn tool_list(role: &str) -> Vec<Value> {
         "description": "Every agent Overseer runs, one line each: id, title, status, harness, repository, worktree, files changed.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false}
     })];
+    if role == "agent" {
+        // The channel (AC-190): report, ask and claim, attributed by the token.
+        tools.push(json!({
+            "name": "report",
+            "description": "Tell Overseer what you are doing, what you have changed, what you need and what blocks you. The same report sent again has one effect.",
+            "inputSchema": {"type": "object", "properties": {"doing": {"type": "string"}, "changed": {"type": "array", "items": {"type": "string"}}, "needs": {"type": "string"}, "blocked": {"type": "string"}}, "required": ["doing"], "additionalProperties": false}
+        }));
+        tools.push(json!({
+            "name": "ask",
+            "description": "Ask Overseer a question about the other agents or the work; it answers from what it knows or asks the agent concerned, and the answer arrives as a message from Overseer.",
+            "inputSchema": {"type": "object", "properties": {"question": {"type": "string"}}, "required": ["question"], "additionalProperties": false}
+        }));
+        tools.push(json!({
+            "name": "claim",
+            "description": "Claim the paths (files or directories, relative to the repository) you are taking as your area; another agent writing there is a conflict.",
+            "inputSchema": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}}}, "required": ["paths"], "additionalProperties": false}
+        }));
+    }
     if role == "overseer" {
         tools.push(json!({
             "name": "agent",
@@ -50,9 +69,19 @@ pub(crate) fn tool_list(role: &str) -> Vec<Value> {
             "inputSchema": {"type": "object", "properties": {"agent": {"type": "string"}, "result": {"type": "string", "enum": ["on_task", "drifting", "done"]}, "reason": {"type": "string"}, "left_out": {"type": "string"}}, "required": ["agent", "result", "reason"], "additionalProperties": false}
         }));
         tools.push(json!({
+            "name": "rally",
+            "description": "The map of the agents in one repository (by default the one with the most active agents): who owns what (areas), where they overlap, what each needs, and which agents' digests cannot answer (no area, no report) and would cost one agent turn each to ask for a report. Built by the daemon with no model.",
+            "inputSchema": {"type": "object", "properties": {"repo": {"type": "string"}, "agents": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}
+        }));
+        tools.push(json!({
+            "name": "answer",
+            "description": "Answer an agent's question (its ask id): the answer goes to the agent as a message from Overseer, at the owner's level.",
+            "inputSchema": {"type": "object", "properties": {"ask": {"type": "string"}, "text": {"type": "string"}}, "required": ["ask", "text"], "additionalProperties": false}
+        }));
+        tools.push(json!({
             "name": "propose",
-            "description": "Ask the daemon for actions on agents: message (agent, text), stop (agent), pin (agent), start (repo, title, prompt). The daemon checks each one and, at the owner's level, either records a proposal that waits for the owner's yes or carries it out. Returns what happened.",
-            "inputSchema": {"type": "object", "properties": {"actions": {"type": "array", "items": {"type": "object", "properties": {"action": {"type": "string", "enum": ["message", "stop", "pin", "start"]}, "agent": {"type": "string"}, "text": {"type": "string"}, "repo": {"type": "string"}, "title": {"type": "string"}, "prompt": {"type": "string"}}, "required": ["action"]}}}, "required": ["actions"], "additionalProperties": false}
+            "description": "Ask the daemon for actions on agents: message (agent, text), stop (agent), pin (agent), start (repo, title, prompt), hold (agent, reason), release (agent), guardrail (agent, words, allow, deny), redirect (agent, text), cadence (agent, cadence), report (agent: ask it for a report), area (agent, paths), share (to, from, what: diff|report|messages|note|finding, path, text), withdraw (share), archive (agent). The daemon checks each one and, at the owner's level, either records a proposal that waits for the owner's yes or carries it out. Returns what happened.",
+            "inputSchema": {"type": "object", "properties": {"actions": {"type": "array", "items": {"type": "object", "properties": {"action": {"type": "string", "enum": ["message", "stop", "pin", "start", "hold", "release", "guardrail", "redirect", "cadence", "report", "area", "share", "withdraw", "archive", "answer"]}, "agent": {"type": "string"}, "text": {"type": "string"}, "repo": {"type": "string"}, "title": {"type": "string"}, "prompt": {"type": "string"}, "reason": {"type": "string"}, "paths": {"type": "array", "items": {"type": "string"}}, "to": {"type": "string"}, "from": {"type": "string"}, "what": {"type": "string"}, "path": {"type": "string"}, "share": {"type": "string"}, "ask": {"type": "string"}, "cadence": {"type": "string"}, "words": {"type": "string"}, "allow": {"type": "array", "items": {"type": "string"}}, "deny": {"type": "array", "items": {"type": "string"}}}, "required": ["action"]}}}, "required": ["actions"], "additionalProperties": false}
         }));
     }
     tools
@@ -101,6 +130,26 @@ impl Daemon {
             }
             "check_in" => match self.record_check_in(arguments["agent"].as_str().unwrap_or(""), arguments["result"].as_str().unwrap_or(""), arguments["reason"].as_str().unwrap_or(""), arguments["left_out"].as_str().unwrap_or("")) {
                 Ok(_) => "Recorded.".to_string(),
+                Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
+            },
+            "report" => match self.channel_report(&run_id, arguments) {
+                Ok(t) => t,
+                Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
+            },
+            "ask" => match self.channel_ask(&run_id, arguments) {
+                Ok(t) => t,
+                Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
+            },
+            "claim" => match self.channel_claim(&run_id, arguments) {
+                Ok(t) => t,
+                Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
+            },
+            "rally" => {
+                let agents = arguments["agents"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect::<Vec<_>>());
+                serde_json::to_string_pretty(&self.rally(arguments["repo"].as_str(), agents)?)?
+            }
+            "answer" => match self.overseer_propose(&json!([{"action": "answer", "ask": arguments["ask"], "text": arguments["text"]}]), "tool") {
+                Ok(r) => format!("{} (proposal {})", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or("")),
                 Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
             },
             "propose" => match self.overseer_propose(&arguments["actions"], "tool") {
@@ -161,7 +210,7 @@ pub(crate) fn bound(s: &str, max: usize) -> String {
 
 impl Daemon {
     /// A run's conversation as text: messages and tool steps, oldest first, from `after`.
-    fn conversation_text(&self, run_id: &str, after: i64, limit: i64) -> Result<String> {
+    pub(crate) fn conversation_text(&self, run_id: &str, after: i64, limit: i64) -> Result<String> {
         let run = self.run(run_id)?;
         let events = self.store.lock().unwrap().events_after(after.max(0), Some(&run.id), limit.clamp(1, 1000))?;
         let mut lines = Vec::new();

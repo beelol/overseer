@@ -18,9 +18,9 @@ if (process.argv.includes('auth') && process.argv.includes('status')) { console.
 if (!process.argv.includes('-p')) { console.log('claude-fixture 0.0.0 (synthetic)'); process.exit(0); }
 // CLAUDE_FIXTURE_MODE_FILE lets one test session give each task its own mode (read at start).
 const modeFile = process.env.CLAUDE_FIXTURE_MODE_FILE;
-// Overseer's own run is the one given the daemon's tools (--mcp-config): it is always Overseer,
-// whatever mode the agents' processes run in.
-const mode = process.argv.includes('--mcp-config') ? 'overseer' : (modeFile && fs.existsSync(modeFile) && fs.readFileSync(modeFile, 'utf8').trim()) || process.env.CLAUDE_FIXTURE_MODE || process.env.FIXTURE_MODE || 'nested';
+// Overseer's own run is the one whose prompt carries the agents' state: it is always Overseer,
+// whatever mode the agents' processes run in (the mode is settled once the first prompt is read).
+let mode = (modeFile && fs.existsSync(modeFile) && fs.readFileSync(modeFile, 'utf8').trim()) || process.env.CLAUDE_FIXTURE_MODE || process.env.FIXTURE_MODE || 'nested';
 const sid = 'fixture-session-1';
 const out = o => process.stdout.write(JSON.stringify(o) + '\n');
 const assistant = (content, parent = null) => out({ type: 'assistant', session_id: sid, parent_tool_use_id: parent, message: { role: 'assistant', content } });
@@ -55,6 +55,8 @@ async function mcpClient() {
 
 (async () => {
   const first = await next(m => m.type === 'user');
+  const firstText = Array.isArray(first.message.content) ? first.message.content.filter(c => c.type === 'text').map(c => c.text).join('\n') : String(first.message.content);
+  if (firstText.includes('<overseer-state>')) mode = 'overseer';
   out({ type: 'system', subtype: 'init', session_id: sid, model: 'fixture', cwd: process.cwd(), tools: ['Agent', 'Write'] });
   if (mode === 'nested') {
     // Grandchild traffic arrives before the child's Agent tool_use is reported (delayed parent).
@@ -245,11 +247,48 @@ async function mcpClient() {
     // A check-in composed by the daemon: one check_in call per agent, from the JSON it sent; an
     // agent whose files left its area (or whose task names a part it left out) is drifting or
     // done-with-something-left-out; for drifting, propose what the prompt says the level allows.
-    const checkIn = /Check-in \(JSON\):\n([\s\S]*?)\n\nDigests:/.exec(text);
+    const checkIn = /Check-in \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    const questions = /Questions \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    const reports = /Reports \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    const rallyAsk = /rally my agents(?: in (\S+))?/i.exec(said);
+    // The rally's map: ask only the agents whose digests cannot answer (one report each, the cost
+    // said first); once every digest answers, propose the areas in one proposal.
+    const rally = async repo => {
+      const map = JSON.parse(await call('rally', repo ? { repo } : {}));
+      if (map.ask.length) {
+        await call('propose', { actions: map.ask.map(id => ({ action: 'report', agent: id })) });
+        return `Rally: ${map.agents.length} agents in ${path.basename(map.repository)}; ${map.ask.length} of them have no area and no report, so I asked them for a report (${map.cost}).`;
+      }
+      const areas = map.agents.filter(a => !a.area.length && a.suggested_area.length).map(a => ({ action: 'area', agent: a.id, paths: a.suggested_area }));
+      if (areas.length) await call('propose', { actions: areas });
+      const owns = map.agents.map(a => `${a.title} owns ${(a.area.length ? a.area : a.suggested_area).join(', ') || 'nothing yet'}${a.needs ? ` (needs ${a.needs})` : ''}`).join('; ');
+      const overlap = map.overlaps.length ? ' Overlaps: ' + map.overlaps.map(o => o.path).join(', ') + '.' : ' No overlaps.';
+      return `Map: ${owns}.${overlap}${areas.length ? ` I proposed ${areas.length} areas.` : ''}`;
+    };
+    if (rallyAsk && mcp) {
+      const reply = await rally(rallyAsk[1]);
+      assistant([{ type: 'text', text: reply }]);
+      result(false, reply);
+      mcp.close();
+      await sleep(100);
+      process.exit(0);
+    }
+    if (mcp && (questions || reports) && !checkIn) {
+      const lines = [];
+      for (const q of questions ? JSON.parse(questions[1]) : []) lines.push(await call('answer', { ask: q.id, text: 'From the roster: ' + q.question.replace(/\?$/, '') + ' — see the other agents\' digests.' }));
+      if (reports) { const list = JSON.parse(reports[1]); lines.push(await rally(list[0]?.repository)); }
+      reply = lines.join(' ');
+      assistant([{ type: 'text', text: reply }]);
+      result(false, reply);
+      mcp.close();
+      await sleep(100);
+      process.exit(0);
+    }
     if (checkIn && mcp) {
       const level = (/The level is (\w+)\./.exec(text) || [])[1] || 'ask_first';
       const items = JSON.parse(checkIn[1]);
       const lines = [];
+      for (const q of questions ? JSON.parse(questions[1]) : []) lines.push(await call('answer', { ask: q.id, text: 'From the roster: ' + q.question.replace(/\?$/, '') + ' — see the other agents\' digests.' }));
       for (const it of items) {
         const outside = it.area && it.area.length ? it.changed.filter(p => !it.area.some(a => p === a || p.startsWith(a.replace(/\/$/, '') + '/'))) : [];
         const leftOut = (it.asked.join(' ').match(/\[leave out: ([^\]]+)\]/) || [])[1];
@@ -294,6 +333,55 @@ async function mcpClient() {
       else if (mcp) { const outcome = await call('propose', { actions: [{ action: 'message', agent: who.id, text: `Please ${task}.` }] }); reply = `I proposed sending ${who.title} this message: "Please ${task}." ${outcome}`; }
       else reply = `I will send ${who.title} this follow-up: "Please ${task}."\n\n\`\`\`overseer-actions\n${JSON.stringify([{ action: 'message', agent: who.id, title: who.title, text: `Please ${task}.` }])}\n\`\`\``;
     } else reply = 'I can tell you what your agents are doing, or pass a message to one of them.';
+    assistant([{ type: 'text', text: reply }]);
+    result(false, reply);
+    if (mcp) mcp.close();
+  } else if (mode === 'channel') {
+    // An agent with Overseer's channel (AC-190): it writes the files its prompt names (write:),
+    // claims, reports and asks as the prompt says (claim:, report:, ask:; "report x3:" repeats),
+    // answers a request for a report from Overseer with what git sees, and refers to a share.
+    // Without --mcp-config (a lone agent) it has no channel and says so.
+    const text = firstText;
+    const mcp = await mcpClient();
+    let n = 0;
+    const call = async (name, args) => {
+      const id = `toolu_mcp_${++n}`;
+      assistant([{ type: 'tool_use', id, name: `mcp__overseer__${name}`, input: args }]);
+      out({ type: 'control_request', request_id: `req-mcp-${n}`, request: { subtype: 'can_use_tool', tool_name: `mcp__overseer__${name}`, input: args } });
+      const reply = await next(m => m.type === 'control_response' && m.response?.request_id === `req-mcp-${n}`);
+      if (reply.response.response.behavior !== 'allow') throw new Error('tool refused');
+      const r = await mcp.call(name, args);
+      user([{ type: 'tool_result', tool_use_id: id, content: r.content, is_error: !!r.isError }]);
+      return r.content.map(c => c.text || '').join('');
+    };
+    const writes = [...text.matchAll(/write: (\S+)/g)].map(m => m[1]);
+    for (const rel of writes) {
+      const file = path.join(process.cwd(), rel);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const content = '// written by the fixture\n';
+      const id = `toolu_w_${++n}`;
+      assistant([{ type: 'tool_use', id, name: 'Write', input: { file_path: file, content } }]);
+      fs.writeFileSync(file, content);
+      user([{ type: 'tool_result', tool_use_id: id, content: 'File created successfully at: ' + file }]);
+    }
+    const lines = [];
+    const claim = /claim: ([^;\n]+)/.exec(text);
+    if (claim && mcp) lines.push(await call('claim', { paths: claim[1].split(',').map(s => s.trim()) }));
+    const rep = /report(?: x(\d+))?: ([^;\n]+)/.exec(text);
+    if (rep && mcp) { for (let i = 0; i < Number(rep[1] || 1); i++) lines.push(await call('report', { doing: rep[2].trim(), changed: writes, needs: '', blocked: '' })); }
+    const ask = /ask: ([^;\n]+)/.exec(text);
+    if (ask && mcp) lines.push(await call('ask', { question: ask[1].trim() }));
+    if (/Report, with your report tool/.test(text) && mcp) {
+      const changed = require('child_process').execSync('git status --porcelain', { encoding: 'utf8' }).split('\n').filter(Boolean).map(l => l.slice(3).trim());
+      lines.push(await call('report', { doing: 'working in ' + path.basename(process.cwd()), changed, needs: '', blocked: '' }));
+    }
+    let reply;
+    const shared = /Shared by Overseer from (.+?) \(/.exec(text);
+    if (shared) reply = 'Read the share from ' + shared[1] + '; using it.';
+    else if (/Withdrawn: what Overseer shared/.test(text)) reply = 'Dropped the withdrawn share.';
+    else if (/Answer to your question/.test(text)) reply = 'Got the answer from Overseer.';
+    else if (/Briefing from Overseer/.test(text) && !claim && !rep && !ask) reply = 'Noted the briefing.';
+    else reply = mcp ? 'channel: ' + lines.join(' | ') : 'no channel';
     assistant([{ type: 'text', text: reply }]);
     result(false, reply);
     if (mcp) mcp.close();

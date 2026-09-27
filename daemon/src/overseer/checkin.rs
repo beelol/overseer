@@ -112,7 +112,7 @@ impl Daemon {
         self.check_in_due_at(run_id, reason, 0)
     }
 
-    fn check_in_due_at(&self, run_id: &str, reason: &str, not_before: i64) -> Result<()> {
+    pub(crate) fn check_in_due_at(&self, run_id: &str, reason: &str, not_before: i64) -> Result<()> {
         let run = self.run(run_id)?;
         if run.parent_run_id.is_some() || self.run_role(run_id) != "agent" {
             return Ok(());
@@ -286,8 +286,16 @@ impl Daemon {
         }
         let prompt = self.compose_check_in(&per)?;
         let harness = session["harness"].as_str().unwrap_or("claude").to_string();
-        self.overseer_turn_with_cause(&session, &prompt, &harness, session["model"].as_str(), "check_in")?;
+        // Questions and reports from the agents' channel ride the same turn; a turn with nothing
+        // else is theirs.
+        let is_channel = |r: &String| r.starts_with("ask:") || r.starts_with("report:");
+        let cause = if per.iter().any(|(_, reasons)| reasons.iter().any(|r| !is_channel(r))) { "check_in" } else if per.iter().any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("ask:"))) { "ask" } else { "report" };
+        self.overseer_turn_with_cause(&session, &prompt, &harness, session["model"].as_str(), cause)?;
         for (run, reasons) in &per {
+            let reasons: Vec<&String> = reasons.iter().filter(|r| !is_channel(r)).collect();
+            if reasons.is_empty() {
+                continue;
+            }
             let task = self.run(run).ok().map(|r| r.task_id);
             self.emit(task.as_deref(), Some(run), "check_in_started", "overseer", "exact", json!({"reasons": reasons}))?;
         }
@@ -296,23 +304,49 @@ impl Daemon {
 
     /// What Overseer reads for a check-in: each agent's digest and why it is looked at.
     fn compose_check_in(&self, per: &[(String, Vec<String>)]) -> Result<String> {
+        use rusqlite::OptionalExtension;
         let level = self.overseer_session()?["level"].as_str().unwrap_or("ask_first").to_string();
         let mut items = Vec::new();
+        let mut questions = Vec::new();
+        let mut reports = Vec::new();
         let mut texts = Vec::new();
         for (run, reasons) in per {
             let d = self.digest(run)?;
             let last_check = d.last_check_in.clone();
-            items.push(json!({"id": d.id, "title": d.title, "status": d.status, "reasons": reasons, "area": d.area, "changed": d.changed.iter().map(|c| c.path.clone()).collect::<Vec<_>>(), "asked": d.asked.iter().map(|a| a.text.clone()).collect::<Vec<_>>(), "last_check_in": last_check}));
+            let plain: Vec<&String> = reasons.iter().filter(|r| !r.starts_with("ask:") && !r.starts_with("report:")).collect();
+            for r in reasons {
+                if let Some(id) = r.strip_prefix("ask:") {
+                    let q: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT body FROM agent_messages WHERE id=?1 AND answer IS NULL", [id], |r| r.get(0)).optional()?;
+                    if let Some(body) = q.and_then(|b| serde_json::from_str::<Value>(&b).ok()) {
+                        questions.push(json!({"id": id, "agent": d.id, "title": d.title, "question": body["question"], "area": d.area, "repository": d.repository}));
+                    }
+                } else if let Some(id) = r.strip_prefix("report:") {
+                    let b: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT body FROM agent_messages WHERE id=?1", [id], |r| r.get(0)).optional()?;
+                    if let Some(mut body) = b.and_then(|b| serde_json::from_str::<Value>(&b).ok()) {
+                        body["agent"] = json!(d.id);
+                        body["title"] = json!(d.title);
+                        body["repository"] = json!(d.repository);
+                        reports.push(body);
+                    }
+                }
+            }
+            if !plain.is_empty() {
+                items.push(json!({"id": d.id, "title": d.title, "status": d.status, "reasons": plain, "area": d.area, "changed": d.changed.iter().map(|c| c.path.clone()).collect::<Vec<_>>(), "asked": d.asked.iter().map(|a| a.text.clone()).collect::<Vec<_>>(), "last_check_in": last_check}));
+            }
             texts.push(self.digest_text(run)?);
         }
-        let mut out = format!(
-            "{}\nCheck-in. For each agent below, decide whether it is doing what was asked (its task, the owner's later messages, your directions, its guardrails and its area) and answer with the check_in tool once per agent: result on_task, drifting or done, with a reason; for done, also what was left out, if anything. An agent that is on task hears nothing from you. For one that is drifting, use propose: at the Steer level a message or a hold, at the Auto level a redirect; at Ask first the owner decides. Judge what the agent is doing, not how. The level is {level}.\n\nCheck-in (JSON):\n{}\n\nDigests:\n{}\n{}\n",
-            super::session::OPEN,
-            serde_json::to_string_pretty(&items)?,
-            texts.join("\n\n"),
-            super::session::CLOSE
-        );
-        out.push_str("\nCheck in on these agents.");
+        let mut out = format!("{}\n", super::session::OPEN);
+        if !items.is_empty() {
+            out.push_str(&format!("Check-in. For each agent below, decide whether it is doing what was asked (its task, the owner's later messages, your directions, its guardrails and its area) and answer with the check_in tool once per agent: result on_task, drifting or done, with a reason; for done, also what was left out, if anything. An agent that is on task hears nothing from you. For one that is drifting, use propose: at the Steer level a message or a hold, at the Auto level a redirect; at Ask first the owner decides. Judge what the agent is doing, not how. The level is {level}.\n\nCheck-in (JSON):\n{}\n\n", serde_json::to_string_pretty(&items)?));
+        }
+        if !questions.is_empty() {
+            out.push_str(&format!("Questions from agents. Answer each with the answer tool (its id and your text) from what you know: the roster, the digests, the other agents' reports and files; if only another agent can answer, ask it with propose (a message) and answer once it replies. The level is {level}.\n\nQuestions (JSON):\n{}\n\n", serde_json::to_string_pretty(&questions)?));
+        }
+        if !reports.is_empty() {
+            out.push_str(&format!("Reports that came back from the agents you asked. Call rally for the repository's map, then propose in one proposal the areas (area actions) and shares it needs.\n\nReports (JSON):\n{}\n\n", serde_json::to_string_pretty(&reports)?));
+        }
+        out.push_str(&format!("Digests:\n{}\n{}\n", texts.join("\n\n"), super::session::CLOSE));
+        out.push_str(if items.is_empty() { "\nAnswer the agents." } else { "\nCheck in on these agents." });
         Ok(super::bound(&out, 32 * 1024))
     }
 

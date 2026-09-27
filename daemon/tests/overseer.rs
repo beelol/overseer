@@ -61,7 +61,7 @@ fn ac180_mcp_shim_serves_overseers_tools_from_the_daemon() {
     assert_eq!(replies[0]["result"]["serverInfo"]["name"], "overseer");
     assert_eq!(replies[0]["result"]["capabilities"]["tools"]["listChanged"], false);
     let tools: Vec<&str> = replies[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(tools, ["roster", "agent", "conflicts", "conversation", "changes", "diff", "file", "search", "usage", "check_in", "propose"]);
+    assert_eq!(tools, ["roster", "agent", "conflicts", "conversation", "changes", "diff", "file", "search", "usage", "check_in", "rally", "answer", "propose"]);
     let roster = replies[2]["result"]["content"][0]["text"].as_str().unwrap();
     assert!(roster.contains(&run) && roster.contains("completed"), "roster names the run: {roster}");
     assert_eq!(replies[2]["result"]["isError"], false);
@@ -89,7 +89,7 @@ fn ac180_tokens_decide_who_may_call_what() {
     let agent = d.call("overseer.token", json!({"run_id": "r-agent", "role": "agent"}))["token"].as_str().unwrap().to_string();
     let tools = d.call("overseer.tools", json!({"token": agent}));
     let names: Vec<&str> = tools["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(names, ["roster"]);
+    assert_eq!(names, ["roster", "report", "ask", "claim"], "an agent has the roster and its channel");
     let err = d.try_call("overseer.tool", json!({"token": agent, "name": "agent", "arguments": {"id": "x"}})).unwrap_err();
     assert!(err.contains("no tool agent"), "{err}");
     assert!(d.try_call("overseer.token", json!({"run_id": "r", "role": "king"})).is_err());
@@ -97,6 +97,13 @@ fn ac180_tokens_decide_who_may_call_what() {
 
 fn claude_fixture() -> String {
     repo_root().join("fixtures/fake-harness/claude-fixture.js").display().to_string()
+}
+
+/// The tests that spawn many fixture processes and assert on timing run one at a time; the
+/// light ones still run alongside.
+fn heavy() -> std::sync::MutexGuard<'static, ()> {
+    static HEAVY: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    HEAVY.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 /// A daemon whose Claude is the fixture, with the mode chosen per task through a mode file.
@@ -229,6 +236,7 @@ fn refs(repo: &Path) -> String {
 /// branch.
 #[test]
 fn ac192_conflicts_between_agents_in_flight() {
+    let _one_at_a_time = heavy();
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let twenty: Vec<String> = (1..=20).map(|i| format!("line {i}")).collect();
@@ -319,6 +327,7 @@ fn ac192_conflicts_between_agents_in_flight() {
 /// daemon keeps answering meanwhile.
 #[test]
 fn ac192_sixteen_agents_in_a_large_repository() {
+    let _one_at_a_time = heavy();
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     for dnum in 0..100 {
@@ -653,6 +662,7 @@ fn sql(d: &Daemon, statement: &str) {
 /// cards survive a restart; a native child is refused.
 #[test]
 fn ac185_actions_have_classes_and_cards() {
+    let _one_at_a_time = heavy();
     // Every method dispatched by the daemon is in the class table (the table is the source of
     // the phone's classes too); a method without one is a test failure.
     let source = std::fs::read_to_string(repo_root().join("daemon/src/server.rs")).unwrap();
@@ -741,6 +751,7 @@ fn ac185_actions_have_classes_and_cards() {
 /// answering one proposal at the same moment get one outcome; a stale proposal is not done.
 #[test]
 fn ac186_levels_decide_how_steer_actions_happen() {
+    let _one_at_a_time = heavy();
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let mode_file = r.path().join("mode");
@@ -759,7 +770,14 @@ fn ac186_levels_decide_how_steer_actions_happen() {
     std::thread::sleep(Duration::from_millis(600));
     assert_eq!(turns(&a), before, "nothing yet inside the window");
     std::thread::sleep(Duration::from_millis(2200));
-    let card = d.call("overseer.card", json!({"id": p["proposal"]}));
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let card = loop {
+        let card = d.call("overseer.card", json!({"id": p["proposal"]}));
+        if card["state"] != "answering" || std::time::Instant::now() > deadline {
+            break card;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    };
     assert_eq!(card["state"], "yes", "{card}");
     // The sleeper is a generic program, which takes a follow-up on its stdin at once (AC-60).
     assert_eq!(turns(&a), before + 1, "the message went after the window");
@@ -826,6 +844,7 @@ fn ac186_levels_decide_how_steer_actions_happen() {
 /// and holds the agent when the guardrail says so; the label per harness; a restart keeps both.
 #[test]
 fn ac187_holds_and_guardrails() {
+    let _one_at_a_time = heavy();
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     std::fs::create_dir_all(repo.join("api")).unwrap();
@@ -962,6 +981,7 @@ fn ac187_holds_and_guardrails() {
 /// message survives a restart and is delivered once; nothing uncommitted is lost.
 #[test]
 fn ac188_redirect_and_the_queue() {
+    let _one_at_a_time = heavy();
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     let mode_file = r.path().join("mode");
@@ -1089,6 +1109,7 @@ fn wait_check_ins(d: &Daemon, run: &str, n: usize, secs: u64) -> Vec<Value> {
 /// together are one Overseer turn; an agent that did nothing causes none.
 #[test]
 fn ac189_overseer_keeps_agents_on_task() {
+    let _one_at_a_time = heavy();
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
     std::fs::create_dir_all(repo.join("docs")).unwrap();
@@ -1252,4 +1273,291 @@ fn ac189_overseer_keeps_agents_on_task() {
     let cap = d.call("overseer.cap", json!({}));
     assert!(cap["self_started_today"].as_i64().unwrap() >= 5 && cap["cap"] == 100, "{cap}");
     assert_eq!(overseer_turn_causes(&d).iter().filter(|c| *c == "owner").count() as i64 + cap["self_started_today"].as_i64().unwrap(), overseer_turn_causes(&d).len() as i64);
+}
+
+/// Turns of a run, oldest first.
+fn turns(d: &Daemon, run: &str) -> Vec<Value> {
+    d.call("run.turns", json!({"run_id": run})).as_array().cloned().unwrap_or_default()
+}
+
+/// What Overseer's own run said and hit, for a failing assertion.
+fn overseer_trace(d: &Daemon) -> String {
+    let s = session(d);
+    let run = s["run_id"].as_str().unwrap_or("").to_string();
+    let lines: Vec<String> = d.events(&run).iter().filter(|e| ["output", "error", "tool", "tool_result", "turn_started", "overseer_tool_call"].contains(&e["kind"].as_str().unwrap_or(""))).map(|e| format!("{} {}", e["kind"], serde_json::to_string(&e["payload"]).unwrap_or_default().chars().take(700).collect::<String>())).collect();
+    format!("causes {:?}\n{}", overseer_turn_causes(d), lines.join("\n"))
+}
+
+/// Wait until a run has a turn whose prompt contains the text.
+fn wait_turn_with(d: &Daemon, run: &str, text: &str, secs: u64) -> Value {
+    let deadline = std::time::Instant::now() + Duration::from_secs(secs);
+    loop {
+        if let Some(t) = turns(d, run).into_iter().find(|t| t["prompt"].as_str().unwrap_or("").contains(text)) {
+            return t;
+        }
+        assert!(std::time::Instant::now() < deadline, "{run} never got a turn with {text:?}: {:?}", turns(d, run).iter().map(|t| t["prompt"].clone()).collect::<Vec<_>>());
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn wait_event(d: &Daemon, run: &str, pred: impl Fn(&Value) -> bool, secs: u64) -> Value {
+    let deadline = std::time::Instant::now() + Duration::from_secs(secs);
+    loop {
+        if let Some(e) = d.events(run).into_iter().find(|e| pred(e)) {
+            return e;
+        }
+        assert!(std::time::Instant::now() < deadline, "{run}: no such event; kinds {:?}", d.events(run).iter().map(|e| e["kind"].clone()).collect::<Vec<_>>());
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+/// AC-190: a lone agent works as before; a second agent in the repository gives both a briefing
+/// (the first as a queued message) and a channel; report, ask and claim reach the digest and the
+/// conversation with the sender the token names; a repeated report is stored once; a question is
+/// answered by Overseer's next turn and the answer reaches the agent.
+#[test]
+fn ac190_briefing_and_channel() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.level", json!({"level": "steer"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    // A lone agent: no briefing, no channel, its task exactly as typed.
+    let lone = claude_task(&d, &repo, &mode_file, "echo", "Lone", "tidy the docs");
+    d.wait_done(&lone, 30);
+    assert_eq!(turns(&d, &lone)[0]["prompt"], "tidy the docs");
+    let echo = d.events(&lone).iter().find(|e| e["kind"] == "output" && e["payload"]["text"].as_str().unwrap_or("").starts_with("ECHO")).expect("echo")["payload"]["text"].as_str().unwrap().to_string();
+    assert!(!echo.contains("--mcp-config"), "a lone agent has no channel: {echo}");
+    assert!(!d.events(&lone).iter().any(|e| e["kind"] == "briefing"));
+    assert_eq!(d.call("agent.channel", json!({"run_id": lone}))["channel"], false);
+    // A second agent while the first works: both get a briefing, the first as a queued message.
+    let first = claude_task(&d, &repo, &mode_file, "slow", "Login API", "build the login API");
+    d.wait_status(&first, |s| s == "running", 20);
+    sql(&d, &format!("INSERT INTO areas(run_id, path, set_by, created_ms) VALUES('{first}', 'api', 'owner', 1);"));
+    let second = claude_task(&d, &repo, &mode_file, "channel", "Login page", "claim: web/login; report: building the login page; ask: what does the login endpoint return?; write: web/login/page.ts");
+    d.wait_done(&second, 40);
+    let prompt = turns(&d, &second)[0]["prompt"].as_str().unwrap().to_string();
+    assert!(prompt.starts_with("[Briefing from Overseer:") && prompt.contains("Login API") && prompt.contains("in api") && prompt.ends_with("write: web/login/page.ts"), "second {second}: {:?}\nfirst {first}: {:?}", turns(&d, &second), turns(&d, &first));
+    let briefing = d.events(&second).iter().find(|e| e["kind"] == "briefing").expect("briefing event").clone();
+    assert_eq!(briefing["payload"]["how"], "task");
+    assert!(briefing["payload"]["text"].as_str().unwrap().len() <= 1024);
+    assert_eq!(d.call("agent.channel", json!({"run_id": second}))["channel"], true);
+    // The channel: report, ask and claim, each with the right sender.
+    let ev = d.events(&second);
+    assert_eq!(ev.iter().find(|e| e["kind"] == "report").expect("report")["payload"]["doing"], "building the login page");
+    assert_eq!(ev.iter().find(|e| e["kind"] == "ask").expect("ask")["payload"]["question"], "what does the login endpoint return?");
+    assert_eq!(ev.iter().find(|e| e["kind"] == "claim").expect("claim")["payload"]["paths"], json!(["web/login"]));
+    let digest = d.call("agent.digest", json!({"run_id": second}))["digest"].clone();
+    assert_eq!(digest["area"], json!(["web/login"]));
+    assert_eq!(digest["last_report"]["doing"], "building the login page");
+    assert_eq!(digest["asks"][0]["question"], "what does the login endpoint return?");
+    let s = session(&d);
+    let cards: Vec<&Value> = s["messages"].as_array().unwrap().iter().filter(|m| m["card"]["agent"] == second).collect();
+    for kind in ["report", "ask", "claim"] {
+        assert!(cards.iter().any(|m| m["card"]["kind"] == kind && m["source"] == "agent"), "{kind} card from the agent: {cards:?}");
+    }
+    // The first agent's briefing waited for its turn to end; it names the second and its area.
+    d.wait_done(&first, 30);
+    let queued = wait_turn_with(&d, &first, "[Briefing from Overseer:", 20);
+    let text = queued["prompt"].as_str().unwrap();
+    assert!(text.contains("Login page") && text.contains("web/login"), "{text}");
+    assert!(d.events(&first).iter().any(|e| e["kind"] == "briefing" && e["payload"]["how"] == "queued"));
+    // The question: answered by Overseer's next turn (at Steer, at once), and the answer reaches the agent.
+    std::thread::sleep(Duration::from_secs(6));
+    wait_overseer_idle(&d, 60);
+    let asked = d.call("channel.messages", json!({"run_id": second}))["messages"].as_array().unwrap().iter().find(|m| m["kind"] == "ask").cloned().expect("ask row");
+    assert!(asked["answer"].as_str().map(|a| a.contains("From the roster")).unwrap_or(false), "{asked}\n{}", overseer_trace(&d));
+    wait_turn_with(&d, &second, "Answer to your question “what does the login endpoint return?”", 20);
+    assert!(session(&d)["messages"].as_array().unwrap().iter().any(|m| m["card"]["kind"] == "answer" && m["card"]["agent"] == second));
+    assert!(overseer_turn_causes(&d).contains(&"ask".to_string()), "{:?}", overseer_turn_causes(&d));
+    // A report sent three times is stored once (the channel on by the owner's default: the
+    // other agents have finished, so the repository would count as one agent's).
+    d.call("agent.channel", json!({"default": "on", "by": "owner"}));
+    let thrice = claude_task(&d, &repo, &mode_file, "channel", "Repeater", "report x3: still going");
+    d.wait_done(&thrice, 40);
+    assert_eq!(d.events(&thrice).iter().filter(|e| e["kind"] == "report").count(), 1);
+    assert_eq!(d.call("channel.messages", json!({"run_id": thrice}))["messages"].as_array().unwrap().len(), 1);
+    // A token from one run cannot report as another: the sender is the token's run, whatever the text says.
+    let token = d.call("overseer.token", json!({"run_id": thrice, "role": "agent"}))["token"].as_str().unwrap().to_string();
+    let r = d.call("overseer.tool", json!({"token": token, "name": "report", "arguments": {"agent": second, "run_id": second, "doing": "spoof"}}));
+    assert_eq!(r["is_error"], false, "{r}");
+    assert!(d.events(&thrice).iter().any(|e| e["kind"] == "report" && e["payload"]["doing"] == "spoof"));
+    assert!(!d.events(&second).iter().any(|e| e["kind"] == "report" && e["payload"]["doing"] == "spoof"));
+    let r = d.try_call("overseer.tool", json!({"token": token, "name": "agent", "arguments": {"id": second}}));
+    assert!(r.is_err() && r.unwrap_err().contains("no tool agent"), "an agent's token reads no digest");
+    // The owner's setting: off for every agent, then on for one.
+    d.call("agent.channel", json!({"default": "off", "by": "owner"}));
+    let quiet = claude_task(&d, &repo, &mode_file, "echo", "Quiet", "hello");
+    d.wait_done(&quiet, 30);
+    assert_eq!(turns(&d, &quiet)[0]["prompt"], "hello");
+    assert!(!d.events(&quiet).iter().any(|e| e["kind"] == "briefing"));
+    d.call("agent.channel", json!({"run_id": quiet, "briefing": true, "channel": true, "by": "owner"}));
+    let c = d.call("agent.channel", json!({"run_id": quiet}));
+    assert!(c["briefing"] == true && c["channel"] == true, "{c}");
+    d.call("agent.channel", json!({"default": "auto", "by": "owner"}));
+}
+
+/// AC-190, Rally: the map comes from the digests; only the agents whose digests cannot answer
+/// (no area, no report) are asked for a report, with the cost said first; their reports come
+/// back through the channel and Overseer proposes the areas; one yes records them.
+#[test]
+fn ac190_rally_asks_only_where_the_digests_cannot_answer() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("agent.channel", json!({"default": "on", "by": "owner"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    // Four agents in different roles: two claimed areas, two only wrote files.
+    let api = claude_task(&d, &repo, &mode_file, "channel", "API", "claim: api; write: api/login.ts");
+    d.wait_done(&api, 40);
+    let web = claude_task(&d, &repo, &mode_file, "channel", "Web", "claim: web; write: web/page.ts");
+    d.wait_done(&web, 40);
+    let docs = claude_task(&d, &repo, &mode_file, "channel", "Docs", "write: docs/guide.md");
+    d.wait_done(&docs, 40);
+    let tests = claude_task(&d, &repo, &mode_file, "channel", "Tests", "write: tests/login.test.ts");
+    d.wait_done(&tests, 40);
+    // The daemon's map, with no model.
+    let map = d.call("overseer.rally", json!({"repo": repo}));
+    assert_eq!(map["agents"].as_array().unwrap().len(), 4, "{map}");
+    let ask: std::collections::BTreeSet<String> = map["ask"].as_array().unwrap().iter().map(|a| a.as_str().unwrap().to_string()).collect();
+    assert_eq!(ask, [docs.clone(), tests.clone()].into_iter().collect(), "{map}");
+    assert_eq!(map["cost"], "2 agent turns");
+    let docs_line = map["agents"].as_array().unwrap().iter().find(|a| a["id"] == docs).unwrap();
+    assert_eq!(docs_line["suggested_area"], json!(["docs"]));
+    // From the conversation: the report requests are one proposal that says the cost.
+    d.call("overseer.send", json!({"text": format!("Rally my agents in {}", repo.display()), "surface": "ctl", "harness": "claude"}));
+    let s = wait_overseer_idle(&d, 30);
+    let open = s["proposals"].as_array().unwrap().clone();
+    assert_eq!(open.len(), 1, "{open:?}\n{}", overseer_trace(&d));
+    let actions = open[0]["actions"].as_array().unwrap();
+    assert!(actions.iter().all(|a| a["action"] == "report"), "{actions:?}");
+    let asked: std::collections::BTreeSet<String> = actions.iter().map(|a| a["agent"].as_str().unwrap().to_string()).collect();
+    assert_eq!(asked, ask);
+    let said = s["messages"].as_array().unwrap().iter().rev().find(|m| m["source"] == "overseer").unwrap()["text"].as_str().unwrap().to_string();
+    assert!(said.contains("2 agent turns"), "the cost before it is spent: {said}");
+    // One yes: the two are asked, their reports come back through the channel, and Overseer's
+    // next turn (the reports' own) proposes the areas.
+    d.call("overseer.answer", json!({"id": open[0]["id"], "yes": true, "surface": "ctl", "by": "owner"}));
+    for id in [&docs, &tests] {
+        wait_event(&d, id, |e| e["kind"] == "report" && e["payload"]["doing"].as_str().unwrap_or("").starts_with("working in"), 30);
+    }
+    for id in [&api, &web] {
+        assert!(!turns(&d, id).iter().any(|t| t["prompt"].as_str().unwrap().contains("Report, with your report tool")), "not asked: its digest answers");
+    }
+    let card = d.call("overseer.card", json!({"id": open[0]["id"]}));
+    // Through the channel a request reads picked up (the tool call) and then answered (the report).
+    assert!(card["rows"].as_array().unwrap().iter().all(|x| x["state"] == "answered" && x["picked_ms"].is_number() && x["answered_ms"].is_number()), "the reports came back: {card}");
+    std::thread::sleep(Duration::from_secs(6));
+    let s = wait_overseer_idle(&d, 60);
+    let open = s["proposals"].as_array().unwrap().clone();
+    assert_eq!(open.len(), 1, "{open:?}");
+    let actions = open[0]["actions"].as_array().unwrap();
+    assert!(actions.iter().all(|a| a["action"] == "area"), "{actions:?}");
+    assert!(actions.iter().any(|a| a["agent"] == docs && a["paths"] == json!(["docs"])) && actions.iter().any(|a| a["agent"] == tests && a["paths"] == json!(["tests"])), "{actions:?}");
+    let said = s["messages"].as_array().unwrap().iter().rev().find(|m| m["source"] == "overseer").unwrap()["text"].as_str().unwrap().to_string();
+    assert!(said.starts_with("Map:") && said.contains("API owns api") && said.contains("Web owns web"), "{said}");
+    assert!(overseer_turn_causes(&d).contains(&"report".to_string()), "{:?}", overseer_turn_causes(&d));
+    d.call("overseer.answer", json!({"id": open[0]["id"], "yes": true, "surface": "ctl", "by": "owner"}));
+    assert_eq!(d.call("agent.digest", json!({"run_id": docs}))["digest"]["area"], json!(["docs"]));
+    assert_eq!(d.call("agent.digest", json!({"run_id": tests}))["digest"]["area"], json!(["tests"]));
+    assert_eq!(d.call("agent.digest", json!({"run_id": api}))["digest"]["area"], json!(["api"]));
+    let map = d.call("overseer.rally", json!({"repo": repo}));
+    assert!(map["ask"].as_array().unwrap().is_empty(), "every digest answers now: {map}");
+}
+
+/// AC-191: a share is a message from Overseer that names its source; large pieces go as a file;
+/// across repositories it waits for a yes at every level; a denied destination gets nothing;
+/// redaction applies; a withdrawn finding reaches everyone who received it.
+#[test]
+fn ac191_context_passed_between_agents() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo2 = repo(&r.path().join("repo2"));
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.level", json!({"level": "steer"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    let alpha = claude_task(&d, &repo, &mode_file, "channel", "Alpha", "write: src/a.ts");
+    d.wait_done(&alpha, 40);
+    let beta = claude_task(&d, &repo, &mode_file, "channel", "Beta", "hello");
+    d.wait_done(&beta, 40);
+    // Alpha's diff reaches Beta with its source named, and Beta's reply refers to it.
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "share", "to": beta, "from": alpha, "what": "diff", "path": "src/a.ts"}], "source": "ctl"}));
+    assert_eq!(p["state"], "settling", "the owner asked at Steer: {p}");
+    let t = wait_turn_with(&d, &beta, "Shared by Overseer from Alpha (diff of src/a.ts)", 15);
+    let text = t["prompt"].as_str().unwrap();
+    assert!(text.starts_with("From Overseer: Shared by Overseer from Alpha") && text.contains("+// written by the fixture"), "{text}");
+    wait_event(&d, &beta, |e| e["kind"] == "output" && e["payload"]["text"] == "Read the share from Alpha; using it.", 30);
+    d.wait_done(&beta, 30);
+    let shares = d.call("share.list", json!({"run_id": beta}))["shares"].as_array().unwrap().clone();
+    assert_eq!(shares.len(), 1);
+    assert!(shares[0]["kind"] == "diff" && shares[0]["file"].is_null() && shares[0]["from"] == alpha, "{shares:?}");
+    // A 100 KiB diff arrives as a patch file in Beta's run folder, the inline part within 8 KiB.
+    let big = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "yes 'a line of text for the patch' | head -c 102400 > big.txt"]));
+    d.wait_done(&big, 30);
+    d.call("overseer.propose", json!({"actions": [{"action": "share", "to": beta, "from": big, "what": "diff"}], "source": "ctl"}));
+    let t = wait_turn_with(&d, &beta, "the whole piece at", 15);
+    let text = t["prompt"].as_str().unwrap();
+    assert!(text.len() <= 8 * 1024 + 512, "inline part within the bound: {} bytes", text.len());
+    let share = d.call("share.list", json!({"run_id": beta}))["shares"].as_array().unwrap().iter().find(|s| s["from"] == big).cloned().unwrap();
+    let file = share["file"].as_str().expect("a patch file").to_string();
+    assert!(text.contains(&file) && file.contains(&format!("/{beta}/shares/")), "{file}");
+    assert!(std::fs::metadata(&file).unwrap().len() >= 102400 && share["bytes"].as_i64().unwrap() >= 102400 && share["inline_bytes"].as_i64().unwrap() <= 8 * 1024);
+    d.wait_done(&beta, 30);
+    // Across repositories: a Confirm action, waiting for a yes at Steer and at Auto.
+    let gamma = claude_task(&d, &repo2, &mode_file, "echo", "Gamma", "hello");
+    d.wait_done(&gamma, 30);
+    for level in ["steer", "auto"] {
+        d.call("overseer.level", json!({"level": level}));
+        let p = d.call("overseer.propose", json!({"actions": [{"action": "share", "to": gamma, "from": alpha, "what": "diff", "path": "src/a.ts"}], "source": "ctl"}));
+        assert!(p["state"] == "open" && p["done"] != true, "at {level} a share across repositories waits for a yes: {p}");
+        std::thread::sleep(Duration::from_secs(3));
+        let open = session(&d)["proposals"].as_array().unwrap().clone();
+        assert!(open.iter().any(|o| o["id"] == p["proposal"]), "still waiting at {level}");
+        assert!(!turns(&d, &gamma).iter().any(|t| t["prompt"].as_str().unwrap().contains("Shared by Overseer")));
+        d.call("overseer.answer", json!({"id": p["proposal"], "yes": false, "surface": "ctl", "by": "owner"}));
+    }
+    d.call("overseer.level", json!({"level": "steer"}));
+    // A denied destination receives nothing.
+    d.call("agent.share_deny", json!({"run_id": gamma, "denied": true, "by": "owner"}));
+    let refused = d.try_call("overseer.propose", json!({"actions": [{"action": "share", "to": gamma, "what": "note", "text": "hello"}], "source": "ctl"}));
+    assert!(refused.is_err() && refused.unwrap_err().contains("denied"), "a denied destination is never used");
+    d.call("agent.share_deny", json!({"run_id": gamma, "denied": false, "by": "owner"}));
+    // A credential-shaped string is redacted.
+    d.call("overseer.propose", json!({"actions": [{"action": "share", "to": beta, "what": "note", "text": "use the key sk-ant-api03-abcdefghijklmnopqrstuvwxyz for staging"}], "source": "ctl"}));
+    let t = wait_turn_with(&d, &beta, "(Overseer's note)", 15);
+    let text = t["prompt"].as_str().unwrap();
+    assert!(text.contains("[redacted]") && !text.contains("sk-ant-api03"), "{text}");
+    d.wait_done(&beta, 30);
+    // A withdrawn finding reaches both earlier recipients.
+    let eps = claude_task(&d, &repo, &mode_file, "channel", "Epsilon", "hello");
+    d.wait_done(&eps, 40);
+    let p = d.call("overseer.propose", json!({"actions": [
+        {"action": "share", "to": beta, "what": "finding", "text": "the login endpoint returns 500 on an empty body"},
+        {"action": "share", "to": eps, "what": "finding", "text": "the login endpoint returns 500 on an empty body"}], "source": "ctl"}));
+    for id in [&beta, &eps] {
+        wait_turn_with(&d, id, "(Overseer's finding)", 15);
+        d.wait_done(id, 30);
+    }
+    let finding = d.call("share.list", json!({"run_id": beta}))["shares"].as_array().unwrap().iter().find(|s| s["kind"] == "finding" && s["proposal"] == p["proposal"]).cloned().unwrap();
+    let w = d.call("share.withdraw", json!({"id": finding["id"], "by": "owner"}));
+    assert_eq!(w["told"].as_array().unwrap().len(), 2, "{w}");
+    for id in [&beta, &eps] {
+        wait_turn_with(&d, id, "Withdrawn: what Overseer shared (Overseer's finding)", 15);
+    }
+    assert!(d.call("share.list", json!({}))["shares"].as_array().unwrap().iter().filter(|s| s["kind"] == "finding").all(|s| !s["withdrawn_ms"].is_null()));
 }

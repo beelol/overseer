@@ -41,6 +41,8 @@ pub struct Digest {
     /// The harness's own numbers, or "not reported".
     pub usage: Value,
     pub last_report: Option<Value>,
+    /// The agent's questions to Overseer, latest first, each with its answer when it has one.
+    pub asks: Vec<Value>,
     pub last_check_in: Option<Value>,
     pub area: Vec<String>,
     pub holds: Vec<Value>,
@@ -137,7 +139,6 @@ impl Daemon {
         let mut messages: Vec<String> = Vec::new();
         let mut changed: BTreeMap<String, String> = BTreeMap::new();
         let mut usage = Value::Null;
-        let mut last_report = None;
         let mut last_check_in = None;
         let mut updated_ms = run.created_ms;
         for e in &events {
@@ -162,7 +163,6 @@ impl Daemon {
                 }
                 // The latest usage the harness reported (rate-limit windows alone are not usage).
                 "usage" if e.payload.get("rate_limits").is_none() || e.payload.as_object().map(|o| o.len() > 1).unwrap_or(false) => usage = e.payload.clone(),
-                "report" => last_report = Some(e.payload.clone()),
                 "check_in" => last_check_in = Some(e.payload.clone()),
                 _ => {}
             }
@@ -178,6 +178,7 @@ impl Daemon {
         let waiting = if run.status == "waiting_for_user" { run.attention.clone().or_else(|| Some(json!({"kind": "question"}))) } else { None };
         let since_ms = events.iter().rev().find(|e| e.kind == "status").map(|e| e.ts).unwrap_or(run.created_ms);
         let role = self.run_role(run_id);
+        let (last_report, asks) = self.channel_summary(run_id);
         let redact = |s: &str| crate::redact::redact(s);
         let asked: Vec<Asked> = asked.into_iter().map(|a| Asked { source: a.source, text: redact(&a.text) }).collect();
         let messages: Vec<String> = messages.iter().map(|m| redact(m)).collect();
@@ -204,6 +205,7 @@ impl Daemon {
             children,
             usage: if usage.is_null() { json!("not reported") } else { usage },
             last_report,
+            asks,
             last_check_in,
             area: self.area_of(run_id),
             holds: Vec::new(),
@@ -249,6 +251,12 @@ impl Daemon {
         lines.push(format!("usage: {}", if d.usage.is_string() { d.usage.as_str().unwrap_or_default().to_string() } else { d.usage.to_string() }));
         if !d.area.is_empty() {
             lines.push(format!("area: {}", d.area.join(", ")));
+        }
+        if let Some(r) = &d.last_report {
+            lines.push(format!("report: {}{}{}", r["doing"].as_str().unwrap_or(""), r["needs"].as_str().filter(|s| !s.is_empty()).map(|n| format!(" · needs {n}")).unwrap_or_default(), r["blocked"].as_str().filter(|s| !s.is_empty()).map(|b| format!(" · blocked by {b}")).unwrap_or_default()));
+        }
+        for a in &d.asks {
+            lines.push(format!("asked Overseer: {} → {}", a["question"].as_str().unwrap_or(""), a["answer"].as_str().unwrap_or("(no answer yet)")));
         }
         if !d.conflicts.is_empty() {
             lines.push(format!("open conflicts: {}", d.conflicts.iter().map(|c| format!("{} with {} on {}", c["kind"].as_str().unwrap_or("?"), c["other_title"].as_str().unwrap_or("?"), c["paths"].as_array().map(|p| p.len()).unwrap_or(0))).collect::<Vec<_>>().join("; ")));

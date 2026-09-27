@@ -524,7 +524,9 @@ impl Daemon {
         generic_meta["opts"] = json!({"effort": effort, "mode": mode});
         let snap = self.take_snapshot(&ws, "run-start")?;
         let n = self.store.lock().unwrap().turns(run_id)?.len() as i64 + 1;
-        let preface = if follow_up { self.guardrail_preface(run_id) } else { String::new() };
+        // Guardrails are repeated on later turns; the briefing about the agents beside this one
+        // goes with its task (AC-190).
+        let preface = if follow_up { self.guardrail_preface(run_id) } else { self.briefing_preface(run_id) };
         let prompt_owned = if preface.is_empty() { prompt.to_string() } else { format!("{preface}\n\n{prompt}") };
         let prompt = prompt_owned.as_str();
         let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt.into(), snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
@@ -562,6 +564,8 @@ impl Daemon {
         if follow_up {
             extra_args.extend(self.guardrail_launch_args(run_id, &run.harness));
         }
+        // The channel back to Overseer, on every turn of an agent that has one (AC-190).
+        extra_args.extend(self.channel_launch_args(run_id, &run.harness)?);
         let resume = if follow_up { run.native_id.clone() } else { None };
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
@@ -1030,11 +1034,9 @@ impl Daemon {
             }
             Norm::Usage(u) => ev("usage", "harness", "exact", u, None)?,
             Norm::Permission { request_id, tool, input } => {
-                let own_tool = tool.starts_with("mcp__overseer__") && {
-                    use rusqlite::OptionalExtension;
-                    store.conn.query_row("SELECT role FROM run_roles WHERE run_id=?1", [&run.id], |r| r.get::<_, String>(0)).optional()?.as_deref() == Some("overseer")
-                };
-                if own_tool {
+                // The daemon's own tools (Overseer's reads, an agent's channel) are always allowed:
+                // the daemon decides what each token may do.
+                if tool.starts_with("mcp__overseer__") {
                     if let Some(reply) = adapters::permission_reply(&run.harness, &request_id, true, &input, "") {
                         state.sends.push(reply);
                     }
