@@ -8,6 +8,14 @@ const { Cdp, delay } = require('./cdp');
 const repoRoot = path.resolve(__dirname, '../..');
 const CODE = process.env.OVERSEER_CODE || '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code';
 
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = require('net').createServer();
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => { const { port } = server.address(); server.close(() => resolve(port)); });
+  });
+}
+
 function git(cwd, ...args) { return cp.execFileSync('git', args, { cwd, encoding: 'utf8' }).trim(); }
 
 function makeRepo(dir, { dirty = true } = {}) {
@@ -58,7 +66,27 @@ class Session {
   baseEnv() {
     const env = { ...process.env };
     if (this.home) env.OVERSEER_HOME = this.home; else delete env.OVERSEER_HOME;
+    // A scenario's daemon is never advertised on the owner's network.
+    if (this.home) env.OVERSEER_GATEWAY_MDNS = 'off';
     return env;
+  }
+
+  /**
+   * OVERSEER_TEST_PHONE_ACCESS=on runs any scenario with phone access turned on (AC-116, AC-132),
+   * the way the owner turns it on: a request on the daemon's own socket. Never on the owner's daemon.
+   */
+  async phoneAccess() {
+    if (process.env.OVERSEER_TEST_PHONE_ACCESS !== 'on' || !this.home) return;
+    for (let i = 0; i < 80; i++) {
+      try {
+        if (this.ctl('gateway.status').enabled) return;
+        const port = await freePort();
+        const status = this.ctl('gateway.enable', { port });
+        if (status.enabled) { this.note('phone access is on for this scenario', { port }); return; }
+      } catch {}
+      await delay(250);
+    }
+    throw new Error('phone access could not be turned on for this scenario');
   }
 
   note(msg, data) {
@@ -94,6 +122,7 @@ class Session {
   async connect() {
     this.cdp = await Cdp.connect(this.profile);
     await delay(1500);
+    await this.phoneAccess();
     return this.cdp;
   }
 

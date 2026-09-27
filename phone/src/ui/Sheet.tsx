@@ -48,11 +48,11 @@ export function Sheet({ testID, open, onClose, title, message, children }: Sheet
   const scrim = useAnimatedStyle(() => ({ opacity: shown.value }));
   return (
     <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent supportedOrientations={['portrait', 'landscape']}>
-      <View style={styles.fill}>
+      <View style={styles.fill} accessibilityViewIsModal>
         <Animated.View style={[styles.scrim, scrim]}>
           <Pressable testID={`${testID}.close`} accessibilityLabel="Close" accessibilityRole="button" style={styles.fill} onPress={onClose} />
         </Animated.View>
-        <Animated.View testID={testID} style={[styles.sheet, sheet]} accessibilityViewIsModal>
+        <Animated.View testID={testID} style={[styles.sheet, sheet]}>
           <SafeAreaView edges={['bottom', 'left', 'right']}>
             <View style={styles.grip} />
             {title ? (

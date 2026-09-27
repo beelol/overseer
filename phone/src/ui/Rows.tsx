@@ -26,11 +26,13 @@ export interface SectionProps {
   readonly title?: string;
   /** A sentence under the card. */
   readonly note?: string;
+  /** The test id of the sentence under the card. */
+  readonly noteTestID?: string;
   readonly children: ReactNode;
 }
 
 /** A titled group of rows on a raised card. */
-export function Section({ title, note, children }: SectionProps) {
+export function Section({ title, note, noteTestID, children }: SectionProps) {
   const styles = useStyles();
   return (
     <View style={styles.section}>
@@ -41,7 +43,7 @@ export function Section({ title, note, children }: SectionProps) {
       ) : null}
       <View style={styles.card}>{children}</View>
       {note ? (
-        <Txt kind="small" tone="muted" style={styles.note}>
+        <Txt testID={noteTestID} kind="small" tone="muted" style={styles.note}>
           {note}
         </Txt>
       ) : null}
@@ -135,6 +137,7 @@ export function SwitchRow({ testID, label, detail, value, onChange, disabled, di
       <Switch
         testID={testID}
         accessibilityLabel={label}
+        accessibilityState={{ disabled: Boolean(disabled), checked: value }}
         value={value}
         disabled={disabled}
         onValueChange={(next) => {
