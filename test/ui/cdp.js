@@ -151,7 +151,13 @@ class Cdp {
 
   /** Moves keyboard focus out of a webview so workbench shortcuts reach VS Code. */
   async focusWorkbench() {
-    await this.evalWorkbench(`(() => { const a = document.activeElement; if (a && a.tagName === 'IFRAME') a.blur(); return true; })()`).catch(() => {});
+    // Blurring a webview leaves focus on <body>, where the first key press misses VS Code's
+    // keybindings; put it on a real workbench element instead.
+    await this.evalWorkbench(`(() => { const a = document.activeElement; if (a && a.tagName === 'IFRAME') a.blur();
+      if (document.activeElement && document.activeElement !== document.body) return true;
+      for (const sel of ['.part.sidebar .monaco-list[tabindex]', '.part.editor .editor-group-container.active', '.part.activitybar .action-item.checked a', '.part.activitybar .action-item a']) {
+        const el = document.querySelector(sel); if (!el) continue; el.focus(); if (document.activeElement === el) return true; }
+      return false; })()`).catch(() => {});
   }
 
   /** Runs a command through the real command palette. */
