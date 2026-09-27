@@ -282,6 +282,19 @@ export const scenarios = [
     },
   },
   {
+    name: 'restart',
+    criteria: ['AC-141'],
+    says: 'the phone restarted: the app opens on the agents list with no prompt and connects by itself',
+    async run(c) {
+      const paired = me(c).paired_ms;
+      c.dev.reboot();
+      await c.flow('opened');
+      await c.until('the phone connected again', () => me(c)?.connected, 90_000);
+      expect(me(c).paired_ms === paired, 'the phone was paired again');
+      c.shot('restarted');
+    },
+  },
+  {
     name: 'off-and-on',
     criteria: ['AC-116', 'AC-121'],
     says: 'phone access turned off on the Mac and on again: the app says so and comes back by itself',

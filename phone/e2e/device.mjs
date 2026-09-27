@@ -56,6 +56,12 @@ function ios() {
     install: (app) => void simctl('install', udid, app),
     uninstall: () => void quiet('xcrun', ['simctl', 'uninstall', udid, BUNDLE]),
     launch: () => void simctl('launch', udid, BUNDLE),
+    /** Shuts the simulator down and boots it again; returns once it has booted. */
+    reboot: () => {
+      quiet('xcrun', ['simctl', 'shutdown', udid]);
+      simctl('boot', udid);
+      out('xcrun', ['simctl', 'bootstatus', udid, '-b']);
+    },
     stop: () => void quiet('xcrun', ['simctl', 'terminate', udid, BUNDLE]),
     appearance: (mode) => void simctl('ui', udid, 'appearance', mode),
     /** The system's text size: `small`, `standard` or `large` (the largest standard size). */
@@ -98,6 +104,17 @@ function android() {
     uninstall: () => void quiet(ADB, ['-s', serial, 'uninstall', BUNDLE]),
     // `monkey` reports failure (exit 251) on this emulator image and starts nothing; the activity is started by name.
     launch: () => void shell(`am start -n ${BUNDLE}/.MainActivity >/dev/null 2>&1`),
+    /** Reboots the emulator and waits until Android says it has booted; storage is read as root again afterwards. */
+    reboot: () => {
+      adb('-s', serial, 'reboot');
+      adb('-s', serial, 'wait-for-device');
+      for (let i = 0; i < 120; i += 1) {
+        if (quiet(ADB, ['-s', serial, 'shell', 'getprop', 'sys.boot_completed']).trim() === '1') break;
+        execFileSync('sleep', ['1']);
+      }
+      quiet(ADB, ['-s', serial, 'root']);
+      adb('-s', serial, 'wait-for-device');
+    },
     stop: () => void shell(`am force-stop ${BUNDLE}`),
     appearance: (mode) => void shell(`cmd uimode night ${mode === 'dark' ? 'yes' : 'no'}`),
     textSize: (size) => void shell(`settings put system font_scale ${{ small: '0.85', standard: '1.0', large: '1.3' }[size]}`),
