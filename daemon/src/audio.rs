@@ -96,12 +96,19 @@ fn test_sink() -> bool {
     std::env::var_os("OVERSEER_TEST_AUDIO_LOG").is_some()
 }
 
+fn player(path: &str) -> bool {
+    // A test can take the players away to stand in for a platform without them.
+    std::env::var_os("OVERSEER_TEST_AUDIO_UNAVAILABLE").is_none()
+        && cfg!(target_os = "macos")
+        && Path::new(path).exists()
+}
+
 fn reactor_available() -> bool {
-    test_sink() || (cfg!(target_os = "macos") && Path::new("/usr/bin/afplay").exists())
+    test_sink() || player("/usr/bin/afplay")
 }
 
 fn system_available() -> bool {
-    test_sink() || (cfg!(target_os = "macos") && Path::new("/usr/bin/say").exists())
+    test_sink() || player("/usr/bin/say")
 }
 
 fn meta(conn: &rusqlite::Connection, key: &str) -> Result<Option<String>> {
@@ -250,7 +257,7 @@ pub fn import_commander(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
 }
 
 fn installed_voices() -> Result<Vec<(String, String)>> {
-    if !Path::new("/usr/bin/say").exists() {
+    if !player("/usr/bin/say") {
         return Err(anyhow!("macOS system speech is unavailable"));
     }
     let output = std::process::Command::new("/usr/bin/say")

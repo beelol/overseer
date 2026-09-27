@@ -349,6 +349,41 @@ fn missing_local_cache_does_not_interrupt_agents() {
 }
 
 #[test]
+fn a_platform_without_players_reports_unavailable_and_stays_silent() {
+    let root = tmp();
+    let repo = repo(&root.path().join("repo"));
+    let mut d = Daemon::start(&[]);
+    if d.call("audio.get", json!({}))["available"] == true {
+        // The setting is already on when the players go away.
+        d.call("audio.set", json!({"enabled": true}));
+    }
+    d.kill9();
+    d.env
+        .push(("OVERSEER_TEST_AUDIO_UNAVAILABLE".into(), "1".into()));
+    d.spawn();
+
+    let audio = d.call("audio.get", json!({}));
+    assert_eq!(audio["available"], false);
+    assert_eq!(audio["keys"].as_array().unwrap().len(), 12);
+    for (method, params) in [
+        ("audio.set", json!({"enabled": true})),
+        ("audio.preview", json!({"key": "agent_started"})),
+        ("audio.voices", json!({})),
+    ] {
+        let error = d.try_call(method, params).unwrap_err();
+        assert!(error.contains("unavailable"), "{method}: {error}");
+    }
+    let run = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "exit 0"]));
+    assert_eq!(d.wait_done(&run, 10)["status"], "completed");
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    assert!(!d.home.path().join("audio").exists());
+    assert_eq!(
+        d.call("audio.set", json!({"enabled": false}))["enabled"],
+        false
+    );
+}
+
+#[test]
 fn authentication_failure_makes_one_attention_cue() {
     let root = tmp();
     let repo = repo(&root.path().join("repo"));
