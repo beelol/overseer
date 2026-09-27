@@ -115,8 +115,8 @@ These are this RFC's choices, not the owner's. A change is a recorded revision.
   it can be reached from Rust, for words.
 - The listener plays Overseer's speech itself. It then knows exactly what the speakers are
   playing, which echo cancellation needs, and it can lower or stop the voice within the budget.
-- The listener sends **words** and **loudness levels**, never audio, over the daemon's owner-only
-  socket (AC-08).
+- The listener sends **words** and **levels** for the mark, never the recording, over the
+  daemon's owner-only socket (AC-08).
 - The orchestrator never talks to an agent. It writes a plan; the daemon sends through the same
   methods the chat uses, so every message is an ordinary event in the agent's run.
 - UI clients draw what the daemon reports. None of them listens or speaks.
@@ -388,8 +388,8 @@ Each mode works with the other off. Audio Mode's rules and tests do not change.
 - **On the Mac.** Recognition and speech are on-device. The listener opens no network connection.
 - **No recordings.** Audio lives in the listener's memory for at most 30 s and is never written to
   disk.
-- **Levels.** The loudness values that move the mark are numbers, not sound. They are sent at
-  most 30 times a second, cannot be turned back into speech, and are never stored.
+- **Levels.** What moves the mark is the least the chosen animation needs: how loud, and for the
+  Ring the outline of the wave. The outline is treated like audio: on this Mac only, never stored.
 - **What is stored.** The words of requests, redacted like other events, for 30 days or 5,000
   requests. Speech that was not a request lives only in the rolling context (10 minutes, memory).
 - **What reaches a model.** The words of each utterance that passes the gate go to the
@@ -446,7 +446,7 @@ Proposed names. The implementation may change them with the reason recorded.
 | `voice.request` | A request created or changed |
 | `voice.dispatch` | One dispatch's state change, with the run's event id |
 | `voice.spoke` | A line spoken, lowered, stopped or sent to the card alone |
-| `voice.level` | The loudness of the owner's voice or of Overseer's, at most 30 a second; not stored |
+| `voice.level` | The loudness of the owner's voice or of Overseer's, and for the Ring the outline of the wave; at most 30 a second; not stored; never sent to a phone |
 
 | Record | Fields |
 | --- | --- |
@@ -471,8 +471,16 @@ with the voice. It answers one question at a glance: is Overseer getting what I 
 - **Where.** In the centre of the voice view, which takes the middle of the editor area like the
   home chat (AC-72). Beside a review or the grid the same mark is shown small in the voice strip,
   so the work is not covered.
-- **Levels, not audio.** The listener sends one loudness value at most 30 times a second. Speech
-  cannot be rebuilt from it, and it is never stored. Every window draws from the same levels.
+- **Hearing moves the outside, speaking moves the inside.** While the owner speaks the swooshes,
+  the ring or the sweep of light react. While Overseer speaks the light comes from the star and
+  spreads outward. The two are told apart by where the motion is, not by colour.
+- **Levels, not the recording.** The mark is drawn by the windows, and the sound is heard by the
+  Rust listener, so something has to travel from one to the other. It is the smallest thing the
+  chosen animation needs. For Gradient, Orbit and Star that is one number, how loud, at most 30
+  times a second; speech cannot be rebuilt from it. Ring also needs the outline of the wave (at
+  most 32 points, 30 times a second). Rough speech could be rebuilt from that outline, so it is
+  treated like audio: it goes to windows on this Mac only, never to the phone, and is never
+  stored. Every window draws from the same levels.
 - **States without colour alone.** Each state differs in motion and shape, so it reads in
   grayscale and for colour-blind eyes.
 - **Reduced motion.** With reduced motion on, the mark is still and a small level meter shows the
@@ -480,20 +488,28 @@ with the voice. It answers one question at a glance: is Overseer getting what I 
 - **Cheap.** 60 frames a second without slowing the views beside it. Nothing is drawn while the
   view is hidden.
 
-The owner is not sure of the best way to animate it. So at least three candidates are built and
-the owner picks on a review page.
+The owner is not sure of the best way to animate it, and left it to the implementing agent's
+judgement, with one suggestion: a gradient moving against the mark. So the candidates are built
+and the owner picks. A first version of each runs on the real logo, with a simulated voice, on
+the [preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr).
 
-| Candidate | The effect |
-| --- | --- |
-| Ring | The mark stays as drawn. A ring around it carries the waveform of the voice. |
-| Orbit | The three swooshes turn around the core, wider and faster with the voice. |
-| Star | The star at the core brightens and the glow behind the mark breathes with the voice. |
+| Candidate | The effect | Needs |
+| --- | --- | --- |
+| Gradient | A gradient moves through the mark: its colours turn, and a band of light sweeps across, faster and brighter with the voice. The owner's suggestion. | The logo as it is |
+| Ring | The mark stays as drawn. A ring around it carries the waveform of the voice. | The logo as it is |
+| Orbit | The swooshes turn around the core, faster and a little wider with the voice. | The layers |
+| Star | The star grows and the glow behind the mark breathes with the voice. | The layers |
+| Together | Orbit, the gradient on the swooshes, and the star, at once. | The layers |
 
-*Orbit* needs the mark in layers (swooshes, core, star). If the owner's files are flat images,
-the effects are drawn around and behind the mark and the mark itself is not cut up.
+**The layers.** The owner's logo is one transparent image. At the owner's suggestion a copy was
+cut into three layers by a script: the core as a whole disc, the swooshes as one ring, and the
+star. They are in [`docs/design/brand/layers/`](../design/brand/layers/), with the script. The
+owner's file is untouched. The [brand notes](../design/brand.md#the-mark-in-layers-docsdesignbrandlayers)
+give the numbers and the limits: the three swooshes are not separated from each other, and the
+inner edge has small flaws. A layered file from whoever drew the mark would replace them.
 
-The [brand rules](../design/brand.md) say the mark gets no effects. This is the one exception,
-at the owner's request: only here, only the chosen animation, and never stretched or recoloured.
+Effects on the mark are allowed. The brand notes once forbade them; the owner corrected that on
+2026-09-27. What stays fixed is the mark's shape and proportions.
 
 ## UI
 
@@ -522,7 +538,7 @@ at the owner's request: only here, only the chosen animation, and never stretche
 | Request records | 5,000 or 30 days |
 | Listener | one per daemon; at most 3 restarts in 10 minutes |
 | Speech model | inside Gate L's memory budget, checked before it is loaded |
-| Loudness levels | 30 a second at most; never stored |
+| Levels for the mark | 30 a second at most; the wave's outline at most 32 points; never stored |
 | While off | no listener process, microphone closed, no recognizer loaded |
 
 ## Working alongside the other gates
@@ -568,7 +584,7 @@ at the owner's request: only here, only the chosen animation, and never stretche
 | 6. Should Overseer speak up by itself when an agent needs you? | No. Audio Mode's cue does that. Overseer speaks only in answer. |
 | 7. Should the typed chat follow the same tiers? | No change to AC-107 in this gate. |
 | 8. Audio is collected on the Rust side: inside `overseerd` itself, or in a Rust process of its own? | Its own process, started by the daemon, so a fault in audio code cannot stop the agents. |
-| 9. Which animation for the mark, and should the large mark also appear over a review or the grid? | The owner picks from three candidates. The large mark is in the voice view only; beside other work it is small, in the strip. |
+| 9. Which animation for the mark? | The owner picks on the [preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr), one or a mix. The large mark in the voice view and the small one in the strip are fine for now (owner, 2026-09-27); the owner judges again on the build. |
 
 ## Order of work
 
