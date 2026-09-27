@@ -1,0 +1,528 @@
+{
+  "checks": [
+    {
+      "name": "online at the start: the real probes answer and the status bar is quiet",
+      "ok": true,
+      "detail": {
+        "text": "",
+        "aria": "Connection: Online"
+      }
+    },
+    {
+      "name": "the network went off while the Codex turn was running",
+      "ok": true,
+      "detail": {
+        "status": "running"
+      }
+    },
+    {
+      "name": "Overseer is offline within 10 s of the system's signal",
+      "ok": true,
+      "detail": {
+        "ms": 814,
+        "reason": "no network (system)",
+        "bar": "Offline"
+      }
+    },
+    {
+      "name": "the run moved to a local model: the predecessor reads handed off, the successor is OpenCode on the daemon's pick in the same task and worktree",
+      "ok": true,
+      "detail": {
+        "predecessor": "handed_off",
+        "exit": "handed off to r-97f99a281800 (offline)",
+        "why": [
+          "no progress while OpenAI could not be reached; the turn was interrupted by Overseer",
+          "no progress while OpenAI could not be reached; the turn was interrupted by Overseer"
+        ],
+        "successor": "opencode-serve ollama/qwen3-coder:30b-64k",
+        "pick": {
+          "model": "ollama/qwen3-coder:30b-64k",
+          "context": 65536,
+          "bytes": 26072893212
+        }
+      }
+    },
+    {
+      "name": "the local model finished the task in the same worktree",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "written": "# offline-repo\n\nThis is a test repository for offline functionality.\n\nUsed for testing local changes.",
+        "asked": []
+      }
+    },
+    {
+      "name": "the successor's chat says where it continues from, and the tree folds Codex under it",
+      "ok": true,
+      "detail": {
+        "opened": [
+          "Local model qwen3-coder:30b at a 64k context · 24.3 GiB.",
+          "This agent continues the work of another.Open the first agent",
+          "Continued from \"Offline session\" after the connection was lost at 15:47."
+        ],
+        "rows": [
+          "offline-repo · ",
+          "Offline session · now",
+          "Earlier: Codex · handed off · the connection was lost"
+        ]
+      }
+    },
+    {
+      "name": "the predecessor's chat announces the transition, and reads handed off, not failed",
+      "ok": true,
+      "detail": {
+        "told": [
+          "No answer while offline. Overseer interrupted the turn; your message is kept.",
+          "The work continues in another agent.Open it",
+          "Transitioning to qwen3-coder:30b (local, Ollama) because you've disconnected. Work continues in the same worktree."
+        ],
+        "status": "Handed off"
+      }
+    },
+    {
+      "name": "the review shows the local agent's work",
+      "ok": true,
+      "detail": [
+        "notes/offline.md",
+        "Anotes/offline.md+5−0Save↗112345# offline-repoThis is a test"
+      ]
+    },
+    {
+      "name": "back online, the local agent offers Switch back to Codex",
+      "ok": true,
+      "detail": {
+        "title": "Back online",
+        "line": "This agent can continue with Codex, in the same worktree.",
+        "actions": [
+          "Switch back to Codex",
+          "Stay here"
+        ]
+      }
+    },
+    {
+      "name": "Switch back continued in Codex, in its own session and the same worktree, on the same small model",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "model": "gpt-5.6-luna",
+        "session": true
+      }
+    },
+    {
+      "name": "Codex's connections really went through the simulated link, before the cut and after it",
+      "ok": true,
+      "detail": {
+        "tunnels": 34,
+        "log": [
+          "listening 127.0.0.1:64792",
+          "   6231 ms  CONNECT chatgpt.com:443: tunnelled",
+          "   6233 ms  CONNECT chatgpt.com:443: tunnelled",
+          "   6233 ms  CONNECT chatgpt.com:443: tunnelled",
+          "   6233 ms  CONNECT chatgpt.com:443: tunnelled",
+          "   6233 ms  CONNECT chatgpt.com:443: tunnelled",
+          "   6266 ms  CONNECT chatgpt.com:443: tunnelled",
+          "   6266 ms  CONNECT chatgpt.com:443: tunnelled",
+          "   6288 ms  CONNECT github.com:443: tunnelled",
+          "   6373 ms  CONNECT chatgpt.com:443: tunnelled",
+          "   6379 ms  CONNECT chatgpt.com:443: tunnelled",
+          "   6458 ms  CONNECT mcp.us2.signoz.cloud:443: tunnelled",
+          "   7508 ms  CONNECT chatgpt.com:443: tunnelled",
+          "   8994 ms  link Refuse",
+          "  89291 ms  link Online",
+          "  99035 ms  CONNECT chatgpt.com:443: tunnelled",
+          "  99035 ms  CONNECT chatgpt.com:443: tunnelled",
+          "  99035 ms  CONNECT chatgpt.com:443: tunnelled",
+          "  99035 ms  CONNECT chatgpt.com:443: tunnelled",
+          "  99056 ms  CONNECT chatgpt.com:443: tunnelled",
+          "  99064 ms  CONNECT chatgpt.com:443: tunnelled",
+          "  99064 ms  CONNECT chatgpt.com:443: tunnelled",
+          "  99129 ms  CONNECT github.com:443: tunnelled",
+          "  99137 ms  CONNECT chatgpt.com:443: tunnelled",
+          "  99221 ms  CONNECT mcp.us2.signoz.cloud:443: tunnelled",
+          "  99222 ms  CONNECT chatgpt.com:443: tunnelled",
+          " 100338 ms  CONNECT chatgpt.com:443: tunnelled",
+          " 101436 ms  CONNECT chatgpt.com:443: tunnelled",
+          " 110346 ms  CONNECT chatgpt.com:443: tunnelled",
+          " 113312 ms  CONNECT chatgpt.com:443: tunnelled",
+          " 114701 ms  CONNECT chatgpt.com:443: tunnelled",
+          " 114902 ms  CONNECT chatgpt.com:443: tunnelled",
+          " 115074 ms  CONNECT chatgpt.com:443: tunnelled",
+          " 115227 ms  CONNECT chatgpt.com:443: tunnelled",
+          " 115389 ms  CONNECT chatgpt.com:443: tunnelled",
+          " 115597 ms  CONNECT chatgpt.com:443: tunnelled",
+          " 115743 ms  CONNECT ab.chatgpt.com:443: tunnelled"
+        ]
+      }
+    }
+  ],
+  "timeline": [
+    {
+      "at": "22:46:21",
+      "ms": 1790549181169,
+      "what": "Codex codex-cli 0.155.0-alpha.16.4 through the simulated network on port 64792; memory level 80%"
+    },
+    {
+      "at": "22:46:27",
+      "ms": 1790549187250,
+      "what": "Codex started",
+      "run": "r-790445c992d0"
+    },
+    {
+      "at": "22:46:30",
+      "ms": 1790549190108,
+      "what": "network off (simulated): the system says no network; the link refuses and ends its connections"
+    },
+    {
+      "at": "22:47:17",
+      "ms": 1790549237215,
+      "what": "handed off",
+      "successor": "r-97f99a281800",
+      "after_ms": 47108
+    },
+    {
+      "at": "22:47:45",
+      "ms": 1790549265084,
+      "what": "the local agent ended",
+      "status": "completed"
+    },
+    {
+      "at": "22:47:50",
+      "ms": 1790549270353,
+      "what": "network on (simulated): the system says connected; the link tunnels again"
+    },
+    {
+      "at": "22:47:57",
+      "ms": 1790549277662,
+      "what": "online again",
+      "after_ms": 7061
+    },
+    {
+      "at": "22:47:59",
+      "ms": 1790549279584,
+      "what": "Switch back clicked"
+    },
+    {
+      "at": "22:48:17",
+      "ms": 1790549297227,
+      "what": "Codex ended again",
+      "status": "completed"
+    }
+  ],
+  "memory": {
+    "level_before": 80,
+    "loaded_before": [],
+    "unloaded": "ollama/qwen3-coder:30b-64k",
+    "level_after": 61,
+    "loaded_after": []
+  },
+  "versions": {
+    "codex": "codex-cli 0.155.0-alpha.16.4"
+  },
+  "review_after": [
+    "notes/offline.md",
+    "Mnotes/offline.md+1−3Save↗12345# offline-repoThis is a test "
+  ],
+  "runs": [
+    {
+      "id": "r-790445c992d0",
+      "harness": "codex",
+      "model": "gpt-5.6-luna",
+      "status": "handed_off",
+      "exit": "handed off to r-97f99a281800 (offline)",
+      "events": [
+        {
+          "at": "22:46:27",
+          "kind": "status",
+          "payload": "{\"generation\":1,\"program\":\"/SESSION/codex-through-netsim.sh\",\"status\":\"starting\"}"
+        },
+        {
+          "at": "22:46:27",
+          "kind": "status",
+          "payload": "{\"status\":\"running\",\"why\":\"harness process started\"}"
+        },
+        {
+          "at": "22:46:27",
+          "kind": "output",
+          "payload": "{\"role\":\"stderr\",\"text\":\"Reading additional input from stdin...\"}"
+        },
+        {
+          "at": "22:46:30",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"2026-09-27T22:46:30.308381Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 61), url: wss://chatgpt.com/backend-api/codex/responses\"}"
+        },
+        {
+          "at": "22:46:30",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"2026-09-27T22:46:30.599906Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 61), url: wss://chatgpt.com/backend-api/codex/responses\"}"
+        },
+        {
+          "at": "22:46:30",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"Reconnecting... 2/5 (stream disconnected before completion: Connection refused (os error 61))\"}"
+        },
+        {
+          "at": "22:46:31",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"2026-09-27T22:46:31.093865Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 61), url: wss://chatgpt.com/backend-api/codex/responses\"}"
+        },
+        {
+          "at": "22:46:31",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"Reconnecting... 3/5 (stream disconnected before completion: Connection refused (os error 61))\"}"
+        },
+        {
+          "at": "22:46:32",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"2026-09-27T22:46:32.038237Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 61), url: wss://chatgpt.com/backend-api/codex/responses\"}"
+        },
+        {
+          "at": "22:46:32",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"Reconnecting... 4/5 (stream disconnected before completion: Connection refused (os error 61))\"}"
+        },
+        {
+          "at": "22:46:33",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"2026-09-27T22:46:33.881505Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 61), url: wss://chatgpt.com/backend-api/codex/responses\"}"
+        },
+        {
+          "at": "22:46:33",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"Reconnecting... 5/5 (stream disconnected before completion: Connection refused (os error 61))\"}"
+        },
+        {
+          "at": "22:46:37",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"2026-09-27T22:46:37.472547Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 61), url: wss://chatgpt.com/backend-api/codex/responses\"}"
+        },
+        {
+          "at": "22:46:37",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"Falling back from WebSockets to HTTPS transport. stream disconnected before completion: Connection refused (os error 61)\"}"
+        },
+        {
+          "at": "22:46:40",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"Reconnecting... waiting for network (Connection failed: error sending request)\"}"
+        },
+        {
+          "at": "22:46:48",
+          "kind": "error",
+          "payload": "{\"class\":\"network\",\"message\":\"Reconnecting... waiting for network (Connection failed: error sending request)\"}"
+        },
+        {
+          "at": "22:47:00",
+          "kind": "stall",
+          "payload": "{\"action\":\"interrupted by Overseer\",\"connection\":\"no network (system)\",\"limit_ms\":30000,\"reason\":\"no progress while OpenAI could not be reached; the turn was interrupted by Overseer\",\"reconnecting_ms\":30583,\"silent_ms\":12568}"
+        },
+        {
+          "at": "22:47:01",
+          "kind": "status",
+          "payload": "{\"message_kept\":true,\"reason\":\"no progress while OpenAI could not be reached; the turn was interrupted by Overseer\",\"status\":\"waiting_for_connection\",\"turn\":\"u-752f767845da\"}"
+        },
+        {
+          "at": "22:47:17",
+          "kind": "handoff",
+          "payload": "{\"at_ms\":1790549237213,\"connection\":{\"reason\":\"no network (system)\",\"state\":\"offline\"},\"pending_message\":true,\"predecessor\":\"r-790445c992d0\",\"reason\":\"offline\",\"successor\":\"r-97f99a281800\",\"target\":{\"account\":null,\"difference\":null,\"harness\":\"opencode-serve\",\"label\":\"qwen3-coder:30b\",\"mode\":\"acceptE"
+        },
+        {
+          "at": "22:47:17",
+          "kind": "status",
+          "payload": "{\"reason\":\"handed off to r-97f99a281800 (offline)\",\"status\":\"handed_off\",\"successor\":\"r-97f99a281800\"}"
+        },
+        {
+          "at": "22:47:17",
+          "kind": "output",
+          "payload": "{\"continuity\":true,\"role\":\"system\",\"text\":\"Transitioning to **qwen3-coder:30b** (local, Ollama) because you've disconnected. Work continues in the same worktree.\"}"
+        }
+      ]
+    },
+    {
+      "id": "r-97f99a281800",
+      "harness": "opencode-serve",
+      "model": "ollama/qwen3-coder:30b-64k",
+      "status": "handed_off",
+      "exit": "handed off to r-3e2f12b0949c (back_online)",
+      "events": [
+        {
+          "at": "22:47:17",
+          "kind": "local_load",
+          "payload": "{\"approved\":{\"already_loaded\":false,\"base\":\"qwen3-coder:30b\",\"budget\":{\"available\":78967717888,\"budget\":48103633690,\"ceiling_level\":48103633690,\"ceiling_now\":65223822541,\"ceiling_percent\":40,\"ceiling_share\":54975581360,\"headroom\":13743895347,\"level\":80,\"level_floor\":45,\"note\":null,\"pressure\":\"normal"
+        },
+        {
+          "at": "22:47:17",
+          "kind": "local_model",
+          "payload": "{\"already_loaded\":false,\"auto\":true,\"base\":\"qwen3-coder:30b\",\"budget\":{\"available\":78967717888,\"budget\":48103633690,\"ceiling_level\":48103633690,\"ceiling_now\":65223822541,\"ceiling_percent\":40,\"ceiling_share\":54975581360,\"headroom\":13743895347,\"level\":80,\"level_floor\":45,\"note\":null,\"pressure\":\"normal"
+        },
+        {
+          "at": "22:47:17",
+          "kind": "status",
+          "payload": "{\"generation\":1,\"program\":\"/SESSION/extensions/beelol.overseer-0.1.0/bin/overseerd-darwin-arm64\",\"status\":\"starting\"}"
+        },
+        {
+          "at": "22:47:17",
+          "kind": "handoff",
+          "payload": "{\"at_ms\":1790549237213,\"connection\":{\"reason\":\"no network (system)\",\"state\":\"offline\"},\"pending_message\":true,\"predecessor\":\"r-790445c992d0\",\"reason\":\"offline\",\"successor\":\"r-97f99a281800\",\"target\":{\"account\":null,\"difference\":null,\"harness\":\"opencode-serve\",\"label\":\"qwen3-coder:30b\",\"mode\":\"acceptE"
+        },
+        {
+          "at": "22:47:17",
+          "kind": "output",
+          "payload": "{\"continuity\":true,\"role\":\"system\",\"text\":\"Continued from \\\"Offline session\\\" after the connection was lost at 15:47.\"}"
+        },
+        {
+          "at": "22:47:17",
+          "kind": "status",
+          "payload": "{\"status\":\"running\",\"why\":\"harness process started\"}"
+        },
+        {
+          "at": "22:47:39",
+          "kind": "usage",
+          "payload": "{\"agent\":\"build\",\"cost\":0,\"local\":true,\"model\":\"ollama/qwen3-coder:30b-64k\",\"tokens\":{\"cache\":{\"read\":0,\"write\":0},\"input\":10327,\"output\":52,\"reasoning\":0,\"total\":10379}}"
+        },
+        {
+          "at": "22:47:41",
+          "kind": "usage",
+          "payload": "{\"agent\":\"build\",\"cost\":0,\"local\":true,\"model\":\"ollama/qwen3-coder:30b-64k\",\"tokens\":{\"cache\":{\"read\":10326,\"write\":0},\"input\":133,\"output\":55,\"reasoning\":0,\"total\":10514}}"
+        },
+        {
+          "at": "22:47:44",
+          "kind": "usage",
+          "payload": "{\"agent\":\"build\",\"cost\":0,\"local\":true,\"model\":\"ollama/qwen3-coder:30b-64k\",\"tokens\":{\"cache\":{\"read\":10458,\"write\":0},\"input\":136,\"output\":86,\"reasoning\":0,\"total\":10680}}"
+        },
+        {
+          "at": "22:47:44",
+          "kind": "output",
+          "payload": "{\"role\":\"assistant\",\"text\":\"done\"}"
+        },
+        {
+          "at": "22:47:44",
+          "kind": "usage",
+          "payload": "{\"agent\":\"build\",\"cost\":0,\"local\":true,\"model\":\"ollama/qwen3-coder:30b-64k\",\"tokens\":{\"cache\":{\"read\":10593,\"write\":0},\"input\":104,\"output\":2,\"reasoning\":0,\"total\":10699}}"
+        },
+        {
+          "at": "22:47:44",
+          "kind": "turn_done",
+          "payload": "{\"ok\":true,\"summary\":null}"
+        },
+        {
+          "at": "22:47:45",
+          "kind": "status",
+          "payload": "{\"reason\":\"turn completed; exit 0\",\"status\":\"completed\"}"
+        },
+        {
+          "at": "22:47:57",
+          "kind": "output",
+          "payload": "{\"continuity\":true,\"role\":\"system\",\"text\":\"Back online. This agent is still on a local model.\"}"
+        },
+        {
+          "at": "22:48:00",
+          "kind": "handoff",
+          "payload": "{\"at_ms\":1790549280028,\"connection\":{\"reason\":\"connected\",\"state\":\"online\"},\"pending_message\":false,\"predecessor\":\"r-97f99a281800\",\"reason\":\"back_online\",\"successor\":\"r-3e2f12b0949c\",\"target\":{\"account\":null,\"difference\":null,\"harness\":\"codex\",\"label\":\"Codex\",\"mode\":null,\"model\":\"gpt-5.6-luna\",\"prof"
+        },
+        {
+          "at": "22:48:00",
+          "kind": "status",
+          "payload": "{\"reason\":\"handed off to r-3e2f12b0949c (back_online)\",\"status\":\"handed_off\",\"successor\":\"r-3e2f12b0949c\"}"
+        },
+        {
+          "at": "22:48:00",
+          "kind": "output",
+          "payload": "{\"continuity\":true,\"role\":\"system\",\"text\":\"Back online. Continuing with **Codex**.\"}"
+        }
+      ]
+    },
+    {
+      "id": "r-3e2f12b0949c",
+      "harness": "codex",
+      "model": "gpt-5.6-luna",
+      "status": "completed",
+      "exit": "turn completed; exit 0",
+      "events": [
+        {
+          "at": "22:48:00",
+          "kind": "status",
+          "payload": "{\"generation\":1,\"program\":\"/SESSION/codex-through-netsim.sh\",\"status\":\"starting\"}"
+        },
+        {
+          "at": "22:48:00",
+          "kind": "handoff",
+          "payload": "{\"at_ms\":1790549280028,\"connection\":{\"reason\":\"connected\",\"state\":\"online\"},\"pending_message\":false,\"predecessor\":\"r-97f99a281800\",\"reason\":\"back_online\",\"successor\":\"r-3e2f12b0949c\",\"target\":{\"account\":null,\"difference\":null,\"harness\":\"codex\",\"label\":\"Codex\",\"mode\":null,\"model\":\"gpt-5.6-luna\",\"prof"
+        },
+        {
+          "at": "22:48:00",
+          "kind": "output",
+          "payload": "{\"continuity\":true,\"role\":\"system\",\"text\":\"Continued from \\\"Offline session\\\" now that the connection is back.\"}"
+        },
+        {
+          "at": "22:48:00",
+          "kind": "status",
+          "payload": "{\"status\":\"running\",\"why\":\"harness process started\"}"
+        },
+        {
+          "at": "22:48:05",
+          "kind": "output",
+          "payload": "{\"role\":\"assistant\",\"text\":\"I’m checking the existing file to confirm the prior work is complete.\"}"
+        },
+        {
+          "at": "22:48:15",
+          "kind": "output",
+          "payload": "{\"role\":\"assistant\",\"text\":\"done\"}"
+        },
+        {
+          "at": "22:48:15",
+          "kind": "usage",
+          "payload": "{\"cache_write_input_tokens\":0,\"cached_input_tokens\":62464,\"input_tokens\":71264,\"output_tokens\":452,\"reasoning_output_tokens\":101}"
+        },
+        {
+          "at": "22:48:15",
+          "kind": "turn_done",
+          "payload": "{\"ok\":true,\"summary\":null}"
+        },
+        {
+          "at": "22:48:17",
+          "kind": "status",
+          "payload": "{\"reason\":\"turn completed; exit 0\",\"status\":\"completed\"}"
+        }
+      ]
+    }
+  ],
+  "netsim": [
+    "listening 127.0.0.1:64792",
+    "   6231 ms  CONNECT chatgpt.com:443: tunnelled",
+    "   6233 ms  CONNECT chatgpt.com:443: tunnelled",
+    "   6233 ms  CONNECT chatgpt.com:443: tunnelled",
+    "   6233 ms  CONNECT chatgpt.com:443: tunnelled",
+    "   6233 ms  CONNECT chatgpt.com:443: tunnelled",
+    "   6266 ms  CONNECT chatgpt.com:443: tunnelled",
+    "   6266 ms  CONNECT chatgpt.com:443: tunnelled",
+    "   6288 ms  CONNECT github.com:443: tunnelled",
+    "   6373 ms  CONNECT chatgpt.com:443: tunnelled",
+    "   6379 ms  CONNECT chatgpt.com:443: tunnelled",
+    "   6458 ms  CONNECT mcp.us2.signoz.cloud:443: tunnelled",
+    "   7508 ms  CONNECT chatgpt.com:443: tunnelled",
+    "   8994 ms  link Refuse",
+    "  89291 ms  link Online",
+    "  99035 ms  CONNECT chatgpt.com:443: tunnelled",
+    "  99035 ms  CONNECT chatgpt.com:443: tunnelled",
+    "  99035 ms  CONNECT chatgpt.com:443: tunnelled",
+    "  99035 ms  CONNECT chatgpt.com:443: tunnelled",
+    "  99056 ms  CONNECT chatgpt.com:443: tunnelled",
+    "  99064 ms  CONNECT chatgpt.com:443: tunnelled",
+    "  99064 ms  CONNECT chatgpt.com:443: tunnelled",
+    "  99129 ms  CONNECT github.com:443: tunnelled",
+    "  99137 ms  CONNECT chatgpt.com:443: tunnelled",
+    "  99221 ms  CONNECT mcp.us2.signoz.cloud:443: tunnelled",
+    "  99222 ms  CONNECT chatgpt.com:443: tunnelled",
+    " 100338 ms  CONNECT chatgpt.com:443: tunnelled",
+    " 101436 ms  CONNECT chatgpt.com:443: tunnelled",
+    " 110346 ms  CONNECT chatgpt.com:443: tunnelled",
+    " 113312 ms  CONNECT chatgpt.com:443: tunnelled",
+    " 114701 ms  CONNECT chatgpt.com:443: tunnelled",
+    " 114902 ms  CONNECT chatgpt.com:443: tunnelled",
+    " 115074 ms  CONNECT chatgpt.com:443: tunnelled",
+    " 115227 ms  CONNECT chatgpt.com:443: tunnelled",
+    " 115389 ms  CONNECT chatgpt.com:443: tunnelled",
+    " 115597 ms  CONNECT chatgpt.com:443: tunnelled",
+    " 115743 ms  CONNECT ab.chatgpt.com:443: tunnelled"
+  ]
+}

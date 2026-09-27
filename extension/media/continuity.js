@@ -151,12 +151,25 @@
         return true;
       }
       case 'error': {
-        // A connection error reported twice by the harness (its error line and its failed turn) is shown once.
+        // Connection errors are one quiet line per turn, updated in place, not a stack of red alerts:
+        // a lost connection is not a failure, and the real Codex words each reconnect attempt
+        // differently (six red blocks in the live offline session). The latest message is its tooltip.
         if (!mine || p.class !== 'network') return false;
-        const key = String(p.message || '');
-        if (c.lastError === key) return true;
-        c.lastError = key;
-        return false;
+        const text = String(p.message || '').trim();
+        if (!text) return true;
+        if (c.netLine && c.netLine.isConnected) {
+          if (c.netLast !== text) { c.netCount += 1; c.netLast = text; }
+          c.netLine.querySelector('.cont-count').textContent = ` · ${c.netCount} attempts`;
+          c.netLine.title = text;
+          return true;
+        }
+        c.netCount = 1; c.netLast = text;
+        c.netLine = note('cloud', 'The connection was lost; the agent keeps trying to reconnect.', 'cont-net');
+        c.netLine.dataset.continuity = 'network';
+        c.netLine.lastChild.append(el('span', 'cont-count', ''));
+        c.netLine.title = text;
+        last(conv).append(c.netLine);
+        return true;
       }
       case 'stall': if (mine) last(conv).append(note('debug-pause', 'No answer while offline. Overseer interrupted the turn; your message is kept.')); return true;
       case 'memory_valve': if (mine) last(conv).append(note('chip', 'The system ran short of memory. Overseer paused this agent and unloaded the model; your message is kept.')); return true;
@@ -182,7 +195,7 @@
         return true;
       default:
         // Whatever comes next ends a wait that was drawn.
-        if (mine && (ev.kind === 'turn_started' || ev.kind === 'turn_done')) { if (ev.kind === 'turn_started') { c.wait = null; c.lastError = undefined; } setTimeout(() => { fold(conv); drawWait(conv); drawBack(conv); }, 0); }
+        if (mine && (ev.kind === 'turn_started' || ev.kind === 'turn_done')) { if (ev.kind === 'turn_started') { c.wait = null; c.netLine = null; } setTimeout(() => { fold(conv); drawWait(conv); drawBack(conv); }, 0); }
         return false;
     }
   }

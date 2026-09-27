@@ -769,6 +769,12 @@ As built (2026-09-26), in `extension/src/continuity.js` (the host), `extension/m
   of a waiting agent never reads *Failed*. Tiles show the same, compact. The settings are 19
   `overseer.continuity.*` entries with the daemon's ranges; VS Code pushes what the user sets and
   mirrors what the daemon has.
+- **Found by the live offline session** (2026-09-27, the real Codex cut mid-turn): each reconnect
+  attempt of the real Codex is worded differently, so the chat showed six red *Connection problem*
+  alerts for one lost connection. A connection error is now one quiet line per turn, *The
+  connection was lost; the agent keeps trying to reconnect. · 6 attempts*, updated in place, the
+  latest message in its tooltip. And under Accounts, *Local models* read *signed out*; it now reads
+  *no account needed*, with no sign-in or sign-out menu.
 
 ## Security and privacy
 

@@ -1,0 +1,5 @@
+[2026-09-27T22:52:31.868Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T22:52:41.954Z] PASS the lost connection is one quiet line with the number of attempts, not a stack of red alerts {"red":[],"quiet":[{"text":"The connection was lost; the agent keeps trying to reconnect. · 12 attempts","tip":"Reconnecting... waiting for network (Connection failed: error sending request)"}],"notes":["The connection was lost; the agent keeps trying to reconnect. · 12 attempts","No answer while offline. Overseer interrupted the turn; your message is kept.","The work continues in another agent.Open it","Transitioning to qwen3-coder:30b (local, Ollama) because you've disconnected. Work continues in the same worktree."]}
+[2026-09-27T22:52:42.129Z] screenshot docs/verification/evidence/ui/offline-session-review/01-predecessor-quiet.png
+[2026-09-27T22:52:42.131Z] PASS under Accounts, local models need no account ["no account needed"]
+[2026-09-27T22:52:42.294Z] screenshot docs/verification/evidence/ui/offline-session-review/02-accounts-local.png
