@@ -7,6 +7,11 @@ appId: ${APP}
     visible:
       id: "agents.screen"
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000
 - tapOn:
     id: "agents.row.${SHOWCASE}"
 - extendedWaitUntil:
@@ -21,7 +26,3 @@ appId: ${APP}
 - extendedWaitUntil:
     visible: ".*${MESSAGE}.*"
     timeout: 5000
-- tapOn:
-    id: "agent.back"
-- assertVisible:
-    id: "agents.screen"

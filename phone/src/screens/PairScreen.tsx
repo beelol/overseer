@@ -128,6 +128,9 @@ export function PairScreen({ onDone }: PairScreenProps = {}) {
         return;
       }
       if (delivers(permission)) tellTheMac({ push, launch }, session).catch(() => undefined);
+      // Where the system delivers nothing, the app shows what needs the owner itself, while it
+      // is open. There is nothing to ask the system; the switches in Settings turn it off.
+      if (permission === null) session.setNotifications({ enabled: true }).catch(() => undefined);
       toAgents();
     },
     [session, name, device, haptics, push, launch, toAgents],

@@ -50,9 +50,31 @@ context.tsx          <PlatformProvider>, useCapabilities(), useLive()
 | `appState`     | Foreground or background                                                                                      | Foreground or background                                                                                                          | Set by the test                                                                            | Own code over React Native's `AppState`                                                                     | Part of React Native; no library needed.                                                                                                                              |
 | `network`      | Connection and its kind                                                                                       | Connection and its kind                                                                                                           | Set by the test                                                                            | `expo-network`                                                                                              | One maintained library covers both.                                                                                                                                   |
 
-Not capabilities yet, because nothing uses them yet: the back gesture, the launch screen's door
-(AC-136) and power state. Each gets its interface here when its screen is built. Notification
-actions are part of `push` (categories with actions).
+Notification actions are part of `push` (categories with actions). Power state is the Mac's
+concern in this gate (the daemon keeps the Mac awake), not the phone's.
+
+## What each platform does its own way
+
+People expect their phone's own conventions. The app keeps them, and no screen asks which
+platform it runs on: a convention is either the platform's own component, or a value a screen
+hands on from `launch.info().conventions` without looking at it.
+
+| Convention | iOS | Android | How the app gets it |
+| --- | --- | --- | --- |
+| Going back | A swipe from the left edge, or anywhere across the screen; the header's arrow | The system's back gesture or button; the header's arrow | The native stack of `react-native-screens`, with gestures on |
+| A screen entering | Slides in from the right | Fades up from the bottom | `conventions.screenEnter`, handed to the stack |
+| Making room for the keyboard | The screen pads its bottom | The window resizes | `conventions.keyboard`, handed to `Screen` |
+| Haptics | The system's feedback generators | The system's view haptics | `haptics.play(moment)`: one set of moments, each platform's own feel |
+| What needs the owner | The system's notifications, with Allow and Deny on them | The app's own banner while it is open (push on Android comes with the relay) | `push` where supported, else the banner of `src/notifications` |
+| The launch screen | The mark on the theme's background, from a storyboard | Android's own splash: the mark on one colour | `expo-splash-screen`, configured in `app.config.ts`; the door starts as the same picture |
+| Switches, the photo picker, the keyboard | The system's | The system's | React Native's and Expo's components |
+| Text size | Dynamic Type, up to the largest standard size | Font scale | `Txt`, which every word goes through |
+| Light and dark | Follows the system | Follows the system | `appearance`, a `Live` value |
+| Less motion | Reduce Motion | Remove animations | `reduceMotion`, a `Live` value: movement becomes a fade |
+
+Sheets and menus are the app's own on both platforms, so they look like Overseer everywhere.
+Screenshots of every screen on each platform are in
+`docs/verification/evidence/phone/e2e/<platform>/screens/`.
 
 ## The rule, and its check
 

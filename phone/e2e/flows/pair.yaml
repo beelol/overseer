@@ -2,7 +2,10 @@
 # confirms, and the app is on the agents list. It asks for notifications once, with the reason.
 appId: ${APP}
 ---
-- launchApp
+# The system has not been asked about notifications yet: the app asks, once, after pairing.
+- launchApp:
+    permissions:
+      notifications: unset
 - extendedWaitUntil:
     visible:
       id: "pair.code"
@@ -25,13 +28,15 @@ appId: ${APP}
       visible:
         id: "pair.notifications.reason"
     commands:
+      - takeScreenshot: notifications-the-reason-first
       - tapOn:
           id: "${NOTIFICATIONS}"
-      - runFlow:
-          when:
-            visible: "Allow"
-          commands:
-            - tapOn: "Allow"
+      # The system's own question.
+      - extendedWaitUntil:
+          visible: "Allow"
+          timeout: 15000
+      - takeScreenshot: the-system-asks-about-notifications
+      - tapOn: "Allow"
 - extendedWaitUntil:
     visible:
       id: "agents.screen"

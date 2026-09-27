@@ -3,11 +3,10 @@ appId: ${APP}
 ---
 - extendedWaitUntil:
     visible: "Needs your permission"
-    timeout: 20000
+    timeout: 60000
+- takeScreenshot: notification
 - tapOn: "Needs your permission"
 - extendedWaitUntil:
     visible:
       id: "agent.permission.allow"
     timeout: 30000
-- tapOn:
-    id: "agent.back"

@@ -29,6 +29,11 @@ export interface SessionDeps {
   readonly cacheEveryMs?: number;
   /** Told, no more often than the cache is written, how the stream of events has arrived. */
   readonly onStream?: (stream: StreamStats) => void;
+  /**
+   * Told how long a line took from the Mac to the phone's display: from the moment the daemon
+   * stamped the event to the frame that shows it, in milliseconds. News only, never history.
+   */
+  readonly onDelay?: (ms: number) => void;
   readonly log?: (message: string) => void;
 }
 
@@ -83,6 +88,8 @@ export class Session {
   private started = false;
   private readonly closing = new Set<ReturnType<typeof setTimeout>>();
   private stream: StreamStats = { count: 0, last: 0, gaps: 0, duplicates: 0, truncated: 0 };
+  /** When the daemon stamped the lines that are news and not yet on the display. */
+  private fresh: number[] = [];
   private switches: NotificationSwitches = NOT_YET;
 
   constructor(private readonly deps: SessionDeps) {
@@ -119,7 +126,7 @@ export class Session {
     const c = this.deps.connection;
     this.subscriptions.push(
       c.on('state', (state) => this.onConnection(state)),
-      c.on('event', (event) => this.onEvent(event)),
+      c.on('event', (event, info) => this.onEvent(event, info)),
       c.on('truncated', () => this.onTruncated()),
       c.on('outbox', () => this.update({ outbox: c.outbox() })),
       c.on('paired', () => this.readConnection()),
@@ -380,7 +387,8 @@ export class Session {
     return this.stream;
   }
 
-  private onEvent(event: DaemonEvent): void {
+  private onEvent(event: DaemonEvent, info?: { readonly live: boolean }): void {
+    if (info?.live && event.kind === 'output' && this.deps.onDelay) this.fresh.push(event.ts);
     const { last } = this.stream;
     this.stream = {
       ...this.stream,
@@ -415,6 +423,14 @@ export class Session {
   private flush(): void {
     if (this.pending.length === 0) return;
     this.flushInto(this.snapshot.state);
+    // The lines of this batch are on the display with the next frame.
+    const shown = this.fresh;
+    if (shown.length === 0) return;
+    this.fresh = [];
+    this.deps.nextFrame(() => {
+      const now = this.deps.now();
+      for (const stamped of shown) this.deps.onDelay?.(Math.max(0, now - stamped));
+    });
   }
 
   private flushInto(base: PhoneState): void {

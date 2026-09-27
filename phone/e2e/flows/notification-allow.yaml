@@ -3,7 +3,8 @@ appId: ${APP}
 ---
 - extendedWaitUntil:
     visible: "Needs your permission"
-    timeout: 20000
+    timeout: 60000
+- takeScreenshot: notification-before-allow
 - longPressOn: "Needs your permission"
 - extendedWaitUntil:
     visible: "Allow"

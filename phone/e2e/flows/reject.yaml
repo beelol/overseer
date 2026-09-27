@@ -1,4 +1,4 @@
-# The agent's changes: the files, one file's hunks, and a hunk marked reviewed.
+# A hunk rejected from the phone: asked once, then the lines are back as they were.
 appId: ${APP}
 ---
 - launchApp:
@@ -37,12 +37,15 @@ appId: ${APP}
     id: "changes.row.${FILE}"
 - extendedWaitUntil:
     visible:
-      id: "file.hunk.accept"
+      id: "file.hunk.reject"
     timeout: 30000
 - tapOn:
-    id: "file.hunk.accept"
+    id: "file.hunk.reject"
     index: 0
+- extendedWaitUntil:
+    visible:
+      id: "file.reject.confirm"
+    timeout: 10000
+- takeScreenshot: reject-asks-once
 - tapOn:
-    id: "file.back"
-- tapOn:
-    id: "changes.back"
+    id: "file.reject.confirm"

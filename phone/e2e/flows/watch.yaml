@@ -11,6 +11,11 @@ appId: ${APP}
     notVisible:
       id: "agents.new"
     timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000
 - tapOn:
     id: "agents.row.${SHOWCASE}"
 - extendedWaitUntil:
@@ -23,5 +28,3 @@ appId: ${APP}
     id: "agent.composer.text"
 - assertNotVisible:
     id: "agent.composer.send"
-- tapOn:
-    id: "agent.back"

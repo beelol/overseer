@@ -1,0 +1,20 @@
+# Stop all agents: it names how many will stop and asks once.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- tapOn:
+    id: "agents.menu"
+- tapOn:
+    id: "agents.menu.stop"
+- extendedWaitUntil:
+    visible:
+      id: "agents.stop.confirm"
+    timeout: 10000
+- takeScreenshot: stop-all-asks-once
+- tapOn:
+    id: "agents.stop.confirm"

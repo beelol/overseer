@@ -313,6 +313,27 @@ describe('the session', () => {
     expect(session.streamStats()).toMatchObject({ gaps: 1, duplicates: 1, truncated: 1, last: 91 });
   });
 
+  test('it times a line from the Mac to the display: news only, at the frame that shows it', async () => {
+    const platform = createFakePlatform();
+    const connection = new FakeConnection();
+    connection.gateway = GATEWAY;
+    connection.answers['state'] = () => STATE;
+    const frames: (() => void)[] = [];
+    const delays: number[] = [];
+    let now = 5_000;
+    const session = new Session({ connection, cache: platform.capabilities.keyValue.scope<SessionCache>('cache'), now: () => now, nextFrame: (f) => (frames.push(f), () => undefined), onDelay: (ms) => delays.push(ms) });
+    await session.start();
+    connection.go('online');
+    await settle();
+    connection.emit('event', { ...event(11, 'output', { text: 'old' }), ts: 1_000 }, { live: false });
+    connection.emit('event', { ...event(12, 'output', { text: 'new' }), ts: 4_900 }, { live: true });
+    now = 5_020;
+    frames.splice(0).forEach((f) => f());
+    now = 5_036;
+    frames.splice(0).forEach((f) => f());
+    expect(delays).toEqual([136]);
+  });
+
   test('coming to the front tries the Mac at once', async () => {
     const { session, connection } = make();
     await session.start();

@@ -8,6 +8,11 @@ appId: ${APP}
       id: "agents.screen"
     timeout: 30000
 - takeScreenshot: agents
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000
 - tapOn:
     id: "agents.row.${SHOWCASE}"
 - extendedWaitUntil:
@@ -17,6 +22,15 @@ appId: ${APP}
 - takeScreenshot: conversation
 - tapOn:
     id: "agent.changes"
+- extendedWaitUntil:
+    visible:
+      id: "changes.comparison"
+    timeout: 30000
+# Everything the agent changed since its task started, whatever its latest run did.
+- tapOn:
+    id: "changes.comparison"
+- tapOn:
+    id: "changes.comparison.menu.task_start"
 - extendedWaitUntil:
     visible:
       id: "changes.row.${FILE}"
@@ -31,8 +45,16 @@ appId: ${APP}
 - takeScreenshot: file
 - tapOn:
     id: "file.back"
+- extendedWaitUntil:
+    visible:
+      id: "changes.screen"
+    timeout: 10000
 - tapOn:
     id: "changes.back"
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 10000
 - tapOn:
     id: "agent.more"
 - tapOn:
@@ -44,6 +66,10 @@ appId: ${APP}
 - takeScreenshot: merge-back
 - tapOn:
     id: "merge.back"
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 10000
 - tapOn:
     id: "agent.more"
 - tapOn:
@@ -55,8 +81,16 @@ appId: ${APP}
 - takeScreenshot: pull-request
 - tapOn:
     id: "pr.back"
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 10000
 - tapOn:
     id: "agent.back"
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 10000
 - tapOn:
     id: "agents.new"
 - extendedWaitUntil:
@@ -66,6 +100,10 @@ appId: ${APP}
 - takeScreenshot: new-agent
 - tapOn:
     id: "new.back"
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 10000
 - tapOn:
     id: "agents.menu"
 - takeScreenshot: agents-menu
@@ -78,6 +116,10 @@ appId: ${APP}
 - takeScreenshot: accounts
 - tapOn:
     id: "accounts.back"
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 10000
 - tapOn:
     id: "agents.menu"
 - tapOn:

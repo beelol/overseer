@@ -136,7 +136,7 @@ async function flow(log, dev, name, env, out) {
 function collect(from, to) {
   if (!fs.existsSync(from)) return;
   for (const entry of fs.readdirSync(from, { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith('.png') || entry.name.startsWith('screenshot-')) continue;
+    if (!entry.isFile() || !entry.name.endsWith('.png') || entry.name.startsWith('screenshot-') || entry.name.startsWith('step-')) continue;
     fs.mkdirSync(to, { recursive: true });
     fs.copyFileSync(path.join(entry.parentPath ?? entry.path, entry.name), path.join(to, entry.name));
   }
@@ -176,7 +176,7 @@ async function platformRun(args, platform, summary) {
     lab = await startLab(log, platform, args.out);
   }
   const results = [];
-  const context = { log, dev, lab, out, platform, until, sleep, port: args.dev ? lab.info().port : PORTS[platform], flow: (name, env = {}) => flow(log, dev, name, env, args.out), shot: (name) => dev.screenshot(path.join(out, `${name}.png`)) };
+  const context = { log, dev, lab, out, platform, until, sleep, app: APPS[platform], port: args.dev ? lab.info().port : PORTS[platform], flow: (name, env = {}) => flow(log, dev, name, env, args.out), shot: (name) => dev.screenshot(path.join(out, `${name}.png`)) };
   fs.mkdirSync(out, { recursive: true });
   try {
     for (const scenario of scenarios) {

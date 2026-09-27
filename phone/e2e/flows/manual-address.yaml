@@ -19,8 +19,7 @@ appId: ${APP}
 - tapOn:
     id: "settings.mac.address"
 - inputText: ${ADDRESS}
-- tapOn:
-    id: "settings.mac.address.add"
+- pressKey: Enter
 - scrollUntilVisible:
     element:
       id: "settings.mac.address.0"

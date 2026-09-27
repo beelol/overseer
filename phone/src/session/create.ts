@@ -1,4 +1,5 @@
 import { PhoneClient, webSocketFactory, type KeyValueStore } from '@/core';
+import { perf } from '@/perf';
 import type { AsyncStore, Capabilities, SyncStore } from '@/platform';
 
 import { Session, type SessionCache } from './session';
@@ -68,11 +69,15 @@ export function createSession({ capabilities, app, log }: CreateSessionOptions):
     // Read by the scenario run, which compares it with the Mac's own log.
     onStream: (stream) => {
       try {
-        capabilities.keyValue.scope<{ stream: string }>('perf').set('stream', JSON.stringify(stream));
+        const measured = capabilities.keyValue.scope<{ stream: string; delay: string }>('perf');
+        measured.set('stream', JSON.stringify(stream));
+        const delay = perf.report().summary['stream.delay'];
+        if (delay) measured.set('delay', JSON.stringify(delay));
       } catch {
         // Measuring never breaks the app.
       }
     },
+    onDelay: (ms) => perf.record('stream.delay', ms),
     now: () => Date.now(),
     nextFrame: (callback) => {
       const id = requestAnimationFrame(callback);

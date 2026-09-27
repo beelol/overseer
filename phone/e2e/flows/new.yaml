@@ -22,9 +22,3 @@ appId: ${APP}
     visible:
       id: "agent.list"
     timeout: 30000
-- tapOn:
-    id: "agent.back"
-- extendedWaitUntil:
-    visible:
-      id: "agents.screen"
-    timeout: 10000

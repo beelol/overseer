@@ -8,9 +8,11 @@ appId: ${APP}
     visible:
       id: "agents.screen"
     timeout: 30000
+# Opened while phone access is off, the app cannot tell off from unreachable: the Mac told it
+# nothing. Either way it is not connected, and what is sent waits.
 - extendedWaitUntil:
     visible:
-      id: "connection.off"
+      id: "connection.off|connection.unreachable"
     timeout: 60000
 - tapOn:
     id: "agents.row.${SHOWCASE}"

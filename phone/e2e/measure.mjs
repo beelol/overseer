@@ -89,6 +89,8 @@ function figures(records) {
   return {
     launches: records.length,
     reached: ok.length,
+    // A launch that drew the pairing screen asked the owner for something.
+    pairing: ok.filter((r) => r.marks['screen.pair.shown'] !== undefined).length,
     'javascript.loaded': summary(ok.map((r) => r.startup['javascript.loaded'])),
     'door.shown': mark('door.shown'),
     'agents.shown': mark('screen.agents.shown'),
@@ -107,6 +109,9 @@ export function verdicts(platform, withDoor, withoutDoor, baseline) {
   const say = (name, value, limit, ok, note = '') => out.push({ name, value, limit, ok, note });
   const p95 = withDoor['agents.interactive'].p95;
   say('every launch reaches the agents list', withDoor.reached, withDoor.launches, withDoor.reached === withDoor.launches);
+  const asked = withDoor.pairing + (withoutDoor ? withoutDoor.pairing : 0);
+  const launches = withDoor.launches + (withoutDoor ? withoutDoor.launches : 0);
+  say(`launches that showed pairing or any other question, of ${launches}`, asked, 0, asked === 0);
   say('agents list interactive, p95 (ms)', p95, limits['agents.interactive.p95'], p95 !== null && p95 <= limits['agents.interactive.p95']);
   if (baseline) {
     const allowed = round(baseline['agents.interactive.p95'] * ALLOWED);

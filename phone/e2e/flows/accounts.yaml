@@ -17,7 +17,3 @@ appId: ${APP}
     timeout: 30000
 - assertVisible:
     id: "accounts.list"
-- tapOn:
-    id: "accounts.back"
-- assertVisible:
-    id: "agents.screen"

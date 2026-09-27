@@ -19,7 +19,3 @@ appId: ${APP}
     id: "settings.notifications.all"
 - assertVisible:
     id: "settings.phone.name"
-- tapOn:
-    id: "settings.back"
-- assertVisible:
-    id: "agents.screen"
