@@ -321,6 +321,54 @@ export const scenarios = [
     },
   },
   {
+    name: 'cleanup',
+    criteria: ['AC-130', 'AC-127'],
+    says: 'clean up a worktree with uncommitted files: the phone names them and asks once; the worktree is gone',
+    async run(c) {
+      const created = c.lab.call('task.create', {
+        repo: c.lab.info().repo, harness: 'generic', workspace_mode: 'worktree', program: '/bin/sh', prompt: '', title: 'Draft the returns note',
+        args: ['-c', "printf 'returns within 30 days\\n' > returns-draft.txt; echo more >> README.md"],
+      });
+      const id = created.run.id;
+      await c.until('the agent done', () => !ACTIVE.includes(run(c, id)?.status ?? 'queued'), 60_000);
+      const workspace = run(c, id).workspace_id;
+      const where = c.lab.call('state').workspaces.find((w) => w.id === workspace).path;
+      expect(fs.existsSync(path.join(where, 'returns-draft.txt')), 'the agent left no uncommitted file');
+      await c.flow('cleanup', { RUN: id, LOST: 'returns-draft\\.txt' });
+      const gone = await c.until('the worktree removed', () => c.lab.call('state').workspaces.find((w) => w.id === workspace)?.removed_ms ?? null, 30_000);
+      expect(!fs.existsSync(where), 'the worktree folder is still there');
+      return { removed_ms: gone };
+    },
+  },
+  {
+    name: 'merge',
+    criteria: ['AC-130', 'AC-127'],
+    says: 'merge back from the phone: aborted after a conflict, and completed, each asked once',
+    async run(c) {
+      const repo = c.lab.info().repo;
+      const git = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' }).trim();
+      fs.writeFileSync(path.join(repo, 'prices.txt'), 'price list\n');
+      git('add', 'prices.txt');
+      git('commit', '-q', '-m', 'prices');
+      const agentOf = (title, script) => c.lab.call('task.create', { repo, harness: 'generic', workspace_mode: 'worktree', program: '/bin/sh', prompt: '', title, args: ['-c', script] }).run.id;
+      // Abort: the agent and the main branch change the same line.
+      const clash = agentOf('Reprice the list', "echo 'agent prices' > prices.txt && git commit -qam 'agent prices'");
+      const plain = agentOf('Write the stock note', "echo 'stock is fine' > stock-note.txt && git add stock-note.txt && git commit -qm 'stock note'");
+      await c.until('both agents done', () => [clash, plain].every((id) => !ACTIVE.includes(run(c, id)?.status ?? 'queued')), 60_000);
+      fs.writeFileSync(path.join(repo, 'prices.txt'), 'main prices\n');
+      git('commit', '-qam', 'main prices');
+      await c.flow('merge-abort', { RUN: clash });
+      const clashWorkspace = run(c, clash).workspace_id;
+      const after = c.lab.call('workspace.merge_plan', { workspace_id: clashWorkspace });
+      expect(after.ok && after.state === 'idle', `after the abort the merge is ${after.state}`);
+      expect(!git('log', '--oneline', 'main').includes('agent prices'), 'the aborted merge reached main');
+      // Complete: nothing in the way.
+      await c.flow('merge-complete', { RUN: plain });
+      expect(git('ls-tree', '--name-only', 'main').split('\n').includes('stock-note.txt'), "the agent's commit did not land on main");
+      return { aborted: clash, completed: plain };
+    },
+  },
+  {
     name: 'new',
     criteria: ['AC-125'],
     says: 'a new agent started from the phone',
