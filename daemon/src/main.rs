@@ -7,6 +7,7 @@ mod auto_collect;
 mod auto_consumption;
 mod auto_select;
 mod auto_health;
+mod auto_maintenance;
 mod adapters;
 mod background;
 mod daemon;

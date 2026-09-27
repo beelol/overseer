@@ -40,6 +40,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
     // still be this process's own uid), so it lets a test observe a "foreign" connection being
     // refused without a second macOS account; it can never admit a different user.
     let expected = std::env::var("OVERSEER_TEST_EXPECT_UID").ok().and_then(|v| v.parse::<u32>().ok());
+    crate::auto_maintenance::start(daemon.clone());
     loop {
         let (stream, _) = listener.accept().await?;
         let peer = crate::shim::peer_uid_fd(stream.as_raw_fd());

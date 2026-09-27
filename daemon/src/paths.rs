@@ -58,6 +58,12 @@ pub fn db_path() -> PathBuf {
     data_dir().join("overseer.sqlite")
 }
 
+pub fn learning_db_path(database: &std::path::Path) -> PathBuf {
+    let mut name = database.as_os_str().to_os_string();
+    name.push(".learning");
+    PathBuf::from(name)
+}
+
 pub fn runs_dir() -> PathBuf {
     data_dir().join("runs")
 }

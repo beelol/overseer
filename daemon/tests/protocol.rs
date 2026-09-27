@@ -1600,6 +1600,102 @@ fn auto_usage_inspection_reports_paused_when_retention_cleanup_fails_then_recove
 }
 
 #[test]
+fn unattended_learning_expiry_does_not_delay_execution_dispatch() {
+    use rusqlite::params;
+    let root = tmp();
+    let project = repo(&root.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_TEST_AUTO_MAINTENANCE_MS", "50")]);
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    const DAY: i64 = 86_400_000;
+    let learning = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
+    learning.execute("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<130)
+        INSERT INTO auto_measurements(event_seq,observed_ms,task_id,run_id,harness)
+        SELECT x,?1,'task','run','codex' FROM n",
+        params![now - 31 * DAY]).unwrap();
+    learning.execute("INSERT INTO auto_thread_usage_observations(run_id,profile_id,read_account_generation,attribution,observed_ms,source,estimate) VALUES('run','profile',1,'unverified',?1,'fixture','{}')",
+        params![now - 31 * DAY]).unwrap();
+    learning.execute("INSERT INTO auto_work_observations(work_unit_id,run_id,profile_id,observed_ms,record) VALUES('unit','run',NULL,?1,'{}')",
+        params![now - 31 * DAY]).unwrap();
+    learning.execute("INSERT INTO auto_daily_aggregates(day_ms,harness,profile_id,model,effort,last_observed_ms,samples,input_observations,input_tokens,output_observations,output_tokens,cached_input_observations,cached_input_tokens,reasoning_output_observations,reasoning_output_tokens,cost_observations,cost_usd) VALUES(1,'codex','','','',?1,1,0,0,0,0,0,0,0,0,0,0)",
+        params![now - 91 * DAY]).unwrap();
+
+    learning.execute_batch("BEGIN EXCLUSIVE").unwrap();
+    std::thread::sleep(Duration::from_millis(200));
+    let started = std::time::Instant::now();
+    let created = d.generic(&project, "worktree", "/bin/sh", &["-c", "echo dispatched"]);
+    assert!(started.elapsed() < Duration::from_secs(2),
+        "learning maintenance must not hold execution dispatch behind its database lock");
+    assert_eq!(d.wait_done(&run_id(&created), 10)["status"], "completed");
+    learning.execute_batch("COMMIT").unwrap();
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    loop {
+        let remaining: i64 = ["auto_measurements", "auto_daily_aggregates", "auto_thread_usage_observations", "auto_work_observations"]
+            .iter().map(|table| learning.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get::<_, i64>(0)).unwrap()).sum();
+        if remaining == 0 { break; }
+        assert!(std::time::Instant::now() < deadline,
+            "background maintenance left {remaining} expired learning rows without any user inspection");
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    assert_eq!(d.run(&run_id(&created))["status"], "completed");
+}
+
+#[test]
+fn locked_learning_inspection_cannot_hold_execution_dispatch_for_its_sqlite_timeout() {
+    let root = tmp();
+    let project = repo(&root.path().join("repo"));
+    let d = Daemon::start(&[]);
+    let learning = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
+    learning.execute_batch("BEGIN EXCLUSIVE").unwrap();
+    let (created, elapsed, inspection) = std::thread::scope(|scope| {
+        let pending = scope.spawn(|| d.try_call("auto.usage.list", json!({})));
+        std::thread::sleep(Duration::from_millis(100));
+        let started = std::time::Instant::now();
+        let created = d.generic(&project, "worktree", "/bin/sh", &["-c", "echo dispatched"]);
+        let elapsed = started.elapsed();
+        learning.execute_batch("COMMIT").unwrap();
+        (created, elapsed, pending.join().unwrap())
+    });
+    assert!(elapsed < Duration::from_secs(2),
+        "user inspection held execution dispatch for {elapsed:?} while learning SQLite was locked");
+    assert_eq!(inspection.unwrap()["learning_paused"], true);
+    assert_eq!(d.wait_done(&run_id(&created), 10)["status"], "completed");
+}
+
+#[test]
+fn locked_learning_recording_does_not_hold_execution_events_or_dispatch() {
+    let root = tmp();
+    let project = repo(&root.path().join("repo"));
+    let replay = root.path().join("locked-learning-usage.jsonl");
+    std::fs::write(&replay, concat!(
+        "{\"type\":\"thread.started\",\"thread_id\":\"locked-learning-thread\"}\n",
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":4,\"output_tokens\":1}}\n"
+    )).unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/replay.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "REPLAY_FILE,REPLAY_DELAY_MS"),
+        ("REPLAY_FILE", replay.to_str().unwrap()), ("REPLAY_DELAY_MS", "10")]);
+    let learning = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
+    learning.execute_batch("BEGIN EXCLUSIVE").unwrap();
+    let created = d.call("task.create", json!({"repo":project,"harness":"codex",
+        "model":"gpt-6-sol","effort":"medium","prompt":"x","title":"locked learning"}));
+    let run = run_id(&created);
+    let started = std::time::Instant::now();
+    let settled = d.wait_done(&run, 10);
+    let elapsed = started.elapsed();
+    learning.execute_batch("COMMIT").unwrap();
+    assert_eq!(settled["status"], "completed", "{settled}");
+    assert!(elapsed < Duration::from_secs(3),
+        "telemetry lock held execution state for {elapsed:?}");
+    assert_eq!(d.events(&run).iter().filter(|event| event["kind"] == "usage").count(), 1,
+        "execution usage event must commit despite learning pressure");
+    let history = d.call("auto.usage.list", json!({}));
+    assert_eq!(history["learning_paused"], true, "{history}");
+    assert!(history["measurements"].as_array().unwrap().is_empty(),
+        "failed learning must not be reconstructed from the execution event");
+}
+
+#[test]
 fn auto_clearing_learning_during_an_active_child_preserves_its_execution() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

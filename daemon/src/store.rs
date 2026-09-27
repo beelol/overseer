@@ -6,7 +6,7 @@ use crate::auto_quota::{QuotaSnapshot, StoredQuotaObservation};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::Serialize;
 use serde_json::Value;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub const SCHEMA_VERSION: i64 = 15;
 /// Retained normalized events per run before older ones are pruned (with a marker).
@@ -154,9 +154,7 @@ impl Store {
             let learning_conn = if path == Path::new(":memory:") {
                 Connection::open_in_memory()?
             } else {
-                let mut name = path.as_os_str().to_os_string();
-                name.push(".learning");
-                let learning_path = PathBuf::from(name);
+                let learning_path = crate::paths::learning_db_path(path);
                 let learning = Connection::open(&learning_path)?;
                 #[cfg(unix)] {
                     use std::os::unix::fs::PermissionsExt;
@@ -167,7 +165,9 @@ impl Store {
             };
             learning_conn.pragma_update(None, "journal_mode", "DELETE")?;
             learning_conn.pragma_update(None, "synchronous", "FULL")?;
-            learning_conn.busy_timeout(std::time::Duration::from_secs(5))?;
+            // Learning storage is separate from execution. A busy learning
+            // file must fail quickly while callers hold the shared Store lock.
+            learning_conn.busy_timeout(std::time::Duration::from_millis(25))?;
             let page_size: i64 = learning_conn.pragma_query_value(None, "page_size", |row| row.get(0))?;
             let max_pages = (128 * 1024 * 1024 / page_size).max(1);
             learning_conn.pragma_update(None, "max_page_count", max_pages)?;
