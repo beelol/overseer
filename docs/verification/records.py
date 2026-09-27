@@ -1204,7 +1204,41 @@ rec(145, "Audio Mode by ear (owner-confirmed)", "not started", date="—", commi
     actual="Not started.", live="—",
     blocker="Not started: needs the owner's listening session on the build of pull request #5 (see docs/rfcs/audio-mode-goal.md).")
 
+# Gate P, follow-through (added by the owner on 2026-09-27). Not started.
+rec(146, "Reconcile and merge the work in flight", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(147, "One command runs every test", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(148, "Checks on every pull request", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(149, "A steady UI suite", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(150, "The first click always lands", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(151, "Every live scenario rerun on the current build", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(152, "Performance re-measured", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(153, "A ledger that stays true", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+
 SHORT_BLOCKERS = {
+    146: "not started (Gate P, added by the owner on 2026-09-27)",
+    147: "not started (Gate P, added by the owner on 2026-09-27)",
+    148: "not started (Gate P, added by the owner on 2026-09-27)",
+    149: "not started (Gate P, added by the owner on 2026-09-27)",
+    150: "not started (Gate P, added by the owner on 2026-09-27)",
+    151: "not started (Gate P, added by the owner on 2026-09-27)",
+    152: "not started (Gate P, added by the owner on 2026-09-27)",
+    153: "not started (Gate P, added by the owner on 2026-09-27)",
     142: "not started: waits for the owner\'s logo files",
     143: "in progress: built and verified in pull request #5, not merged",
     144: "not started (Gate O, the owner's decision of 2026-09-26)",
