@@ -1,6 +1,6 @@
 # SWARM-23 — visible Swarm status
 
-Status: partial. Initial revision: `0997e20`. Latest evidence revision: `6ba3d06`.
+Status: partial. Initial revision: `0997e20`. Latest evidence revision: `3733cea2`.
 
 Input: a category with one admitted local worker, and a separate category with a planned job but no worker process. Both use the deterministic `OVERSEER_NOTIFY_COMMAND=/usr/bin/true` fixture. The tests call `daemon.background_notice`; the active-worker case is `daemon_stop_all_preserves_unconfirmed_swarm_worker_after_control_loss`, and the queued case is `background_notice_names_queued_swarm_without_a_worker_process` in `daemon/tests/swarm_control.rs`.
 
@@ -98,3 +98,15 @@ sidebar unit suite (5/5), extension check, VSIX build and packaged scenario pass
 These values are injected fixture observations; current provider usage remains
 labelled unknown. Live Auto account identity and usage, a joined redaction check,
 and the remaining full UI matrix are still required. SWARM-23 remains partial.
+
+Snapshot-identifier guard (`3733cea2`): the Swarm policy boundary now rejects
+credential-shaped target, account, pool, window, unit and route identifiers
+before an injected availability snapshot can enter durable status. A focused
+test was red when a secret-shaped target ID appeared as a key in the policy
+readout. After validation, it checks each identifier class, confirms that the
+error does not echo the credential, refuses a secret-shaped approved target at
+category creation, and confirms a rejected availability observation leaves no
+stored status. This is a best-effort guard for known credential patterns at the
+fixture interface, not a claim that every possible secret can be recognized or
+that all status/log surfaces have passed a joined redaction audit. SWARM-23
+remains partial.

@@ -1,6 +1,6 @@
 # SWARM-59 — durable eligibility block and wake
 
-Status: partial. Revision: `c0c47c6`. Support level: fixture-only observation of the agreed Auto Mode snapshot shape; no live telemetry feed or user-facing control.
+Status: partial. Initial revision: `c0c47c6`. Latest evidence revision: `3733cea2`. Support level: fixture-only observation of the agreed Auto Mode snapshot shape; no live telemetry feed or user-facing control.
 
 Input: four local replays cover (1) an allowed target missing at category start, daemon restart, repeat observation and later recovery; (2) loss of the only allowed target after the first of two jobs is admitted; (3) insufficient finishing capacity followed by increased headroom; and (4) an otherwise healthy recovery after the original 15-second run deadline. Each observation declares the required capability, native-unit estimate and purpose. The first replay also tries to turn the block into eligibility by changing only the purpose or estimate. A migration fixture supplies a legacy eligible observation without an assessment identity. The mid-run worker submits a discovery and artifact while availability is blocked.
 
@@ -56,3 +56,13 @@ The Atlas J2/J4 allowance-drop replay was not rerun with this display, so this
 is complementary fixture evidence, not one joined S5 trace. Live Auto updates,
 verified account identity, user-triggered target changes and a qualified live
 director remain open. SWARM-59 stays partial.
+
+Joined numeric replay (`3733cea2`): the versioned Atlas J2/J4 fault test
+now reads the allowance window from both `swarm.get` and `swarm.list` after its
+injected external drop. In the same PostgreSQL-backed trace, the daemon records
+100,000 previous and 500 remaining milli-points, a signed -99,500 change in
+`points`, and a `finishing_reserve` block that holds J4 while J2's reproduction
+remains reviewable. The opt-in Atlas runner passed all 17 joined tests. The
+separate packaged sidebar fixture already shows this data visually, but it
+still does not draw the Atlas run itself, and the source is injected rather than
+live Auto telemetry. SWARM-59 remains partial.

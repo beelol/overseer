@@ -63,3 +63,11 @@ completion with an accepted but unintegrated patch is rejected. The full 24-modu
 Catalog replay also passes. These are scripted fixture decisions; S0, autonomous
 director behavior, live user-message intake and live communication qualification
 remain unverified, so SWARM-64 is partial.
+
+Allowance-readout follow-up (`3733cea2`): the tenth named Atlas S5 fault
+now asserts the selected window's previous/remaining native balance and signed
+change through `swarm.get` and `swarm.list` in the same run that blocks J4 and
+accepts J2's PostgreSQL-backed evidence. The disposable Atlas runner passes all
+17 joined tests. This strengthens S5's injected external-activity trace, but
+S0, a full S1-sized ordered fault replay, autonomous decisions and live
+provider communication remain unverified. SWARM-64 stays partial.

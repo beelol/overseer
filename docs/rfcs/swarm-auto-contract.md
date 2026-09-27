@@ -63,6 +63,11 @@ health/auth status, and eligibility reasons. A pool/window has native unit, fres
 amount or unknown, reset if known, and scope (account, model, endpoint, or other binding
 limit). Consumed tokens/usage remain separate observations. A local provider may have an
 explicit `not_applicable` subscription quota; this never means infinite machine capacity.
+Target, account, pool, window, unit and route identifiers passed to Swarm are bounded,
+opaque, non-secret labels; they must not contain raw login output or credentials.
+The daemon rejects recognized credential patterns before a snapshot can enter
+Swarm availability or status. This is a boundary check, not a substitute for
+Auto's source-side redaction and a joined status/log redaction test.
 
 Linked profiles are grouped by verified account/pool identity. If independence cannot be
 proved, their capacity cannot be added. A changed identity invalidates prior route eligibility
