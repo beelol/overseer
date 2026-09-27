@@ -91,6 +91,11 @@ fn acknowledge(
         || !["planning", "running"].contains(&current.2.as_str()) {
         bail!("run cannot integrate after its control state changed");
     }
+    let accepted: bool = tx.prepare("SELECT 1 FROM swarm_jobs WHERE run_id=?1 AND id=?2
+        AND status='accepted' AND stop_reason IS NULL")?.exists(params![run,job])?;
+    if !accepted {
+        bail!("job is not accepted after its evidence or control state changed");
+    }
     let changed = tx.execute(
         "UPDATE swarm_integrations SET current_commit=?2,updated_ms=?3 WHERE run_id=?1 AND current_commit=?4",
         params![run,commit,now,prior],
@@ -111,7 +116,7 @@ fn acknowledge(
     tx.commit().map_err(Into::into)
 }
 
-fn ensure_current(store: &Store, run: &str, generation: i64, revision: i64) -> Result<()> {
+fn ensure_current(store: &Store, run: &str, job: &str, generation: i64, revision: i64) -> Result<()> {
     let current: (i64, i64, String) = store.conn.query_row(
         "SELECT generation,revision,status FROM swarm_runs WHERE id=?1",
         [run], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
@@ -119,6 +124,11 @@ fn ensure_current(store: &Store, run: &str, generation: i64, revision: i64) -> R
     if current.0 != generation || current.1 != revision
         || !["planning", "running"].contains(&current.2.as_str()) {
         bail!("run cannot integrate after its control state changed");
+    }
+    let accepted: bool = store.conn.prepare("SELECT 1 FROM swarm_jobs WHERE run_id=?1 AND id=?2
+        AND status='accepted' AND stop_reason IS NULL")?.exists(params![run,job])?;
+    if !accepted {
+        bail!("job is not accepted after its evidence or control state changed");
     }
     Ok(())
 }
@@ -357,7 +367,7 @@ pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
         if millis > 5000 { bail!("fixture integration delay exceeds limit"); }
         std::thread::sleep(std::time::Duration::from_millis(millis));
     }
-    ensure_current(store, run, generation, revision)?;
+    ensure_current(store, run, job, generation, revision)?;
     ensure_no_active_commit_hooks(&root)?;
     git::git_env(&workspace, &["commit", "-m", &message], &IDENTITY)?;
     let commit = git::head(&workspace).ok_or_else(|| anyhow!("integration commit missing"))?;
