@@ -13,3 +13,17 @@ Reproduce with `cargo test --offline -p overseerd --test swarm_broker --test swa
 Joined Atlas replay at `8efd953`, refined at `c168d78`: a scripted J4 worker starts the versioned PostgreSQL attachment probe and keeps polling the daemon broker while that command is held. A marker written after the backend request records fixture version 1, J4, and the seeded foreign attachment status 200. The director revises J4's assignment to plan revision 2, which emits a redirect during the held command. The worker acknowledges `delivered`, not `applied`; the test advances the persisted receipt timestamp beyond 30 seconds. The daemon records `redirect_ack_timeout`, leaves a dependent review job planned, queues a checkpoint request and interrupts only the linked worker. The redirect remains delivered, with zero J4 result messages and zero acceptance decisions, so a partial probe cannot become a final finding. The completion attempt is rejected. Reproduce with `./fixtures/swarm/atlas-v1/run-swarm.sh` (Node.js 24 and Docker; disposable PostgreSQL 16): all seven joined Atlas tests passed after each change. `node --check` passed for the two changed fixture scripts. The pre-implementation run passed the previous six tests and failed the new J4 test because its worker never entered the probe. The 30-second boundary is injected deterministically by aging a committed receipt; this is not a 30-second wall-clock wait.
 
 Remaining: The complete six-job S1 revision-2 assignment and old-revision evidence flow, actual delivery/acknowledgement through a qualified live harness during a tool call, and exclusion of unsupported harness paths remain unverified. The joined J4 path uses a scripted worker with a real local backend probe, not a provider agent. SWARM-43 stays unchecked.
+
+Finished-attempt directive guard (2026-09-27):
+`finished_attempt_cannot_receive_a_new_directive_but_can_replay_one` first
+failed because a director could queue a new redirect after the worker's exit
+was confirmed. The broker now accepts an exact replay of an earlier advisory
+with its original receipt, but refuses a new directive for that finished
+attempt. The test restarts the daemon between exit and replay and checks that
+the worker inbox contains only the original advisory. The focused red run
+observed the unwanted `after-exit` queued receipt; the corrected broker,
+control, and supervised-director suites passed 19 + 6 + 8 tests with
+`cargo test -p overseerd --test swarm_broker --test swarm_director_loop
+--test swarm_control --offline -- --test-threads=1`. This closes one local
+stale-delivery path, not the live mid-tool-call acknowledgement or complete S1
+trace. SWARM-43 remains partial.

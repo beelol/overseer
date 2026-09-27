@@ -190,6 +190,15 @@ fn insert_message(
         }
         return Ok(json!({"message_id":id,"seq":seq,"phase":phase,"duplicate":true}));
     }
+    if sender == "director" {
+        let status: String = store.conn.query_row(
+            "SELECT status FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3",
+            params![attempt,run,job], |row| row.get(0),
+        )?;
+        if status != "registered" {
+            bail!("cannot send a new directive to a finished attempt");
+        }
+    }
     if current["status"] == "stopped" || current["status"] == "completed" || current["status"] == "invalidated" {
         bail!("swarm run is terminal");
     }

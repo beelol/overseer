@@ -377,6 +377,39 @@ fn directive_delivery_and_application_are_distinct() {
 }
 
 #[test]
+fn finished_attempt_cannot_receive_a_new_directive_but_can_replay_one() {
+    let mut d = Daemon::start(&[]);
+    let (run, attempt, token) = planned(&d);
+    let prior = json!({"run_id":run,"job_id":"routes","attempt_id":attempt,
+        "message_id":"before-exit","generation":1,"revision":1,
+        "type":"advisory","payload":{"focus":"check the route"}});
+    let sent = d.call("swarm.direct", prior.clone());
+    assert_eq!(sent["phase"], "queued");
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"routes",
+        "attempt_id":attempt,"token":token,"artifact_id":"route-proof",
+        "source_revision":1,"kind":"finding","content":"route evidence"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"routes",
+        "attempt_id":attempt,"token":token,"message_id":"result-before-exit",
+        "type":"result","revision":1,"payload":{"artifact_ids":["route-proof"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"routes","decision":"reject","evidence":["route-proof"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"job_id":"routes",
+        "attempt_id":attempt,"generation":1,"revision":1}));
+    d.kill9();
+    d.spawn();
+
+    assert_eq!(d.call("swarm.direct",prior)["duplicate"],true);
+    let error = d.try_call("swarm.direct",json!({"run_id":run,"job_id":"routes",
+        "attempt_id":attempt,"message_id":"after-exit","generation":1,
+        "revision":1,"type":"redirect","payload":{"focus":"new work"}}))
+        .unwrap_err();
+    assert!(error.contains("finished attempt"),"{error}");
+    let inbox = d.call("swarm.messages",json!({"run_id":run,"recipient":attempt,
+        "token":token}));
+    assert_eq!(inbox["messages"].as_array().unwrap().len(),1);
+}
+
+#[test]
 fn unapplied_redirect_times_out_and_holds_dependent_work() {
     let mut d = Daemon::start(&[]);
     let run = d.call("swarm.create", json!({"category":"Redirect timeout",
