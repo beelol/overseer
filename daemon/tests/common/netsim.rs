@@ -46,6 +46,9 @@ impl Mode {
 
 struct Shared {
     mode: Mutex<Mode>,
+    /// The listener, closed at the moment the link is cut (not when the accept loop next wakes, so
+    /// a connection made right after `set` is refused, however loaded the machine is).
+    listener: Mutex<Option<TcpListener>>,
     open: Mutex<Vec<TcpStream>>,
     log: Mutex<Vec<String>>,
     stop: AtomicBool,
@@ -66,10 +69,11 @@ impl NetSim {
 
     pub fn start_at(at: &str) -> NetSim {
         let listener = TcpListener::bind(at).expect("bind the simulated network");
+        listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
-        let shared = Arc::new(Shared { mode: Mutex::new(Mode::Online), open: Mutex::new(Vec::new()), log: Mutex::new(Vec::new()), stop: AtomicBool::new(false), started: Instant::now() });
+        let shared = Arc::new(Shared { mode: Mutex::new(Mode::Online), listener: Mutex::new(Some(listener)), open: Mutex::new(Vec::new()), log: Mutex::new(Vec::new()), stop: AtomicBool::new(false), started: Instant::now() });
         let s = shared.clone();
-        let thread = std::thread::spawn(move || accept_loop(Some(listener), addr, s));
+        let thread = std::thread::spawn(move || accept_loop(addr, s));
         NetSim { addr, shared, thread: Some(thread) }
     }
 
@@ -84,6 +88,18 @@ impl NetSim {
     /// Changes the link. Anything but online also ends every open connection.
     pub fn set(&self, mode: Mode) {
         *self.shared.mode.lock().unwrap() = mode;
+        // The listener closes or opens here and now, so the link is what was set as soon as this
+        // returns (the accept loop only reopens it if binding failed here).
+        let mut slot = self.shared.listener.lock().unwrap();
+        if mode == Mode::Refuse {
+            slot.take();
+        } else if slot.is_none() {
+            if let Ok(l) = TcpListener::bind(self.addr) {
+                l.set_nonblocking(true).unwrap();
+                *slot = Some(l);
+            }
+        }
+        drop(slot);
         note(&self.shared, format!("link {mode:?}"));
         if mode != Mode::Online {
             for s in self.shared.open.lock().unwrap().drain(..) {
@@ -115,31 +131,32 @@ fn note(shared: &Shared, line: String) {
     shared.log.lock().unwrap().push(format!("{at:>7} ms  {line}"));
 }
 
-fn accept_loop(mut listener: Option<TcpListener>, addr: SocketAddr, shared: Arc<Shared>) {
-    if let Some(l) = &listener {
-        l.set_nonblocking(true).unwrap();
-    }
+fn accept_loop(addr: SocketAddr, shared: Arc<Shared>) {
     while !shared.stop.load(Ordering::SeqCst) {
         let mode = *shared.mode.lock().unwrap();
         if mode == Mode::Refuse {
             // Nothing listens while the link is down: connections are refused by the kernel.
-            listener = None;
             std::thread::sleep(Duration::from_millis(10));
             continue;
         }
-        if listener.is_none() {
-            match TcpListener::bind(addr) {
-                Ok(l) => {
-                    l.set_nonblocking(true).unwrap();
-                    listener = Some(l);
-                }
-                Err(_) => {
-                    std::thread::sleep(Duration::from_millis(10));
-                    continue;
+        let accepted = {
+            let mut slot = shared.listener.lock().unwrap();
+            if slot.is_none() {
+                match TcpListener::bind(addr) {
+                    Ok(l) => {
+                        l.set_nonblocking(true).unwrap();
+                        *slot = Some(l);
+                    }
+                    Err(_) => {
+                        drop(slot);
+                        std::thread::sleep(Duration::from_millis(10));
+                        continue;
+                    }
                 }
             }
-        }
-        match listener.as_ref().unwrap().accept() {
+            slot.as_ref().unwrap().accept()
+        };
+        match accepted {
             Ok((stream, _)) => {
                 let _ = stream.set_nonblocking(false);
                 match mode {
