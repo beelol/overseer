@@ -1184,7 +1184,13 @@ rec(141, "Pair once", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
 
+# Brand (added by the owner on 2026-09-26; docs/design/brand.md). Not started: waits for the owner's image files.
+rec(142, "One Overseer mark everywhere", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
+    actual="Not started.", live="—", blocker="Not started: the owner's two images need to be added to docs/design/brand/ as files; then the single-colour glyph is drawn for VS Code and approved.")
+
 SHORT_BLOCKERS = {
+    142: "not started: waits for the owner\'s logo files",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
     41: "deferred: no Linux environment",
