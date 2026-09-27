@@ -1211,6 +1211,22 @@ impl Daemon {
                         }))) {
                 bail!("automatic child profile has another active run");
             }
+            if launch["auto_selected"] == true {
+                let auto_parent = run.parent_run_id.as_deref().filter(|parent_id| {
+                    let saved: Option<String> = store.conn.query_row(
+                        "SELECT launch FROM runs WHERE id=?1", [*parent_id], |row| row.get(0))
+                        .ok().flatten();
+                    saved.as_deref().and_then(|text| serde_json::from_str::<Value>(text).ok())
+                        .is_some_and(|meta| meta["generic"]["auto_routing"] == true)
+                });
+                if let Some(pool_id) = run.profile_id.as_deref()
+                    .map(|profile_id| store.auto_account_pool_id(profile_id)).transpose()?.flatten() {
+                    if store.active_run_on_known_account_pool(&pool_id,
+                        Some(&run.id), auto_parent)? {
+                        bail!("automatic child account has another active run");
+                    }
+                }
+            }
         }
         if follow_up && run.relation_source.as_deref() == Some("managed-delegation") {
             bail!("a managed work unit has one result; delegate a new work unit instead");

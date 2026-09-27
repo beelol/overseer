@@ -4499,6 +4499,51 @@ fn auto_unknown_draw_claim_blocks_another_profile_on_the_same_account_until_sett
 }
 
 #[test]
+fn auto_dispatch_sees_an_active_manual_run_on_another_profile_of_the_same_account() {
+    let r = tmp();
+    let parent_repo = repo(&r.path().join("parent-repo"));
+    let manual_repo = repo(&r.path().join("manual-repo"));
+    let accounts = r.path().join("account-ids");
+    std::fs::create_dir_all(&accounts).unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS,FIXTURE_ACCOUNT_IDS_DIR"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "6000"),
+        ("FIXTURE_ACCOUNT_IDS_DIR", accounts.to_str().unwrap())]);
+    let profiles: Vec<String> = ["Manual", "Auto", "Independent"].into_iter().map(|name|
+        d.call("profile.create", json!({"name":name,"harness":"codex"}))["id"]
+            .as_str().unwrap().to_string()).collect();
+    for (index, profile) in profiles.iter().enumerate() {
+        std::fs::write(accounts.join(profile), if index < 2 { "shared-manual-account" } else { "independent-account" }).unwrap();
+    }
+    let parent = run_id(&d.call("task.create", json!({"repo":parent_repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    d.call("auto.models.refresh", json!({"profile_id":profiles[0]}));
+    let manual = run_id(&d.call("task.create", json!({"repo":manual_repo,"harness":"codex-app",
+        "profile_id":profiles[0],"model":"gpt-6-sol","effort":"medium","prompt":"browser check"})));
+    d.wait_status(&manual, |status| status == "running", 10);
+    let blocked = d.call("auto.dispatch", json!({"work_unit_id":"manual-shared-account-block",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[profiles[1]],"prompt":"independent bounded work"}));
+    assert_eq!(blocked["state"], "paused", "{blocked}");
+    assert!(blocked["decision"]["exclusions"].as_array().unwrap().iter().any(|item|
+        item["reason"] == "pool_in_flight_unknown_draw"), "{blocked}");
+    assert_eq!(d.runs().len(), 2, "blocked Auto work must not start a child");
+    let independent = d.call("auto.dispatch", json!({"work_unit_id":"manual-independent-account",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[profiles[2]],"prompt":"separate bounded work"}));
+    assert_eq!(independent["state"], "dispatched", "{independent}");
+    assert_eq!(d.run(&manual)["status"], "running");
+    assert_eq!(d.wait_done(&run_id(&independent), 15)["status"], "completed");
+    assert_eq!(d.wait_done(&manual, 15)["status"], "completed");
+    let after = d.call("auto.dispatch", json!({"work_unit_id":"manual-shared-account-after",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":[profiles[1]],"prompt":"next bounded work"}));
+    assert_eq!(after["state"], "dispatched", "{after}");
+    assert_eq!(d.wait_done(&run_id(&after), 15)["status"], "completed");
+}
+
+#[test]
 fn auto_simultaneous_unknown_draw_units_admit_only_one_shared_account_child() {
     use std::sync::{Arc, Barrier};
     let r = tmp();
@@ -4595,6 +4640,69 @@ fn auto_child_does_not_start_while_a_manual_run_uses_its_profile() {
     assert_eq!(response["state"], "paused", "Auto must not overlap the active manual profile run: {response}");
     assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 0,
         "the Auto child must not start a model turn while manual work is active");
+    assert_eq!(d.wait_done(&manual, 15)["status"], "completed");
+}
+
+#[test]
+fn auto_child_rechecks_a_manual_run_on_another_profile_of_its_account_before_turn() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::net::UnixStream;
+    use std::time::Instant;
+    let r = tmp();
+    let parent_repo = repo(&r.path().join("repo"));
+    let manual_repo = repo(&r.path().join("manual-repo"));
+    let accounts = r.path().join("account-ids");
+    std::fs::create_dir_all(&accounts).unwrap();
+    let bin = r.path().join("bin");
+    std::fs::create_dir(&bin).unwrap();
+    let marker = r.path().join("auto-git-stalled");
+    let release = r.path().join("release-auto-git");
+    let trace = r.path().join("cross-profile-race-trace.txt");
+    let wrapper = bin.join("git");
+    std::fs::write(&wrapper, format!("#!/bin/sh\nif [ \"$1\" = worktree ] && [ \"$2\" = add ] && [ \"$3\" = -b ]; then\n  case \"$4\" in overseer/delegate-*|overseer/auto-*)\n    printf x > '{}'\n    while [ ! -e '{}' ]; do /bin/sleep 0.05; done;;\n  esac\nfi\nexec /usr/bin/git \"$@\"\n", marker.display(), release.display())).unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap());
+    let d = Daemon::start(&[("PATH", &path),
+        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS,FIXTURE_TRACE_FILE,FIXTURE_ACCOUNT_IDS_DIR"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "6000"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
+        ("FIXTURE_ACCOUNT_IDS_DIR", accounts.to_str().unwrap())]);
+    let profiles: Vec<String> = ["Auto", "Manual"].into_iter().map(|name|
+        d.call("profile.create", json!({"name":name,"harness":"codex"}))["id"]
+            .as_str().unwrap().to_string()).collect();
+    for profile in &profiles { std::fs::write(accounts.join(profile), "shared-race-account").unwrap(); }
+    let parent = run_id(&d.call("task.create", json!({"repo":parent_repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    d.call("auto.models.refresh", json!({"profile_id":profiles[1]}));
+    let request = json!({"work_unit_id":"manual-cross-profile-race","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"allowed_profiles":[profiles[0]],
+        "prompt":"browser check"});
+    let socket = d.socket();
+    let auto = std::thread::spawn(move || {
+        let mut conn = UnixStream::connect(socket).unwrap();
+        conn.set_read_timeout(Some(Duration::from_secs(15))).unwrap();
+        conn.write_all(format!("{}\n", json!({"id":1,"method":"auto.dispatch","params":request})).as_bytes()).unwrap();
+        let mut line = String::new();
+        BufReader::new(conn).read_line(&mut line).unwrap();
+        let reply: serde_json::Value = serde_json::from_str(&line).unwrap();
+        reply["result"].clone()
+    });
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !marker.exists() {
+        assert!(Instant::now() < deadline, "Auto did not reach Git preparation");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let manual = run_id(&d.call("task.create", json!({"repo":manual_repo,"harness":"codex-app",
+        "profile_id":profiles[1],"model":"gpt-6-astra","effort":"high","prompt":"browser check"})));
+    d.wait_status(&manual, |status| status == "running", 10);
+    std::fs::write(&release, "go").unwrap();
+    let response = auto.join().unwrap();
+    assert_eq!(response["state"], "paused", "Auto must not start while the shared account has manual work: {response}");
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 0,
+        "the selected child must not start a model turn on a shared account");
     assert_eq!(d.wait_done(&manual, 15)["status"], "completed");
 }
 

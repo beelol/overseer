@@ -888,10 +888,27 @@ impl Store {
     /// settles. A paused intent without a child remains effects-uncertain and
     /// cannot be released merely because this daemon restarted.
     pub fn auto_pool_claimed(&self, pool_id: &str) -> Result<bool> {
-        Ok(self.conn.query_row(
+        let claimed = self.conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM auto_pool_claims WHERE (pool_id=?1 OR pool_id='legacy/unresolved')
                 AND state IN ('active','uncertain'))",
-            [pool_id], |row| row.get(0))?)
+            [pool_id], |row| row.get(0))?;
+        Ok(claimed || self.active_run_on_known_account_pool(pool_id, None, None)?)
+    }
+
+    /// Recognize active manual or automatic runs on another profile with a
+    /// previously verified account identity. Unknown profile identities need
+    /// separate admission treatment; this method never guesses equivalence.
+    pub fn active_run_on_known_account_pool(&self, pool_id: &str,
+        except_run_id: Option<&str>, except_parent_run_id: Option<&str>) -> Result<bool> {
+        let Some(fingerprint) = pool_id.strip_prefix("account/") else { return Ok(false); };
+        Ok(self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM runs r
+                JOIN auto_account_identity a ON a.profile_id=r.profile_id
+                WHERE a.fingerprint=?1 AND r.status IN
+                    ('queued','starting','running','waiting_for_user')
+                  AND (?2 IS NULL OR r.id<>?2)
+                  AND (?3 IS NULL OR r.id<>?3))",
+            params![fingerprint, except_run_id, except_parent_run_id], |row| row.get(0))?)
     }
 
     /// A running Auto root owns an allocation that may admit one of its own
@@ -899,7 +916,7 @@ impl Store {
     /// an independent child, another root, or an uncertain root still blocks.
     pub fn auto_pool_claimed_for_child(&self, pool_id: &str, parent_run_id: &str,
         account_generation: Option<i64>) -> Result<bool> {
-        Ok(self.conn.query_row(
+        let claimed = self.conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM auto_pool_claims c
                 LEFT JOIN auto_root_intents i ON i.work_unit_id=c.work_unit_id
                 LEFT JOIN runs r ON r.id=i.run_id
@@ -909,7 +926,8 @@ impl Store {
                     AND c.account_generation IS ?3 AND COALESCE(i.run_id,'')=?2
                     AND COALESCE(r.status,'')='running' AND r.ended_ms IS NULL
                     AND COALESCE(r.process_generation,0)>0))",
-            params![pool_id, parent_run_id, account_generation], |row| row.get(0))?)
+            params![pool_id, parent_run_id, account_generation], |row| row.get(0))?;
+        Ok(claimed || self.active_run_on_known_account_pool(pool_id, Some(parent_run_id), None)?)
     }
 
     /// Called in the terminal run transaction. Unknown or still-running
@@ -2435,6 +2453,37 @@ mod schema_migration_tests {
             "account/shared", None, 300_000, &serde_json::json!({"unit":"two"})).unwrap().is_some());
         assert!(reopened.release_unstarted_auto_pool_claim("two").unwrap(),
             "a worker proven never spawned may release its claim");
+    }
+
+    #[test]
+    fn active_manual_run_on_another_known_profile_occupies_the_shared_account_pool() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(&dir.path().join("state.sqlite")).unwrap();
+        store.record_auto_account_identity("manual-profile", &"a".repeat(64)).unwrap();
+        store.record_auto_account_identity("auto-profile", &"a".repeat(64)).unwrap();
+        store.record_auto_account_identity("other-profile", &"b".repeat(64)).unwrap();
+        store.conn.execute_batch("INSERT INTO workspaces
+            (id,path,repo_root,common_dir,kind,initial_dirty,created_ms)
+            VALUES('w','/tmp/manual','/tmp/manual','/tmp/manual','current','{}',0);
+            INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms)
+            VALUES('t','manual','prompt','/tmp/manual','w',0);
+            INSERT INTO runs(id,task_id,harness,profile_id,workspace_id,status,created_ms,title,capabilities)
+            VALUES('manual','t','codex-app','manual-profile','w','running',0,'manual','{}');").unwrap();
+        let pool = store.auto_account_pool_id("auto-profile").unwrap().unwrap();
+        let other = store.auto_account_pool_id("other-profile").unwrap().unwrap();
+        assert!(store.auto_pool_claimed(&pool).unwrap(),
+            "a manual model turn on the same account must occupy the pool");
+        assert!(store.auto_pool_claimed_for_child(&pool, "parent", Some(1)).unwrap(),
+            "a child on another profile must see the manual run");
+        assert!(!store.auto_pool_claimed(&other).unwrap(),
+            "an independently identified account remains eligible");
+        store.conn.execute("UPDATE runs SET status='completed',ended_ms=1 WHERE id='manual'", []).unwrap();
+        assert!(!store.auto_pool_claimed(&pool).unwrap(),
+            "settlement releases the manual run's occupied pool");
+        store.conn.execute("UPDATE runs SET id='parent',profile_id='auto-profile',status='running',ended_ms=NULL WHERE id='manual'", []).unwrap();
+        assert!(store.auto_pool_claimed(&pool).unwrap());
+        assert!(!store.auto_pool_claimed_for_child(&pool, "parent", Some(1)).unwrap(),
+            "an Auto parent can delegate within its own known account pool");
     }
 
     #[test]
