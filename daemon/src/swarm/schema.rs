@@ -338,7 +338,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           request_sha256 TEXT NOT NULL,
           generation INTEGER NOT NULL,
           revision INTEGER NOT NULL,
-          reason TEXT NOT NULL CHECK(reason IN ('unresolved_conflict','attempts_exhausted')),
+          reason TEXT NOT NULL CHECK(length(reason)>0 AND length(reason)<=128),
           summary TEXT NOT NULL,
           limitations TEXT NOT NULL,
           created_ms INTEGER NOT NULL
@@ -505,6 +505,30 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           ON swarm_effects(run_id,operation_sha256);
         "#,
     )?;
+    // Older databases restricted partial reports to conflict/exhaustion. Keep
+    // their reports while allowing a director to cite a fresh persisted
+    // availability block by its exact reason.
+    let partial_schema: String = conn.query_row(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='swarm_partial_reports'",
+        [],|row|row.get(0),
+    )?;
+    if partial_schema.contains("CHECK(reason IN") {
+        let tx=conn.unchecked_transaction()?;
+        tx.execute_batch(
+            "CREATE TABLE swarm_partial_reports_next(
+                run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
+                request_sha256 TEXT NOT NULL,generation INTEGER NOT NULL,
+                revision INTEGER NOT NULL,
+                reason TEXT NOT NULL CHECK(length(reason)>0 AND length(reason)<=128),
+                summary TEXT NOT NULL,limitations TEXT NOT NULL,
+                created_ms INTEGER NOT NULL);
+             INSERT INTO swarm_partial_reports_next
+                SELECT * FROM swarm_partial_reports;
+             DROP TABLE swarm_partial_reports;
+             ALTER TABLE swarm_partial_reports_next RENAME TO swarm_partial_reports;",
+        )?;
+        tx.commit()?;
+    }
     let has_stop_reason = conn
         .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='stop_reason'")?
         .exists([])?;
@@ -744,6 +768,49 @@ pub fn migrate(conn: &Connection) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_partial_reports_survive_availability_reason_migration() {
+        let conn=Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        migrate(&conn).unwrap();
+        conn.execute_batch(
+            "INSERT INTO swarm_runs(id,category,category_key,objective,status,
+                generation,revision,allowed_targets,policy,created_ms,updated_ms)
+             VALUES('old-run','Audit','audit','Inspect','stopped',1,1,'[]','{}',1,1);
+             DROP TABLE swarm_partial_reports;
+             CREATE TABLE swarm_partial_reports(
+                run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
+                request_sha256 TEXT NOT NULL,generation INTEGER NOT NULL,
+                revision INTEGER NOT NULL,
+                reason TEXT NOT NULL CHECK(reason IN ('unresolved_conflict','attempts_exhausted')),
+                summary TEXT NOT NULL,limitations TEXT NOT NULL,
+                created_ms INTEGER NOT NULL);
+             INSERT INTO swarm_partial_reports VALUES(
+                'old-run','digest',1,1,'unresolved_conflict','Disputed result',
+                'No reproduction',2);",
+        ).unwrap();
+        migrate(&conn).unwrap();
+        let saved:(String,String)=conn.query_row(
+            "SELECT reason,summary FROM swarm_partial_reports WHERE run_id='old-run'",
+            [],|r|Ok((r.get(0)?,r.get(1)?)),
+        ).unwrap();
+        assert_eq!(saved,("unresolved_conflict".into(),"Disputed result".into()));
+        conn.execute("INSERT INTO swarm_partial_reports VALUES(
+            'new-run','digest',1,1,'allowed_target_missing','Unavailable','Unprobed',3)",[])
+            .unwrap_err(); // the parent run must still exist
+        conn.execute_batch(
+            "INSERT INTO swarm_runs(id,category,category_key,objective,status,
+                generation,revision,allowed_targets,policy,created_ms,updated_ms)
+             VALUES('new-run','Audit 2','audit-2','Inspect','stopped',1,1,'[]','{}',1,1);")
+            .unwrap();
+        conn.execute("INSERT INTO swarm_partial_reports VALUES(
+            'new-run','digest',1,1,'allowed_target_missing','Unavailable','Unprobed',3)",[])
+            .unwrap();
+        migrate(&conn).unwrap();
+        let count:i64=conn.query_row("SELECT COUNT(*) FROM swarm_partial_reports",[],|r|r.get(0)).unwrap();
+        assert_eq!(count,2);
+    }
 
     #[test]
     fn existing_registered_attempts_remain_worker_attempts_after_upgrade() {

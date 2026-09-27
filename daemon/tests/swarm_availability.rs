@@ -22,6 +22,62 @@ fn snapshot(at: i64, healthy: bool, remaining: i64) -> Value {
 }
 
 #[test]
+fn director_can_close_a_fresh_target_block_without_claiming_success() {
+    let mut d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Unavailable route closeout",
+        "objective":"Audit backend routes","allowed_targets":["route-a"]}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"audit","title":"Inspect route","acceptance":"route evidence","deps":[]}
+    ]}));
+    let request=json!({"run_id":run,"generation":1,"revision":1,
+        "expected_revision":1,"expected_control_revision":0,
+        "request_id":"close-missing-route","incomplete_reason":"allowed_target_missing",
+        "summary":"The approved route is unavailable; the audit is incomplete",
+        "limitations":"The route could not be probed"});
+    assert!(d.try_call("swarm.partial",request.clone()).is_err());
+    let at=now();
+    let observed=d.call("swarm.availability.observe",json!({"run_id":run,
+        "snapshot":snapshot(at,false,100000),"now_ms":at,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(observed["reason"],"allowed_target_missing");
+    let mut false_reason=request.clone();
+    false_reason["request_id"]=json!("close-wrong-reason");
+    false_reason["incomplete_reason"]=json!("finishing_reserve");
+    assert!(d.try_call("swarm.partial",false_reason).is_err());
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute("UPDATE swarm_availability SET expires_ms=1 WHERE run_id=?1",[run]).unwrap();
+    assert!(d.try_call("swarm.partial",request.clone()).unwrap_err()
+        .contains("recorded evidence"));
+    db.execute("UPDATE swarm_availability SET expires_ms=?2 WHERE run_id=?1",
+        rusqlite::params![run,at+60000]).unwrap();
+    let fingerprint:String=db.query_row(
+        "SELECT snapshot_sha256 FROM swarm_availability WHERE run_id=?1",
+        [run],|r|r.get(0)).unwrap();
+    db.execute("UPDATE swarm_availability SET snapshot_sha256='' WHERE run_id=?1",
+        [run]).unwrap();
+    assert!(d.try_call("swarm.partial",request.clone()).unwrap_err()
+        .contains("recorded evidence"));
+    db.execute("UPDATE swarm_availability SET snapshot_sha256=?2 WHERE run_id=?1",
+        rusqlite::params![run,fingerprint]).unwrap();
+    let closed=d.call("swarm.partial",request.clone());
+    assert_eq!(closed["status"],"stopped");
+    assert_eq!(closed["stop_reason"],"allowed_target_missing");
+    let coverage=d.call("swarm.coverage",json!({"run_id":run}));
+    assert_eq!(coverage["outcome"],"incomplete");
+    assert_eq!(coverage["partial_report"]["reason"],"allowed_target_missing");
+    assert_eq!(coverage["partial_report"]["finalized"],true);
+    assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"false-completion","summary":"done",
+        "verification":"none","checks":[]})).is_err());
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.partial",request)["duplicate"],true);
+    assert_eq!(d.call("swarm.coverage",json!({"run_id":run}))["outcome"],"incomplete");
+}
+
+#[test]
 fn revoked_selected_identity_cancels_only_its_active_attempt_and_keeps_usage_uncertain() {
     let mut d=Daemon::start(&[]);
     let created=d.call("swarm.create",json!({"category":"Revoked identity",

@@ -796,8 +796,8 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
     let partial = if reason == "incomplete" {
         owner::require(store,id,p)?;
         let incomplete_reason=required(p,"incomplete_reason")?;
-        if !["unresolved_conflict","attempts_exhausted"].contains(&incomplete_reason) {
-            bail!("unsupported incomplete reason");
+        if incomplete_reason.is_empty() || incomplete_reason.len()>128 {
+            bail!("invalid incomplete reason");
         }
         let summary=required(p,"summary")?.trim();
         let limitations=required(p,"limitations")?.trim();
@@ -867,7 +867,19 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
                 "SELECT 1 FROM swarm_jobs WHERE run_id=?1 AND status='failed'
                  AND stop_reason='attempts_exhausted'"
             )?.exists([id])?,
-            _ => false,
+            // A director may also close a blocked run under the exact reason
+            // reported by the last fresh, durable eligibility assessment. A
+            // stale observation cannot justify a claim about current routes.
+            _ => {
+                let saved: Option<(String,Option<String>,i64,String,String)> = tx.query_row(
+                    "SELECT state,reason,expires_ms,request_sha256,snapshot_sha256
+                     FROM swarm_availability WHERE run_id=?1",
+                    [id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+                ).optional()?;
+                saved.is_some_and(|(state,reason,expires,assessment,snapshot)| state=="blocked"
+                    && reason.as_deref()==Some(incomplete_reason.as_str()) && expires>now
+                    && !assessment.is_empty() && !snapshot.is_empty())
+            },
         };
         if !supported { bail!("incomplete reason lacks recorded evidence"); }
         let active: i64=tx.query_row(
