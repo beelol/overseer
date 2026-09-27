@@ -149,7 +149,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-128** Talk to Overseer from the phone — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-128.md)
 - [ ] **AC-129** Needs-you notifications on the phone — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-129.md)
 - [ ] **AC-130** Safe by default — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-130.md)
-- [ ] **AC-131** One app, iOS and Android — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-131.md)
+- [ ] **AC-131** One app, iOS and Android, that looks like Overseer — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-131.md)
 - [ ] **AC-132** Regression coverage for the phone — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-132.md)
 - [ ] **AC-133** Phone session (owner-confirmed) — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-133.md)
 - [ ] **AC-134** Platform behaviour behind generic interfaces — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-134.md)
@@ -358,7 +358,7 @@ the owner action or decision each one needs.
 - [ ] [AC-128](docs/verification/AC-128.md) (Talk to Overseer from the phone): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
 - [ ] [AC-129](docs/verification/AC-129.md) (Needs-you notifications on the phone): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
 - [ ] [AC-130](docs/verification/AC-130.md) (Safe by default): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
-- [ ] [AC-131](docs/verification/AC-131.md) (One app, iOS and Android): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
+- [ ] [AC-131](docs/verification/AC-131.md) (One app, iOS and Android, that looks like Overseer): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
 - [ ] [AC-132](docs/verification/AC-132.md) (Regression coverage for the phone): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
 - [ ] [AC-133](docs/verification/AC-133.md) (Phone session (owner-confirmed)): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
 - [ ] [AC-134](docs/verification/AC-134.md) (Platform behaviour behind generic interfaces): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).

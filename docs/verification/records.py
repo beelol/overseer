@@ -1147,7 +1147,7 @@ rec(129, "Needs-you notifications on the phone", "not started", date="—", comm
 rec(130, "Safe by default", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(131, "One app, iOS and Android", "not started", date="—", commit="—",
+rec(131, "One app, iOS and Android, that looks like Overseer", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
 rec(132, "Regression coverage for the phone", "not started", date="—", commit="—",

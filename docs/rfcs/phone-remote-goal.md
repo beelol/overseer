@@ -19,15 +19,20 @@ Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 (Gate N) in the
 > platform layer, behind generic interfaces, and prefer a maintained cross-platform library to
 > own native code.
 >
+> The app follows the phone's light or dark setting and looks the same as Overseer Light and
+> Overseer Dark in VS Code. Generate its tokens from `extension/design/tokens.js`; never copy
+> values by hand. The door appears on a cold start only.
+>
 > The phone talks only to the Overseer daemon. Do not build a relay, a server, or anything that
 > runs agents away from the Mac; those belong to a later RFC. Do not change the Unix socket
 > boundary (AC-08).
 >
 > Work in this order, and do not start a phase before the one above it has evidence:
 >
-> 1. **Prove (AC-115).** Measure both app stacks on the owner's iPhone and choose by the numbers,
->    unless the owner has named the stack. Run the other spikes and write the reuse decision. If a
->    spike fails, revise the RFC's proposed default and record why before building on it.
+> 1. **Prove (AC-115).** Measure Expo on the owner's iPhone against the speed budget. Choose it if
+>    it meets the budget; measure Flutter and choose it if Expo misses. Run the other spikes and
+>    write the reuse decision. If a spike fails, revise the RFC's proposed default and record why
+>    before building on it.
 > 2. **Connect (AC-116 to AC-120, AC-134).** Gateway, pairing, encryption, devices, discovery,
 >    with a minimal app built on the platform layer and the generated protocol types.
 > 3. **Hold (AC-121 to AC-123).** Resume from the cursor, exactly-once requests, an awake Mac.

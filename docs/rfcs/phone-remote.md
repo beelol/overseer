@@ -32,22 +32,24 @@ already replays its event log from a cursor.
 | Sessions | No lost sessions ("no disconnect"). |
 | Platforms | An iOS app, tested on the owner's iPhone. Android tested on the emulator only for now. |
 | Apple Developer Program | The owner has a membership: device installs, TestFlight and push notifications are available. |
-| App stack | The best option that is not slow. Expo is acceptable. Rust is not forced: it is used only where it is needed. |
+| App stack | The best option that is not slow. Expo is acceptable. Rust is not forced: it is used only where it is needed. The owner likes native views. |
 | Platform behaviour | Separated per platform behind generic interfaces. Cross-platform libraries are used where they fit. |
 | Speed | The app is hyper fast. |
 | Motion | Cool animations, with a signature launch: a sci-fi gradient door carrying a grayscale logo that splits open diagonally when the app is ready. |
+| The door | On a cold start only. |
+| Themes | Light and dark, following the phone's system setting. The app looks the same as Overseer Light and Overseer Dark in VS Code. |
 
 ## Proposed defaults, distinguished from the decisions above
 
 These are the implementing agent's proposals. The owner can change any of them; a change is a
 recorded revision of this RFC.
 
-- **Flutter for the app**, in `phone/`, because it is compiled ahead of time and draws every
-  frame itself. Expo with React Native, which the owner accepted, is the second candidate. AC-115
-  measures both on the owner's iPhone and the numbers decide (see [The app stack](#the-app-stack)).
+- **Expo with React Native for the app**, in `phone/`, when it meets the speed budget on the
+  owner's iPhone: it draws native views, which the owner likes, and it can share the extension's
+  design tokens and conversation code. **Flutter is the fallback** if Expo misses the budget.
+  AC-115 measures before anything is built on either (see [The app stack](#the-app-stack)).
 - **Rust on the phone only for the encrypted session**, and only if the spike shows a clean
   binding. Everything else is written in the app's own language.
-- **The door shows on a cold start only**, never when returning from the background.
 - **Message-layer encryption** with an established handshake (Noise IK proposed), so the same
   session can later cross a relay that sees only ciphertext. Chosen in AC-115.
 - **Full control is the default scope** of a paired phone; *Watch only* exists as a choice.
@@ -266,11 +268,17 @@ on the phone.
 | Platform features | Plugins, with native code where none fits | Expo's modules | First party |
 | Tests without a device | Screen and screenshot tests run on the Mac | Logic tests on the Mac; screens need a simulator | Simulator |
 
-React Native is not a web page in an app: its screens are real native views, and it is fast enough
-for many well-known apps. It is still JavaScript at run time, and the owner asked for hyper fast
-with heavy custom animation, which is where a compiled stack with its own renderer has the
-advantage. Two native apps would be fastest and would double every screen. The proposal is
-Flutter, with the choice made by AC-115's measurements rather than by opinion.
+React Native is not a web page in an app: its screens are real native views, so text selection,
+scrolling, the keyboard and accessibility behave exactly as the platform's own. Its logic is
+JavaScript at run time. This app does little computing on the phone (the Mac does the work and
+the phone displays it), so the risk is not raw speed but busy JavaScript delaying what it drives.
+Flutter is compiled and draws every frame itself, which makes animation consistent, but its views
+are drawn to resemble the platform's rather than being them. Two native apps would be fastest and
+would double every screen.
+
+The rule: Expo is measured first and chosen when it meets the speed budget (AC-135) on the
+owner's iPhone, because the owner likes native views. Flutter is measured and chosen if Expo
+misses. The numbers decide, not opinion.
 
 ## App architecture
 
@@ -308,6 +316,15 @@ Flutter, with the choice made by AC-115's measurements rather than by opinion.
 Android 12 and later allow only a centered icon on one color as a launch screen, so the two
 platforms start differently and meet at the same door.
 
+## Look
+
+The app has two themes, light and dark. They follow the phone's system setting and change at once
+when it changes. They look the same as Overseer Light and Overseer Dark in VS Code, because both
+are generated from one source, `extension/design/tokens.js`: colors, type scale, spacing, radii
+and motion values. A check fails when a phone token differs from that source. Provider logos are
+the same files. What differs on purpose is what a phone needs: larger touch targets, the system
+text size, and each platform's own conventions.
+
 ## Speed
 
 | Budget | The owner's iPhone | Android emulator |
@@ -342,16 +359,18 @@ must stay within 10% of it. How the app meets the budget:
   └───────────────┘          └───────────────┘          └───────────────┘
 ```
 
-- **Closed.** A dark, sci-fi gradient in the Overseer theme's colors fills the screen. A grayscale
-  Overseer logo (from `extension/media/overseer.svg`) sits across a diagonal seam.
+- **Closed.** A sci-fi gradient built from the active theme's colors fills the screen: a dark
+  door in dark mode and a light door in light mode, following the phone's system setting. A
+  grayscale Overseer logo (from `extension/media/overseer.svg`) sits across a diagonal seam.
 - **Waiting.** A slow light travels along the seam, so the door is clearly alive.
 - **Opening.** When the first screen is drawn, the door splits along the seam. The halves slide
   apart and the logo splits with them. The app is already in place underneath.
-- **No jump.** The system's launch screen shows the same closed door in the same place.
+- **No jump.** The system's launch screen shows the same closed door in the same place and mode.
 - **Never slower.** The door opens as soon as the first screen is ready from the cache. It does
   not wait for the connection and has no minimum time on screen. Launch to a usable list is the
   same with the door turned off.
-- **Cold start only**, about 600 ms, interruptible by a touch. With Reduce Motion on it fades.
+- **Cold start only** (the owner's decision): returning from the background shows no door.
+- **About 600 ms**, interruptible by a touch. With Reduce Motion on it fades.
 
 The rest of the app moves with the same care. One motion system, with durations, easing and
 springs as tokens, drives every transition. Motion explains where a thing came from or what
@@ -386,10 +405,9 @@ The owner marks the door and each transition on a review page until they look ri
 
 | Question | Recommendation |
 | --- | --- |
-| App stack | Flutter, confirmed by AC-115's measurement against Expo on the owner's iPhone. The owner can name the stack instead and skip the comparison. |
+| App stack | Expo when it meets the speed budget on the owner's iPhone, Flutter if it does not (AC-115). The owner can name the stack instead and skip the measurement. |
 | Where Rust is used on the phone | Only the encrypted session, if the binding is clean. Otherwise a vetted library with shared test vectors. |
-| When the door shows | On a cold start only. |
-| The door in the light theme | A light variant. The dark door is the default. |
+| Gate M's third theme (AC-103) on the phone | Not in this gate. The phone follows the system setting with two themes. |
 | Sound with the door | None. |
 | Default scope of a new device | Full control, as the owner asked. |
 | Which addresses may connect | Private and link-local ranges only. A setting can add the VPN range. |
@@ -419,8 +437,7 @@ Each phase is independently useful and verifiable; the criteria are in the main 
 
 AC-115 to AC-137 in the main RFC are the acceptance criteria. Their Verify clauses cover, in short:
 
-- spikes that prove the parts, and an app stack chosen by measuring both candidates on the
-  owner's iPhone;
+- spikes that prove the parts, and an app stack chosen by measuring on the owner's iPhone;
 - a gateway that is closed by default, answers nothing before authentication, and leaves the local
   socket boundary untouched;
 - pairing that needs the Mac, with expiry, single use and lockout;
@@ -436,9 +453,11 @@ AC-115 to AC-137 in the main RFC are the acceptance criteria. Their Verify claus
 - no credential in any traffic, and every daemon method listed with its phone status;
 - a notification on a locked iPhone within five seconds, answered from the notification;
 - a security review, a fuzz test, and confirmations for everything destructive;
-- both platforms in both themes, accessible, each with its own conventions;
+- both platforms in both themes, following the system setting, matching VS Code's Overseer
+  themes from one token source, accessible, each with its own conventions;
 - no platform test outside the platform layer, and protocol types that cannot drift;
 - every speed budget met on the owner's iPhone, and a slow change failing the run;
-- the door matching the launch screen frame for frame, never adding to the launch time;
+- the door matching the launch screen frame for frame in both modes, on a cold start only, never
+  adding to the launch time;
 - every transition recorded, on tokens, and marked right by the owner;
 - the owner's dated confirmation after a real session on their iPhone.
