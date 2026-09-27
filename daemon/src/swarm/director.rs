@@ -104,8 +104,11 @@ pub fn claim_batch(store: &mut Store, p: &Value) -> Result<Value> {
     let accepted_at_claim: i64 = tx.query_row(
         "SELECT COALESCE(MAX(id),0) FROM swarm_decisions WHERE run_id=?1 AND decision='accept'",
         params![run], |r| r.get(0))?;
-    tx.execute("INSERT INTO swarm_director_turns(id,run_id,generation,revision,token_sha256,status,accepted_decision_id_at_claim,created_ms) VALUES(?1,?2,?3,?4,?5,'active',?6,?7)",
-        params![id,run,generation,revision,hash(&token),accepted_at_claim,now])?;
+    let conflicts_at_claim: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM swarm_conflicts WHERE run_id=?1 AND status='resolved'",
+        params![run], |r| r.get(0))?;
+    tx.execute("INSERT INTO swarm_director_turns(id,run_id,generation,revision,token_sha256,status,accepted_decision_id_at_claim,resolved_conflict_count_at_claim,created_ms) VALUES(?1,?2,?3,?4,?5,'active',?6,?7,?8)",
+        params![id,run,generation,revision,hash(&token),accepted_at_claim,conflicts_at_claim,now])?;
     for seq in seqs {
         tx.execute(
             "INSERT INTO swarm_director_turn_messages(turn_id,seq) VALUES(?1,?2)",
@@ -343,12 +346,12 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     if current["generation"] != generation {
         bail!("stale director generation");
     }
-    let (stored_hash, status, turn_revision, accepted_at_claim, stored_applied, stored_pending): (String, String, i64, i64, i64, i64) = store
+    let (stored_hash, status, turn_revision, accepted_at_claim, conflicts_at_claim, stored_applied, stored_pending): (String, String, i64, i64, i64, i64, i64) = store
         .conn
         .query_row(
-            "SELECT token_sha256,status,revision,accepted_decision_id_at_claim,applied_count,pending_review_count FROM swarm_director_turns WHERE id=?1 AND run_id=?2 AND generation=?3",
+            "SELECT token_sha256,status,revision,accepted_decision_id_at_claim,resolved_conflict_count_at_claim,applied_count,pending_review_count FROM swarm_director_turns WHERE id=?1 AND run_id=?2 AND generation=?3",
             params![id,run,generation],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)),
         )
         .optional()?
         .ok_or_else(|| anyhow!("unknown director turn"))?;
@@ -400,8 +403,12 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     let accepted_now: i64 = tx.query_row(
         "SELECT COALESCE(MAX(id),0) FROM swarm_decisions WHERE run_id=?1 AND decision='accept'",
         params![run], |r| r.get(0))?;
+    let conflicts_now: i64 = tx.query_row(
+        "SELECT COUNT(*) FROM swarm_conflicts WHERE run_id=?1 AND status='resolved'",
+        params![run], |r| r.get(0))?;
     let material_progress = current["revision"].as_i64().unwrap_or(0) > turn_revision
-        || accepted_now > accepted_at_claim;
+        || accepted_now > accepted_at_claim
+        || conflicts_now > conflicts_at_claim;
     let turns = if !material_progress {
         current["no_progress_turns"]
             .as_i64()

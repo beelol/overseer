@@ -347,6 +347,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           token_sha256 TEXT NOT NULL,
           status TEXT NOT NULL CHECK(status IN ('active','complete')),
           accepted_decision_id_at_claim INTEGER NOT NULL DEFAULT 0,
+          resolved_conflict_count_at_claim INTEGER NOT NULL DEFAULT 0,
           applied_count INTEGER NOT NULL DEFAULT 0,
           pending_review_count INTEGER NOT NULL DEFAULT 0,
           created_ms INTEGER NOT NULL,
@@ -637,7 +638,25 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         .prepare("SELECT 1 FROM pragma_table_info('swarm_director_turns') WHERE name='accepted_decision_id_at_claim'")?
         .exists([])?;
     if !has_decision_snapshot {
-        conn.execute_batch("ALTER TABLE swarm_director_turns ADD COLUMN accepted_decision_id_at_claim INTEGER NOT NULL DEFAULT 0;")?;
+        conn.execute_batch(
+            "ALTER TABLE swarm_director_turns ADD COLUMN accepted_decision_id_at_claim INTEGER NOT NULL DEFAULT 0;
+             UPDATE swarm_director_turns SET accepted_decision_id_at_claim=(
+               SELECT COALESCE(MAX(id),0) FROM swarm_decisions d
+               WHERE d.run_id=swarm_director_turns.run_id AND d.decision='accept'
+             ) WHERE status='active';",
+        )?;
+    }
+    let has_conflict_snapshot = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_director_turns') WHERE name='resolved_conflict_count_at_claim'")?
+        .exists([])?;
+    if !has_conflict_snapshot {
+        conn.execute_batch(
+            "ALTER TABLE swarm_director_turns ADD COLUMN resolved_conflict_count_at_claim INTEGER NOT NULL DEFAULT 0;
+             UPDATE swarm_director_turns SET resolved_conflict_count_at_claim=(
+               SELECT COUNT(*) FROM swarm_conflicts c
+               WHERE c.run_id=swarm_director_turns.run_id AND c.status='resolved'
+             ) WHERE status='active';",
+        )?;
     }
     let has_reviewed_message_seq = conn
         .prepare(
@@ -918,6 +937,34 @@ mod tests {
             [], |row| Ok((row.get(0)?,row.get(1)?)),
         ).unwrap();
         assert_eq!(counts,(2,0));
+        migrate(&conn).unwrap();
+    }
+
+    #[test]
+    fn active_legacy_turn_does_not_gain_false_progress_on_upgrade() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE swarm_director_turns(
+                id TEXT PRIMARY KEY,run_id TEXT NOT NULL,generation INTEGER NOT NULL,
+                revision INTEGER NOT NULL,token_sha256 TEXT NOT NULL,status TEXT NOT NULL,
+                applied_count INTEGER NOT NULL DEFAULT 0,
+                pending_review_count INTEGER NOT NULL DEFAULT 0,
+                created_ms INTEGER NOT NULL,completed_ms INTEGER);
+             CREATE TABLE swarm_conflicts(run_id TEXT NOT NULL,status TEXT NOT NULL);
+             CREATE TABLE swarm_decisions(
+               id INTEGER PRIMARY KEY,run_id TEXT NOT NULL,decision TEXT NOT NULL,
+               reviewed_message_seq INTEGER NOT NULL DEFAULT 0);
+             INSERT INTO swarm_director_turns VALUES('active-turn','run',1,1,'hash','active',0,0,1,NULL);
+             INSERT INTO swarm_conflicts VALUES('run','resolved');
+             INSERT INTO swarm_decisions VALUES(1,'run','accept',0);",
+        ).unwrap();
+        migrate(&conn).unwrap();
+        let at_claim: (i64,i64) = conn.query_row(
+            "SELECT resolved_conflict_count_at_claim,accepted_decision_id_at_claim
+             FROM swarm_director_turns WHERE id='active-turn'",
+            [], |row| Ok((row.get(0)?,row.get(1)?)),
+        ).unwrap();
+        assert_eq!(at_claim,(1,1),"pre-upgrade decisions are not new turn progress");
         migrate(&conn).unwrap();
     }
 

@@ -544,11 +544,14 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_plan.rs",
+        "daemon/tests/swarm_conflict.rs",
+        "daemon/tests/swarm_director.rs",
+        "daemon/src/swarm/schema.rs",
         "docs/verification/swarm/milestone-2.md",
         "daemon/tests/swarm_state.rs",
         "docs/verification/swarm/SWARM-48.md"
       ],
-      "blocker": "Fixture plan validation, independent subgraphs, two failed plan/repair validation turns, recorded accepted-evidence progress, and durable two-turn no-progress stalls pass. Other material-progress and repair-error classes, live director behavior, and complete S3/S5 traces remain unverified."
+      "blocker": "Fixture plan validation, independent subgraphs, two failed plan/repair validation turns, recorded accepted-evidence and resolved-conflict progress, and durable two-turn no-progress stalls pass. Legacy active turns conservatively backfill accepted-decision and resolved-conflict snapshots on migration. Other material-progress and repair-error classes, live director behavior, and complete S3/S5 traces remain unverified."
     },
     "SWARM-49": {
       "status": "partial",

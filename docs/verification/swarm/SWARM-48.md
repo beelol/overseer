@@ -14,4 +14,28 @@ Additional fixture at `49617a6`: two consecutive `no_progress` director batch co
 
 Additional fixtures at `b71a451`: two invalid initial plans or two invalid repair revisions, including a daemon restart, persist `failed_planning_turns: 2` and `stall_reason: planning_failed`. A stale generation does not consume a turn; a valid plan clears a preceding failure. An unsupported caller claim of `progress` no longer resets the director counter: completion compares the claimed turn's plan revision and accepted-decision snapshot to durable run state. Evidence accepted during the turn resets the counter. Identical plans and repair revisions return `unchanged` without advancing revision or clearing the stall counter. The schema migration adds the counters and decision snapshot to an earlier Swarm database without losing its run. Focused suites passed (`cargo test --test swarm_state --test swarm_director --test swarm_plan --offline`); `cargo test --workspace --offline` passed 109 tests.
 
-Remaining: the live director does not yet consume partial-plan rejections and repair them. The fixture detector recognizes changed plan revision and accepted evidence, but does not yet classify every possible material-progress event, such as a resolved blocker. Some repair failures outside plan validation still return errors without incrementing the failure counter. No live director runs or complete S3/S5 trace exists. This criterion remains unchecked.
+Earlier remaining gaps: the live director does not yet consume partial-plan rejections and repair them. At that revision the fixture detector recognized changed plan revision and accepted evidence, but not every material-progress event. Some repair failures outside plan validation still returned errors without incrementing the failure counter. No live director runs or complete S3/S5 trace existed. This criterion remained unchecked.
+
+Resolved-conflict progress follow-up (2026-09-27):
+`daemon/tests/swarm_conflict.rs::resolving_a_conflict_during_a_director_turn_resets_no_progress_count`
+starts with one no-progress turn, accepts an independent reproduction before
+claiming the next turn, then resolves the open evidence conflict during that
+turn. Before the fix, `complete_batch` returned `material_progress:false`,
+raised the counter to two and stalled the run despite the resolution. A turn
+now stores the number of resolved conflicts at claim time and compares it
+with the durable count at completion; a caller's `progress` label alone still
+cannot reset the counter. The regression passes and the run remains planning
+with its counter reset to zero.
+
+The schema migration backfills both the accepted-decision and resolved-conflict
+snapshots for legacy active turns so pre-upgrade decisions cannot become false
+new progress. `active_legacy_turn_does_not_gain_false_progress_on_upgrade`
+failed first with a zero conflict snapshot, then with a zero accepted-decision
+snapshot; both passed after conservative backfills. The daemon unit, conflict,
+director and plan suites passed against the final code (83 + 3 + 11 + 10 tests).
+The opt-in Atlas PostgreSQL disagreement replay was listed but ignored by a
+plain test invocation; it was not counted as validation for this change.
+
+Remaining: other material-progress and repair-error classes, autonomous
+director repair, qualified live behavior and complete S3/S5 traces are still
+unverified. SWARM-48 remains partial.

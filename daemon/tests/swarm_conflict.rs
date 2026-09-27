@@ -2,6 +2,11 @@ mod common;
 
 use common::*;
 use serde_json::{json, Value};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+fn now() -> i64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64
+}
 
 fn submit(d: &Daemon, run: &str, job: &str, kind: &str, content: &str) -> Value {
     let attempt = d.call("swarm.attempt.register", json!({"run_id":run,
@@ -16,6 +21,50 @@ fn submit(d: &Daemon, run: &str, job: &str, kind: &str, content: &str) -> Value 
         "payload":{"artifact_ids":[artifact],"audit_outcome":
             if kind=="reproduction" {"confirmed_defect"} else {"negative"}}}));
     attempt
+}
+
+#[test]
+fn resolving_a_conflict_during_a_director_turn_resets_no_progress_count() {
+    let d = Daemon::start(&[]);
+    let created = d.call("swarm.create",json!({"category":"Conflict progress",
+        "objective":"Reconcile contradictory probes","allowed_targets":["fixture"]}));
+    let run = created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"First probe","acceptance":"Evidence","deps":[]},
+        {"id":"right","title":"Second probe","acceptance":"Evidence","deps":[]},
+        {"id":"repro","title":"Independent repro","acceptance":"Evidence","deps":[]}
+    ]}));
+    submit(&d,run,"left","finding","foreign request returned 200");
+    submit(&d,run,"right","finding","foreign request returned 403");
+    d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"response-disagreement","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"Different responses"}));
+    let first = d.call("swarm.director.claim_batch",json!({"run_id":run,
+        "generation":1,"revision":1,"now_ms":now()+6000}));
+    assert_eq!(first["status"],"claimed");
+    let first_done = d.call("swarm.director.complete_batch",json!({"run_id":run,
+        "generation":1,"turn_id":first["turn_id"],"token":first["token"],
+        "outcome":"no_progress"}));
+    assert_eq!(first_done["no_progress_turns"],1);
+
+    let repro = submit(&d,run,"repro","reproduction","fresh probe confirms the left response");
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"repro","decision":"accept","evidence":["repro-evidence"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"repro","attempt_id":repro["id"]}));
+    let second = d.call("swarm.director.claim_batch",json!({"run_id":run,
+        "generation":1,"revision":1,"now_ms":now()+6000}));
+    assert_eq!(second["status"],"claimed");
+    d.call("swarm.conflict.resolve",json!({"run_id":run,"generation":1,
+        "revision":1,"conflict_id":"response-disagreement","outcome":"supports_left",
+        "reproduction_job_id":"repro","reproduction_artifact_id":"repro-evidence"}));
+    let done = d.call("swarm.director.complete_batch",json!({"run_id":run,
+        "generation":1,"turn_id":second["turn_id"],"token":second["token"],
+        "outcome":"progress"}));
+    assert_eq!(done["material_progress"],true,"{done}");
+    assert_eq!(done["no_progress_turns"],0,"{done}");
+    assert_eq!(done["status"],"planning","{done}");
 }
 
 #[test]
