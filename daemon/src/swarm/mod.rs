@@ -48,7 +48,8 @@ pub use verification::{prepare as prepare_verification, run as run_verification,
 pub use policy::preview;
 pub use settings::set_policy;
 pub use revision::revise;
-pub use runtime::{interrupt_workers, launch_worker, liveness, reconcile_terminal_workers,
+pub use runtime::{interrupt_workers, launch_worker, liveness, reconcile_stopping_runs,
+    reconcile_terminal_workers,
     reconcile_worker, retry_targeted_interrupts, retry_stopping_interrupts,
     sample_due_workers, sample_liveness};
 pub use runtime::launch_director;
@@ -157,10 +158,26 @@ fn finalize_control_if_idle(conn: &rusqlite::Connection, run: &str, now: i64) ->
     let registered: i64 = conn.query_row(
         "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND status='registered'",
         [run], |r| r.get(0))?;
-    let unconfirmed: i64 = conn.query_row(
+    let mut unconfirmed: i64 = conn.query_row(
         "SELECT COUNT(*) FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
          WHERE l.run_id=?1 AND (r.ended_ms IS NULL OR r.status='disconnected')",
         [run], |r| r.get(0))?;
+    if status == "stopping" {
+        let director: Option<(Option<String>, Option<String>, Option<i64>)> = conn.query_row(
+            "SELECT o.overseer_run_id,r.status,r.ended_ms FROM swarm_director_owners o
+             LEFT JOIN runs r ON r.id=o.overseer_run_id
+             WHERE o.run_id=?1 AND o.status='active' AND o.supervised_launch=1",
+            [run], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+        ).optional()?;
+        match director {
+            Some((Some(process),Some(process_status),Some(_)))
+                if ["completed","failed","interrupted"].contains(&process_status.as_str()) => {
+                unconfirmed += runtime::descendant_receipts(conn,&process)?.0;
+            }
+            Some(_) => unconfirmed += 1,
+            None => {}
+        }
+    }
     let checking: i64 = conn.query_row(
         "SELECT COUNT(*) FROM swarm_verifications WHERE run_id=?1 AND status='running'",
         [run], |r| r.get(0))?;
@@ -280,7 +297,7 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
             "process_status":row.get::<_,Option<String>>(2)?})),
     ).optional()?.unwrap_or(Value::Null);
     if run["status"] == "stopping" {
-        let count: i64 = store.conn.query_row(
+        let mut count: i64 = store.conn.query_row(
             "SELECT COUNT(*) FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
              WHERE l.run_id=?1 AND (r.ended_ms IS NULL OR r.status='disconnected')",
             params![id], |row| row.get(0))?;
@@ -291,12 +308,30 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
              LEFT JOIN swarm_stop_signals s ON s.run_id=l.run_id AND s.overseer_run_id=r.id
              WHERE l.run_id=?1 AND (r.ended_ms IS NULL OR r.status='disconnected')
              ORDER BY l.created_ms,l.attempt_id LIMIT 100")?;
-        let exits = stmt.query_map(params![id], |row| Ok(json!({
+        let mut exits = stmt.query_map(params![id], |row| Ok(json!({
             "job_id":row.get::<_,String>(0)?,"attempt_id":row.get::<_,String>(1)?,
             "overseer_run_id":row.get::<_,String>(2)?,"worker_status":row.get::<_,String>(3)?,
             "last_signal_outcome":row.get::<_,String>(4)?,"signal_attempts":row.get::<_,i64>(5)?,
             "last_signal_ms":row.get::<_,Option<i64>>(6)?
         })))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        let director_exit: Option<Value> = store.conn.query_row(
+            "SELECT o.overseer_run_id,r.status,COALESCE(s.last_outcome,'not_attempted'),
+                    COALESCE(s.attempts,0),s.last_attempt_ms
+             FROM swarm_director_owners o LEFT JOIN runs r ON r.id=o.overseer_run_id
+             LEFT JOIN swarm_stop_signals s ON s.run_id=o.run_id AND s.overseer_run_id=r.id
+             WHERE o.run_id=?1 AND o.status='active' AND o.supervised_launch=1
+               AND (r.id IS NULL OR r.ended_ms IS NULL OR r.status='disconnected')",
+            params![id], |row| Ok(json!({"kind":"director",
+                "overseer_run_id":row.get::<_,Option<String>>(0)?,
+                "process_status":row.get::<_,Option<String>>(1)?,
+                "last_signal_outcome":row.get::<_,String>(2)?,
+                "signal_attempts":row.get::<_,i64>(3)?,
+                "last_signal_ms":row.get::<_,Option<i64>>(4)?})),
+        ).optional()?;
+        if let Some(director_exit) = director_exit {
+            count += 1;
+            if exits.len() < 100 { exits.push(director_exit); }
+        }
         run["unconfirmed_exit_count"] = json!(count);
         run["unconfirmed_exits_truncated"] = json!(count > exits.len() as i64);
         run["unconfirmed_exits"] = json!(exits);

@@ -338,24 +338,25 @@ fn admit_inner(
     } else {
         0
     };
-    if director_self {
+    let director_process_id = if director_self {
         if app_limit != 1 || app_active != 1 || pending_slots != 0 {
             return Ok(blocked("director_self_requires_one_slot"));
         }
-        let linked_harness: Option<String> = tx.query_row(
-            "SELECT r.harness FROM swarm_director_owners o JOIN runs r ON r.id=o.overseer_run_id
+        let linked: Option<(String,String)> = tx.query_row(
+            "SELECT r.id,r.harness FROM swarm_director_owners o JOIN runs r ON r.id=o.overseer_run_id
              WHERE o.run_id=?1 AND o.generation=?2 AND o.status='active'
              AND o.supervised_launch=1 AND r.run_dir IS NOT NULL
              AND r.status IN ('queued','starting','running','waiting_for_user')
              AND r.ended_ms IS NULL",
-            params![run,generation], |r| r.get(0),
+            params![run,generation], |r| Ok((r.get(0)?,r.get(1)?)),
         ).optional()?;
-        if linked_harness.as_deref() != candidate["harness"].as_str() {
+        if linked.as_ref().map(|(_,harness)| harness.as_str()) != candidate["harness"].as_str() {
             return Ok(blocked("director_route_not_linked"));
         }
+        linked.map(|(id,_)|id)
     } else if app_active + pending_slots + new_director >= app_limit {
         return Ok(blocked("global_agent_limit"));
-    }
+    } else { None };
     let growth: Option<(i64, i64)> = tx
         .query_row(
             "SELECT wave_start_ms,admitted_count FROM swarm_growth WHERE run_id=?1",
@@ -505,9 +506,9 @@ fn admit_inner(
     }
     let attempt_id = format!("att-{}", &uuid::Uuid::new_v4().simple().to_string()[..16]);
     let token = uuid::Uuid::new_v4().simple().to_string();
-    tx.execute("INSERT INTO swarm_attempts(id,run_id,job_id,revision,token_sha256,status,executor,created_ms) VALUES(?1,?2,?3,?4,?5,'registered',?6,?7)",
+    tx.execute("INSERT INTO swarm_attempts(id,run_id,job_id,revision,token_sha256,status,executor,executor_run_id,created_ms) VALUES(?1,?2,?3,?4,?5,'registered',?6,?7,?8)",
         params![attempt_id,run,job,job_revision,hash(&token),
-            if director_self { "director" } else { "worker" },now])?;
+            if director_self { "director" } else { "worker" },director_process_id,now])?;
     if let Some((wave, estimate_elapsed_ms, estimate_usage_milli)) = benefit_assignment {
         tx.execute("INSERT INTO swarm_benefit_attempt_outcomes(attempt_id,run_id,revision,wave,job_id,estimate_elapsed_ms,estimate_usage_milli)
             VALUES(?1,?2,?3,?4,?5,?6,?7)",

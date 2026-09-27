@@ -71,7 +71,7 @@
         "daemon/tests/swarm_director_loop.rs",
         "fixtures/swarm/director-loop-v1/serial.py"
       ],
-      "blocker": "The app setting is the total-agent ceiling; fixtures cover manual reservations, native-child exclusion, lower-limit drain, a supervised director plus 32 live workers at a 33-slot cap, a supervised director plus two live workers at a three-slot cap with confirmed-exit reuse, and a one-slot scripted director completing its own metered job without a worker launch. Separate reviewer/watch and Overseer-started admission, coordinating-run allowance accounting, live-harness qualification, and director-self crash/Stop recovery remain unverified."
+      "blocker": "The app setting is the total-agent ceiling; fixtures cover manual reservations, native-child exclusion, lower-limit drain, a supervised director plus 32 live workers at a 33-slot cap, a supervised director plus two live workers at a three-slot cap with confirmed-exit reuse, and a one-slot scripted director completing its own metered job without a worker launch. Stop now interrupts an active one-slot director and safely closes its unreviewed self-attempt after confirmed exit. Separate reviewer/watch and Overseer-started admission, coordinating-run allowance accounting, live-harness qualification, and director-self crash recovery outside Stop remain unverified."
     },
     "SWARM-08": {
       "status": "partial",
@@ -203,9 +203,11 @@
         "test/unit/swarm-controls.js",
         "test/ui/scenario-swarm-status.js",
         "test/ui/scenario-swarm-scale.js",
-        "docs/verification/evidence/ui/swarm-scale/result.json"
+        "docs/verification/evidence/ui/swarm-scale/result.json",
+        "daemon/tests/swarm_director_process.rs",
+        "daemon/tests/swarm_director_loop.rs"
       ],
-      "blocker": "Local fixtures cover durable Stop/Off state, slow-signal lock release, retained reservations and restart reconciliation. A packaged 100-job/32-live-worker scenario confirms Pause/Resume, active Swarm-off drain without interrupting workers, blocked new admission, owner-confirmed Stop, unconfirmed-exit display and process teardown. Live harness checkpoints, native-descendant control, changed-objective delivery and joined Overseer/phone paths remain unverified."
+      "blocker": "Local fixtures cover durable Stop/Off state, slow-signal lock release, retained reservations and restart reconciliation. Stop now interrupts a linked director, retries a missed signal after daemon restart, reports its unconfirmed exit, and cancels an unreviewed one-slot self-attempt only after confirmed exit. A packaged 100-job/32-live-worker scenario confirms Pause/Resume, active Swarm-off drain without interrupting workers, blocked new admission, owner-confirmed Stop, unconfirmed-exit display and process teardown. Live harness checkpoints, native-descendant control, changed-objective delivery and joined Overseer/phone paths remain unverified."
     },
     "SWARM-21": {
       "status": "partial",

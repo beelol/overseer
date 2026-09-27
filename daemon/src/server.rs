@@ -78,6 +78,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
                 crate::swarm::retry_stopping_interrupts(&daemon)?;
                 crate::swarm::retry_targeted_interrupts(&daemon)?;
                 crate::swarm::reconcile_terminal_workers(&daemon)?;
+                crate::swarm::reconcile_stopping_runs(&daemon)?;
                 crate::swarm::sample_due_workers(&daemon, crate::daemon::now())?;
                 Ok::<(), anyhow::Error>(())
             })

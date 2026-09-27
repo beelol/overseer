@@ -371,11 +371,18 @@ pub fn interrupt_workers_with_fault(d: &Arc<Daemon>, run: &str, fail_first: bool
     let linked = {
         let store = d.store.lock().unwrap();
         let mut stmt = store.conn.prepare(
-            "SELECT r.id FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
-             LEFT JOIN swarm_stop_signals s ON s.run_id=l.run_id AND s.overseer_run_id=r.id
-             WHERE l.run_id=?1 AND r.status IN ('queued','starting','running','waiting_for_user')
-             AND (s.overseer_run_id IS NULL OR s.last_attempt_ms<=?2)
-             ORDER BY r.id",
+            "SELECT id FROM (
+                 SELECT r.id FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+                 LEFT JOIN swarm_stop_signals s ON s.run_id=l.run_id AND s.overseer_run_id=r.id
+                 WHERE l.run_id=?1 AND r.status IN ('queued','starting','running','waiting_for_user')
+                 AND (s.overseer_run_id IS NULL OR s.last_attempt_ms<=?2)
+                 UNION
+                 SELECT r.id FROM swarm_director_owners o JOIN runs r ON r.id=o.overseer_run_id
+                 LEFT JOIN swarm_stop_signals s ON s.run_id=o.run_id AND s.overseer_run_id=r.id
+                 WHERE o.run_id=?1 AND o.status='active' AND o.supervised_launch=1
+                 AND r.status IN ('queued','starting','running','waiting_for_user')
+                 AND (s.overseer_run_id IS NULL OR s.last_attempt_ms<=?2)
+             ) ORDER BY id",
         )?;
         let ids = stmt
             .query_map(params![run,now-STOP_RETRY_MS], |row| row.get::<_, String>(0))?
@@ -407,19 +414,28 @@ pub fn interrupt_workers_with_fault(d: &Arc<Daemon>, run: &str, fail_first: bool
     Ok(json!({"interrupt_requested":requested,"unconfirmed":unconfirmed}))
 }
 
-/// A committed Stop survives a failed first signal or daemon crash. Retry only linked,
-/// still-active workers; process exit is reconciled separately before releasing an attempt.
+/// A committed Stop survives a failed first signal or daemon crash. Retry linked,
+/// still-active workers and director; process exit is reconciled separately.
 pub fn retry_stopping_interrupts(d: &Arc<Daemon>) -> Result<usize> {
     let due = {
         let store = d.store.lock().unwrap();
         let mut stmt = store.conn.prepare(
-            "SELECT DISTINCT l.run_id FROM swarm_worker_launches l
-             JOIN swarm_runs s ON s.id=l.run_id AND s.status='stopping'
-             JOIN runs r ON r.id=l.overseer_run_id
-               AND r.status IN ('queued','starting','running','waiting_for_user')
-             LEFT JOIN swarm_stop_signals i ON i.run_id=l.run_id AND i.overseer_run_id=r.id
-             WHERE i.overseer_run_id IS NULL OR i.last_attempt_ms<=?1
-             ORDER BY l.run_id LIMIT 100",
+            "SELECT DISTINCT run_id FROM (
+                 SELECT l.run_id FROM swarm_worker_launches l
+                 JOIN swarm_runs s ON s.id=l.run_id AND s.status='stopping'
+                 JOIN runs r ON r.id=l.overseer_run_id
+                   AND r.status IN ('queued','starting','running','waiting_for_user')
+                 LEFT JOIN swarm_stop_signals i ON i.run_id=l.run_id AND i.overseer_run_id=r.id
+                 WHERE i.overseer_run_id IS NULL OR i.last_attempt_ms<=?1
+                 UNION
+                 SELECT o.run_id FROM swarm_director_owners o
+                 JOIN swarm_runs s ON s.id=o.run_id AND s.status='stopping'
+                 JOIN runs r ON r.id=o.overseer_run_id
+                   AND r.status IN ('queued','starting','running','waiting_for_user')
+                 LEFT JOIN swarm_stop_signals i ON i.run_id=o.run_id AND i.overseer_run_id=r.id
+                 WHERE o.status='active' AND o.supervised_launch=1
+                   AND (i.overseer_run_id IS NULL OR i.last_attempt_ms<=?1)
+             ) ORDER BY run_id LIMIT 100",
         )?;
         let rows = stmt.query_map(params![crate::daemon::now()-STOP_RETRY_MS], |row| row.get::<_,String>(0))?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -635,4 +651,56 @@ pub fn reconcile_terminal_workers(d: &Arc<Daemon>) -> Result<usize> {
         }
     }
     Ok(reconciled)
+}
+
+/// Revisit a committed Stop after supervised process exits. This also covers a
+/// daemon restart between the interrupt request and its terminal receipt.
+pub fn reconcile_stopping_runs(d: &Arc<Daemon>) -> Result<usize> {
+    let mut store = d.store.lock().unwrap();
+    let self_attempts = {
+        let mut stmt = store.conn.prepare(
+            "SELECT a.id,a.run_id,a.job_id,a.executor_run_id FROM swarm_attempts a
+             JOIN swarm_runs s ON s.id=a.run_id AND s.status='stopping'
+             JOIN runs r ON r.id=a.executor_run_id
+             WHERE a.status='registered' AND a.executor='director'
+               AND r.ended_ms IS NOT NULL AND r.status IN ('completed','failed','interrupted')
+             ORDER BY r.ended_ms LIMIT 100",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,
+            r.get::<_,String>(2)?,r.get::<_,String>(3)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
+    };
+    for (attempt,run,job,process) in self_attempts {
+        if descendant_receipts(&store.conn,&process)?.0 > 0 { continue; }
+        let now = crate::daemon::now();
+        let tx = store.conn.transaction()?;
+        if tx.execute("UPDATE swarm_attempts SET status='finished'
+            WHERE id=?1 AND run_id=?2 AND status='registered' AND executor='director'
+            AND executor_run_id=?3",params![attempt,run,process])? == 0 {
+            continue;
+        }
+        tx.execute("UPDATE swarm_reservations SET status='uncertain'
+            WHERE attempt_id=?1 AND run_id=?2 AND status='active'",params![attempt,run])?;
+        tx.execute("UPDATE swarm_jobs SET status=CASE WHEN EXISTS(
+                SELECT 1 FROM swarm_effects e WHERE e.run_id=?1 AND e.job_id=?2
+                    AND e.outcome IN ('unknown','applied')) THEN 'blocked' ELSE 'cancelled' END,
+            updated_ms=?3 WHERE run_id=?1 AND id=?2
+            AND status NOT IN ('accepted','rejected','failed','blocked','cancelled')",
+            params![run,job,now])?;
+        tx.commit()?;
+    }
+    let mut stmt = store.conn.prepare(
+        "SELECT id FROM swarm_runs WHERE status='stopping' ORDER BY updated_ms LIMIT 100",
+    )?;
+    let runs = stmt.query_map([], |r| r.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    let mut stopped = 0;
+    for run in runs {
+        if super::finalize_control_if_idle(&store.conn,&run,crate::daemon::now())? == "stopped" {
+            stopped += 1;
+        }
+    }
+    Ok(stopped)
 }

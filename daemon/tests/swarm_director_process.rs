@@ -32,6 +32,80 @@ fn active_category_director_uses_its_reserved_app_slot() {
 }
 
 #[test]
+fn stop_interrupts_linked_director_and_waits_for_confirmed_exit() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("stop-director-source"));
+    let run = d.call("swarm.create", json!({"category":"Stop director",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":id,
+        "generation":1,"repo":checkout,"program":"/bin/sleep",
+        "args":["30"],"prompt":"Audit backend","title":"Director to stop"}));
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    let start = Instant::now();
+    while d.run(process)["status"] != "running" {
+        assert!(start.elapsed() < Duration::from_secs(3),"director did not start");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let stopped = d.call("swarm.stop",json!({"run_id":id}));
+    let stop_status = stopped["status"].clone();
+    let deadline = Instant::now()+Duration::from_secs(3);
+    while d.run(process)["status"] == "running" && Instant::now()<deadline {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let process_status = d.run(process)["status"].clone();
+    if process_status == "running" {
+        d.call("run.interrupt",json!({"run_id":process}));
+        d.wait_done(process,8);
+    }
+    assert_eq!(stop_status,"stopping","a live director has not exited yet");
+    assert_eq!(process_status,"interrupted","Stop must signal the linked director");
+    let deadline = Instant::now()+Duration::from_secs(3);
+    while d.call("swarm.get",json!({"id":id}))["status"] != "stopped" {
+        assert!(Instant::now()<deadline,"confirmed director exit did not finish Stop");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+#[test]
+fn restart_retries_a_missed_director_stop_signal() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("retry-director-stop-source"));
+    let run = d.call("swarm.create", json!({"category":"Retry director Stop",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":id,
+        "generation":1,"repo":checkout,"program":"/bin/sleep",
+        "args":["30"],"prompt":"Audit backend","title":"Director retry Stop"}));
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    let start = Instant::now();
+    while d.run(process)["status"] != "running" {
+        assert!(start.elapsed()<Duration::from_secs(3),"director did not start");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let stopped = d.call("swarm.stop",json!({"run_id":id,"fault_interrupt_once":true}));
+    assert_eq!(stopped["status"],"stopping");
+    assert_eq!(stopped["workers"]["unconfirmed"],json!([process]));
+    assert_eq!(d.run(process)["status"],"running");
+    let state = d.call("swarm.get",json!({"id":id}));
+    assert_eq!(state["unconfirmed_exit_count"],1);
+    assert_eq!(state["unconfirmed_exits"][0]["kind"],"director");
+    d.kill9();
+    d.spawn();
+    let deadline = Instant::now()+Duration::from_secs(9);
+    while d.call("swarm.get",json!({"id":id}))["status"] != "stopped" {
+        if Instant::now()>=deadline {
+            d.call("run.interrupt",json!({"run_id":process}));
+            panic!("missed director Stop was not retried after daemon restart");
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert_eq!(d.run(process)["status"],"interrupted");
+}
+
+#[test]
 fn linked_healthy_director_renews_lease_but_exited_director_does_not() {
     let mut d = Daemon::start(&[]);
     let temp = tmp();

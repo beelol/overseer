@@ -114,6 +114,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           token_sha256 TEXT NOT NULL,
           status TEXT NOT NULL,
           executor TEXT NOT NULL DEFAULT 'worker' CHECK(executor IN ('worker','director')),
+          executor_run_id TEXT,
           created_ms INTEGER NOT NULL,
           FOREIGN KEY(run_id,job_id) REFERENCES swarm_jobs(run_id,id)
         );
@@ -486,6 +487,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     if !has_attempt_executor {
         conn.execute_batch("ALTER TABLE swarm_attempts ADD COLUMN executor TEXT NOT NULL DEFAULT 'worker' CHECK(executor IN ('worker','director'));")?;
     }
+    let has_executor_run_id = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_attempts') WHERE name='executor_run_id'")?
+        .exists([])?;
+    if !has_executor_run_id {
+        conn.execute_batch("ALTER TABLE swarm_attempts ADD COLUMN executor_run_id TEXT;")?;
+    }
     let has_source_change_permission = conn
         .prepare(
             "SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='source_change_permission'",
@@ -655,6 +662,10 @@ mod tests {
             "SELECT executor,status FROM swarm_attempts WHERE id='old-attempt'",
             [],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
         assert_eq!((executor.as_str(),status.as_str()),("worker","registered"));
+        let executor_run_id: Option<String> = conn.query_row(
+            "SELECT executor_run_id FROM swarm_attempts WHERE id='old-attempt'",
+            [],|r|r.get(0)).unwrap();
+        assert!(executor_run_id.is_none());
         migrate(&conn).unwrap();
     }
 

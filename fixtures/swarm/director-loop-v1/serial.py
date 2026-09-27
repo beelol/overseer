@@ -46,6 +46,9 @@ admission = call("swarm.admit", {**auth, "revision": 1, "job_id": "inspect",
     "estimate_milli": {"points": 100}, "purpose": "director_self"})
 assert admission["status"] == "admitted", admission
 assert call("agents.limit.get", {})["active"] == 1
+if len(sys.argv) > 2:
+    Path(sys.argv[2]).write_text(admission["attempt_id"])
+    time.sleep(30)
 
 try:
     call("swarm.attempt.confirm_exit", {**auth, "revision": 1,

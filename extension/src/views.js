@@ -290,7 +290,7 @@ class AgentsProvider {
         exits.id = 'swarm-unconfirmed:' + run.id;
         exits.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('charts.orange'));
         exits.description = 'Stop requested · reservations held';
-        exits.tooltip = 'These worker processes have not confirmed exit. Their reservations remain held.';
+        exits.tooltip = 'These swarm processes have not confirmed exit. Their reservations remain held.';
         rows.push({ item: exits, parent });
       }
     }

@@ -408,8 +408,12 @@ fn three_slot_limit_runs_director_and_two_workers_then_reuses_confirmed_slot() {
     d.call("swarm.stop",json!({"run_id":run}));
     d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
         "revision":1,"job_id":"j1","attempt_id":second["attempt_id"]}));
-    d.call("run.interrupt",json!({"run_id":director}));
     d.wait_done(director,8);
+    let deadline = Instant::now()+Duration::from_secs(3);
+    while d.call("swarm.get",json!({"id":run}))["status"] != "stopped" {
+        assert!(Instant::now()<deadline,"director exit did not finish Stop");
+        std::thread::sleep(Duration::from_millis(20));
+    }
     assert_eq!(d.call("agents.limit.get",json!({}))["active"],0);
 }
 
@@ -473,8 +477,12 @@ fn three_slot_limit_counts_live_director_and_workers_until_confirmed_exit() {
     d.wait_done(second_run,8);
     d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
         "generation":1,"revision":1,"job_id":"j1","attempt_id":second["attempt_id"]}));
-    d.call("run.interrupt",json!({"run_id":director_run}));
     d.wait_done(director_run,8);
+    let deadline = Instant::now()+Duration::from_secs(3);
+    while d.call("swarm.get",json!({"id":run}))["status"] != "stopped" {
+        assert!(Instant::now()<deadline,"director exit did not finish Stop");
+        std::thread::sleep(Duration::from_millis(20));
+    }
     assert_eq!(d.call("agents.limit.get",json!({}))["active"],0);
 }
 
