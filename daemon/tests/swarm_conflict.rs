@@ -155,3 +155,74 @@ fn explicitly_unresolved_conflict_remains_visible_and_blocks_acceptance() {
     assert_eq!(d.call("swarm.coverage",json!({"run_id":run}))["rows"][0]["coverage_state"],
         "conflict_unresolved");
 }
+
+#[test]
+fn late_conflict_holds_accepted_jobs_until_contradicted_review_is_revised() {
+    let mut d = Daemon::start(&[]);
+    let made = d.call("swarm.create",json!({"category":"Late contradiction",
+        "objective":"Audit conflicting responses","allowed_targets":["fixture"]}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"Left probe","acceptance":"response proof"},
+        {"id":"right","title":"Right probe","acceptance":"response proof"},
+        {"id":"repro","title":"Independent probe","acceptance":"fresh proof"}
+    ]}));
+    for (job,kind,content) in [
+        ("left","finding","foreign request returned 200"),
+        ("right","finding","foreign request returned 403"),
+        ("repro","reproduction","fresh isolated probe supports left")
+    ] {
+        let attempt = submit(&d,run,job,kind,content);
+        d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":job,"decision":"accept","evidence":[format!("{job}-evidence")]}));
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":job,"attempt_id":attempt["id"]}));
+    }
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute("UPDATE swarm_runs SET status='running' WHERE id=?1",[run]).unwrap();
+    let conflict = json!({"run_id":run,"generation":1,
+        "revision":1,"conflict_id":"late-response","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"Accepted results disagree"});
+    let opened = d.call("swarm.conflict.open",conflict.clone());
+    assert_eq!(opened["status"],"open");
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.conflict.open",conflict)["duplicate"],true);
+    let rows = d.call("swarm.coverage",json!({"run_id":run}))["rows"].as_array().unwrap().clone();
+    for job in ["left","right"] {
+        assert_eq!(rows.iter().find(|row|row["job_id"]==job).unwrap()["coverage_state"],
+            "conflict_unresolved");
+    }
+    assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"late-conflict-complete","summary":"Done",
+        "verification":"Local probes","checks":[
+            {"job_id":"left","outcome":"passed","evidence":["left-evidence"]},
+            {"job_id":"right","outcome":"passed","evidence":["right-evidence"]},
+            {"job_id":"repro","outcome":"passed","evidence":["repro-evidence"]}
+        ]})).unwrap_err().contains("conflict"));
+    let resolution = json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"late-response","outcome":"supports_left",
+        "reproduction_job_id":"repro","reproduction_artifact_id":"repro-evidence"});
+    assert!(d.try_call("swarm.conflict.resolve",resolution.clone()).unwrap_err()
+        .contains("accepted contradictory review"));
+    d.call("swarm.revise",json!({"id":run,"generation":1,"expected_revision":1,
+        "reason":"Recheck the contradicted right result","jobs":[
+            {"id":"left","title":"Left probe","acceptance":"response proof"},
+            {"id":"right","title":"Right probe","acceptance":"fresh right-side proof"},
+            {"id":"repro","title":"Independent probe","acceptance":"fresh proof"}
+        ]}));
+    let mut revised_resolution = resolution;
+    revised_resolution["revision"] = json!(2);
+    assert_eq!(d.call("swarm.conflict.resolve",revised_resolution)["status"],"resolved");
+    let right = d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|job|job["id"]=="right").unwrap().clone();
+    assert_ne!(right["status"],"accepted");
+    assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":2,"request_id":"revised-conflict-complete","summary":"Done",
+        "verification":"Local probes","checks":[
+            {"job_id":"left","outcome":"passed","evidence":["left-evidence"]},
+            {"job_id":"right","outcome":"passed","evidence":["right-evidence"]},
+            {"job_id":"repro","outcome":"passed","evidence":["repro-evidence"]}
+        ]})).unwrap_err().contains("accepted and checked"));
+}

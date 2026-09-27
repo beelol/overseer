@@ -79,8 +79,8 @@ pub fn open(store: &mut Store, p: &Value) -> Result<Value> {
     let (left_attempt,_,left_state)=artifact_chain(store,&run,left_job,left_artifact)?;
     let (right_attempt,_,right_state)=artifact_chain(store,&run,right_job,right_artifact)?;
     if left_attempt==right_attempt || [left_state.as_str(),right_state.as_str()]
-        .iter().any(|state| *state!="submitted" && *state!="reserved") {
-        bail!("conflict requires separate undecided submitted attempts");
+        .iter().any(|state| !["submitted","reserved","accepted"].contains(state)) {
+        bail!("conflict requires separate submitted or accepted attempts");
     }
     let now=crate::daemon::now();
     store.conn.execute(
@@ -145,6 +145,18 @@ pub fn resolve(store: &mut Store, p: &Value) -> Result<Value> {
             "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND job_id=?2 AND status='registered'",
             params![run,job],|r|r.get(0))?;
         if active>0 { bail!("conflict reproduction worker exit is unconfirmed"); }
+    }
+    // A prior accepted review of the contradicted side cannot become valid merely
+    // because an independent reproduction supports the other side. Re-plan that
+    // job so its old evidence cannot satisfy the current acceptance check.
+    if outcome!="unresolved" {
+        let contradicted = if outcome=="supports_left" { &right } else { &left };
+        let status: String = store.conn.query_row(
+            "SELECT status FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            params![run,contradicted], |r| r.get(0))?;
+        if status=="accepted" {
+            bail!("accepted contradictory review requires plan revision before resolution");
+        }
     }
     let new_status=if outcome=="unresolved" {"unresolved"} else {"resolved"};
     store.conn.execute(
