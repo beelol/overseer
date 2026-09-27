@@ -417,9 +417,10 @@
         "daemon/tests/swarm_dispatch.rs",
         "daemon/tests/swarm_atlas.rs",
         "daemon/tests/swarm_runtime.rs",
-        "docs/verification/swarm/SWARM-43.md"
+        "docs/verification/swarm/SWARM-43.md",
+        "fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs"
       ],
-      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect. Daemon fixtures now keep duplicate delivered receipts from extending the 30-second deadline, hold the job and dependent work at expiry, persist one checkpoint request, and interrupt a linked long-running worker after restart. The complete J4 revision-2 assignment and stale-output trace, qualified live delivery/acknowledgement during a tool call, and exclusion of unsupported harness paths remain unverified."
+      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect. Daemon fixtures enforce the 30-second applied-ack timeout, and a joined Atlas S5 replay now polls the broker while J4's PostgreSQL attachment probe is held: receipt remains delivered, dependent review is held, a checkpoint is queued and the linked worker is interrupted without accepting a result. The complete J4 revision-2 assignment and stale-output trace, qualified live provider delivery/acknowledgement, and exclusion of unsupported harness paths remain unverified."
     },
     "SWARM-44": {
       "status": "partial",
@@ -667,7 +668,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins lost-result-receipt and director-death-after-dispatch faults to Atlas v1, with one recovered worker and old-generation rejection, but the other named S5 faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins lost-result-receipt, director-death-after-dispatch, and held J4 redirect-timeout faults to Atlas v1, but its other named faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
     }
   },
   "scenarios": {
@@ -731,7 +732,7 @@
         "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Atlas v1 J2 replays lost-result-receipt and director death after dispatch admission: restart deduplicates the result retry, while startup recovers one supervised worker, retains its database-backed result and rejects old-generation commands. Separate daemon fixtures cover SQLite-full replay, late shared-database contamination and durable unapplied-redirect timeout with a targeted worker interrupt. Both one-job Atlas audits complete with accepted evidence; the other named S5 faults, Atlas-backed redirect/contamination/full storage, and full S1-sized ordered replay remain unverified. Live harness communication is absent."
+      "blocker": "Atlas v1 joins three named faults: J2 lost-result-receipt, director death after dispatch admission, and J4 delivery without application during a held PostgreSQL attachment probe. The J4 timeout holds dependent review, queues a checkpoint and interrupts the worker without accepting a result. Separate daemon fixtures cover SQLite-full replay and late shared-database contamination. Other named S5 faults, Atlas-backed contamination/full storage and a full S1-sized ordered replay remain unverified. Live provider harness communication is absent."
     }
   }
 }
