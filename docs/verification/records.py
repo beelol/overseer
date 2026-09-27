@@ -1526,9 +1526,12 @@ rec(194, "A watch that checks", "partial", commit="b46de8e (branch claude/orches
     steps="""`cargo test -p overseerd --test overseer ac194_a_watch_that_checks`.""",
     expected="See the RFC criterion (Gate S).", actual="The test passes. The copy is removed through the same cleanup as any worktree (AC-24's rules), once the watcher's run is idle.",
     evidence="`daemon/tests/overseer.rs`", live="Fixtures only.", blocker="The UI (AC-199).")
-rec(195, "With Swarm: one decision-maker per swarm", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(195, "With Swarm: one decision-maker per swarm", "partial", commit="d09978a (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="fixture harnesses; no paid tokens",
+    proven="with Swarm absent everything else in the gate works (the whole suite runs without it); a message, redirect or hold aimed at a native child is refused and named as steered through its parent (AC-185's test); areas, conflicts and the channel's messages live in one set of tables (`areas`, `conflicts`, `agent_messages`) with stable ids, stored before they are acknowledged, that Swarm adopts when it lands second",
+    deferred="every contract test that needs Swarm's fixtures (pull request #3): a worker refused as a target and offered as an advisory to its director; a pause and a plan revision reaching the director with `overseer` as their source; a worker and an agent unable to hold one exclusive claim; a watcher's finding on a worker reaching the director; starting a swarm and raising its limit as Confirm actions",
+    steps="""`cargo test -p overseerd --test overseer` (Swarm absent).""",
+    expected="See the RFC criterion (Gate S).", actual="The suite passes without Swarm; the contract tests wait for it.",
+    evidence="`daemon/tests/overseer.rs`", live="Fixtures only.", blocker="Partial until Swarm (pull request #3) and this gate are both on main.")
 rec(196, "With route picking: routes, admission and metering", "partial", commit="b46de8e (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="Claude fixture (permission, echo); no paid tokens",
     proven="a permission the owner denied (a write of perm.txt) is remembered by the daemon, and a proposal to have another agent do the same thing, by a message or by starting an agent, is refused naming the denial; a different message goes through; Overseer's own run reports usage like any run (its turns are metered)",
     deferred="everything that needs pull request #2 on main: the one admission (allowance, agent slot, workspace, launch intent) that two starts from Overseer and one by hand compete for, the watcher's route differing from its subject's with the decision trace, a pinned harness kept, and Overseer's turns in the usage views",
@@ -1559,9 +1562,12 @@ rec(200, "What agents say is data", "partial", commit="8dd860b (branch claude/or
     steps="""`cargo test -p overseerd --test overseer ac200_what_agents_say_is_data`; read [the review](evidence/ac-200/review.md).""",
     expected="See the RFC criterion (Gate S).", actual="The test passes (about 70 s). The daemon, not the model, enforces the classes, the level, the caps and the read-only rule; the fixture stands in for a model that does what the words say, and is refused.",
     evidence="`daemon/tests/overseer.rs`; [the review](evidence/ac-200/review.md)", live="Fixtures only.", blocker="A second reviewer is the owner's call.")
-rec(201, "Regression coverage", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(201, "Regression coverage", "partial", commit="d09978a (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="fixture harnesses; no paid tokens",
+    proven="the gate's daemon tests (`daemon/tests/overseer.rs`, 24 tests) run in `cargo test --workspace`, its terminal test in `cargo test -p overseer-tui`, and its packaged-UI scenario (`test/ui/scenario-home.js`, with `scenario-talk.js` and `scenario-parity.js`) in the fixture suite that `scripts/test-all` discovers; the existing suites pass with briefings and the channel off and on and with check-ins off and on (`OVERSEER_CHANNEL_DEFAULT` and `OVERSEER_CHECK_INS`, read at the daemon's start): the protocol suite 52 of 52 with both settings, the gate's suite 24 of 24 with the new behaviour on and with the defaults, and the talk, parity and home scenarios with both",
+    deferred="the one-command run's log from a clean clone (the branch's own run is recorded here; the clean clone is for the merge)",
+    steps="""`cargo test --workspace`; `OVERSEER_CHANNEL_DEFAULT=on OVERSEER_CHECK_INS=every:3 cargo test -p overseerd --test protocol --test overseer`; `OVERSEER_CHANNEL_DEFAULT=off OVERSEER_CHECK_INS=off cargo test -p overseerd --test protocol`; `node extension/scripts/package.js` then the scenarios (`scripts/test-all --only=home,talk,parity`, once with each setting).""",
+    expected="See the RFC criterion (Gate S).", actual="Every run passes ([the logs](evidence/ac-201/README.md)). The first run with the setting on found two things, fixed in d09978a: a self-started turn never creates Overseer's run, and a requested scan waits out the sweep's.",
+    evidence="[the runs' logs](evidence/ac-201/)", live="Fixtures only.", blocker="The clean-clone run at the merge.")
 rec(202, "Orchestration session (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
@@ -1700,13 +1706,13 @@ SHORT_BLOCKERS = {
     192: "partial: the daemon half is built on pull request #14; the rest comes with its later steps",
     193: "partial: watches, wakes, findings and the live watch (pull request #14); route picking, the agent limit and the VS Code screenshots remain",
     194: "partial: the checking watch's copy is in the daemon (pull request #14); the UI remains",
-    195: "not started (Gate S, added by the owner on 2026-09-27)",
+    195: "partial: everything works with Swarm absent (pull request #14); the contract tests wait for Swarm on main",
     196: "partial: a denied permission is never worked around (pull request #14); admission and routes wait for pull request #2 on main",
     197: "partial: without a model the daemon half keeps working (pull request #14); handoffs wait for Continuity on main",
     198: "partial: one turn per window, the cap and the usage are in the daemon (pull request #14); the bounds' own test remains",
     199: "partial: VS Code, the terminal and the audio rules (pull request #14); the phone waits for pull request #10",
     200: "partial: the fixtures pass and the review is written (pull request #14); a second reviewer is the owner's call",
-    201: "not started (Gate S, added by the owner on 2026-09-27)",
+    201: "partial: the gate's tests and scenarios are in the suites and pass with the new behaviour off and on (pull request #14); the clean-clone run waits for the merge",
     202: "not started (Gate S, added by the owner on 2026-09-27)",
 }
 TOTAL = 53

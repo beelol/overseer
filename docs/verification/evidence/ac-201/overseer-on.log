@@ -9,3 +9,34 @@ test ac183_roster_equals_state_and_digests_stay_bounded_and_clean ... ok
 test ac187_holds_and_guardrails ... ok
 test ac184_quotes_diffs_bounds_turns_and_falls_back_without_tools ... ok
 test ac186_levels_decide_how_steer_actions_happen ... ok
+test ac185_actions_have_classes_and_cards has been running for over 60 seconds
+test ac188_redirect_and_the_queue has been running for over 60 seconds
+test ac189_overseer_keeps_agents_on_task has been running for over 60 seconds
+test ac190_briefing_and_channel has been running for over 60 seconds
+test ac190_rally_asks_only_where_the_digests_cannot_answer has been running for over 60 seconds
+test ac191_context_passed_between_agents has been running for over 60 seconds
+test ac192_conflicts_between_agents_in_flight has been running for over 60 seconds
+test ac192_sixteen_agents_in_a_large_repository has been running for over 60 seconds
+test ac193_one_agent_watches_another has been running for over 60 seconds
+test ac194_a_watch_that_checks has been running for over 60 seconds
+test ac196_a_denied_permission_is_never_worked_around has been running for over 60 seconds
+test ac197_without_a_model_the_daemon_half_keeps_working has been running for over 60 seconds
+test ac198_quiet_and_bounded has been running for over 60 seconds
+test ac200_what_agents_say_is_data has been running for over 60 seconds
+test ac189_overseer_keeps_agents_on_task ... ok
+test ac188_redirect_and_the_queue ... ok
+test ac185_actions_have_classes_and_cards ... ok
+test ac190_briefing_and_channel ... ok
+test ac191_context_passed_between_agents ... ok
+test ac192_conflicts_between_agents_in_flight ... ok
+test ac190_rally_asks_only_where_the_digests_cannot_answer ... ok
+test ac192_sixteen_agents_in_a_large_repository ... ok
+test ac193_one_agent_watches_another ... ok
+test ac194_a_watch_that_checks ... ok
+test ac196_a_denied_permission_is_never_worked_around ... ok
+test ac197_without_a_model_the_daemon_half_keeps_working ... ok
+test ac198_quiet_and_bounded ... ok
+test ac200_what_agents_say_is_data ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 462.40s
+
