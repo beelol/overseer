@@ -14,6 +14,7 @@ import { Notice } from './review/Notice';
 import type { MergeReady } from './review/plans';
 import { useReviewParams, useRunPlace } from './review/run';
 import { WORDS } from './review/words';
+import { UNLOCK_FAILED, useUnlockBeforeChanges } from './settings/safety';
 
 const useStyles = makeStyles((theme) => ({
   body: { paddingBottom: theme.space[8] },
@@ -70,6 +71,22 @@ export function MergeScreen() {
     router.push(routes.changes(rootId));
   }, [kept, rootId, target, router]);
 
+  // Completing and aborting cannot be undone: the device's unlock first, when the owner asked for it.
+  const unlockFirst = useUnlockBeforeChanges();
+  const [refused, setRefused] = useState(false);
+  const finish = useCallback(
+    async (action: MergeAction) => {
+      setRefused(false);
+      const unlocked = await unlockFirst(action === 'abort' ? WORDS.merge.confirmAbort : WORDS.merge.confirmComplete);
+      if (!unlocked.ok) {
+        if (unlocked.cause !== 'cancelled') setRefused(true);
+        return;
+      }
+      await merge.run(action);
+    },
+    [merge, unlockFirst],
+  );
+
   const press = useCallback(
     (action: MergeAction) => {
       if (action === 'complete' || action === 'abort') setAsking(action);
@@ -117,6 +134,7 @@ export function MergeScreen() {
         ) : undefined
       }
     >
+      {refused ? <Notice testID="merge.unlock" text={UNLOCK_FAILED} tone="red" /> : null}
       {merge.outcome && plan ? <Notice testID="merge.outcome" text={merge.outcome.text} tone={merge.outcome.tone} /> : null}
       {empty ? (
         <Empty testID="merge.empty" text={empty} />
@@ -182,7 +200,7 @@ export function MergeScreen() {
         confirm={asking === 'abort' ? WORDS.merge.confirmAbort : WORDS.merge.confirmComplete}
         danger={asking === 'abort'}
         onConfirm={() => {
-          if (asking) void merge.run(asking);
+          if (asking) void finish(asking);
         }}
       />
     </Screen>

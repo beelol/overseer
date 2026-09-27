@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { GATEWAY_DISCOVERY } from '@/config';
 import { coldStart, Door, doorEnabled, seededSlowness, type TestSettings } from '@/door';
+import { AppLock } from '@/lock';
 import { Notifications } from '@/notifications';
 import { perf, persistPerf, type PerfStored } from '@/perf';
 import { PlatformProvider, useCapabilities, useLive } from '@/platform';
@@ -116,6 +117,7 @@ function App() {
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={screenOptions} />
       <Notifications />
+      <AppLock behindDoor={closed} />
       {closed ? <Door ready={ready && settled} onShown={shown} onOpened={opened} /> : null}
     </>
   );

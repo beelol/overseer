@@ -4,6 +4,7 @@ import { isActive, record, store, text } from '@/model';
 import type { Session } from '@/session';
 import { useSession, useSessionValue } from '@/session';
 
+import { UNLOCK_FAILED, useUnlockBeforeChanges } from '../settings/safety';
 import { WORDS } from './words';
 
 const NOTHING: ReadonlySet<string> = new Set();
@@ -134,7 +135,13 @@ export function useAgentActions(): AgentActions {
     [session, until],
   );
 
-  const stopAll = useCallback(() => {
+  const unlockFirst = useUnlockBeforeChanges();
+  const stopAll = useCallback(async () => {
+    const unlocked = await unlockFirst(WORDS.stopAll);
+    if (!unlocked.ok) {
+      if (unlocked.cause !== 'cancelled') setError(UNLOCK_FAILED);
+      return;
+    }
     const ids = activeAgents();
     setError(null);
     setStopped((now) => withId(now, ids));
@@ -144,7 +151,7 @@ export function useAgentActions(): AgentActions {
       setStopped((now) => withoutId(now, ids));
       setError(WORDS.notDone(WORDS.stopAll, why(refused)));
     });
-  }, [session, activeAgents, until]);
+  }, [session, activeAgents, until, unlockFirst]);
 
   return useMemo(() => ({ archiving, stopping, error, archive, stop, stopAll, activeAgents }), [archiving, stopping, error, archive, stop, stopAll, activeAgents]);
 }

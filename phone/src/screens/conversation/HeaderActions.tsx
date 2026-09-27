@@ -7,6 +7,7 @@ import { routes } from '@/routes';
 import { useSession } from '@/session';
 import { Button, Confirm, IconButton, Menu, Sheet, type MenuItem } from '@/ui';
 
+import { UNLOCK_FAILED, useUnlockBeforeChanges } from '../settings/safety';
 import { WORDS } from './words';
 
 /** How many of the files that would be lost are named; the rest is a number. */
@@ -52,10 +53,17 @@ export const HeaderActions = memo(function HeaderActions({ runId, header, taskId
     );
   }, [session, workspaceId]);
 
-  const cleanUp = useCallback(() => {
+  const unlockFirst = useUnlockBeforeChanges();
+  const cleanUp = useCallback(async () => {
     if (!workspaceId || asking.kind !== 'confirm') return;
-    session.request('workspace.cleanup', { workspace_id: workspaceId, discard_dirty: asking.lost.length > 0 }).catch(() => undefined);
-  }, [session, workspaceId, asking]);
+    const lost = asking.lost;
+    const unlocked = await unlockFirst(WORDS.cleanUp);
+    if (!unlocked.ok) {
+      if (unlocked.cause !== 'cancelled') setAsking({ kind: 'no', why: UNLOCK_FAILED });
+      return;
+    }
+    session.request('workspace.cleanup', { workspace_id: workspaceId, discard_dirty: lost.length > 0 }).catch(() => undefined);
+  }, [session, workspaceId, asking, unlockFirst]);
 
   const archived = header?.archived === true;
   const archive = useCallback(() => {

@@ -167,6 +167,43 @@ describe('merge back', () => {
     expect(screen.getByTestId('merge.plan.state')).toHaveTextContent(/Not prepared/);
   });
 
+  test('with the unlock before changes on, completing and aborting need the unlock', async () => {
+    plan = planOf('ready');
+    const app = await open();
+    app.platform.fakes.keyValue.items.set('settings.unlockBeforeChanges', 'true');
+    app.connection.answers['workspace.merge_complete'] = () => ({ merged: true, commit: '0123456789abcdef', target: 'main', branch: 'overseer/fix-cart' });
+    await draw(app, <MergeScreen />);
+
+    app.platform.fakes.deviceUnlock.answerWith({ ok: false, cause: 'failed' });
+    await fireEvent.press(screen.getByTestId('merge.complete'));
+    await fireEvent.press(screen.getByTestId('merge.ask.confirm'));
+    await app.settle();
+    expect(app.platform.fakes.deviceUnlock.requests()).toEqual([{ reason: 'Complete merge back' }]);
+    expect(app.connection.calls('workspace.merge_complete')).toHaveLength(0);
+    expect(screen.getByTestId('merge.unlock')).toHaveTextContent('The unlock did not work. Nothing was changed.');
+
+    app.platform.fakes.deviceUnlock.answerWith({ ok: true });
+    await fireEvent.press(screen.getByTestId('merge.complete'));
+    await fireEvent.press(screen.getByTestId('merge.ask.confirm'));
+    await app.settle();
+    expect(app.connection.calls('workspace.merge_complete')).toEqual([{ workspace_id: WORKSPACE }]);
+    expect(screen.queryByTestId('merge.unlock')).toBeNull();
+  });
+
+  test('with the unlock before changes on, a cancelled unlock aborts nothing and says nothing', async () => {
+    plan = planOf('resolving');
+    const app = await open();
+    app.platform.fakes.keyValue.items.set('settings.unlockBeforeChanges', 'true');
+    await draw(app, <MergeScreen />);
+    app.platform.fakes.deviceUnlock.answerWith({ ok: false, cause: 'cancelled' });
+    await fireEvent.press(screen.getByTestId('merge.abort'));
+    await fireEvent.press(screen.getByTestId('merge.ask.confirm'));
+    await app.settle();
+    expect(app.platform.fakes.deviceUnlock.requests()).toEqual([{ reason: 'Abort merge' }]);
+    expect(app.connection.calls('workspace.merge_abort')).toHaveLength(0);
+    expect(screen.queryByTestId('merge.unlock')).toBeNull();
+  });
+
   test('a merge that is blocked says why in the words of the Mac and offers no Complete', async () => {
     plan = planOf('ready', { can_complete: false, blockers: ['The source checkout /Users/owner/shop is on release — switch it to main to merge back.'] });
     const app = await open();

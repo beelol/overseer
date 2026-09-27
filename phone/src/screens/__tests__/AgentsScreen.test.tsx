@@ -464,6 +464,26 @@ describe('what the list changes on the Mac', () => {
     expect(screen.getByTestId(`${row(RUN.waiting)}.status`)).toHaveTextContent('billing-service · stopping');
   });
 
+  test('with the unlock before changes on, Stop all needs the unlock', async () => {
+    const app = await open();
+    app.platform.fakes.keyValue.items.set('settings.unlockBeforeChanges', 'true');
+    app.platform.fakes.deviceUnlock.answerWith({ ok: false, cause: 'failed' });
+    await fireEvent.press(screen.getByTestId('agents.menu'));
+    await fireEvent.press(screen.getByTestId('agents.menu.stop'));
+    await fireEvent.press(await screen.findByTestId('agents.stop.confirm'));
+    await app.settle();
+    expect(app.platform.fakes.deviceUnlock.requests()).toEqual([{ reason: 'Stop all agents' }]);
+    expect(app.connection.calls('runs.stop_all')).toEqual([]);
+    expect(screen.getByTestId('agents.error')).toHaveTextContent('The unlock did not work. Nothing was changed.');
+
+    app.platform.fakes.deviceUnlock.answerWith({ ok: true });
+    await fireEvent.press(screen.getByTestId('agents.menu'));
+    await fireEvent.press(screen.getByTestId('agents.menu.stop'));
+    await fireEvent.press(await screen.findByTestId('agents.stop.confirm'));
+    await app.settle();
+    expect(app.connection.calls('runs.stop_all')).toEqual([{}]);
+  });
+
   test('the menu leads to a new agent, the accounts and the settings', async () => {
     await open();
     for (const [item, route] of [['new', routes.newAgent], ['accounts', routes.accounts], ['settings', routes.settings]] as const) {

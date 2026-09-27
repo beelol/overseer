@@ -179,6 +179,26 @@ describe("a file's changes", () => {
     expect(screen.queryByTestId('file.notice')).toBeNull();
   });
 
+  test('with the unlock before changes on, Reject needs the unlock', async () => {
+    const app = await open();
+    await draw(app, <FileScreen />);
+    await app.settle();
+    app.platform.fakes.keyValue.items.set('settings.unlockBeforeChanges', 'true');
+    app.platform.fakes.deviceUnlock.answerWith({ ok: false, cause: 'failed' });
+    await fireEvent.press(heading(TWO.key).getByTestId('file.hunk.reject'));
+    await fireEvent.press(screen.getByTestId('file.reject.confirm'));
+    await app.settle();
+    expect(app.platform.fakes.deviceUnlock.requests()).toHaveLength(1);
+    expect(app.connection.calls('review.reject')).toHaveLength(0);
+    expect(screen.getByTestId('file.notice')).toHaveTextContent('The unlock did not work. Nothing was changed.');
+
+    app.platform.fakes.deviceUnlock.answerWith({ ok: true });
+    await fireEvent.press(heading(TWO.key).getByTestId('file.hunk.reject'));
+    await fireEvent.press(screen.getByTestId('file.reject.confirm'));
+    await app.settle();
+    expect(app.connection.calls('review.reject')).toEqual([{ workspace_id: WORKSPACE, path: PATH, base: LATEST, key: TWO.key }]);
+  });
+
   test('the question counts the lines that come back, or the added lines that go', async () => {
     const app = await open();
     hunks = [ONE, ADDED];

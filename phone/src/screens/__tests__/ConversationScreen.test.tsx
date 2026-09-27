@@ -131,6 +131,32 @@ describe('the header', () => {
     expect(app.connection.calls('workspace.cleanup')).toEqual([{ workspace_id: workspace?.id, discard_dirty: true }]);
   });
 
+  test('with the unlock before changes on, Clean up needs the unlock', async () => {
+    const { app, r } = await open('showcase');
+    const workspace = r.final.workspaces[0];
+    app.platform.fakes.keyValue.items.set('settings.unlockBeforeChanges', 'true');
+    app.connection.answers['workspace.cleanup_plan'] = () => ({ workspace, active_runs: [], removable: true, reason: '', dirty: { staged: [], unstaged: [], untracked: ['notes.txt'], conflicted: [] } });
+    app.connection.answers['workspace.cleanup'] = () => ({ ok: true });
+    app.platform.fakes.deviceUnlock.answerWith({ ok: false, cause: 'failed' });
+    await fireEvent.press(screen.getByTestId('agent.more'));
+    await fireEvent.press(screen.getByTestId('agent.more.cleanup'));
+    await app.settle();
+    await fireEvent.press(screen.getByTestId('agent.more.cleanup.confirm'));
+    await app.settle();
+    expect(app.platform.fakes.deviceUnlock.requests()).toEqual([{ reason: 'Clean up' }]);
+    expect(app.connection.calls('workspace.cleanup')).toHaveLength(0);
+    expect(screen.getByText('The unlock did not work. Nothing was changed.')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('agent.more.cleanup.no.ok'));
+    app.platform.fakes.deviceUnlock.answerWith({ ok: true });
+    await fireEvent.press(screen.getByTestId('agent.more'));
+    await fireEvent.press(screen.getByTestId('agent.more.cleanup'));
+    await app.settle();
+    await fireEvent.press(screen.getByTestId('agent.more.cleanup.confirm'));
+    await app.settle();
+    expect(app.connection.calls('workspace.cleanup')).toEqual([{ workspace_id: workspace?.id, discard_dirty: true }]);
+  });
+
   test('Clean up that the Mac refuses says why and removes nothing', async () => {
     const { app, r } = await open('showcase');
     app.connection.answers['workspace.cleanup_plan'] = () => ({ workspace: r.final.workspaces[0], active_runs: ['r1'], removable: false, reason: 'an agent is still working in it' });

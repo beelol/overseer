@@ -17,6 +17,7 @@ import { useMarks } from './review/marks';
 import { Notice } from './review/Notice';
 import { useReviewParams } from './review/run';
 import { WORDS } from './review/words';
+import { UNLOCK_FAILED, useUnlockBeforeChanges } from './settings/safety';
 
 const useStyles = makeStyles((theme) => ({
   fill: { flex: 1 },
@@ -109,10 +110,17 @@ export function FileScreen() {
 
   const { workspaceId, base } = file;
   const { forget } = marks;
+  const unlockFirst = useUnlockBeforeChanges();
   const putBack = useCallback(
     async (hunk: review.HunkView) => {
       if (workspaceId === null || base === null) return;
       setNotice(null);
+      // Putting the lines back cannot be undone: the device's unlock first, when the owner asked for it.
+      const unlocked = await unlockFirst(hunk.reject.label);
+      if (!unlocked.ok) {
+        if (unlocked.cause !== 'cancelled') setNotice(UNLOCK_FAILED);
+        return;
+      }
       // Shown at once: the hunk leaves the list while the Mac puts the lines back.
       setHidden((before) => new Set(before).add(hunk.key));
       try {
@@ -129,7 +137,7 @@ export function FileScreen() {
         });
       }
     },
-    [session, workspaceId, base, path, forget, reload, refused],
+    [session, workspaceId, base, path, forget, reload, refused, unlockFirst],
   );
 
   const controls = !watching;

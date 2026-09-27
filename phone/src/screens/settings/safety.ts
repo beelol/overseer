@@ -80,3 +80,30 @@ export function useSafety(): Safety {
 
   return { values, support, change, confirm };
 }
+
+/** Said when the unlock asked for before a change did not work, whatever the cause but a cancel. */
+export const UNLOCK_FAILED = 'The unlock did not work. Nothing was changed.';
+
+/**
+ * Asks for the device's unlock before a change that cannot be undone (stop all agents, clean up a
+ * worktree, complete or abort a merge, reject a hunk, forget the Mac), when the owner turned that
+ * on. Resolves `{ ok: true }` when the change may go on. A device that can no longer unlock (its
+ * passcode was removed) does not hold the owner back: the setting could not be turned on there.
+ */
+export function useUnlockBeforeChanges(): (reason: string) => Promise<UnlockResult> {
+  const { keyValue, deviceUnlock } = useCapabilities();
+  const store = useMemo(() => keyValue.scope<SafetySettings>('settings'), [keyValue]);
+  return useCallback(
+    async (reason: string): Promise<UnlockResult> => {
+      if (!read(store).unlockBeforeChanges) return { ok: true };
+      try {
+        const support = await deviceUnlock.support();
+        if (!support.supported) return { ok: true };
+        return await deviceUnlock.unlock({ reason });
+      } catch {
+        return { ok: false, cause: 'unavailable' };
+      }
+    },
+    [store, deviceUnlock],
+  );
+}
