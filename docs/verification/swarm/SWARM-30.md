@@ -1,6 +1,6 @@
 # SWARM-30 — director replacement
 
-Status: partial. Latest code revision: `26a44b2`; earlier no-spawn revision `3c4917a`, crash-boundary revision `f802c1c`, supervised-process revision `acc097a` and recovery revisions `0fc1446`, `3d7bc31` and `e89bc7d`.
+Status: partial. Latest code revision: `9981ec7b`; earlier no-spawn revisions `6f3dcdd1` and `3c4917a`, crash-boundary revision `f802c1c`, supervised-process revision `acc097a` and recovery revisions `0fc1446`, `3d7bc31` and `e89bc7d`.
 
 Input: a fixture-admitted worker with a reserved quota window reports a discovery. The director claims it, and the daemon restarts before the batch is applied. The worker sends a late terminal result while director termination is uncertain. The fixture then reports confirmed director death.
 
@@ -72,5 +72,12 @@ and reserved. The focused test was red before the fix and green after it;
 swarm_director_owner --test swarm_director -q` passed 14, 3 and 11 tests.
 The neighboring director-loop and worker-runtime suites passed 8 and 24 tests;
 the coverage JSON, link check (699 links, zero broken), and diff check passed.
+Linked pre-spawn follow-up at `9981ec7b`: the earlier injected metadata-write
+failure leaves an owner linked to a queued director run, but the durable phase
+is still `linked` and no process directory exists. Its updated focused test
+failed before the extension and now finds generation 2 already awaiting a
+replacement after restart. All 14 supervised-director process tests pass,
+including the `spawn_requested` fault that remains uncertain and reserved.
+Startup does not infer no-spawn from a missing process directory alone.
 This is local scripted recovery, not live model-director selection or shared
 Auto allowance admission. SWARM-30 remains partial.
