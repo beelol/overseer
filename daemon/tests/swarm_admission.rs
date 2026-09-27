@@ -327,7 +327,7 @@ fn ordinary_launches_take_priority_over_active_swarm_capacity() {
     assert_eq!(first["status"],"admitted");
     let manual = d.call("task.create",json!({"repo":checkout,
         "harness":"generic","workspace_mode":"worktree", "program":"/bin/sleep",
-        "args":["5"],"prompt":"","title":"ordinary when full"}));
+        "args":["30"],"prompt":"","title":"ordinary when full"}));
     assert!(manual["launch_error"].is_null(),"{manual}");
     let held = admit(&d,id,"j1","codex-a","manual-priority",now(),100000,100).unwrap();
     assert_eq!(held["reason"],"global_agent_limit","{held}");
@@ -341,13 +341,13 @@ fn ordinary_launches_take_priority_over_active_swarm_capacity() {
             barrier.wait();
             d.try_call("task.create",json!({"repo":checkout,
                 "harness":"generic","workspace_mode":"worktree","program":"/bin/sleep",
-                "args":["5"],"prompt":"","title":"ordinary a"}))
+                "args":["30"],"prompt":"","title":"ordinary a"}))
         });
         let second = scope.spawn(|| {
             barrier.wait();
             d.try_call("task.create",json!({"repo":checkout,
                 "harness":"generic","workspace_mode":"worktree","program":"/bin/sleep",
-                "args":["5"],"prompt":"","title":"ordinary b"}))
+                "args":["30"],"prompt":"","title":"ordinary b"}))
         });
         barrier.wait();
         [first.join().unwrap(),second.join().unwrap()]
@@ -477,6 +477,51 @@ fn late_shared_database_use_quarantines_evidence_and_bounds_retries() {
         let third=admit(&d,run,"j0","codex-a","forbidden-third",at,1000000,100);
         assert!(third.is_err() || third.unwrap()["status"]!="admitted");
     }
+}
+
+#[test]
+fn unconfirmed_planned_owner_preserves_late_use_and_holds_both_jobs() {
+    let mut d = Daemon::start(&[]);
+    let owner = setup(&d, "Planned DB owner", 1);
+    let observer = setup(&d, "Unplanned DB observer", 1);
+    d.call("swarm.claim", json!({"run_id":owner,"job_id":"j0",
+        "generation":1,"revision":1,"resource":"db:unconfirmed",
+        "mode":"write"}));
+    let at = now();
+    let attempt = admit(&d,&observer,"j0","codex-a","unconfirmed-use",at,1000000,100).unwrap();
+    d.call("swarm.artifact.put",json!({"run_id":observer,"job_id":"j0",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "artifact_id":"unconfirmed-evidence","source_revision":1,
+        "kind":"finding","content":"database row observed"}));
+    d.call("swarm.report",json!({"run_id":observer,"job_id":"j0",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "message_id":"unconfirmed-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["unconfirmed-evidence"]}}));
+    let observation = json!({"run_id":observer,"job_id":"j0",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "generation":1,"revision":1,"resource":"db:unconfirmed",
+        "mode":"write","after_use":true});
+    let result = d.call("swarm.claim",observation.clone());
+    assert_eq!(result["status"],"contaminated");
+    assert_eq!(result["unconfirmed_planned_owners"],1);
+    assert_eq!(d.call("swarm.jobs",json!({"id":observer}))["jobs"][0]["status"],"cancel_requested");
+    assert_eq!(d.call("swarm.jobs",json!({"id":owner}))["jobs"][0]["status"],"blocked");
+    assert_eq!(d.call("swarm.coverage",json!({"run_id":observer}))["rows"][0]["coverage_state"],"contaminated");
+    assert!(d.try_call("swarm.decide",json!({"run_id":observer,
+        "generation":1,"revision":1,"job_id":"j0","decision":"accept",
+        "evidence":["unconfirmed-evidence"]})).is_err());
+    d.kill9();
+    d.spawn();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let observations: i64 = db.query_row("SELECT COUNT(*) FROM swarm_resource_observations
+        WHERE run_id=?1 AND job_id='j0' AND resource='db:unconfirmed'",
+        [&observer],|r|r.get(0)).unwrap();
+    assert_eq!(observations,1);
+    assert_eq!(d.call("swarm.claim",observation)["duplicate"],true);
+    assert_eq!(d.call("swarm.jobs",json!({"id":owner}))["jobs"][0]["status"],"blocked");
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":observer,
+        "generation":1,"revision":1,"job_id":"j0","attempt_id":attempt["attempt_id"]}));
+    assert_eq!(d.call("swarm.jobs",json!({"id":observer}))["jobs"][0]["status"],"ready");
 }
 
 #[test]

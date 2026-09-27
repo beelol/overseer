@@ -549,6 +549,7 @@ pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
     let mut conflicts = Vec::new();
+    let mut unconfirmed_owners = Vec::new();
     let mut own_mode = None;
     for (owner_run, owner_job, owner_mode) in &existing {
         if owner_run == run && owner_job == job {
@@ -566,7 +567,7 @@ pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
             if let Some(peer_attempt) = peer_attempt {
                 conflicts.push((owner_run.clone(),owner_job.clone(),peer_attempt));
             } else {
-                bail!("claim conflict on {resource}: owned by {owner_run}/{owner_job}; usage overlap is unconfirmed");
+                unconfirmed_owners.push((owner_run.clone(),owner_job.clone()));
             }
         }
     }
@@ -601,7 +602,7 @@ pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
               mode=CASE WHEN mode='write' OR excluded.mode='write' THEN 'write' ELSE 'read' END,
               updated_ms=excluded.updated_ms",
             params![run,job,attempt,resource,mode,now])?;
-        if !conflicts.is_empty() {
+        if !conflicts.is_empty() || !unconfirmed_owners.is_empty() {
             for (peer_run,peer_job,peer_attempt) in &conflicts {
                 for (affected_run,affected_job,affected_attempt,other_run,other_job) in [
                     (run,job,attempt,peer_run.as_str(),peer_job.as_str()),
@@ -635,9 +636,36 @@ pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
                         params![affected_attempt,json!({"resource":resource,"reason":"resource_contamination"}).to_string(),now])?;
                 }
             }
+            // A planned owner with no registered attempt cannot prove that it used the
+            // resource. Keep the observation and quarantine the reporting attempt;
+            // hold the owner before it can launch until a director resolves the claim.
+            for (peer_run,peer_job) in &unconfirmed_owners {
+                tx.execute("INSERT OR IGNORE INTO swarm_resource_contamination
+                    (run_id,job_id,attempt_id,resource,peer_run_id,peer_job_id,created_ms)
+                    VALUES(?1,?2,?3,?4,?5,?6,?7)",
+                    params![run,job,attempt,resource,peer_run,peer_job,now])?;
+                tx.execute("UPDATE swarm_jobs SET status='cancel_requested',
+                    stop_reason='resource_contamination',updated_ms=?3
+                    WHERE run_id=?1 AND id=?2 AND status IN ('reserved','launching','running','submitted')",
+                    params![run,job,now])?;
+                tx.execute("UPDATE swarm_jobs SET status='blocked',
+                    stop_reason='resource_contamination',updated_ms=?3
+                    WHERE run_id=?1 AND id=?2 AND status='accepted'",
+                    params![run,job,now])?;
+                tx.execute("UPDATE swarm_jobs SET status='blocked',
+                    stop_reason='resource_overlap_unconfirmed',updated_ms=?3
+                    WHERE run_id=?1 AND id=?2 AND status IN ('planned','ready','reserved','launching','running','submitted','accepted')",
+                    params![peer_run,peer_job,now])?;
+                tx.execute("INSERT OR IGNORE INTO swarm_messages
+                    (run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+                    SELECT a.run_id,'contamination-'||a.id,a.job_id,a.id,'control',a.id,'stop',a.revision,?2,'queued',?3,?3
+                    FROM swarm_attempts a WHERE a.id=?1 AND a.status='registered'",
+                    params![attempt,json!({"resource":resource,"reason":"resource_overlap_unconfirmed"}).to_string(),now])?;
+            }
             tx.commit()?;
             return Ok(json!({"resource":resource,"mode":mode,"status":"contaminated",
-                "affected":conflicts.len()+1,"duplicate":false}));
+                "affected":conflicts.len()+unconfirmed_owners.len()+1,
+                "unconfirmed_planned_owners":unconfirmed_owners.len(),"duplicate":false}));
         }
     }
     if let Some(held) = own_mode {
