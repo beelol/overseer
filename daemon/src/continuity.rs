@@ -546,6 +546,89 @@ pub fn pick_value(d: &Daemon) -> Result<Value> {
     Ok(json!({"pick": pick, "ollama": l.inventory.ollama, "harness": settings.local_harness, "may_download": opts.may_download, "context_target": opts.context_target, "context_floor": opts.context_floor}))
 }
 
+/// Every local model a person could choose, with its fit on this machine now (AC-94): the base
+/// models that are installed and call tools, and the catalogue's models that are not installed.
+/// A fit is the guard's own answer (`local::approve`), so a badge never promises what a run would
+/// be refused: the longest of the usual contexts that fits, or why none does.
+pub fn local_models(d: &Daemon) -> Result<Value> {
+    let settings = settings();
+    let l = gather(d);
+    let opts = settings.pick_options(may_download(&settings, &l.inventory.ollama));
+    let memory = l.inventory.memory.clone();
+    let budget = memory.as_ref().map(|m| local::budget(m, &opts, 0));
+    let mut out = Vec::new();
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    let verdict = |base: &str| -> (String, Option<String>) {
+        match l.catalogue.iter().find(|e| e.tag == base) {
+            Some(e) if e.verified_with(&settings.local_harness) => ("passed".into(), None),
+            Some(e) if e.verified[&settings.local_harness]["status"] == "failed" => ("failed".into(), Some(e.verification_note(&settings.local_harness))),
+            Some(e) => ("unverified".into(), Some(e.verification_note(&settings.local_harness))),
+            None => ("unverified".into(), Some(format!("not in the catalogue, so not verified with {}", settings.local_harness))),
+        }
+    };
+    // Installed: one entry per base model; the tags that set a context are ways to run it.
+    for m in l.inventory.models.iter().filter(|m| m.base == m.tag || !l.inventory.models.iter().any(|b| b.tag == m.base)) {
+        if !seen.insert(m.tag.clone()) {
+            continue;
+        }
+        let tools = m.capabilities.iter().any(|c| c == "tools");
+        let (verified, note) = verdict(&m.tag);
+        let steps = local::context_steps(opts.context_target, opts.context_floor, m.max_context.unwrap_or(local::COMFORTABLE_CONTEXT));
+        let mut fit = json!({"status": "too_big"});
+        let mut refused = None;
+        for context in &steps {
+            match local::approve(&m.tag, *context, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts) {
+                Ok(a) => {
+                    fit = json!({"status": "fits", "context": context, "bytes": a["bytes"], "measured": a["measured"], "already_loaded": a["already_loaded"]});
+                    break;
+                }
+                Err(e) => refused = Some(e.to_string()),
+            }
+        }
+        if steps.is_empty() {
+            fit = json!({"status": "too_small", "detail": format!("its longest context ({}) is under the floor ({})", m.max_context.unwrap_or(0), opts.context_floor)});
+        } else if fit["status"] == "too_big" {
+            fit["detail"] = json!(refused);
+            fit["bytes"] = json!(l.measured.get(&(m.tag.clone(), opts.context_floor)).copied().or_else(|| local::estimate(m.size, m.geometry.as_ref(), opts.context_floor)));
+        }
+        if !tools {
+            fit = json!({"status": "no_tools", "detail": "Ollama does not report tool calling for it"});
+        }
+        let loaded = l.inventory.loaded.iter().filter(|x| x.tag == m.tag || l.inventory.models.iter().any(|t| t.tag == x.tag && t.base == m.tag)).map(|x| json!({"tag": x.tag, "bytes": x.size, "context": x.context})).collect::<Vec<_>>();
+        out.push(json!({"tag": m.tag, "installed": true, "disk_bytes": m.size, "parameters": m.parameter_size, "tools": tools, "verified": verified, "note": note, "fit": fit, "loaded": loaded,
+            "eligible": tools && (verified == "passed" || settings.allow_unverified_models)}));
+    }
+    // Not installed: what the catalogue knows, with the size of the download.
+    for e in l.catalogue.iter().filter(|e| !seen.contains(&e.tag)) {
+        let (verified, note) = verdict(&e.tag);
+        out.push(json!({"tag": e.tag, "installed": false, "disk_bytes": e.disk_bytes, "tools": true, "verified": verified, "note": note, "loaded": [],
+            "fit": {"status": "not_installed", "download_bytes": e.disk_bytes, "may_download": opts.may_download}, "eligible": false}));
+    }
+    let pick = memory.as_ref().map(|m| local::pick(m, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts));
+    Ok(json!({"models": out, "budget": budget, "ollama": l.inventory.ollama, "memory": memory, "harness": settings.local_harness,
+        "pick": pick.as_ref().and_then(|p| p.chosen.as_ref()).map(|c| json!({"tag": c.tag, "run_tag": c.run_tag, "context": c.context, "bytes": c.bytes, "installed": c.installed})),
+        "why_no_pick": pick.as_ref().filter(|p| p.chosen.is_none()).and_then(|p| p.rejected.first()).map(|r| format!("{}: {}", r.tag, r.reason))}))
+}
+
+/// Everything the user interface shows about Continuity, in one answer.
+pub fn ui(d: &Daemon) -> Result<Value> {
+    let s = settings();
+    let st = status();
+    let notice = meta_get(d, "continuity.notice_shown").and_then(|v| v.parse::<i64>().ok());
+    let waiting: Vec<Value> = crate::handoff::waiting(d);
+    Ok(json!({
+        "connection": st,
+        "settings": s,
+        "notice": {"show": s.enabled && notice.is_none(), "shown_ms": notice},
+        "new_agents": st.as_ref().map(|st| crate::handoff::new_agents(d, st)),
+        "local": local_models(d).ok(),
+        "waiting": waiting,
+        "handoffs": crate::handoff::handoffs(d),
+        "downloads": crate::downloads::listing(d),
+        "ollama": crate::ollama_install::status(d),
+    }))
+}
+
 /// The guard every load passes (AC-140): fresh memory, Ollama's own list of loaded models, no
 /// override. Errors say exactly why a model may not be loaded.
 pub fn approve(d: &Daemon, tag: &str, context: u64) -> Result<Value> {
@@ -758,7 +841,7 @@ pub fn prepare_local_run(d: &Arc<Daemon>, run: &mut crate::store::Run, profile_e
 // ------------------------------------------------------------------ protocol
 
 pub fn handles(method: &str) -> bool {
-    crate::downloads::handles(method) || crate::handoff::handles(method) || crate::ollama_install::handles(method) || matches!(method, "connection.status" | "connection.check" | "continuity.status" | "continuity.notice" | "settings.get" | "settings.set" | "local.inventory" | "local.pick" | "local.approve" | "local.catalogue" | "local.load" | "local.unload")
+    crate::downloads::handles(method) || crate::handoff::handles(method) || crate::ollama_install::handles(method) || matches!(method, "connection.status" | "connection.check" | "continuity.status" | "continuity.ui" | "continuity.notice" | "local.models" | "settings.get" | "settings.set" | "local.inventory" | "local.pick" | "local.approve" | "local.catalogue" | "local.load" | "local.unload")
 }
 
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
@@ -798,6 +881,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let s = settings();
             json!({"show": s.enabled && shown.is_none(), "shown_ms": shown, "enabled": s.enabled, "allow_model_downloads": s.allow_model_downloads, "allow_ollama_install": s.allow_ollama_install})
         }
+        "continuity.ui" => ui(d)?,
+        "local.models" => local_models(d)?,
         "local.inventory" => serde_json::to_value(gather(d).inventory)?,
         "local.pick" => pick_value(d)?,
         "local.approve" => approve(d, p["tag"].as_str().ok_or_else(|| anyhow!("missing string parameter tag"))?, p["context"].as_u64().ok_or_else(|| anyhow!("missing number parameter context"))?)?,

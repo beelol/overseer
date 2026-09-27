@@ -428,3 +428,55 @@ fn ac140_no_model_over_the_budget_is_loaded_by_any_path() {
     assert!(loads[0]["payload"]["memory_before"]["available"].is_u64() && loads[0]["payload"]["memory_after"]["available"].is_u64());
     assert!(loads[2]["payload"]["error"].as_str().unwrap().contains("cancelled"));
 }
+
+// ---------------------------------------------------------------- AC-94 (the daemon's side)
+
+#[test]
+fn ac94_every_local_model_has_a_fit_that_the_guard_would_give() {
+    let o = Ollama::start();
+    o.install(ollama::qwen3_coder_30b()).install(ollama::qwen3_coder_30b_64k()).install(ollama::qwen25_coder_14b()).install(ollama::qwen35_122b());
+    let w = World::new();
+    let d = w.start(&o.url(), &[]);
+    let by = |v: &Value, tag: &str| v["models"].as_array().unwrap().iter().find(|m| m["tag"] == tag).cloned().unwrap_or(Value::Null);
+    let all = d.call("local.models", json!({}));
+    // One entry per base model: the tag that sets a context is a way to run it, not another model.
+    let tags: Vec<&str> = all["models"].as_array().unwrap().iter().map(|m| m["tag"].as_str().unwrap()).collect();
+    assert_eq!(tags, ["qwen3-coder:30b", "qwen2.5-coder:14b", "qwen3.5:122b", "qwen2.5-coder:32b", "qwen2.5-coder:7b", "qwen2.5-coder:3b", "qwen2.5-coder:1.5b"]);
+    let m = by(&all, "qwen3-coder:30b");
+    assert_eq!((m["fit"]["status"].as_str(), m["fit"]["context"].as_u64(), gib(&m["fit"]["bytes"]), m["verified"].as_str(), m["eligible"].clone()), (Some("fits"), Some(65536), 24.3, Some("passed"), json!(true)));
+    // Installed and failed its check: it fits, it is marked, and Overseer does not pick it.
+    let m = by(&all, "qwen2.5-coder:14b");
+    assert_eq!((m["fit"]["status"].as_str(), m["fit"]["context"].as_u64(), m["verified"].as_str(), m["eligible"].clone()), (Some("fits"), Some(32768), Some("failed"), json!(false)));
+    assert_eq!(m["note"], "failed its check with opencode: wrote its tool calls as text, or said done without calling a tool; nothing ran");
+    // Too big, with the numbers.
+    let m = by(&all, "qwen3.5:122b");
+    assert_eq!((m["fit"]["status"].as_str(), gib(&m["fit"]["bytes"]), m["verified"].as_str()), (Some("too_big"), 77.2, Some("unverified")));
+    assert!(m["fit"]["detail"].as_str().unwrap().starts_with("qwen3.5:122b is too big to load: 77.2 GiB at a 16k context is over the budget of 51.2 GiB"), "{m}");
+    // Not installed, with the size of the download.
+    let m = by(&all, "qwen2.5-coder:7b");
+    assert_eq!((m["installed"].clone(), m["fit"]["status"].as_str(), m["fit"]["download_bytes"].as_u64(), m["fit"]["may_download"].clone()), (json!(false), Some("not_installed"), Some(4_683_087_561), json!(false)));
+    assert_eq!((gib(&all["budget"]["budget"]), all["pick"]["tag"].as_str(), all["pick"]["run_tag"].as_str()), (51.2, Some("qwen3-coder:30b"), Some("qwen3-coder:30b-64k")));
+
+    // The badge is the guard's answer: what is said to fit is approved, at that context and no longer one.
+    for m in all["models"].as_array().unwrap().iter().filter(|m| m["fit"]["status"] == "fits") {
+        let (tag, context) = (m["tag"].as_str().unwrap(), m["fit"]["context"].as_u64().unwrap());
+        assert_eq!(d.call("local.approve", json!({"tag": tag, "context": context}))["bytes"], m["fit"]["bytes"], "{tag}");
+    }
+    assert!(d.try_call("local.approve", json!({"tag": "qwen3.5:122b", "context": 16384})).is_err());
+    // And the pick of the dry run is one of them.
+    let pick = d.call("local.pick", json!({}))["pick"]["chosen"].clone();
+    assert_eq!((pick["tag"].clone(), pick["context"].clone()), (by(&all, "qwen3-coder:30b")["tag"].clone(), by(&all, "qwen3-coder:30b")["fit"]["context"].clone()));
+
+    // Less memory now: the same model at a shorter context, then not at all.
+    w.memory(128.0, 34.0, "normal");
+    let m = by(&d.call("local.models", json!({})), "qwen3-coder:30b");
+    assert_eq!((m["fit"]["status"].as_str(), m["fit"]["context"].as_u64()), (Some("fits"), Some(16384)));
+    w.memory(128.0, 20.0, "normal");
+    let less = d.call("local.models", json!({}));
+    assert_eq!(by(&less, "qwen3-coder:30b")["fit"]["status"], "too_big");
+    assert_eq!((less["pick"].clone(), less["why_no_pick"].as_str().map(|s| s.starts_with("qwen3-coder:30b: too big")), gib(&less["budget"]["budget"])), (Value::Null, Some(true), 7.2));
+    // One answer has everything the interface shows.
+    let ui = d.call("continuity.ui", json!({}));
+    assert_eq!((ui["connection"]["state"].as_str(), ui["notice"]["show"].clone(), ui["settings"]["enabled"].clone(), ui["new_agents"]["local_only"].clone()), (Some("online"), json!(true), json!(true), json!(false)));
+    assert!(ui["local"]["models"].is_array() && ui["waiting"].as_array().unwrap().is_empty() && ui["downloads"]["downloads"].is_array() && ui["ollama"]["allowed"] == false);
+}

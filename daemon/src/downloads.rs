@@ -282,6 +282,11 @@ pub fn prefetch(d: &Arc<Daemon>) -> Option<String> {
     pull(d, &tag, "prefetch", false).ok().map(|_| tag)
 }
 
+/// The downloads of this session, and whether the first one was ever confirmed.
+pub fn listing(d: &Daemon) -> Value {
+    json!({"downloads": list(), "first_pull_confirmed": confirmed(d)})
+}
+
 pub fn handles(method: &str) -> bool {
     matches!(method, "local.pull" | "local.pull_cancel" | "local.downloads")
 }
@@ -291,7 +296,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "local.pull" => pull(d, tag()?, "user", p["confirm"].as_bool().unwrap_or(false))?,
         "local.pull_cancel" => cancel(tag()?)?,
-        "local.downloads" => json!({"downloads": list(), "first_pull_confirmed": confirmed(d)}),
+        "local.downloads" => listing(d),
         other => bail!("unknown method {other}"),
     })
 }

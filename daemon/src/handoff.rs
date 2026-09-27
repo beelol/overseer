@@ -497,6 +497,19 @@ fn give_up(d: &Daemon, run: &Run, wait: &Wait) -> Result<()> {
     Ok(())
 }
 
+/// The runs that wait, with what the last look found, for the user interface.
+pub fn waiting(d: &Daemon) -> Vec<Value> {
+    let hours = continuity::settings().retry_for_hours as i64;
+    waits(d)
+        .into_iter()
+        .filter(|w| w.note.as_deref() != Some("expired"))
+        .map(|w| {
+            let offers = d.store.lock().unwrap().events_after(0, Some(&w.run_id), 5000).ok().and_then(|ev| ev.into_iter().rev().find(|e| e.kind == "retry" && e.payload["offers"].is_array()).map(|e| e.payload["offers"].clone())).unwrap_or(json!([]));
+            json!({"run_id": w.run_id, "kind": w.kind, "provider": w.provider, "reason": w.reason, "since_ms": w.started_ms, "next_ms": w.next_ms, "attempts": w.attempts, "note": w.note, "offers": offers, "gives_up_ms": w.started_ms + hours * 3_600_000})
+        })
+        .collect()
+}
+
 /// One pass at a time: the scheduler and the user's own requests never act on the same run together.
 static PASS: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
@@ -743,7 +756,7 @@ pub fn before_follow_up(d: &Arc<Daemon>, run: &Run, prompt: &str) -> Result<Opti
 
 // ------------------------------------------------------------------ what the user asks for
 
-fn waiting(d: &Daemon, run_id: &str) -> Result<(Run, Option<Wait>)> {
+fn run_and_wait(d: &Daemon, run_id: &str) -> Result<(Run, Option<Wait>)> {
     let run = d.run(run_id)?;
     Ok((run, wait_of(d, run_id)))
 }
@@ -767,7 +780,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "continuity.handoffs" => json!({"handoffs": handoffs(d)}),
         "continuity.waits" => json!({"waits": waits(d)}),
         "run.retry_now" => {
-            let (run, wait) = waiting(d, id()?)?;
+            let (run, wait) = run_and_wait(d, id()?)?;
             let wait = wait.ok_or_else(|| anyhow!("this agent is not waiting for a connection"))?;
             if run.status == "failed" {
                 // Given up after the limit: the wait starts again, and the message is still there.
@@ -795,7 +808,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             json!({"online": failover_targets(d, &run, &status), "local": local, "back": back, "connection": {"state": status.state, "reason": status.reason}})
         }
         "run.handoff" => {
-            let (run, wait) = waiting(d, id()?)?;
+            let (run, wait) = run_and_wait(d, id()?)?;
             let to = p["to"].as_str().ok_or_else(|| anyhow!("missing string parameter to (local, back or a provider)"))?;
             let status = continuity::status().ok_or_else(|| anyhow!("Continuity has not started"))?;
             let mut target = match to {
