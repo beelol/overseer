@@ -342,7 +342,7 @@ fn revoked_selected_identity_cancels_only_its_active_attempt_and_keeps_usage_unc
 fn rate_limited_provider_blocks_new_launches_without_stopping_an_independent_peer() {
     let d=Daemon::start(&[]);
     let created=d.call("swarm.create",json!({"category":"Scoped provider rate limit",
-        "objective":"Audit separate routes","allowed_targets":["opencode-a","opencode-b"]}));
+        "objective":"Audit separate routes","allowed_targets":["opencode-a","opencode-a-alt","opencode-b"]}));
     let run=created["id"].as_str().unwrap();
     d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
         {"id":"a","title":"Inspect A","acceptance":"A evidence","deps":[]},
@@ -354,8 +354,13 @@ fn rate_limited_provider_blocks_new_launches_without_stopping_an_independent_pee
     let snap=|time:i64,limited:bool|json!({"version":1,"observed_ms":time,
         "expires_ms":time+60000,"targets":[
             {"id":"opencode-a","account_id":"account-a","pool_ids":["pool-a"],
+                "endpoint_id":"endpoint-a","health_scope":"endpoint",
                 "capabilities":["code"],"health":if limited {"rate_limited"} else {"up"},"auth":"ok"},
+            {"id":"opencode-a-alt","account_id":"account-a","pool_ids":["pool-a"],
+                "endpoint_id":"endpoint-a",
+                "capabilities":["code"],"health":"up","auth":"ok"},
             {"id":"opencode-b","account_id":"account-b","pool_ids":["pool-b"],
+                "endpoint_id":"endpoint-b",
                 "capabilities":["code"],"health":"up","auth":"ok"}],
         "pools":[{"id":"pool-a","windows":[{"id":"week","unit":"points",
                 "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
@@ -385,6 +390,8 @@ fn rate_limited_provider_blocks_new_launches_without_stopping_an_independent_pee
     assert_eq!(observed["revoked_jobs"],json!([]));
     let denied=admit("c","opencode-a","limited-a",limited.clone(),at+1500);
     assert_eq!(denied["reason"],"rate_limited");
+    let denied_alias=admit("c","opencode-a-alt","limited-a-alias",limited.clone(),at+1500);
+    assert_eq!(denied_alias["reason"],"rate_limited");
     let replacement=admit("c","opencode-b","healthy-b",limited,at+1500);
     assert_eq!(replacement["status"],"admitted","{replacement}");
     let jobs=d.call("swarm.jobs",json!({"id":run}));

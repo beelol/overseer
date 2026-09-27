@@ -21,6 +21,10 @@ struct Target {
     #[serde(default = "default_fixture_harness")]
     harness: String,
     #[serde(default)]
+    endpoint_id: Option<String>,
+    #[serde(default = "default_health_scope")]
+    health_scope: String,
+    #[serde(default)]
     profile_id: Option<String>,
     #[serde(default)]
     model: Option<String>,
@@ -70,6 +74,30 @@ struct Request {
 fn default_allocation_percent() -> i64 { 10 }
 fn default_finishing_reserve_percent() -> i64 { 20 }
 fn default_fixture_harness() -> String { "generic".to_string() }
+fn default_health_scope() -> String { "target".to_string() }
+
+fn health_reason(health: &str) -> &'static str {
+    match health {
+        "rate_limited" => "rate_limited",
+        "local_unavailable" => "local_harness_unavailable",
+        _ => "target_unhealthy",
+    }
+}
+
+fn scoped_failure<'a>(targets: &'a [Target], candidate: &Target) -> Option<&'a Target> {
+    let mut matching: Vec<&Target> = targets.iter().filter(|source| source.health != "up"
+        && source.id != candidate.id && match source.health_scope.as_str() {
+            "account" => source.account_id == candidate.account_id,
+            "endpoint" => source.endpoint_id.is_some() && source.endpoint_id == candidate.endpoint_id,
+            "harness" => source.harness == candidate.harness,
+            _ => false,
+        }).collect();
+    // A mixed failure snapshot must produce the same reason regardless of row order.
+    matching.sort_by_key(|source| (match source.health.as_str() {
+        "local_unavailable" => 0, "rate_limited" => 1, _ => 2,
+    }, source.id.as_str()));
+    matching.into_iter().next()
+}
 
 fn safe_identity(value: &str) -> bool {
     !value.is_empty() && value.len() <= 200 && !value.chars().any(char::is_control)
@@ -123,6 +151,7 @@ pub fn preview(p: &Value) -> Result<Value> {
     let mut target_ids = HashSet::new();
     let mut account_pools: HashMap<&str, (usize, HashSet<&str>)> = HashMap::new();
     let mut revoked_accounts = HashSet::new();
+    let mut auth_failed_accounts = HashSet::new();
     for target in &snapshot.targets {
         if !safe_identity(&target.id)
             || !safe_identity(&target.account_id)
@@ -136,6 +165,11 @@ pub fn preview(p: &Value) -> Result<Value> {
         {
             bail!("invalid target harness");
         }
+        if !["target", "account", "endpoint", "harness"].contains(&target.health_scope.as_str())
+            || (target.health_scope == "endpoint" && target.endpoint_id.is_none())
+            || target.endpoint_id.as_deref().is_some_and(|id| !safe_identity(id)) {
+            bail!("invalid target health scope or endpoint identity");
+        }
         let route_values = [&target.profile_id, &target.model, &target.effort];
         if route_values.iter().filter_map(|value| value.as_deref()).any(|value| value.is_empty()
             || value.len() > 128 || value.chars().any(char::is_control)
@@ -148,6 +182,9 @@ pub fn preview(p: &Value) -> Result<Value> {
         }
         if target.auth == "revoked" {
             revoked_accounts.insert(target.account_id.as_str());
+        }
+        if target.auth != "ok" {
+            auth_failed_accounts.insert(target.account_id.as_str());
         }
         let declared: HashSet<&str> = target.pool_ids.iter().map(String::as_str).collect();
         if let Some((count, common)) = account_pools.get_mut(target.account_id.as_str()) {
@@ -174,13 +211,11 @@ pub fn preview(p: &Value) -> Result<Value> {
         } else if revoked_accounts.contains(target.account_id.as_str()) {
             reason = Some("auth_unavailable");
         } else if target.health != "up" {
-            reason = Some(match target.health.as_str() {
-                "rate_limited" => "rate_limited",
-                "local_unavailable" => "local_harness_unavailable",
-                _ => "target_unhealthy",
-            });
-        } else if target.auth != "ok" {
+            reason = Some(health_reason(&target.health));
+        } else if auth_failed_accounts.contains(target.account_id.as_str()) {
             reason = Some("auth_unavailable");
+        } else if let Some(source) = scoped_failure(&snapshot.targets, target) {
+            reason = Some(health_reason(&source.health));
         } else if !required
             .iter()
             .all(|cap| target.capabilities.iter().any(|c| c == cap))
@@ -237,6 +272,10 @@ pub fn preview(p: &Value) -> Result<Value> {
                         .saturating_sub(window.protected_milli)
                         .saturating_sub(window.reserved_milli)
                         .max(0);
+                    if usable == 0 {
+                        reason = Some("quota_exhausted");
+                        break;
+                    }
                     let allocation = usable.saturating_mul(request.allocation_percent) / 100;
                     let minimum_reserve = allocation
                         .saturating_mul(request.finishing_reserve_percent) / 100;

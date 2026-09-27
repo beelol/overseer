@@ -75,11 +75,12 @@ fn snapshot_and_allowed_target_identifiers_cannot_expose_credentials_in_status()
         input["request"]["estimate_milli"][secret] = json!(1000);
         input
     };
-    for field in ["target", "account", "pool", "window", "unit", "model"] {
+    for field in ["target", "account", "endpoint", "pool", "window", "unit", "model"] {
         let mut candidate = snapshot(Some(60000), true);
         match field {
             "target" => candidate["targets"][1]["id"] = json!(secret),
             "account" => candidate["targets"][1]["account_id"] = json!(secret),
+            "endpoint" => candidate["targets"][1]["endpoint_id"] = json!(secret),
             "pool" => {
                 candidate["targets"][1]["pool_ids"] = json!([secret]);
                 candidate["pools"][0]["id"] = json!(secret);
@@ -285,8 +286,73 @@ fn rate_limit_and_local_harness_failure_leave_another_provider_eligible() {
     input["targets"][0]["auth"]=json!("ok");
     input["pools"][0]["windows"][0]["remaining_milli"]=json!(0);
     let quota=preview(&d,input,&allowed,1000,0);
-    assert_eq!(quota["targets"][allowed[0]]["reason"],"finishing_reserve");
+    assert_eq!(quota["targets"][allowed[0]]["reason"],"quota_exhausted");
     assert_eq!(quota["targets"][allowed[1]]["eligible"],true);
+}
+
+#[test]
+fn failures_follow_declared_account_endpoint_and_harness_scope() {
+    let d=Daemon::start(&[]);
+    let mut base=snapshot(Some(60000),true);
+    for (index,endpoint) in [(0,"provider-a"),(1,"provider-a"),(2,"provider-b")] {
+        base["targets"][index]["endpoint_id"]=json!(endpoint);
+        base["targets"][index]["harness"]=json!("opencode");
+        base["targets"][index]["profile_id"]=json!(format!("profile-{index}"));
+        base["targets"][index]["model"]=json!("fixture-model");
+    }
+    let allowed=["cheap","qualified","independent"];
+    let mut outage=base.clone();
+    outage["targets"][0]["health"]=json!("down");
+    outage["targets"][0]["health_scope"]=json!("endpoint");
+    let result=preview(&d,outage,&allowed,1000,0);
+    assert_eq!(result["targets"]["cheap"]["reason"],"target_unhealthy");
+    assert_eq!(result["targets"]["qualified"]["reason"],"target_unhealthy");
+    assert_eq!(result["targets"]["independent"]["eligible"],true,
+        "healthy OpenCode provider B remains usable");
+
+    let mut auth=base.clone();
+    auth["targets"][0]["auth"]=json!("expired");
+    let result=preview(&d,auth,&allowed,1000,0);
+    assert_eq!(result["targets"]["qualified"]["reason"],"auth_unavailable");
+    assert_eq!(result["targets"]["independent"]["eligible"],true);
+
+    let mut limited=base.clone();
+    limited["targets"][0]["health"]=json!("rate_limited");
+    limited["targets"][0]["health_scope"]=json!("endpoint");
+    let result=preview(&d,limited,&allowed,1000,0);
+    assert_eq!(result["targets"]["qualified"]["reason"],"rate_limited");
+    assert_eq!(result["targets"]["independent"]["eligible"],true);
+
+    let mut account_limit=base.clone();
+    account_limit["targets"][0]["health"]=json!("rate_limited");
+    account_limit["targets"][0]["health_scope"]=json!("account");
+    let result=preview(&d,account_limit,&allowed,1000,0);
+    assert_eq!(result["targets"]["qualified"]["reason"],"rate_limited");
+    assert_eq!(result["targets"]["independent"]["eligible"],true);
+
+    let mut local=base.clone();
+    local["targets"][0]["health"]=json!("local_unavailable");
+    local["targets"][0]["health_scope"]=json!("harness");
+    let result=preview(&d,local,&allowed,1000,0);
+    assert_eq!(result["targets"]["qualified"]["reason"],"local_harness_unavailable");
+    assert_eq!(result["targets"]["independent"]["reason"],"local_harness_unavailable",
+        "a missing OpenCode binary blocks every OpenCode provider");
+
+    let mut empty=base.clone();
+    empty["pools"][0]["windows"][0]["remaining_milli"]=json!(0);
+    let result=preview(&d,empty,&allowed,1000,0);
+    assert_eq!(result["targets"]["qualified"]["reason"],"quota_exhausted");
+    assert_eq!(result["targets"]["independent"]["eligible"],true);
+
+    let mut malformed=base;
+    malformed["targets"][0]["health"]=json!("down");
+    malformed["targets"][0]["health_scope"]=json!("endpoint");
+    malformed["targets"][0]["endpoint_id"]=Value::Null;
+    assert!(d.try_call("swarm.policy.preview",json!({"snapshot":malformed,
+        "request":{"now_ms":1200,"allowed_targets":allowed,
+            "required_capabilities":["write"],"purpose":"worker",
+            "estimate_milli":{"points":1000}}})).unwrap_err()
+        .contains("invalid target health scope"));
 }
 
 #[test]
