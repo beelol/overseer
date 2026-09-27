@@ -399,9 +399,9 @@ pub fn retry_stopping_interrupts(d: &Arc<Daemon>) -> Result<usize> {
     Ok(retried)
 }
 
-/// Stop only workers whose own job was quarantined by a late resource conflict.
-/// The job transition is durable before socket I/O, so restart retries a missed signal.
-pub fn retry_contaminated_interrupts(d: &Arc<Daemon>) -> Result<Value> {
+/// Stop only workers whose own job was quarantined by a resource conflict or
+/// selected-account revocation. Restart retries a missed signal from durable state.
+pub fn retry_targeted_interrupts(d: &Arc<Daemon>) -> Result<Value> {
     let now = crate::daemon::now();
     let linked = {
         let store = d.store.lock().unwrap();
@@ -410,7 +410,7 @@ pub fn retry_contaminated_interrupts(d: &Arc<Daemon>) -> Result<Value> {
              JOIN swarm_jobs j ON j.run_id=l.run_id AND j.id=l.job_id
              JOIN runs r ON r.id=l.overseer_run_id
              LEFT JOIN swarm_stop_signals s ON s.run_id=l.run_id AND s.overseer_run_id=r.id
-             WHERE j.stop_reason='resource_contamination'
+             WHERE j.stop_reason IN ('resource_contamination','account_identity_revoked')
                AND j.status IN ('cancel_requested','blocked')
                AND r.status IN ('queued','starting','running','waiting_for_user')
                AND (s.overseer_run_id IS NULL OR s.last_attempt_ms<=?1)

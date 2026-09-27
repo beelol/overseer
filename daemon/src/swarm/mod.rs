@@ -49,7 +49,7 @@ pub use policy::preview;
 pub use settings::set_policy;
 pub use revision::revise;
 pub use runtime::{interrupt_workers, launch_worker, liveness, reconcile_terminal_workers,
-    reconcile_worker, retry_contaminated_interrupts, retry_stopping_interrupts,
+    reconcile_worker, retry_targeted_interrupts, retry_stopping_interrupts,
     sample_due_workers, sample_liveness};
 pub use runtime::launch_director;
 pub use runtime::refresh_linked_director_owners;

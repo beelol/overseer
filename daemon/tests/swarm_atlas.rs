@@ -1453,3 +1453,105 @@ fn atlas_s5_lower_worker_ceiling_drains_existing_backend_probes() {
         [run],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
     assert_eq!(counts,(1,1,1));
 }
+
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_revoked_account_interrupts_only_affected_backend_worker() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d=Daemon::start(&[]);
+    let temp=tmp();
+    let checkout=repo(&temp.path().join("atlas-revoked-account"));
+    let j2_script=repo_root().join("fixtures/swarm/atlas-v1/swarm-j2-worker.mjs");
+    let j4_script=repo_root().join("fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs");
+    let database_url_file=temp.path().join("disposable-database-url");
+    let release_j2=temp.path().join("release-j2");
+    let probe_j4=temp.path().join("j4-probe-active");
+    std::fs::write(&database_url_file,std::env::var("ATLAS_DATABASE_URL").unwrap()).unwrap();
+    let created=d.call("swarm.create",json!({"category":"Atlas revoked identity fault",
+        "objective":"Audit task and attachment routes","allowed_targets":["account-a","account-b"],
+        "policy":{"max_workers":3}}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Tasks","acceptance":"foreign task mutation","deps":[],
+            "resource_claims":[{"resource":"atlas-db-j2","mode":"write"}]},
+        {"id":"j4","title":"Attachments","acceptance":"foreign object retrieval","deps":[],
+            "resource_claims":[{"resource":"atlas-db-j4","mode":"write"}]},
+        {"id":"j6","title":"Tokens","acceptance":"token permissions","deps":[]}
+    ]}));
+    commit_wave(&d,run,1,&["j2","j4","j6"]);
+    let at=now();
+    let snapshot=|observed:i64,revoked:bool|json!({"version":1,
+        "observed_ms":observed,"expires_ms":observed+120000,
+        "targets":[
+            {"id":"account-a","account_id":"account-a","pool_ids":["pool-a"],
+                "capabilities":["audit"],"health":"up",
+                "auth":if revoked {"revoked"} else {"ok"}},
+            {"id":"account-b","account_id":"account-b","pool_ids":["pool-b"],
+                "capabilities":["audit"],"health":"up","auth":"ok"}],
+        "pools":[
+            {"id":"pool-a","windows":[{"id":"week","unit":"points",
+                "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":observed+120000}]},
+            {"id":"pool-b","windows":[{"id":"week","unit":"points",
+                "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":observed+120000}]}]});
+    let observe=|when:i64,revoked:bool|d.call("swarm.availability.observe",json!({
+        "run_id":run,"snapshot":snapshot(when-1000,revoked),"now_ms":when,
+        "required_capabilities":["audit"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(observe(at,false)["state"],"eligible");
+    let a2=admit(&d,run,1,"j2","account-b",&snapshot(at-1000,false),at);
+    let a4=admit(&d,run,1,"j4","account-a",&snapshot(at-1000,false),at);
+    for attempt in [&a2,&a4] { assert_eq!(attempt["status"],"admitted","{attempt}"); }
+    let j2=d.call("swarm.worker.launch",json!({"run_id":run,"job_id":"j2",
+        "attempt_id":a2["attempt_id"],"token":a2["token"],"repo":checkout,
+        "program":"/usr/bin/env","args":["node",j2_script,database_url_file,release_j2],
+        "prompt":"Audit Atlas tasks","title":"Atlas J2 unaffected"}));
+    let j4=d.call("swarm.worker.launch",json!({"run_id":run,"job_id":"j4",
+        "attempt_id":a4["attempt_id"],"token":a4["token"],"repo":checkout,
+        "program":"/usr/bin/env","args":["node",j4_script,database_url_file,probe_j4],
+        "prompt":"Audit Atlas attachments","title":"Atlas J4 revoked"}));
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(10);
+    loop {
+        let j2_results:i64=db.query_row("SELECT COUNT(*) FROM swarm_messages
+            WHERE run_id=?1 AND job_id='j2' AND kind='result'",[run],|r|r.get(0)).unwrap();
+        if j2_results==1 && probe_j4.exists() { break; }
+        assert!(std::time::Instant::now()<until,"both Atlas probes did not become active");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let probe:Value=serde_json::from_slice(&std::fs::read(&probe_j4).unwrap()).unwrap();
+    assert_eq!(probe["attachmentStatus"],200);
+    let revocation_at=now().max(at+2000);
+    let revoked_snapshot=snapshot(revocation_at-1000,true);
+    let revoked=d.call("swarm.availability.observe",json!({"run_id":run,
+        "snapshot":revoked_snapshot,"now_ms":revocation_at,
+        "required_capabilities":["audit"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(revoked["state"],"eligible","{revoked}");
+    assert_eq!(revoked["revoked_jobs"],json!(["j4"]));
+    assert_eq!(revoked["workers"]["interrupt_requested"],json!([j4["overseer_run_id"]]));
+    assert_eq!(admit(&d,run,1,"j6","account-a",&revoked_snapshot,revocation_at)["reason"],
+        "auth_unavailable");
+    let j2_id=j2["overseer_run_id"].as_str().unwrap();
+    let j4_id=j4["overseer_run_id"].as_str().unwrap();
+    let j2_dir:String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[j2_id],|r|r.get(0)).unwrap();
+    let j4_dir:String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[j4_id],|r|r.get(0)).unwrap();
+    assert!(std::path::Path::new(&j4_dir).join("interrupt.requested").exists());
+    assert!(!std::path::Path::new(&j2_dir).join("interrupt.requested").exists());
+    std::fs::write(&release_j2,"continue").unwrap();
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(12);
+    loop {
+        let finished:i64=db.query_row("SELECT COUNT(*) FROM swarm_attempts
+            WHERE id=?1 AND status='finished'",[a4["attempt_id"].as_str().unwrap()],|r|r.get(0)).unwrap();
+        if finished==1 { break; }
+        assert!(std::time::Instant::now()<until,"revoked J4 did not exit");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let usage:String=db.query_row("SELECT status FROM swarm_reservations
+        WHERE attempt_id=?1 LIMIT 1",[a4["attempt_id"].as_str().unwrap()],|r|r.get(0)).unwrap();
+    assert_eq!(usage,"uncertain");
+    let j2_artifacts:i64=db.query_row("SELECT COUNT(*) FROM swarm_artifacts
+        WHERE run_id=?1 AND job_id='j2'",[run],|r|r.get(0)).unwrap();
+    assert_eq!(j2_artifacts,1);
+}

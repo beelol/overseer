@@ -22,6 +22,70 @@ fn snapshot(at: i64, healthy: bool, remaining: i64) -> Value {
 }
 
 #[test]
+fn revoked_selected_identity_cancels_only_its_active_attempt_and_keeps_usage_uncertain() {
+    let mut d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Revoked identity",
+        "objective":"Audit selected accounts","allowed_targets":["route-a","route-b"]}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"a","title":"Inspect A","acceptance":"A evidence","deps":[]},
+        {"id":"b","title":"Inspect B","acceptance":"B evidence","deps":[]}
+    ]}));
+    commit_beneficial_batch(&d,run,&["a".into(),"b".into()]);
+    let at=now();
+    let snap=|time:i64,revoked:bool|json!({"version":1,"observed_ms":time,
+        "expires_ms":time+60000,"targets":[
+            {"id":"route-a","account_id":"account-a","pool_ids":["pool-a"],
+                "capabilities":["code"],"health":"up",
+                "auth":if revoked {"revoked"} else {"ok"}},
+            {"id":"route-b","account_id":"account-b","pool_ids":["pool-b"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool-a","windows":[{"id":"week","unit":"points",
+            "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":time+60000}]},
+            {"id":"pool-b","windows":[{"id":"week","unit":"points",
+            "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":time+60000}]}]});
+    let observe=|time:i64,revoked:bool|d.call("swarm.availability.observe",json!({
+        "run_id":run,"snapshot":snap(time,revoked),"now_ms":time,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(observe(at,false)["state"],"eligible");
+    let admit=|job:&str,target:&str,time:i64,revoked:bool|d.call("swarm.admit",json!({
+        "run_id":run,"generation":1,"revision":1,"job_id":job,"target_id":target,
+        "request_id":format!("admit-{job}"),"snapshot":snap(time,revoked),
+        "now_ms":time,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"}));
+    let a=admit("a","route-a",at,false);
+    assert_eq!(a["status"],"admitted","{a}");
+    let changed=observe(at+1000,true);
+    assert_eq!(changed["state"],"eligible","{changed}");
+    assert_eq!(changed["revoked_jobs"],json!(["a"]));
+    let replay=observe(at+1000,true);
+    assert_eq!(replay["changed"],false);
+    assert_eq!(replay["revoked_jobs"],json!([]));
+    let jobs=d.call("swarm.jobs",json!({"id":run}));
+    let a_job=jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="a").unwrap();
+    assert_eq!(a_job["status"],"cancel_requested");
+    assert_eq!(a_job["stop_reason"],"account_identity_revoked");
+    assert_eq!(admit("b","route-a",at+1000,true)["reason"],"auth_unavailable");
+    let b=admit("b","route-b",at+1000,true);
+    assert_eq!(b["status"],"admitted","{b}");
+    d.kill9();
+    d.spawn();
+    let after_restart=d.call("swarm.jobs",json!({"id":run}));
+    let a_after=after_restart["jobs"].as_array().unwrap().iter()
+        .find(|job|job["id"]=="a").unwrap();
+    assert_eq!(a_after["stop_reason"],"account_identity_revoked");
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"a","attempt_id":a["attempt_id"]}));
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let reservation:String=db.query_row("SELECT status FROM swarm_reservations
+        WHERE attempt_id=?1 LIMIT 1",[a["attempt_id"].as_str().unwrap()],|r|r.get(0)).unwrap();
+    assert_eq!(reservation,"uncertain");
+}
+
+#[test]
 fn missing_target_blocks_durably_and_only_eligibility_change_wakes() {
     let mut d = Daemon::start(&[]);
     let run = d.call(

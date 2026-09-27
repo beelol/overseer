@@ -75,7 +75,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
                 }
                 crate::swarm::retry_revoked_interrupts(&daemon)?;
                 crate::swarm::retry_stopping_interrupts(&daemon)?;
-                crate::swarm::retry_contaminated_interrupts(&daemon)?;
+                crate::swarm::retry_targeted_interrupts(&daemon)?;
                 crate::swarm::reconcile_terminal_workers(&daemon)?;
                 crate::swarm::sample_due_workers(&daemon, crate::daemon::now())?;
                 Ok::<(), anyhow::Error>(())
@@ -409,7 +409,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             fixture_only()?;
             let claim = crate::swarm::claim(&mut d.store.lock().unwrap(), p)?;
             if claim["status"] == "contaminated" {
-                if let Err(error) = crate::swarm::retry_contaminated_interrupts(d) {
+                if let Err(error) = crate::swarm::retry_targeted_interrupts(d) {
                     crate::log(&format!("swarm contamination interrupt failed: {error}"));
                 }
             }
@@ -472,7 +472,11 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "swarm.availability.observe" => {
             fixture_only()?;
-            crate::swarm::observe_availability(&mut d.store.lock().unwrap(), p)?
+            let mut observation=crate::swarm::observe_availability(&mut d.store.lock().unwrap(), p)?;
+            if observation["revoked_jobs"].as_array().is_some_and(|jobs| !jobs.is_empty()) {
+                observation["workers"]=crate::swarm::retry_targeted_interrupts(d)?;
+            }
+            observation
         }
         "swarm.policy.set" => crate::swarm::set_policy(&mut d.store.lock().unwrap(), p)?,
         "swarm.limit.set" => {

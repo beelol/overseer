@@ -112,6 +112,12 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
         }
     }
     eligible.sort();
+    let revoked_targets: Vec<String> = allowed.iter().filter_map(|id| {
+        let id=id.as_str()?;
+        p["snapshot"]["targets"].as_array()?.iter()
+            .any(|target| target["id"]==id && target["auth"]=="revoked")
+            .then(|| id.to_string())
+    }).collect();
     let reason = if !eligible.is_empty() {
         None
     } else if allowed.is_empty() {
@@ -170,6 +176,37 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
          wake_count=excluded.wake_count,updated_ms=excluded.updated_ms",
         params![run,state,reason,json!(eligible).to_string(),purpose,request_sha256,snapshot_sha256,observed,expires,wakes,now],
     )?;
+    let mut revoked_jobs=Vec::new();
+    for target in &revoked_targets {
+        let mut stmt=tx.prepare(
+            "SELECT DISTINCT j.id FROM swarm_jobs j
+             JOIN swarm_attempts a ON a.run_id=j.run_id AND a.job_id=j.id AND a.status='registered'
+             JOIN swarm_admissions s ON s.attempt_id=a.id AND s.target_id=?2
+             WHERE j.run_id=?1 AND j.status IN ('reserved','launching','running','submitted','accepted')
+             ORDER BY j.id")?;
+        let jobs=stmt.query_map(params![run,target],|r|r.get::<_,String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(stmt);
+        for job in jobs {
+            tx.execute("UPDATE swarm_jobs SET status='cancel_requested',
+                stop_reason='account_identity_revoked',updated_ms=?3
+                WHERE run_id=?1 AND id=?2",
+                params![run,job,now])?;
+            revoked_jobs.push(job);
+        }
+    }
+    revoked_jobs.sort();
+    revoked_jobs.dedup();
+    if !revoked_jobs.is_empty() {
+        tx.execute(
+            "INSERT INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+             VALUES(?1,?2,NULL,NULL,'control','director','availability',?3,?4,'queued',?5,?5)",
+            params![run,format!("identity-revoked-{observed}"),
+                current["revision"].as_i64().unwrap_or(0),
+                json!({"reason":"account_identity_revoked","targets":revoked_targets,
+                    "affected_jobs":revoked_jobs}).to_string(),now],
+        )?;
+    }
     if woken {
         let message_id = format!("availability-wake-{wakes}");
         tx.execute(
@@ -182,6 +219,7 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
     tx.commit()?;
     Ok(
         json!({"state":state,"reason":reason,"eligible_targets":eligible,
-        "changed":changed,"woken":woken,"wake_count":wakes}),
+        "changed":changed,"woken":woken,"wake_count":wakes,
+        "revoked_jobs":revoked_jobs}),
     )
 }

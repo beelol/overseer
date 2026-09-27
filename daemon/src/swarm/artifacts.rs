@@ -360,7 +360,8 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
         if unsafe_effects == 0 {
             tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![run,job,now])?;
         }
-    } else if job_status == "cancel_requested" && job_stop_reason.as_deref() == Some("resource_contamination") {
+    } else if job_status == "cancel_requested"
+        && matches!(job_stop_reason.as_deref(), Some("resource_contamination" | "account_identity_revoked")) {
         let unsafe_effects: i64 = tx.query_row(
             "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')",
             params![run,job], |r| r.get(0),
