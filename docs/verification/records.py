@@ -816,7 +816,35 @@ Known limitations and remaining platform/account combinations: {limits}
 Blocker, attempted alternatives and next action (if blocked): {blocker}
 """
 
+def rank(status):
+    return 2 if status.startswith("verified") or status == "__PERF__" else 1 if status.startswith("partial") else 0
+
+def guard_against_a_stale_copy():
+    """Refuse to write when this copy would lower a record that origin/main has as verified or
+    partial: that is almost always an older records.py edited and regenerated, which silently
+    drops what other agents recorded since. All worktrees on a machine share origin/main, so a
+    fetch by anyone updates it. Pull (or merge origin/main) and edit again; to lower a record on
+    purpose, set LEDGER_ALLOW_DOWNGRADE=AC-NN[,AC-NN...]."""
+    import os, re, subprocess
+    try:
+        theirs = subprocess.run(["git", "show", "origin/main:docs/verification/records.py"], cwd=pathlib.Path(__file__).parent,
+                                capture_output=True, text=True, check=True).stdout
+    except Exception:
+        return
+    allowed = {int(x) for x in re.findall(r"\d+", os.environ.get("LEDGER_ALLOW_DOWNGRADE", ""))}
+    lower = []
+    for m in re.finditer(r'^rec\((\d+), "(?:[^"\\]|\\.)*", "([^"]*)"', theirs, re.M):
+        n, status = int(m.group(1)), m.group(2)
+        mine = R.get(n, {}).get("status", "not started")
+        if rank(status) > rank(mine) and n not in allowed:
+            name = lambda st: ("verified", "partial")[2 - rank(st)] if rank(st) else st.split(" (")[0].split(":")[0]
+            lower.append(f"AC-{n:02d}: {name(status)} on origin/main, {name(mine)} here")
+    if lower:
+        sys.exit("records.py is older than origin/main (AC-153): it would lower\n  " + "\n  ".join(lower)
+                 + "\nPull or merge origin/main, make your change again, and regenerate. To lower a record on purpose: LEDGER_ALLOW_DOWNGRADE=AC-NN.")
+
 def main():
+    guard_against_a_stale_copy()
     out = pathlib.Path(__file__).parent
     perf = pathlib.Path(out, "perf-summary.txt")
     perf_text = perf.read_text().strip() if perf.exists() else "pending"
@@ -996,55 +1024,242 @@ rec(82, "Gate K design review (owner-confirmed)", "verified", commit="8d239cb (m
     blocker="not blocked")
 
 # Gate L, Continuity (added by the owner on 2026-09-26; docs/rfcs/offline-mode.md). Not started; built in its own worktree and pull request.
-rec(83, "Offline is not an outage", "not started", date="—", commit="—",
+HARNESS_L = "Real `overseerd` binary, its real bridge and supervisors. In the protocol tests everything outside the daemon is synthetic: the network and the machine's memory are JSON files, Ollama is a loopback server, and Codex, Claude Code and OpenCode are fixtures that act out a script and fail on command (fixtures/fake-harness/continuity-harness.js, opencode-serve-fixture.js)"
+FIXTURE_L = "An isolated OVERSEER_HOME and a disposable repository per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY`, `OVERSEER_OLLAMA_URL` and `OVERSEER_TEST_SYSTEM_HOME` point the daemon at the fixtures; the backoff is shortened (first look after 100 ms, cap 400 ms)"
+rec(83, "Offline is not an outage", "partial", commit="15108e4", date="2026-09-27",
+    proven="the daemon keeps one connection state decided from the system's own answer, the probes and the agents' errors, with every change an event; a provider outage gives degraded naming the provider, a failing baseline or the system's no-network gives offline, and a 429 or a usage limit leaves it online; on this machine the system's answer, both baseline probes and both providers are read live; the status bar and the side bar show each state in the packaged extension",
+    deferred="the owner turning Wi-Fi off and on while the daemon logs the change (offline within 10 s of the system signal, online after the checks agree): this session needs the network itself",
+    harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens). The packaged extension in an isolated VS Code profile for the status bar and the side bar",
+    fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures",
+    steps="""1. `cargo test -p overseerd --test continuity`: `ac83_offline_is_told_from_an_outage`, `ac83_rate_limits_and_usage_limits_are_never_offline`, `ac83_with_probes_off_the_system_and_the_agents_decide`.
+2. Unit tests: `continuity::tests::the_decision_table`, `the_agents_are_evidence_too`; `net::tests::*` (transport errors, the baseline's failure, Linux answers, macOS reachability flags); `adapters::tests::network_errors_are_their_own_class`; `test/unit/continuity.js` (the words of each state).
+3. Live: `node test/local/continuity-live.js` ([live.txt](evidence/ac-85/live.txt)).
+4. Packaged UI: `node test/ui/scenario-continuity.js` ([scenario.log](evidence/ui/continuity/scenario.log), [03-offline-composer-dark.png](evidence/ui/continuity/03-offline-composer-dark.png), [11-offline-composer-light.png](evidence/ui/continuity/11-offline-composer-light.png)).""",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#connection-state).",
+    actual="""- **States (fixtures):** online → one provider's hosts fail → `degraded: OpenAI unreachable` (Claude still reachable) → both fail → `degraded: Claude and OpenAI unreachable` (acts as offline) → names do not resolve → `offline: no working connection (DNS is not answering)` → a portal's certificate → `offline: no working connection (captive portal)` → online → the system says no network → `offline: no network (system)` in under one second with no probe → online. Eight `connection` events, each with the reason, the system's answer and per-provider health.
+- **Account states:** a 429 (`rate_limit`) and a usage limit (`quota`) leave the state online and add no event. A connection error from an agent is class `network` and starts a probe round at once; two 503 answers within two minutes make that provider `unreachable (outage, agents)`, which is degraded, not offline.
+- **Probes off:** the system's answer and the agents still decide; every provider in use failing on connection errors gives `offline: all agents lost their connection`.
+- **Live on this machine:** `online (connected)`; SystemConfiguration reachability IPv4 and IPv6 reachable (flags 0x00000002); baseline by name answered 204 and by IP 301; OpenAI answered 403 and Anthropic 404 (any HTTP answer means reachable).
+- **Status bar and side bar (packaged UI):** online, the status bar carries a cloud alone (its accessible name says Online) and the side bar says nothing; offline, the status bar reads *Offline* on the warning background (*Offline · 1 waiting* with a waiting agent) and the Agents view says *Overseer is offline: no network (system).*; degraded reads the provider's name. Both go back to quiet when the connection returns. No view said online while offline.""",
+    evidence="daemon/tests/continuity.rs, daemon/src/net.rs, daemon/src/continuity.rs, extension/src/continuity.js, [live.txt](evidence/ac-85/live.txt), [evidence/ui/continuity/](evidence/ui/continuity/)",
+    live="Fixtures for every state; the live reading covers the online state only.",
+    limits="macOS verified; the Linux answers (NetworkManager, default route) are parsed from fixtures and belong to AC-41. Polling every 5 seconds; change notifications were not needed so far.",
+    blocker="Owner: run `node test/local/wifi-live.js` (a real daemon in its own home, real network) and turn Wi-Fi off when it asks, then on again when it says Overseer is offline. It measures the gap from Wi-Fi power going off to the offline event (must be 10 s or less), reads the reason and the return online, and writes `evidence/ac-83/wifi.txt` and `wifi-events.jsonl`. Its rehearsal against the network fixture (`node test/local/wifi-live.js rehearse`) passed 4 of 4 on 2026-09-27; the script only reads Wi-Fi power, it never changes the network.")
+rec(84, "Fail over to the best working provider", "verified", commit="f33d76a", date="2026-09-27",
+    harness=HARNESS_L + ". Live: the real Codex 0.155.0-alpha.16.4 with every connection of its process sent to a closed local port, the real Claude Code 2.1.246 on its existing login (haiku), and a fixture probe answer that says OpenAI is unreachable", fixture=FIXTURE_L,
+    steps="""1. Live: `node test/local/handoff-live.js failover`: [live.txt](evidence/ac-84/live.txt), [the two runs' events](evidence/ac-84/live-events.jsonl).
+2. `cargo test -p overseerd --test handoff`: `ac84_fail_over_to_the_best_working_provider`, `ac84_an_agent_that_only_keeps_reconnecting_is_moved`.
+3. Unit tests: `handoff::tests::the_owners_order_of_providers_is_kept`, `modes_are_carried_and_never_loosened`, `the_handoff_prompt_is_built_from_the_record_and_bounded`.""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(84, "Fail over to the best working provider", "not started", date="—", commit="—",
+    actual="""- **Live, 10 of 10 checks (third attempt; see below).** A first tiny Claude Code turn completed on haiku. With OpenAI's probe failing (state degraded, "OpenAI unreachable") Codex was started on a tiny prompt with every connection of its process refused: it never reached its provider (no usage), the turn was interrupted 30.1 s after its first connection error ("no progress while OpenAI could not be reached; the turn was interrupted by Overseer"), and Claude Code started 6.5 s later on haiku, in the same task and worktree, in Accept edits (Codex's sandbox, not loosened); it wrote `failover.txt` with the text asked for without asking anything; the predecessor read `handed off to <run> (provider_unreachable:openai)` and never failed; the chat said "OpenAI is unreachable; continuing with **Claude Code** (account "claude (existing login)") because it is the best working option."; the task's review listed `failover.txt`; nothing local was loaded.
+- **Found by the live check:** the real Codex never fails such a turn. It printed `Reconnecting... 2/5` to `5/5 (Connection refused)` and then `Reconnecting... waiting for network` every few seconds for the whole 300 s the second attempt waited, with its status `running`; the state was degraded, not offline, so the silence rule did not apply either. The first attempt stopped earlier: the probe interval was not shortened, so degraded was not reached within the wait. Built from it: a turn whose provider is unreachable and that has produced only network-class errors since its last progress for 30 s is interrupted by Overseer (`stall` event with the reason; `OVERSEER_TEST_RECONNECT_MS`), then treated like a failed turn. `ac84_an_agent_that_only_keeps_reconnecting_is_moved` covers it with the fixture's `reconnect` behaviour, including that a reconnecting agent whose provider still answers the probe is left alone.
+- **Failover (fixtures):** Codex failing on the network with OpenAI's probe failing and Claude's answering: the successor ran on Claude Code (account "claude (existing login)") in the same task and worktree and wrote the file; the predecessor read `handed off to <run> (provider_unreachable:openai)`; the chat said "OpenAI is unreachable; continuing with **Claude Code** (account "claude (existing login)") because it is the best working option."; the task's review listed `failover.txt`. Nothing local was loaded and OpenCode never ran.
+- **Modes:** Codex's sandbox became Accept edits on Claude Code (stricter). Claude Code in Ask first was not moved to Codex, which does not ask: the run waited, the offer said "Codex edits files and runs commands in its sandbox without asking first", `run.handoff` was refused until the mode `workspace-write` was accepted by name. Plan only moved on its own, as read only.
+- **Accounts:** three Codex accounts at 90%, 20% and 70% used: the one at 20% was taken; put at its limit, the one at 70%; with all at 50%, the one used last.
+- **Order:** with both providers working `run.targets` lists OpenAI then Claude, and the reverse after `providerOrder` is set to `["anthropic", "openai"]`; the user may still take the second.
+- **Every provider failing:** no failover; the work went to the local model with "Transitioning to **qwen3-coder:30b** (local, Ollama) because no provider can be reached."
+- **Continuity off:** the run waited and was offered Claude Code; nothing moved.""",
+    evidence="[live.txt](evidence/ac-84/live.txt), [live-events.jsonl](evidence/ac-84/live-events.jsonl), [the first, blocked attempt](evidence/ac-84/blocked-2026-09-26.txt), daemon/tests/handoff.rs, daemon/src/handoff.rs, test/local/handoff-live.js",
+    live="Live with the real Codex and the real Claude Code; the probe's answer is a fixture, because this session needs the network itself. Paid turns: two tiny Claude Code turns on haiku in the passing run (the two earlier attempts spent none: the first stopped before its first turn, the second's Codex never reached its provider and no successor started). Codex spent nothing.",
+    limits="Codex's hosts were blocked for its process through a proxy that refuses every connection, not by the network; the owner's Wi-Fi checks are AC-83 and AC-97.")
+rec(85, "Local inventory read from the machine", "verified", commit="e16bdaf", date="2026-09-26",
+    harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures; synthetic Codex transcripts replayed through fixtures/fake-harness/replay.js",
+    steps="""1. Live: `node test/local/continuity-live.js` on this machine: `local.inventory` from a real daemon, compared with `sysctl -n hw.memsize`, `vm_stat` (read before and after), `sysctl -n kern.memorystatus_level`, `memory_pressure`, and Ollama's own `/api/tags`, `/api/show` (per model) and `/api/ps`.
+2. `cargo test -p overseerd --test continuity`: `ac85_inventory_reports_the_machine_and_ollama_without_guessing` (a fixture Ollama server with four models and one loaded; Ollama installed but stopped; Ollama absent; memory that cannot be read; an address that is not loopback).
+3. Unit tests: `sys::tests::linux_meminfo_is_read_in_bytes`, `linux_pressure_levels`, `macos_numbers_match_the_systems_own_tools`; `local::tests::tags_and_parameters_are_read`, `kv_cache_per_token_for_both_shapes`, `ollama_is_only_addressed_on_loopback`.""",
+    expected="The report matches the system's own tools within 5% and Ollama's own answers; Linux /proc fixtures go through the same module; a stopped or absent Ollama is said so without guessing.",
+    actual="""- **Memory, live:** total 137,438,953,472 bytes, exactly `hw.memsize`; available 59.0 GiB against `vm_stat`'s 59.0 GiB (0.0% apart); free percentage 83% against 83% from `kern.memorystatus_level` and 83% from `memory_pressure`; pressure normal.
+- **Models, live:** all 8 installed models and no other; size, family, quantization, longest and configured context, capabilities, base tag and KV geometry match `/api/tags` and `/api/show` for 8 of 8; loaded models match `/api/ps`; Ollama 0.34.2 installed and running; free disk reported.
+- **Not guessing (fixtures):** Ollama installed but stopped reads "Ollama is installed but not running", no version and no models; absent reads "Ollama is not installed"; memory that cannot be read gives no pick; an address outside this machine is refused. The owner's own Ollama was never stopped: the stopped case is a loopback port with nothing listening.
+- **Linux:** `/proc/meminfo` and `/proc/pressure/memory` fixtures parse to the same structure (bytes; normal, warn, critical).""",
+    evidence="[live.txt](evidence/ac-85/live.txt), [live.json](evidence/ac-85/live.json), daemon/tests/continuity.rs, daemon/src/sys.rs, daemon/src/local.rs",
+    live="Live on this machine for memory and models; fixtures for a stopped or absent Ollama and for Linux.",
+    limits="macOS verified. Linux reads are unit-tested from fixtures; running them on Linux belongs to AC-41. Discrete GPU memory is not read.")
+rec(86, "Memory budget and fit", "verified", commit="e16bdaf", date="2026-09-26",
+    harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures; synthetic Codex transcripts replayed through fixtures/fake-harness/replay.js",
+    steps="""1. Unit tests: `local::tests::the_worked_examples_for_16_32_64_and_128_gib`, `the_budget_has_two_terms_and_a_hard_ceiling`, `contexts_halve_from_the_target_to_the_floor`, `with_100_gib_in_use_the_pick_drops_to_the_14b_at_16k`, `the_estimate_is_within_15_percent_of_the_measured_size`, `a_measured_size_replaces_the_estimate_and_an_installed_tag_is_reused`, `a_raised_target_gives_the_longer_context_when_it_fits`, `the_owners_order_comes_first`.
+2. `cargo test -p overseerd --test continuity`: `ac86_the_pick_follows_the_machines_memory` (the same daemon described as 128, 64, 32 and 16 GiB, with 100 GiB in use, under a pressure warning and at critical pressure; a ceiling of 60% refused).
+3. Live: `node test/local/continuity-live.js`: the budget and the pick on this machine, then one guarded load of the pick and Ollama's measurement.""",
+    expected="The RFC's worked examples are reproduced; on this machine the pick is qwen3-coder:30b at 64k or more with an estimate within 15% of the measured size; 100 GiB in use drops the pick to a 14B-class model at 16k; a ceiling of 60% is refused; no pick is above the budget.",
+    actual="""- **Worked examples:** 16 GiB (budget 6.4 GiB): `qwen2.5-coder:3b` at 32k, then `1.5b` at 32k, then `7b` at 16k. 32 GiB (12.8): `7b` at 32k, `3b` at 32k, then `14b` at 16k. 64 GiB (25.6): `qwen3-coder:30b` at 64k; `qwen2.5-coder:32b` at 32k does not fit. 128 GiB (51.2): `qwen3-coder:30b` at 64k, then `qwen2.5-coder:32b` at 32k. While building this the RFC's table was corrected to follow its own ranking rule (fits at 32k before fits at 16k; the 64k target).
+- **This machine, live:** budget 46.2 GiB = min(40% of 128 GiB = 51.2 GiB, 59 GiB available − 12.8 GiB headroom); pick `qwen3-coder:30b` at a 64k context, run as the installed `qwen3-coder:30b-64k`. Estimate 24.3 GiB, measured 23.7 GiB, 2.6% apart; the next pick used the measurement.
+- **100 GiB in use:** with the 30B and the 14B installed, the budget is 15.2 GiB, the 30B is rejected ("too big: 19.8 GiB at a 16k context is over the budget of 15.2 GiB") and the pick is `qwen2.5-coder:14b` at 16k (12.4 GiB).
+- **Limits:** 60% refused ("ramCeilingPercent must be between 10 and 50 percent"); 50% accepted; a pressure warning lowers the ceiling to 30%; critical pressure picks nothing; on profiles from 8 to 128 GiB no pick or alternative is above its budget.""",
+    evidence="daemon/src/local.rs (tests), daemon/tests/continuity.rs, [live.txt](evidence/ac-85/live.txt)",
+    live="Live on this machine for the budget, the pick, the load and the measurement; unit and protocol tests for other machines.",
+    limits="macOS verified. The budget counts system memory only. OpenCode's own instructions take about 10,600 tokens, so the 16k floor leaves little room; the ranking prefers models that fit at 32k.")
+rec(87, "Verified local catalogue, Qwen coders first", "verified", commit="62b00a8", date="2026-09-27",
+    harness="OpenCode 1.15.13 through the `opencode-serve` harness, and Codex 0.155.0-alpha.16.4 with `--oss --local-provider ollama` and an empty `CODEX_HOME` of its own; Ollama 0.34.2; macOS 26 on arm64, 128 GiB. No account and no paid tokens",
+    fixture="An isolated OVERSEER_HOME and a new disposable repository for every attempt. Every model was loaded by the daemon, through the guard and under the watchdog",
+    steps="""1. `node test/local/catalogue-verify.js`: [opencode-serve.txt](evidence/ac-87/opencode-serve.txt), [opencode-serve.json](evidence/ac-87/opencode-serve.json).
+2. `node test/local/codex-oss-eval.js`: [codex-oss.txt](evidence/ac-87/codex-oss.txt) (14b, 30b, 32b) and [codex-oss-small.txt](evidence/ac-87/codex-oss-small.txt) (1.5b, 3b, 7b); the run that stopped itself is [codex-oss-stopped.txt](evidence/ac-87/codex-oss-stopped.txt).
+3. The catalogue: [daemon/src/local_catalogue.json](../../daemon/src/local_catalogue.json). Unit tests: `local::tests::only_verified_models_with_tools_are_picked_on_their_own`; protocol tests `ac86_the_pick_follows_the_machines_memory`, `ac94_every_local_model_has_a_fit_that_the_guard_would_give`.
+4. Packaged UI: `node test/ui/scenario-continuity.js` ([02-agent-menu-local-dark.png](evidence/ui/continuity/02-agent-menu-local-dark.png): a failed model reads *fits at 32k · failed its check*, an unknown one *unverified*).""",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#model-catalogue).",
+    actual="""| Model | OpenCode (`opencode serve`) | Codex (`--oss`) |
+| --- | --- | --- |
+| `qwen3-coder:30b` | **passed**, 3 of 3, at 64k (23.7 GiB loaded), 22 to 28 s a turn | **passed**, 3 of 3, at 64k, 3 to 15 s a turn |
+| `qwen2.5-coder:32b` | failed, 0 of 3, at 32k (26.5 GiB) | failed, 0 of 3, at 16k (22.5 GiB) |
+| `qwen2.5-coder:14b` | failed, 0 of 3, at 32k (14.2 GiB) | failed, 0 of 3, at 32k |
+| `qwen2.5-coder:7b` | failed, 0 of 3, at 32k (6.1 GiB) | failed, 0 of 3 |
+| `qwen2.5-coder:3b` | failed, 0 of 3, at 32k (3.1 GiB) | failed, 0 of 3 |
+| `qwen2.5-coder:1.5b` | failed, 0 of 3, at 32k (2.0 GiB) | failed, 0 of 3 |
+
+- **How the family fails:** the model writes the call into its reply (`{"name": "write", "arguments": …}`, or `exec_command` with Codex) instead of calling the tool, so nothing runs; the smaller sizes often reply "done" with nothing written. Overseer's one nudge did not change it. The same happened on 2026-09-25 with the 14B.
+- **What follows:** on its own Overseer picks `qwen3-coder:30b` or nothing. A machine whose budget is under about 20 GiB has no eligible model today; a run there waits and says why. A family that calls tools at 8 to 16 GiB is the next thing to look for.
+- **Codex as a second local harness:** it works with the model that passed, and is faster per turn. It has no permission requests in this transport, so it could only take runs in Auto or in Codex's own sandbox modes. OpenCode stays the local harness.
+- **Memory:** see [AC-140](AC-140.md). In the verification through OpenCode the pressure stayed normal throughout (lowest free level 44%).
+- **In the interface:** automatic picks take only models the catalogue marks passed (`qwen3-coder:30b`); the Agent menu, the model menu and the New Task tiles show a failed model with *failed its check* and a model outside the catalogue with *unverified*, and the reason in the tooltip; the user may still name one.""",
+    evidence="[evidence/ac-87/](evidence/ac-87/), daemon/src/local_catalogue.json, test/local/catalogue-verify.js, test/local/codex-oss-eval.js",
+    live="Real harnesses and real local models.",
+    limits="One machine, one quantisation (Q4_K_M), Ollama 0.34.2. The check is one small task, three times.",)
+rec(88, "Settings the daemon enforces", "verified", commit="15108e4", date="2026-09-27",
+    harness="Real `overseerd` binary for the protocol tests (the network, the memory and Ollama are fixtures). The packaged extension in an isolated VS Code profile, driven over the debugging protocol; a real `overseerd`; everything else synthetic: the network and the memory are files, Ollama is fixtures/fake-harness/ollama-fixture.js with four models (no model runs), Codex and Claude Code are fixtures/fake-harness/continuity-harness.js, OpenCode is fixtures/fake-harness/opencode-serve-fixture.js. No account and no paid tokens",
+    fixture="An isolated OVERSEER_HOME per test. An isolated OVERSEER_HOME, VS Code profile and extensions folder per scenario; evidence in docs/verification/evidence/ui/continuity-settings/ (screenshots, scenario.log, result.json)",
+    steps="""1. `cargo test -p overseerd --test continuity`: `ac88_settings_are_kept_and_enforced_by_the_daemon`.
+2. Unit tests: `continuity::tests::settings_defaults_are_the_owners_decisions`, `out_of_range_settings_are_refused_with_the_reason`; `test/unit/continuity.js` (the manifest offers every setting with the daemon's ranges).
+3. Packaged UI: `node test/ui/scenario-continuity-settings.js` ([scenario.log](evidence/ui/continuity-settings/scenario.log), [02-refused.png](evidence/ui/continuity-settings/02-refused.png)).""",
+    expected="Change each setting in VS Code and read it back from `ctl`; quit VS Code and show the daemon still applies the Continuity and download settings in a fixture offline scenario; an out-of-range value is refused with the reason.",
+    actual="""- **VS Code to the daemon:** all 19 `overseer.continuity.*` settings were written to the profile's settings.json with values away from their defaults; `overseerd ctl settings.get` read every one of them back (7 of 7 checks).
+- **Refused with the reason:** a ceiling of 80 gave the toast *Overseer: ramCeilingPercent must be between 10 and 50 percent (one model never takes more than half of the memory); 80 was refused*; the daemon kept 35 and VS Code's settings.json showed 35 again.
+- **VS Code closed:** the daemon kept running; with Continuity off (set in VS Code) and the network fixture offline, a Codex agent that failed on the network waited (`waiting_for_connection`, no handoff) instead of transitioning; the download setting was the daemon's too (allowed, first pull not yet confirmed).
+- **ctl:** `overseerd ctl continuity.status` printed `online`, the budget and the pick (`qwen3-coder:30b`).
+- **Defaults, kept, enforced (protocol tests):** the owner's decisions as defaults; each setting changed, read back and still there after a restart; refusals for a ceiling of 51%, 37 retry hours, a target under the floor, an unknown word, a wrong type, an unknown setting.""",
+    evidence="[evidence/ui/continuity-settings/](evidence/ui/continuity-settings/), daemon/tests/continuity.rs, extension/src/continuity.js, extension/package.json",
+    live="Packaged extension in a real VS Code; fixture harnesses and network.")
+rec(89, "Download models only when allowed", "verified", commit="15108e4", date="2026-09-27",
+    harness="Real `overseerd`; the protocol tests use a synthetic Ollama with a registry; the live check uses Ollama 0.34.2 and the real registry (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME; `OVERSEER_TEST_DISK_FREE` describes a disk that is nearly full",
+    steps="""1. `cargo test -p overseerd --test downloads`: `ac89_models_are_downloaded_only_when_allowed`, `ac89_a_full_disk_refuses_the_download`, `ac89_prefetch_fetches_the_pick_and_nothing_else`.
+2. Live: `node test/local/downloads-live.js`: [live.txt](evidence/ac-89/live.txt), [the events](evidence/ac-89/live-events.jsonl).
+3. Packaged UI: `node test/ui/scenario-continuity.js` (the notice's Allow, the one-time offer, Not now); the protocol test `ac94_every_local_model_has_a_fit_that_the_guard_would_give` covers the offer's record in the daemon.""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(85, "Local inventory read from the machine", "not started", date="—", commit="—",
+    actual="""- **Live, 14 of 14 checks.** With downloads off the pull was refused ("qwen2.5-coder:1.5b is not installed, and model downloads are off"). The first pull asked once with the size (0.92 GiB) and nothing was downloaded before the answer. `qwen2.5-coder:1.5b` (0.92 GiB, 11 s), `:7b` (4.36 GiB, 45 s) and `:32b` (18.49 GiB, 183 s) were pulled with progress; `:3b` was cancelled at 36% and the next pull continued from 0.7 GiB. 184 progress events. Nothing was loaded into memory.
+- **Fixtures:** a disk with too little room is refused with the numbers; offline nothing is pulled; a second pull waits for the first; a model the registry does not have fails with Ollama's own words.
+- **Prefetch (fixtures):** allowing downloads alone fetches nothing ahead of need; turned on, it waits for the first confirmation, then fetches the pick and only the pick, not while a paid turn runs; with downloads off again it stops.
+- **In VS Code (packaged UI):** when downloads are first allowed (the notice's Allow, or the setting), one message offers to keep the best-fitting model ready, naming it and its download size; Not now leaves prefetch off and the daemon records the offer, so it is not made again. A download in progress shows above the composer and in the Local models pick with Cancel; the first pull asks once with its size before anything is fetched.""",
+    evidence="daemon/tests/downloads.rs, daemon/src/downloads.rs, [live.txt](evidence/ac-89/live.txt)",
+    live="Live pulls from the real registry (about 25.6 GiB, granted by the owner); the packaged extension in a real VS Code for the offer.",
+    limits="A run never starts a download itself (the pick uses what is installed), so progress is shown where downloads are asked for: above the composer and in the Local models pick, not inside a run's chat.")
+rec(90, "Install and run Ollama only when allowed", "verified", commit="8639ebb", date="2026-09-26",
+    harness="Live: a real `overseerd` told that Ollama is nowhere (hidden from PATH and `/Applications`), with its own loopback port, HOME and models folder, and the official Ollama archive (0.34.4) from `ollama.com`. Protocol tests: a synthetic Homebrew and a synthetic `ollama` program (fixtures/fake-harness/brew-fixture.sh, ollama-fixture.js)",
+    fixture="An isolated folder per run; nothing is installed outside it. The owner's own Ollama (`/Applications/Ollama.app`, port 11434) ran throughout and was not touched",
+    steps="""1. Live: `node test/local/ollama-install-live.js`: [live.txt](evidence/ac-90/live.txt).
+2. `cargo test -p overseerd --test ollama_install`: `ac90_nothing_is_installed_or_started_unless_allowed`, `ac90_homebrew_installs_it_and_the_server_is_loopback_only_and_stops_when_idle`, `ac90_an_archive_that_does_not_verify_is_deleted`, `ac90_an_ollama_the_user_runs_is_used_as_it_is_and_never_stopped`.
+3. Unit tests: `ollama_install::tests::an_unsigned_application_is_refused`, `a_program_signed_by_someone_else_is_refused`, `the_own_copy_lives_in_overseers_folder`.""",
+    expected="With Ollama hidden from PATH and `/Applications`, the install path completes and `/api/version` answers; a tampered archive fixture fails verification and is deleted; the started server listens on `127.0.0.1` only; the user's own running Ollama keeps its pid across a session.",
+    actual="""- **Live, 17 of 17 checks.** With install off the machine was reported as without Ollama and `ollama.install` was refused; nothing was written. Allowed: 190 MB were downloaded from `https://ollama.com/download/Ollama-darwin.zip`, unpacked, and kept only after the signature verified (`Developer ID Application: Infra Technologies, Inc (3MU9H2V9Y9)`, Gatekeeper: `Notarized Developer ID`); the application is in Overseer's own folder and the download is gone. The steps ran in the order download, verify, install.
+- **The server:** `/api/version` answered (Ollama 0.34.4); `lsof` showed it listening on `127.0.0.1:<port>` and nowhere else; it was Overseer's own copy; asked again, no second server was started; it had its own models folder and its own key.
+- **Idle stop:** with the idle time set to one minute and no local work, the server was stopped ("no local work for 62 s") and its process was gone.
+- **A tampered archive:** the application that had just verified, with one byte added to `Contents/Resources/GO_LICENSE`, was refused ("its code signature does not verify (… a sealed resource is missing or invalid); the download was deleted"); the folder was empty afterwards and nothing was installed or started.
+- **The owner's own Ollama:** its processes kept their ids (2184, 2294), its application and its answer were as before, and its key file was unchanged.
+- **Fixtures:** with Homebrew present it is asked `install --cask ollama` once and never again; an application signed by nobody, and one signed by someone else (Apple's Calculator), are refused; nothing in a refused download is run; offline nothing is fetched; an Ollama that answers already is used as it is and is still there long after the idle time; local work starts the server again by itself.""",
+    evidence="[live.txt](evidence/ac-90/live.txt), daemon/src/ollama_install.rs, daemon/tests/ollama_install.rs, test/local/ollama-install-live.js",
+    live="Live with the real archive and the real `ollama serve`, in an isolated folder. No model was run on that server.",
+    limits="Homebrew is present on this machine, and `brew install --cask ollama` installs for the whole machine, so the live check took the archive path and the Homebrew path is shown with a synthetic Homebrew only. On its first start Ollama spent 19 s looking for the machine's GPUs before it answered (Overseer waits up to 90 s), and in one run that search timed out and Ollama reported CPU inference; whether that repeats outside a temporary folder is not known. macOS only; Linux is AC-41.")
+rec(91, "Transition to local when offline", "verified", commit="15108e4", date="2026-09-27",
+    harness=HARNESS_L + ". Live: a fixture Codex that fails on the network and a fixture system answer of no network, with the real OpenCode 1.15.13 and `qwen3-coder:30b-64k` through Ollama 0.34.2 (no account, no paid tokens)", fixture=FIXTURE_L,
+    steps="""1. Live: `node test/local/handoff-live.js local`: [live.txt](evidence/ac-91/live.txt), [the two runs' events](evidence/ac-91/live-events.jsonl).
+2. `cargo test -p overseerd --test handoff`: `ac91_transition_to_local_when_offline`, `ac91_without_a_local_model_it_says_why_and_waits`, `ac91_a_turn_that_stalls_while_offline_is_interrupted_and_handed_off`.
+3. Packaged UI: `node test/ui/scenario-continuity.js` ([05-transition-successor-dark.png](evidence/ui/continuity/05-transition-successor-dark.png), [06-transition-predecessor-dark.png](evidence/ui/continuity/06-transition-predecessor-dark.png), [14-transition-light.png](evidence/ui/continuity/14-transition-light.png)).""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(86, "Memory budget and fit", "not started", date="—", commit="—",
+    actual="""- **Live, 11 of 11 checks.** The local run started 9.8 s after the turn failed, the model's load included; it ran the pick (`qwen3-coder:30b` at a 64k context, 24.3 GiB of a 46.9 GiB budget), loaded under the watchdog; it wrote `handoff.txt` with the text asked for, in the same worktree, without asking (Codex's sandbox became Accept edits); the predecessor read `handed off to <run> (offline)`; the chats said "Transitioning to **qwen3-coder:30b** (local, Ollama) because you've disconnected. Work continues in the same worktree." and "Continued from "live handoff" after the connection was lost at 22:31."; Codex was started once and had ended before OpenCode was started; the turn cost nothing; memory pressure stayed normal (available 59.5 → 40.3 GiB) and the model was unloaded afterwards.
+- **Found by the live check:** OpenCode prints `serve --help` on the error stream, so the first build took the real OpenCode for one without a server and only offered the move. Fixed, with a unit test on the real help text.
+- **The prompt:** "You are continuing a task another agent started; its model became unreachable.", the task, the worktree and "Do not change branches.", the previous agent's last messages, the files changed, the message not yet answered; bounded to fit a 16k context.
+- **No model:** "no local model is installed that is verified and fits the memory budget of 51.2 GiB (qwen3-coder:30b: not installed, and downloads are off or the registry cannot be reached); downloads need a connection"; the run waited, and moved once the model was installed.
+- **In VS Code (packaged UI, synthetic model):** the predecessor's chat reads *Transitioning to qwen3-coder:30b (local, Ollama) because you've disconnected. Work continues in the same worktree.* and *The work continues in another agent · Open it*, and its status reads *Handed off*, not failed; the successor's chat opens with *Continued from "Rename the helpers" after the connection was lost at 06:46.* and names the local model, its context and its size; in the side bar the task's row is the successor, with *Earlier: Codex · handed off · the connection was lost* folded under it.
+- **Stall:** silence while online is not a stall; offline, after the limit, the turn was interrupted ("interrupted by Overseer", not a user interrupt) and the work handed off.""",
+    evidence="[live.txt](evidence/ac-91/live.txt), [live-events.jsonl](evidence/ac-91/live-events.jsonl), daemon/tests/handoff.rs, daemon/src/handoff.rs, test/local/handoff-live.js",
+    live="Live with the real OpenCode and a real local model; the failing Codex and the system's answer are fixtures, because this session needs the network itself (the owner's own offline session is AC-97).",
+    limits="The chats and the tree were shown with a synthetic OpenCode and Ollama in the packaged UI; the real model ran through the same daemon path in the live check.")
+rec(92, "Wait and retry, never fail (for 36 hours)", "verified", commit="15108e4", date="2026-09-27",
+    harness=HARNESS_L, fixture=FIXTURE_L + "; `continuity.test_age` (refused without a fixture network) ages a wait as a clock would",
+    steps="""1. `cargo test -p overseerd --test handoff ac92_wait_and_retry_never_fail`.
+2. Unit test: `handoff::tests::the_backoff_doubles_to_the_cap`; `test/unit/continuity.js` (the card's words, the Needs-you item).
+3. Packaged UI: `node test/ui/scenario-continuity.js` ([07-waiting-dark.png](evidence/ui/continuity/07-waiting-dark.png), [13-waiting-light.png](evidence/ui/continuity/13-waiting-light.png), [15-waiting-default-dark.png](evidence/ui/continuity/15-waiting-default-dark.png), [08-grid-waiting-dark.png](evidence/ui/continuity/08-grid-waiting-dark.png)).""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(87, "Verified local catalogue, Qwen coders first", "not started", date="—", commit="—",
+    actual="""- **Waiting:** the run read `waiting_for_connection` with "the connection to OpenAI failed: stream disconnected…", no end time, its one turn `waiting` with the prompt kept. Four and more checks in two seconds, each within a fifth of 200, 400, 400… ms, none sending, each naming the 36 hours. Codex was not started again while offline.
+- **Back:** one more start of Codex, `exec resume <the same session>`, with the message that was kept; one turn, one `turn_started`, one check that sent; the file was written.
+- **Failing again:** while online with the agent still failing, the turn was tried again with the next delay each time, and stayed one turn.
+- **Stop:** `interrupted`, "stopped by the user while waiting"; nothing was started afterwards.
+- **36 hours:** five seconds before the limit the run still waited; past it: `failed`, "no connection for 36 hours", attention with `message_kept` and the actions `retry_now` and `use_local`; Retry now completed the turn.
+- **Use a local model now:** offered (`to: local`, Accept edits, no difference), not taken on its own; `run.handoff` moved the work: "Moving to **qwen3-coder:30b** (local, Ollama) as you asked."
+- **Backoff (unit):** 5, 10, 20, 40, 80, 120, 120 s; a fifth more or less with jitter.
+- **In VS Code (packaged UI, both Overseer themes):** the waiting agent shows one quiet card, *Waiting for a connection*, what failed and *Your message is kept*, *Next check in 3 s · waiting 1 s · gives up after 36 hours*, with **Use a local model now**, **Retry now** and **Stop**; its status reads *Waiting for a connection* with a cloud, and its turn does not read Failed; the grid keeps it as a tile with the same card, compact; Needs you shows one row, *1 agent waiting for a connection*, and the status bar reads *Offline · 1 waiting*. Use a local model now made the handoff and opened the agent that took over.""",
+    evidence="daemon/tests/handoff.rs, daemon/src/handoff.rs",
+    live="Fixtures (the schedule and the 36 hours cannot be waited for live).",
+    limits="The 36 hours are aged by a test method (`continuity.test_age`), never waited for.")
+rec(93, "Back online", "verified", commit="15108e4", date="2026-09-27",
+    harness=HARNESS_L, fixture=FIXTURE_L,
+    steps="""1. `cargo test -p overseerd --test handoff ac93_back_online`.
+2. Packaged UI: `node test/ui/scenario-continuity.js` ([09-back-online-dark.png](evidence/ui/continuity/09-back-online-dark.png), [10-switched-back-dark.png](evidence/ui/continuity/10-switched-back-dark.png)).""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(88, "Settings the daemon enforces", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(89, "Download models only when allowed", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(90, "Install and run Ollama only when allowed", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(91, "Transition to local when offline", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(92, "Wait and retry, never fail (for 36 hours)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(93, "Back online", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(94, "Local models as a first-class choice", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(95, "Honest offline UI", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(96, "Several local agents", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+    actual="""- **Offline:** `continuity.status` gave `new_agents.local_only: true`, the default `opencode-serve`, and Codex as not usable with "offline: no network (system)".
+- **Back online:** one `back_online` event on the local run (`offer: true`, back to Codex), "Back online. This agent is still on a local model.", said once; the default for new agents was Codex with the first run's account again.
+- **Stay local:** the next message ran on the local model; no handoff.
+- **Switch back:** the successor ran on Codex with `exec resume <the first run's session>`, in the same worktree and account; its prompt began "You are continuing a task another agent started; the connection is back and the work returns to its first agent." and listed the local agent's messages and the files changed; the chats said "Back online. Continuing with **Codex**." and "Continued from "…" now that the connection is back."
+- **In VS Code (packaged UI):** back online, the local agent's chat showed *Back online. This agent is still on a local model.* and one card, *Back online · This agent can continue with Codex, in the same worktree*, with **Switch back to Codex** and **Stay here**; Switch back started Codex through its own resume of the first agent's session, in the same worktree, and the chat moved there; the composer's default was the online agent again, not the local one; the side bar and the status bar were quiet again.
+- **Auto:** the next message sent to the local run was started on Codex instead (a new session, because the first agent never had one), carrying "The user's last message, not yet answered: …"; the local run read handed off.""",
+    evidence="daemon/tests/handoff.rs, daemon/src/handoff.rs",
+    live="Fixtures.",
+    limits="The owner's own offline session (a real connection loss and return) is AC-97.")
+rec(94, "Local models as a first-class choice", "verified", commit="15108e4", date="2026-09-27",
+    harness="The packaged extension in an isolated VS Code profile, driven over the debugging protocol; a real `overseerd`; everything else synthetic: the network and the memory are files, Ollama is fixtures/fake-harness/ollama-fixture.js with four models (no model runs), Codex and Claude Code are fixtures/fake-harness/continuity-harness.js, OpenCode is fixtures/fake-harness/opencode-serve-fixture.js. No account and no paid tokens. The badges are the daemon's own answers (`local.models`), tested against the guard in `daemon/tests/continuity.rs`",
+    fixture="An isolated OVERSEER_HOME, VS Code profile and extensions folder per scenario; evidence in docs/verification/evidence/ui/continuity/ (screenshots, scenario.log, result.json); the fixture models are fixtures/continuity/ui-models.json",
+    steps="""1. Packaged UI: `node test/ui/scenario-continuity.js` ([02-agent-menu-local-dark.png](evidence/ui/continuity/02-agent-menu-local-dark.png), [12-agent-menu-local-light.png](evidence/ui/continuity/12-agent-menu-local-light.png), [04-local-run-dark.png](evidence/ui/continuity/04-local-run-dark.png), [03-offline-composer-dark.png](evidence/ui/continuity/03-offline-composer-dark.png)).
+2. `cargo test -p overseerd --test continuity ac94_every_local_model_has_a_fit_that_the_guard_would_give`.
+3. `node test/unit/continuity.js` (the badges' words).""",
+    expected="Packaged-UI screenshots in both Overseer themes; a local run started from the composer completes the write check with the fixture network disabled; the badges match `local.pick`'s dry run.",
+    actual="""- **The Agent menu** ends with *Local models · Ollama*: *Best fit · qwen3-coder:30b* (64k), then each installed model with its badge: *qwen3-coder:30b · fits at 64k*, *qwen2.5-coder:14b · fits at 32k · failed its check*, *qwen3.5:122b · too big · 77.2 GiB of 51.2 GiB · unverified* (disabled), and the four models the catalogue knows but that are not installed behind one entry (each with its download size). The New Task form lists the same as tiles.
+- **The badges are the guard's answers:** `local.models` gives every model the longest of the usual contexts that `local.approve` allows, or why none does; what it says fits is approved at that context and no longer one, and the dry run's pick is one of them; with less memory the same model fits at a shorter context, then not at all.
+- **Offline:** the online agents are disabled in the menu with *offline*, the composer says *Offline: no network (system). Codex cannot be reached.* with **Use a local model (qwen3-coder:30b)**, and one click sets the agent to *Local model* and the model to *Best fit · qwen3-coder:30b*. A local agent started from the composer with the network fixture off asked before it wrote (Ask first is the default), then completed the write check in its worktree; its chat names the local model, its context and its size, and the run has no account, cost 0.
+- **Screenshots** in Overseer Dark and Overseer Light.""",
+    evidence="[evidence/ui/continuity/](evidence/ui/continuity/), daemon/tests/continuity.rs, extension/media/continuity.js, extension/media/continuity-text.js",
+    live="Packaged extension in a real VS Code; the model in the scenario is synthetic (no model runs). A real local model went through the same daemon path in [AC-91](AC-91.md) and [AC-138](AC-138.md).",
+    limits="The Local provider mark is OpenCode's (AC-65: a licensed Ollama mark is not recorded).")
+rec(95, "Honest offline UI", "verified", commit="15108e4", date="2026-09-27",
+    harness="The packaged extension in an isolated VS Code profile, driven over the debugging protocol; a real `overseerd`; everything else synthetic: the network and the memory are files, Ollama is fixtures/fake-harness/ollama-fixture.js with four models (no model runs), Codex and Claude Code are fixtures/fake-harness/continuity-harness.js, OpenCode is fixtures/fake-harness/opencode-serve-fixture.js. No account and no paid tokens",
+    fixture="An isolated OVERSEER_HOME, VS Code profile and extensions folder per scenario; evidence in docs/verification/evidence/ui/continuity/ (screenshots, scenario.log, result.json)",
+    steps="""1. Packaged UI: `node test/ui/scenario-continuity.js` (every state and transition in Overseer Dark, Overseer Light and Default Dark Modern; [scenario.log](evidence/ui/continuity/scenario.log), [result.json](evidence/ui/continuity/result.json)).
+2. `node test/unit/continuity.js`: no view's words say online while offline.""",
+    expected="An audit scenario at each state and after each transition, in both Overseer themes and a stock theme; no view claims online while offline; the text budget re-measured.",
+    actual="""- **Each state, each once:** online (a cloud alone in the status bar, nothing in the side bar), offline (*Offline* on the warning background, *Overseer is offline: no network (system).* under Agents, the line above the composer with what the system said and what Continuity does), back online (quiet again, the way back offered once). The status bar and the side bar are one item and one line, updated in place.
+- **Never online while offline:** every text shown while offline (status bar, side bar, composer line, the blocking note) was checked for the word; none carried it.
+- **Local runs marked:** *Local model* with OpenCode's mark and the model in the chat header; **waiting runs** with a cloud, not the failure icon, in the chat header, the side bar's badge and the grid tile; **handed-off predecessors** folded under their successor as *Earlier: Codex · handed off · the connection was lost*.
+- **Themes:** Overseer Dark, Overseer Light and Default Dark Modern.
+- **Text budget (Default Dark Modern, measured with the Gate J audit, result.json `textBudget`):** the chat with a waiting card shows 740 characters, under Gate J's 1,050 for the chat; what Continuity adds to the side bar is one line of 58 characters and one Needs-you row of 32; no sideways overflow, no unbroken run over 80 characters outside code, every icon-only control named.""",
+    evidence="[evidence/ui/continuity/](evidence/ui/continuity/), extension/src/continuity.js, extension/media/continuity.js",
+    live="Packaged extension in a real VS Code; fixture network and harnesses.",
+    limits="Degraded (one provider unreachable) is shown by the words in the unit tests and the status bar text; the packaged scenario drives offline and online.")
+rec(96, "Several local agents", "verified", commit="0759272", date="2026-09-26",
+    harness=HARNESS_L, fixture=FIXTURE_L + "; the synthetic Ollama keeps the fixture memory in step with what is loaded, as a machine would",
+    steps="""1. `cargo test -p overseerd --test handoff ac96_several_local_agents_share_one_model`: three local agents at work at once, then a second model by name.
+2. `cargo test -p overseerd --test handoff ac96_a_memory_squeeze_shrinks_the_next_pick_and_leaves_the_turn_alone`.""",
+    expected="Three fixture-driven local runs: `/api/ps` shows one loaded model and the queue note appears; a second model is refused when the sum exceeds the budget; a fixture memory squeeze changes the next pick and leaves the running turn alone.",
+    actual="""- **One copy:** with three agents working at once Ollama held one model (`qwen3-coder:30b-64k`), loaded once; the second and third agents found it loaded and said "Queued behind 1 local agent: they share one loaded model." and "Queued behind 2 local agents: …"; all three finished their work.
+- **A second model:** with a 30% ceiling, `qwen2.5-coder:32b` was refused: "qwen2.5-coder:32b does not fit beside qwen3-coder:30b-64k: 23.5 GiB and 23.7 GiB together are over 30% of 128 GiB (38.4 GiB)", and the run ended as failed; `qwen2.5-coder:14b` was loaded beside it at a 16k context, because at 32k the two together would be over the share. Nothing was loaded twice.
+- **A squeeze:** with 11.3 GiB left (under the headroom of 12.8 GiB) the running turn finished and nothing was unloaded under it; the next turn unloaded the 64k copy first, then loaded the same model at a 32k context, with one note: "Memory is tighter now (11.3 GiB available). This turn uses qwen3-coder:30b at a 32k context instead of a 64k context."; the turn after that used the same copy with no second note.
+- **Not Overseer's to unload:** a copy the user had loaded in their own Ollama was shared as it was under the same squeeze: nothing loaded, nothing unloaded. Only copies Overseer loaded itself, and no other agent is working on, are ever replaced.""",
+    evidence="daemon/tests/handoff.rs, daemon/src/continuity.rs (`prepare_local_run`), daemon/tests/common/ollama.rs",
+    live="Fixtures, as the criterion asks. The live runs of AC-91 and AC-138 show one real model loaded and unloaded.",
+    limits="The queue note counts agents on the same tag; how Ollama orders their requests is Ollama's own (`OLLAMA_NUM_PARALLEL`).")
 rec(97, "Offline session (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(98, "On by default, explained once", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-
+    actual="Not started: the session is the owner's own. Everything it needs is built and verified separately (the transition to local, AC-91; the way back, AC-93; the announcements and the run tree in the packaged UI), and the same path ran live with a real model in `node test/local/handoff-live.js local`.",
+    live="—",
+    blocker="Owner: `node test/local/owner-session.js start` opens an isolated VS Code (own profile, extensions folder and OVERSEER_HOME; your own VS Code, daemon, logins and settings untouched) with this branch's VSIX on a scratch repository and prints the steps: start a small agent, turn Wi-Fi off while it runs and screenshot the transition announcement, the run tree and the review, turn Wi-Fi on and take Switch back, screenshot that; quit, then `node test/local/owner-session.js report` writes the daemon's record to `evidence/ac-97/` and the screenshots go to `/private/tmp/ac-97/`. `node test/local/owner-session.js check` confirmed on 2026-09-27: the VSIX, VS Code, Ollama running and `qwen3-coder:30b` installed.")
+rec(98, "On by default, explained once", "verified", commit="49b2ecb", date="2026-09-27",
+    harness="Real `overseerd` for the protocol test. The packaged extension in an isolated VS Code profile, driven over the debugging protocol; a real `overseerd`; everything else synthetic: the network and the memory are files, Ollama is fixtures/fake-harness/ollama-fixture.js with four models (no model runs), Codex and Claude Code are fixtures/fake-harness/continuity-harness.js, OpenCode is fixtures/fake-harness/opencode-serve-fixture.js. No account and no paid tokens",
+    fixture="An isolated OVERSEER_HOME, VS Code profile and extensions folder per scenario; evidence in docs/verification/evidence/ui/continuity/ (screenshots, scenario.log, result.json)",
+    steps="""1. `cargo test -p overseerd --test continuity`: `ac98_the_notice_is_shown_once_per_machine`.
+2. Packaged UI: `node test/ui/scenario-continuity.js` ([01-notice-dark.png](evidence/ui/continuity/01-notice-dark.png), the notice opened); the offline wait with Continuity off is in the same scenario and in `scenario-continuity-settings.js`.
+3. `node test/ui/scenario-audit.js` (AC-54): the composer with the notice stays within Gate J's text budget.""",
+    expected="A fresh `OVERSEER_HOME` shows the notice exactly once across two windows and a reload; Allow downloads flips the setting in the daemon; with Continuity off, an offline fixture waits instead of transitioning; screenshots in both themes.",
+    actual="""- **Once per machine:** with a fresh OVERSEER_HOME the notice sat above the composer, one line until opened (*Continuity is on* and **Got it**, 22 characters; the merge monitor's audit had found the full card taking the composer from 133 to 491 characters of visible text against AC-54's budget); opened from that line: what may happen, *Download local models · off · Allow* and *Install and start Ollama · off · Allow*, and **Turn Continuity off**. With the notice folded the composer measured 129 of Gate J's 133 in every theme and width (`scenario-audit.js`, 2026-09-27). Allow flipped `allowModelDownloads` in the daemon and the notice read *allowed*. Got it removed it and the daemon recorded it; after a window reload it was not shown again. The daemon keeps the record, so a second window and a reinstall see it too (protocol test: shown until dismissed, never after, across connections and a restart).
+- **Continuity off:** with the switch off and the network fixture offline, a failing agent waited (`waiting_for_connection`) instead of transitioning, with VS Code open and closed.
+- **The first transition** was announced in the chat, and the notice was not repeated.""",
+    evidence="[evidence/ui/continuity/](evidence/ui/continuity/), daemon/tests/continuity.rs, extension/media/continuity.js",
+    live="Packaged extension in a real VS Code.",
+    limits="The notice is screenshotted in Overseer Dark; in Overseer Light it had already been dismissed on that machine, which is the point of the criterion.")
 # Gate M, Overseer as the whole surface (added by the owner on 2026-09-26; docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface). Not started; built in its own pull request.
 rec(99, "The review is where files live", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
     steps="`node test/ui/scenario-review-files.js`: Changes only by default; All files; a nested unchanged file and a changed file opened, edited and saved in the review; no editor tab; a 10,000-file worktree.",
@@ -1128,90 +1343,461 @@ rec(114, "Gate K in the owner's VS Code (owner-confirmed)", "not started", date=
     actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
 
 # Gate N, phone remote on the same network (added by the owner on 2026-09-26; docs/rfcs/phone-remote.md). Not started; built in its own worktree and pull request.
-rec(115, "Feasibility and reuse before lock-in", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(116, "A gateway switched on and off on the desktop", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(117, "Pairing needs the Mac", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(118, "Encrypted and mutually authenticated", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(119, "Devices, scopes and revoking", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(120, "Found on the network", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(121, "Never lose the session", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(122, "Sent exactly once", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(123, "The Mac stays awake while it matters", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(124, "See every agent", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(125, "Control every agent", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(126, "Review on the phone", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(127, "Everything else Overseer has", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(128, "Talk to Overseer from the phone", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(129, "Needs-you notifications you can switch", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(130, "Safe without friction", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(131, "One app, iOS and Android, that looks like Overseer", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(132, "Regression coverage for the phone", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(133, "Phone session (owner-confirmed)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(134, "Platform behaviour behind generic interfaces", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(135, "Hyper fast", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(136, "The door", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(137, "Motion throughout", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(115, 'Feasibility and reuse before lock-in', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="on both simulators in release builds the app itself, with its own record of each launch (the door shown, the first screen, the opening timed and its frames counted on the UI thread); the encrypted session (Noise IK) between the Rust daemon and the app, resumed after the app was in the background and after the daemon was killed; the shared test vectors passing in the daemon, in the app's library and in the extension's reference phone; the daemon's exact notification payload delivered with `xcrun simctl push` and shown by the iOS simulator; Happy inspected at a recorded revision and the decision written down",
+    deferred="the baselines of the door and the conversation on both simulators (the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed); the owner's iPhone: the same measured against the speed budget, then the stack decision with its reasons; Bonjour with the local network permission and a real push through Apple's service (steps for the owner in the phone remote RFC)",
+    steps="""1. Stack: Expo SDK 57, React Native 0.86 with the New Architecture, Hermes, TypeScript strict; Reanimated 4 on the UI thread; the conversation code ported from the extension with parity tests (`phone/model`). No Rust on the phone: the Noise session is `@noble` (audited primitives) and the shared vectors prove it against the daemon's `snow`.
+2. Spikes, in the order of the RFC: `node phone/e2e/run.mjs` builds the daemon and both release apps, pairs, drives every screen and measures 20 cold starts per platform with the door and without it (`phone/e2e/measure.mjs`).
+3. Vectors: `cargo test -p overseerd noise` (writes `protocol/vectors/noise.json`), `cd phone/core && npm test` (reads them), `node test/unit/ref-phone.js` (the extension's reference phone, byte for byte).
+4. Happy: cloned read-only at `8517ab232528a6046271d6010aaed663e1187dfc`; the decision is in [source-assessment.md](../source-assessment.md).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Door baseline (release, cold starts with the door):** iOS simulator: agents list interactive p95 — ms, door opening p50 — ms, frames dropped while it opens (worst launch) —; Android emulator: agents list interactive p95 — ms, door opening p50 — ms, dropped — ([measure-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/measure-ios.json), [measure-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/measure-android.json), baselines in `phone/e2e/baselines.json`).
+- **Encrypted session, resumed:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; the daemon-side tests of AC-118 and AC-121; `phone/integration` (10 tests against a real overseerd: resume after a cut, the daemon killed mid-stream, exactly-once).
+- **Vectors:** `protocol/vectors/noise.json` passes in `snow` (daemon), in `@noble` (phone/core, 217 tests) and in the extension's reference phone (19 of 19).
+- **Notification payload on the simulator:** FAILED: the flow notification-open failed (the daemon delivers with `xcrun simctl push`; a tap opens the agent; Allow on the notification unblocks it).
+- **Happy:** nothing adopted as code; every message of Happy passes through its server and its accounts, which this gate rules out. Same stack confirmed for long conversations.
+- **Rust on the phone:** not needed; no measurement asked for it (one event on a 5,000-row conversation costs about 7 microseconds in the view models).""",
+    evidence='[foundation](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/foundation) (versions, run logs, screenshots of both simulators in both themes), [e2e](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e), [daemon](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/daemon), [source-assessment.md](../source-assessment.md)',
+    live="Simulators only; the iPhone is the owner's next step.",
+    limits='No iPhone measurement yet; Flutter stays the fallback the RFC names if the iPhone misses the budget.')
+rec(116, 'A gateway switched on and off on the desktop', 'verified',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac116: refused by default, listens after enabling, sessions dropped and told on disabling, reconnect with no pairing, a phone's request to change the setting refused, a public address refused, unauthenticated and malformed input); the fuzz test (200,000 first frames, 100,000 transport frames).
+2. `OVERSEER_TEST_PHONE_ACCESS=off|on cargo test --workspace --no-fail-fast` and every packaged-UI scenario in both settings ([suites](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/suites)).
+3. VS Code and the terminal UI: `node test/ui/scenario-phone-access.js`, `cargo test -p overseer-tui --test phone`.
+4. The phone: the scenarios `off-and-on` (phone access turned off on the Mac while the app watches, then on again) and `unreachable` (the daemon killed).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac116 test passes; the AC-08 tests pass with phone access off and on (the protocol suite: 54 passed in each setting, [logs](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/daemon)).
+- **The Mac:** a status bar item in VS Code says off, on, or how many phones; `O` in the terminal; `overseerd ctl gateway.enable` ([phone-access screenshots](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/ui/phone-access), [terminal](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/tui/phone-access)).
+- **The phone:** *Phone access is off on the Mac* while it is off, then connected again by itself: iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; *Mac unreachable · last contact …* when the daemon is gone: iOS simulator FAILED: the flow reachable failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).
+- **Whole suites in both settings:** see AC-132.""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/gateway.rs), [daemon evidence](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/daemon), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='Fixtures with a real daemon.',
+    limits='macOS only.')
+rec(117, 'Pairing needs the Mac', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven='protocol tests for every refusal and the lockout; the code and the confirmation in VS Code and the terminal, in screenshots; the simulator and the emulator pair by typing the code, and the Mac confirms',
+    deferred="the owner's iPhone pairs by scanning the QR code (the camera is unsupported on simulators)",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac117: a wrong, expired and reused secret pair nothing; a declined confirmation pairs nothing; five failures close pairing; a phone without the code never reaches the owner's confirmation, which is why pairing is Noise IKpsk1).
+2. `node test/ui/scenario-phone-access.js`: the code as a QR code and as text, read back by an independent decoder and by the Mac's Vision framework; the confirmation with name, platform, address and key fingerprint.
+3. The phone: the scenario `pair` on each simulator: the code typed, the Mac confirms (the lab confirms as the owner would), the agents list.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Refusals and lockout:** every ac117 test passes.
+- **The Mac:** [phone-access](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/ui/phone-access) (`04` to `08`, `13`), [terminal](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/tui/phone-access) (`11` to `14`).
+- **By typing:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; the Mac lists the phone as connected, full control, with its platform (`e2e/ios/paired.png`).
+- **After pairing:** the app asks about notifications once, with the reason first, and the system's own question follows on iOS (`e2e/ios/screens/notifications-the-reason-first.png`, `the-system-asks-about-notifications.png`).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/gateway.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='Fixtures with a real daemon.',
+    limits='Scanning waits for the iPhone; the camera path is tested against the fake.')
+rec(118, 'Encrypted and mutually authenticated', 'verified',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac118: a capture of a live session through a recording forwarder holds no method name, prompt or output; an unknown device key, a gateway with the wrong key, a tampered frame, a replayed frame and a replayed handshake are refused).
+2. `cargo test -p overseerd noise` writes `protocol/vectors/noise.json`; `cd phone/core && npm test` and `node test/unit/ref-phone.js` read them.
+3. The fuzz run ([fuzz.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/daemon/fuzz.log)).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Door and app, as the app recorded them by hand on the iOS simulator (debug build, one launch each):** door shown at 1,337 ms after the process started, first screen interactive at 1,355 ms, the opening 629 ms with 36 frames and 0 dropped, longest frame 16.7 ms. The 20-launch measurement of release builds (the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed) is the takeover branch's next step ([measure.mjs]({BR}phone/e2e/measure.mjs)).
+- **Encrypted session, resumed:** the daemon-side tests of AC-118 and AC-121; `phone/integration` (10 tests against a real overseerd); on the iOS simulator five minutes away with the daemon restarted half way (2,583 events, no gap, no duplicate).
+- **Vectors:** `protocol/vectors/noise.json` passes in `snow` (daemon), in `@noble` (phone/core, 217 tests) and in the extension's reference phone (19 of 19).
+- **Notification payload on the simulator:** the daemon's own send (route `simulator`, outcome `sent`) showed *Claude · shop — Needs your permission* with the app's icon ([screenshot]({ev('e2e/ios/notification-shown.png')})); the tap and Allow on it were not exercised (Maestro cannot see the system's banner).
+- **Happy:** nothing adopted as code; every message of Happy passes through its server and its accounts, which this gate rules out. Same stack confirmed for long conversations.
+- **Rust on the phone:** not needed; no measurement asked for it (one event on a 5,000-row conversation costs about 7 microseconds in the view models).""",
+    evidence='[daemon tests](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/gateway.rs), [daemon evidence](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/daemon), [phone/core](https://github.com/beelol/overseer/blob/49cd85e9/phone/core), [protocol/vectors](https://github.com/beelol/overseer/blob/49cd85e9/protocol/vectors)',
+    live='—',
+    limits='macOS only.')
+rec(119, 'Devices, scopes and revoking', 'verified',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cargo test -p overseerd` (classes: every daemon method has a class and every class a method; the README table matches; a method added without a class fails; ac119 table-driven: a watch-only device refused on every control method, every device on every Mac-only method; revoke during a live stream; events name the device).
+2. `node test/ui/scenario-phone-access.js` and `cargo test -p overseer-tui --test phone` (the Devices list, scope, revoke).
+3. The phone: the scenarios `watch-only` (made watch only on the Mac while connected: the controls go; full control again: they are back) and `revoke` (removed on the Mac: pairing is the only way on, and the phone holds nothing of the Mac).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Classes:** 72 methods classified (`protocol/protocol.json`); the table in the README is generated from them.
+- **Table-driven:** every control method refused for watch only, every Mac-only method refused for every device.
+- **Revoke:** the session ends within 1 s during a stream; the key never authenticates again; a phone revoked while away is told at its next handshake.
+- **The Mac:** the Devices list with name, platform, scope, paired, last seen, address and key ([screenshots](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/ui/phone-access) `09` to `12`, `16`).
+- **The phone:** iOS simulator FAILED: the flow full failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: the phone still holds what it knew of the Mac; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/gateway.rs), [classes.rs](https://github.com/beelol/overseer/blob/49cd85e9/daemon/src/gateway/classes.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='macOS only.')
+rec(120, 'Found on the network', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="the daemon advertises `_overseer._tcp` with its key's fingerprint while phone access is on and withdraws it when off; an impostor with the same name and another key is refused by the handshake; both simulators connect through a typed address, with no pairing again, after the Mac moved to another port",
+    deferred="the owner's iPhone: Bonjour browsing in the app (unsupported on both platforms in this build), the local network permission explained before the system asks and the denied state, the Mac's address changing on a real network",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac120: `dns-sd` shows the record only while phone access is on; an impostor gateway is refused).
+2. The phone: the scenario `manual-address`: phone access turned off and on again on another port; the app cannot find the Mac; the owner types `<host>:<port>` under Settings, The Mac's address; the app connects.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Advertised:** the daemon-side tests pass.
+- **Typed address:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; the pairing is the same before and after  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).
+- **Not built:** browsing on the phone reports unsupported with its reason (`phone/src/platform/README.md`); the app finds the Mac through the pairing code's addresses, the platform's own, and typed ones.""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/gateway.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android), [platform layer](https://github.com/beelol/overseer/blob/49cd85e9/phone/src/platform/README.md)",
+    live='—',
+    limits="The local network permission and Bonjour browsing are iPhone steps (the RFC's steps for the owner).")
+rec(121, 'Never lose the session', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven='the protocol tests at 100 random cuts and the daemon killed mid-stream; on the iOS simulator five minutes in the background with the daemon restarted half way: 2,583 events, no gap, no duplicate; the cached state marked with its age and the reconnecting and unreachable states in screenshots',
+    deferred="the same scenario on the Android emulator: the run's log was overwritten before it was committed; the app did not reconnect within two minutes after the daemon was killed in the `unreachable` scenario (it did after a longer wait), which the takeover branch is looking at",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac121: a stream cut at 100 random points, with the daemon killed mid-stream, equals the daemon's log event for event; `history_truncated` after pruning); `phone/integration` (the same through the app's own library, 10 tests).
+2. The phone: the scenario `away`: an agent writes numbered lines; the conversation is open; the app leaves the screen for five minutes; the daemon is killed and started again half way; back in the app, the phone's count of what it received (gaps, duplicates, reloads; `phone/src/session`) is read from its storage and compared with the Mac's newest event.
+3. The scenario `queued` (the app opened from what it stored while the Mac was off; `As of …`) and `unreachable` (the reconnecting and unreachable states).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** identical sequences at 100 random cuts; truncation reloads the state and says so.
+- **Five minutes away, the daemon restarted:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced — no gap, no duplicate, the phone at the Mac's newest event (the counts are in each platform's log).
+- **Cached, never live:** what is stored opens at once and reads *As of 2m ago* until the Mac confirms it; the connection line says *Reconnecting…* or *Mac unreachable · last contact …*  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/gateway.rs), [phone/integration](https://github.com/beelol/overseer/blob/49cd85e9/phone/integration/test/real-gateway.test.ts), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='macOS only.')
+rec(122, 'Sent exactly once', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="every protocol test (three at once, a cut before the reply, lost while sending, outcomes across a restart and 25 hours, an interrupted request); on the iOS simulator a message sent once and recorded as the phone's",
+    deferred='the phone scenario that sends with the network off: it failed on the iOS simulator (the composer did not show within 30 s while the app was unreachable) and the Android run that passed it lost its log',
+    steps="""1. `cargo test -p overseerd --test gateway` (ac122: the same id three times at once runs once with three identical replies; a connection cut after the request was written and before the reply, then a retry, leaves one turn; a connection lost while sending; outcomes kept across a restart and 25 hours, and 7 days in the store; an interrupted request is not run again).
+2. The phone: the scenario `send` (a message typed on the phone reaches the agent once and is recorded as the phone's) and `queued` (typed while phone access is off, shown as queued, sent once when it is on again).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac122 test passes; every changing method a phone may call is a control method with a request id (`protocol/protocol.json`).
+- **On the phone:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: the flow send-offline failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced (the daemon's turns for the agent hold the message once, checked again after four seconds).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/gateway.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='macOS only.')
+rec(123, 'The Mac stays awake while it matters', 'verified',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac123: `pmset -g assertions` names Overseer's assertion during a fixture run and while an agent waits, not afterwards, and never with phone access off; both are events).
+2. The phone: the scenario `unreachable` (the daemon killed: *Mac unreachable · last contact …*).
+3. The README's Phone access section states the limit.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Assertion:** held and released as the criterion says (IOKit on macOS, `systemd-inhibit` on Linux).
+- **Unreachable with the time:** iOS simulator FAILED: the flow reachable failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).
+- **README:** "a closed lid on battery sleeps anyway" ([README](https://github.com/beelol/overseer/blob/49cd85e9/README.md#phone-access-gate-n-in-progress)).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/gateway.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='macOS only.')
+rec(124, 'See every agent', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="the phone's list equals the daemon's state and VS Code's side bar over the nine-agent recording; each conversation equals VS Code's chat model row for row; live agents and conversations on the iOS simulator in both themes",
+    deferred="the delay from a printed line to the rendered line as a figure (the app records it, the run does not yet assert it); the Android screenshots (the run's log was overwritten); the tour of every screen (it failed on iOS because the agent it chose had no changes left)",
+    steps="""1. `cd phone/model && npm test` (149 tests: the store against the daemon's `state` at 111 recorded moments; the conversation against `conversation.js` in jsdom; the agents list against `views.js`; Markdown against marked with DOMPurify).
+2. The phone: the scenarios `agents`, `conversation` and `tour` (every screen in both themes at the smallest and largest text size).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Parity:** no difference in any comparison ([phone/model/README.md](https://github.com/beelol/overseer/blob/49cd85e9/phone/model/README.md) lists the few known differences from VS Code, such as who answered a permission request).
+- **Live on the simulators:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; the tour's screenshots are the takeover branch's next step (it failed on iOS and the Android log was lost).
+- **Delay:** recorded by the app for every live line (from the daemon's stamp to the frame that shows it); see the limits.""",
+    evidence="[phone/model](https://github.com/beelol/overseer/blob/49cd85e9/phone/model), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='The p95 of the stream delay is measured by the app but not yet asserted by the run; a future run adds it to the budgets.')
+rec(125, 'Control every agent', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="the race of two answers settled by the daemon 100 times; launch records equal; on the iOS simulator a message sent once, a new agent started and recorded as the phone's, a permission allowed from the phone (the fixture went on; the flow's last step failed)",
+    deferred="Stop all on the simulators (the scenario's two agents did not both stay going); one tiny live turn each on Claude Code and Codex from the phone; an image reaching the Claude fixture, checked on a device",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac125: the phone and the Mac answer one permission request at the same moment, 100 rounds: the harness receives one answer each time, the other side gets `already_answered` with the first outcome) and `--test phone_methods` (launch records from the phone equal VS Code's for the same choices; a phone never chooses a program or an approval policy).
+2. The phone: the scenarios `permission`, `send`, `new`, `stop-all`, each checked against the daemon's events and turns.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** the ac125 race passes 100 of 100; launch records equal.
+- **On the simulators:** iOS simulator FAILED: the flow permission failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: two agents going did not happen in 20000 ms; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced.
+- **Across surfaces:** VS Code's chat shows *Message from <phone>* and *Stopped from <phone>* ([phone-access](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/ui/phone-access) `18`); a permission answered on the Mac first updates the phone's card (tests against the fakes).
+- **Composer:** model, effort and permission mode per turn; up to four images fitted to the request's size (tests against the fakes).""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/gateway.rs), [phone_methods.rs](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/phone_methods.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='Not in this session.',
+    limits='The live turns and the image block on a device are the next steps.')
+rec(126, 'Review on the phone', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="the daemon's file, diff and hunk methods with their refusals; marks made on each surface seen on the other; on the iOS simulator Accept from the phone (the Mac's mark names the phone) and Reject (asked once, one hunk fewer in the worktree, recorded as the phone's)",
+    deferred='scrolling a 10,000-file repository on a device with frames counted; the rendered diff compared line for line with `git diff` on a device; the Android run',
+    steps="""1. `cargo test -p overseerd --test phone_methods` (ac126: path escape, symlink, binary, oversized, `.git` in any case; marks made on each surface seen on the other; a hunk that changed since refused; the 10,000-file repository).
+2. `node test/ui/scenario-hunks.js` and `scenario-review.js` (VS Code keeps its marks through the same daemon methods now).
+3. The phone: the scenarios `review` (Accept from the phone; the mark on the Mac names the phone) and `reject` (asked once; one hunk fewer in the worktree; the daemon records the phone).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac126 test passes.
+- **On the simulators:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).
+- **Rendering:** hunks with line numbers and syntax colours, wrapped or scrolled sideways; a changed line's tint at half strength so every syntax colour keeps its contrast (tests against the fakes; `screens/<theme>-<size>/file.png`).""",
+    evidence="[phone_methods.rs](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/phone_methods.rs), [review.rs](https://github.com/beelol/overseer/blob/49cd85e9/daemon/src/review.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='The on-device scroll of a 10,000-file listing is not yet measured.')
+rec(127, 'Everything else Overseer has', 'verified',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cargo test -p overseerd --test phone_methods` (ac127: device-code sign-in with the synthetic account CLI, the address and the code reach the phone and a credential never does; *Sign in on the Mac* for a provider without one; a pull request through a fake GitHub CLI and a local stand-in remote; merge back; cleanup that lists uncommitted files first; search, archive, stop all; everything the phone received, decrypted, holds no token).
+2. `cargo test -p overseerd classes` (the README table matches the classes; an unclassified method fails).
+3. The phone: the scenarios `accounts` and `tour` (Accounts, Merge back and Pull request drawn against the real daemon); the screens' tests against the fakes (merge steps, the pull request's parameters and failure, sign-in with a code).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac127 test passes; no credential in any decrypted frame.
+- **Table:** [README, Phone access](https://github.com/beelol/overseer/blob/49cd85e9/README.md#phone-access-gate-n-in-progress), generated by `protocol/capabilities.py`.
+- **On the simulators:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: the showcase agent has no changed file to show; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced (the tour that draws Accounts, Merge back and Pull request against the real daemon failed on iOS for a fixture reason; the screens' tests against the fakes cover them).""",
+    evidence="[phone_methods.rs](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/phone_methods.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='The connection state of Gate L waits for Gate L.')
+rec(128, 'Talk to Overseer from the phone', 'not started',
+    date='—',
+    commit='—',
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual='Not started.',
+    live='—',
+    blocker='Depends on AC-107 (the chat with Overseer itself), which is not built. Nothing to put on the phone yet.')
+rec(129, 'Needs-you notifications you can switch', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="on the iOS simulator: the daemon's exact payload, sent by the daemon itself with `xcrun simctl push`, shows the notification with the app's icon, title and body; the payload holds only the allowed fields; each switch off (phone, kind, the Mac) sends nothing and the log says why; a focused VS Code window suppresses the push; the switches on the phone reach the Mac",
+    deferred="a tap on the notification opening the agent and Allow on it unblocking the fixture, exercised on the simulator (the daemon-side test covers Allow from the notification's fields; Maestro cannot see the system's banner, so this is done by hand next); Android's own banner (its run's log was lost); the owner's locked iPhone through Apple's service within 5 s, and on another network",
+    steps="""1. `cargo test -p overseerd --test phone_methods` (ac129: sent within five seconds with only the allowed fields; Allow from the notification's fields unblocks the agent; each switch off; no push while a window on the Mac looks at the agent; a revoked phone gets nothing).
+2. The phone: the scenarios `notifications` (the switch for all off on the phone, then the Mac's log for a new request), `push` (iOS: the daemon sends to the simulator itself; a tap; Allow on the notification) and `banner` (Android).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac129 test passes.
+- **Switches:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced.
+- **iOS simulator:** FAILED: the flow notification-open failed ([notification-shown.png](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios/notification-shown.png): a payload of the same shape delivered by hand with `xcrun simctl push`, after the daemon's own send was logged as sent).
+- **Android:** not run (not evidenced: the Android run's log was lost).
+- **Asked once, with the reason first:** at pairing (`screens/notifications-the-reason-first.png`).""",
+    evidence="[phone_methods.rs](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/phone_methods.rs), [push.rs](https://github.com/beelol/overseer/blob/49cd85e9/daemon/src/gateway/push.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits="Apple's push service needs Overseer's own key in the Mac's Keychain (the RFC's steps for the owner).")
+rec(130, 'Safe without friction', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven='zero prompts across reopening and an update installed over the app on the iOS simulator; every confirmation and both safety settings against the fakes; the security review with its three findings fixed; the fuzz run',
+    deferred="the forty measured launches (the measurement did not run because scenarios failed), Stop all and Reject asked once on a device (Stop all's scenario failed for a fixture reason, Reject passed on iOS), and an attempt to read the key from an app backup, which needs a device",
+    steps="""1. `node phone/e2e/measure.mjs` (every launch that reached the first screen, none of them the pairing screen); the scenarios `reopen`, `stop-all`, `reject`.
+2. `npx jest src/screens` (Stop all, clean up, complete and abort a merge, reject a hunk; both safety settings turned on).
+3. [security/review.md](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/security/review.md) and [fuzz.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/daemon/fuzz.log).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Zero prompts:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; the measurement's launches showed pairing 0 times (see the budgets in each platform's log).
+- **Asked once:** iOS simulator FAILED: two agents going did not happen in 20000 ms; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced  (the screenshots of that run were lost when a later run rewrote the folder; `result-ios.json` is the run's record).
+- **Keys:** in the system keystore (Keychain, this device only, after the first unlock; Android's Keystore-encrypted preferences, excluded from backup), never exported; the pairing secret is wiped after use.
+- **Review and fuzz:** three findings (a phone choosing a program, `.GIT`, a predictable temporary name), each fixed at 89189f8; 300,000 fuzz inputs, no crash.""",
+    evidence="[security](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/security), [daemon](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/daemon), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='The backup attempt needs a device.')
+rec(131, 'One app, iOS and Android, that looks like Overseer', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="one source for the tokens with a check that fails on a difference; the lint that fails on a value written by hand, proven with seeded values; 84 text pairs per theme at or above 4.5 to 1; every control of every screen labelled (75); the conventions listed per platform; the iOS simulator's screens in both themes",
+    deferred='the screenshots of every screen at the smallest and largest text size on both platforms and the theme switched with the app open (the tour scenario failed on iOS and the Android log was lost); the side-by-side images with VS Code',
+    steps="""1. `cd phone && npm run tokens:check` (fails when a token differs from `extension/design/tokens.js`); `npm run check:token-rule` (ten seeded values written by hand fail the lint).
+2. `npx jest src/theme` (84 text pairs per theme at or above 4.5 to 1); `npx jest src/__tests__/accessibility` (every control of every screen has a label and a test id).
+3. The scenario `tour`: every screen in both themes at the smallest and the largest text size, on both simulators; the system's theme switched with the app open.
+4. `phone/src/platform/README.md`: what each platform does its own way.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **One source:** the phone's tokens are generated from the VS Code themes' source; the check fails on a difference; the lint fails on a value written by hand.
+- **Side by side:** the phone's screens (the tour did not complete) next to VS Code's own screenshots ([sidebar](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/ui/sidebar), [chat](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/ui/chat)): the same colours, type scale and logos.
+- **Switched with the app open:** iOS simulator FAILED: the showcase agent has no changed file to show; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced (not reached: the tour scenario failed before it).
+- **Contrast:** 84 pairs per theme pass, after the phone stopped drawing words in the faint colour and drew a changed line's tint at half strength.
+- **Labels:** 75 controls, none without a label ([labels.md](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/accessibility/labels.md)).
+- **Conventions:** listed per platform in the platform layer's README; the back gesture, screen transitions and the keyboard differ through `launch.info().conventions` and the native stack.""",
+    evidence="[accessibility](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/accessibility), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android), [platform README](https://github.com/beelol/overseer/blob/49cd85e9/phone/src/platform/README.md)",
+    live='—',
+    limits='Speed is AC-135.')
+rec(132, 'Regression coverage for the phone', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="the gateway's protocol tests in `cargo test`; one command that runs the phone's scenarios on both simulators against a real daemon and checks the budgets; the daemon suites and the packaged-UI scenarios run with phone access off and on",
+    deferred="a green run of every scenario on both simulators; the run's log from a clean clone; the packaged-UI scenarios keyboard, perf, restore and files, which fail on this branch in a quiet rerun and pass on the takeover branch according to its session; the two Rust timing tests that fail only under load",
+    steps="""1. `cd phone && npm run e2e` (`node e2e/run.mjs`): builds the daemon and both release apps, installs each app anew, starts the lab (`e2e/lab.mjs`), drives every scenario with Maestro (`e2e/flows`), asks the daemon what happened, measures 20 cold starts with the door and without it, and checks the budgets against `e2e/baselines.json`.
+2. `OVERSEER_TEST_PHONE_ACCESS=off|on cargo test --workspace --no-fail-fast` and every packaged-UI scenario that starts no paid agent, in both settings (`test/ui/harness.js` turns phone access on the way the owner does).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **One command:** the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android).
+- **Suites in both settings:** [suites](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/suites). The Rust workspace: the timing tests `t10_nine_busy_agents_stay_responsive` and `ac51_worktree_tree` failed under load (average above 100) and pass alone. The packaged-UI scenarios: see the two logs; the failures named there ran while the machine was building the apps.""",
+    evidence="[suites](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/suites), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='A clean-clone run and a quiet rerun of the packaged-UI scenarios are the next steps.')
+rec(133, 'Phone session (owner-confirmed)', 'not started',
+    date='—',
+    commit='—',
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual='Not started.',
+    live='—',
+    blocker="The owner's iPhone: the steps for the owner in the phone remote RFC (a new app identifier, a push key, signing, the local network and notification permissions, then pairing by scanning). The simulator milestone is in pull request #10.")
+rec(134, 'Platform behaviour behind generic interfaces', 'verified',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    steps="""1. `cd phone && npm run check:platform-rule` (six seeded violations fail the lint outside the platform layer and in a package beside the app; the same code inside the layer is allowed; the clean tree passes).
+2. `npx jest` (every screen and the session against the fakes, no simulator); `node protocol/gen-ts.mjs --check` (types stale after a change to `protocol/protocol.json` fail; a daemon test runs the check).
+3. The capability table: `phone/src/platform/README.md`.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Door and app, as the app recorded them by hand on the iOS simulator (debug build, one launch each):** door shown at 1,337 ms after the process started, first screen interactive at 1,355 ms, the opening 629 ms with 36 frames and 0 dropped, longest frame 16.7 ms. The 20-launch measurement of release builds (the measurement runs after every scenario passes, and scenarios failed) is the takeover branch's next step ([measure.mjs](https://github.com/beelol/overseer/blob/49cd85e9/phone/e2e/measure.mjs)).
+- **Encrypted session, resumed:** the daemon-side tests of AC-118 and AC-121; `phone/integration` (10 tests against a real overseerd); on the iOS simulator five minutes away with the daemon restarted half way (2,583 events, no gap, no duplicate).
+- **Vectors:** `protocol/vectors/noise.json` passes in `snow` (daemon), in `@noble` (phone/core, 217 tests) and in the extension's reference phone (19 of 19).
+- **Notification payload on the simulator:** the daemon's own send (route `simulator`, outcome `sent`) showed *Claude · shop — Needs your permission* with the app's icon ([screenshot](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios/notification-shown.png)); the tap and Allow on it were not exercised (Maestro cannot see the system's banner).
+- **Happy:** nothing adopted as code; every message of Happy passes through its server and its accounts, which this gate rules out. Same stack confirmed for long conversations.
+- **Rust on the phone:** not needed; no measurement asked for it (one event on a 5,000-row conversation costs about 7 microseconds in the view models).""",
+    evidence='[platform layer](https://github.com/beelol/overseer/blob/49cd85e9/phone/src/platform), [foundation](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/foundation), [protocol_shapes.rs](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/protocol_shapes.rs)',
+    live='—',
+    limits='—')
+rec(135, 'Hyper fast', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="release builds on both simulators run the scenarios; the app records every launch (the door, the first screen, the opening's frames on the UI thread) and every tap's response, and leaves the record for the run; an animation dropped no frame while the app's logic was held for 500 ms on the iOS simulator (the `busy` scenario); the measurement script, its budgets and the seeded slow start exist",
+    deferred="the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed; the baselines of both simulators; the seeded slow start failing the run; the owner's iPhone, where every budget is due",
+    steps="""1. `node phone/e2e/measure.mjs --platform ios|android --check` (part of `npm run e2e`): 20 cold starts with the door, 20 without; the app's own record of each launch (`phone/src/perf`) read from its storage.
+2. The scenario `busy`: `overseer://perf`, the busy-logic test (an animation on the UI thread while the logic is held for 500 ms).
+3. `node e2e/run.mjs --seed-slow 400`: every start held for 400 ms must fail the budgets.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **iOS simulator (release):** agents list interactive p50 — ms, p95 — ms; door opening — to — ms; dropped frames while opening (worst launch) —.
+- **Android emulator (release):** interactive p50 — ms, p95 — ms; door opening — to — ms; dropped —.
+- **Baselines:** `phone/e2e/baselines.json` (a later run must stay within 10%).
+- **Busy logic:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced.
+- **Seeded slow start:** see the run's log named in the limits.""",
+    evidence="[measure-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/measure-ios.json), [measure-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/measure-android.json), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits="Simulators carry no display budget; the iPhone is where the budgets are due. The seeded-slow run's log is `e2e/seeded-slow.log` when it was run; see the record's text.")
+rec(136, 'The door', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="on the iOS simulator: the closed door from the first frame the app draws (the same picture as the launch screen), its gradient and seam light fading in, the diagonal split with the mark splitting, in recordings of debug builds read frame by frame; one launch recorded by the app itself: the opening 629 ms, 36 frames, 0 dropped; the door waits for the first screen to settle so nothing slides in under it; no door on return from the background and a fade with Reduce Motion, by design and by the app's tests against the fakes",
+    deferred="the 20-launch measurement on both simulators in release builds (the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed); the recordings of the emulator, of Reduce Motion and of the return from the background (`phone/e2e/door.mjs` is written for them); the owner's iPhone recordings; the owner's marks on the look: the review page is published (https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq, from the recordings in `evidence/phone/door`) and the owner has been asked",
+    steps="""1. `node phone/e2e/measure.mjs`: the door's opening is timed by the app and its frames counted on the UI thread (`door.opening`, `door.frames`, `door.dropped`), for 20 cold starts; 20 more with the door off by `overseer://test?door=off`.
+2. Recordings of the simulators' screens at launch, in both themes, and with Reduce Motion (`docs/verification/evidence/phone/door/`).""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **iOS simulator:** opening — to — ms over 20 launches, — frames at least, dropped at most —; door shown at p50 — ms, first screen at p50 — ms.
+- **Android emulator:** opening — to — ms, dropped at most —.
+- **No slower:** the first screen with the door and without it is compared by the run (the budget "the door makes the first screen no later").
+- **Look:** a dark door in dark mode, a light one in light mode, the grey mark across the seam, a slow light along the seam, plating lines that travel with the halves.""",
+    evidence='[door recordings](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/door), [measure-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/measure-ios.json), [measure-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/measure-android.json)',
+    live='—',
+    limits="The owner's marks are asked for on the published review page; the iPhone frame-by-frame recording is a device step.")
+rec(137, 'Motion throughout', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven='one motion system: every duration, distance, easing and spring is a token, and the lint fails on one written by hand (proven with seeded values); the door, screen transitions, arriving rows, the needs-you pulse, sheets, presses and the connection line all use it; with Reduce Motion movement becomes a fade; an animation drops no frame while the logic is held for 500 ms',
+    deferred="a recording of each transition on both platforms with dropped frames counted per transition; the owner's marks on a review page",
+    steps="""1. `cd phone && npm run check:token-rule` (prints the motion tokens; ten seeded values fail the lint).
+2. The scenario `busy` on both simulators.
+3. `phone/src/motion` (Tap, Arrive, Pulse, useMotion) and the screens' tests against the fakes with Reduce Motion on.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Tokens:** `theme.motion` (VS Code's durations and curve) and `theme.phone.motion` (the door, screens, arrivals, status changes, the pulse, sheets, presses, the connection line, two springs, distances).
+- **Busy logic:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced.
+- **Reduce Motion:** the door fades, rows fade in place, the pulse holds still, sheets fade (tests against the fakes).""",
+    evidence="[phone/src/motion](https://github.com/beelol/overseer/blob/49cd85e9/phone/src/motion), [phone-tokens.json](https://github.com/beelol/overseer/blob/49cd85e9/phone/design/phone-tokens.json), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits="Per-transition recordings with frame counts are the next step; the review page is published (https://claude.ai/artifact/FzD5ido4NdwX3annWoY9Uq) and the owner's marks are asked for.")
 
 # Gate L addition (Continuity): permission modes on handoff.
-rec(138, "Permission modes carry over", "not started", date="—", commit="—",
+rec(138, "Permission modes carry over", "verified", commit="9dbf16f", date="2026-09-26",
+    harness="OpenCode 1.15.13 through `overseerd opencode-bridge`, Ollama 0.34.2, `qwen3-coder:30b-64k` (local model; no account, no paid tokens); the protocol tests use a synthetic OpenCode server and a synthetic Ollama",
+    fixture="Live: an isolated OVERSEER_HOME and a disposable repository; Overseer's own OpenCode profile `local-ollama` inside it. Protocol tests: fixtures/fake-harness/opencode-serve-fixture.js, whose prompt is a script",
+    steps="""1. Live: `node test/local/opencode-serve-live.js` (plan, manual, deny, acceptEdits, auto, interrupt, followup): [live.txt](evidence/ac-138/live.txt), [the runs' events](evidence/ac-138/live-events.jsonl).
+2. `cargo test -p overseerd --test local_runs`: `ac138_permission_modes_through_opencode`, `ac138_interrupt_and_follow_up_in_the_same_session`, `ac138_a_tool_call_written_as_text_is_retried_once`, `ac138_children_and_failures_of_the_local_model`.
+3. Unit tests: `opencode_bridge::tests::modes_become_an_agent_and_rules`, `the_profile_names_only_the_local_provider`, `the_server_is_recognised_from_its_own_help`, `handoff::tests::modes_are_carried_and_never_loosened`, and the four fixture replays (AC-139).
+4. The handoff: `cargo test -p overseerd --test handoff`: `ac91_transition_to_local_when_offline` (Claude Code in Ask first, Codex read only and Codex in its sandbox, each moved to local), `ac138_without_the_server_a_local_agent_cannot_ask_so_the_move_is_offered`, `ac84_fail_over_to_the_best_working_provider` (between providers).
+5. The spike: [AC-139](AC-139.md).""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#permission-modes-carry-over-ac-138).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(139, "OpenCode session transport spike", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(140, "Memory safety guard", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+    actual="""- **Live, 24 of 24 checks.** Plan only: completed, no file, nothing asked. Ask first: `edit: asked.txt` asked before anything was written, with the path and the diff (`+hello from ask first`); Allow wrote the file; the model then asked again for `command: ls -la`. Deny: `denied.txt` was not written and no file activity was reported; the model replied "refused". Accept edits: the file was written without a request and `command: ls` asked. Auto: write and command both ran, nothing asked.
+- **Interrupt and follow-up (live):** a 45 s command ended 563 ms after the interrupt, as `interrupted`, with no server left running; a follow-up in Ask first continued the same session (it named `first.txt`) and asked before writing `second.txt`.
+- **The user's own OpenCode:** `~/.config/opencode` (3,427 files) has the same SHA-256 before and after; the run's server held 17 files open, 5 in Overseer's profile and none in the user's OpenCode folders; its logs and sessions are in the profile. Other OpenCode processes were writing to the user's data folder during the run, which is why that folder is not hashed.
+- **What the bridge sends (protocol tests):** per mode the agent and the rules (`plan`; `build` with edit and bash `ask`; edit `allow` and bash `ask`; agent defaults), each with `question: deny`; only `once` and `reject` as answers; the model `ollama/<tag>`; the server behind a password; a profile that enables the `ollama` provider only and holds no rules. A mode that would bypass everything is refused.
+- **Usage:** tokens with cost 0, marked local.
+- **The handoff keeps the mode (fixtures):** a Claude Code run in Ask first, moved to the local model, asked before its write (`edit: asked.txt`), wrote nothing before the answer and wrote the file after Allow. A read-only Codex run became Plan only and changed no file. Codex in its sandbox became Accept edits: edits allowed, commands asked, the `question` tool denied.
+- **With the session transport not available:** the run waited and the move was offered with the difference ("this OpenCode has no server, so the local agent cannot ask before it edits or runs a command"); `run.handoff` was refused until the mode `auto` was accepted by name; a run that was already in Auto moved on its own. Every such run still passes the memory guard.
+- **Between providers:** Ask first on Claude Code is not moved to Codex on its own, because Codex does not ask; Plan only is, as read only.""",
+    evidence="[live.txt](evidence/ac-138/live.txt), [live-events.jsonl](evidence/ac-138/live-events.jsonl), daemon/tests/local_runs.rs, daemon/tests/handoff.rs, daemon/src/opencode_bridge.rs, daemon/src/handoff.rs",
+    live="Live with a real local model for every mode, interrupt and follow-up; synthetic server for the protocol tests.",
+    limits="macOS, OpenCode 1.15.13, one model. Images and reasoning effort are not supported by this harness. The Allow and Deny cards are the chat's own permission cards (AC-16), which the live run drove through the daemon; the Continuity screens of the packaged UI are AC-94 and AC-95.",
+    blocker="—")
+rec(139, "OpenCode session transport spike", "verified (research criterion)", commit="d2081e1", date="2026-09-26",
+    harness="OpenCode 1.15.13 with Ollama 0.34.2 and `qwen3-coder:30b-64k` (local model; no account, no paid tokens)",
+    fixture="An isolated OpenCode profile (its own XDG folders, `enabled_providers: [\"ollama\"]`, rules `edit: ask`, `bash: ask`) and two disposable Git repositories under the session scratchpad; the user's own OpenCode configuration was neither read nor written",
+    steps="""1. Memory before loading: 55.5 GiB available, budget 42.7 GiB; the model measures 23.7 GiB at a 65,536-token context ([memory.jsonl](evidence/ac-139/memory.jsonl)).
+2. `opencode serve --port 47931 --hostname 127.0.0.1` in the disposable repository, then `node test/spike/opencode-serve.js allow deny plan interrupt children directory usage`; the server was stopped and started again, then `node test/spike/opencode-serve.js resume-after plan`.
+3. `node test/spike/opencode-acp.js allow deny plan config interrupt kill children load` (it starts `opencode acp` itself).
+4. The model was unloaded (`keep_alive: 0`) and memory recorded again: 52.4 GiB available, nothing loaded.
+5. The adapter's tests replay the recorded fixtures: `cargo test -p overseerd opencode_bridge` (`ac139_the_allow_fixture_replays_as_a_conversation`, `ac139_the_deny_fixture_shows_the_refused_write`, `ac139_the_interrupt_fixture_ends_as_aborted`, `ac139_the_children_fixture_gives_a_child_run_with_its_output`).""",
+    expected="Redacted transcripts of both transports with versions; the written decision; a fixture recorded from the chosen transport that the adapter tests replay.",
+    actual="""- **`opencode serve`: 22 of 23 checks pass** ([results.txt](evidence/ac-139/results.txt)). A permission request arrives as a `permission.asked` event with the file path and a diff; nothing is written before the answer; `once` lets the write through and `reject` blocks it; a later command in the same turn asks again. `POST /session/{id}/abort` ended a 45 s command in 56 ms with `MessageAbortedError`, and the session took the next prompt. A restarted server continued the earlier session with its history. A child session is announced by `session.created` with its parent and listed by `/session/{id}/children`. One server served a second directory, with events and pending requests scoped to it. The assistant message reports tokens and cost. The one failure is the first plan attempt, which waited on OpenCode's `question` tool; with that tool denied by a session rule the plan agent finished and changed no file.
+- **`opencode acp`: 19 of 21 checks pass.** Permission requests, Allow, Deny, model and mode through config options, and `session/load` in a new process all work. **Interrupt does not:** `session/cancel` answers "Method not found" as a notification and as a request, and the 45 s command ran to its end (45,565 ms). A plan turn that delegated to a child never finished (300 s) and no request reached the client.
+- **Decision:** local runs use `opencode serve` through a bridge subcommand of `overseerd` and a new harness id `opencode-serve`; written in [the RFC](../rfcs/offline-mode.md#the-spike-comes-first-ac-139), and built.
+- **Fixtures replayed:** the four recorded transcripts go through the bridge and the parser as the daemon sees them: the allow fixture gives two permission requests with the path and the diff, the file activity, the reply and the usage, and leaves out the user's own prompt and an unrelated session; the deny fixture gives a tool error and no file activity; the interrupt fixture ends as `aborted`; the children fixture gives a child run with its own reply.
+- **Also learned:** a fresh profile offers eight online OpenCode Zen models unless `enabled_providers` names only the local provider; once in the 49 prompts of the spike the verified model wrote its tool call as text and nothing ran ([transcript](evidence/ac-139/serve-tool-call-as-text.jsonl)).""",
+    evidence="[evidence/ac-139/](evidence/ac-139/) (transcripts, results, memory), `fixtures/transcripts/opencode-1.15.13-serve-{allow,deny,interrupt,children}-local.jsonl`, drivers `test/spike/opencode-serve.js` and `test/spike/opencode-acp.js`, daemon/src/opencode_bridge.rs (tests)",
+    live="Real OpenCode runtime and a real local model through Ollama; no account and no paid tokens.",
+    limits="macOS only; one OpenCode version (1.15.13) and one model. A research criterion: it does not pass AC-138.")
+rec(140, "Memory safety guard", "verified", commit="8639ebb", date="2026-09-26",
+    harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures; synthetic Codex transcripts replayed through fixtures/fake-harness/replay.js",
+    steps="""1. `cargo test -p overseerd --test continuity`: `ac140_no_model_over_the_budget_is_loaded_by_any_path`; `--test local_runs`: `ac140_a_local_run_passes_the_guard_before_it_starts`.
+2. Unit tests: `local::tests::the_guard_refuses_anything_over_the_budget`, `a_load_is_stopped_when_memory_runs_short`.
+3. Live: `node test/local/continuity-live.js`: the guard asked about all 8 installed models, a load of `qwen3.5:122b` attempted, the pick loaded and unloaded.
+4. The valve: `cargo test -p overseerd --test handoff ac140_critical_pressure_pauses_local_runs_and_resumes_them`.
+5. Catalogue verification: `node test/local/catalogue-verify.js` ([log](evidence/ac-87/opencode-serve.txt)) and `node test/local/codex-oss-eval.js` ([log](evidence/ac-87/codex-oss.txt), [the run that stopped itself](evidence/ac-87/codex-oss-stopped.txt)).
+6. Unit test for the third term of the budget: `local::tests::the_systems_own_free_level_is_a_third_bound`.""",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#memory-safety-ac-140).",
+    actual="""- **Refused (live):** "qwen3.5:122b is too big to load: 77.2 GiB at a 16k context is over the budget of 46.2 GiB (40% of 128 GiB is 51.2 GiB; 59 GiB available minus 12.8 GiB headroom is 46.2 GiB)", from the guard and from a load; nothing was loaded. The other 7 models were allowed at 16k, each under the budget.
+- **Refused (fixtures):** the same model at the 50% ceiling with unverified models allowed; a model of unknown size; the pick itself when memory is short now ("23.7 GiB at a 64k context is over the budget of 17.2 GiB"); anything at critical pressure. The fixture Ollama received no load for any refused model.
+- **Local runs (protocol tests):** a run asking for `qwen3.5:122b` by name is refused ("77.2 GiB at a 16k context is over the budget of 51.2 GiB") and ends as `failed` with `not launched: …`; so is the pick when memory is short, anything at critical pressure, a model that is not installed, and a run on the user's own OpenCode profile. For every refused run Ollama received no load and OpenCode was never started. A tag that sets no context is run through a tag that does (`overseer/qwen2.5-coder-14b:32k`), and the model is loaded once under the watchdog and found loaded by later runs. A copy that is already loaded is not counted twice, under whichever tag of the same model it was loaded.
+- **Watchdog (fixtures):** memory dropped to 5 GiB during a load: "the load of qwen3-coder:30b-64k was cancelled and the model unloaded: available memory fell to 5 GiB, under half the headroom of 12.8 GiB", followed by an unload request; a critical-pressure signal stopped a load the same way. Every load is a `local_load` event with memory before and after.
+- **The valve (fixtures):** a critical-pressure signal during a local turn: the run read `waiting_for_memory` with "the system reported critical memory pressure; the local model was unloaded", `/api/ps` showed nothing loaded, the turn was `waiting` with its prompt kept, and it was recorded as Overseer's action, not a user interrupt. While the pressure stayed critical nothing was loaded, nothing was sent, and a new local run was refused. With the pressure normal again the turn was sent once, in the same session, the model loaded again through the guard, and the work finished: one turn, one `turn_started`.
+- **Catalogue verification (live):** six models, one at a time, smallest first, each loaded by the daemon through the guard and unloaded after its check, with memory before and after in the log. The pressure stayed normal throughout; the system's free level was 73 to 75% between models and 44% at its lowest, under the 26.5 GiB model.
+- **What a later run found, and what was changed:** the evaluation of Codex's local mode ran while the machine was busy (another session's 24 GiB model loaded, an emulator, two builds). The guard allowed a 14.2 GiB load (30.5 GiB read as available, less 12.8 GiB headroom, is 17.7 GiB), and with it the system reached its **warning** level (free level 47% to 26%). The run stopped within two seconds and unloaded the model, as it is written to; nothing else was loaded while the warning lasted. The budget now has a third term: the system's own free level must stay at 45% or more after a load. The same load is refused with the numbers, and the repeated evaluation ran with the pressure normal throughout (lowest level 48%).
+- **Prefetch** fetches a model and loads nothing (AC-89).
+- **Live load:** `qwen3-coder:30b-64k` loaded in 5.1 s with 5 memory samples; available went from 59.0 to 42.4 GiB; pressure stayed normal (level 64%); the model was unloaded afterwards.""",
+    evidence="daemon/tests/continuity.rs, daemon/tests/handoff.rs, daemon/src/local.rs, daemon/src/handoff.rs, [live.txt](evidence/ac-85/live.txt)",
+    live="Live on this machine for the refusal, the guarded loads and the catalogue verification; fixtures for the watchdog and the valve.",
+    limits="The warning level was reached once, as described, during an evaluation that is not the catalogue verification the criterion names; it is reported here because it is the reason the budget was tightened. The third term uses macOS's `kern.memorystatus_level`; Linux has no such number yet and keeps two terms. Overseer cannot stop a model that someone starts in Ollama themselves.")
 # Gate N addition: pair once (the owner's decision of 2026-09-26).
-rec(141, "Pair once", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(141, 'Pair once', 'partial',
+    date='2026-09-27 UTC',
+    commit='49cd85e9 (branch claude/phone-remote-vscode-control-b48a34, pull request #10, not merged yet)',
+    harness='Fixture harnesses only (the Claude fixture, the synthetic account CLI, generic programs); no accounts, no paid tokens',
+    fixture="A real overseerd with its own data folder under /tmp and phone access on; fixture repositories; the iPhone 17 Pro simulator (iOS 26.5) and the Android virtual device Overseer_API_35 (API 35), both Overseer's own; release builds of the app",
+    proven="every protocol test (20 reopens, a daemon restart, a newer state version, off and on, thirty days); on the iOS simulator: opened five times with no prompt, a new build installed over the old one, phone access off and on, the Mac's address changed (a typed address, no pairing again); the app's screens with no sign-in among them; revoking on the Mac brings the app to pairing",
+    deferred="the daemon killed and started again: the app did not reconnect within the two minutes the scenario allowed; a phone restart (the simulator rebooted); the Android run's log",
+    steps="""1. `cargo test -p overseerd --test gateway` (ac141: reconnects by itself after 20 reopens, a daemon restart, a newer state version, phone access off and on, and thirty days; pairing was opened once).
+2. The phone: the scenarios `reopen` (closed and opened five times), `update` (a new build installed over the old one), `unreachable` (the daemon killed and started again), `manual-address` (the Mac's address changed), `off-and-on`, and `revoke` (removed on the Mac: pairing is the only way on); the measurement's 40 cold starts.
+3. The app's screens: the routes in `phone/app` (pairing, agents, an agent, changes, a file, merge back, pull request, new agent, accounts, settings, and two for tests); no sign-in among them.""",
+    expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
+    actual="""- **Protocol:** every ac141 test passes, including thirty days and a newer state version.
+- **On the simulators:** iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: the flow reachable failed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator passed; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced; iOS simulator FAILED: the phone still holds what it knew of the Mac; Android emulator: the log of the Android run was overwritten by a run that could not start its lab; not evidenced.
+- **No account:** the app has no account, password or sign-in screen; the keys are the identity.""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/49cd85e9/daemon/tests/gateway.rs), the scenario run's logs [ios.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios.log) and [android.log](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android.log), its results [result-ios.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-ios.json) and [result-android.json](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/result-android.json), screenshots under [e2e/ios](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/ios) and [e2e/android](https://github.com/beelol/overseer/blob/49cd85e9/docs/verification/evidence/phone/e2e/android)",
+    live='—',
+    limits='A phone restart (the simulator rebooted) is not in the run; the pairing lives in the keystore, which a restart keeps.')
 
 # Brand (added by the owner on 2026-09-26; docs/design/brand.md). Built on branch claude/brand-mark (stacked on Gate M);
 # the owner approves the single-colour silhouette and the Mac helper icon.
@@ -1224,9 +1810,13 @@ rec(142, "One Overseer mark everywhere", "verified", date="2026-09-27", commit="
 rec(178, "The phone app uses the owner's mark", "not started", date="—", commit="—",
     expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
     actual="Not started.", live="—", blocker="Not started: the phone app's agent (Gate N) replaces its placeholder marks with the owner's files in docs/design/brand/.")
-rec(179, "The Mac surfaces use the owner's mark", "not started", date="—", commit="—",
+rec(179, "The Mac surfaces use the owner's mark", "partial", commit="8653510", date="2026-09-27", harness="none (the packaged VSIX and the helper's build)",
+    proven="the notification helper's `.icns` is built from `docs/design/brand/exports/overseer-app-icon-macos-1024.png` by `extension/notifier/build.js` (sips for every macOS size, iconutil); the brand scenario unpacks the installed helper's icon and finds every size, the owner's violet tile (`node test/ui/scenario-brand.js`); Overseer has no menu-bar item and no other Mac app, so those parts do not apply yet",
+    deferred="a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission; the menu-bar image when a menu-bar item exists",
     expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
-    actual="Not started: the notification helper's icon is done on branch claude/brand-mark (AC-142); a menu-bar item does not exist yet.", live="—", blocker="Not started: verified with AC-142's merge for the helper; the menu-bar part waits for a menu-bar item.")
+    actual="See proven and deferred.",
+    evidence="[helper icon as installed](evidence/ui/brand/notifier-app-icon.png), [brand scenario](evidence/ui/brand/)", live="—",
+    blocker="Owner: run Overseer: Test Notification in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder.")
 
 # Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code came with pull
 # request #5 (merged as e0db692) and the terminal UI (T-23, T-24) with pull request #6 (merged as ea6a6c2).
@@ -1308,20 +1898,25 @@ rec(147, "One command runs every test", "verified", commit="fb43c9b (merge of pu
 rec(148, "Checks on every pull request", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate P).",
     actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
-rec(149, "A steady UI suite", "partial", commit="91c7fc8", date="2026-09-27", harness="fixture harnesses; no paid tokens",
-    proven="causes fixed on main: the UI harness aims a click only once its target has stopped moving; the review no longer takes keyboard focus while following an agent; ⌥⌘J presses queue; the keyboard scenario waits for each selection; staging refreshes the review in 225 ms (was about 2 s); the hunk scenario's redo passed in every run this session",
+rec(149, "A steady UI suite", "partial", commit="95163bc", date="2026-09-27", harness="fixture harnesses; no paid tokens",
+    proven="causes fixed on main: the UI harness aims a click only once its target has stopped moving; the review no longer takes keyboard focus while following an agent; ⌥⌘J presses queue; the keyboard scenario waits for each selection; staging refreshes the review in 225 ms (was about 2 s); the hunk scenario's redo passed in every run this session; the harness puts focus on a workbench element before key presses (95163bc), so keyboard's first ⌥⌘J lands",
     deferred="three consecutive clean full runs on one build, and the first-edit p95 under 400 ms over ten runs (last single runs: 361 and 466 ms): both need a machine where no other agent is running VS Code scenarios at the same time (the phone and Continuity agents were running theirs throughout)",
     expected="See the RFC criterion (Gate P).",
-    actual="Full run on main plus pull requests #8, #11 to #13: 40 of 48; every failure since fixed on main or passing on rerun except keyboard, whose first ⌥⌘J reading still lags under load.",
+    actual="Full run on main after Continuity (#9) and the keyboard fix: 49 of 51, with other agents running scenarios at the same time; the two failures were timing under load: arrangement's first edit took 517 ms against 500, and audit's review measured 178 characters against 175 (175 when rerun alone).",
     evidence="[AC-147 runs](evidence/ac-147/)", live="—", blocker="Needs a quiet machine (no other agent running UI scenarios) for the three-in-a-row runs and the p95.")
 rec(150, "The first click always lands", "verified", commit="bc358a1", date="2026-09-27", harness="fixture harnesses; no paid tokens",
     steps="`node test/ui/scenario-first-click.js`: focus in the side bar or another editor group, then one click on each view's first control, in the composer, review beside the chat, grid and dashboard arrangements.",
     expected="See the RFC criterion (Gate P).",
     actual="All seven first clicks acted: the composer's agent menu, the chat's More menu (after focus in the review and in the dashboard), the review's Changes only toggle both ways, the search field (and the typing after it), a grid tile's pin.",
     evidence="[first-click scenario](evidence/ui/first-click/)", live="—")
-rec(151, "Every live scenario rerun on the current build", "not started", date="—", commit="—",
+rec(151, "Every live scenario rerun on the current build", "partial", commit="06d6d75", date="2026-09-27", harness="Claude Code 2.1.246 (haiku) and Codex (gpt-5.6-luna, low effort) on the owner's existing logins",
+    proven="rerun on current main and passing: claude-live (AC-17, AC-43: nested native children, a permission answered in the chat, a follow-up turn, the latest-run comparison, an interrupt; 9 of 9 after the daemon fix below), background (AC-45), the live Gate J scenario (Claude half and Codex half, AC-81), merge (AC-44), Talk to Overseer live (AC-107), and conversation-live's Codex exec and Claude runs. The claude-live rerun found a daemon bug, fixed in 06d6d75: on Claude Code 2.1.246 a Claude run stayed running after its result when a subagent launched its own child in the background (spawn depth 2, reported to that subagent) or when a background task's notice was read within the same turn; the daemon waited for a further top-level turn that Claude never starts. Two fixture modes replay those live streams (`cargo test -p overseerd --test protocol ac14_`)",
+    deferred="codex-live, codex-approval, codex-follow and conversation-live's app-server run: the app-server transport cannot set reasoning effort, and the paid-turn rule allows only low effort",
     expected="See the RFC criterion (Gate P).",
-    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+    actual="See proven and deferred.",
+    evidence="[claude-live](evidence/ui/claude-live/), [background](evidence/ui/background/), [live Gate J, Claude](evidence/ui/live-gatej-claude/), [live Gate J, Codex](evidence/ui/live-gatej-codex/), [merge](evidence/ui/merge/), [talk-live](evidence/ui/talk-live/), [conversation-live](evidence/ui/conversation-live/)",
+    live="Claude Code haiku and Codex luna at low effort, one attempt per step",
+    blocker="The app-server live runs need either effort support in that transport or the owner's allowance for its default effort.")
 rec(152, "Performance re-measured", "verified", commit="4fb5d60", date="2026-09-27", harness="fixture harnesses; no paid tokens",
     steps="`node test/ui/scenario-perf.js` (the AC-35 load test): 10,000 tracked files, four active runs editing and printing for ten minutes, the review open on 100 changed files; while other agents ran their own VS Code scenarios on the same machine.",
     expected="AC-35's numbers: navigation p95 under 250 ms, an ordinary file refresh within 2 s under load with none missed, bounded daemon retention, extension-host memory stable (under 25% growth).",
@@ -1586,7 +2181,7 @@ SHORT_BLOCKERS = {
     148: "not started (Gate P, added by the owner on 2026-09-27)",
     149: "partial: the causes are fixed; three clean runs in a row need a machine where no other agent runs UI tests",
     150: "verified",
-    151: "not started (Gate P, added by the owner on 2026-09-27)",
+    151: "partial: every live scenario but the four app-server Codex runs (no low-effort setting there)",
     152: "verified",
     153: "verified",
     142: "verified",
@@ -1614,12 +2209,7 @@ SHORT_BLOCKERS = {
     66: "owner design review after the Gate J build",
     81: "verified",
     82: "verified",
-    83: "not started (Gate L, added by the owner on 2026-09-26)",
-    84: "not started (Gate L, added by the owner on 2026-09-26)",
-    85: "not started (Gate L, added by the owner on 2026-09-26)",
-    86: "not started (Gate L, added by the owner on 2026-09-26)",
     87: "not started (Gate L, added by the owner on 2026-09-26)",
-    88: "not started (Gate L, added by the owner on 2026-09-26)",
     89: "not started (Gate L, added by the owner on 2026-09-26)",
     90: "not started (Gate L, added by the owner on 2026-09-26)",
     91: "not started (Gate L, added by the owner on 2026-09-26)",
@@ -1629,7 +2219,6 @@ SHORT_BLOCKERS = {
     95: "not started (Gate L, added by the owner on 2026-09-26)",
     96: "not started (Gate L, added by the owner on 2026-09-26)",
     97: "not started (Gate L, added by the owner on 2026-09-26)",
-    98: "not started (Gate L, added by the owner on 2026-09-26)",
     99: "verified",
     100: "verified",
     101: "verified",
@@ -1669,9 +2258,6 @@ SHORT_BLOCKERS = {
     135: "not started (Gate N, added by the owner on 2026-09-26)",
     136: "not started (Gate N, added by the owner on 2026-09-26)",
     137: "not started (Gate N, added by the owner on 2026-09-26)",
-    138: "not started (Gate L, added by the owner on 2026-09-26)",
-    139: "not started (Gate L, added by the owner on 2026-09-26; the goal's first step)",
-    140: "not started (Gate L, added by the owner on 2026-09-26)",
     141: "not started (Gate N, added by the owner on 2026-09-26)",
     162: "not started (Gate R, added by the owner on 2026-09-27; the goal's first step)",
     163: "not started (Gate R, added by the owner on 2026-09-27)",
@@ -1690,7 +2276,7 @@ SHORT_BLOCKERS = {
     176: "not started (Gate R, added by the owner on 2026-09-27)",
     177: "not started (Gate R, added by the owner on 2026-09-27)",
     178: "not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files",
-    179: "not started (Brand, added by the owner on 2026-09-27): the Mac helper's icon is built with AC-142; a menu-bar item does not exist yet",
+    179: "partial: the helper's icon is built from the owner's mark and checked as installed; the banner and Finder screenshots need the owner",
     180: "verified",
     181: "verified",
     182: "partial: home's conversation, the target and the corrections are in VS Code (pull request #14); the keyboard-only corrections and the AC-54 measure remain",
@@ -1790,7 +2376,9 @@ def sync(out):
     follow += [f"- [ ] {x}" for x in EXTRA_FOLLOWUPS]
     readme = root / "README.md"
     rt = readme.read_text()
-    rt = re.sub(r"(<!-- ac-list:start -->\n)(.*?)(<!-- ac-list:end -->)", lambda m: m.group(1) + "\n".join(items) + "\n" + m.group(3), rt, flags=re.S)
+    # A record's text links relative to docs/verification/; in the README, relative to the root.
+    rebased = [re.sub(r"\]\((?!https?:|#|docs/)(\.\./)?", lambda m: "](docs/" if m.group(1) else "](docs/verification/", i) for i in items]
+    rt = re.sub(r"(<!-- ac-list:start -->\n)(.*?)(<!-- ac-list:end -->)", lambda m: m.group(1) + "\n".join(rebased) + "\n" + m.group(3), rt, flags=re.S)
     rt = re.sub(r"Verified acceptance\ncriteria: \*\*[^*]+\*\*( · \*\*\d+\*\* partial)?", f"Verified acceptance\ncriteria: **{len(verified)} / {TOTAL}** · **{len(partials)}** partial", rt)
     rt = rt.replace("__VERIFIED__ / 41", f"{len(verified)} / {TOTAL}")
     rt = rt.replace("__UNVERIFIED__", ", ".join(f"AC-{n:02d}" for n in unverified))
