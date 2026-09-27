@@ -1,9 +1,9 @@
 # Side RFC: Voice Mode — talk to Overseer, redirect every agent
 
-Status: owner request (2026-09-27). Proposed; nothing is built. Tracked by AC-162 to AC-177 under
-[Gate R](../overseer-rfc.md#gate-r--voice-mode-added-by-the-owner-2026-09-27) in the main RFC.
-The defaults below stand until the owner changes them; the
-[questions for the owner](#open-questions-for-the-owner) are at the end.
+Status: owner request (2026-09-27); the owner's answers are in. Not built yet. Tracked by AC-162
+to AC-177 under [Gate R](../overseer-rfc.md#gate-r--voice-mode-added-by-the-owner-2026-09-27) in
+the main RFC. The build is one goal: [voice-mode-goal.md](voice-mode-goal.md). The animation's
+reference is [`docs/design/voice-mark/`](../design/voice-mark/index.html).
 
 ## Why
 
@@ -39,13 +39,18 @@ Added the same day, about what is on screen:
 | Always there | The owner can talk to it constantly. While it is on it listens; no button per sentence. |
 | Reach | It changes and redirects course across all orchestrated agents. |
 | By context | Which agents a sentence is for comes from the context of what is being said. |
-| Hard to interrupt | It does not interrupt easily. |
+| Hard to interrupt | It does not interrupt easily. The owner's meaning (2026-09-27): other voice modes stop what they are doing at a tiny noise when nobody is even talking; Overseer must not. A higher tolerance, and reasoning about whether the owner actually meant to talk to it. See [Listening and the floor](#listening-and-the-floor). |
 | Flow | It always flows and keeps listening to what is being said. |
 | Quick answer | It quickly answers that it is working on the request. |
 | Evidence | It shows what it is saying to every new agent and every in-flight agent it references for that request. |
 | Audio | Audio is collected on the Rust side (owner, 2026-09-27, added while this RFC was written). No Swift or webview code captures the microphone. |
 | The mark | The animated Overseer logo is in the middle while the conversation is happening. The waveform has an effect on it, so the owner knows Overseer is getting what is said. |
-| The animation | Orbit (owner, 2026-09-27, from the preview page): the swooshes turn around the core. Ideally each swoosh on its own; when they cannot be separated, a gradient pulse through them is the owner's alternative. |
+| The animation | Star (owner, 2026-09-27, from the preview page: "perfect"). It replaces the earlier pick of Orbit. See [The mark in the middle](#the-mark-in-the-middle). |
+| Working while listening | The mark reacts to the owner's real voice, from the Rust listener, while Voice Mode listens: not a simulation. |
+| Open floor | Fine (owner, 2026-09-27). |
+| Who is spoken to | A setting: Overseer (the orchestrator, the default) or one agent. See [Talking to one agent](#talking-to-one-agent). |
+| Redirects | A spoken redirect goes out without a yes, after the 2 s window in which it can be cancelled. |
+| Permissions by voice | Yes, one at a time, after Overseer reads the request back. The owner must be sure it was taken: a sound (a Reactor key, under Audio Mode's rules: on and off, and the key for the clip) and a toast, and it can be cancelled. See [Answering a permission by voice](#answering-a-permission-by-voice). |
 
 ## Proposed defaults, distinguished from the decisions above
 
@@ -63,11 +68,9 @@ These are this RFC's choices, not the owner's. A change is a recorded revision.
   VS Code closed, and two open windows never handle one sentence twice.
 - **One Overseer.** Voice Mode is the spoken side of Talk to Overseer (AC-107). Typed and spoken
   messages are one conversation with one memory.
-- **Open floor.** While Voice Mode is on, everything the owner says is heard without a wake word.
-  *Name first* and *push to talk* are settings for shared rooms.
-- **Steering needs no separate yes.** A spoken redirect is sent after a short settle window in
-  which the owner can correct or cancel it. Actions that cannot be taken back still wait for a yes.
-  This differs from the typed chat of AC-107, where every action waits for a yes.
+- **Name first and push to talk** stay as settings for shared rooms; the open floor is the default.
+- **The typed chat keeps its own rule.** A spoken redirect needs no yes (the owner's decision);
+  what is typed follows Overseer's level (Gate S, AC-186).
 - **The model proposes, the daemon sends.** The orchestrator's model writes a plan. The daemon
   checks it, sends the messages and records them. What the card shows is what was sent.
 - **Add by default, stop when the course changes.** A message waits for the end of the agent's
@@ -116,8 +119,8 @@ These are this RFC's choices, not the owner's. A change is a recorded revision.
   it can be reached from Rust, for words.
 - The listener plays Overseer's speech itself. It then knows exactly what the speakers are
   playing, which echo cancellation needs, and it can lower or stop the voice within the budget.
-- The listener sends **words** and **levels** for the mark, never the recording, over the
-  daemon's owner-only socket (AC-08).
+- The listener sends **words** and **levels** for the mark, never the recording, to the daemon
+  that started it.
 - The orchestrator never talks to an agent. It writes a plan; the daemon sends through the same
   methods the chat uses, so every message is an ordinary event in the agent's run.
 - UI clients draw what the daemon reports. None of them listens or speaks.
@@ -137,14 +140,43 @@ These are this RFC's choices, not the owner's. A change is a recorded revision.
 
 ## Listening and the floor
 
-"Does not interrupt easily" can be read three ways. All three are covered, because each one
-breaks the flow when it goes wrong.
+The owner's complaint about other voice modes (2026-09-27): they stop what they are doing at a
+tiny noise when nobody is even talking. So Overseer has a high tolerance at two levels. The sound
+itself must be speech (the speech gate), and the words must be meant for Overseer (the intent
+check). Noise alone never changes anything: not the mark, not Overseer's voice, not an agent.
 
 | Who interrupts whom | Rule |
 | --- | --- |
 | Noise, or the owner, interrupts Overseer's speech | Overseer keeps talking unless the owner really speaks to it. |
 | Overseer interrupts the owner | Never. It waits for the end of the thought and for a free floor. |
 | Overseer interrupts an agent | Only when the request changes what the agent is doing now. See [Sending](#sending-add-redirect-stop). |
+
+### The speech gate
+
+The listener decides on the Mac, from the sound alone, whether someone is speaking. Only then does
+the mark move, is Overseer's voice lowered, or is anything sent to the recognizer.
+
+| The sound | Counts as speech |
+| --- | --- |
+| At least 250 ms of voiced sound in the speech band, 12 dB above the room's noise floor | yes |
+| Taps, clicks, typing, a chair, a door, a cup set down (short and broadband) | no |
+| A cough, a laugh, a sigh (no voiced syllables) | no |
+| A steady hum, a fan, music in the background | no: the noise floor follows it |
+| Overseer's own voice and Audio Mode's cues through the speakers | no: cancelled first |
+
+The numbers are the starting point; the spike (AC-162) sets them on the owner's Mac against real
+rooms, and a change is recorded here.
+
+### Meant for Overseer
+
+Speech that passes the gate is not yet a request. With the open floor the owner also talks to
+people, takes calls and thinks aloud. An utterance counts only when it reads as meant for the one
+being spoken to (Overseer or the chosen agent): it names Overseer or an agent, continues the
+conversation, answers a question Overseer asked, or asks for something about the agents. Anything
+else (talk to someone in the room, a call, a video) makes no request, no answer and no sound; it
+stays in the rolling context only. Words that are clearly addressed (a stop word, Overseer's name)
+are decided on the Mac at once; the rest is the orchestrator's first judgement, before it writes
+anything, and costs no answer when the answer is no.
 
 ### The end of a thought
 
@@ -162,11 +194,12 @@ punctuation. No model turn is spent on it. The spike (AC-162) tests the rule on 
 
 ### What never counts
 
-None of these starts a request, and none of them stops Overseer's speech:
+None of these starts a request, lowers or stops Overseer's speech, or moves the mark:
 
-- noise, typing, music, a cough, a door;
+- anything the speech gate rejects: noise, typing, music, a cough, a door;
 - sound that does not become words;
 - backchannels;
+- speech that is not meant for Overseer;
 - Overseer's own voice and Audio Mode's cues coming back through the microphone (the listener
   cancels the Mac's own output).
 
@@ -174,13 +207,16 @@ None of these starts a request, and none of them stops Overseer's speech:
 
 | The owner | Overseer |
 | --- | --- |
+| makes a noise, coughs, types | keeps talking at full voice |
 | says one word or a backchannel | keeps talking |
-| says two or more words | lowers its voice within 150 ms and keeps listening |
-| is still speaking 0.7 s later | stops at the end of its phrase |
+| says two or more words (recognized, not a backchannel) | lowers its voice within 150 ms of the second word and keeps listening |
+| is still speaking 0.7 s later, and the words are meant for Overseer | stops at the end of its phrase |
+| is still speaking, and the words are not meant for Overseer | returns to full voice and finishes |
 | says "stop", "wait" or "hold on" | stops within 300 ms |
 
-Lowering first and stopping second is what makes it hard to knock over and still quick to yield.
-What Overseer had not said yet stays in the card. "Go on" says the rest.
+Lowering needs words, not sound, and stopping needs words meant for Overseer. That is what makes it
+hard to knock over and still quick to yield. What Overseer had not said yet stays in the card.
+"Go on" says the rest.
 
 ### When Overseer wants to speak
 
@@ -194,13 +230,26 @@ What Overseer had not said yet stays in the card. "Go on" says the rest.
 
 | Setting | Behaviour |
 | --- | --- |
-| Open floor (default) | Every utterance is heard. The orchestrator drops speech that is not for it. |
+| Open floor (default, confirmed by the owner) | Every utterance is heard; only what is [meant for Overseer](#meant-for-overseer) counts. |
 | Name first | Saying "Overseer" or an agent's name opens the conversation. It stays open during the exchange and for 60 s after. |
 | Push to talk | Overseer listens while a key is held. |
 
 Open floor is what the owner asked for. Its cost is stated under
-[Privacy and security](#privacy-and-security): the words of everything the owner says in the room
-reach the orchestrator's model.
+[Privacy and security](#privacy-and-security): the words of speech that passes the gate reach the
+orchestrator's model for the intent check, even when they turn out not to be meant for it.
+
+### Talking to one agent
+
+Who the owner is talking to is a setting (`voice.target`), switched in the voice strip, by a
+command, or by voice ("talk to Continuity", "back to Overseer"):
+
+| Target | What happens to what is said |
+| --- | --- |
+| Overseer (default) | The orchestrator works out the agents from context, as below. |
+| One agent | What is meant for it goes to that agent as its next message, with the same card and evidence, and no working out of targets. Naming Overseer ("Overseer, stop everyone") still reaches Overseer. |
+
+The strip always shows the target, and the mark's view names it. When the chosen agent finishes or
+is archived, the target returns to Overseer and Overseer says so once.
 
 ### Mute and calls
 
@@ -356,10 +405,28 @@ The daemon enforces the tiers, whatever the plan says.
 | --- | --- | --- |
 | Look | Questions about the agents; select or track an agent; open the grid; mute | At once |
 | Steer | Add, redirect, stop an agent or every agent; up to three new agents | Answer, settle window, send. Stop skips the window |
-| Confirm | Answer a permission request; merge back; open a pull request; archive; more than three new agents | Read back in one sentence, then a yes by voice or click within 20 s. Silence or anything unclear is a no |
+| Confirm | Answer a permission request; merge back; open a pull request; archive; more than three new agents | Read back in one sentence, then a yes by voice or click within 20 s. Silence or anything unclear is a no. A permission answer then plays its cue, shows its toast and waits out the settle window, where it can be cancelled (below) |
 | Not by voice | Accounts and sign-in; phone access and pairing; Continuity's download and install settings; workspace cleanup; stopping the daemon; changing these rules | Overseer opens the place in the UI and says so |
 
 Permission requests are answered one at a time. "Allow everything" is refused.
+
+### Answering a permission by voice
+
+The owner decided (2026-09-27) that permissions may be answered by voice, and that there must be no
+doubt it was taken.
+
+1. Overseer reads the request back in one sentence: "Codex wants to run `npm install` in
+   overseer. Allow?"
+2. The owner answers. Only a clear yes or no counts; silence for 20 s or anything unclear is no
+   answer, and the request stays waiting.
+3. At once: a sound and a toast. The sound is an Audio Mode cue, so it follows Audio Mode's rules:
+   it plays only while Audio Mode is on, through the audio arbiter, and uses a Reactor key
+   (`agent_unblocked` for allow, `agent_stopped` for deny); no sound is added. The toast shows
+   whatever Audio Mode is set to: *Allowed: npm install for Codex* with **Cancel**, and a bar
+   for the time left.
+4. The answer is held for the settle window (2 s). "Cancel", "no, wait" or the toast's Cancel
+   withdraws it: nothing reaches the agent, the request is waiting again, and the toast says so.
+5. After the window the answer goes to the agent once, and the toast reads *Sent*.
 
 ## Audio Mode and Voice Mode together
 
@@ -371,6 +438,7 @@ One audio arbiter in the daemon decides what plays.
 | A routine cue is due while the owner speaks | It is dropped. |
 | An attention cue is due while the owner speaks | It waits for the end of the thought, at most 5 s. |
 | The heard signal | It reuses one of the twelve Reactor keys. No sound is added or generated. |
+| A permission answered by voice | `agent_unblocked` (allow) or `agent_stopped` (deny), like any cue: only while Audio Mode is on, and through this arbiter. The toast shows either way. |
 
 Each mode works with the other off. Audio Mode's rules and tests do not change.
 
@@ -389,8 +457,8 @@ Each mode works with the other off. Audio Mode's rules and tests do not change.
 - **On the Mac.** Recognition and speech are on-device. The listener opens no network connection.
 - **No recordings.** Audio lives in the listener's memory for at most 30 s and is never written to
   disk.
-- **Levels.** What moves the mark is the least the chosen animation needs: how loud, and for the
-  Ring the outline of the wave. The outline is treated like audio: on this Mac only, never stored.
+- **Levels.** What moves the mark is one number, how loud, sent only while the speech gate is
+  open. It cannot be turned back into speech, and it is never stored.
 - **What is stored.** The words of requests, redacted like other events, for 30 days or 5,000
   requests. Speech that was not a request lives only in the rolling context (10 minutes, memory).
 - **What reaches a model.** The words of each utterance that passes the gate go to the
@@ -416,6 +484,7 @@ Stored and enforced by the daemon.
 | --- | --- | --- |
 | `voice.enabled` | off | |
 | `voice.floor` | open | open, name first, push to talk |
+| `voice.target` | Overseer | Overseer, or one active agent |
 | `voice.delivery` | auto | auto, always add, always redirect |
 | `voice.settleSeconds` | 2 | 0 to 10 |
 | `voice.speak` | all | all, first answer only, none (cards only) |
@@ -447,7 +516,7 @@ Proposed names. The implementation may change them with the reason recorded.
 | `voice.request` | A request created or changed |
 | `voice.dispatch` | One dispatch's state change, with the run's event id |
 | `voice.spoke` | A line spoken, lowered, stopped or sent to the card alone |
-| `voice.level` | The loudness of the owner's voice or of Overseer's, and for the Ring the outline of the wave; at most 30 a second; not stored; never sent to a phone |
+| `voice.level` | The loudness of the owner's voice (while the speech gate is open) or of Overseer's; at most 30 a second; not stored |
 
 | Record | Fields |
 | --- | --- |
@@ -459,29 +528,38 @@ Proposed names. The implementation may change them with the reason recorded.
 While a voice conversation is happening, the Overseer mark (AC-142) is in the middle and moves
 with the voice. It answers one question at a glance: is Overseer getting what I am saying?
 
-| State | What the mark does |
-| --- | --- |
-| Listening | Calm, slow motion. It is on and nobody is speaking. |
-| Hearing you | It moves with the owner's voice, within 100 ms of the sound. |
-| Thinking | Its own steady motion, not tied to any sound. |
-| Speaking | It moves with Overseer's own voice. |
-| Muted, paused for a call | Still and dimmed, with the mute or pause sign. |
+The owner picked the **Star** animation (2026-09-27). The swooshes never move; the life is in the
+star at the core and the glow behind the mark. Its reference implementation, with every number in
+one table (`MOTION`), is [`docs/design/voice-mark/index.html`](../design/voice-mark/index.html):
+open it in a browser to see each state. The build ports its `MOTION`, `step()` and `pose()` as
+they are, so the product and this table cannot drift.
+
+| State | Star | Glow behind the mark | Core |
+| --- | --- | --- | --- |
+| Listening (on, nobody speaking) | at rest | faint (18%), breathing slowly (±5% over 4 s): it is on | still |
+| Hearing you | grows with the owner's voice, up to 1.85× its size, and brightens | swells with the voice, up to 98%, and widens | still |
+| Thinking | turns slowly (1.3 rad/s) and sits 12% larger; comes to rest on a quarter turn, where it looks as drawn | faint | still |
+| Speaking | grows with Overseer's voice, up to 1.3×, and brightens | swells, up to 53% | a ring of light leaves the star on each stressed syllable (level above 0.42, at least 200 ms apart) and fades at the rim in 0.95 s |
+| Muted | at rest | none | the whole mark grey and dimmed to 45%, with a mute sign |
+| Paused for a call | as muted, with a pause sign | | |
+
+- **Timing.** The mark starts to move when the speech gate opens (within 300 ms of the first
+  word), then follows the voice within 100 ms: it rises in about 30 ms and falls back over about
+  0.5 s. Changes between states blend over about 120 ms.
+- **Colour.** The glow is the theme's accent; the ring of light is the star's own white. Nothing
+  else is tinted.
 
 - **A still mark means it does not hear.** Noise that does not count as speech leaves the mark
   calm. So when the owner speaks and the mark does not move, Overseer is not getting it.
 - **Where.** In the centre of the voice view, which takes the middle of the editor area like the
   home chat (AC-72). Beside a review or the grid the same mark is shown small in the voice strip,
   so the work is not covered.
-- **Hearing moves the outside, speaking moves the inside.** While the owner speaks the swooshes,
-  the ring or the sweep of light react. While Overseer speaks the light comes from the star and
-  spreads outward. The two are told apart by where the motion is, not by colour.
+- **Hearing grows the star; speaking sends light out of it.** The two are told apart by motion
+  (a swelling star, or rings crossing the core), not by colour.
 - **Levels, not the recording.** The mark is drawn by the windows, and the sound is heard by the
-  Rust listener, so something has to travel from one to the other. It is the smallest thing the
-  chosen animation needs. For Gradient, Orbit and Star that is one number, how loud, at most 30
-  times a second; speech cannot be rebuilt from it. Ring also needs the outline of the wave (at
-  most 32 points, 30 times a second). Rough speech could be rebuilt from that outline, so it is
-  treated like audio: it goes to windows on this Mac only, never to the phone, and is never
-  stored. Every window draws from the same levels.
+  Rust listener, so something has to travel from one to the other: one number, how loud, at most
+  30 times a second, only while the speech gate is open. Speech cannot be rebuilt from it, and it
+  is never stored. Every window draws from the same levels.
 - **States without colour alone.** Each state differs in motion and shape, so it reads in
   grayscale and for colour-blind eyes.
 - **Reduced motion.** With reduced motion on, the mark is still and a small level meter shows the
@@ -489,10 +567,9 @@ with the voice. It answers one question at a glance: is Overseer getting what I 
 - **Cheap.** 60 frames a second without slowing the views beside it. Nothing is drawn while the
   view is hidden.
 
-The owner is not sure of the best way to animate it, and left it to the implementing agent's
-judgement, with one suggestion: a gradient moving against the mark. So the candidates are built
-and the owner picks. A first version of each runs on the real logo, with a simulated voice, on
-the [preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr).
+**How it was chosen.** The owner left the animation to the implementing agent's judgement, with
+one suggestion: a gradient moving against the mark. Five candidates were drawn on the real logo,
+with a simulated voice, on a [preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr). The owner first picked Orbit, then Star.
 
 | Candidate | The effect | Needs |
 | --- | --- | --- |
@@ -502,20 +579,16 @@ the [preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr).
 | Star | The star grows and the glow behind the mark breathes with the voice. | The layers |
 | Together | Orbit, the gradient on the swooshes, and the star, at once. | The layers |
 
-**The owner's pick (2026-09-27): Orbit, with a gradient pulse.** The swooshes turn as one ring
-around the core, faster with the owner's voice, and a gradient pulses through them with it; the
-star lights up when Overseer speaks. That is the *Together* candidate on the preview page. If
-the swooshes are ever separated, each gets its own motion.
+With Star the swooshes stay still, so the small flaws on the inner edge of the swoosh layer (see
+below) never show.
 
 **The layers.** The owner's logo is one transparent image. At the owner's suggestion a copy was
 cut into three layers by a script: the core as a whole disc, the swooshes as one ring, and the
 star. They are in [`docs/design/brand/layers/`](../design/brand/layers/), with the script. The
 owner's file is untouched. The [brand notes](../design/brand.md#the-mark-in-layers-docsdesignbrandlayers)
 give the numbers and the limits. Separating the three swooshes from each other by machine was
-tried and does not work: their colours run in one gradient around the ring (hue tells the top
-and the right swoosh apart nowhere), and the shape does not repeat every 120° (overlap 0.38), so
-neither colour nor symmetry finds the parts hidden where they cross. A layered source file from
-whoever drew the mark (Figma, Illustrator, an SVG) would give clean, separate swooshes at once.
+tried and does not work (one colour gradient around the ring, no 120° symmetry); Star does not
+need it.
 
 Effects on the mark are allowed. The brand notes once forbade them; the owner corrected that on
 2026-09-27. What stays fixed is the mark's shape and proportions.
@@ -547,7 +620,7 @@ Effects on the mark are allowed. The brand notes once forbade them; the owner co
 | Request records | 5,000 or 30 days |
 | Listener | one per daemon; at most 3 restarts in 10 minutes |
 | Speech model | inside Gate L's memory budget, checked before it is loaded |
-| Levels for the mark | 30 a second at most; the wave's outline at most 32 points; never stored |
+| Levels for the mark | one number, 30 a second at most; never stored |
 | While off | no listener process, microphone closed, no recognizer loaded |
 
 ## Working alongside the other gates
@@ -563,14 +636,27 @@ Effects on the mark are allowed. The brand notes once forbade them; the owner co
 
 ## Testing
 
+Everything that does not need the owner is built and tested first, with a simulated voice (owner,
+2026-09-27). The owner is needed only for what a simulation cannot prove: the microphone prompt,
+a real room, their real voice, and the session.
+
 - **Words layer.** Most tests send fixture words with timings through `voice.say` and use a
   fixture orchestrator that returns scripted plans. They are deterministic and cost nothing.
-- **Audio layer.** The listener, in test mode, reads audio from a file instead of the microphone.
-  Test speech is synthesized at test time into a temporary folder and deleted. The repository
-  holds no recorded or generated voice, as Audio Mode requires.
+- **Audio layer.** The listener reads PCM audio (16 kHz, 16-bit, mono) from a file or from its
+  standard input instead of the microphone, at real-time pace or as fast as it can. Test speech
+  is synthesized at test time (`say -o <tmp>.wav --data-format=LEI16@16000 "…"`) into a temporary
+  folder and deleted; noise (taps, clicks, typing, a chair, a cough, a fan, music) is generated by
+  the tests. The repository holds no recorded or generated voice, as Audio Mode requires.
+- **A simulated voice for a running daemon.** For building and screenshotting the voice view, the
+  daemon can be fed simulated audio or words while VS Code is open, so the mark can be seen in
+  every state (listening, hearing, thinking, speaking with Overseer's own voice, muted, paused,
+  reduced motion). This path exists only when the daemon starts with `OVERSEER_VOICE_SIMULATE=1`,
+  and never from a phone.
 - **Live.** A small sample on the default account inside the paid-turn budget, one attempt per
   step, recorded with its misses.
-- **By voice.** The owner's session (AC-176).
+- **By voice.** The owner's checks: the microphone prompt, a quiet room (AC-164), the star
+  following their real voice (AC-177), echo on the real speakers (AC-162), and the session
+  (AC-176).
 
 ## Limits and out of scope
 
@@ -581,32 +667,38 @@ Effects on the mark are allowed. The brand notes once forbade them; the owner co
 - Messaging a harness's native child directly.
 - Linux and Windows: they report Voice Mode as unavailable.
 
-## Open questions for the owner
+## The owner's answers
 
-| Question | This RFC's default |
+| Question | Answer (2026-09-27) |
 | --- | --- |
-| 1. "Not interrupt easily": noise and small sounds interrupting Overseer, Overseer cutting in on you, or Overseer stopping agents too quickly? | All three are covered. Say which matters most and the thresholds follow it. |
-| 2. Open floor, or say "Overseer" first? | Open floor. Everything said in the room then reaches the model as words. |
-| 3. May a spoken redirect go out without a yes? | Yes, after a 2 s settle window. Actions that cannot be taken back wait for a yes. |
-| 4. May permission requests be answered by voice? | Yes, one at a time, after a read-back. |
-| 5. Which voice? | The system voice at first; the owner picks by ear, as with the cues. |
-| 6. Should Overseer speak up by itself when an agent needs you? | No. Audio Mode's cue does that. Overseer speaks only in answer. |
-| 7. Should the typed chat follow the same tiers? | No change to AC-107 in this gate. |
-| 8. Audio is collected on the Rust side: inside `overseerd` itself, or in a Rust process of its own? | Its own process, started by the daemon, so a fault in audio code cannot stop the agents. |
-| 9. Which animation for the mark? | Answered on 2026-09-27: Orbit, with a gradient pulse through the swooshes ([preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr)). The large mark in the voice view and the small one in the strip are fine for now; the owner judges again on the build. |
+| 1. What does "not interrupt easily" mean? | Other voice modes stop at tiny noises when nobody is talking. A higher tolerance, and reasoning about whether the owner meant to talk to it: [the speech gate](#the-speech-gate) and [meant for Overseer](#meant-for-overseer). |
+| 2. Open floor, or say "Overseer" first? | Open floor is fine. Who is spoken to, Overseer or one agent, is a setting: [talking to one agent](#talking-to-one-agent). |
+| 3. May a spoken redirect go out without a yes? | Yes, after the 2 s window to cancel. |
+| 4. May permission requests be answered by voice? | Yes, one at a time, after the read-back; with a cue under Audio Mode's rules and a toast, and cancellable: [answering a permission by voice](#answering-a-permission-by-voice). |
+| 5. Which animation for the mark? | Star ([preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr)). The large mark in the voice view and the small one in the strip are fine for now; the owner judges again on the build. |
+
+These defaults stand without an answer: the system voice first, picked by ear later; Overseer
+speaks only in answer (Audio Mode's cue says when an agent needs the owner); the typed chat keeps
+Gate S's level; and the listener is a Rust process of its own, started by the daemon.
 
 ## Order of work
 
-One goal, written once the owner has answered the questions above. Built in its own worktree and
-pull request.
+One goal: [voice-mode-goal.md](voice-mode-goal.md), in two phases (owner, 2026-09-27). First
+everything that does not need the owner, with a simulated voice. Then the owner's checks, while a
+loop every 5 minutes keeps the pull request in step with the branches it depends on.
+
+It is built in its own worktree and pull request, branched from Gate S's (pull request #14) and
+based on it. Only steps 2 and 3 need Gate S's Overseer session, but Voice Mode changes the same
+files (`daemon.rs`, `server.rs`, `audio.rs`, the home view), so starting from it avoids a large
+conflict later. The pull request is retargeted to `main` when #14 merges.
 
 | Step | Criteria | Outcome |
 | --- | --- | --- |
-| 0. Find out | AC-162 | The spike: audio capture in Rust, the recognizer, echo cancellation, the microphone permission, the orchestrator's speed. Decisions written here. |
-| 1. Hear | AC-163, AC-164, AC-172, AC-173 | The Rust listener, the voice session in the daemon, the floor rules, the arbiter, privacy and bounds. Nothing is sent to agents yet. |
+| 0. Find out | AC-162 | The spike: audio capture in Rust, the recognizer, echo cancellation, the microphone permission, the orchestrator's speed. Decisions written here. What needs no macOS prompt is measured on files first. |
+| 1. Hear | AC-163, AC-164, AC-172, AC-173, AC-177 | The Rust listener, the voice session in the daemon, the speech gate, the arbiter, privacy and bounds, and the voice view with the Star mark in every state, driven by simulated audio. Nothing is sent to agents yet. |
 | 2. Answer and send | AC-165, AC-166, AC-167, AC-168, AC-171 | The three answers, targets from context, delivery, new agents, the tiers. |
-| 3. Show and prove | AC-169, AC-170, AC-174, AC-175, AC-177 | Cards and messages, correcting and cancelling, the UI, the animated mark with its candidates, failures. |
-| 4. Confirm | AC-176, the pick of AC-177 | The owner's session by voice, and the owner's choice of animation. |
+| 3. Show and prove | AC-169, AC-170, AC-174, AC-175 | Cards and messages, correcting and cancelling, permission answers with cue and toast, the UI, failures. |
+| 4. The owner | AC-162, AC-164, AC-176, AC-177 | The microphone prompt, the live checks and the session, while the 5-minute loop keeps the pull request current. |
 
 ## Acceptance
 
