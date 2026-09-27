@@ -997,24 +997,68 @@ rec(82, "Gate K design review (owner-confirmed)", "partial", commit=GK, date="20
     blocker="Next: the three Needs work items are AC-109 to AC-113 (after the Gate K merge, #7); show them again on the page and get the owner's confirmation.")
 
 # Gate L, Continuity (added by the owner on 2026-09-26; docs/rfcs/offline-mode.md). Not started; built in its own worktree and pull request.
-rec(83, "Offline is not an outage", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(83, "Offline is not an outage", "partial", commit="e16bdaf", date="2026-09-26",
+    proven="the daemon keeps one connection state decided from the system's own answer, the probes and the agents' errors, with every change an event; a provider outage gives degraded naming the provider, a failing baseline or the system's no-network gives offline, and a 429 or a usage limit leaves it online; on this machine the system's answer, both baseline probes and both providers are read live",
+    deferred="the status bar and the side bar showing each state (the extension work waits for beelol/overseer#8, which changes the same files), and the owner turning Wi-Fi off and on for the 10-second check",
+    harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures; synthetic Codex transcripts replayed through fixtures/fake-harness/replay.js",
+    steps="""1. `cargo test -p overseerd --test continuity`: `ac83_offline_is_told_from_an_outage`, `ac83_rate_limits_and_usage_limits_are_never_offline`, `ac83_with_probes_off_the_system_and_the_agents_decide`.
+2. Unit tests: `continuity::tests::the_decision_table`, `the_agents_are_evidence_too`; `net::tests::*` (transport errors, the baseline's failure, Linux answers, macOS reachability flags); `adapters::tests::network_errors_are_their_own_class`.
+3. Live: `node test/local/continuity-live.js` ([live.txt](evidence/ac-85/live.txt)).""",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#connection-state).",
+    actual="""- **States (fixtures):** online → one provider's hosts fail → `degraded: OpenAI unreachable` (Claude still reachable) → both fail → `degraded: Claude and OpenAI unreachable` (acts as offline) → names do not resolve → `offline: no working connection (DNS is not answering)` → a portal's certificate → `offline: no working connection (captive portal)` → online → the system says no network → `offline: no network (system)` in under one second with no probe → online. Eight `connection` events, each with the reason, the system's answer and per-provider health.
+- **Account states:** a 429 (`rate_limit`) and a usage limit (`quota`) leave the state online and add no event. A connection error from an agent is class `network` and starts a probe round at once; two 503 answers within two minutes make that provider `unreachable (outage, agents)`, which is degraded, not offline.
+- **Probes off:** the system's answer and the agents still decide; every provider in use failing on connection errors gives `offline: all agents lost their connection`.
+- **Live on this machine:** `online (connected)`; SystemConfiguration reachability IPv4 and IPv6 reachable (flags 0x00000002); baseline by name answered 204 and by IP 301; OpenAI answered 403 and Anthropic 404 (any HTTP answer means reachable).""",
+    evidence="daemon/tests/continuity.rs, daemon/src/net.rs, daemon/src/continuity.rs, [live.txt](evidence/ac-85/live.txt)",
+    live="Fixtures for every state; the live reading covers the online state only.",
+    limits="macOS verified; the Linux answers (NetworkManager, default route) are parsed from fixtures and belong to AC-41. Polling every 5 seconds; change notifications were not needed so far.",
+    blocker="Next: the status bar and side bar states after beelol/overseer#8 merges; then ask the owner to turn Wi-Fi off and on while the daemon logs the change.")
 rec(84, "Fail over to the best working provider", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(85, "Local inventory read from the machine", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(86, "Memory budget and fit", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(85, "Local inventory read from the machine", "verified", commit="e16bdaf", date="2026-09-26",
+    harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures; synthetic Codex transcripts replayed through fixtures/fake-harness/replay.js",
+    steps="""1. Live: `node test/local/continuity-live.js` on this machine: `local.inventory` from a real daemon, compared with `sysctl -n hw.memsize`, `vm_stat` (read before and after), `sysctl -n kern.memorystatus_level`, `memory_pressure`, and Ollama's own `/api/tags`, `/api/show` (per model) and `/api/ps`.
+2. `cargo test -p overseerd --test continuity`: `ac85_inventory_reports_the_machine_and_ollama_without_guessing` (a fixture Ollama server with four models and one loaded; Ollama installed but stopped; Ollama absent; memory that cannot be read; an address that is not loopback).
+3. Unit tests: `sys::tests::linux_meminfo_is_read_in_bytes`, `linux_pressure_levels`, `macos_numbers_match_the_systems_own_tools`; `local::tests::tags_and_parameters_are_read`, `kv_cache_per_token_for_both_shapes`, `ollama_is_only_addressed_on_loopback`.""",
+    expected="The report matches the system's own tools within 5% and Ollama's own answers; Linux /proc fixtures go through the same module; a stopped or absent Ollama is said so without guessing.",
+    actual="""- **Memory, live:** total 137,438,953,472 bytes, exactly `hw.memsize`; available 59.0 GiB against `vm_stat`'s 59.0 GiB (0.0% apart); free percentage 83% against 83% from `kern.memorystatus_level` and 83% from `memory_pressure`; pressure normal.
+- **Models, live:** all 8 installed models and no other; size, family, quantization, longest and configured context, capabilities, base tag and KV geometry match `/api/tags` and `/api/show` for 8 of 8; loaded models match `/api/ps`; Ollama 0.34.2 installed and running; free disk reported.
+- **Not guessing (fixtures):** Ollama installed but stopped reads "Ollama is installed but not running", no version and no models; absent reads "Ollama is not installed"; memory that cannot be read gives no pick; an address outside this machine is refused. The owner's own Ollama was never stopped: the stopped case is a loopback port with nothing listening.
+- **Linux:** `/proc/meminfo` and `/proc/pressure/memory` fixtures parse to the same structure (bytes; normal, warn, critical).""",
+    evidence="[live.txt](evidence/ac-85/live.txt), [live.json](evidence/ac-85/live.json), daemon/tests/continuity.rs, daemon/src/sys.rs, daemon/src/local.rs",
+    live="Live on this machine for memory and models; fixtures for a stopped or absent Ollama and for Linux.",
+    limits="macOS verified. Linux reads are unit-tested from fixtures; running them on Linux belongs to AC-41. Discrete GPU memory is not read.")
+rec(86, "Memory budget and fit", "verified", commit="e16bdaf", date="2026-09-26",
+    harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures; synthetic Codex transcripts replayed through fixtures/fake-harness/replay.js",
+    steps="""1. Unit tests: `local::tests::the_worked_examples_for_16_32_64_and_128_gib`, `the_budget_has_two_terms_and_a_hard_ceiling`, `contexts_halve_from_the_target_to_the_floor`, `with_100_gib_in_use_the_pick_drops_to_the_14b_at_16k`, `the_estimate_is_within_15_percent_of_the_measured_size`, `a_measured_size_replaces_the_estimate_and_an_installed_tag_is_reused`, `a_raised_target_gives_the_longer_context_when_it_fits`, `the_owners_order_comes_first`.
+2. `cargo test -p overseerd --test continuity`: `ac86_the_pick_follows_the_machines_memory` (the same daemon described as 128, 64, 32 and 16 GiB, with 100 GiB in use, under a pressure warning and at critical pressure; a ceiling of 60% refused).
+3. Live: `node test/local/continuity-live.js`: the budget and the pick on this machine, then one guarded load of the pick and Ollama's measurement.""",
+    expected="The RFC's worked examples are reproduced; on this machine the pick is qwen3-coder:30b at 64k or more with an estimate within 15% of the measured size; 100 GiB in use drops the pick to a 14B-class model at 16k; a ceiling of 60% is refused; no pick is above the budget.",
+    actual="""- **Worked examples:** 16 GiB (budget 6.4 GiB): `qwen2.5-coder:3b` at 32k, then `1.5b` at 32k, then `7b` at 16k. 32 GiB (12.8): `7b` at 32k, `3b` at 32k, then `14b` at 16k. 64 GiB (25.6): `qwen3-coder:30b` at 64k; `qwen2.5-coder:32b` at 32k does not fit. 128 GiB (51.2): `qwen3-coder:30b` at 64k, then `qwen2.5-coder:32b` at 32k. While building this the RFC's table was corrected to follow its own ranking rule (fits at 32k before fits at 16k; the 64k target).
+- **This machine, live:** budget 46.2 GiB = min(40% of 128 GiB = 51.2 GiB, 59 GiB available − 12.8 GiB headroom); pick `qwen3-coder:30b` at a 64k context, run as the installed `qwen3-coder:30b-64k`. Estimate 24.3 GiB, measured 23.7 GiB, 2.6% apart; the next pick used the measurement.
+- **100 GiB in use:** with the 30B and the 14B installed, the budget is 15.2 GiB, the 30B is rejected ("too big: 19.8 GiB at a 16k context is over the budget of 15.2 GiB") and the pick is `qwen2.5-coder:14b` at 16k (12.4 GiB).
+- **Limits:** 60% refused ("ramCeilingPercent must be between 10 and 50 percent"); 50% accepted; a pressure warning lowers the ceiling to 30%; critical pressure picks nothing; on profiles from 8 to 128 GiB no pick or alternative is above its budget.""",
+    evidence="daemon/src/local.rs (tests), daemon/tests/continuity.rs, [live.txt](evidence/ac-85/live.txt)",
+    live="Live on this machine for the budget, the pick, the load and the measurement; unit and protocol tests for other machines.",
+    limits="macOS verified. The budget counts system memory only. OpenCode's own instructions take about 10,600 tokens, so the 16k floor leaves little room; the ranking prefers models that fit at 32k.")
 rec(87, "Verified local catalogue, Qwen coders first", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(88, "Settings the daemon enforces", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(88, "Settings the daemon enforces", "partial", commit="e16bdaf", date="2026-09-26",
+    proven="all 19 Continuity settings are owned by the daemon: set through the protocol, range-checked with the reason for a refusal, persisted across a restart, and applied (the ceiling, the context, probes on and off); `overseerd ctl continuity.status` prints the state, the budget and the pick",
+    deferred="editing the settings in VS Code and reading them back (the extension work waits for beelol/overseer#8), and the daemon applying the Continuity and download settings in an offline scenario with VS Code closed (those policies are built in the later steps)",
+    harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures; synthetic Codex transcripts replayed through fixtures/fake-harness/replay.js",
+    steps="""1. `cargo test -p overseerd --test continuity`: `ac88_settings_are_kept_and_enforced_by_the_daemon`.
+2. Unit tests: `continuity::tests::settings_defaults_are_the_owners_decisions`, `out_of_range_settings_are_refused_with_the_reason`.""",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#settings).",
+    actual="""- **Defaults are the owner's decisions:** Continuity on; provider order OpenAI then Anthropic; downloads, the Ollama install and prefetch off; ceiling 40%; retry for 36 hours; stall 90 s; context 64k down to 16k; return online `offer`.
+- **Kept and enforced:** each of the 19 settings was changed, read back, and was still there after `daemon.shutdown` and a new start; with probes off no probe ran.
+- **Refused with the reason:** a ceiling of 51%, 37 retry hours ("the owner's limit is 36 hours"), a target under the floor, an unknown return-online word, a wrong type, an unknown setting, and a change naming one bad value among good ones; a refused change changed nothing.
+- **ctl:** `overseerd ctl continuity.status` printed `online`, a budget of 44.8 GiB with a 6 GiB headroom, and the pick.""",
+    evidence="daemon/tests/continuity.rs, daemon/src/continuity.rs",
+    live="Protocol tests against the real daemon; no VS Code yet.",
+    blocker="Next: the `overseer.continuity.*` settings in the extension after beelol/overseer#8 merges; then the offline scenario with VS Code closed once the policies exist.")
 rec(89, "Download models only when allowed", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
@@ -1042,9 +1086,15 @@ rec(96, "Several local agents", "not started", date="—", commit="—",
 rec(97, "Offline session (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(98, "On by default, explained once", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(98, "On by default, explained once", "partial", commit="e16bdaf", date="2026-09-26",
+    proven="Continuity is on by default in the daemon; the notice's state is kept by the daemon (shown until dismissed, never again after, across connections and a restart); with Continuity off there is nothing to show",
+    deferred="the notice itself above the composer and in New Task, its Allow downloads button, the Continuity switch, and the screenshots (the composer work waits for beelol/overseer#8)",
+    harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures; synthetic Codex transcripts replayed through fixtures/fake-harness/replay.js",
+    steps="""1. `cargo test -p overseerd --test continuity`: `ac98_the_notice_is_shown_once_per_machine`.""",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#on-by-default-explained-once).",
+    actual="A fresh data folder answers `show: true` with downloads and the install off; asking again does not dismiss it; after downloads are allowed and the notice dismissed it answers `show: false` to every later connection and after a restart; with Continuity off it is not shown.",
+    evidence="daemon/tests/continuity.rs", live="Protocol test against the real daemon.",
+    blocker="Next: the notice card and the switch in the extension after beelol/overseer#8 merges.")
 
 # Gate M, Overseer as the whole surface (added by the owner on 2026-09-26; docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface). Not started; built in its own pull request.
 rec(99, "The review is where files live", "not started", date="—", commit="—",
@@ -1191,9 +1241,21 @@ rec(139, "OpenCode session transport spike", "partial", commit="b5776a2", date="
     live="Real OpenCode runtime and a real local model through Ollama; no account and no paid tokens.",
     limits="macOS only; one OpenCode version (1.15.13) and one model. A research criterion: it does not pass AC-138.",
     blocker="Next: build the bridge and the `opencode-serve` adapter (AC-138); its tests replay the recorded fixtures, which completes this criterion.")
-rec(140, "Memory safety guard", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(140, "Memory safety guard", "partial", commit="e16bdaf", date="2026-09-26",
+    proven="the guard refuses any model over the budget on the paths that exist (the automatic pick, `local.approve`, `local.load`), with no override, on fresh memory readings; a load is watched once a second and cancelled and unloaded when available memory falls under half the headroom or the system reports critical pressure; on this machine `qwen3.5:122b` cannot be loaded and the pick loaded with pressure staying normal",
+    deferred="the same refusal from the composer, prefetch and catalogue verification (built in the later steps), the critical-pressure valve that pauses a working local run, and the catalogue verification log",
+    harness="Real `overseerd` binary; the network, the machine's memory and Ollama are fixtures in the protocol tests (a JSON file each, and a loopback server); the live check uses the real network, memory and Ollama 0.34.2 with local models only (no account, no paid tokens)", fixture="An isolated OVERSEER_HOME per test; `OVERSEER_TEST_NET`, `OVERSEER_TEST_MEMORY` and `OVERSEER_OLLAMA_URL` point the daemon at the fixtures; synthetic Codex transcripts replayed through fixtures/fake-harness/replay.js",
+    steps="""1. `cargo test -p overseerd --test continuity`: `ac140_no_model_over_the_budget_is_loaded_by_any_path`.
+2. Unit tests: `local::tests::the_guard_refuses_anything_over_the_budget`, `a_load_is_stopped_when_memory_runs_short`.
+3. Live: `node test/local/continuity-live.js`: the guard asked about all 8 installed models, a load of `qwen3.5:122b` attempted, the pick loaded and unloaded.""",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#memory-safety-ac-140).",
+    actual="""- **Refused (live):** "qwen3.5:122b is too big to load: 77.2 GiB at a 16k context is over the budget of 46.2 GiB (40% of 128 GiB is 51.2 GiB; 59 GiB available minus 12.8 GiB headroom is 46.2 GiB)", from the guard and from a load; nothing was loaded. The other 7 models were allowed at 16k, each under the budget.
+- **Refused (fixtures):** the same model at the 50% ceiling with unverified models allowed; a model of unknown size; the pick itself when memory is short now ("23.7 GiB at a 64k context is over the budget of 17.2 GiB"); anything at critical pressure. The fixture Ollama received no load for any refused model.
+- **Watchdog (fixtures):** memory dropped to 5 GiB during a load: "the load of qwen3-coder:30b-64k was cancelled and the model unloaded: available memory fell to 5 GiB, under half the headroom of 12.8 GiB", followed by an unload request; a critical-pressure signal stopped a load the same way. Every load is a `local_load` event with memory before and after.
+- **Live load:** `qwen3-coder:30b-64k` loaded in 5.1 s with 5 memory samples; available went from 59.0 to 42.4 GiB; pressure stayed normal (level 64%); the model was unloaded afterwards.""",
+    evidence="daemon/tests/continuity.rs, daemon/src/local.rs, [live.txt](evidence/ac-85/live.txt)",
+    live="Live on this machine for the refusal and one guarded load; fixtures for the watchdog.",
+    blocker="Next: route the composer, prefetch and catalogue verification through the same guard as they are built; the critical-pressure valve once local runs exist.")
 # Gate N addition: pair once (the owner's decision of 2026-09-26).
 rec(141, "Pair once", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
@@ -1316,12 +1378,8 @@ SHORT_BLOCKERS = {
     66: "owner design review after the Gate J build",
     81: "partial: the live Gate J scenario not rerun on the Gate K build",
     82: "owner marked 19 views: 16 Looks right, 3 Needs work (AC-109 to AC-113)",
-    83: "not started (Gate L, added by the owner on 2026-09-26)",
     84: "not started (Gate L, added by the owner on 2026-09-26)",
-    85: "not started (Gate L, added by the owner on 2026-09-26)",
-    86: "not started (Gate L, added by the owner on 2026-09-26)",
     87: "not started (Gate L, added by the owner on 2026-09-26)",
-    88: "not started (Gate L, added by the owner on 2026-09-26)",
     89: "not started (Gate L, added by the owner on 2026-09-26)",
     90: "not started (Gate L, added by the owner on 2026-09-26)",
     91: "not started (Gate L, added by the owner on 2026-09-26)",
@@ -1331,7 +1389,6 @@ SHORT_BLOCKERS = {
     95: "not started (Gate L, added by the owner on 2026-09-26)",
     96: "not started (Gate L, added by the owner on 2026-09-26)",
     97: "not started (Gate L, added by the owner on 2026-09-26)",
-    98: "not started (Gate L, added by the owner on 2026-09-26)",
     99: "not started (Gate M, added by the owner on 2026-09-26)",
     100: "not started (Gate M, added by the owner on 2026-09-26)",
     101: "not started (Gate M, added by the owner on 2026-09-26)",
@@ -1372,7 +1429,6 @@ SHORT_BLOCKERS = {
     136: "not started (Gate N, added by the owner on 2026-09-26)",
     137: "not started (Gate N, added by the owner on 2026-09-26)",
     138: "not started (Gate L, added by the owner on 2026-09-26)",
-    140: "not started (Gate L, added by the owner on 2026-09-26)",
     141: "not started (Gate N, added by the owner on 2026-09-26)",
 }
 TOTAL = 53
