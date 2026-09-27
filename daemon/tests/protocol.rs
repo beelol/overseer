@@ -5898,6 +5898,106 @@ fn auto_codex_tool_inventory_can_preflight_a_repo_without_creating_a_workspace()
 }
 
 #[test]
+fn auto_root_preview_selects_from_repo_evidence_before_a_workspace_exists() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("root-selection-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "metadata-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let before = d.call("state", json!({}));
+    let preview = d.call("auto.root.preview", json!({"repo":repo,
+        "work_unit_id":"root-browser-preview", "allowed_profiles":["system-codex"],
+        "min_tier":"general", "required_tools":["browser/navigate"],
+        "sandbox":"workspace_write"}));
+    assert_eq!(preview["decision"]["selected"], "system-codex/gpt-6-sol/medium", "{preview}");
+    assert_eq!(preview["repo"], json!(repo));
+    assert_eq!(preview["decision"]["work_unit_id"], "root-browser-preview");
+    assert!(preview["evidence"].as_array().unwrap().iter().any(|item|
+        item["source"] == "codex-app/model-and-tool-metadata"));
+    let after = d.call("state", json!({}));
+    assert_eq!(after["tasks"], before["tasks"]);
+    assert_eq!(after["runs"], before["runs"]);
+    assert_eq!(after["workspaces"], before["workspaces"]);
+    assert!(std::fs::read_to_string(trace).unwrap().contains(&format!("tool_cwd:{}", repo.display())));
+}
+
+#[test]
+fn auto_start_selects_and_launches_one_root_before_a_model_turn_then_replays_it() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("root-start-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let request = json!({"work_unit_id":"first-root-browser", "repo":repo,
+        "workspace_mode":"worktree", "prompt":"seed context", "title":"root browser check",
+        "allowed_profiles":["system-codex"], "min_tier":"general",
+        "required_tools":["browser/navigate"], "sandbox":"workspace_write"});
+    let first = d.call("auto.start", request.clone());
+    assert_eq!(first["decision"]["selected"], "system-codex/gpt-6-sol/medium", "{first}");
+    let run = run_id(&first);
+    let finished = d.wait_done(&run, 15);
+    assert_eq!(finished["status"], "completed", "{finished}");
+    let replay = d.call("auto.start", request.clone());
+    assert_eq!(replay["run"]["id"], run);
+    assert_eq!(replay["replayed"], true);
+    let state = d.call("state", json!({}));
+    assert_eq!(state["tasks"].as_array().unwrap().len(), 1);
+    assert_eq!(state["runs"].as_array().unwrap().len(), 1);
+    assert_eq!(state["workspaces"].as_array().unwrap().len(), 1);
+    let trace = std::fs::read_to_string(&trace).unwrap();
+    assert_eq!(trace.lines().filter(|line| *line == "turn_model:gpt-6-sol").count(), 1,
+        "replay must not start another model turn");
+    let mut changed = request.clone();
+    changed["prompt"] = json!("different work");
+    assert!(d.try_call("auto.start", changed).is_err());
+    d.call("auto.mode.set", json!({"enabled":false}));
+    assert_eq!(d.call("auto.start", request)["run"]["id"], run,
+        "disabling Auto must not erase a completed decision");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let events: i64 = db.query_row("SELECT COUNT(*) FROM events WHERE kind='auto_decision'", [],
+        |row| row.get(0)).unwrap();
+    assert_eq!(events, 1);
+    let claim: String = db.query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id='first-root-browser'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(claim, "released");
+}
+
+#[test]
+fn auto_root_disabled_during_discovery_cannot_commit_a_launch() {
+    use std::time::Instant;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("root-disable-during-discovery.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_MODEL_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
+        ("FIXTURE_MODEL_DELAY_MS", "1500")]);
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let request = json!({"work_unit_id":"root-disabled-before-admission", "repo":repo,
+        "workspace_mode":"worktree", "prompt":"seed context", "title":"root disabled",
+        "allowed_profiles":["system-codex"], "required_tools":["browser/navigate"]});
+    let outcome = std::thread::scope(|scope| {
+        let pending = scope.spawn(|| d.try_call("auto.start", request));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !std::fs::read_to_string(&trace).unwrap_or_default().contains("model_read") {
+            assert!(Instant::now() < deadline, "root metadata collection did not begin");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        d.call("auto.mode.set", json!({"enabled":false}));
+        pending.join().unwrap()
+    });
+    assert!(outcome.is_err(), "disabled Auto committed a root launch: {outcome:?}");
+    let state = d.call("state", json!({}));
+    assert!(state["tasks"].as_array().unwrap().is_empty());
+    assert!(state["runs"].as_array().unwrap().is_empty());
+    assert!(state["workspaces"].as_array().unwrap().is_empty());
+}
+
+#[test]
 fn auto_failed_account_read_does_not_leave_fresh_model_or_allowance_evidence() {
     let r = tmp();
     let auth_file = r.path().join("auth-state.txt");

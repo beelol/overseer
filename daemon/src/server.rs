@@ -423,13 +423,14 @@ where K: Ord + Clone, T: Clone, F: FnOnce() -> Result<T> {
 /// read, including its source timestamps and account generation. A completed
 /// read is removed immediately; later decisions must collect fresh evidence.
 fn discover_auto_profile_shared(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
-    parent_run_id: &str,
+    parent_run_id: &str, repo: Option<&std::path::Path>,
     budget: Duration) -> Result<AutoProfileDiscovery> {
     let key = (Arc::as_ptr(d) as usize, profile_id.to_string(),
-        workspace_id.to_string(), parent_run_id.to_string());
+        repo.map(|path| format!("repo:{}", path.display()))
+            .unwrap_or_else(|| format!("workspace:{workspace_id}")), parent_run_id.to_string());
     let flights = AUTO_DISCOVERY_FLIGHTS.get_or_init(|| Mutex::new(std::collections::BTreeMap::new()));
     collect_shared(flights, key, budget,
-        || discover_auto_profile(d, profile_id, workspace_id, parent_run_id, budget))
+        || discover_auto_profile(d, profile_id, workspace_id, parent_run_id, repo, budget))
 }
 
 /// Public status has no account or workspace scope. Share only overlapping
@@ -638,7 +639,7 @@ fn refresh_active_parent_discovery(d: &Arc<Daemon>, parent: &crate::store::Run,
 }
 
 fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
-    parent_run_id: &str,
+    parent_run_id: &str, repo: Option<&std::path::Path>,
     budget: Duration) -> Result<AutoProfileDiscovery> {
     let deadline = Instant::now() + budget;
     let profile = d.profile(profile_id)?;
@@ -707,8 +708,13 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
                 })?;
             let models = read.models;
             let first_generation = read.generation;
-            let tools = dispatch(d, "auto.tools.inspect", &json!({"profile_id":profile_id,
-                "workspace_id":workspace_id,"timeout_ms":remaining_metadata_ms(deadline)?}))?;
+            let mut tool_request = json!({"profile_id":profile_id,
+                "timeout_ms":remaining_metadata_ms(deadline)?});
+            match repo {
+                Some(root) => tool_request["repo"] = json!(root),
+                None => tool_request["workspace_id"] = json!(workspace_id),
+            }
+            let tools = dispatch(d, "auto.tools.inspect", &tool_request)?;
             let store = d.store.lock().unwrap();
             let generation = store.auto_account_generation(profile_id)?;
             if generation.is_none() || generation != first_generation {
@@ -787,9 +793,15 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
                     && ACTIVE.contains(&run.status.as_str())) {
                 return Err(anyhow!("OpenCode profile has an active run"));
             }
-            let workspace = d.workspace(workspace_id)?;
-            if workspace.removed_ms.is_some() { return Err(anyhow!("workspace was removed")); }
-            let project = std::path::Path::new(&workspace.path);
+            let project_path = match repo {
+                Some(root) => root.to_path_buf(),
+                None => {
+                    let workspace = d.workspace(workspace_id)?;
+                    if workspace.removed_ms.is_some() { return Err(anyhow!("workspace was removed")); }
+                    std::path::PathBuf::from(workspace.path)
+                }
+            };
+            let project = project_path.as_path();
             let program = crate::adapters::resolve_program("opencode")
                 .ok_or_else(|| anyhow!("OpenCode executable unavailable"))?;
             let mut env = crate::adapters::base_env(&program.display().to_string());
@@ -839,6 +851,330 @@ fn recheck_claude_account_before_child(d: &Arc<Daemon>, profile_id: &str,
     Ok(())
 }
 
+/// Select an initial route from repository-scoped evidence without creating a
+/// workspace. The eventual auto.start admission must revalidate this result;
+/// preview by itself never owns a process, Git resource, or allowance claim.
+fn auto_root_preview(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
+    use crate::auto_select::{CapabilityTier, Sandbox, WorkUnit};
+    use std::collections::{BTreeMap, BTreeSet};
+    let fields = p.as_object().ok_or_else(|| anyhow!("automatic root preview must be an object"))?;
+    for field in fields.keys() {
+        if !matches!(field.as_str(), "repo" | "work_unit_id" | "allowed_profiles" | "min_tier"
+            | "required_tools" | "context_needed" | "requires_approvals" | "sandbox"
+            | "pinned_route" | "preferred_harness" | "task_class" | "execution_budget_ms") {
+            return Err(anyhow!("unsupported automatic root preview field: {field}"));
+        }
+    }
+    if !d.store.lock().unwrap().auto_mode_enabled()? {
+        return Err(anyhow!("Auto Mode is disabled"));
+    }
+    let work_unit_id = s(p, "work_unit_id")?;
+    if work_unit_id.is_empty() || work_unit_id.len() > 120 || !work_unit_id.bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')) {
+        return Err(anyhow!("invalid automatic root work-unit identity"));
+    }
+    let repo = crate::git::toplevel(std::path::Path::new(s(p, "repo")?))?;
+    let min_tier = match p.get("min_tier") {
+        None => CapabilityTier::General,
+        Some(value) => serde_json::from_value(value.clone())?,
+    };
+    let tool_values = match p.get("required_tools") {
+        None => Vec::new(),
+        Some(Value::Array(values)) if values.len() <= 16 => values.clone(),
+        _ => return Err(anyhow!("required_tools must be a bounded list")),
+    };
+    let mut required_tools = BTreeSet::new();
+    for value in tool_values {
+        let tool = value.as_str().filter(|name| crate::daemon::valid_required_tool(name))
+            .ok_or_else(|| anyhow!("invalid required tool"))?;
+        if !required_tools.insert(tool.to_string()) { return Err(anyhow!("duplicate required tool")); }
+    }
+    let context_needed = match p.get("context_needed") {
+        None => 0,
+        Some(value) => value.as_u64().ok_or_else(|| anyhow!("context_needed must be nonnegative"))?,
+    };
+    let requires_approvals = match p.get("requires_approvals") {
+        None => false,
+        Some(value) => value.as_bool().ok_or_else(|| anyhow!("requires_approvals must be a boolean"))?,
+    };
+    let sandbox = match p.get("sandbox") {
+        None => Sandbox::WorkspaceWrite,
+        Some(value) => {
+            let requested: Sandbox = serde_json::from_value(value.clone())?;
+            if !matches!(requested, Sandbox::ReadOnly | Sandbox::WorkspaceWrite) {
+                return Err(anyhow!("automatic root sandbox is unsupported"));
+            }
+            requested
+        }
+    };
+    let optional_name = |name: &str, max: usize| -> Result<Option<String>> {
+        match p.get(name) {
+            None => Ok(None),
+            Some(Value::String(value)) if !value.is_empty() && value.len() <= max => Ok(Some(value.clone())),
+            _ => Err(anyhow!("invalid {name}")),
+        }
+    };
+    let pinned_route = optional_name("pinned_route", 300)?;
+    let preferred_harness = optional_name("preferred_harness", 40)?;
+    let task_class = match p.get("task_class") {
+        None => None,
+        Some(Value::String(value)) if matches!(value.as_str(),
+            "browser_check" | "routine_edit" | "difficult_diagnosis" | "general") => Some(value.clone()),
+        _ => return Err(anyhow!("task_class must be a supported broad work category")),
+    };
+    let execution_budget_ms = match p.get("execution_budget_ms") {
+        None => crate::daemon::DEFAULT_AUTO_EXECUTION_BUDGET_MS,
+        Some(value) => value.as_u64().filter(|ms| (1_000..=1_800_000).contains(ms))
+            .ok_or_else(|| anyhow!("execution_budget_ms must be 1000-1800000"))?,
+    };
+    let allowed_profiles = match p.get("allowed_profiles") {
+        None => d.store.lock().unwrap().profiles()?.into_iter()
+            .filter(|profile| profile.is_system && matches!(profile.harness.as_str(),
+                "codex" | "claude" | "opencode"))
+            .map(|profile| profile.id).collect::<BTreeSet<_>>(),
+        Some(Value::Array(values)) if !values.is_empty() && values.len() <= 8 => {
+            let mut allowed = BTreeSet::new();
+            for value in values {
+                let id = value.as_str().filter(|id| !id.is_empty() && id.len() <= 120)
+                    .ok_or_else(|| anyhow!("invalid allowed account profile"))?;
+                let profile = d.profile(id)?;
+                if !matches!(profile.harness.as_str(), "codex" | "claude" | "opencode")
+                    || !allowed.insert(id.to_string()) {
+                    return Err(anyhow!("invalid or duplicate allowed account profile"));
+                }
+            }
+            allowed
+        }
+        _ => return Err(anyhow!("allowed_profiles must be a bounded nonempty account list")),
+    };
+    if allowed_profiles.is_empty() || allowed_profiles.len() > 8 {
+        return Err(anyhow!("no bounded authorized account profiles for automatic root"));
+    }
+    let work = WorkUnit { id:work_unit_id.into(), min_tier, required_tools,
+        context_needed, requires_approvals, min_sandbox:sandbox, max_sandbox:sandbox,
+        allowed_profiles:allowed_profiles.clone(), pinned_route, preferred_harness,
+        task_class, execution_budget_ms:Some(execution_budget_ms) };
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let candidate_ids = allowed_profiles.into_iter().collect::<Vec<_>>();
+    let mut routes = Vec::new();
+    let mut evidence = Vec::new();
+    let mut discovery_failures = Vec::new();
+    let mut generations = BTreeMap::new();
+    for (id, discovered) in collect_unique_bounded(&candidate_ids,
+        Duration::from_secs(8).min(deadline.saturating_duration_since(Instant::now())),
+        |id, budget| discover_auto_profile_shared(d, id, "", "", Some(&repo), budget)) {
+        match discovered {
+            Ok(found) => {
+                routes.extend(found.routes);
+                if let Some(generation) = found.generation { generations.insert(id, generation); }
+                evidence.push(found.evidence);
+            }
+            Err(_) => discovery_failures.push(json!({"profile_id":id,
+                "reason":"metadata_or_auth_unavailable"})),
+        }
+    }
+    if routes.len() > 128 { return Err(anyhow!("automatic root candidate catalog exceeded its bound")); }
+    let now_ms = crate::daemon::now();
+    let mut health = match crate::auto_health::recent_local_observations(
+        &d.store.lock().unwrap(), now_ms) {
+        Ok(observations) => observations,
+        Err(_) => { discovery_failures.push(json!({"reason":"local_health_evidence_unavailable"})); Vec::new() }
+    };
+    let public = routes.iter().map(|route| route.provider.clone())
+        .filter(|provider| matches!(provider.as_str(), "openai" | "anthropic"))
+        .collect::<Vec<_>>();
+    let public_budget = Duration::from_millis(750)
+        .min(deadline.saturating_duration_since(Instant::now()));
+    if !public.is_empty() && public_budget >= Duration::from_millis(20) {
+        for (provider, reading) in collect_unique_bounded(&public, public_budget, |id, timeout|
+            collect_public_status_shared(std::path::Path::new("/usr/bin/curl"), id, timeout)) {
+            match reading {
+                Ok(observation) => { evidence.push(json!({"provider":provider,
+                    "source":"official-status-summary","observed_ms":observation.observed_ms,
+                    "advisory":true})); health.push(observation); }
+                Err(_) => discovery_failures.push(json!({"provider":provider,
+                    "reason":"public_status_unavailable"})),
+            }
+        }
+    }
+    let now_ms = crate::daemon::now();
+    for route in &mut routes {
+        if route.health != crate::auto_select::Health::Unavailable {
+            route.health = crate::auto_health::evaluate(route, &health, now_ms);
+        }
+    }
+    if routes.iter().any(|route| route.harness != "opencode"
+        && route.quota == crate::auto_select::Allowance::Exhausted) {
+        for route in routes.iter_mut().filter(|route| route.harness == "opencode") {
+            route.unresolved_quota_pool_identity = true;
+        }
+    }
+    {
+        let store = d.store.lock().unwrap();
+        for route in &mut routes { route.in_flight_pool_claim = store.auto_pool_claimed(&route.pool_id)?; }
+    }
+    let fit_now_ms = crate::daemon::now();
+    let (fit_inputs, fit_evidence) = if d.learning_is_paused() {
+        (routes.iter().map(|_| crate::auto_fit::FitEvidenceInput::Unavailable {
+            reason:"learning_paused".into() }).collect::<Vec<_>>(),
+         routes.iter().map(|route| json!({"route_id":route.id,"fit":"unknown",
+            "reason":"learning_paused","source":null,"observed_ms":null,
+            "expected_windows":[]})).collect::<Vec<_>>())
+    } else {
+        crate::auto_fit::apply_scoped_fit_with_inputs(&d.store.lock().unwrap(), &work,
+            &mut routes, &generations, fit_now_ms)
+    };
+    let decision = crate::auto_select::select(&work, &routes);
+    let selected_route = decision.selected.as_deref().and_then(|id|
+        routes.iter().find(|route| route.id == id));
+    let trace = json!({"selector_version":"multi-harness-preflight-v7","decision":decision,
+        "selected_route":selected_route.map(|route| json!({
+            "harness":route.harness,"provider":route.provider,"profile_id":route.profile_id,
+            "model":route.model,"effort":route.effort,"quota":route.quota,
+            "fit":route.fit,"health":route.health})),
+        "estimator":{"state":"scoped_fit","version":"v2","now_ms":fit_now_ms,
+            "inputs":fit_inputs,"routes":fit_evidence},
+        "inference":{"state":"not_used","output":null},
+        "selection_input":{"work":work,"routes":routes,
+            "attempt_limit_reached":false,"deadline_exhausted":false},
+        "evidence":evidence,"discovery_failures":discovery_failures});
+    Ok(json!({"repo":repo,"decision":decision,"selected_route":selected_route,
+        "evidence":evidence,"discovery_failures":discovery_failures,"trace":trace}))
+}
+
+fn auto_root_response(d: &Arc<Daemon>, work_unit_id: &str, request_hash: &str,
+    replayed: bool) -> Result<Value> {
+    let (intent, decision) = {
+        let store = d.store.lock().unwrap();
+        let intent = store.auto_root_intent(work_unit_id)?
+            .ok_or_else(|| anyhow!("automatic root intent is unavailable"))?;
+        if intent.requirements_hash != request_hash {
+            return Err(anyhow!("work unit was already used for different automatic work"));
+        }
+        let decision = intent.decision_event_seq.and_then(|seq| store.conn.query_row(
+            "SELECT payload FROM events WHERE seq=?1 AND kind='auto_decision'",
+            [seq], |row| row.get::<_, String>(0)).ok())
+            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+            .map(|trace| trace["decision"].clone()).unwrap_or(Value::Null);
+        (intent, decision)
+    };
+    let run = d.run(&intent.run_id)?;
+    let task = d.task(&intent.task_id)?;
+    let workspace = d.workspace(&intent.workspace_id)?;
+    let state = if run.status == "completed" { "completed" }
+        else if intent.phase == "paused" || matches!(run.status.as_str(), "failed" | "interrupted" | "unknown") {
+            "paused"
+        } else if run.process_generation > 0 { "running" }
+        else if auto_launch_active(work_unit_id) { "launch_pending" }
+        else { "paused" };
+    Ok(json!({"state":state,"work_unit_id":work_unit_id,"replayed":replayed,
+        "task":task,"run":run,"workspace":workspace,"decision":decision,
+        "launch_phase":intent.phase,
+        "pause_reason":if state == "paused" { Some("launch_effects_uncertain") } else { None },
+        "actions":if state == "paused" { vec!["inspect_launch","choose_manual_route"] }
+            else { vec!["refresh"] }}))
+}
+
+fn auto_root_launch_worker(d: &Arc<Daemon>, work_unit_id: &str,
+    route: &crate::auto_select::Route, required_tools: &[String],
+    expected_generation: Option<i64>, request_hash: &str) -> Result<Value> {
+    d.store.lock().unwrap().set_auto_root_phase(work_unit_id, "preparing")?;
+    if !d.store.lock().unwrap().auto_mode_enabled()? {
+        return Err(anyhow!("Auto Mode was disabled before root launch"));
+    }
+    let intent = d.store.lock().unwrap().auto_root_intent(work_unit_id)?
+        .ok_or_else(|| anyhow!("automatic root intent disappeared"))?;
+    let workspace = d.workspace(&intent.workspace_id)?;
+    let task = d.task(&intent.task_id)?;
+    let run = d.run(&intent.run_id)?;
+    if run.profile_id.as_deref() != Some(route.profile_id.as_str())
+        || run.model.as_deref() != Some(route.model.as_str())
+        || run.effort.as_deref() != Some(route.effort.as_str()) {
+        return Err(anyhow!("selected automatic root route changed before launch"));
+    }
+    if let Some(generation) = expected_generation {
+        if d.store.lock().unwrap().auto_account_generation(&route.profile_id)? != Some(generation) {
+            return Err(anyhow!("automatic root account changed before Git preparation"));
+        }
+    }
+    if workspace.kind == "worktree" {
+        let branch = workspace.branch.as_deref()
+            .ok_or_else(|| anyhow!("automatic root planned branch is unavailable"))?;
+        let start = task.fork_commit.as_deref()
+            .ok_or_else(|| anyhow!("automatic root start commit is unavailable"))?;
+        let (created, _) = crate::git::worktree_add_planned_auto(
+            std::path::Path::new(&task.repo_root), std::path::Path::new(&workspace.path),
+            branch, start)?;
+        if created != std::fs::canonicalize(&workspace.path)? {
+            return Err(anyhow!("automatic root worktree path changed during Git preparation"));
+        }
+    }
+    d.store.lock().unwrap().set_auto_root_phase(work_unit_id, "prepared")?;
+    let snapshot = d.take_snapshot(&workspace, "task-start")?;
+    d.store.lock().unwrap().set_task_start_snapshot(&task.id, &snapshot.id)?;
+    if !d.store.lock().unwrap().auto_mode_enabled()? {
+        return Err(anyhow!("Auto Mode was disabled before the root model turn"));
+    }
+    if d.store.lock().unwrap().runs()?.iter().any(|other|
+        other.id != run.id && other.profile_id.as_deref() == Some(route.profile_id.as_str())
+            && ACTIVE.contains(&other.status.as_str())) {
+        return Err(anyhow!("automatic root profile has another active run"));
+    }
+    if route.harness == "codex-app" {
+        // The model catalog was collected before the queued root occupied
+        // this profile. Recheck effective project tools in the actual worktree.
+        let catalog = d.store.lock().unwrap().auto_model_catalog(&route.profile_id)?
+            .ok_or_else(|| anyhow!("automatic root model catalog is unavailable"))?;
+        let now_ms = crate::daemon::now();
+        if now_ms < catalog.observed_ms || now_ms >= catalog.expires_ms
+            || !catalog.models.iter().any(|model| model.model == route.model
+                && model.efforts.contains(&route.effort)) {
+            return Err(anyhow!("automatic root model catalog changed before launch"));
+        }
+        let tools = dispatch(d, "auto.tools.inspect", &json!({"profile_id":route.profile_id,
+            "workspace_id":workspace.id,"timeout_ms":4000}))?;
+        let tool_catalog: crate::auto_route::ToolCatalog =
+            serde_json::from_value(tools["catalog"].clone())?;
+        if required_tools.iter().any(|tool| !tool_catalog.tools.contains(tool)) {
+            return Err(anyhow!("automatic root required tool is unavailable in the selected workspace"));
+        }
+        let store = d.store.lock().unwrap();
+        if store.auto_account_generation(&route.profile_id)? != expected_generation {
+            return Err(anyhow!("automatic root account changed during tool preflight"));
+        }
+        let launch: Option<String> = store.conn.query_row("SELECT launch FROM runs WHERE id=?1",
+            [&run.id], |row| row.get(0))?;
+        let mut launch: Value = launch.as_deref().and_then(|text| serde_json::from_str(text).ok())
+            .ok_or_else(|| anyhow!("automatic root launch metadata is unavailable"))?;
+        launch["generic"]["auto_parent_discovery"] = json!({"workspace_id":workspace.id,
+            "account_generation":expected_generation,"model_catalog":catalog,
+            "tool_catalog":tool_catalog});
+        store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1",
+            rusqlite::params![run.id, launch.to_string()])?;
+    } else if route.harness == "claude" {
+        recheck_claude_account_before_child(d, &route.profile_id,
+            expected_generation.ok_or_else(|| anyhow!("Claude account generation unavailable"))?,
+            Instant::now() + Duration::from_secs(2))?;
+    } else if route.harness == "opencode" {
+        let profile = d.profile(&route.profile_id)?;
+        crate::auto_opencode::auto_local_inline_config(&profile,
+            std::path::Path::new(&workspace.path), &route.model, &route.endpoint)?;
+        if crate::auto_opencode::probe_local_endpoint(&route.endpoint)
+            != crate::auto_opencode::EndpointProbe::Reachable {
+            return Err(anyhow!("selected local OpenCode endpoint is unavailable before root turn"));
+        }
+    }
+    if let Some(observation) = d.store.lock().unwrap().latest_auto_quota(&route.profile_id)? {
+        if observation.snapshot.state_for(&route.model, crate::daemon::now())
+            == crate::auto_quota::QuotaState::Exhausted {
+            return Err(anyhow!("automatic root account allowance is exhausted"));
+        }
+    }
+    d.start_turn(&run.id, &task.prompt, false, &crate::daemon::TurnOpts::default())?;
+    d.store.lock().unwrap().set_auto_root_phase(work_unit_id, "running")?;
+    auto_root_response(d, work_unit_id, request_hash, false)
+}
+
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
@@ -878,6 +1214,175 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "branches": crate::git::branches(&root), "status": crate::git::status(&root)?})
         }
         "task.create" => d.create_task(p)?,
+        "auto.root.preview" => auto_root_preview(d, p)?,
+        "auto.start" => {
+            use sha2::{Digest, Sha256};
+            use crate::store::{Run, Task, Workspace};
+            let fields = p.as_object().ok_or_else(|| anyhow!("automatic root request must be an object"))?;
+            for field in fields.keys() {
+                if !matches!(field.as_str(), "repo" | "work_unit_id" | "allowed_profiles" | "min_tier"
+                    | "required_tools" | "context_needed" | "requires_approvals" | "sandbox"
+                    | "pinned_route" | "preferred_harness" | "task_class" | "execution_budget_ms"
+                    | "prompt" | "title" | "workspace_mode" | "target_ref" | "approval_policy") {
+                    return Err(anyhow!("unsupported automatic root launch field: {field}"));
+                }
+            }
+            let work_unit_id = s(p, "work_unit_id")?;
+            if work_unit_id.is_empty() || work_unit_id.len() > 120 || !work_unit_id.bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')) {
+                return Err(anyhow!("invalid automatic root work-unit identity"));
+            }
+            let prompt = s(p, "prompt")?;
+            if prompt.is_empty() || prompt.len() > 32_768 {
+                return Err(anyhow!("automatic root prompt must be 1-32768 bytes"));
+            }
+            let title = p["title"].as_str().unwrap_or_default();
+            let title = if title.is_empty() { prompt.chars().take(60).collect::<String>() }
+                else { title.to_string() };
+            if title.trim().is_empty() || title.len() > 80 {
+                return Err(anyhow!("automatic root title must be 1-80 bytes"));
+            }
+            let mode = p["workspace_mode"].as_str().unwrap_or("worktree");
+            if !matches!(mode, "worktree" | "current") {
+                return Err(anyhow!("automatic root workspace mode is unsupported"));
+            }
+            let approval = p["approval_policy"].as_str().unwrap_or("on-request");
+            if !matches!(approval, "on-request" | "never") {
+                return Err(anyhow!("automatic root approval policy is unsupported"));
+            }
+            if approval == "never" && p["requires_approvals"] == true {
+                return Err(anyhow!("automatic root requires approvals disabled by its launch policy"));
+            }
+            let target_ref = match p.get("target_ref") {
+                None => None,
+                Some(Value::String(value)) if !value.is_empty() && value.len() <= 200
+                    && !value.starts_with('-') => Some(value.clone()),
+                _ => return Err(anyhow!("automatic root target_ref is invalid")),
+            };
+            let repo = crate::git::toplevel(std::path::Path::new(s(p, "repo")?))?;
+            let mut preview_request = p.clone();
+            for field in ["prompt", "title", "workspace_mode", "target_ref", "approval_policy"] {
+                preview_request.as_object_mut().unwrap().remove(field);
+            }
+            preview_request["repo"] = json!(repo);
+            let request_hash = format!("{:x}", Sha256::digest(serde_json::to_vec(&json!({
+                "repo":repo,"preview":preview_request,"prompt":prompt,"title":title,
+                "workspace_mode":mode,"target_ref":target_ref,"approval_policy":approval
+            }))?));
+            let gate = d.work_unit_gate(work_unit_id);
+            let _guard = gate.lock().unwrap();
+            if d.store.lock().unwrap().auto_root_intent(work_unit_id)?.is_some() {
+                return auto_root_response(d, work_unit_id, &request_hash, true);
+            }
+            if d.store.lock().unwrap().auto_launch_intent(work_unit_id)?.is_some() {
+                return Err(anyhow!("automatic work-unit identity was already used by a child"));
+            }
+            let preview = auto_root_preview(d, &preview_request)?;
+            let decision = &preview["decision"];
+            if decision["selected"].is_null() {
+                return Ok(json!({"state":"paused","work_unit_id":work_unit_id,
+                    "decision":decision,"discovery_failures":preview["discovery_failures"],
+                    "actions":["refresh","choose_manual_route"]}));
+            }
+            let route: crate::auto_select::Route =
+                serde_json::from_value(preview["selected_route"].clone())?;
+            let work: crate::auto_select::WorkUnit = serde_json::from_value(
+                preview["trace"]["selection_input"]["work"].clone())?;
+            let generation = preview["evidence"].as_array().and_then(|items| items.iter()
+                .find(|item| item["profile_id"] == route.profile_id))
+                .and_then(|item| item["account_generation"].as_i64());
+            if route.harness != "opencode" && generation.is_none() {
+                return Err(anyhow!("selected automatic root account generation is unavailable"));
+            }
+            let common = crate::git::common_dir(&repo)?;
+            let start_name = target_ref.as_deref().unwrap_or("HEAD");
+            let start_sha = crate::git::rev_parse(&repo, start_name)
+                .ok_or_else(|| anyhow!("automatic root starting ref is unavailable"))?;
+            let (path, branch, initial_dirty) = if mode == "worktree" {
+                let repo_name = repo.file_name().map(|name| name.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "repo".into());
+                let common_hash = format!("{:x}", Sha256::digest(common.display().to_string().as_bytes()));
+                let parent = crate::paths::worktrees_dir().join(format!("{repo_name}-{}", &common_hash[..8]));
+                let (path, branch) = crate::git::plan_worktree_add(&repo, &parent, &title)?;
+                (path, Some(branch), json!({"clean":true}))
+            } else {
+                let status = crate::git::status(&repo)?;
+                (repo.clone(), status.branch.clone(), serde_json::to_value(status)?)
+            };
+            let stamp = crate::daemon::now();
+            let workspace = Workspace { id:format!("w-{}", uuid::Uuid::new_v4().simple()),
+                path:path.display().to_string(), repo_root:repo.display().to_string(),
+                common_dir:common.display().to_string(), kind:mode.into(), branch,
+                owner_run_id:None, initial_dirty, created_ms:stamp, removed_ms:None };
+            let task = Task { id:format!("t-{}", uuid::Uuid::new_v4().simple()),
+                title:title.clone(), prompt:prompt.into(), repo_root:workspace.repo_root.clone(),
+                target_ref, workspace_id:workspace.id.clone(), start_snapshot:None,
+                fork_commit:Some(start_sha), fork_provenance:Some("recorded: Auto root start ref".into()),
+                created_ms:stamp, archived_ms:None };
+            let profile = d.profile(&route.profile_id)?;
+            let expected_harness = if route.harness == "codex-app" { "codex" }
+                else { route.harness.as_str() };
+            if profile.harness != expected_harness {
+                return Err(anyhow!("selected automatic root profile changed harness"));
+            }
+            let run = Run { id:format!("r-{}", uuid::Uuid::new_v4().simple()),
+                task_id:task.id.clone(), parent_run_id:None, harness:route.harness.clone(),
+                harness_version:crate::adapters::resolve_program(&route.harness)
+                    .and_then(|program| crate::adapters::version_of(&program)),
+                profile_id:Some(route.profile_id.clone()), model:Some(route.model.clone()),
+                effort:Some(route.effort.clone()), workspace_id:workspace.id.clone(),
+                native_id:None, status:"queued".into(), exit_reason:None, created_ms:stamp,
+                ended_ms:None, title:title.clone(), relation_source:None,
+                relation_confidence:None,
+                capabilities:crate::adapters::capabilities(&route.harness),
+                process_generation:0, attention:None };
+            let auto_routing = route.harness == "codex-app";
+            let sandbox = if work.min_sandbox == crate::auto_select::Sandbox::ReadOnly {
+                "read-only" } else { "workspace-write" };
+            let launch = json!({"generic":{"approval":approval,"sandbox":sandbox,
+                "auto_selected":true,"expected_account_generation":generation,
+                "required_tools":work.required_tools,"execution_budget_ms":work.execution_budget_ms,
+                "auto_local_endpoint":if route.harness == "opencode" {
+                    Some(route.endpoint.as_str()) } else { None },
+                "auto_routing":auto_routing,
+                "auto_allowed_profiles":if auto_routing { Some(work.allowed_profiles.iter()
+                    .cloned().collect::<Vec<_>>()) } else { None },
+                "auto_parent_budget_ms":crate::daemon::DEFAULT_AUTO_PARENT_BUDGET_MS}});
+            let admitted = d.store.lock().unwrap().insert_auto_root_selected(work_unit_id,
+                &request_hash, &route.id, &route.pool_id, generation,
+                &workspace, &task, &run, &launch, &preview["trace"])?;
+            if admitted.is_none() {
+                return Ok(json!({"state":"paused","work_unit_id":work_unit_id,
+                    "decision":decision,"pause_reason":"admission_conflict",
+                    "actions":["refresh","choose_manual_route"]}));
+            }
+            let id = work_unit_id.to_string();
+            let worker_daemon = d.clone();
+            let worker_hash = request_hash.clone();
+            let worker_route = route.clone();
+            let required = work.required_tools.into_iter().collect::<Vec<_>>();
+            let runtime = tokio::runtime::Handle::current();
+            auto_launches().lock().unwrap().insert(id.clone());
+            let spawn = std::thread::Builder::new().name("auto-root-launch".into()).spawn(move || {
+                let _active = ActiveAutoLaunch(id.clone());
+                let _runtime = runtime.enter();
+                if let Err(error) = auto_root_launch_worker(&worker_daemon, &id, &worker_route,
+                    &required, generation, &worker_hash) {
+                    let store = worker_daemon.store.lock().unwrap();
+                    let _ = store.set_auto_root_phase(&id, "paused");
+                    if let Ok(Some(intent)) = store.auto_root_intent(&id) {
+                        let _ = store.conn.execute("UPDATE runs SET status='unknown',
+                            exit_reason=?2 WHERE id=?1 AND process_generation=0",
+                            rusqlite::params![intent.run_id, format!("automatic root launch paused: {error}")]);
+                    }
+                }
+            });
+            if spawn.is_err() {
+                auto_launches().lock().unwrap().remove(work_unit_id);
+                d.store.lock().unwrap().set_auto_root_phase(work_unit_id, "paused")?;
+            }
+            auto_root_response(d, work_unit_id, &request_hash, false)?
+        }
         "run.delegate" => d.delegate_run(p, false)?,
         "run.handoff" => d.handoff_run(p)?,
         "auto.mode.get" => json!({"enabled":d.store.lock().unwrap().auto_mode_enabled()?}),
@@ -1130,7 +1635,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let candidate_ids = allowed_profiles.iter().cloned().collect::<Vec<_>>();
                 for (candidate_id, discovered) in collect_unique_bounded(&candidate_ids,
                     Duration::from_secs(8).min(decision_deadline.saturating_duration_since(Instant::now())), |id, budget|
-                        discover_auto_profile_shared(d, id, &parent.workspace_id, &parent.id, budget)) {
+                        discover_auto_profile_shared(d, id, &parent.workspace_id, &parent.id, None, budget)) {
                     match discovered {
                         Ok(discovered) => {
                             routes.extend(discovered.routes);

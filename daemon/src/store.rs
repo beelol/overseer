@@ -150,6 +150,7 @@ pub struct AutoRootIntent {
     pub task_id: String,
     pub run_id: String,
     pub workspace_id: String,
+    pub decision_event_seq: Option<i64>,
 }
 
 fn json_col(row: &Row, idx: &str) -> rusqlite::Result<Value> {
@@ -745,12 +746,25 @@ impl Store {
     pub fn auto_root_intent(&self, id: &str) -> Result<Option<AutoRootIntent>> {
         Ok(self.conn.query_row(
             "SELECT work_unit_id,requirements_hash,route_id,account_generation,phase,
-                task_id,run_id,workspace_id FROM auto_root_intents WHERE work_unit_id=?1",
+                task_id,run_id,workspace_id,decision_event_seq
+                FROM auto_root_intents WHERE work_unit_id=?1",
             [id], |row| Ok(AutoRootIntent { work_unit_id:row.get(0)?,
                 requirements_hash:row.get(1)?, route_id:row.get(2)?,
                 account_generation:row.get(3)?, phase:row.get(4)?, task_id:row.get(5)?,
-                run_id:row.get(6)?, workspace_id:row.get(7)? }),
+                run_id:row.get(6)?, workspace_id:row.get(7)?,
+                decision_event_seq:row.get(8)? }),
         ).optional()?)
+    }
+
+    pub fn set_auto_root_phase(&self, work_unit_id: &str, phase: &str) -> Result<()> {
+        if !matches!(phase, "preparing" | "prepared" | "running" | "paused") {
+            return Err(anyhow!("unsupported automatic root phase"));
+        }
+        let updated = self.conn.execute(
+            "UPDATE auto_root_intents SET phase=?2 WHERE work_unit_id=?1",
+            params![work_unit_id, phase])?;
+        if updated != 1 { return Err(anyhow!("automatic root intent is unavailable")); }
+        Ok(())
     }
 
     /// Commit the selected root, its queued execution rows, pool claim and
@@ -773,6 +787,9 @@ impl Store {
             return Err(anyhow!("automatic root execution rows are inconsistent"));
         }
         let tx = self.conn.unchecked_transaction()?;
+        if !self.auto_mode_enabled()? {
+            return Err(anyhow!("Auto Mode was disabled before root admission"));
+        }
         if self.auto_launch_intent(work_unit_id)?.is_some()
             || self.auto_root_intent(work_unit_id)?.is_some() {
             return Err(anyhow!("automatic work-unit identity was already used"));
@@ -2381,6 +2398,7 @@ mod schema_migration_tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("state.sqlite");
         let store = Store::open(&path).unwrap();
+        store.set_auto_mode_enabled(true).unwrap();
         store.conn.execute_batch("INSERT INTO workspaces
             (id,path,repo_root,common_dir,kind,initial_dirty,created_ms)
             VALUES('parent-w','/tmp/parent','/tmp/parent','/tmp/parent','current','{}',0);
