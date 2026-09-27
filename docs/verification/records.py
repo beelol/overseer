@@ -1189,7 +1189,8 @@ rec(142, "One Overseer mark everywhere", "not started", date="—", commit="—"
     expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
     actual="Not started.", live="—", blocker="Not started: the owner's two images need to be added to docs/design/brand/ as files; then the single-colour glyph is drawn for VS Code and approved.")
 
-# Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). Built in its own pull request (#5).
+# Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code are built in pull
+# request #5; the terminal UI is T-23 and T-24 (pull request #6).
 rec(143, "Opt-in audio cues owned by the daemon", "verified", date="2026-09-26",
     commit="d7be0a3 (branch codex/reactor-audio-mode, pull request #5); later commits on the branch change documents, comments and evidence only",
     harness="Fixture harnesses only (Claude fixture, Codex app-server fixture, generic programs); no paid tokens. Live playback through macOS `afplay` and `say`",
@@ -1213,13 +1214,23 @@ rec(143, "Opt-in audio cues owned by the daemon", "verified", date="2026-09-26",
 - **Failing quietly:** with the cache blocked, or the Commander folder removed, the agent completes and the failure is in the daemon log; an unknown cue key is refused.
 - **Other platforms:** with the players taken away by a test switch the daemon reports `available: false`, refuses to turn on, to preview and to list voices, and an agent completes in silence even when the setting was already on.
 - **VS Code:** the Agents title bar is unchanged from main (New Agent, Search Agents, Toggle Agent Grid, VS Code's Collapse All); *Audio Mode and Reactor Cues…* is in the overflow menu; turning on, choosing a track and a preview go through the daemon. 10 of 10 checks.
-- **Merge:** the branch contains main (28fe118); the virtual merge is clean.""",
+- **Merge:** the branch contains main; the virtual merge is clean.""",
     evidence="[daemon tests](evidence/audio-mode/cargo-test-overseerd.txt), [extension and whitespace checks](evidence/audio-mode/extension-check.txt), [pack check](evidence/audio-mode/pack-check.txt), [live playback](evidence/audio-mode/live-playback.txt), [VS Code scenario](evidence/ui/audio/), [requirement by requirement](audio-mode.md)",
     live="Live macOS playback (`afplay`, `say`) and the packaged VSIX in VS Code; agents are fixtures.",
     limits="macOS only; no other platform was run (the unavailable path is exercised on macOS through a test switch; Linux belongs to AC-41). The Commander check used three generated beeps in a temporary private folder; the owner's recordings were not read. The pack was compared with the owner's copy of the approved folder, not the folder itself. Nobody listened: the checks prove that the approved files are the ones played, not how they sound.")
+rec(144, "A lost session asks for attention", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
+    actual="Not started. The daemon already plays the attention cue for a lost session; only a unit test touches it.", live="—",
+    blocker="Not started (Gate O, the owner's decision of 2026-09-26; the tests belong to pull request #5; see docs/rfcs/audio-mode-goal.md).")
+rec(145, "Audio Mode by ear (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
+    actual="Not started.", live="—",
+    blocker="Not started: needs the owner's listening session on the build of pull request #5 (see docs/rfcs/audio-mode-goal.md).")
 
 SHORT_BLOCKERS = {
     142: "not started: waits for the owner\'s logo files",
+    144: "not started (Gate O, the owner's decision of 2026-09-26)",
+    145: "not started: the owner's listening session",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
     41: "deferred: no Linux environment",

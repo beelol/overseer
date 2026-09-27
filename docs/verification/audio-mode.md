@@ -1,6 +1,7 @@
 # Audio Mode verification (pull request #5)
 
-Criterion: [AC-143](AC-143.md), Gate O in [the RFC](../overseer-rfc.md). Design:
+Criterion: [AC-143](AC-143.md), Gate O in [the RFC](../overseer-rfc.md); what remains is
+AC-144, AC-145, T-23 and T-24 in the [prepared goal](../rfcs/audio-mode-goal.md). Design:
 [side RFC](../rfcs/audio-mode.md). Tested implementation commit: `d7be0a3`; later commits on
 the branch change documents, comments and evidence only. Date: 2026-09-26, macOS 26.6.2 arm64.
 
@@ -89,9 +90,10 @@ The seven checks the owner's cue ledger asks of this pull request:
 - The owner's Commander recordings were not read; the live check used three generated beeps
   in a temporary private folder.
 - Nobody listened. The checks prove which files are played, not how they sound.
-- A top-level run that becomes `disconnected` plays the attention cue. The owner's ledger
-  lists *disconnected* under **Agent stopped**, silent by default. The behaviour is as it was
-  before this pass and is an open question in the [side RFC](../rfcs/audio-mode.md); only the
-  unit test `core_transitions_are_broad_and_attention_is_deduped` touches it.
+- A top-level run whose session is lost (`disconnected`) plays the attention cue. The owner
+  decided on 2026-09-26 that it stays that way; only the unit test
+  `core_transitions_are_broad_and_attention_is_deduped` touches it so far. AC-144 asks for
+  the protocol tests.
+- The owner's confirmation by ear is AC-145.
 - The in-flight pull requests #2 (Auto Mode), #3 (Swarm) and #6 (terminal UI controls) were
   not rechecked against this branch in this pass.

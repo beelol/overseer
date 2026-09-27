@@ -1,8 +1,10 @@
 # Side RFC: Audio Mode — opt-in cues from the daemon
 
-Status: owner request (2026-09-26). Tracked by
-[AC-143](../overseer-rfc.md#gate-o--audio-mode-added-by-the-owner-2026-09-26) in the main RFC.
-Built in pull request #5; evidence in [the audio ledger](../verification/audio-mode.md).
+Status: owner request (2026-09-26). Tracked by AC-143 to AC-145 under
+[Gate O](../overseer-rfc.md#gate-o--audio-mode-added-by-the-owner-2026-09-26) in the main RFC and
+by T-23 and T-24 in the [TUI RFC](tui.md). The daemon and VS Code are built in pull request #5,
+which carries the evidence; the terminal UI follows in pull request #6. What remains is in the
+[prepared goal](audio-mode-goal.md).
 
 ## Why
 
@@ -92,20 +94,25 @@ palette. It never plays sound itself.
 | Reactor cache | at most the 12 bundled files, owner-only, under the daemon's data folder; written on first play and rewritten when the content differs from the bundled cue |
 | While off | no player process, no cache folder |
 
-## Open question for the owner
+## Owner decisions
 
-The owner's cue ledger lists *disconnected* under **Agent stopped**, which is silent by
-default. The daemon plays the attention cue when a top-level run's status becomes
-`disconnected` (its session was lost and it cannot continue), as it did before this pass.
-That behaviour is unchanged and untested by a live run; the owner decides whether a lost
-session should sound or stay silent.
+- **A lost session sounds (2026-09-26).** The owner's cue ledger lists *disconnected* under
+  **Agent stopped**, silent by default. The owner decided otherwise for a top-level agent whose
+  session is lost while the daemon runs: it cannot continue without the user, so it keeps the
+  attention cue. A session found lost when the daemon starts stays silent, because cues are
+  never played for what happened while the daemon was down. AC-144 holds the rule and its test.
+- **By ear (2026-09-26).** The checks prove which files are played, not how they sound. The
+  owner confirms the result by ear (AC-145).
 
-## Out of scope for this pull request
+## Out of scope
 
-Streaming or online voices, per-event customization, controls in the terminal UI (pull
-request #6) and spoken detail for every event.
+Streaming or online voices, per-event customization and spoken detail for every event.
+Controls in the terminal UI are not part of pull request #5; they are T-23 and T-24, built in
+pull request #6.
 
 ## Acceptance
 
-AC-143 in the main RFC is the criterion. The [audio ledger](../verification/audio-mode.md)
-maps each part of it to a test or a live check and records the results.
+AC-143 is the criterion for the daemon and VS Code; the audio ledger
+(`docs/verification/audio-mode.md`, in pull request #5) maps each part of it to a test or a live
+check. AC-144 and AC-145 are the two loose ends of that pull request; T-23 and T-24 are the
+terminal UI.
