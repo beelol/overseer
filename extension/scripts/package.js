@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+require('../../scripts/git-fallback').ensureGit('packager'); // AC-159
 const root = path.resolve(__dirname, '..');
 const repo = path.resolve(root, '..');
 const run = (cmd, args, cwd) => {
