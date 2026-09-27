@@ -1,6 +1,12 @@
 // Listening session for AC-145 (Audio Mode by ear). It plays real sound.
 //
 //     node extension/scripts/package.js && node test/ui/listen-audio.js
+//     node test/ui/listen-audio.js --play once,system,closed,commander=<your folder>
+//
+// With --play the session does the named steps by itself and says each one aloud before it
+// starts, so the owner only listens: once (two agents need you at the same moment), system
+// (System voice), commander=<folder> (the owner's own folder, played where it is), closed (the
+// VS Code window is quit first). --silent sends the cues to a log instead of the speakers.
 //
 // Opens VS Code with its own profile and its own Overseer home, with the packaged VSIX installed,
 // so the owner's own VS Code, daemon and agents are not touched. Agents are fixtures: no account
@@ -17,6 +23,10 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 // Records of earlier sessions are kept: a new session adds its own file.
 const kept = path.join(repoRoot, 'docs/verification/evidence/ui/audio-listening');
 const earlier = fs.existsSync(kept) ? fs.readdirSync(kept).filter(f => /^marks.*\.json$/.test(f)).map(f => [f, fs.readFileSync(path.join(kept, f))]) : [];
+const args = process.argv.slice(2);
+const play = (args[args.indexOf('--play') + 1] || '').split(',').filter(Boolean);
+const automatic = args.includes('--play');
+const silent = args.includes('--silent');
 const s = new Session('audio-listening');
 for (const [name, data] of earlier) fs.writeFileSync(path.join(s.evidence, name), data);
 const recordFile = `marks-${new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15)}.json`;
@@ -36,6 +46,74 @@ function did(key) {
   return `Audio Mode ${event.enabled ? 'on' : 'off'} · ${event.track} · VS Code ${event.vscode}`;
 }
 let cues = [], repo, n = 0, busy = false;
+const cueLog = path.join(s.root, 'cues.log');
+
+/** Says what comes next, aloud (in a voice the System voice track does not use) and in the terminal. */
+function announce(text) {
+  say(`\n${text}`);
+  record.heard.push(`${new Date().toISOString().slice(11, 19)} announced: ${text}`);
+  if (!silent) cp.spawnSync('/usr/bin/say', ['-v', 'Samantha', '-r', '185', text]);
+}
+
+function quitWindow() {
+  try { s.child?.kill('SIGTERM'); } catch {}
+  for (let i = 0; i < 40 && windowOpen(); i++) cp.spawnSync('sleep', ['0.5']);
+  for (const pid of cp.spawnSync('pgrep', ['-f', s.profile], { encoding: 'utf8' }).stdout.trim().split('\n').filter(Boolean)) { try { process.kill(Number(pid), 'SIGKILL'); } catch {} }
+}
+
+/** The steps named with --play, one after the other. */
+async function automatic_steps() {
+  record.played = [];
+  tryCtl('audio.set', { enabled: true, track: 'reactor' });
+  for (const step of play) {
+    const [name, value] = step.split(/=(.*)/s);
+    if (name === 'once') {
+      announce('Two agents need you at the same moment. You should hear the agents start, then a single attention cue for both.');
+      await needs(2);
+    } else if (name === 'system') {
+      const voices = s.ctl('audio.voices');
+      const voice = (voices.find(v => v.name === 'Daniel') || voices[0])?.name || '';
+      if (!tryCtl('audio.set', { track: 'system', voice })) continue;
+      announce(`System voice, spoken by ${voice || 'the system default'}. You should hear: Agent started. Agent complete. Then: Agent started. An agent needs your attention.`);
+      await generic(); await delay(2500);
+      await needs(1);
+    } else if (name === 'commander') {
+      if (!value || !tryCtl('audio.import_commander', { path: value }) || !tryCtl('audio.set', { track: 'commander' })) { say('  the Commander folder could not be used; this step was not played'); continue; }
+      announce('Your Commander folder. You should hear your recordings for started, complete, and then started and needs attention.');
+      await generic(); await delay(2500);
+      await needs(1);
+    } else if (name === 'closed') {
+      tryCtl('audio.set', { track: 'reactor' });
+      quitWindow();
+      announce('The Visual Studio Code window is closed now. You should hear a start cue and a complete cue, then a start cue and an attention cue.');
+      await generic(); await delay(2500);
+      await needs(1);
+    } else { say(`  unknown step: ${name}`); continue; }
+    await delay(3500);
+    stopAgents();
+    record.played.push(name);
+    tryCtl('audio.set', { track: 'reactor' });
+    await delay(1500);
+  }
+  for (const key of ['open', 'closed', 'once', 'system', 'commander', 'off']) record.steps[key] = record.played.includes(key) ? 'played; waits for the owner to say what was heard' : 'not played in this session';
+  if (silent) record.cue_log = fs.existsSync(cueLog) ? fs.readFileSync(cueLog, 'utf8').split('\n').filter(Boolean) : [];
+  writeRecord();
+  if (!silent) announce('That was the last step.');
+}
+
+function writeRecord() {
+  const audio = s.ctl('audio.get');
+  const bin = path.join(s.extensions, fs.readdirSync(s.extensions).find(d => d.startsWith('beelol.overseer')), 'bin', `overseerd-${process.platform}-${process.arch}`);
+  Object.assign(record, {
+    commit: cp.execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim(),
+    macos: cp.execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf8' }).trim(), arch: os.arch(),
+    daemon_sha256: require('crypto').createHash('sha256').update(fs.readFileSync(bin)).digest('hex'),
+    pack: cues.map(c => ({ key: c.key, sha256: c.sha256 })),
+    commander_folder_set: audio.commander_imported, // whether one was chosen; never its path or its files
+  });
+  fs.writeFileSync(path.join(s.evidence, recordFile), JSON.stringify(record, null, 2) + '\n');
+  say(`\nWritten: ${path.relative(repoRoot, path.join(s.evidence, recordFile))}`);
+}
 
 const KEYS = '123456789abc';
 function menu() {
@@ -105,17 +183,7 @@ async function marks() {
     if (done) record.steps[key] = { y: 'yes', n: 'no' }[await ask(`  ${text}? y / n `)] || 'no';
     else { record.steps[key] = 'not tried'; say(`  ${text}: not done in this session (${how})`); }
   }
-  const audio = s.ctl('audio.get');
-  const bin = path.join(s.extensions, fs.readdirSync(s.extensions).find(d => d.startsWith('beelol.overseer')), 'bin', `overseerd-${process.platform}-${process.arch}`);
-  Object.assign(record, {
-    commit: cp.execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim(),
-    macos: cp.execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf8' }).trim(), arch: os.arch(),
-    daemon_sha256: require('crypto').createHash('sha256').update(fs.readFileSync(bin)).digest('hex'),
-    pack: cues.map(c => ({ key: c.key, sha256: c.sha256 })),
-    commander_folder_set: audio.commander_imported, // whether one was chosen; never its path or its files
-  });
-  fs.writeFileSync(path.join(s.evidence, recordFile), JSON.stringify(record, null, 2) + '\n');
-  say(`\nWritten: ${path.relative(repoRoot, path.join(s.evidence, recordFile))}`);
+  writeRecord();
 }
 
 (async () => {
@@ -123,13 +191,14 @@ async function marks() {
     repo = makeRepo(path.join(s.root, 'listening'), { dirty: false });
     s.settings({ 'workbench.colorTheme': 'Overseer Dark' });
     s.install(latestVsix());
-    s.launch(repo, { OVERSEER_CLAUDE_PATH: path.join(repoRoot, 'fixtures/fake-harness/claude-fixture.js'), OVERSEER_CODEX_PATH: '/nonexistent/codex', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode',
+    s.launch(repo, { ...(silent ? { OVERSEER_TEST_AUDIO_LOG: cueLog } : {}), OVERSEER_CLAUDE_PATH: path.join(repoRoot, 'fixtures/fake-harness/claude-fixture.js'), OVERSEER_CODEX_PATH: '/nonexistent/codex', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode',
       FIXTURE_MODE: 'permission', FIXTURE_PERMISSION_BARRIER: barrier, OVERSEER_HARNESS_ENV_PASSTHROUGH: 'FIXTURE_MODE,FIXTURE_PERMISSION_BARRIER' });
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     await cdp.command('View: Show Overseer');
     cdp.close(); s.cdp = null; // from here on the window is the owner's
     cues = s.ctl('audio.get').manifest;
+    if (automatic) { await automatic_steps(); return; }
     say('\nAudio Mode listening session. Real sound: set the volume to what you work with.');
     say('A VS Code window is open with its own profile. Your own VS Code and daemon are untouched.');
     say('To listen with VS Code closed, quit that window (Cmd+Q in it) and keep using the keys here.');
