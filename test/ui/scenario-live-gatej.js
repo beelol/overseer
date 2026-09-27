@@ -99,7 +99,7 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
       const effortOk = spec.harness === 'claude' ? flag(argv, '--effort') === 'low' : (argv || []).some(a => /model_reasoning_effort="?low"?/.test(a));
       const modeOk = (argv || []).some((a, i) => (a === spec.modeFlag[0] && argv[i + 1] === spec.modeFlag[1]) || (spec.harness === 'codex' && a === 'sandbox_mode="read-only"'));
       const imageOk = spec.harness === 'claude' ? true : (argv || []).includes('-i');
-      check(`${spec.key}: an attached image and a mentioned worktree file reach the agent (reply names red and "# fixture")`, /red/i.test(r.rich.reply || '') && /fixture/i.test(r.rich.reply || '') && imageOk, { reply: r.rich.reply });
+      check(`${spec.key}: an attached image and a mentioned worktree file reach the agent (reply names red and "# fixture")`, /\bred\b/i.test(r.rich.reply || '') && /fixture/i.test(r.rich.reply || '') && imageOk, { reply: r.rich.reply });
       check(`${spec.key}: per-turn model, effort and permission mode reach the harness`, flag(argv, spec.harness === 'claude' ? '--model' : '-m') === spec.model && effortOk && modeOk, { argv: r.rich.argv });
 
       // Stop and send: interrupt a longer turn, then send the new message (what ⌥Enter does).

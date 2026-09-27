@@ -1,0 +1,17 @@
+{
+  "checks": [
+    {
+      "name": "the live Claude turn finished (haiku, existing login)",
+      "ok": false,
+      "detail": {
+        "status": "running",
+        "model": "haiku"
+      }
+    },
+    {
+      "name": "Overseer's answer names the working agent from the shared state",
+      "ok": true,
+      "detail": "What is everyone doing? One short sentence per agent.\nShared the state of 1 agent\n\nBilling migration (r-c8bfad78d085): Running a migration task in the talk-live-repo.\n\nDone\n4s\n228 tokens · $0.04"
+    }
+  ]
+}

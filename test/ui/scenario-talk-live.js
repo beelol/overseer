@@ -29,7 +29,8 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     const chat = await cdp.webview(`!!document.querySelector('#conv') && /What is everyone doing/.test(document.querySelector('#conv').textContent)`, 40000);
     const done = await chat.waitFor(`!!document.querySelector('#conv .turn-foot:not([hidden])')`, 120000).then(() => true, () => false);
     const text = await chat.eval(`document.querySelector('#conv').innerText`);
-    const run = s.ctl('state').runs.find(r => r.title === 'Talk to Overseer');
+    // The run's status can lag the turn's footer by a moment.
+    let run; for (let i = 0; i < 40; i++) { run = s.ctl('state').runs.find(r => r.title === 'Talk to Overseer'); if (run?.status === 'completed') break; await delay(250); }
     await s.screenshot('live-answer');
     check('the live Claude turn finished (haiku, existing login)', done && run && run.status === 'completed', { status: run?.status, model: run?.model });
     check('Overseer\'s answer names the working agent from the shared state', /Billing migration/i.test(text) && /running|working|migrat/i.test(text), text.slice(0, 800));
