@@ -2983,6 +2983,14 @@ fn auto_dispatch_selects_reachable_local_opencode_provider_after_another_fails()
         "model":"gpt-6-astra","effort":"high","prompt":"parent checkpoint",
         "approval_policy":"never"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    // The installed CLI can resolve its local provider package on first use.
+    // Prepare metadata before testing route selection; the decision itself
+    // still has its fixed deadline and cannot launch from unknown metadata.
+    let workspace = d.run(&parent)["workspace_id"].as_str().unwrap().to_string();
+    let catalog = (0..3).find_map(|_| d.try_call("auto.opencode.local.inspect", json!({
+        "profile_id":local["id"],"workspace_id":workspace
+    })).ok()).expect("installed OpenCode did not return local metadata after bounded setup");
+    assert_eq!(catalog["catalog"]["models"].as_array().unwrap().len(), 2);
     let request = json!({"work_unit_id":"local-auto-route-1","parent_run_id":parent,
         "min_tier":"general","required_tools":[],"sandbox":"read_only",
         "allowed_profiles":[local["id"]],"preferred_harness":"opencode",
@@ -4074,6 +4082,11 @@ fn auto_hundred_local_routes_with_stalled_account_read_pause_before_deadline_and
     let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
         "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let workspace = d.run(&parent)["workspace_id"].as_str().unwrap().to_string();
+    let catalog = (0..3).find_map(|_| d.try_call("auto.opencode.local.inspect", json!({
+        "profile_id":local["id"],"workspace_id":workspace
+    })).ok()).expect("installed OpenCode did not return the 100-route fixture metadata");
+    assert_eq!(catalog["catalog"]["models"].as_array().unwrap().len(), 100);
     let request = json!({"work_unit_id":"hundred-local-routes-1","parent_run_id":parent,
         "min_tier":"general","required_tools":["browser/navigate"],
         "sandbox":"read_only","allowed_profiles":[local["id"],"system-codex"],
