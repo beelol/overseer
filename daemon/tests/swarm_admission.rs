@@ -375,6 +375,44 @@ fn stopped_swarm_releases_director_slot_after_attempt_exit() {
 }
 
 #[test]
+fn three_slot_limit_runs_director_and_two_workers_then_reuses_confirmed_slot() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":3}));
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("three-slot-director"));
+    let run = setup(&d,"Three slot director",2);
+    commit_beneficial_batch(&d,&run,&["j0".into(),"j1".into()]);
+    let at = now();
+    let first = admit(&d,&run,"j0","codex-a","three-slot-0",at,100000,100).unwrap();
+    let second = admit(&d,&run,"j1","codex-a","three-slot-1",at,100000,100).unwrap();
+    assert_eq!(first["status"],"admitted","{first}");
+    assert_eq!(second["status"],"admitted","{second}");
+    let launched = d.call("swarm.director.launch",json!({"run_id":run,
+        "generation":1,"repo":checkout,"program":"/bin/sleep","args":["30"],
+        "prompt":"Direct the audit","title":"Three slot director"}));
+    let director = launched["overseer_run_id"].as_str().unwrap();
+    assert_eq!(launched["status"],"launched");
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],3);
+    assert!(d.try_call("task.create",json!({"repo":checkout,"harness":"generic",
+        "workspace_mode":"worktree","program":"/bin/sleep","args":["30"],
+        "prompt":"","title":"fourth agent"})).unwrap_err().contains("agent limit reached"));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j0","attempt_id":first["attempt_id"]}));
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],2);
+    let ordinary = d.generic(&checkout,"worktree","/bin/sleep", &["30"]);
+    assert!(ordinary["launch_error"].is_null(),"{ordinary}");
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],3);
+    d.call("run.interrupt",json!({"run_id":run_id(&ordinary)}));
+    d.wait_done(&run_id(&ordinary),8);
+    d.call("swarm.stop",json!({"run_id":run}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j1","attempt_id":second["attempt_id"]}));
+    d.call("run.interrupt",json!({"run_id":director}));
+    d.wait_done(director,8);
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],0);
+}
+
+#[test]
 fn lowering_app_limit_holds_new_workers_until_existing_work_drains() {
     let d = Daemon::start(&[]);
     d.call("agents.limit.set",json!({"max_active":3}));
