@@ -1,5 +1,7 @@
 /* The side bar's search field: one line, like VS Code's own search boxes, in Overseer's tokens. */
 html, body { height: auto; background: transparent; }
+/* Flat: the side bar around it is a workbench surface, and a gradient in a pane this short bands. */
+body { background-image: none; }
 body { padding: 6px 12px 6px 20px; overflow: hidden; }
 .search-field { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px 0 8px; border-radius: var(--ov-radius-control, 4px);
   border: 1px solid var(--vscode-input-border, var(--ov-border)); background: var(--vscode-input-background); color: var(--vscode-input-foreground); }

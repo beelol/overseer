@@ -22,22 +22,36 @@ class Model {
   constructor(client) {
     this.client = client;
     this.state = { tasks: [], runs: [], workspaces: [], profiles: [], turns: {} };
+    this.all = this.state;
+    // Tasks Overseer runs for itself (the Talk to Overseer chat, AC-107): kept out of every list.
+    this.hidden = new Set();
     this.emitter = new vscode.EventEmitter();
     this.onDidChange = this.emitter.event;
     this.profileStatus = new Map();
   }
   async refresh() {
-    try { this.state = await this.client.request('state'); for (const p of this.state.profiles || []) p.name = accountName(p); this.error = undefined; }
+    try {
+      this.all = await this.client.request('state'); for (const p of this.all.profiles || []) p.name = accountName(p);
+      this.state = this.visible(this.all); this.error = undefined;
+    }
     catch (error) { this.error = error.message; }
     this.emitter.fire();
   }
   // Coalesces bursts without starving: a steady stream of events still refreshes every 120 ms.
   scheduleRefresh() { if (!this.timer) this.timer = setTimeout(() => { this.timer = undefined; this.refresh(); }, 120); }
-  run(id) { return this.state.runs.find(r => r.id === id); }
-  task(id) { return this.state.tasks.find(t => t.id === id); }
-  workspace(id) { return this.state.workspaces.find(w => w.id === id); }
+  hide(taskId) { if (taskId && !this.hidden.has(taskId)) { this.hidden.add(taskId); this.state = this.visible(this.all); this.emitter.fire(); } }
+  visible(all) {
+    if (!this.hidden.size) return all;
+    const runs = (all.runs || []).filter(r => !this.hidden.has(r.task_id));
+    const used = new Set(runs.map(r => r.workspace_id));
+    return { ...all, tasks: (all.tasks || []).filter(t => !this.hidden.has(t.id)), runs, workspaces: (all.workspaces || []).filter(w => used.has(w.id) || !(all.runs || []).some(r => r.workspace_id === w.id)) };
+  }
+  // Lookups see every run, hidden ones included (the Overseer chat shows its own run).
+  run(id) { return this.all.runs.find(r => r.id === id); }
+  task(id) { return this.all.tasks.find(t => t.id === id); }
+  workspace(id) { return this.all.workspaces.find(w => w.id === id); }
   profile(id) { return this.state.profiles.find(p => p.id === id); }
-  children(runId) { return this.state.runs.filter(r => r.parent_run_id === runId); }
+  children(runId) { return this.all.runs.filter(r => r.parent_run_id === runId); }
   rootRun(run) { let r = run; const seen = new Set(); while (r?.parent_run_id && !seen.has(r.id)) { seen.add(r.id); r = this.run(r.parent_run_id); } return r; }
   descendants(runId) {
     const out = [], queue = [runId], seen = new Set();

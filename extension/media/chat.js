@@ -25,11 +25,12 @@
       titles.append(this.titleEl, this.metaEl);
       const actions = el('div', 'chat-actions');
       this.reviewBtn = ui.iconButton('diff-multiple', 'Review changes', { action: 'review' }); this.reviewBtn.id = 'review';
-      this.filesBtn = ui.iconButton('list-tree', 'Files', { action: 'files', pressed: false }); this.filesBtn.id = 'files-toggle';
       this.stopBtn = ui.iconButton('debug-stop', 'Stop', { action: 'interrupt', shortcut: '⌘.' }); this.stopBtn.id = 'interrupt';
       this.moreBtn = ui.iconButton('ellipsis', 'More actions', { action: 'more' }); this.moreBtn.id = 'more'; this.moreBtn.setAttribute('aria-haspopup', 'menu');
-      if (this.opts.mode !== 'dashboard') this.filesBtn.hidden = true;
-      actions.append(this.stopBtn, this.reviewBtn, this.filesBtn, this.moreBtn);
+      // AC-106: every Overseer view open in this window, and a jump to each.
+      this.whereBtn = ui.iconButton('location', 'Where am I', { action: 'where', shortcut: '⌥⌘M' }); this.whereBtn.id = 'where';
+      if (this.opts.mode !== 'dashboard') this.whereBtn.hidden = true;
+      actions.append(this.stopBtn, this.reviewBtn, this.whereBtn, this.moreBtn);
       head.append(this.statusEl, titles, actions);
 
       this.scroll = el('div', 'chat-scroll'); this.scroll.id = 'scroll';
@@ -45,7 +46,6 @@
 
       const bottom = el('div', 'chat-bottom'); const inner = el('div', 'chat-bottom-inner');
       this.permBar = el('div', 'needs-bar'); this.permBar.id = 'perm'; this.permBar.hidden = true; this.permBar.setAttribute('role', 'alert');
-      this.changesBar = el('button', 'changes-bar'); this.changesBar.id = 'changes'; this.changesBar.type = 'button'; this.changesBar.hidden = true;
       this.noticeEl = el('div', 'composer-note'); this.noticeEl.id = 'notice'; this.noticeEl.setAttribute('role', 'status');
       const composer = el('div', 'composer inline');
       this.prompt = el('textarea'); this.prompt.id = 'prompt'; this.prompt.rows = 1; this.prompt.setAttribute('aria-label', 'Message to this agent');
@@ -58,15 +58,14 @@
       this.tools = window.OverseerPromptTools.create(this.prompt, tools, this.tray, { post: m => this.post(m), harness: () => this.msg?.run.harness, target: () => this.msg?.workspace ? { workspace_id: this.msg.workspace.id } : null,
         notice: t => this.notice(t), onChange: () => {} });
       this.why = el('div', 'composer-note'); this.why.id = 'send-why';
-      inner.append(this.permBar, this.changesBar, this.queuedEl, this.noticeEl, this.tray, composer, this.why);
+      inner.append(this.permBar, this.queuedEl, this.noticeEl, this.tray, composer, this.why);
       bottom.append(inner);
       this.root.replaceChildren(head, this.scroll, this.jump, bottom);
 
       this.stopBtn.addEventListener('click', () => this.post({ type: 'interrupt' }));
       this.reviewBtn.addEventListener('click', () => this.post({ type: 'openReview' }));
-      this.changesBar.addEventListener('click', () => this.post({ type: 'openReview' }));
-      this.filesBtn.addEventListener('click', () => this.opts.onFiles && this.opts.onFiles(this.filesBtn));
       this.moreBtn.addEventListener('click', () => this.menu());
+      this.whereBtn.addEventListener('click', () => this.post({ type: 'command', command: 'overseer.whereAmI' }));
       this.sendBtn.addEventListener('click', e => this.send(e.altKey ? 'interrupt' : 'queue'));
       this.jump.addEventListener('click', () => { this.stick = true; this.toBottom(); });
       this.prompt.addEventListener('keydown', e => {
@@ -93,7 +92,7 @@
       this.conversation = new window.OverseerConversation(this.convEl, { post: m => this.post(m) });
       this.logEl.replaceChildren(); this.rawEl.hidden = true; this.details.hidden = true;
       this.prompt.value = this.drafts.get(runId) || ''; this.grow();
-      this.changesBar.hidden = true; this.permBar.hidden = true; this.noticeEl.textContent = '';
+      this.permBar.hidden = true; this.noticeEl.textContent = '';
       this.show('conv');
     }
 
@@ -181,7 +180,6 @@
       // Narrow (beside a diff): the header's Review and Files buttons are in this menu instead.
       if (window.innerWidth <= 480) {
         items.push({ id: 'review-menu', label: 'Review changes', icon: 'diff-multiple', run: () => this.post({ type: 'openReview' }) });
-        if (this.opts.mode === 'dashboard') items.push({ id: 'files-menu', label: 'Files', icon: 'list-tree', run: () => this.opts.onFiles?.() });
         items.push('sep');
       }
       if (!this.child) {
@@ -248,14 +246,11 @@
     events(items) { for (const x of items) this.add(x.event, x.label); }
     notice(text) { this.noticeEl.textContent = text || ''; this.noticeEl.classList.toggle('error', !!text); }
     raw(raw) { this.rawEl.hidden = false; this.rawEl.textContent = (raw.truncated ? `[${raw.note}]\n` : '') + raw.lines.map(l => `[${l.s}] ${l.d}`).join('\n'); this.rawEl.scrollIntoView({ block: 'start' }); }
+    // AC-100: the changed files are listed in the review only; the Review button says how many.
     changes(c) {
       const n = c && c.files || 0;
-      this.changesBar.hidden = !n || this.child;
-      if (!n) return;
-      const names = (c.names || []).slice(0, 3).join(', ') + ((c.names || []).length > 3 ? ', …' : '');
-      this.changesBar.replaceChildren(ui.icon('diff', 'sm'), el('span', null, `${n} file${n === 1 ? '' : 's'}`), ...(c.added !== undefined ? [el('span', 'add', `+${c.added}`), el('span', 'del', `−${c.removed}`)] : []),
-        el('span', 'changes-files', names), ui.icon('chevron-right', 'sm'));
-      this.changesBar.title = 'Review changes\n' + (c.names || []).join('\n');
+      this.reviewBtn.dataset.count = String(n);
+      this.reviewBtn.title = n ? `Review changes (${n} file${n === 1 ? '' : 's'})` : 'Review changes';
     }
 
     buildLog() {

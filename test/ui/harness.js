@@ -72,7 +72,7 @@ class Session {
       'telemetry.telemetryLevel': 'off', 'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false,
       'git.autofetch': false, 'git.openRepositoryInParentFolders': 'always', 'workbench.startupEditor': 'none',
       'security.workspace.trust.enabled': false, 'files.autoSave': 'off', 'update.mode': 'none',
-      'workbench.tips.enabled': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
+      'workbench.tips.enabled': false, 'overseer.sideBar.openOnStartup': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
       'editor.minimap.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden', 'window.dialogStyle': 'custom', ...extra,
     }, null, 2));
   }
@@ -199,8 +199,21 @@ class Session {
     return this.cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.view-chat') && (${extra})`, ms);
   }
 
-  /** Absolute page coordinates of an element inside a webview frame. */
+  /** Absolute page coordinates of an element inside a webview frame, once it has stopped moving:
+   *  a click aimed while a view is still settling (the review arriving, columns resizing, a
+   *  composer rendering its choices) would land where the element was, not where it is (AC-149). */
   async webviewPoint(frame, selector) {
+    let last;
+    for (let i = 0; i < 12; i++) {
+      const p = await this.webviewPointOnce(frame, selector);
+      if (last && Math.abs(p.x - last.x) < 1 && Math.abs(p.y - last.y) < 1) return p;
+      last = p;
+      await delay(120);
+    }
+    return last;
+  }
+
+  async webviewPointOnce(frame, selector) {
     const inner = await frame.eval(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + Math.min(r.width / 2, 40), y: r.top + Math.min(r.height / 2, 12), w: innerWidth, h: innerHeight }; })()`);
     if (!inner) throw new Error('element not found ' + selector);
     const frames = await this.cdp.evalWorkbench(`[...document.querySelectorAll('iframe.webview')].map(f => { const r = f.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, src: f.src }; }).filter(r => r.w > 0 && r.h > 0)`);

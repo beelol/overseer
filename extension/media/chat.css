@@ -2,7 +2,7 @@
    composer and the changes bar. Tokens only (tokens.css), so every theme works. */
 
 /* ---- Chat frame ---- */
-.chat { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--ov-bg); }
+.chat { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--ov-bg); background-image: var(--ov-backdrop); }
 .chat-head { flex: none; display: flex; align-items: center; gap: var(--ov-space-2); height: 48px; padding: 0 var(--ov-space-3) 0 var(--ov-space-4); border-bottom: 1px solid var(--ov-border); }
 .chat-head .status { margin-right: 2px; }
 .chat-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
@@ -17,7 +17,7 @@
 @media (max-width: 560px) { .chat-column { padding-left: var(--ov-chat-gutter-narrow); padding-right: var(--ov-chat-gutter-narrow); } }
 /* Beside a diff (AC-77): the name wins. Review and Files move into More; the title may wrap once. */
 @media (max-width: 480px) {
-  .chat-head #review, .chat-head #files-toggle { display: none; }
+  .chat-head #review { display: none; }
   .chat-head { height: auto; min-height: 48px; padding-top: 6px; padding-bottom: 6px; }
   .chat-head h1 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
 }
@@ -163,10 +163,6 @@ pre.code.error { color: var(--ov-failed); }
 .needs-bar { display: flex; align-items: center; gap: var(--ov-space-2); padding: var(--ov-space-2) var(--ov-space-2) var(--ov-space-2) var(--ov-space-3); border-radius: var(--ov-radius-card); border: 1px solid var(--ov-waiting); background: var(--ov-raised); }
 .needs-bar .codicon { color: var(--ov-waiting); }
 .needs-bar .needs-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.changes-bar { display: flex; align-items: center; gap: var(--ov-space-2); height: 32px; padding: 0 var(--ov-space-3); border-radius: var(--ov-radius-card); border: 1px solid var(--ov-border); background: var(--ov-raised); color: var(--ov-muted); font-size: var(--ov-font-sm); text-align: left; }
-.changes-bar:hover { border-color: var(--ov-border-strong); color: var(--ov-text); }
-.changes-bar .add { color: var(--ov-added); } .changes-bar .del { color: var(--ov-removed); }
-.changes-bar .changes-files { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composer { display: flex; flex-direction: column; gap: 6px; padding: 10px 10px 8px 14px; border-radius: var(--ov-radius-card); border: 1px solid var(--ov-border); background: var(--ov-raised); transition: border-color var(--ov-motion-fast); }
 .composer:focus-within { border-color: var(--ov-focus); }
 .composer textarea { width: 100%; resize: none; border: none; background: transparent; padding: 2px 0; min-height: 22px; max-height: 240px; line-height: 1.5; color: var(--ov-input-fg); outline: none; }
@@ -207,3 +203,16 @@ pre.code.error { color: var(--ov-failed); }
 .queued { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 12px; border-radius: var(--ov-radius-card); border: 1px dashed var(--ov-border-strong); font-size: var(--ov-font-sm); }
 .queued-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composer-note.warn { color: var(--ov-waiting); }
+
+/* Talk to Overseer (AC-107): a proposal card; a message Overseer sent to an agent; the shared state. */
+.proposal { margin: var(--ov-space-2) 0; padding: var(--ov-space-3); border: 1px solid var(--ov-border-strong); border-radius: var(--ov-radius-card); background: var(--ov-raised); }
+.proposal-head { display: flex; align-items: center; gap: var(--ov-space-2); font-weight: var(--ov-weight-semibold); color: var(--ov-text); }
+.proposal-head .codicon { color: var(--ov-accent); }
+.proposal-list { margin: var(--ov-space-2) 0; padding-left: var(--ov-space-5); line-height: var(--ov-line-body); }
+.proposal-actions { display: flex; gap: var(--ov-space-2); }
+.proposal-status { margin-top: var(--ov-space-2); color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.proposal-status:empty { display: none; }
+.proposal.answered { border-color: var(--ov-border); }
+.msg-from { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; font-size: var(--ov-font-xs); font-weight: var(--ov-weight-semibold); color: var(--ov-accent); }
+.msg.user.from-overseer { border: 1px solid var(--ov-accent-soft); }
+.msg-context { margin-top: 4px; font-size: var(--ov-font-xs); color: var(--ov-muted); }

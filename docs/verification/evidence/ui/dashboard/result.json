@@ -48,6 +48,56 @@
       }
     },
     {
+      "name": "AC-102: in the dashboard the immersive settings are applied and no editor group shows a tab strip or breadcrumbs",
+      "ok": true,
+      "detail": {
+        "applied": {
+          "showTabs": "none",
+          "breadcrumbs": false,
+          "actions": "hidden"
+        },
+        "chat": {
+          "groups": 1,
+          "tabs": 0,
+          "breadcrumbs": 0,
+          "titles": [
+            0
+          ]
+        }
+      }
+    },
+    {
+      "name": "AC-102: with no tab strip the review names its agent in its own header",
+      "ok": true,
+      "detail": {
+        "text": "Dashboard demo",
+        "shown": true
+      }
+    },
+    {
+      "name": "AC-102: review beside the chat and the grid have no tab strip or breadcrumbs either",
+      "ok": true,
+      "detail": {
+        "split": {
+          "groups": 2,
+          "tabs": 0,
+          "breadcrumbs": 0,
+          "titles": [
+            0,
+            0
+          ]
+        },
+        "grid": {
+          "groups": 1,
+          "tabs": 0,
+          "breadcrumbs": 0,
+          "titles": [
+            0
+          ]
+        }
+      }
+    },
+    {
       "name": "the dashboard survives a window reload (still in dashboard mode)",
       "ok": true,
       "detail": {
@@ -55,10 +105,14 @@
         "sidebarTitle": "Overseer",
         "panel": false,
         "auxiliary": false,
-        "groups": 1,
+        "groups": 2,
         "sizes": [
           {
-            "w": 842,
+            "w": 556,
+            "h": 731
+          },
+          {
+            "w": 286,
             "h": 731
           }
         ]
@@ -105,11 +159,34 @@
       }
     },
     {
+      "name": "AC-102: leaving the dashboard puts the user settings back exactly (breadcrumbs.enabled true again; showTabs and editorActionsLocation unset again)",
+      "ok": true,
+      "detail": {
+        "telemetry.telemetryLevel": "off",
+        "extensions.autoUpdate": "off",
+        "extensions.autoCheckUpdates": false,
+        "git.autofetch": false,
+        "git.openRepositoryInParentFolders": "always",
+        "workbench.startupEditor": "none",
+        "security.workspace.trust.enabled": false,
+        "files.autoSave": "off",
+        "update.mode": "none",
+        "workbench.tips.enabled": false,
+        "chat.disableAIFeatures": true,
+        "window.restoreWindows": "none",
+        "editor.minimap.enabled": false,
+        "workbench.secondarySideBar.defaultVisibility": "hidden",
+        "window.dialogStyle": "custom",
+        "workbench.colorTheme": "Overseer Dark",
+        "breadcrumbs.enabled": true
+      }
+    },
+    {
       "name": "no setting changed (user settings identical apart from VS Code's own migration)",
       "ok": true,
       "detail": {
-        "before": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\"}",
-        "after": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\"}"
+        "before": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\",\"breadcrumbs.enabled\":true}",
+        "after": "{\"telemetry.telemetryLevel\":\"off\",\"extensions.autoUpdate\":\"off\",\"extensions.autoCheckUpdates\":false,\"git.autofetch\":false,\"git.openRepositoryInParentFolders\":\"always\",\"workbench.startupEditor\":\"none\",\"security.workspace.trust.enabled\":false,\"files.autoSave\":\"off\",\"update.mode\":\"none\",\"workbench.tips.enabled\":false,\"chat.disableAIFeatures\":true,\"window.restoreWindows\":\"none\",\"editor.minimap.enabled\":false,\"workbench.secondarySideBar.defaultVisibility\":\"hidden\",\"window.dialogStyle\":\"custom\",\"workbench.colorTheme\":\"Overseer Dark\",\"breadcrumbs.enabled\":true}"
       }
     },
     {

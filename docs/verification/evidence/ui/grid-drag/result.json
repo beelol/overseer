@@ -1,0 +1,1097 @@
+{
+  "checks": [
+    {
+      "name": "each agent dragged from the side bar lands in the grid (1 to 16 tiles, counted at each step)",
+      "ok": true,
+      "detail": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ]
+    },
+    {
+      "name": "the chosen edges built a 4×4 grid of 16 tiles",
+      "ok": true,
+      "detail": {
+        "cols": 4,
+        "rows": 4
+      }
+    },
+    {
+      "name": "each tile dragged to an edge of another tile ends up on that side of it (measured on screen at each step)",
+      "ok": true,
+      "detail": [
+        "2:right:true",
+        "3:right:true",
+        "4:right:true",
+        "5:bottom:true",
+        "6:bottom:true",
+        "7:bottom:true",
+        "8:bottom:true",
+        "9:bottom:true",
+        "10:bottom:true",
+        "11:bottom:true",
+        "12:bottom:true",
+        "13:bottom:true",
+        "14:bottom:true",
+        "15:bottom:true",
+        "16:bottom:true"
+      ]
+    },
+    {
+      "name": "during each drag the drop preview shows the edge and tile it will land on",
+      "ok": true,
+      "detail": [
+        {
+          "shown": true,
+          "edge": "right",
+          "target": "r-d167abd07505"
+        },
+        {
+          "shown": true,
+          "edge": "right",
+          "target": "r-25194f83c21f"
+        },
+        {
+          "shown": true,
+          "edge": "right",
+          "target": "r-55719113d5c5"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-d167abd07505"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-25194f83c21f"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-55719113d5c5"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-038e333447dc"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-fb817da3125d"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-a67842784d8f"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-ac842ff579d6"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-b635d928246a"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-63f3f465c23d"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-42fa00324873"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-58b01459b15a"
+        },
+        {
+          "shown": true,
+          "edge": "bottom",
+          "target": "r-2ca0a002c441"
+        }
+      ]
+    },
+    {
+      "name": "a 17th agent is refused with \"The grid is full (16)\" and the layout does not change (no chat editor opens either)",
+      "ok": true,
+      "detail": {
+        "fullShown": true,
+        "count": 16,
+        "tabs": [
+          "Overseer"
+        ]
+      }
+    },
+    {
+      "name": "at 16 no drop zone appears for another agent; the drag says the grid is full",
+      "ok": true,
+      "detail": {
+        "accepted": true,
+        "preview": false,
+        "full": true
+      }
+    },
+    {
+      "name": "Alt+Left moves the focused tile to the left (a keyboard path to place tiles)",
+      "ok": true,
+      "detail": {
+        "before": {
+          "l": 814,
+          "t": 8,
+          "r": 1074,
+          "b": 198
+        },
+        "after": {
+          "l": 545,
+          "t": 8,
+          "r": 671,
+          "b": 198
+        }
+      }
+    },
+    {
+      "name": "a window reload keeps the grid layout exactly",
+      "ok": true,
+      "detail": {
+        "same": true
+      }
+    }
+  ],
+  "steps": [
+    {
+      "tiles": 2,
+      "dragged": "Agent 02",
+      "from": "side bar",
+      "then": {
+        "edge": "right",
+        "of": "Agent 01"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "right",
+        "target": "r-d167abd07505"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "run": "r-d167abd07505"
+          },
+          {
+            "run": "r-25194f83c21f"
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 3,
+      "dragged": "Agent 03",
+      "from": "side bar",
+      "then": {
+        "edge": "right",
+        "of": "Agent 02"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "right",
+        "target": "r-25194f83c21f"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "run": "r-d167abd07505"
+          },
+          {
+            "run": "r-25194f83c21f"
+          },
+          {
+            "run": "r-55719113d5c5"
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 4,
+      "dragged": "Agent 04",
+      "from": "side bar",
+      "then": {
+        "edge": "right",
+        "of": "Agent 03"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "right",
+        "target": "r-55719113d5c5"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "run": "r-d167abd07505"
+          },
+          {
+            "run": "r-25194f83c21f"
+          },
+          {
+            "run": "r-55719113d5c5"
+          },
+          {
+            "run": "r-038e333447dc"
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 5,
+      "dragged": "Agent 05",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 01"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-d167abd07505"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              }
+            ]
+          },
+          {
+            "run": "r-25194f83c21f"
+          },
+          {
+            "run": "r-55719113d5c5"
+          },
+          {
+            "run": "r-038e333447dc"
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 6,
+      "dragged": "Agent 06",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 02"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-25194f83c21f"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-25194f83c21f"
+              },
+              {
+                "run": "r-a67842784d8f"
+              }
+            ]
+          },
+          {
+            "run": "r-55719113d5c5"
+          },
+          {
+            "run": "r-038e333447dc"
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 7,
+      "dragged": "Agent 07",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 03"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-55719113d5c5"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-25194f83c21f"
+              },
+              {
+                "run": "r-a67842784d8f"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-55719113d5c5"
+              },
+              {
+                "run": "r-ac842ff579d6"
+              }
+            ]
+          },
+          {
+            "run": "r-038e333447dc"
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 8,
+      "dragged": "Agent 08",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 04"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-038e333447dc"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-25194f83c21f"
+              },
+              {
+                "run": "r-a67842784d8f"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-55719113d5c5"
+              },
+              {
+                "run": "r-ac842ff579d6"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-038e333447dc"
+              },
+              {
+                "run": "r-b635d928246a"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 9,
+      "dragged": "Agent 09",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 05"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-fb817da3125d"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              },
+              {
+                "run": "r-63f3f465c23d"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-25194f83c21f"
+              },
+              {
+                "run": "r-a67842784d8f"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-55719113d5c5"
+              },
+              {
+                "run": "r-ac842ff579d6"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-038e333447dc"
+              },
+              {
+                "run": "r-b635d928246a"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 10,
+      "dragged": "Agent 10",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 06"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-a67842784d8f"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              },
+              {
+                "run": "r-63f3f465c23d"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-25194f83c21f"
+              },
+              {
+                "run": "r-a67842784d8f"
+              },
+              {
+                "run": "r-42fa00324873"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-55719113d5c5"
+              },
+              {
+                "run": "r-ac842ff579d6"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-038e333447dc"
+              },
+              {
+                "run": "r-b635d928246a"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 11,
+      "dragged": "Agent 11",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 07"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-ac842ff579d6"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              },
+              {
+                "run": "r-63f3f465c23d"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-25194f83c21f"
+              },
+              {
+                "run": "r-a67842784d8f"
+              },
+              {
+                "run": "r-42fa00324873"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-55719113d5c5"
+              },
+              {
+                "run": "r-ac842ff579d6"
+              },
+              {
+                "run": "r-58b01459b15a"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-038e333447dc"
+              },
+              {
+                "run": "r-b635d928246a"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 12,
+      "dragged": "Agent 12",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 08"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-b635d928246a"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              },
+              {
+                "run": "r-63f3f465c23d"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-25194f83c21f"
+              },
+              {
+                "run": "r-a67842784d8f"
+              },
+              {
+                "run": "r-42fa00324873"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-55719113d5c5"
+              },
+              {
+                "run": "r-ac842ff579d6"
+              },
+              {
+                "run": "r-58b01459b15a"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-038e333447dc"
+              },
+              {
+                "run": "r-b635d928246a"
+              },
+              {
+                "run": "r-2ca0a002c441"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 13,
+      "dragged": "Agent 13",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 09"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-63f3f465c23d"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              },
+              {
+                "run": "r-63f3f465c23d"
+              },
+              {
+                "run": "r-9935727ec46c"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-25194f83c21f"
+              },
+              {
+                "run": "r-a67842784d8f"
+              },
+              {
+                "run": "r-42fa00324873"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-55719113d5c5"
+              },
+              {
+                "run": "r-ac842ff579d6"
+              },
+              {
+                "run": "r-58b01459b15a"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-038e333447dc"
+              },
+              {
+                "run": "r-b635d928246a"
+              },
+              {
+                "run": "r-2ca0a002c441"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 14,
+      "dragged": "Agent 14",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 10"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-42fa00324873"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              },
+              {
+                "run": "r-63f3f465c23d"
+              },
+              {
+                "run": "r-9935727ec46c"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-25194f83c21f"
+              },
+              {
+                "run": "r-a67842784d8f"
+              },
+              {
+                "run": "r-42fa00324873"
+              },
+              {
+                "run": "r-d7c950f1ae33"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-55719113d5c5"
+              },
+              {
+                "run": "r-ac842ff579d6"
+              },
+              {
+                "run": "r-58b01459b15a"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-038e333447dc"
+              },
+              {
+                "run": "r-b635d928246a"
+              },
+              {
+                "run": "r-2ca0a002c441"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 15,
+      "dragged": "Agent 15",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 11"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-58b01459b15a"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              },
+              {
+                "run": "r-63f3f465c23d"
+              },
+              {
+                "run": "r-9935727ec46c"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-25194f83c21f"
+              },
+              {
+                "run": "r-a67842784d8f"
+              },
+              {
+                "run": "r-42fa00324873"
+              },
+              {
+                "run": "r-d7c950f1ae33"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-55719113d5c5"
+              },
+              {
+                "run": "r-ac842ff579d6"
+              },
+              {
+                "run": "r-58b01459b15a"
+              },
+              {
+                "run": "r-a66dc79760f6"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-038e333447dc"
+              },
+              {
+                "run": "r-b635d928246a"
+              },
+              {
+                "run": "r-2ca0a002c441"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "tiles": 16,
+      "dragged": "Agent 16",
+      "from": "side bar",
+      "then": {
+        "edge": "bottom",
+        "of": "Agent 12"
+      },
+      "preview": {
+        "shown": true,
+        "edge": "bottom",
+        "target": "r-2ca0a002c441"
+      },
+      "beside": true,
+      "layout": {
+        "dir": "row",
+        "parts": [
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-d167abd07505"
+              },
+              {
+                "run": "r-fb817da3125d"
+              },
+              {
+                "run": "r-63f3f465c23d"
+              },
+              {
+                "run": "r-9935727ec46c"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-25194f83c21f"
+              },
+              {
+                "run": "r-a67842784d8f"
+              },
+              {
+                "run": "r-42fa00324873"
+              },
+              {
+                "run": "r-d7c950f1ae33"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-55719113d5c5"
+              },
+              {
+                "run": "r-ac842ff579d6"
+              },
+              {
+                "run": "r-58b01459b15a"
+              },
+              {
+                "run": "r-a66dc79760f6"
+              }
+            ]
+          },
+          {
+            "dir": "col",
+            "parts": [
+              {
+                "run": "r-038e333447dc"
+              },
+              {
+                "run": "r-b635d928246a"
+              },
+              {
+                "run": "r-2ca0a002c441"
+              },
+              {
+                "run": "r-3ecd68672964"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

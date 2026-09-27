@@ -48,6 +48,7 @@
   function decorate(pre, post) {
     const code = pre.querySelector('code');
     const lang = code && /language-([\w+-]+)/.exec(code.className || '')?.[1];
+    if (lang === 'overseer-actions') { proposal(pre, code.textContent, post); return; }
     if (code && window.hljs) {
       try {
         if (lang && window.hljs.getLanguage(lang)) code.innerHTML = window.hljs.highlight(code.textContent, { language: lang, ignoreIllegals: true }).value;
@@ -70,6 +71,31 @@
       more.addEventListener('click', () => { block.classList.remove('collapsed'); more.remove(); });
       block.append(more);
     }
+  }
+
+  // Talk to Overseer (AC-107): a proposal from Overseer is a card; nothing happens without a Yes.
+  function proposal(pre, text, post) {
+    let actions;
+    try { actions = JSON.parse(text); if (!Array.isArray(actions)) actions = [actions]; } catch { actions = null; }
+    const card = ui.el('div', 'proposal'); card.setAttribute('role', 'group'); card.setAttribute('aria-label', 'Overseer proposes');
+    const head = ui.el('div', 'proposal-head'); head.append(ui.icon('eye', 'sm'), ui.el('span', null, 'Overseer will'));
+    const list = ui.el('ul', 'proposal-list');
+    const say = a => a.action === 'follow_up' ? `Send ${a.title || a.agent}: “${a.text}”` : a.action === 'stop' ? `Stop ${a.title || a.agent}` : a.action === 'pin' ? `Pin ${a.title || a.agent} to the grid` : a.action === 'start' ? `Start “${a.title || a.prompt}” in ${a.repo}` : JSON.stringify(a);
+    for (const a of actions || []) list.append(ui.el('li', null, say(a)));
+    const status = ui.el('div', 'proposal-status'); status.setAttribute('role', 'status');
+    const yes = ui.el('button', 'btn primary sm', 'Yes'); yes.type = 'button'; yes.dataset.proposal = 'yes';
+    const no = ui.el('button', 'btn sm', 'No'); no.type = 'button'; no.dataset.proposal = 'no';
+    const row = ui.el('div', 'proposal-actions'); row.append(yes, no);
+    card.append(head, list, row, status);
+    if (!actions) { list.replaceChildren(ui.el('li', null, 'The proposal could not be read, so nothing will be done.')); row.hidden = true; }
+    let key = 0; for (let i = 0; i < text.length; i++) key = (Math.imul(key, 31) + text.charCodeAt(i)) | 0;
+    key = 'p' + (key >>> 0).toString(16);
+    card.dataset.key = key;
+    const decide = type => { yes.disabled = no.disabled = true; status.textContent = type === 'overseerActions' ? 'Working…' : 'Declining…'; post && post({ type, actions, key }); };
+    yes.addEventListener('click', () => decide('overseerActions'));
+    no.addEventListener('click', () => decide('overseerDecline'));
+    window.addEventListener('message', e => { if (e.data?.type === 'overseerAnswered' && e.data.key === key) { status.textContent = e.data.text; row.hidden = true; card.classList.add('answered'); } });
+    pre.replaceWith(card);
   }
 
   window.OverseerMarkdown = { render };
