@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "purpose": "Fixed local serial-versus-swarm comparison; no provider or customer data",
+  "unit": "fixture_work_units_milli",
+  "worker_delay_ms": 1500,
+  "worker_usage_milli": 100,
+  "cases": ["serial_dependency", "independent", "exclusive_conflict", "constrained_budget"]
+}
