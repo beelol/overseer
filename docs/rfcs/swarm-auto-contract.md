@@ -18,6 +18,16 @@ place a target becomes committed work. Swarm does not maintain a competing accou
 allowance balance.
 No second quota collector, per-harness CLI scraper or user routing file is added by swarm.
 
+Continuity (Gate L) owns daemon-wide connectivity and local-model memory eligibility. Auto
+may rank its qualified route, but neither Auto nor Swarm may reinterpret a single provider
+failure as machine-wide offline state or bypass the AC-140 memory guard. A provider handoff
+inside a Swarm run remains one logical job and one shared admission decision: preserve its
+approved target pool, permission mode, workspace ownership, attempt cap, allocation and
+uncertain predecessor effects. A waiting state alone never proves process exit or usage
+settlement: release a process slot only after confirmed exit, and keep any uncertain
+allowance commitment until usage and effects are reconciled. The Swarm deadline is not
+extended by Continuity's ordinary-run retry duration.
+
 ## Target snapshot
 
 A snapshot has a monotonically increasing version, `observed_ms`, expiry, provenance,

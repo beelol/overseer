@@ -141,6 +141,42 @@ allocation. No background model calls just to ask whether anything changed.
 
 ## Boundary with automode and existing Overseer
 
+### Compatibility with the current main branch
+
+Main now has the Gate K/M agent sidebar, composer, chat, review and grid, plus daemon-owned
+Audio Mode. Swarm launch and status should extend those existing agent surfaces: a category
+objective and Swarm control in the normal launch flow, one director in the agent tree, and
+filterable/paged workers and jobs in the existing views. The grid's 16-tile presentation
+limit is not an execution limit: the app-level agent ceiling, category ceiling, account
+allowance and qualified descendant control still govern admission. A cue or notification
+is a view of durable state, never a result receipt or proof that an attempt exited.
+S0 and SWARM-01/23/27/28/39/56/63 must be exercised through that normal launch and
+readout path, including more jobs than visible grid tiles.
+
+Gate L (Continuity) is specified on main but is not a Swarm target or quota collector.
+Swarm consumes its daemon-owned online/degraded/offline and `waiting_for_connection` states
+when that feature lands; it does not infer machine-wide offline state from one provider's
+failure. A Continuity handoff is a route change for the **same logical Swarm job**. It may
+use only the run's approved destination pool, capability floor, context permissions,
+remaining attempt budget and frozen allocation. It must preserve workspace ownership and
+the predecessor's uncertain reservations until effects are reconciled. A local Ollama
+candidate additionally needs Gate L's fresh memory-fit admission and critical-pressure
+control (AC-140); an unapproved or unqualified local model is not an emergency escape.
+`waiting_for_connection` and `waiting_for_memory` are visible waiting states, not confirmed
+worker exits or accepted results. The Swarm run deadline still applies while waiting;
+Continuity's 36-hour ordinary-run retry policy cannot silently extend it. SWARM-08/14/15/16/
+17/20/22/24/51/59/61/62 need joined tests once Gate L's authority is available.
+
+Gate M's Overseer chat, Gate N's phone gateway and Gate R's voice requests are additional
+control surfaces, not schedulers. An authorized and, where that surface requires it,
+confirmed user action enters the same daemon Swarm control/revision path as VS Code or the
+CLI. A director or worker message cannot impersonate that action. A proposed voice action
+that was not sent must not be replayed after reconnection. Test the same Stop, redirect,
+permission revocation and stale-revision ordering from each supported surface under
+SWARM-20/21/43/61; keep unsupported surfaces explicitly unverified until their own gates
+land. Gate P's PR monitor must treat this draft PR as in flight and cannot merge it merely
+because a fixture passes; SWARM evidence stays in its own ledger until its criteria pass.
+
 Automode owns target eligibility/ranking and the acquisition/normalization of service health,
 account authentication, quota windows, and model capabilities. This RFC proposes a consumer
 contract, not a second telemetry implementation or a frozen API for the other agent.
