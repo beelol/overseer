@@ -63,3 +63,22 @@ bulk formatting was applied.
 
 Other semantic repair rejections, autonomous director repair, live behavior,
 and complete S3/S5 traces remain unverified. The RFC box stays unchecked.
+
+Rejected-request replay follow-up at `e2b4d68` (2026-09-27):
+`daemon/tests/swarm_revision_replay.rs::rejected_repair_request_replays_without_consuming_a_second_turn`
+reproduced a lost-reply case: after a superseded-ID repair was rejected once,
+replaying its identical `request_id` after daemon restart raised the failure
+counter from 1 to 2 and stalled the run. The failing assertion observed 2
+where 1 was expected. The daemon now persists the failed request identity,
+input hash, and rejection in the same transaction as the failed-turn count.
+An identical replay returns the original error without another count; changed
+input under that ID is refused; a distinct request ID counts as a second
+failed turn and stalls. Owner authentication still precedes replay lookup.
+
+The focused test passed after the fix. The affected revision, plan, state,
+and director suites passed 4 + 11 + 19 + 11 tests with
+`cargo test -p overseerd --test swarm_revision_replay --test swarm_plan
+--test swarm_state --test swarm_director --offline -- --test-threads=1`.
+`git diff --check` passed. This proves local durable replay for this
+semantic rejection. Invalid revisions without a request ID and other repair
+error paths do not yet have this replay guarantee; SWARM-48 remains partial.
