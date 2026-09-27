@@ -31,7 +31,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Exact planned resource claims survive restart, constrain parallel benefit and cannot be omitted or downgraded at admission. A joined Atlas replay rejects a cycle and unknown dependency before dispatch, then preserves an independent J2 job through real backend evidence with explicit partial-plan permission. Full serial-chain/three-independent replay, real worktree writer isolation and undeclared-resource discovery remain incomplete."
+      "blocker": "Exact planned resource claims survive restart, constrain parallel benefit and cannot be omitted or downgraded at admission. A joined local replay now admits a benefit-approved root plus three independent jobs, holds a conflicting writer before attempt reservation, and advances a separate root→child→leaf chain only after accepted evidence and confirmed exit. Blocked dependents name their unsatisfied job IDs, including an accepted parent still active or awaiting patch integration. Supervised simultaneous execution of that exact fixture, real worktree writer enforcement, undeclared-resource discovery and a live path remain incomplete."
     },
     "SWARM-04": {
       "status": "partial",

@@ -35,3 +35,10 @@ later run revision: completion refuses it while unintegrated, then accepts the r
 only after the twelfth patch and combined backend check pass. See [S3](S3.md).
 
 Remaining: a stopped integration leaves a durable intent and staged patch for a future operator-controlled reconciliation path; it never claims success. An orphaned checker that never exits remains held and needs an operator-controlled termination path; the fixture checker is not a qualified live execution sandbox. Patch conflicts have no director resolution flow. Hook detection has a race against external hook changes. Live adapter permissions, unsaved buffers and service-side writes remain unqualified. This criterion stays unchecked.
+
+At `53df06a`, the existing accepted-contract-patch fixture also asks admission
+for its consumer before integration. The daemon returns
+`dependency_pending` with `contract` in `waiting_on`, using the same
+dependency-satisfaction check as readiness. After integration the consumer is
+ready. The focused test and all 19 integration tests passed. This makes the
+hold's cause observable; it does not qualify a live integration path.

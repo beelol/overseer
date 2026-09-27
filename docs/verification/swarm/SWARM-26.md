@@ -4,7 +4,7 @@ Status: partial. Implementation revision: `9b86545`. Fixture: `evaluation-v1`, m
 
 Input: four fixed two-job cases—`serial_dependency` (B depends on accepted A), `independent`, `exclusive_conflict` (both write `db:shared`), and `constrained_budget` (225 fixture milli-work-units available against serial cost 220 and parallel cost 230). Each case runs a one-worker baseline and a two-worker candidate. Both use the same two 1,500 ms scripted workers and the same evidence checks. Each worker stores one reproduction artifact and reports 100 scripted fixture milli-work-units. A dependent B is evaluated in a second benefit wave only after A is accepted.
 
-Expected: independent work chooses and executes in parallel, finishing sooner at equal 2/2 acceptance; the other three choose serial and hold B until A is accepted. A dependency must block B as `job_not_ready`, simultaneous exclusive writes as `resource_conflict`, and a rejected candidate parallel plan as `benefit_serial`. All eight runs must complete with 2/2 accepted evidence and 200 scripted work units. No speedup is required for cases where parallelism is unsafe or unaffordable.
+Expected: independent work chooses and executes in parallel, finishing sooner at equal 2/2 acceptance; the other three choose serial and hold B until A is accepted. A dependency must block B as `dependency_pending` with A in `waiting_on`, simultaneous exclusive writes as `resource_conflict`, and a rejected candidate parallel plan as `benefit_serial`. All eight runs must complete with 2/2 accepted evidence and 200 scripted work units. No speedup is required for cases where parallelism is unsafe or unaffordable.
 
 Actual: the independent candidate chose `beneficial` and parallel; the dependency, exclusive-write and constrained-budget candidates chose serial for `dependent_jobs`, `resource_conflict`, and `allocation_exceeded`. All eight local runs accepted 2/2 checks, reported 200 scripted work units and reached evidence-gated completion. The second worker was held for the corresponding dependency, resource or benefit reason. One run on this machine measured:
 
@@ -22,3 +22,9 @@ Replay: `cargo test --offline -p overseerd --test swarm_evaluation -- --nocaptur
 Evidence: `fixtures/swarm/evaluation-v1/manifest.json`, `fixtures/swarm/evaluation-v1/worker.py`, `fixtures/swarm/evaluation-v1/README.md`, `daemon/tests/swarm_evaluation.rs`, plus [SWARM-05](SWARM-05.md) for retained estimates and outcomes.
 
 Remaining: `work_units` are scripted receipts, not provider tokens. No native usage, supported-harness comparison or repeatable live quality/time result has been established. The independent wall-time improvement is machine-specific and does not establish universal speed or usage savings. SWARM-26 stays unchecked.
+
+At `53df06a`, the daemon made the serial-dependency blocker explicit as
+`dependency_pending` with the predecessor IDs in `waiting_on`; the evaluation
+fixture expectation changed accordingly. Its three tests passed alongside the
+affected admission and integration suites. The measured results above are
+unchanged, and provider usage remains unverified.
