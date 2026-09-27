@@ -13,7 +13,10 @@ pub const FRAME: usize = (RATE / 50) as usize;
 
 /// Little-endian signed 16-bit samples to floats.
 pub fn from_s16le(bytes: &[u8]) -> Vec<f32> {
-    bytes.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect()
+    bytes
+        .chunks_exact(2)
+        .map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0)
+        .collect()
 }
 
 /// Floats to little-endian signed 16-bit samples, clipped.
@@ -38,7 +41,9 @@ pub fn read_wav(bytes: &[u8]) -> Result<Vec<f32>> {
     while pos + 8 <= bytes.len() {
         let id = &bytes[pos..pos + 4];
         let len = u32::from_le_bytes(bytes[pos + 4..pos + 8].try_into().unwrap()) as usize;
-        let body = bytes.get(pos + 8..(pos + 8 + len).min(bytes.len())).context("truncated WAV chunk")?;
+        let body = bytes
+            .get(pos + 8..(pos + 8 + len).min(bytes.len()))
+            .context("truncated WAV chunk")?;
         match id {
             b"fmt " => {
                 if body.len() < 16 {
@@ -165,10 +170,15 @@ mod tests {
     #[test]
     fn resampling_keeps_duration_and_tone() {
         // One second of 440 Hz at 48 kHz becomes one second at 16 kHz with the same zero crossings.
-        let s: Vec<f32> = (0..48_000).map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / 48_000.0).sin()).collect();
+        let s: Vec<f32> = (0..48_000)
+            .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / 48_000.0).sin())
+            .collect();
         let r = resample(&s, 48_000, RATE);
         assert!((r.len() as i64 - 16_000).abs() <= 1);
-        let crossings = r.windows(2).filter(|w| (w[0] < 0.0) != (w[1] < 0.0)).count();
+        let crossings = r
+            .windows(2)
+            .filter(|w| (w[0] < 0.0) != (w[1] < 0.0))
+            .count();
         assert!((870..=890).contains(&crossings), "{crossings}");
     }
 

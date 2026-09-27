@@ -34,7 +34,13 @@ fn words(s: &str) -> Vec<String> {
     s.to_lowercase()
         .replace('-', " ")
         .chars()
-        .map(|c| if c.is_alphanumeric() || c.is_whitespace() { c } else { ' ' })
+        .map(|c| {
+            if c.is_alphanumeric() || c.is_whitespace() {
+                c
+            } else {
+                ' '
+            }
+        })
         .collect::<String>()
         .split_whitespace()
         .map(str::to_string)
@@ -48,7 +54,11 @@ fn word_errors(expected: &[String], got: &[String]) -> usize {
         row[0] = i + 1;
         for (j, g) in got.iter().enumerate() {
             let cur = row[j + 1];
-            row[j + 1] = if e == g { prev } else { 1 + prev.min(row[j]).min(row[j + 1]) };
+            row[j + 1] = if e == g {
+                prev
+            } else {
+                1 + prev.min(row[j]).min(row[j + 1])
+            };
             prev = cur;
         }
     }
@@ -62,7 +72,9 @@ fn peak_rss_mib() -> f64 {
 }
 
 fn main() -> anyhow::Result<()> {
-    let model = std::env::args().nth(1).expect("usage: spike_recognizer <model.bin> [hint]");
+    let model = std::env::args()
+        .nth(1)
+        .expect("usage: spike_recognizer <model.bin> [hint]");
     let hint = std::env::args().nth(2).is_some();
     whisper_rs::install_logging_hooks();
     let tmp = tempfile::tempdir()?;
@@ -70,9 +82,18 @@ fn main() -> anyhow::Result<()> {
     for (vi, voice) in VOICES.iter().enumerate() {
         for (si, text) in SENTENCES.iter().enumerate() {
             let path = tmp.path().join(format!("{vi}-{si}.wav"));
-            let ok = Command::new("say").args(["-v", voice, "-o"]).arg(&path).args(["--data-format=LEI16@16000", text]).status()?.success();
+            let ok = Command::new("say")
+                .args(["-v", voice, "-o"])
+                .arg(&path)
+                .args(["--data-format=LEI16@16000", text])
+                .status()?
+                .success();
             anyhow::ensure!(ok, "say failed for voice {voice}");
-            clips.push((voice.to_string(), text.to_string(), pcm::read_wav(&std::fs::read(&path)?)?));
+            clips.push((
+                voice.to_string(),
+                text.to_string(),
+                pcm::read_wav(&std::fs::read(&path)?)?,
+            ));
             std::fs::remove_file(&path)?;
         }
     }
@@ -81,25 +102,29 @@ fn main() -> anyhow::Result<()> {
     let ctx = WhisperContext::new_with_params(&model, WhisperContextParameters::default())?;
     let load_ms = t.elapsed().as_millis();
     let mut state = ctx.create_state()?;
-    let run = |state: &mut whisper_rs::WhisperState, samples: &[f32]| -> anyhow::Result<(String, u128)> {
-        let mut p = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-        p.set_language(Some("en"));
-        p.set_n_threads(4);
-        p.set_no_context(true);
-        p.set_single_segment(true);
-        p.set_print_progress(false);
-        p.set_print_realtime(false);
-        p.set_print_timestamps(false);
-        p.set_print_special(false);
-        if hint {
-            p.set_initial_prompt(HINT);
-        }
-        let t = Instant::now();
-        state.full(p, samples)?;
-        let ms = t.elapsed().as_millis();
-        let text: String = state.as_iter().map(|s| s.to_str_lossy().map(|c| c.into_owned()).unwrap_or_default()).collect();
-        Ok((text.trim().to_string(), ms))
-    };
+    let run =
+        |state: &mut whisper_rs::WhisperState, samples: &[f32]| -> anyhow::Result<(String, u128)> {
+            let mut p = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+            p.set_language(Some("en"));
+            p.set_n_threads(4);
+            p.set_no_context(true);
+            p.set_single_segment(true);
+            p.set_print_progress(false);
+            p.set_print_realtime(false);
+            p.set_print_timestamps(false);
+            p.set_print_special(false);
+            if hint {
+                p.set_initial_prompt(HINT);
+            }
+            let t = Instant::now();
+            state.full(p, samples)?;
+            let ms = t.elapsed().as_millis();
+            let text: String = state
+                .as_iter()
+                .map(|s| s.to_str_lossy().map(|c| c.into_owned()).unwrap_or_default())
+                .collect();
+            Ok((text.trim().to_string(), ms))
+        };
     run(&mut state, &clips[0].2)?; // warm up (Metal compiles its kernels on the first run)
     let (mut errors, mut total, mut times, mut per_second) = (0, 0, Vec::new(), Vec::new());
     println!("| Voice | Said | Heard | ms | audio s |");
@@ -112,14 +137,25 @@ fn main() -> anyhow::Result<()> {
         times.push(ms);
         let secs = samples.len() as f64 / pcm::RATE as f64;
         per_second.push(ms as f64 / secs);
-        println!("| {voice} | {text} | {heard}{} | {ms} | {secs:.1} |", if e > 0 { format!(" ({e} wrong)") } else { String::new() });
+        println!(
+            "| {voice} | {text} | {heard}{} | {ms} | {secs:.1} |",
+            if e > 0 {
+                format!(" ({e} wrong)")
+            } else {
+                String::new()
+            }
+        );
     }
     // Partial words while the owner is still speaking: the cost of a 1 s and a 2 s window.
     let long = &clips[1].2;
     let (_, one) = run(&mut state, &long[..pcm::RATE as usize])?;
     let (_, two) = run(&mut state, &long[..2 * pcm::RATE as usize])?;
     times.sort();
-    let name = Path::new(&model).file_name().unwrap().to_string_lossy().to_string();
+    let name = Path::new(&model)
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
     println!();
     println!(
         "{name}{}: load {load_ms} ms; per utterance median {} ms, p95 {} ms, max {} ms; {:.0} ms per second of speech; partial 1 s {one} ms, 2 s {two} ms; word error rate {:.1}% ({errors}/{total}); peak memory {:.0} MiB (before the model {:.0} MiB)",

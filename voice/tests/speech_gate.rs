@@ -11,7 +11,13 @@ use std::process::Command;
 fn say(text: &str, voice: &str) -> Option<Vec<f32>> {
     let dir = tempfile::tempdir().ok()?;
     let path = dir.path().join("s.wav");
-    let ok = Command::new("say").args(["-v", voice, "-o"]).arg(&path).args(["--data-format=LEI16@16000", text]).status().ok()?.success();
+    let ok = Command::new("say")
+        .args(["-v", voice, "-o"])
+        .arg(&path)
+        .args(["--data-format=LEI16@16000", text])
+        .status()
+        .ok()?
+        .success();
     if !ok {
         return None;
     }
@@ -65,9 +71,17 @@ fn spoken_sentences_open_within_300_ms_for_nine_in_ten_and_450_at_most() {
     ];
     let mut times = Vec::new();
     let mut levels = Vec::new();
-    for voice in ["Daniel", "Eddy (English (US))", "Flo (English (UK))", "Samantha", "Fred"] {
+    for voice in [
+        "Daniel",
+        "Eddy (English (US))",
+        "Flo (English (UK))",
+        "Samantha",
+        "Fred",
+    ] {
         for text in sentences {
-            let Some(speech) = say(text, voice) else { panic!("say failed for {voice}") };
+            let Some(speech) = say(text, voice) else {
+                panic!("say failed for {voice}")
+            };
             let mut s = synth::room(0.6, 0.002, 5);
             let lead = s.len();
             s.extend(&speech);
@@ -83,8 +97,11 @@ fn spoken_sentences_open_within_300_ms_for_nine_in_ten_and_450_at_most() {
                     open_levels.push(g.level());
                 }
             }
-            let Some(first) = first else { panic!("{voice}: '{text}' never opened the gate") };
-            let ms = ((first + 1) * FRAME) as f32 * 1000.0 / RATE as f32 - onset as f32 * 1000.0 / RATE as f32;
+            let Some(first) = first else {
+                panic!("{voice}: '{text}' never opened the gate")
+            };
+            let ms = ((first + 1) * FRAME) as f32 * 1000.0 / RATE as f32
+                - onset as f32 * 1000.0 / RATE as f32;
             times.push(ms);
             levels.push(open_levels.iter().sum::<f32>() / open_levels.len() as f32);
             assert!(!g.is_open(), "{voice}: '{text}' left the gate open");
@@ -97,5 +114,8 @@ fn spoken_sentences_open_within_300_ms_for_nine_in_ten_and_450_at_most() {
     eprintln!("opening after the first word: median {:.0} ms, p90 {p90:.0} ms, max {max:.0} ms; mean level while open {level:.2}", times[times.len() / 2]);
     assert!(p90 <= 300.0, "p90 {p90} ms");
     assert!(max <= 450.0, "max {max} ms");
-    assert!((0.25..=0.7).contains(&level), "the level should move with syllables, not sit at the top: {level}");
+    assert!(
+        (0.25..=0.7).contains(&level),
+        "the level should move with syllables, not sit at the top: {level}"
+    );
 }

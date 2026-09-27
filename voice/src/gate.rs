@@ -46,7 +46,21 @@ pub struct GateConfig {
 
 impl Default for GateConfig {
     fn default() -> Self {
-        Self { above_floor_db: 12.0, min_level_db: -60.0, voicing: 0.45, band_share: 0.3, window: 16, voiced_needed: 9, same_shape: 0.97, steady_share: 0.6, fast_needed: 7, fast_window: 8, fast_above_db: 18.0, hangover: 15, floor_rise_db_per_s: 1.5 }
+        Self {
+            above_floor_db: 12.0,
+            min_level_db: -60.0,
+            voicing: 0.45,
+            band_share: 0.3,
+            window: 16,
+            voiced_needed: 9,
+            same_shape: 0.97,
+            steady_share: 0.6,
+            fast_needed: 7,
+            fast_window: 8,
+            fast_above_db: 18.0,
+            hangover: 15,
+            floor_rise_db_per_s: 1.5,
+        }
     }
 }
 
@@ -64,10 +78,22 @@ impl Biquad {
         let (s, c) = w.sin_cos();
         let alpha = s / (2.0 * std::f32::consts::FRAC_1_SQRT_2);
         let (b, a0, a) = match kind {
-            "high" => ([(1.0 + c) / 2.0, -(1.0 + c), (1.0 + c) / 2.0], 1.0 + alpha, [-2.0 * c, 1.0 - alpha]),
-            _ => ([(1.0 - c) / 2.0, 1.0 - c, (1.0 - c) / 2.0], 1.0 + alpha, [-2.0 * c, 1.0 - alpha]),
+            "high" => (
+                [(1.0 + c) / 2.0, -(1.0 + c), (1.0 + c) / 2.0],
+                1.0 + alpha,
+                [-2.0 * c, 1.0 - alpha],
+            ),
+            _ => (
+                [(1.0 - c) / 2.0, 1.0 - c, (1.0 - c) / 2.0],
+                1.0 + alpha,
+                [-2.0 * c, 1.0 - alpha],
+            ),
         };
-        Self { b: [b[0] / a0, b[1] / a0, b[2] / a0], a: [a[0] / a0, a[1] / a0], z: [0.0; 2] }
+        Self {
+            b: [b[0] / a0, b[1] / a0, b[2] / a0],
+            a: [a[0] / a0, a[1] / a0],
+            z: [0.0; 2],
+        }
     }
 
     fn run(&mut self, x: f32) -> f32 {
@@ -175,26 +201,47 @@ impl SpeechGate {
         let energy = cur.iter().map(|v| v * v).sum::<f32>() / FRAME as f32;
         let in_band = energy * FRAME as f32 / whole.max(1e-12);
         let level_db = 10.0 * (energy + 1e-12).log10() + 3.01; // a full-scale sine reads 0 dB
-        // The floor falls at once and rises slowly, so a steady fan or hum becomes the floor while
-        // speech, which comes and goes, stays above it. It starts from the first frames heard.
+                                                               // The floor falls at once and rises slowly, so a steady fan or hum becomes the floor while
+                                                               // speech, which comes and goes, stays above it. It starts from the first frames heard.
         self.frames_seen += 1;
         if self.frames_seen <= 5 || level_db < self.floor_db {
-            self.floor_db = if self.frames_seen == 1 { level_db } else { self.floor_db.min(level_db).max(-100.0) };
+            self.floor_db = if self.frames_seen == 1 {
+                level_db
+            } else {
+                self.floor_db.min(level_db).max(-100.0)
+            };
         } else {
             self.floor_db += self.cfg.floor_rise_db_per_s / 50.0;
             self.floor_db = self.floor_db.min(level_db);
         }
         // Periodicity is only worth measuring for a frame loud enough to count.
-        let loud = level_db >= self.cfg.min_level_db && level_db - self.floor_db >= self.cfg.above_floor_db && in_band >= self.cfg.band_share;
-        let (voicing, period, shape) = if loud { periodicity(&self.band) } else { (0.0, None, Vec::new()) };
+        let loud = level_db >= self.cfg.min_level_db
+            && level_db - self.floor_db >= self.cfg.above_floor_db
+            && in_band >= self.cfg.band_share;
+        let (voicing, period, shape) = if loud {
+            periodicity(&self.band)
+        } else {
+            (0.0, None, Vec::new())
+        };
         let voiced = loud && voicing >= self.cfg.voicing;
-        let steady = voiced && self.last_shape.as_ref().is_some_and(|prev| similarity(prev, &shape) >= self.cfg.same_shape);
+        let steady = voiced
+            && self
+                .last_shape
+                .as_ref()
+                .is_some_and(|prev| similarity(prev, &shape) >= self.cfg.same_shape);
         if voiced {
             self.last_shape = Some(shape);
         } else {
             self.last_shape = None;
         }
-        let frame = Frame { level_db, floor_db: self.floor_db, voicing, period: if voiced { period } else { None }, voiced, steady };
+        let frame = Frame {
+            level_db,
+            floor_db: self.floor_db,
+            voicing,
+            period: if voiced { period } else { None },
+            voiced,
+            steady,
+        };
         self.recent.push_back(frame);
         if self.recent.len() > self.cfg.window {
             self.recent.pop_front();
@@ -207,18 +254,34 @@ impl SpeechGate {
         } else {
             self.peak_db = (self.peak_db - 6.0 / 50.0).max(self.floor_db + self.cfg.above_floor_db);
         }
-        let target = ((level_db - (self.peak_db - 30.0)) / 30.0).clamp(0.0, 1.0).powf(2.2);
-        self.level = if voiced { target } else { self.level.min(target) };
+        let target = ((level_db - (self.peak_db - 30.0)) / 30.0)
+            .clamp(0.0, 1.0)
+            .powf(2.2);
+        self.level = if voiced {
+            target
+        } else {
+            self.level.min(target)
+        };
         let mut event = None;
         if !self.open {
             let voiced_n = self.recent.iter().filter(|f| f.voiced).count();
-            let fast = self.recent.iter().rev().take(self.cfg.fast_window).filter(|f| f.voiced && f.level_db - f.floor_db >= self.cfg.fast_above_db).count();
-            let enough = (self.recent.len() == self.cfg.window && voiced_n >= self.cfg.voiced_needed) || fast >= self.cfg.fast_needed;
+            let fast = self
+                .recent
+                .iter()
+                .rev()
+                .take(self.cfg.fast_window)
+                .filter(|f| f.voiced && f.level_db - f.floor_db >= self.cfg.fast_above_db)
+                .count();
+            let enough = (self.recent.len() == self.cfg.window
+                && voiced_n >= self.cfg.voiced_needed)
+                || fast >= self.cfg.fast_needed;
             if enough && !self.held_note() {
                 self.open = true;
                 self.quiet = 0;
                 let first = self.recent.iter().position(|f| f.voiced).unwrap_or(0);
-                event = Some(GateEvent::Open { lead: (self.cfg.window - first) * FRAME });
+                event = Some(GateEvent::Open {
+                    lead: (self.cfg.window - first) * FRAME,
+                });
             }
         } else if voiced {
             self.quiet = 0;
@@ -304,7 +367,10 @@ mod tests {
         let (opens, first, level) = run(&mut g, &s);
         assert_eq!(opens, 1);
         let open_ms = first.unwrap() as f32 * 20.0 - 1000.0;
-        assert!(open_ms <= 300.0, "opened {open_ms} ms after the speech began");
+        assert!(
+            open_ms <= 300.0,
+            "opened {open_ms} ms after the speech began"
+        );
         assert!(level > 0.3, "level {level}");
         assert!(!g.is_open(), "closes after the speech ends");
     }
@@ -349,7 +415,13 @@ mod tests {
             s.extend((0..secs(0.4)).map(|i| {
                 let t = i as f32 / RATE as f32;
                 let env = (t * 30.0).min(1.0) * (1.0 - t / 0.45);
-                0.2 * env * (1..=6).map(|h| (2.0 * std::f32::consts::PI * f * h as f32 * t + k as f32).sin() / h as f32).sum::<f32>()
+                0.2 * env
+                    * (1..=6)
+                        .map(|h| {
+                            (2.0 * std::f32::consts::PI * f * h as f32 * t + k as f32).sin()
+                                / h as f32
+                        })
+                        .sum::<f32>()
             }));
         }
         let mut g = SpeechGate::new(GateConfig::default());
@@ -360,7 +432,12 @@ mod tests {
     fn short_voiced_sounds_do_not_open() {
         // A cup set down: a bright ring that dies in 150 ms. A grunt: 100 ms of voice.
         let mut s = room(0.5, 0.002, 8);
-        let ring: Vec<f32> = (0..secs(0.15)).map(|i| 0.5 * (2.0 * std::f32::consts::PI * 1800.0 * i as f32 / RATE as f32).sin() * (-(i as f32) / 600.0).exp()).collect();
+        let ring: Vec<f32> = (0..secs(0.15))
+            .map(|i| {
+                0.5 * (2.0 * std::f32::consts::PI * 1800.0 * i as f32 / RATE as f32).sin()
+                    * (-(i as f32) / 600.0).exp()
+            })
+            .collect();
         mix(&mut s, &ring, secs(0.2));
         s.extend(room(0.5, 0.002, 9));
         s.extend(speechlike(0.10, 0.4));
@@ -369,4 +446,3 @@ mod tests {
         assert_eq!(run(&mut g, &s).0, 0);
     }
 }
-

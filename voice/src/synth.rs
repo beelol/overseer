@@ -10,10 +10,16 @@ use std::f32::consts::PI;
 pub struct Noise(u64);
 impl Noise {
     pub fn new(seed: u64) -> Self {
-        Self(seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407))
+        Self(
+            seed.wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407),
+        )
     }
     pub fn next(&mut self) -> f32 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((self.0 >> 33) as f32 / (1u64 << 31) as f32) * 2.0 - 1.0
     }
 }
@@ -59,10 +65,21 @@ pub fn speechlike(dur: f32, amp: f32) -> Vec<f32> {
     (0..secs(dur))
         .map(|i| {
             let t = i as f32 / RATE as f32;
-            let pitch = 140.0 + 30.0 * (2.0 * PI * 1.3 * t).sin() + 10.0 * (2.0 * PI * 3.1 * t).sin();
+            let pitch =
+                140.0 + 30.0 * (2.0 * PI * 1.3 * t).sin() + 10.0 * (2.0 * PI * 3.1 * t).sin();
             phase += 2.0 * PI * pitch / RATE as f32;
             let syllable = (0.55 + 0.45 * (2.0 * PI * 4.0 * t).sin()).max(0.1);
-            let v: f32 = (1..=12).map(|h| (h as f32 * phase).sin() * (1.0 / h as f32) * if (500.0..1500.0).contains(&(h as f32 * pitch)) { 2.0 } else { 1.0 }).sum();
+            let v: f32 = (1..=12)
+                .map(|h| {
+                    (h as f32 * phase).sin()
+                        * (1.0 / h as f32)
+                        * if (500.0..1500.0).contains(&(h as f32 * pitch)) {
+                            2.0
+                        } else {
+                            1.0
+                        }
+                })
+                .sum();
             amp * syllable * v / 3.0
         })
         .collect()
@@ -75,7 +92,9 @@ pub fn clicks(dur: f32, per_s: f32, amp: f32, seed: u64) -> Vec<f32> {
     let every = (RATE as f32 / per_s) as usize;
     let mut at = every / 3;
     while at + 400 < out.len() {
-        let burst: Vec<f32> = (0..240).map(|i| amp * n.next() * (-(i as f32) / 40.0).exp()).collect();
+        let burst: Vec<f32> = (0..240)
+            .map(|i| amp * n.next() * (-(i as f32) / 40.0).exp())
+            .collect();
         mix(&mut out, &burst, at);
         at += every + (n.next().abs() * every as f32 * 0.5) as usize;
     }
@@ -90,7 +109,10 @@ pub fn chair(amp: f32, seed: u64) -> Vec<f32> {
     out.extend((0..secs(0.8)).map(|i| {
         let t = i as f32 / RATE as f32;
         lp += 0.2 * (n.next() - lp);
-        amp * lp * (0.5 + 0.5 * (2.0 * PI * 23.0 * t).sin().abs()) * (t * 8.0).min(1.0) * (1.0 - t / 0.8)
+        amp * lp
+            * (0.5 + 0.5 * (2.0 * PI * 23.0 * t).sin().abs())
+            * (t * 8.0).min(1.0)
+            * (1.0 - t / 0.8)
     }));
     out.extend(room(0.4, 0.0005, seed + 1));
     out
@@ -111,7 +133,9 @@ pub fn door(amp: f32, seed: u64) -> Vec<f32> {
 /// A cup set down: a bright ring that dies in about 150 ms.
 pub fn cup(amp: f32) -> Vec<f32> {
     let mut out = room(0.3, 0.0005, 3);
-    out.extend((0..secs(0.4)).map(|i| amp * (2.0 * PI * 1800.0 * i as f32 / RATE as f32).sin() * (-(i as f32) / 600.0).exp()));
+    out.extend((0..secs(0.4)).map(|i| {
+        amp * (2.0 * PI * 1800.0 * i as f32 / RATE as f32).sin() * (-(i as f32) / 600.0).exp()
+    }));
     out.extend(room(0.3, 0.0005, 4));
     out
 }
@@ -159,11 +183,19 @@ pub fn fan(dur: f32, amp: f32, seed: u64) -> Vec<f32> {
 pub fn music(dur: f32, amp: f32) -> Vec<f32> {
     let notes = [220.0f32, 261.6, 329.6, 392.0, 293.7, 246.9];
     let mut s = Vec::new();
-    for (k, f) in notes.iter().cycle().take((dur / 0.4).ceil() as usize).enumerate() {
+    for (k, f) in notes
+        .iter()
+        .cycle()
+        .take((dur / 0.4).ceil() as usize)
+        .enumerate()
+    {
         s.extend((0..secs(0.4)).map(|i| {
             let t = i as f32 / RATE as f32;
             let env = (t * 30.0).min(1.0) * (1.0 - t / 0.45);
-            amp * env * (1..=6).map(|h| (2.0 * PI * f * h as f32 * t + k as f32).sin() / h as f32).sum::<f32>()
+            amp * env
+                * (1..=6)
+                    .map(|h| (2.0 * PI * f * h as f32 * t + k as f32).sin() / h as f32)
+                    .sum::<f32>()
         }));
     }
     s
@@ -186,4 +218,6 @@ pub fn noise(kind: &str, seed: u64, scale: f32) -> Option<Vec<f32>> {
     })
 }
 
-pub const NOISES: &[&str] = &["taps", "clicks", "typing", "chair", "door", "cup", "cough", "laugh", "fan", "music"];
+pub const NOISES: &[&str] = &[
+    "taps", "clicks", "typing", "chair", "door", "cup", "cough", "laugh", "fan", "music",
+];
