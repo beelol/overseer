@@ -134,7 +134,12 @@ fn which(name: &str) -> Option<PathBuf> {
 /// ChatGPT app bundle because stale package-manager installs are common.
 pub fn resolve_program(harness: &str) -> Option<PathBuf> {
     // codex-app is a transport of the Codex binary: it shares OVERSEER_CODEX_PATH.
-    let family = if harness == "codex-app" { "codex" } else { harness };
+    // opencode-serve is a transport of the OpenCode binary: it shares OVERSEER_OPENCODE_PATH.
+    let family = match harness {
+        "codex-app" => "codex",
+        "opencode-serve" => "opencode",
+        h => h,
+    };
     let env_key = format!("OVERSEER_{}_PATH", family.to_ascii_uppercase());
     if let Ok(p) = std::env::var(&env_key) {
         // An explicit path wins, and never falls back to PATH; a missing file is "not installed".
@@ -150,7 +155,7 @@ pub fn resolve_program(harness: &str) -> Option<PathBuf> {
             which("codex")
         }
         "claude" => which("claude"),
-        "opencode" => which("opencode"),
+        "opencode" | "opencode-serve" => which("opencode"),
         _ => None,
     }
 }
@@ -212,6 +217,17 @@ pub fn capabilities(harness: &str) -> Value {
             "model": "supported (-m, per turn)", "effort": "unsupported", "permission_mode": "unsupported", "images": "unsupported",
             "quota": "unknown", "account_login": "opencode auth login (XDG_DATA_HOME per profile); login itself untested",
             "verification": "verified through the real OpenCode runtime with a mock provider and with local Ollama models; no account login verified"
+        }),
+        "opencode-serve" => json!({
+            "transport": "opencode serve (HTTP and an event stream on loopback, through overseerd opencode-bridge; one process per turn)",
+            "launch": "supported", "output": "supported", "follow_up": "supported (the same session, continued by a new server)",
+            "interrupt": "supported (POST /session/{id}/abort, then SIGINT)", "resume": "supported",
+            "approvals": "supported (permission.asked events answered Allow once or Deny in Overseer; never remembered)",
+            "file_activity": "supported (edit/write tool parts)", "children": "supported (session.created with a parent; child output on the same stream)",
+            "usage": "supported (tokens per assistant message; cost 0 for local models)", "quota": "not applicable (local model)",
+            "model": "supported (a local Ollama tag, per turn)", "effort": "unsupported", "permission_mode": "supported (plan, manual, acceptEdits, auto as session rules)", "images": "unsupported",
+            "account_login": "none: Overseer's own OpenCode profile with the local Ollama provider only",
+            "verification": "transport verified by the AC-139 spike with OpenCode 1.15.13 and a local model"
         }),
         _ => json!({
             "transport": "generic process (stdin/stdout)", "launch": "supported", "output": "supported (raw lines)",
@@ -323,6 +339,11 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             args.push(req.prompt.to_string());
             (args, None, true)
         }
+        "opencode-serve" => {
+            let title: String = req.prompt.lines().next().unwrap_or_default().chars().take(60).collect();
+            let (_, args, start) = crate::opencode_bridge::launch_parts(&program, req.prompt, model, req.permission_mode, req.resume_session, &title)?;
+            (args, Some(start), false)
+        }
         "generic" => {
             let args = req.args_override.map(|a| a.to_vec()).unwrap_or_default();
             let stdin = if req.prompt.is_empty() { None } else { Some(format!("{}\n", req.prompt)) };
@@ -336,6 +357,8 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
         let extra: Vec<String> = req.extra_args.to_vec();
         args.splice(at..at, extra);
     }
+    // The opencode-serve harness runs `overseerd opencode-bridge`, which starts OpenCode itself.
+    let program_str = if harness == "opencode-serve" { std::env::current_exe()?.display().to_string() } else { program_str };
     Ok(Launch { program: program_str, args, env, initial_stdin, close_stdin })
 }
 
@@ -344,6 +367,7 @@ pub fn check_turn_options(harness: &str, effort: Option<&str>, mode: Option<&str
     let (efforts, modes, can_images): (&[&str], &[&str], bool) = match harness {
         "claude" => (&["low", "medium", "high", "xhigh", "max"], &["acceptEdits", "plan", "auto", "manual"], true),
         "codex" => (&["minimal", "low", "medium", "high", "xhigh"], &["read-only", "workspace-write"], true),
+        "opencode-serve" => (&[], crate::opencode_bridge::MODES, false),
         _ => (&[], &[], false),
     };
     if let Some(e) = effort {
@@ -364,6 +388,7 @@ pub fn check_turn_options(harness: &str, effort: Option<&str>, mode: Option<&str
 
 pub fn interrupt_plan(harness: &str) -> InterruptPlan {
     match harness {
+        "opencode-serve" => InterruptPlan::StdinThenSignal(crate::opencode_bridge::abort_line()),
         "claude" => InterruptPlan::StdinThenSignal(format!("{}\n", json!({"type": "control_request", "request_id": format!("overseer-int-{}", uuid::Uuid::new_v4().simple()), "request": {"subtype": "interrupt"}}))),
         _ => InterruptPlan::Signal,
     }
@@ -384,6 +409,7 @@ pub fn permission_reply(harness: &str, request_id: &str, allow: bool, input: &Va
             let decision = if allow { "accept" } else { "decline" };
             Some(format!("{}\n", json!({"id": id, "result": {"decision": decision}})))
         }
+        "opencode-serve" => Some(crate::opencode_bridge::permission_line(request_id, allow, message)),
         "claude" => {
             let response = if allow { json!({"behavior": "allow", "updatedInput": input}) } else { json!({"behavior": "deny", "message": message}) };
             Some(format!("{}\n", json!({"type": "control_response", "response": {"subtype": "success", "request_id": request_id, "response": response}})))
@@ -401,9 +427,25 @@ pub fn classify_error(message: &str) -> &'static str {
         "rate_limit"
     } else if m.contains("authenticat") || m.contains("401") || m.contains("unauthorized") || m.contains("not logged in") || m.contains("log in") || m.contains("login") || m.contains("oauth") || m.contains("token expired") {
         "auth"
+    } else if is_network_error(&m) {
+        "network"
     } else {
         "other"
     }
+}
+
+/// Connection failures and provider outages (Continuity, AC-83): the request never reached the
+/// provider, or the provider answered with a failure of its own. `m` is lower-case.
+fn is_network_error(m: &str) -> bool {
+    const SIGNS: &[&str] = &[
+        "econnrefused", "econnreset", "enotfound", "eai_again", "etimedout", "enetunreach", "ehostunreach", "epipe", "fetch failed", "getaddrinfo", "socket hang up",
+        "network is unreachable", "network is down", "no route to host", "connection refused", "connection reset", "connection closed", "connection error", "unable to connect",
+        "could not resolve host", "failed to lookup address", "dns error", "name or service not known", "nodename nor servname", "tls handshake", "handshake failed", "certificate",
+        "request timed out", "connection timed out", "operation timed out", "stream disconnected", "error sending request", "network error",
+        "502 bad gateway", "503 service unavailable", "504 gateway timeout", "status 502", "status 503", "status 504", "status 529", "status: 502", "status: 503", "status: 504", "status: 529",
+        "api error: 5", "overloaded", "bad gateway", "service unavailable", "gateway timeout", "internal server error",
+    ];
+    SIGNS.iter().any(|s| m.contains(s))
 }
 
 fn truncate(s: &str, max: usize) -> String {
@@ -426,7 +468,7 @@ pub fn parse(harness: &str, stream: &str, line: &str) -> Vec<Norm> {
     }
     if stream == "e" {
         let class = classify_error(line);
-        if class != "other" && harness != "opencode" && harness != "codex-app" {
+        if class != "other" && harness != "opencode" && harness != "codex-app" && harness != "opencode-serve" {
             return vec![Norm::Error { class: class.into(), message: truncate(line, 2000) }];
         }
         return vec![Norm::Text { role: "stderr".into(), text: truncate(line, 8192) }];
@@ -439,6 +481,7 @@ pub fn parse(harness: &str, stream: &str, line: &str) -> Vec<Norm> {
         "codex-app" => parse_codex_app(&v),
         "claude" => parse_claude(&v),
         "opencode" => parse_opencode(&v),
+        "opencode-serve" => crate::opencode_bridge::parse(&v),
         _ => vec![Norm::Unparsed(truncate(line, 8192))],
     }
 }
@@ -905,6 +948,28 @@ mod tests {
         assert_eq!(classify_error("exceeded retry limit, last status: 429 Too Many Requests"), "rate_limit");
         // Real Claude Code 2.1.246 message captured live.
         assert_eq!(classify_error("Failed to authenticate: OAuth session expired and could not be refreshed"), "auth");
+    }
+
+    #[test]
+    fn network_errors_are_their_own_class() {
+        for m in [
+            "stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses)",
+            "getaddrinfo ENOTFOUND api.anthropic.com",
+            "connect ECONNREFUSED 127.0.0.1:443",
+            "TypeError: fetch failed",
+            "Connection error.",
+            "error: Network is unreachable (os error 51)",
+            "API Error: 529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}",
+            "unexpected status 503 Service Unavailable",
+            "tls handshake eof",
+        ] {
+            assert_eq!(classify_error(m), "network", "{m}");
+        }
+        // Account states are never network errors, whatever else the text says.
+        assert_eq!(classify_error("exceeded retry limit, last status: 429 Too Many Requests"), "rate_limit");
+        assert_eq!(classify_error("You've hit your usage limit."), "quota");
+        assert_eq!(classify_error("401 Unauthorized"), "auth");
+        assert_eq!(classify_error("the command timed out after 120 s"), "other", "a slow tool is not a connection problem");
     }
 
     #[test]

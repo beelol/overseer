@@ -1,0 +1,34 @@
+the owner's own Ollama before: processes 2184 2294; answers {"version":"0.34.2"}
+overseerd 0.1.0; Darwin 25.6.0 arm64; this run's Ollama address: 127.0.0.1:63383
+PASS  a machine without Ollama is reported so  — Ollama is not installed
+PASS  with install off nothing is installed  — Ollama is not installed, and installing it is off (overseer.continuity.allowOllamaInstall)
+
+== Allowed: the official archive
+PASS  the archive is the path taken here  — Homebrew is set aside for this check: it would install for the whole machine
+    downloaded 190 MB from https://ollama.com/download/Ollama-darwin.zip in 8 s (1 progress events)
+    signature: {"authority":"Developer ID Application: Infra Technologies, Inc (3MU9H2V9Y9)","gatekeeper":"Notarized Developer ID","identifier":"com.electron.ollama","team":"3MU9H2V9Y9"}
+PASS  the install completes after the signature verifies  — Developer ID Application: Infra Technologies, Inc (3MU9H2V9Y9); Gatekeeper: Notarized Developer ID
+PASS  it is installed in Overseer's own folder, and the download is gone  — /ISOLATED/machine/overseer/ollama: Ollama.app
+PASS  the order of the steps is download, verify, install  — starting → downloading → verifying → installed
+
+== The server
+PASS  /api/version answers  — Ollama 0.34.4 (pid 20810)
+PASS  the server listens on 127.0.0.1 only  — 127.0.0.1:63383 (LISTEN)
+PASS  it is Overseer's own copy that runs  — /ISOLATED/machine/overseer/ollama/Ollama.app/Contents/Resources/ollama serve
+PASS  asked again, no second server is started
+PASS  it has its own models folder, and none of the owner's models  — 0 models
+
+== Idle stop
+PASS  after the idle time without local work the server is stopped  — no local work for 62 s, 62 s after the setting
+
+== A tampered archive
+    the downloaded Ollama was not opened: its code signature does not verify (/ISOLATED/second-machine/overseer/ollama/staging-1790488957350/Ollama.app: a sealed resource is missing or invalid); the download was deleted
+PASS  a tampered archive fails verification  — one byte was added to Contents/Resources/GO_LICENSE
+PASS  it is deleted, and nothing is installed or started  — /ISOLATED/second-machine/overseer/ollama: empty
+
+== The owner's own Ollama
+PASS  the owner's running Ollama keeps its process ids  — 2184 2294 → 2184 2294
+PASS  the owner's application and its answer are as they were  — {"version":"0.34.2"}
+PASS  this run's server made its key in its own HOME, and the owner's key is as it was  — /ISOLATED/machine/home/.ollama/id_ed25519 exists; the owner's ~/.ollama/id_ed25519 is unchanged
+
+17 passed, 0 failed

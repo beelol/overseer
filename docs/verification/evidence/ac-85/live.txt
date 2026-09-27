@@ -1,0 +1,54 @@
+overseerd 0.1.0 (protocol 1); 26.6.2 arm64; Ollama 0.34.2
+connection: online (connected); SystemConfiguration reachability: IPv4 reachable (flags 0x00000002), IPv6 reachable (flags 0x00000002)
+  baseline by name: answered 204; by IP: answered 301
+  anthropic: reachable (answered 404, probe)
+  openai: reachable (answered 403, probe)
+PASS  the system itself says this machine is connected, with the flags it decided from
+PASS  both baseline probes and both providers answer
+PASS  the state is online
+memory: total 128 GiB, available 59 GiB, pressure normal, level 83% (macOS kernel (hw.memsize, host_statistics64, kern.memorystatus_*))
+PASS  total memory is exactly sysctl hw.memsize  — 137438953472 bytes
+PASS  available memory is within 5% of vm_stat  — daemon 59 GiB, vm_stat 59 GiB, 0.0% apart
+PASS  the free percentage is within 5 points of kern.memorystatus_level and memory_pressure  — daemon 83%, sysctl 83%, memory_pressure 83%
+PASS  every installed model is reported, and no other  — 8 models
+  qwen3-coder:30b-64k         17.3 GiB on disk  30.5B   Q4_K_M  context 65536 of 262144  completion,tools
+  qwen3-coder:30b             17.3 GiB on disk  30.5B   Q4_K_M  context default of 262144  completion,tools
+  qwen3.5:35b-a3b-64k         22.2 GiB on disk  36.0B   Q4_K_M  context 65536 of 262144  completion,vision,tools,thinking
+  qwen3.5:35b-a3b-32k         22.2 GiB on disk  36.0B   Q4_K_M  context 32768 of 262144  completion,vision,tools,thinking
+  qwen3.5:35b-a3b-q4_K_M      22.2 GiB on disk  36.0B   Q4_K_M  context default of 262144  completion,vision,tools,thinking
+  qwen3.5:35b                 22.2 GiB on disk  36.0B   Q4_K_M  context default of 262144  completion,vision,tools,thinking
+  qwen3.5:122b                75.8 GiB on disk  125.1B  Q4_K_M  context default of 262144  completion,vision,tools,thinking
+  qwen2.5-coder:14b            8.4 GiB on disk  14.8B   Q4_K_M  context default of 32768  completion,tools,insert
+PASS  size, family, quantization, context, capabilities and geometry match /api/tags and /api/show  — 8 of 8
+PASS  loaded models match /api/ps  — 0 loaded
+PASS  Ollama is reported as installed and running, with its version  — 0.34.2 at /Applications/Ollama.app/Contents/Resources/ollama
+PASS  free disk where the models live is reported  — 5543.6 GiB
+budget: 46.2 GiB = min(40% of 128 GiB = 51.2 GiB, 59 GiB available − 12.8 GiB headroom = 46.2 GiB)
+pick: qwen3-coder:30b at a 64k context, 24.3 GiB (estimated), run as qwen3-coder:30b-64k
+  not taken: qwen2.5-coder:32b: not verified with opencode
+  not taken: qwen2.5-coder:14b: failed its check with opencode: emitted its tool call as text
+  not taken: qwen2.5-coder:7b: not verified with opencode
+  not taken: qwen2.5-coder:3b: not verified with opencode
+  not taken: qwen2.5-coder:1.5b: not verified with opencode
+PASS  the pick is qwen3-coder:30b at 64k or more
+PASS  the pick is inside the budget  — 24.3 GiB of 46.2 GiB
+PASS  a ceiling over 50% is refused
+  guard, qwen3-coder:30b-64k at 16k: allowed, 19.8 GiB of 46.2 GiB
+  guard, qwen3-coder:30b at 16k: allowed, 19.8 GiB of 46.2 GiB
+  guard, qwen3.5:35b-a3b-64k at 16k: allowed, 23.5 GiB of 46.2 GiB
+  guard, qwen3.5:35b-a3b-32k at 16k: allowed, 23.5 GiB of 46.2 GiB
+  guard, qwen3.5:35b-a3b-q4_K_M at 16k: allowed, 23.5 GiB of 46.2 GiB
+  guard, qwen3.5:35b at 16k: allowed, 23.5 GiB of 46.2 GiB
+  guard, qwen3.5:122b at 16k: REFUSED: qwen3.5:122b is too big to load: 77.2 GiB at a 16k context is over the budget of 46.2 GiB
+  guard, qwen2.5-coder:14b at 16k: allowed, 12.4 GiB of 46.2 GiB
+PASS  qwen3.5:122b is refused, with the arithmetic  — qwen3.5:122b is too big to load: 77.2 GiB at a 16k context is over the budget of 46.2 GiB (40% of 128 GiB is 51.2 GiB; 59 GiB available minus 12.8 GiB headroom is 46.2 GiB)
+PASS  a load of qwen3.5:122b is refused the same way, and nothing is loaded
+loaded qwen3-coder:30b-64k in 5.1 s; 5 memory samples, lowest available 42.4 GiB; available before 59 GiB, after 42.4 GiB
+PASS  the pick loads under the watchdog, with memory sampled while it loads  — 5 samples
+PASS  Ollama's own measurement is recorded  — 23.7 GiB at a 64k context
+PASS  the estimate is within 15% of the measured size  — estimate 24.3 GiB, measured 23.7 GiB, 2.6% apart
+PASS  the next pick uses the measurement  — 23.7 GiB
+PASS  memory pressure stayed normal with the model loaded  — level 64%, available 42.4 GiB
+PASS  the model is unloaded again  — available 42.7 GiB
+
+22 passed, 0 failed

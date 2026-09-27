@@ -1,0 +1,351 @@
+{
+ "at": "2026-09-27T02:25:37.181Z",
+ "results": [
+  {
+   "name": "the system itself says this machine is connected, with the flags it decided from",
+   "ok": true
+  },
+  {
+   "name": "both baseline probes and both providers answer",
+   "ok": true
+  },
+  {
+   "name": "the state is online",
+   "ok": true
+  },
+  {
+   "name": "total memory is exactly sysctl hw.memsize",
+   "ok": true,
+   "detail": "137438953472 bytes"
+  },
+  {
+   "name": "available memory is within 5% of vm_stat",
+   "ok": true,
+   "detail": "daemon 59 GiB, vm_stat 59 GiB, 0.0% apart"
+  },
+  {
+   "name": "the free percentage is within 5 points of kern.memorystatus_level and memory_pressure",
+   "ok": true,
+   "detail": "daemon 83%, sysctl 83%, memory_pressure 83%"
+  },
+  {
+   "name": "every installed model is reported, and no other",
+   "ok": true,
+   "detail": "8 models"
+  },
+  {
+   "name": "size, family, quantization, context, capabilities and geometry match /api/tags and /api/show",
+   "ok": true,
+   "detail": "8 of 8"
+  },
+  {
+   "name": "loaded models match /api/ps",
+   "ok": true,
+   "detail": "0 loaded"
+  },
+  {
+   "name": "Ollama is reported as installed and running, with its version",
+   "ok": true,
+   "detail": "0.34.2 at /Applications/Ollama.app/Contents/Resources/ollama"
+  },
+  {
+   "name": "free disk where the models live is reported",
+   "ok": true,
+   "detail": "5543.6 GiB"
+  },
+  {
+   "name": "the pick is qwen3-coder:30b at 64k or more",
+   "ok": true
+  },
+  {
+   "name": "the pick is inside the budget",
+   "ok": true,
+   "detail": "24.3 GiB of 46.2 GiB"
+  },
+  {
+   "name": "a ceiling over 50% is refused",
+   "ok": true
+  },
+  {
+   "name": "qwen3.5:122b is refused, with the arithmetic",
+   "ok": true,
+   "detail": "qwen3.5:122b is too big to load: 77.2 GiB at a 16k context is over the budget of 46.2 GiB (40% of 128 GiB is 51.2 GiB; 59 GiB available minus 12.8 GiB headroom is 46.2 GiB)"
+  },
+  {
+   "name": "a load of qwen3.5:122b is refused the same way, and nothing is loaded",
+   "ok": true
+  },
+  {
+   "name": "the pick loads under the watchdog, with memory sampled while it loads",
+   "ok": true,
+   "detail": "5 samples"
+  },
+  {
+   "name": "Ollama's own measurement is recorded",
+   "ok": true,
+   "detail": "23.7 GiB at a 64k context"
+  },
+  {
+   "name": "the estimate is within 15% of the measured size",
+   "ok": true,
+   "detail": "estimate 24.3 GiB, measured 23.7 GiB, 2.6% apart"
+  },
+  {
+   "name": "the next pick uses the measurement",
+   "ok": true,
+   "detail": "23.7 GiB"
+  },
+  {
+   "name": "memory pressure stayed normal with the model loaded",
+   "ok": true,
+   "detail": "level 64%, available 42.4 GiB"
+  },
+  {
+   "name": "the model is unloaded again",
+   "ok": true,
+   "detail": "available 42.7 GiB"
+  }
+ ],
+ "connection": {
+  "acts_offline": false,
+  "baseline": {
+   "by_ip": {
+    "ok": true,
+    "reason": "answered 301"
+   },
+   "by_name": {
+    "ok": true,
+    "reason": "answered 204"
+   }
+  },
+  "checked_ms": 1790475931537,
+  "probed_ms": 1790475931537,
+  "probes": true,
+  "providers": {
+   "anthropic": {
+    "reachable": true,
+    "reason": "answered 404",
+    "source": "probe"
+   },
+   "openai": {
+    "reachable": true,
+    "reason": "answered 403",
+    "source": "probe"
+   }
+  },
+  "reason": "connected",
+  "since_ms": 1790475931537,
+  "state": "online",
+  "system": {
+   "detail": "SystemConfiguration reachability: IPv4 reachable (flags 0x00000002), IPv6 reachable (flags 0x00000002)",
+   "state": "connected"
+  },
+  "unreachable": []
+ },
+ "memory": {
+  "available": 63383420928,
+  "level": 83,
+  "pressure": "normal",
+  "source": "macOS kernel (hw.memsize, host_statistics64, kern.memorystatus_*)",
+  "total": 137438953472
+ },
+ "ollama": {
+  "detail": "Ollama is running",
+  "installed": "/Applications/Ollama.app/Contents/Resources/ollama",
+  "running": true,
+  "url": "http://127.0.0.1:11434",
+  "version": "0.34.2"
+ },
+ "models": [
+  {
+   "base": "qwen3-coder:30b",
+   "capabilities": [
+    "completion",
+    "tools"
+   ],
+   "configured_context": 65536,
+   "family": "qwen3moe",
+   "max_context": 262144,
+   "parameter_size": "30.5B",
+   "parameters": 30532122624,
+   "quantization": "Q4_K_M",
+   "size": 18556700444,
+   "tag": "qwen3-coder:30b-64k"
+  },
+  {
+   "base": "qwen3-coder:30b",
+   "capabilities": [
+    "completion",
+    "tools"
+   ],
+   "configured_context": null,
+   "family": "qwen3moe",
+   "max_context": 262144,
+   "parameter_size": "30.5B",
+   "parameters": 30532122624,
+   "quantization": "Q4_K_M",
+   "size": 18556700761,
+   "tag": "qwen3-coder:30b"
+  },
+  {
+   "base": "qwen3.5:35b-a3b-q4_K_M",
+   "capabilities": [
+    "completion",
+    "vision",
+    "tools",
+    "thinking"
+   ],
+   "configured_context": 65536,
+   "family": "qwen35moe",
+   "max_context": 262144,
+   "parameter_size": "36.0B",
+   "parameters": 35951822704,
+   "quantization": "Q4_K_M",
+   "size": 23869191496,
+   "tag": "qwen3.5:35b-a3b-64k"
+  },
+  {
+   "base": "qwen3.5:35b-a3b-q4_K_M",
+   "capabilities": [
+    "completion",
+    "vision",
+    "tools",
+    "thinking"
+   ],
+   "configured_context": 32768,
+   "family": "qwen35moe",
+   "max_context": 262144,
+   "parameter_size": "36.0B",
+   "parameters": 35951822704,
+   "quantization": "Q4_K_M",
+   "size": 23869191496,
+   "tag": "qwen3.5:35b-a3b-32k"
+  },
+  {
+   "base": "qwen3.5:35b-a3b-q4_K_M",
+   "capabilities": [
+    "completion",
+    "vision",
+    "tools",
+    "thinking"
+   ],
+   "configured_context": null,
+   "family": "qwen35moe",
+   "max_context": 262144,
+   "parameter_size": "36.0B",
+   "parameters": 35951822704,
+   "quantization": "Q4_K_M",
+   "size": 23869191742,
+   "tag": "qwen3.5:35b-a3b-q4_K_M"
+  },
+  {
+   "base": "qwen3.5:35b",
+   "capabilities": [
+    "completion",
+    "vision",
+    "tools",
+    "thinking"
+   ],
+   "configured_context": null,
+   "family": "qwen35moe",
+   "max_context": 262144,
+   "parameter_size": "36.0B",
+   "parameters": 35951822704,
+   "quantization": "Q4_K_M",
+   "size": 23869191742,
+   "tag": "qwen3.5:35b"
+  },
+  {
+   "base": "qwen3.5:122b",
+   "capabilities": [
+    "completion",
+    "vision",
+    "tools",
+    "thinking"
+   ],
+   "configured_context": null,
+   "family": "qwen35moe",
+   "max_context": 262144,
+   "parameter_size": "125.1B",
+   "parameters": 125086497008,
+   "quantization": "Q4_K_M",
+   "size": 81370036360,
+   "tag": "qwen3.5:122b"
+  },
+  {
+   "base": "qwen2.5-coder:14b",
+   "capabilities": [
+    "completion",
+    "tools",
+    "insert"
+   ],
+   "configured_context": null,
+   "family": "qwen2",
+   "max_context": 32768,
+   "parameter_size": "14.8B",
+   "parameters": 14770033664,
+   "quantization": "Q4_K_M",
+   "size": 8988124298,
+   "tag": "qwen2.5-coder:14b"
+  }
+ ],
+ "pick": {
+  "alternatives": [],
+  "budget": {
+   "available": 63369691136,
+   "budget": 49625795789,
+   "ceiling_now": 49625795789,
+   "ceiling_percent": 40,
+   "ceiling_share": 54975581360,
+   "headroom": 13743895347,
+   "note": null,
+   "pressure": "normal",
+   "total": 137438953472
+  },
+  "chosen": {
+   "budget": {
+    "available": 63369691136,
+    "budget": 49625795789,
+    "ceiling_now": 49625795789,
+    "ceiling_percent": 40,
+    "ceiling_share": 54975581360,
+    "headroom": 13743895347,
+    "note": null,
+    "pressure": "normal",
+    "total": 137438953472
+   },
+   "bytes": 26072893529,
+   "context": 65536,
+   "download_bytes": null,
+   "installed": true,
+   "measured": false,
+   "run_tag": "qwen3-coder:30b-64k",
+   "run_tag_exists": true,
+   "tag": "qwen3-coder:30b",
+   "tier": 1,
+   "verified": true
+  },
+  "rejected": [
+   {
+    "reason": "not verified with opencode",
+    "tag": "qwen2.5-coder:32b"
+   },
+   {
+    "reason": "failed its check with opencode: emitted its tool call as text",
+    "tag": "qwen2.5-coder:14b"
+   },
+   {
+    "reason": "not verified with opencode",
+    "tag": "qwen2.5-coder:7b"
+   },
+   {
+    "reason": "not verified with opencode",
+    "tag": "qwen2.5-coder:3b"
+   },
+   {
+    "reason": "not verified with opencode",
+    "tag": "qwen2.5-coder:1.5b"
+   }
+  ]
+ }
+}

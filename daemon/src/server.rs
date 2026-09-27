@@ -222,7 +222,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "audio.import_commander" => crate::audio::import_commander(d, p)?,
         "audio.voices" => crate::audio::voices()?,
         "harness.list" => {
-            let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "generic"]
+            let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "opencode-serve", "generic"]
                 .iter()
                 .map(|h| {
                     let program = crate::adapters::resolve_program(h);
@@ -320,6 +320,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let n = d.ui_clients.load(std::sync::atomic::Ordering::SeqCst);
             json!({"vscode": n, "ui": n})
         }
+        // Continuity (Gate L): connection state, settings, local inventory, pick and guard.
+        m if crate::continuity::handles(m) => crate::continuity::dispatch(d, m, p)?,
         other => return Err(anyhow!("unknown method {other}")),
     })
 }
