@@ -202,7 +202,7 @@ describe('fake discovery', () => {
   });
 
   test('manual addresses are told to listeners, kept once, and removed', () => {
-    const { discovery } = createFakePlatform({ launch: FAKE_IPHONE }).capabilities;
+    const { discovery, keyValue } = createFakePlatform({ launch: FAKE_IPHONE }).capabilities;
     const heard: (readonly GatewayAddress[])[] = [];
     discovery.manual.subscribe((addresses) => heard.push(addresses));
 
@@ -220,6 +220,11 @@ describe('fake discovery', () => {
     expect(discovery.manual.get()).toEqual([{ host: 'mac.local', port: 47810 }]);
     expect(heard).toHaveLength(3);
     expect(discovery.candidates()).toEqual([{ host: 'mac.local', port: 47810, source: 'manual' }]);
+
+    // The last one removed leaves no key behind: a phone that forgot its Mac holds nothing of it.
+    discovery.removeManual({ host: 'mac.local', port: 47810 });
+    expect(discovery.manual.get()).toEqual([]);
+    expect(keyValue.scope<{ manual: GatewayAddress[] }>('discovery').get('manual')).toBeNull();
   });
 
   test('an address that cannot be read is refused with the reason and changes nothing', () => {

@@ -60,7 +60,9 @@ export function createDiscovery(parts: DiscoveryParts): DiscoveryCapability {
   }
 
   function save(next: readonly GatewayAddress[]): void {
-    store.set('manual', next);
+    // No addresses is nothing stored: a phone that forgot its Mac holds no key of it.
+    if (next.length === 0) store.delete('manual');
+    else store.set('manual', next);
     manual.set(Object.freeze([...next]));
   }
 
