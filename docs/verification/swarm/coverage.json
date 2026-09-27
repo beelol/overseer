@@ -276,9 +276,14 @@
       "blocker": "Supervised scripted workers submit evidence/results into the director inbox, accepted contract work unlocks a dependent job, and fixture completion requires passed checks for every accepted job plus confirmed exits and an applied inbox. A separately supervised scripted director now plans two jobs, commits a synthetic benefit estimate, admits and launches both workers, forwards D1, reviews their artifact-backed results and records completion without test-runner worker launches. Its choices remain predetermined; a model director, Auto Mode route, arbitrary objective/backlog decomposition and live harness path remain unverified."
     },
     "SWARM-28": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "Policy previews qualified targets, but no live Auto Mode route and worker launch connects capability decisions to jobs."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_policy.rs",
+        "daemon/src/swarm/schema.rs",
+        "docs/verification/swarm/SWARM-28.md"
+      ],
+      "blocker": "Fixture admission now binds its target harness to worker launch and rejects a mismatch before process intent, including unbound migrated rows. Live Auto target selection and route/account/model binding, mixed qualified job routing, a manual single-target pool and normal-path scope rejection remain unverified."
     },
     "SWARM-29": {
       "status": "partial",
