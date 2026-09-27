@@ -506,6 +506,33 @@ fn active_parent_metadata(socket: &std::path::Path, method: &str, params: Value,
     Ok(reply["result"].clone())
 }
 
+/// Initial Auto selection has no workspace yet. Inspect the caller's existing
+/// repository in place, then recheck selected tools in the eventual workspace
+/// before a model turn. Never create a Git resource just to read metadata.
+fn auto_metadata_project(d: &Arc<Daemon>, p: &Value)
+    -> Result<(std::path::PathBuf, Option<String>, Option<String>)> {
+    match (p.get("workspace_id"), p.get("repo")) {
+        (Some(Value::String(id)), None) => {
+            let workspace = d.workspace(id)?;
+            if workspace.removed_ms.is_some() { return Err(anyhow!("workspace was removed")); }
+            Ok((std::path::PathBuf::from(workspace.path), Some(workspace.id), None))
+        }
+        (None, Some(Value::String(raw))) => {
+            let path = std::path::Path::new(raw);
+            if raw.is_empty() || !path.is_absolute() {
+                return Err(anyhow!("repository preflight needs an absolute path"));
+            }
+            let canonical = std::fs::canonicalize(path)?;
+            if !canonical.is_dir() || !canonical.join(".git").exists() {
+                return Err(anyhow!("repository preflight needs a Git root"));
+            }
+            let label = canonical.to_str().ok_or_else(|| anyhow!("repository path is not UTF-8"))?;
+            Ok((canonical.clone(), None, Some(label.to_string())))
+        }
+        _ => Err(anyhow!("metadata preflight requires exactly one workspace_id or repo")),
+    }
+}
+
 fn active_parent_pages(socket: &std::path::Path, method: &str, tool_detail: bool,
     limit: usize, deadline: Instant) -> Result<Value> {
     let mut data = Vec::new();
@@ -1560,8 +1587,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             if profile.harness != "opencode" {
                 return Err(anyhow!("local OpenCode discovery requires an OpenCode profile"));
             }
-            let workspace = d.workspace(s(p, "workspace_id")?)?;
-            if workspace.removed_ms.is_some() { return Err(anyhow!("workspace was removed")); }
+            let (project, workspace_id, repo) = auto_metadata_project(d, p)?;
             let gate = d.profile_gate(&profile.id);
             let _profile_guard = lock_gate_until(&gate, deadline)?;
             if d.store.lock().unwrap().runs()?.iter().any(|run| run.profile_id.as_deref() == Some(profile.id.as_str())
@@ -1577,13 +1603,13 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 return Err(anyhow!("OpenCode local metadata deadline elapsed"));
             }
             let catalog = crate::auto_collect::opencode_local_catalog(&program, &env,
-                std::path::Path::new(&workspace.path), remaining, crate::daemon::now())?;
+                &project, remaining, crate::daemon::now())?;
             let mut endpoint_health = BTreeMap::new();
             let mut local_execution_config_verified = BTreeMap::new();
             let mut local_execution_config_reason = BTreeMap::new();
             for model in &catalog.models {
                 let eligibility = crate::auto_opencode::auto_local_inline_config(&profile,
-                    std::path::Path::new(&workspace.path), &model.model, &model.endpoint);
+                    &project, &model.model, &model.endpoint);
                 local_execution_config_reason.insert(model.model.clone(), eligibility.as_ref().err()
                     .map(ToString::to_string));
                 local_execution_config_verified.insert(model.model.clone(), eligibility.is_ok());
@@ -1597,7 +1623,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 };
                 endpoint_health.insert(model.provider_id.clone(), state);
             }
-            json!({"profile_id":profile.id,"workspace_id":workspace.id,
+            json!({"profile_id":profile.id,"workspace_id":workspace_id,"repo":repo,
                 "source":"opencode/config-providers","catalog":catalog,
                 "endpoint_health":endpoint_health,"local_execution_config_verified":local_execution_config_verified,
                 "local_execution_config_reason":local_execution_config_reason,
@@ -1610,10 +1636,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             if profile.harness != "codex" {
                 return Err(anyhow!("structured tool discovery is not supported for this profile"));
             }
-            let workspace = d.workspace(s(p, "workspace_id")?)?;
-            if workspace.removed_ms.is_some() {
-                return Err(anyhow!("workspace was removed"));
-            }
+            let (project, workspace_id, repo) = auto_metadata_project(d, p)?;
             let gate = d.profile_gate(&profile.id);
             let _profile_guard = lock_gate_until(&gate, deadline)?;
             let read = (|| -> anyhow::Result<_> {
@@ -1621,7 +1644,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let mut env = crate::adapters::base_env(&program.display().to_string());
                 env.extend(Daemon::profile_env(&profile));
                 let raw = crate::auto_collect::codex_tool_inventory(&program, &env,
-                    std::path::Path::new(&workspace.path), Duration::from_millis(remaining_metadata_ms(deadline)?))?;
+                    &project, Duration::from_millis(remaining_metadata_ms(deadline)?))?;
                 let observed_ms = crate::daemon::now();
                 let catalog = crate::auto_route::parse_codex_tools(&raw.tools, observed_ms)?;
                 let fingerprint = crate::auto_quota::account_fingerprint(&raw.rate_limits)?;
@@ -1635,7 +1658,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 }
             };
             d.store.lock().unwrap().record_auto_account_identity(&profile.id, &fingerprint)?;
-            json!({"profile_id":profile.id,"workspace_id":workspace.id,"source":"codex-app/mcpServerStatus-list","catalog":catalog,
+            json!({"profile_id":profile.id,"workspace_id":workspace_id,"repo":repo,"source":"codex-app/mcpServerStatus-list","catalog":catalog,
                 "limitation":"discovery only; effective child tool permission requires launch-time verification"})
         }
         "auto.quota.refresh" => {

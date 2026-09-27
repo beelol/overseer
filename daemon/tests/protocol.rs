@@ -2786,6 +2786,16 @@ fn auto_opencode_metadata_keeps_real_local_endpoints_separate_without_cloud_rout
         ("XDG_CONFIG_HOME",config_home.to_str().unwrap()),
         ("XDG_DATA_HOME",data_home.to_str().unwrap()),
         ("XDG_CACHE_HOME",cache_home.to_str().unwrap())]);
+    let before = d.call("state", json!({}));
+    let preflight = d.call("auto.opencode.local.inspect",
+        json!({"profile_id":"system-opencode","repo":repo}));
+    assert_eq!(preflight["catalog"]["models"].as_array().unwrap().len(), 2);
+    assert_eq!(preflight["repo"], json!(repo));
+    assert!(preflight["workspace_id"].is_null());
+    let after = d.call("state", json!({}));
+    assert_eq!(after["tasks"], before["tasks"]);
+    assert_eq!(after["runs"], before["runs"]);
+    assert_eq!(after["workspaces"], before["workspaces"]);
     let created = d.call("task.create", json!({"repo":repo,"workspace_mode":"current",
         "harness":"generic","program":"/bin/true","prompt":"metadata workspace"}));
     let workspace_id = created["workspace"]["id"].as_str().unwrap();
@@ -5859,6 +5869,32 @@ fn auto_codex_tool_inventory_is_project_scoped_bounded_and_content_free() {
     assert!(trace.contains(&format!("tool_cwd:{}", d.call("state", json!({}))["workspaces"].as_array().unwrap()
         .iter().find(|item| item["id"] == workspace).unwrap()["path"].as_str().unwrap())));
     assert_eq!(d.runs().len(), 1, "tool inventory may not start a model run");
+}
+
+#[test]
+fn auto_codex_tool_inventory_can_preflight_a_repo_without_creating_a_workspace() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("root-tool-preflight-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "metadata-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let before = d.call("state", json!({}));
+    let inspected = d.call("auto.tools.inspect", json!({"profile_id":"system-codex",
+        "repo":repo}));
+    assert_eq!(inspected["catalog"]["tools"], json!(["browser/navigate","browser/snapshot"]));
+    assert_eq!(inspected["repo"], json!(repo));
+    assert!(inspected["workspace_id"].is_null());
+    assert!(std::fs::read_to_string(&trace).unwrap().contains(&format!("tool_cwd:{}", repo.display())));
+    let after = d.call("state", json!({}));
+    assert_eq!(after["tasks"], before["tasks"]);
+    assert_eq!(after["runs"], before["runs"]);
+    assert_eq!(after["workspaces"], before["workspaces"],
+        "root metadata preflight cannot create a workspace before selection");
+    assert!(d.try_call("auto.tools.inspect", json!({"profile_id":"system-codex",
+        "repo":repo,"workspace_id":"w-missing"})).is_err());
+    assert!(d.try_call("auto.tools.inspect", json!({"profile_id":"system-codex",
+        "repo":r.path()})).is_err(), "a non-repository directory is not project evidence");
 }
 
 #[test]
