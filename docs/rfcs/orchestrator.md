@@ -47,6 +47,7 @@ The owner's request (2026-09-27), in the owner's words where it matters:
 | Which model runs Overseer | The default account's harness, as AC-107 does. It can be changed, and route picking chooses when it is on. |
 | Building | Nothing is started now; the criteria are on main. This gate and Voice Mode can be built in parallel. |
 | Permission requests | Overseer never answers one by itself, at any level ("keep never"). The owner can answer one from the conversation. An agent that asks is an agent the owner told to ask; to let an agent work without asking, the owner runs that agent on Auto. |
+| Briefings and the channel | Only when more than one agent works in a repository. A lone agent's task stays exactly as typed. |
 | What Auto means | The Auto an agent has when it is left to work on its own (the permission mode). Overseer has that kind of Auto too. It is Overseer's own switch. |
 | Choosing who does the work | A different layer from Overseer's Auto, and it should perhaps have another name. It is the feature of pull request #2, called Auto mode there. This document calls it *route picking*. The owner's remark is passed on in a comment on that pull request; the name is theirs to settle. |
 | Who acts on what a watcher finds | Overseer. It acts for the watcher and tells the agent what to do. |
@@ -58,11 +59,6 @@ The owner's request (2026-09-27), in the owner's words where it matters:
 These are this RFC's choices, not the owner's. They stand until the owner changes them; a change
 is a recorded revision.
 
-- **Briefings and the channel.** An agent is told about the others, and can message Overseer, only
-  when more than one agent works in a repository
-  ([Agents that know about each other](#agents-that-know-about-each-other)). The owner is not
-  sure yet (2026-09-27). The other choice is every agent, always: simpler to explain, and a lone
-  agent then carries a paragraph and three commands it has no use for.
 - **Hold on stop.** A watch can be set to hold its subject the instant the watcher raises a *stop*.
 - **The name.** *Route picking* is this document's word for choosing who does the work. Candidates
   for the product's name: *Routing*, *Match*. Nothing in this gate depends on it.
@@ -233,8 +229,8 @@ Without the channel, Overseer still sees every agent from outside (the digest) a
 message any of them. The channel is what lets an agent *start* the conversation, in the middle of
 its work, instead of waiting to be asked.
 
-**When.** Proposed: only when more than one agent works in a repository. A lone agent gets no
-briefing and no channel and works exactly as today. It can be set per agent and as a default. An
+**When.** The owner's decision: only when more than one agent works in a repository. A lone agent
+gets no briefing and no channel and works exactly as today. It can be set per agent and as a default. An
 agent that is already running gets its briefing as a queued message when a second one starts or
 when the owner rallies.
 
@@ -657,7 +653,8 @@ the other builds on them, as the phone remote and Gate M did for the review's me
 
 ## Order of work
 
-Built in its own worktree and pull request, like the other gates.
+Built in its own worktree and pull request, like the other gates. The goal text is prepared in
+[orchestrator-goal.md](orchestrator-goal.md); nothing is started until the owner activates it.
 
 | Step | Criteria | Notes |
 | --- | --- | --- |
