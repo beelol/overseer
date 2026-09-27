@@ -658,9 +658,11 @@
         "docs/verification/swarm/milestone-8.md",
         "docs/verification/swarm/milestone-10.md",
         "docs/verification/swarm/SWARM-62.md",
-        "daemon/tests/swarm_runtime.rs"
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md"
       ],
-      "blocker": "A daemon timer checks deadlines without admission requests, records a deadline reason, cancels queued work, interrupts a linked scripted worker and delivers its terminal event. A stopping-run readout now exposes unconfirmed workers, proven in a Stop fixture; deadline-specific readout, live checkpoint/interrupt, VS Code display, and explicit extension remain unverified."
+      "blocker": "A daemon timer checks deadlines without admission requests, records a deadline reason, cancels queued work, interrupts a linked scripted worker and delivers its terminal event. A joined Atlas blocked-deadline replay now queues a checkpoint request and Stop while a PostgreSQL-backed J4 call is held; the checkpoint is not confirmed. A stopping-run readout exposes unconfirmed workers in a Stop fixture; deadline-specific UI, live harness/descendant control and explicit extension remain unverified."
     },
     "SWARM-63": {
       "status": "unverified",
@@ -690,7 +692,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins ten named Atlas v1 faults, adding an injected external allowance drop that holds new admission while an active job retains accepted PostgreSQL evidence. Other named faults are not all replayed. Autonomous director/routing, real account outage and usage feed, complete fault/report traces, live communication and S0 remain unverified."
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins eleven named Atlas v1 faults, including an external allowance drop and a blocked run deadline that requests a checkpoint before interrupting an active PostgreSQL-backed worker. Other named faults are not all replayed. Autonomous director/routing, real account outage and usage feed, complete fault/report traces, live communication and S0 remain unverified."
     }
   },
   "scenarios": {
@@ -755,7 +757,7 @@
         "docs/verification/swarm/S5.md",
         "fixtures/swarm/atlas-v1/probe-shared.mjs"
       ],
-      "blocker": "Atlas v1 joins ten named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, two scripted clients sharing one mutable PostgreSQL schema before isolated retries, 2,000 duplicate progress messages during Stop, both scripted last-result/Stop orderings, full SQLite storage during an Atlas artifact write followed by recovery and replay, and an injected external allowance reduction that holds J4 while J2 evidence survives. Separate daemon fixtures cover SQLite-full result/dispatch failures and completed-run contamination. Other named S5 faults, a full S1-sized ordered replay, numeric allowance history and live provider communication remain unverified; automatic resource alias discovery is absent."
+      "blocker": "Atlas v1 joins eleven named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, two scripted clients sharing one mutable PostgreSQL schema before isolated retries, 2,000 duplicate progress messages during Stop, both scripted last-result/Stop orderings, full SQLite storage during an Atlas artifact write followed by recovery and replay, an injected external allowance reduction that holds J4 while J2 evidence survives, and a blocked run deadline that requests a checkpoint and interrupts a held J4 probe. Separate daemon fixtures cover SQLite-full result/dispatch failures and completed-run contamination. Other named S5 faults, a full S1-sized ordered replay, numeric allowance history and live provider communication remain unverified; automatic resource alias discovery is absent."
     }
   }
 }
