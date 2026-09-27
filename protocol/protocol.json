@@ -1,0 +1,380 @@
+{
+  "about": "Overseer's daemon protocol: every method, its class for devices, and its phone status. The gateway's checks (daemon/src/gateway/classes.rs) and the app's types (phone/scripts/gen-protocol.mjs) are both built from this file. A daemon method that is missing here fails the test suite. A method marked planned is not built yet: the daemon refuses it as unknown, and the test suite fails if it is dispatched while still marked planned.",
+  "version": 1,
+  "classes": {
+    "self": "The calling device's own session and settings. Every device.",
+    "read": "Reads state. Every device.",
+    "control": "Changes something. Full control devices only, with a request id.",
+    "mac_only": "Never from a device."
+  },
+  "methods": {
+    "hello": {
+      "class": "self",
+      "summary": "Say who is connecting; returns protocol, version and, for a device, its scope",
+      "phone": "available"
+    },
+    "ping": {
+      "class": "self",
+      "summary": "Keep the session alive; returns the daemon's time",
+      "phone": "available"
+    },
+    "events.subscribe": {
+      "class": "self",
+      "summary": "Replay events after a cursor, then stream live events",
+      "phone": "available"
+    },
+    "device.notifications": {
+      "class": "self",
+      "summary": "Read or change this device's notification switches and push token",
+      "phone": "available"
+    },
+    "state": {
+      "class": "read",
+      "summary": "Every task, run, workspace and account profile",
+      "phone": "available"
+    },
+    "harness.list": {
+      "class": "read",
+      "summary": "Installed harnesses with versions and capabilities",
+      "phone": "available"
+    },
+    "profile.list": {
+      "class": "read",
+      "summary": "Account profiles",
+      "phone": "available"
+    },
+    "profile.status": {
+      "class": "read",
+      "summary": "Sign-in state of one account profile",
+      "phone": "available"
+    },
+    "repo.inspect": {
+      "class": "read",
+      "summary": "Branches, head and status of a repository Overseer knows",
+      "phone": "available"
+    },
+    "repo.known": {
+      "class": "read",
+      "summary": "The repositories Overseer has used",
+      "phone": "available"
+    },
+    "repo.files": {
+      "class": "read",
+      "summary": "Files of a worktree or repository, for mentions",
+      "phone": "available"
+    },
+    "run.raw_output": {
+      "class": "read",
+      "summary": "The end of a run's raw output",
+      "phone": "available"
+    },
+    "run.turns": {
+      "class": "read",
+      "summary": "The turns of a run",
+      "phone": "available"
+    },
+    "run.active": {
+      "class": "read",
+      "summary": "Runs that are active now",
+      "phone": "available"
+    },
+    "events.list": {
+      "class": "read",
+      "summary": "A page of events",
+      "phone": "available"
+    },
+    "comparison.options": {
+      "class": "read",
+      "summary": "The comparisons a run offers",
+      "phone": "available"
+    },
+    "workspace.diff": {
+      "class": "read",
+      "summary": "The diff of a workspace against a comparison",
+      "phone": "available"
+    },
+    "workspace.status": {
+      "class": "read",
+      "summary": "Git status of a workspace",
+      "phone": "available"
+    },
+    "workspace.changes": {
+      "class": "read",
+      "summary": "Changed files of a workspace since the task started",
+      "phone": "available"
+    },
+    "workspace.tree": {
+      "class": "read",
+      "summary": "One directory of a worktree",
+      "phone": "available"
+    },
+    "workspace.file": {
+      "class": "read",
+      "summary": "One file of a workspace, at a comparison and in the working copy",
+      "phone": "not_yet",
+      "planned": true
+    },
+    "workspace.cleanup_plan": {
+      "class": "read",
+      "summary": "What cleaning up a worktree would remove",
+      "phone": "available"
+    },
+    "workspace.pr_plan": {
+      "class": "read",
+      "summary": "What opening a pull request would do",
+      "phone": "available"
+    },
+    "workspace.merge_plan": {
+      "class": "read",
+      "summary": "What merging back would do",
+      "phone": "available"
+    },
+    "review.marks": {
+      "class": "read",
+      "summary": "The hunks marked reviewed for a run",
+      "phone": "not_yet",
+      "planned": true
+    },
+    "account.list": {
+      "class": "read",
+      "summary": "Accounts with sign-in state and plan",
+      "phone": "available"
+    },
+    "account.usage": {
+      "class": "read",
+      "summary": "Usage and limits of one account",
+      "phone": "available"
+    },
+    "search": {
+      "class": "read",
+      "summary": "Search tasks and runs",
+      "phone": "available"
+    },
+    "daemon.last_notice": {
+      "class": "read",
+      "summary": "The last background notice",
+      "phone": "available"
+    },
+    "daemon.clients": {
+      "class": "read",
+      "summary": "How many watching UIs are connected",
+      "phone": "available"
+    },
+    "task.create": {
+      "class": "control",
+      "summary": "Start an agent",
+      "phone": "available"
+    },
+    "task.archive": {
+      "class": "control",
+      "summary": "Archive or restore a task",
+      "phone": "available"
+    },
+    "run.follow_up": {
+      "class": "control",
+      "summary": "Send a message to an agent",
+      "phone": "available"
+    },
+    "run.interrupt": {
+      "class": "control",
+      "summary": "Stop an agent's turn",
+      "phone": "available"
+    },
+    "run.permission": {
+      "class": "control",
+      "summary": "Allow or deny a permission request",
+      "phone": "available"
+    },
+    "runs.stop_all": {
+      "class": "control",
+      "summary": "Stop every active agent; the daemon keeps running",
+      "phone": "available"
+    },
+    "workspace.cleanup": {
+      "class": "control",
+      "summary": "Remove a finished agent's worktree",
+      "phone": "available"
+    },
+    "workspace.pr_prepare": {
+      "class": "control",
+      "summary": "Commit and prepare the branch for a pull request",
+      "phone": "available"
+    },
+    "workspace.pr_open": {
+      "class": "control",
+      "summary": "Open the pull request with the Mac's Git and GitHub credentials",
+      "phone": "not_yet",
+      "planned": true
+    },
+    "workspace.pr_opened": {
+      "class": "control",
+      "summary": "Record a pull request that was opened",
+      "phone": "available"
+    },
+    "workspace.merge_prepare": {
+      "class": "control",
+      "summary": "Prepare merging back",
+      "phone": "available"
+    },
+    "workspace.merge_resolved": {
+      "class": "control",
+      "summary": "Say conflicts are resolved",
+      "phone": "available"
+    },
+    "workspace.merge_complete": {
+      "class": "control",
+      "summary": "Complete merging back",
+      "phone": "available"
+    },
+    "workspace.merge_abort": {
+      "class": "control",
+      "summary": "Abort merging back",
+      "phone": "available"
+    },
+    "review.accept": {
+      "class": "control",
+      "summary": "Mark a hunk reviewed",
+      "phone": "not_yet",
+      "planned": true
+    },
+    "review.unaccept": {
+      "class": "control",
+      "summary": "Remove a hunk's reviewed mark",
+      "phone": "not_yet",
+      "planned": true
+    },
+    "review.reject": {
+      "class": "control",
+      "summary": "Revert a hunk in the worktree",
+      "phone": "not_yet",
+      "planned": true
+    },
+    "profile.create": {
+      "class": "control",
+      "summary": "Add an account profile",
+      "phone": "available"
+    },
+    "profile.rename": {
+      "class": "control",
+      "summary": "Rename an account profile",
+      "phone": "available"
+    },
+    "profile.logout": {
+      "class": "control",
+      "summary": "Sign an account profile out",
+      "phone": "available"
+    },
+    "profile.device_login": {
+      "class": "control",
+      "summary": "Sign in with the provider's device code, in the phone's browser",
+      "phone": "not_yet",
+      "planned": true
+    },
+    "account.create": {
+      "class": "control",
+      "summary": "Add an account",
+      "phone": "available"
+    },
+    "account.remove": {
+      "class": "control",
+      "summary": "Remove an account",
+      "phone": "available"
+    },
+    "daemon.shutdown": {
+      "class": "mac_only",
+      "summary": "Stop the daemon",
+      "phone": "mac_only",
+      "reason": "A phone that stopped the daemon could not start it again"
+    },
+    "daemon.stop_all": {
+      "class": "mac_only",
+      "summary": "Stop every agent and the daemon",
+      "phone": "mac_only",
+      "reason": "It stops the daemon; a phone uses runs.stop_all"
+    },
+    "daemon.background_notice": {
+      "class": "mac_only",
+      "summary": "Post the background notice",
+      "phone": "mac_only",
+      "reason": "It belongs to the Mac's own notifications"
+    },
+    "daemon.test_notice": {
+      "class": "mac_only",
+      "summary": "Post a test notification on the Mac",
+      "phone": "mac_only",
+      "reason": "It belongs to the Mac's own notifications"
+    },
+    "profile.login_command": {
+      "class": "mac_only",
+      "summary": "The sign-in command for a terminal",
+      "phone": "mac_only",
+      "reason": "It needs a terminal on the Mac; a phone uses profile.device_login"
+    },
+    "gateway.status": {
+      "class": "mac_only",
+      "summary": "Phone access: on or off, port, connected phones",
+      "phone": "mac_only",
+      "reason": "Phone access is managed on the Mac"
+    },
+    "gateway.enable": {
+      "class": "mac_only",
+      "summary": "Turn phone access on",
+      "phone": "mac_only",
+      "reason": "Phone access is switched on the desktop only"
+    },
+    "gateway.disable": {
+      "class": "mac_only",
+      "summary": "Turn phone access off",
+      "phone": "mac_only",
+      "reason": "Phone access is switched on the desktop only"
+    },
+    "gateway.settings": {
+      "class": "mac_only",
+      "summary": "Read or change gateway settings",
+      "phone": "mac_only",
+      "reason": "Phone access is managed on the Mac"
+    },
+    "gateway.pair_start": {
+      "class": "mac_only",
+      "summary": "Open pairing and return the pairing code",
+      "phone": "mac_only",
+      "reason": "Pairing starts on the Mac"
+    },
+    "gateway.pair_cancel": {
+      "class": "mac_only",
+      "summary": "Close pairing",
+      "phone": "mac_only",
+      "reason": "Pairing starts on the Mac"
+    },
+    "gateway.pair_confirm": {
+      "class": "mac_only",
+      "summary": "Accept or decline a phone that asked to pair",
+      "phone": "mac_only",
+      "reason": "The owner confirms on the Mac"
+    },
+    "gateway.devices": {
+      "class": "mac_only",
+      "summary": "Paired devices",
+      "phone": "mac_only",
+      "reason": "Devices are managed on the Mac"
+    },
+    "gateway.device_revoke": {
+      "class": "mac_only",
+      "summary": "Revoke a device",
+      "phone": "mac_only",
+      "reason": "A phone that could manage devices could let another one in"
+    },
+    "gateway.device_scope": {
+      "class": "mac_only",
+      "summary": "Change a device's scope",
+      "phone": "mac_only",
+      "reason": "A phone could raise its own scope"
+    },
+    "gateway.device_rename": {
+      "class": "mac_only",
+      "summary": "Rename a device",
+      "phone": "mac_only",
+      "reason": "Devices are managed on the Mac"
+    }
+  }
+}

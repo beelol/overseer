@@ -175,6 +175,8 @@ impl Store {
         if !has_archived {
             self.conn.execute_batch("ALTER TABLE tasks ADD COLUMN archived_ms INTEGER;")?;
         }
+        // Gate N: paired devices and the outcomes of their requests.
+        crate::gateway::devices::migrate(&self.conn)?;
         self.conn.execute("INSERT OR IGNORE INTO meta(key, value) VALUES('schema_version', ?1)", params![SCHEMA_VERSION.to_string()])?;
         Ok(())
     }
@@ -369,6 +371,33 @@ impl Store {
     pub fn set_run_attention(&self, id: &str, attention: Option<&Value>) -> Result<()> {
         self.conn.execute("UPDATE runs SET attention=?2 WHERE id=?1", params![id, attention.map(|v| v.to_string())])?;
         Ok(())
+    }
+
+    /// Takes a run's pending request when it is the one named. The caller holds the store's lock,
+    /// so of several answers to one request exactly one gets `Some`.
+    pub fn claim_run_attention(&self, id: &str, request_id: &str) -> Result<Option<Value>> {
+        let current: Option<String> = self.conn.query_row("SELECT attention FROM runs WHERE id=?1", params![id], |r| r.get(0)).optional()?.flatten();
+        let Some(attention) = current.and_then(|t| serde_json::from_str::<Value>(&t).ok()) else { return Ok(None) };
+        if attention["request_id"].as_str() != Some(request_id) {
+            return Ok(None);
+        }
+        self.conn.execute("UPDATE runs SET attention=NULL WHERE id=?1", params![id])?;
+        Ok(Some(attention))
+    }
+
+    /// The first answer given to a permission request: `{"allow", "by", "ts"}`.
+    pub fn permission_answer(&self, run: &str, request_id: &str) -> Result<Option<Value>> {
+        let mut stmt = self.conn.prepare("SELECT ts, source, payload FROM events WHERE run_id=?1 AND kind='permission_answered' ORDER BY seq")?;
+        let rows = stmt.query_map(params![run], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)))?;
+        for row in rows {
+            let (ts, source, payload) = row?;
+            let payload: Value = serde_json::from_str(&payload).unwrap_or(Value::Null);
+            if payload["request_id"].as_str() == Some(request_id) {
+                let by = payload["by"].as_str().map(str::to_string).unwrap_or(source);
+                return Ok(Some(serde_json::json!({"allow": payload["allow"], "by": by, "ts": ts})));
+            }
+        }
+        Ok(None)
     }
 
     pub fn set_run_process(&self, id: &str, run_dir: &str, generation: i64, launch: &Value) -> Result<()> {

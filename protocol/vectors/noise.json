@@ -1,0 +1,108 @@
+{
+  "chunk": 65000,
+  "spec": "docs/rfcs/phone-remote-protocol.md",
+  "vectors": [
+    {
+      "handshake_hash": "715fa6bc36dd3aac6de3a9142f2980e265dd6324f42e9156453ecf0515b86063",
+      "initiator_ephemeral_private": "11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3ea",
+      "initiator_ephemeral_public": "e52b940ad182cfed595624daaaa892f68f14d52c49ae9016b6ab870e080e8300",
+      "initiator_static_private": "0a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3",
+      "initiator_static_public": "07a58e47362800f467b4429278d6ab788faacb916a9019e4775fba1cc89a651f",
+      "message1": "e52b940ad182cfed595624daaaa892f68f14d52c49ae9016b6ab870e080e83008f0d5bb6826bae0ecbadbfe7db8a392e2bbe0ba051c409e9ff442c3c5009a452eadf7f6b62686ab79e5110aa610768c2682420b6fe5510fb612878dc9a19af65f3c82851194517ad436ea5400db64a45caed9d3cd399d9011c4303411ee3679fb4cffe43cbad4a374fa49115dbc89a81bdf39e3c2e5dd709ec20a3ad0817b603a9fa59a3dcd56312ffe4f5afa37202c4fc1edb4dc2d0a703e0abbc",
+      "message2": "e57c695eb2c613c1be54eb615343e82b6a954f88409aa3ad1fa739d0041f1a269e3ee50420c32c4880a026abd968f12467926faf2ca4698f5cd0483bd017a300a44b5b56893b9188f329133a0c5289ad7efe2a7796e8bbc44d9947e2b76dac8603e5e890a2eddb97017865c0bbecca13cc2fa1c22eeb0a482c8c72fd9af76e1b1d007bdd2ef49d2d39098d47e670c2f77cc7",
+      "name": "session",
+      "pairing_secret": null,
+      "pattern": "Noise_IK_25519_ChaChaPoly_SHA256",
+      "payload1": "{\"device\":\"d-1\",\"name\":\"Test Phone\",\"platform\":\"ios\",\"app\":\"0.1.0\",\"counter\":1790000000000}",
+      "payload2": "{\"protocol\":1,\"device\":\"d-1\",\"scope\":\"full\",\"gateway\":\"Test Mac\",\"fingerprint\":\"0000000000000000\"}",
+      "prologue": "overseer-gateway-v1",
+      "psk": null,
+      "responder_ephemeral_private": "1f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8",
+      "responder_ephemeral_public": "e57c695eb2c613c1be54eb615343e82b6a954f88409aa3ad1fa739d0041f1a26",
+      "responder_fingerprint": "937b1de964b2e131",
+      "responder_static_private": "181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1",
+      "responder_static_public": "74fcd426a206adc7e952e343cbf25787e2d3057a1af3d2ff4690ae4285959108",
+      "transport": [
+        {
+          "frames": [
+            "958d79557e99276a02110cd271b3d50e47203b6655285ea560b78137b747a9b879867ed14ff92b5203679f6be6971d5ad8b46c528a392be4ccd5f4527be97382bb69be4c7dd3"
+          ],
+          "from": "device",
+          "plaintext": "{\"id\":1,\"method\":\"hello\",\"params\":{\"client\":\"phone\"}}"
+        },
+        {
+          "frames": [
+            "d710e619e2f7ad2b2afe83bef91640de2aed0aeb70e41b7f8e7f15b7791d3fe70db711963834d9d63dc44132e01481709e"
+          ],
+          "from": "gateway",
+          "plaintext": "{\"id\":1,\"result\":{\"protocol\":1}}"
+        },
+        {
+          "frames": [
+            "319915077b7cb864316b62038f07ccc3655608cfc63ea93f7f1cca5d83e24385817caac801b987d540cce670f913f69ed0055afc0df2"
+          ],
+          "from": "device",
+          "plaintext": "{\"id\":2,\"method\":\"state\",\"params\":{}}"
+        },
+        {
+          "frames": [
+            "7590981c8700fcc05f9bb6340ccb76d07eb55611738f3803b8a64b76aeb7ed7e74a315e17e57facd14584dfc7afd414d1daf25b5d174"
+          ],
+          "from": "gateway",
+          "plaintext": "{\"method\":\"event\",\"params\":{\"seq\":1}}"
+        }
+      ]
+    },
+    {
+      "handshake_hash": "b5471ebf31b16f3e7128fc05b2670ab862c25188df093e76425ab19abf0bb5e5",
+      "initiator_ephemeral_private": "11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3ea",
+      "initiator_ephemeral_public": "e52b940ad182cfed595624daaaa892f68f14d52c49ae9016b6ab870e080e8300",
+      "initiator_static_private": "0a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3",
+      "initiator_static_public": "07a58e47362800f467b4429278d6ab788faacb916a9019e4775fba1cc89a651f",
+      "message1": "e52b940ad182cfed595624daaaa892f68f14d52c49ae9016b6ab870e080e8300b9cbf60e24643603b17d5ee63dcaa5698f5c57e85c38a0c11c7c8ffd8f760e3426fbc7ce3d04ae141878baeeb028dac553b511ce54a3212ff86c3d00aad9b7c4868ecd8b4dc59ab7115daa1f8f8e55b533d9250638b7847cc69307dc7bb6c1f3d52b84e3f90ce2fa63478b8b7e18892f89ab7c9e0dbef0ec315e7303e86e93ba03a255db6f468d7ea5bebd861f70246c3f4ae4f7c71876b987c342",
+      "message2": "e57c695eb2c613c1be54eb615343e82b6a954f88409aa3ad1fa739d0041f1a263da77a9f424b89f4c75ec1ad5d19ae686889d579c1e33907fa02efe58bd4ab9bcd432ca84783478d1b0e03d45e9cba899ed7a4354c67e86732cf06e49d799f24a0e3213e57d57161a6ffc34b6c7a04fdfbc5f397447cdfe1a1b09c06a05f3791d78e410fa69da05a9fd03b4f9b152ea7533b",
+      "name": "pairing",
+      "pairing_secret": "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+      "pattern": "Noise_IKpsk1_25519_ChaChaPoly_SHA256",
+      "payload1": "{\"device\":\"d-1\",\"name\":\"Test Phone\",\"platform\":\"ios\",\"app\":\"0.1.0\",\"counter\":1790000000000}",
+      "payload2": "{\"protocol\":1,\"device\":\"d-1\",\"scope\":\"full\",\"gateway\":\"Test Mac\",\"fingerprint\":\"0000000000000000\"}",
+      "prologue": "overseer-gateway-v1",
+      "psk": "503563c1bda45327ff4617750a06bd8143fcd4e7929934b7cf1e826c1ba60c90",
+      "responder_ephemeral_private": "1f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8",
+      "responder_ephemeral_public": "e57c695eb2c613c1be54eb615343e82b6a954f88409aa3ad1fa739d0041f1a26",
+      "responder_fingerprint": "937b1de964b2e131",
+      "responder_static_private": "181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1",
+      "responder_static_public": "74fcd426a206adc7e952e343cbf25787e2d3057a1af3d2ff4690ae4285959108",
+      "transport": [
+        {
+          "frames": [
+            "068997f317cc45cb169c88b9429648639507d1180337da6883cefb106fea1a4bad6e918258c0189a8af27abdbb96862179642b56021221779b1c3933796b6f70237a70141b8a"
+          ],
+          "from": "device",
+          "plaintext": "{\"id\":1,\"method\":\"hello\",\"params\":{\"client\":\"phone\"}}"
+        },
+        {
+          "frames": [
+            "96892be40f0f191c1277ec832d680b776c3661a382491112cdb28b7a9413598c8a4ec440238fbfd7a8d3fe83425f391b30"
+          ],
+          "from": "gateway",
+          "plaintext": "{\"id\":1,\"result\":{\"protocol\":1}}"
+        },
+        {
+          "frames": [
+            "b23a9af3983bfc5bb83a7fe02a596db0728c010c5dbbc0b819ca169d669985ced97937316c2ca4a908320d7a89a2e7202081084d6162"
+          ],
+          "from": "device",
+          "plaintext": "{\"id\":2,\"method\":\"state\",\"params\":{}}"
+        },
+        {
+          "frames": [
+            "fb5cdd95307bdbaae29e6d07fce0a83ce00ac25f347fcbcb82dc731a05e108283b00519a25b50e46d7b482d63dbfc1910e182d3a6375"
+          ],
+          "from": "gateway",
+          "plaintext": "{\"method\":\"event\",\"params\":{\"seq\":1}}"
+        }
+      ]
+    }
+  ]
+}

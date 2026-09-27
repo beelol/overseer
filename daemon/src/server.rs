@@ -16,6 +16,61 @@ use tokio::sync::mpsc;
 pub const PROTOCOL_VERSION: i64 = 1;
 pub const MAX_REQUEST_BYTES: u64 = 1024 * 1024;
 
+/// An error with its own protocol code (and data), for refusals a client acts on.
+/// Anything else is reported as `failed` with its message.
+#[derive(Debug)]
+pub struct ProtoError {
+    pub code: &'static str,
+    pub message: String,
+    pub data: Value,
+}
+
+impl ProtoError {
+    pub fn new(code: &'static str, message: impl Into<String>) -> Self {
+        Self { code, message: message.into(), data: Value::Null }
+    }
+
+    pub fn with_data(mut self, data: Value) -> Self {
+        self.data = data;
+        self
+    }
+}
+
+impl std::fmt::Display for ProtoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for ProtoError {}
+
+/// The error object of a reply.
+pub fn error_value(e: &anyhow::Error) -> Value {
+    match e.downcast_ref::<ProtoError>() {
+        Some(p) if p.data.is_null() => json!({"code": p.code, "message": p.message}),
+        Some(p) => json!({"code": p.code, "message": p.message, "data": p.data}),
+        None => json!({"code": "failed", "message": e.to_string()}),
+    }
+}
+
+thread_local! {
+    /// Who is acting on this thread while a request runs: `None` is the local user, otherwise a
+    /// device (`phone:<name>`). Events a user causes carry it as their source.
+    static ACTOR: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `f` as `actor`. Requests run to completion on one blocking thread, so a thread-local is enough.
+pub fn with_actor<T>(actor: Option<String>, f: impl FnOnce() -> T) -> T {
+    ACTOR.with(|a| *a.borrow_mut() = actor);
+    let out = f();
+    ACTOR.with(|a| *a.borrow_mut() = None);
+    out
+}
+
+pub fn actor() -> Option<String> {
+    ACTOR.with(|a| a.borrow().clone())
+}
+
 pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
     let path = paths::socket_path();
     if let Some(dir) = path.parent() {
@@ -33,6 +88,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
     }
     crate::log(&format!("listening on {}", path.display()));
+    crate::gateway::start(&daemon);
     let uid = unsafe { libc::getuid() };
     // Test-only: pretend the owner is another uid. It can only reject more peers (a peer must
     // still be this process's own uid), so it lets a test observe a "foreign" connection being
@@ -134,7 +190,7 @@ async fn connection_loop(
             };
             let reply = match result {
                 Ok(Ok(v)) => json!({"id": id, "result": v}),
-                Ok(Err(e)) => json!({"id": id, "error": {"code": "failed", "message": e.to_string()}}),
+                Ok(Err(e)) => json!({"id": id, "error": error_value(&e)}),
                 Err(e) => json!({"id": id, "error": {"code": "internal", "message": e.to_string()}}),
             };
             let _ = tx.send(reply).await;
@@ -151,7 +207,7 @@ async fn connection_loop(
 /// Replay retained events after the client's cursor, then stream live events.
 /// Subscribing to the broadcast before replaying avoids a gap; live events at or
 /// below the replayed cursor are dropped so nothing is delivered twice.
-fn subscribe(daemon: Arc<Daemon>, id: Value, params: Value, tx: mpsc::Sender<Value>) {
+pub(crate) fn subscribe(daemon: Arc<Daemon>, id: Value, params: Value, tx: mpsc::Sender<Value>) {
     let mut live = daemon.events.subscribe();
     tokio::spawn(async move {
         let mut cursor = params["after"].as_i64().unwrap_or(0);
@@ -314,6 +370,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let n = d.ui_clients.load(std::sync::atomic::Ordering::SeqCst);
             json!({"vscode": n, "ui": n})
         }
-        other => return Err(anyhow!("unknown method {other}")),
+        "repo.known" => d.known_repos()?,
+        "runs.stop_all" => d.stop_all_runs()?,
+        m if m.starts_with("gateway.") => crate::gateway::local::dispatch(d, m, p)?,
+        other => return Err(ProtoError::new("unknown_method", format!("unknown method {other}")).into()),
     })
 }

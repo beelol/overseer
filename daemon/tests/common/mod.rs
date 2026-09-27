@@ -9,6 +9,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+// The gateway tests' reference phone speaks the daemon's own Noise code.
+#[path = "../../src/gateway/base32.rs"]
+pub mod base32;
+#[path = "../../src/gateway/noise.rs"]
+pub mod noise;
+pub mod phone;
+
 pub const BIN: &str = env!("CARGO_BIN_EXE_overseerd");
 
 pub fn repo_root() -> PathBuf {
