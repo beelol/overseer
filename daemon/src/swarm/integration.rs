@@ -95,8 +95,25 @@ fn disputed_integrated_patch(
                 AND a.source_revision=j.plan_revision))")?;
     let stale=stmt.query_map([run],|r|r.get::<_,String>(0))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
-    Ok(!stale.is_empty() && !(stale.len()==1
-        && repair_job.is_some_and(|job|job==stale[0])))
+    if stale.is_empty() { return Ok(false); }
+    if let Some(job)=repair_job {
+        if stale.iter().any(|id|id==job) {
+            let mut stmt=conn.prepare("WITH RECURSIVE upstream(job_id) AS (
+                SELECT dep.value FROM swarm_jobs j JOIN json_each(j.deps) dep
+                  WHERE j.run_id=?1 AND j.id=?2
+                UNION
+                SELECT dep.value FROM upstream u
+                  JOIN swarm_jobs j ON j.run_id=?1 AND j.id=u.job_id
+                  JOIN json_each(j.deps) dep
+            ) SELECT job_id FROM upstream")?;
+            let upstream=stmt.query_map(params![run,job],|r|r.get::<_,String>(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            if !upstream.iter().any(|id|stale.contains(id)) {
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
 }
 
 pub(super) fn ensure_no_disputed_integrated_patch(
