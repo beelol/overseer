@@ -448,6 +448,8 @@ export const scenarios = [
   {
     name: 'revoke',
     criteria: ['AC-119'],
+    // The run measures the budgets before this one: they need the app paired.
+    unpairs: true,
     says: 'removed on the Mac, the phone is back on pairing and holds nothing of the Mac',
     async run(c) {
       c.lab.call('gateway.device_revoke', { id: c.deviceId });
