@@ -53,6 +53,7 @@ function App() {
   const ready = useSessionValue((s) => s.ready);
   const paired = useSessionValue((s) => s.paired);
   const [closed, setClosed] = useState(door);
+  const settled = useFirstScreen();
 
   // The window behind the screens shows during rotation and transitions; it follows the theme.
   useEffect(() => {
@@ -115,9 +116,39 @@ function App() {
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={screenOptions} />
       <Notifications />
-      {closed ? <Door ready={ready} onShown={shown} onOpened={opened} /> : null}
+      {closed ? <Door ready={ready && settled} onShown={shown} onOpened={opened} /> : null}
     </>
   );
+}
+
+declare function requestIdleCallback(callback: () => void, options?: { timeout: number }): number;
+declare function cancelIdleCallback(handle: number): void;
+
+/**
+ * True once the first screen is drawn and the app's logic has come to rest after drawing it.
+ * The door opens then and not before: what it reveals is already in place, and nothing the
+ * screen still has to do holds the opening back.
+ */
+function useFirstScreen(): boolean {
+  const theme = useTheme();
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (settled) return;
+    let idle: number | null = null;
+    const drawn = (): boolean => Object.keys(perf.report().marks).some((name) => name.startsWith('screen.') && name.endsWith('.interactive'));
+    const check = (): void => {
+      if (idle !== null || !drawn()) return;
+      // At rest, or after a moment at the latest: the door never waits long for a busy screen.
+      idle = requestIdleCallback(() => setSettled(true), { timeout: theme.phone.motion.door.fade });
+    };
+    const off = perf.subscribe(check);
+    check();
+    return () => {
+      off();
+      if (idle !== null) cancelIdleCallback(idle);
+    };
+  }, [settled, theme]);
+  return settled;
 }
 
 const styles = StyleSheet.create({ fill: { flex: 1 } });

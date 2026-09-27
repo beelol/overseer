@@ -22,10 +22,30 @@ export interface DoorProps {
   readonly onOpened: () => void;
 }
 
-/** The door's colours, from the active theme: deep at the edges, lit along the seam. */
-function gradient(theme: Theme): readonly [string, string, string, string] {
+/**
+ * The door's colours, from the active theme: deep at the far corners, lit towards the seam, the
+ * same on both sides of it.
+ */
+function gradient(theme: Theme): readonly [string, string, string, string, string] {
   const c = theme.colors;
-  return [c.chrome, c.bg, c.accentSoft, c.raised2];
+  return [c.chrome, c.bg, c.accentSoft, c.bg, c.chrome];
+}
+
+const STOPS = [0, 0.3, 0.5, 0.7, 1] as const;
+
+/**
+ * Where the gradient starts and ends on a face, so that it runs square to the seam: the seam
+ * climbs to the right by `degrees`, and the light lies along it.
+ */
+function across(width: number, height: number, degrees: number): { start: { x: number; y: number }; end: { x: number; y: number } } {
+  const angle = (degrees * Math.PI) / 180;
+  const nx = Math.sin(angle);
+  const ny = Math.cos(angle);
+  const reach = (width * nx + height * ny) / 2;
+  return {
+    start: { x: 0.5 - (nx * reach) / width, y: 0.5 - (ny * reach) / height },
+    end: { x: 0.5 + (nx * reach) / width, y: 0.5 + (ny * reach) / height },
+  };
 }
 
 /**
@@ -96,15 +116,30 @@ export function Door({ ready, onShown, onOpened }: DoorProps) {
   const moving = useAnimatedStyle(() => ({ transform: [{ translateX: -lightWidth + light.value * (side + lightWidth) }] }));
 
   const mark = theme.phone.size.logo.door;
+  const run = across(width, height, tokens.angle);
   const face = (
     <View style={{ width, height, backgroundColor: theme.colors.bg }}>
       <Animated.View style={[StyleSheet.absoluteFill, glow]}>
-        <LinearGradient colors={gradient(theme)} locations={[0, 0.38, 0.5, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={gradient(theme)} locations={STOPS} start={run.start} end={run.end} style={StyleSheet.absoluteFill} />
       </Animated.View>
       <View style={[StyleSheet.absoluteFill, styles.center]}>
         <Image source={MARKS[theme.scheme]} style={{ width: mark, height: mark }} resizeMode="contain" fadeDuration={0} accessibilityIgnoresInvertColors />
       </View>
     </View>
+  );
+  // What a half carries along its edge of the seam: the light that leaks through, and the
+  // lines of its plating. They lie along the seam and travel with the half.
+  const line = theme.phone.size.hairline;
+  const plating = (edge: 'top' | 'bottom') => (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, glow]}>
+      <LinearGradient
+        colors={edge === 'bottom' ? ['transparent', theme.colors.accent] : [theme.colors.accent, 'transparent']}
+        style={{ position: 'absolute', left: 0, right: 0, [edge]: 0, height: theme.space[10], opacity: theme.phone.opacity.scrim }}
+      />
+      {[theme.space[6], theme.space[8], theme.space[10] * 3].map((distance) => (
+        <View key={distance} style={{ position: 'absolute', left: 0, right: 0, [edge]: distance, height: line, backgroundColor: theme.colors.borderStrong }} />
+      ))}
+    </Animated.View>
   );
   const angle = `${-tokens.angle}deg`;
   const back = `${tokens.angle}deg`;
@@ -126,9 +161,11 @@ export function Door({ ready, onShown, onOpened }: DoorProps) {
       <View style={{ position: 'absolute', width: side, height: side, left: (width - side) / 2, top: (height - side) / 2, transform: [{ rotate: angle }] }}>
         <Animated.View style={[{ position: 'absolute', top: 0, left: 0, width: side, height: half }, styles.clip, upper]}>
           <View style={{ position: 'absolute', left, top: half - height / 2, transform: [{ rotate: back }] }}>{face}</View>
+          {plating('bottom')}
         </Animated.View>
         <Animated.View style={[{ position: 'absolute', top: half, left: 0, width: side, height: half }, styles.clip, lower]}>
           <View style={{ position: 'absolute', left, top: -height / 2, transform: [{ rotate: back }] }}>{face}</View>
+          {plating('top')}
         </Animated.View>
         <Animated.View style={[{ position: 'absolute', top: half - theme.phone.size.doorSeam / 2, left: 0, width: side, height: theme.phone.size.doorSeam, backgroundColor: theme.colors.borderStrong }, styles.clip, seam]}>
           <Animated.View style={[{ width: lightWidth, height: theme.phone.size.doorSeam }, moving]}>
