@@ -97,9 +97,9 @@ class Session {
     return this.cdp;
   }
 
-  async screenshot(label) {
+  async screenshot(label, clip) {
     const file = path.join(this.evidence, `${String(++this.shot).padStart(2, '0')}-${label}.png`);
-    await this.cdp.screenshot(file);
+    await this.cdp.screenshot(file, clip);
     this.note('screenshot ' + path.relative(repoRoot, file));
     return file;
   }
