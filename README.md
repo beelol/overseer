@@ -5,7 +5,7 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **76 / 141** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
+criteria: **77 / 142** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
 AC-41, AC-53, AC-64, AC-66, AC-81, AC-82, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97, AC-98, AC-99, AC-100, AC-101, AC-102, AC-103, AC-104, AC-105, AC-106, AC-107, AC-108, AC-109, AC-110, AC-111, AC-112, AC-113, AC-114, AC-115, AC-116, AC-117, AC-118, AC-119, AC-120, AC-121, AC-122, AC-123, AC-124, AC-125, AC-126, AC-127, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-134, AC-135, AC-136, AC-137, AC-138, AC-139, AC-140, AC-141. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
@@ -160,6 +160,7 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-139** OpenCode session transport spike — not started (Gate L, added by the owner on 2026-09-26; the goal's first step) — [evidence](docs/verification/AC-139.md)
 - [ ] **AC-140** Memory safety guard — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-140.md)
 - [ ] **AC-141** Pair once — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-141.md)
+- [x] **AC-142** Opt-in audio cues owned by the daemon — [evidence](docs/verification/AC-142.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -209,6 +210,12 @@ and Verify clauses. Both lists are generated from the records by
   VS Code with agents running posts a macOS notification naming them (from the bundled
   Overseer notifier app; clicking it opens the Overseer view; **Test Notification** checks it);
   **Stop Agents and Daemon** stops everything on request.
+- **Audio Mode** — off until you turn it on. The daemon plays one short cue when a top-level
+  agent starts, completes or needs you, also with VS Code closed and never twice because
+  several windows are open; children, tool calls and progress stay silent, and needs that
+  arrive together play one cue. Tracks: twelve bundled Reactor synth cues (31,488 bytes), a
+  macOS system voice, or your own private Commander folder, played where it is. Playback is
+  macOS only for now. See the [design](docs/rfcs/audio-mode.md).
 
 ## Build and install (macOS)
 
@@ -265,6 +272,9 @@ node test/ui/scenario-main.js
    **Open PR…** to push the branch and open a GitHub pull request instead.
 6. Agents keep running when VS Code closes (you get a notification). **Stop Agents and
    Daemon** (Agents view menu) stops them all after confirmation.
+7. **Audio Mode and Reactor Cues…** (Agents view menu or the command palette) turns the cues
+   on or off, picks the track and the system voice, imports a private Commander folder and
+   previews a cue.
 
 ### In a terminal: `overseer-tui`
 
@@ -388,6 +398,7 @@ the owner action or decision each one needs.
 - [Side RFC: daily-driver orchestrator UI](docs/rfcs/orchestrator-ui.md)
 - [Side RFC: Continuity — offline mode and local models](docs/rfcs/offline-mode.md)
 - [Side RFC: terminal UI (`overseer-tui`)](docs/rfcs/tui.md)
+- [Side RFC: Audio Mode — opt-in cues from the daemon](docs/rfcs/audio-mode.md)
 - [Side RFC: phone remote on the same network](docs/rfcs/phone-remote.md) and its [prepared goal](docs/rfcs/phone-remote-goal.md)
 - [Inspected sources and reuse assessment](docs/source-assessment.md)
 

@@ -25,7 +25,7 @@ bundled.
 
 `manifest.json` holds the same facts and is what the daemon reports through `audio.get`. A
 unit test compares every entry's size and SHA-256 with the bytes built into the daemon.
-`python3 docs/verification/evidence/ac-138/check-pack.py` decodes every file, measures its
+`python3 docs/verification/evidence/audio-mode/check-pack.py` decodes every file, measures its
 length and checks the manifest, this table and the repository; with `--approved <folder>` it
 also compares each file with the owner-approved folder.
 
@@ -39,4 +39,4 @@ The selectable tracks are:
 
 The Rust daemon classifies durable lifecycle events and owns the setting, playback queue, deduplication, and burst coalescing. VS Code only changes settings and requests previews. Closing VS Code or opening a second client does not create another player. The queue holds at most four routine cues and two urgent cues, one transient player process runs at a time, and attention deduplication history is bounded. Missing private files or playback errors are logged without interrupting agents. On other platforms the selected macOS audio track reports unavailable.
 
-The design and its bounds are in the [side RFC](../../../docs/rfcs/audio-mode.md); the acceptance criterion is AC-138.
+The design and its bounds are in the [side RFC](../../../docs/rfcs/audio-mode.md); the acceptance criterion is under Gate O in the [main RFC](../../../docs/overseer-rfc.md).

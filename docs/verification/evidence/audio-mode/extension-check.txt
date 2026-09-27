@@ -1,0 +1,12 @@
+$ git rev-parse --short HEAD
+d7be0a3
+
+$ npm run check --prefix extension
+
+> overseer@0.1.0 check
+> node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/review.js && node --check src/output-panel.js && node --check branch-diff/review/panel.js
+
+exit=0
+
+$ git diff --check origin/main HEAD
+exit=0

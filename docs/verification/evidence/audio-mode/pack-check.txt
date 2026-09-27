@@ -1,0 +1,70 @@
+$ git rev-parse --short HEAD   # daemon, extension and fixtures are identical to d7be0a3
+d668d32
+$ python3 docs/verification/evidence/audio-mode/check-pack.py --approved <owner-approved folder>
+# <owner-approved folder>: the owner's own copy (cp -RL) of machines-voice-lab/output/reactor-selected-current,
+# made on 2026-09-26 because macOS denies the agent's app access to ~/Downloads.
+
+cue                           bytes  seconds  sha256
+agent_complete.mp3             2828    0.365  167d213ae6b976d9f4bb8ed233352c1bc5cc0eb090c9e6c37ae3808efd0eaa7d
+agent_failed.mp3               2540    0.333  b3df4298da0afed2bf3ee10fa27b7387db823d8ad62c6be9c8693b55d709bdfd
+agent_needs_attention.mp3      2540    0.333  d35944ae8f64d8fb0476551f9a6ba948f9ef18b0e821b119b3e2cd4ae5aebda6
+agent_progress.mp3             2828    0.365  246dfd07208475625c7f71c41f86be4938f11d3bd213c72f9eee3f9e117ea829
+agent_queued.mp3               2684    0.350  37fe68af5b1f3782a285d90428d90345645c529fa8f2f9182cb64be2a945dd11
+agent_resumed.mp3              2828    0.365  d76daca3fa30650fca55505102871be2a5119c54a30e9ff2191658286321fe5a
+agent_started.mp3              2828    0.365  7f8416a67056f790241bb7296ec8d35d47196c08d6f900aac16cfbf9bdcdf64c
+agent_stopped.mp3              2540    0.333  f3fabcc836a4b470b15e96e0dade012e62bd71d0fe00696dd6635d2bfd561a7d
+agent_unblocked.mp3            2252    0.276  7b75354a71059ff7f83eb9765686359c67f4a571924c18f392c4900e0aa1b5cd
+delivery_ready.mp3             2540    0.333  75a6e03d29ccf3888b7ff2b317c460b519805950d2a848169ea0653bf21ac9cb
+review_ready.mp3               2540    0.333  f5e5036c4fdcde894c81a913514c29ae06c908d5a88eb04c3e15274681134cee
+verification_passed.mp3        2540    0.333  648b499f4fd4072345153853c75c6299521ef095968bd75176929fe5bb3145a4
+total                         31488
+
+ok    12 MP3 files in the pack (expected 12)
+ok    31,488 MP3 bytes in total (expected 31,488)
+ok    every MP3 decodes without an error
+ok    longest cue 0.365 s (limit 0.5 s)
+ok    the manifest lists exactly the files in the pack
+ok    manifest entry agent_queued matches its file (size, SHA-256, duration)
+ok    manifest entry agent_queued names no WAV and states original synthesis
+ok    manifest entry agent_started matches its file (size, SHA-256, duration)
+ok    manifest entry agent_started names no WAV and states original synthesis
+ok    manifest entry agent_resumed matches its file (size, SHA-256, duration)
+ok    manifest entry agent_resumed names no WAV and states original synthesis
+ok    manifest entry agent_progress matches its file (size, SHA-256, duration)
+ok    manifest entry agent_progress names no WAV and states original synthesis
+ok    manifest entry agent_complete matches its file (size, SHA-256, duration)
+ok    manifest entry agent_complete names no WAV and states original synthesis
+ok    manifest entry agent_stopped matches its file (size, SHA-256, duration)
+ok    manifest entry agent_stopped names no WAV and states original synthesis
+ok    manifest entry agent_needs_attention matches its file (size, SHA-256, duration)
+ok    manifest entry agent_needs_attention names no WAV and states original synthesis
+ok    manifest entry agent_failed matches its file (size, SHA-256, duration)
+ok    manifest entry agent_failed names no WAV and states original synthesis
+ok    manifest entry agent_unblocked matches its file (size, SHA-256, duration)
+ok    manifest entry agent_unblocked names no WAV and states original synthesis
+ok    manifest entry review_ready matches its file (size, SHA-256, duration)
+ok    manifest entry review_ready names no WAV and states original synthesis
+ok    manifest entry delivery_ready matches its file (size, SHA-256, duration)
+ok    manifest entry delivery_ready names no WAV and states original synthesis
+ok    manifest entry verification_passed matches its file (size, SHA-256, duration)
+ok    manifest entry verification_passed names no WAV and states original synthesis
+ok    the README table states the manifest's facts
+ok    cues that play by themselves: agent_complete, agent_needs_attention, agent_started
+ok    the repository tracks 12 audio files, all in the pack
+ok    no tracked path belongs to a Commander pack
+ok    the approved folder holds the same 12 file names
+ok    agent_complete.mp3 is byte-identical to the approved file (167d213ae6b976d9…)
+ok    agent_failed.mp3 is byte-identical to the approved file (b3df4298da0afed2…)
+ok    agent_needs_attention.mp3 is byte-identical to the approved file (d35944ae8f64d8fb…)
+ok    agent_progress.mp3 is byte-identical to the approved file (246dfd0720847562…)
+ok    agent_queued.mp3 is byte-identical to the approved file (37fe68af5b1f3782…)
+ok    agent_resumed.mp3 is byte-identical to the approved file (d76daca3fa30650f…)
+ok    agent_started.mp3 is byte-identical to the approved file (7f8416a67056f790…)
+ok    agent_stopped.mp3 is byte-identical to the approved file (f3fabcc836a4b470…)
+ok    agent_unblocked.mp3 is byte-identical to the approved file (7b75354a71059ff7…)
+ok    delivery_ready.mp3 is byte-identical to the approved file (75a6e03d29ccf388…)
+ok    review_ready.mp3 is byte-identical to the approved file (f5e5036c4fdcde89…)
+ok    verification_passed.mp3 is byte-identical to the approved file (648b499f4fd40723…)
+
+PASS
+exit=0

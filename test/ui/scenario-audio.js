@@ -1,4 +1,4 @@
-// Packaged-UI scenario for AC-138 (Audio Mode), fixture harnesses only. No sound is played: the
+// Packaged-UI scenario for Audio Mode (Gate O), fixture harnesses only. No sound is played: the
 // daemon writes each cue it would play to a log (OVERSEER_TEST_AUDIO_LOG), so the counts are exact.
 // Audio Mode is off on a new install and its command sits in the Agents view's overflow menu (the
 // title bar keeps its three icons). VS Code turns it on, picks a track and asks for a preview; the
