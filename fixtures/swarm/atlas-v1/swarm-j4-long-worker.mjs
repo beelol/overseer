@@ -17,8 +17,9 @@ const token = required('OVERSEER_SWARM_TOKEN');
 const revision = Number(required('OVERSEER_SWARM_REVISION'));
 const binary = required('OVERSEER_BIN');
 if (jobId !== 'j4' || !Number.isInteger(revision)) throw new Error('unexpected assignment');
-const [databaseUrlFile, marker] = process.argv.slice(2);
+const [databaseUrlFile, marker, mode] = process.argv.slice(2);
 if (!databaseUrlFile || !marker) throw new Error('missing disposable fixture inputs');
+if (mode && mode !== 'heartbeat') throw new Error('unknown fixture worker mode');
 
 const call = (method, params) => {
   const reply = JSON.parse(execFileSync(binary,
@@ -46,7 +47,17 @@ process.on('SIGINT', interrupt);
 
 let cursor = 0;
 const pending = [];
+let heartbeats = 0;
+let lastHeartbeat = 0;
 while (exitCode === undefined) {
+  if (mode === 'heartbeat' && Date.now() - lastHeartbeat >= 250) {
+    heartbeats += 1;
+    call('swarm.report', { run_id: runId, job_id: jobId,
+      attempt_id: attemptId, token, revision,
+      message_id: `atlas-j4-heartbeat-${attemptId}-${heartbeats}`,
+      type: 'progress', payload: { state: 'working' } });
+    lastHeartbeat = Date.now();
+  }
   const page = call('swarm.messages', { run_id: runId, recipient: attemptId,
     cursor, limit: 20 });
   for (const message of page.messages) {

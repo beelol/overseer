@@ -666,3 +666,73 @@ fn atlas_s5_redirect_during_long_probe_interrupts_and_holds_review() {
     assert!(messages["messages"].as_array().unwrap().iter().any(|message|
         message["type"]=="checkpoint" && message["payload"]["reason"]=="redirect_ack_timeout"));
 }
+
+// S5: a worker that repeatedly says "working" contributes no audit evidence.
+// The original job deadline still interrupts the held backend probe.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_progress_heartbeats_do_not_extend_job_deadline() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d=Daemon::start(&[]);
+    let temp=tmp();
+    let checkout=repo(&temp.path().join("atlas-heartbeat"));
+    let script=repo_root().join("fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs");
+    let database_url_file=temp.path().join("disposable-database-url");
+    let probe_marker=temp.path().join("j4-probe-active");
+    std::fs::write(&database_url_file,std::env::var("ATLAS_DATABASE_URL").unwrap()).unwrap();
+    let created=d.call("swarm.create",json!({"category":"Atlas heartbeat fault",
+        "objective":"Audit attachment isolation","allowed_targets":["fixture"],
+        "policy":{"deadline_ms":15000}}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j4","title":"Attachments","acceptance":"foreign download evidence",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j4","mode":"write"}]}
+    ]}));
+    let at=now();
+    let attempt=d.call("swarm.admit",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"j4","target_id":"fixture","request_id":"atlas-s5-heartbeat",
+        "job_deadline_ms":4000,"now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+            "targets":[{"id":"fixture","account_id":"account","pool_ids":["pool"],
+                "capabilities":["audit"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+                "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+120000}]}]},
+        "required_capabilities":["audit"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(attempt["status"],"admitted","{attempt}");
+    let original_deadline=d.call("swarm.jobs",json!({"id":run}))["jobs"][0]
+        ["deadline_at_ms"].as_i64().unwrap();
+    let launched=d.call("swarm.worker.launch",json!({"run_id":run,"job_id":"j4",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "repo":checkout,"program":"/usr/bin/env",
+        "args":["node",script,database_url_file,probe_marker,"heartbeat"],
+        "prompt":"Audit Atlas attachment authorization","title":"Atlas J4 heartbeat"}));
+    let worker=launched["overseer_run_id"].as_str().unwrap();
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let run_dir:String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[worker],|r|r.get(0)).unwrap();
+    let marker=std::path::Path::new(&run_dir).join("interrupt.requested");
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(8);
+    while !marker.exists() {
+        assert!(std::time::Instant::now()<until,"heartbeat worker did not hit its job deadline");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert!(probe_marker.exists(),"Atlas backend probe did not run");
+    let probe:Value=serde_json::from_slice(&std::fs::read(&probe_marker).unwrap()).unwrap();
+    assert_eq!(probe["attachmentStatus"],200);
+    let progress:i64=db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1
+        AND job_id='j4' AND kind='progress'",[run],|r|r.get(0)).unwrap();
+    assert!(progress>=2,"worker did not send repeated progress: {progress}");
+    let job=&d.call("swarm.jobs",json!({"id":run}))["jobs"][0];
+    assert_eq!(job["deadline_at_ms"],original_deadline);
+    assert_eq!(job["stop_reason"],"job_deadline");
+    assert_ne!(job["status"],"accepted");
+    let results:i64=db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1
+        AND job_id='j4' AND kind='result'",[run],|r|r.get(0)).unwrap();
+    let accepts:i64=db.query_row("SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1
+        AND job_id='j4' AND decision='accept'",[run],|r|r.get(0)).unwrap();
+    assert_eq!((results,accepts),(0,0));
+    assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"s5-heartbeat-complete","summary":"Attachment audit passed",
+        "verification":"Repeated progress","checks":[]})).is_err());
+}
