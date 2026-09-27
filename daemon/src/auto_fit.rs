@@ -3,9 +3,13 @@
 use crate::{
     auto_consumption::EstimateKey,
     auto_quota::QuotaSnapshot,
-    auto_select::{self, Allowance, Fit, Route, TaskSignature, WorkUnit},
+    auto_select::{
+        self, Allowance, AllowanceEstimate, DrawSource, Fit, Route, TaskSignature, WindowDraw,
+        WorkUnit,
+    },
     store::Store,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
@@ -15,8 +19,114 @@ enum SnapshotEvidence {
     Unavailable,
 }
 
-/// Apply only same-account, same-plan, same-task, resolved-version estimates.
-/// Learning read failures downgrade fit to unknown rather than stopping work.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub(crate) enum FitEvidenceInput {
+    Unavailable {
+        reason: String,
+    },
+    Observed {
+        snapshots: Vec<QuotaSnapshot>,
+        estimate: Option<AllowanceEstimate>,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct FitEvidenceResult {
+    pub fit: Fit,
+    pub reason: String,
+    pub source: Option<DrawSource>,
+    pub observed_ms: Option<i64>,
+    pub expected_windows: Vec<WindowDraw>,
+}
+
+pub(crate) fn evaluate_fit(
+    work: &WorkUnit,
+    route: &Route,
+    input: &FitEvidenceInput,
+    now_ms: i64,
+) -> FitEvidenceResult {
+    let mut result = FitEvidenceResult {
+        fit: Fit::Unknown,
+        reason: "no_comparable_estimate".into(),
+        source: None,
+        observed_ms: None,
+        expected_windows: Vec::new(),
+    };
+    let (snapshots, estimate) = match input {
+        FitEvidenceInput::Unavailable { reason } => {
+            result.reason = reason.clone();
+            return result;
+        }
+        FitEvidenceInput::Observed {
+            snapshots,
+            estimate,
+        } => (snapshots, estimate),
+    };
+    let Some(estimate) = estimate else {
+        return result;
+    };
+    result.source = Some(estimate.source);
+    result.observed_ms = Some(estimate.observed_ms);
+    result.expected_windows = estimate.windows.clone();
+    if snapshots.is_empty() {
+        result.reason = "quota_snapshot_unavailable".into();
+        return result;
+    }
+    let mut all_fit = true;
+    for snapshot in snapshots {
+        match auto_select::assess_fit(snapshot, work, route, Some(estimate), &[], now_ms) {
+            Fit::Unaffordable => {
+                result.fit = Fit::Unaffordable;
+                break;
+            }
+            Fit::Unknown => all_fit = false,
+            Fit::Fits => {}
+        }
+    }
+    if result.fit != Fit::Unaffordable && all_fit {
+        result.fit = Fit::Fits;
+    }
+    result.reason = match result.fit {
+        Fit::Fits => "bounded_estimate_fits",
+        Fit::Unaffordable => "bounded_estimate_exceeds_allowance",
+        Fit::Unknown => "estimate_or_quota_not_comparable",
+    }
+    .into();
+    result
+}
+
+pub(crate) fn bound_fit_inputs(inputs: &mut [FitEvidenceInput]) {
+    const MAX_TRACE_BYTES: usize = 128 * 1024;
+    const MAX_SNAPSHOTS: usize = 16;
+    const MAX_WINDOWS: usize = 16;
+    let too_large = inputs.len() > 128
+        || inputs.iter().any(|input| match input {
+            FitEvidenceInput::Unavailable { reason } => reason.len() > 80,
+            FitEvidenceInput::Observed {
+                snapshots,
+                estimate,
+            } => {
+                snapshots.len() > MAX_SNAPSHOTS
+                    || snapshots
+                        .iter()
+                        .any(|snapshot| snapshot.windows.len() > MAX_WINDOWS)
+                    || estimate
+                        .as_ref()
+                        .is_some_and(|estimate| estimate.windows.len() > MAX_WINDOWS)
+            }
+        })
+        || serde_json::to_vec(inputs).map_or(true, |bytes| bytes.len() > MAX_TRACE_BYTES);
+    if too_large {
+        for input in inputs {
+            *input = FitEvidenceInput::Unavailable {
+                reason: "fit_trace_budget_exceeded".into(),
+            };
+        }
+    }
+}
+
+/// Apply only same-account, same-plan, same-task, resolved-version evidence.
 /// Unknown-draw pool claims remain the separate durable admission boundary.
 pub fn apply_scoped_fit(
     store: &Store,
@@ -25,153 +135,127 @@ pub fn apply_scoped_fit(
     account_generations: &BTreeMap<String, i64>,
     now_ms: i64,
 ) -> Vec<Value> {
+    apply_scoped_fit_with_inputs(store, work, routes, account_generations, now_ms).1
+}
+
+fn unavailable(reason: &str) -> FitEvidenceInput {
+    FitEvidenceInput::Unavailable {
+        reason: reason.into(),
+    }
+}
+
+/// Capture the bounded normalized evidence before selecting. The returned
+/// inputs are the only source from which this decision's fit is calculated.
+pub(crate) fn apply_scoped_fit_with_inputs(
+    store: &Store,
+    work: &WorkUnit,
+    routes: &mut [Route],
+    account_generations: &BTreeMap<String, i64>,
+    now_ms: i64,
+) -> (Vec<FitEvidenceInput>, Vec<Value>) {
     let mut quota_by_profile = BTreeMap::<String, SnapshotEvidence>::new();
     let started = Instant::now();
     let mut learning_unavailable = false;
-    let mut evidence = Vec::with_capacity(routes.len());
-    for route in routes {
-        route.fit = Fit::Unknown;
-        let mut reason = "allowance_not_observed_nonexhausted";
-        let mut source = None;
-        let mut observed_ms = None;
-        let mut estimated_windows = Vec::new();
-        if route.quota == Allowance::ObservedNonExhausted {
-            if route.resolved_model_version.as_deref().is_none_or(str::is_empty) {
-                evidence.push(json!({"route_id":route.id,"fit":route.fit,
-                    "reason":"model_version_unverified","source":null,
-                    "observed_ms":null,"expected_windows":[]}));
-                continue;
-            }
-            if work.task_class.as_deref().is_none_or(str::is_empty)
-                || work.execution_budget_ms.is_none_or(|budget| budget == 0) {
-                evidence.push(json!({"route_id":route.id,"fit":route.fit,
-                    "reason":"predictive_task_class_unavailable","source":null,
-                    "observed_ms":null,"expected_windows":[]}));
-                continue;
-            }
-            let snapshot_evidence = quota_by_profile
-                .entry(route.profile_id.clone())
-                .or_insert_with(|| {
-                    match store.auto_account_quota_observations(&route.profile_id) {
-                        Ok(observations) if !observations.is_empty() => {
-                            SnapshotEvidence::Available(
-                                observations
-                                    .into_iter()
-                                    .map(|reading| reading.snapshot)
-                                    .collect(),
-                            )
-                        }
-                        Ok(_) => SnapshotEvidence::Unavailable,
-                        Err(_) => SnapshotEvidence::Unavailable,
-                    }
-                });
-            let snapshots = match snapshot_evidence {
-                SnapshotEvidence::Available(snapshots) => Some(&*snapshots),
-                _ => None,
-            };
-            let generation = account_generations.get(&route.profile_id);
-            let version = route
-                .resolved_model_version
-                .as_deref()
-                .filter(|value| !value.is_empty());
-            let plan = snapshots.and_then(|snapshots| {
-                let first = snapshots.first()?.reported_plan_type()?;
-                snapshots
-                    .iter()
-                    .all(|snapshot| snapshot.reported_plan_type() == Some(first))
-                    .then_some(first)
-            });
-            let generation_changed = version.is_some()
-                && generation.is_some_and(|expected| {
-                    store
-                        .auto_account_generation(&route.profile_id)
-                        .ok()
-                        .flatten()
-                        != Some(*expected)
-                });
-            reason = if version.is_none() {
-                "model_version_unverified"
-            } else if generation.is_none() {
-                "account_generation_unavailable"
-            } else if generation_changed {
-                "account_generation_changed"
-            } else if snapshots.is_none() {
-                "quota_snapshot_unavailable"
-            } else if plan.is_none() {
-                "account_plan_unreconciled"
-            } else {
-                "no_comparable_estimate"
-            };
-            if let (Some(snapshots), Some(generation), Some(version), Some(plan)) =
-                (snapshots, generation, version, plan)
-            {
-                if !generation_changed {
-                    let key = EstimateKey {
-                        pool_id: route.pool_id.clone(),
-                        model: route.model.clone(),
-                        effort: route.effort.clone(),
-                        model_version: version.into(),
-                        task_signature: TaskSignature::from(&*work),
-                        plan_type: plan.into(),
-                    };
-                    if learning_unavailable {
-                        reason = "learning_unavailable";
-                    } else if started.elapsed() >= Duration::from_millis(500) {
-                        reason = "fit_read_budget_elapsed";
-                    } else {
-                        match store.auto_allowance_estimate(
-                            &route.profile_id,
-                            *generation,
-                            &key,
-                            now_ms,
-                        ) {
-                            Ok(Some(estimate)) => {
-                                source = Some(estimate.source);
-                                observed_ms = Some(estimate.observed_ms);
-                                estimated_windows = estimate.windows.clone();
-                                let mut all_fit = true;
-                                for snapshot in snapshots {
-                                    match auto_select::assess_fit(
-                                        snapshot,
-                                        work,
-                                        route,
-                                        Some(&estimate),
-                                        &[],
-                                        now_ms,
-                                    ) {
-                                        Fit::Unaffordable => {
-                                            route.fit = Fit::Unaffordable;
-                                            break;
-                                        }
-                                        Fit::Unknown => all_fit = false,
-                                        Fit::Fits => {}
-                                    }
-                                }
-                                if route.fit != Fit::Unaffordable && all_fit {
-                                    route.fit = Fit::Fits;
-                                }
-                                reason = match route.fit {
-                                    Fit::Fits => "bounded_estimate_fits",
-                                    Fit::Unaffordable => "bounded_estimate_exceeds_allowance",
-                                    Fit::Unknown => "estimate_or_quota_not_comparable",
-                                };
-                            }
-                            Ok(None) => {
-                                reason = "no_comparable_estimate";
-                            }
-                            Err(_) => {
-                                learning_unavailable = true;
-                                reason = "learning_unavailable";
-                            }
-                        }
-                    }
-                }
+    let mut inputs = Vec::with_capacity(routes.len());
+    for route in routes.iter() {
+        if route.quota != Allowance::ObservedNonExhausted {
+            inputs.push(unavailable("allowance_not_observed_nonexhausted"));
+            continue;
+        }
+        let Some(version) = route
+            .resolved_model_version
+            .as_deref()
+            .filter(|v| !v.is_empty())
+        else {
+            inputs.push(unavailable("model_version_unverified"));
+            continue;
+        };
+        if work.task_class.as_deref().is_none_or(str::is_empty)
+            || work.execution_budget_ms.is_none_or(|budget| budget == 0)
+        {
+            inputs.push(unavailable("predictive_task_class_unavailable"));
+            continue;
+        }
+        let Some(generation) = account_generations.get(&route.profile_id) else {
+            inputs.push(unavailable("account_generation_unavailable"));
+            continue;
+        };
+        if store
+            .auto_account_generation(&route.profile_id)
+            .ok()
+            .flatten()
+            != Some(*generation)
+        {
+            inputs.push(unavailable("account_generation_changed"));
+            continue;
+        }
+        let snapshot_evidence = quota_by_profile
+            .entry(route.profile_id.clone())
+            .or_insert_with(
+                || match store.auto_account_quota_observations(&route.profile_id) {
+                    Ok(observations) if !observations.is_empty() => SnapshotEvidence::Available(
+                        observations
+                            .into_iter()
+                            .map(|reading| reading.snapshot)
+                            .collect(),
+                    ),
+                    _ => SnapshotEvidence::Unavailable,
+                },
+            );
+        let SnapshotEvidence::Available(snapshots) = snapshot_evidence else {
+            inputs.push(unavailable("quota_snapshot_unavailable"));
+            continue;
+        };
+        let plan = snapshots
+            .first()
+            .and_then(QuotaSnapshot::reported_plan_type);
+        let Some(plan) = plan.filter(|first| {
+            snapshots
+                .iter()
+                .all(|snapshot| snapshot.reported_plan_type() == Some(*first))
+        }) else {
+            inputs.push(unavailable("account_plan_unreconciled"));
+            continue;
+        };
+        if learning_unavailable {
+            inputs.push(unavailable("learning_unavailable"));
+            continue;
+        }
+        if started.elapsed() >= Duration::from_millis(500) {
+            inputs.push(unavailable("fit_read_budget_elapsed"));
+            continue;
+        }
+        let key = EstimateKey {
+            pool_id: route.pool_id.clone(),
+            model: route.model.clone(),
+            effort: route.effort.clone(),
+            model_version: version.into(),
+            task_signature: TaskSignature::from(work),
+            plan_type: plan.into(),
+        };
+        match store.auto_allowance_estimate(&route.profile_id, *generation, &key, now_ms) {
+            Ok(estimate) => inputs.push(FitEvidenceInput::Observed {
+                snapshots: snapshots.clone(),
+                estimate,
+            }),
+            Err(_) => {
+                learning_unavailable = true;
+                inputs.push(unavailable("learning_unavailable"));
             }
         }
-        evidence.push(json!({"route_id":route.id,"fit":route.fit,"reason":reason,
-            "source":source,"observed_ms":observed_ms,"expected_windows":estimated_windows}));
     }
-    evidence
+    bound_fit_inputs(&mut inputs);
+    let mut evidence = Vec::with_capacity(routes.len());
+    for (route, input) in routes.iter_mut().zip(&inputs) {
+        let result = evaluate_fit(work, route, input, now_ms);
+        route.fit = result.fit;
+        evidence.push(
+            json!({"route_id":route.id,"fit":result.fit,"reason":result.reason,
+            "source":result.source,"observed_ms":result.observed_ms,
+            "expected_windows":result.expected_windows}),
+        );
+    }
+    (inputs, evidence)
 }
 
 #[cfg(test)]
@@ -405,5 +489,86 @@ mod tests {
         );
         assert!(routes.iter().all(|route| route.fit == Fit::Unknown));
         assert_eq!(evidence.len(), 100);
+    }
+
+    #[test]
+    fn serialized_meter_inputs_recompute_fit_and_detect_a_changed_window() {
+        let now = 1_800_000_000_000_i64;
+        let (store, pool) = seeded(now);
+        store
+            .put_auto_allowance_estimate("profile", 1, &estimate(&pool, "efficient", 3.0, now), now)
+            .unwrap();
+        store
+            .record_auto_account_identity("other-profile", &"a".repeat(64))
+            .unwrap();
+        let tighter = parse_codex_rate_limits(
+            &json!({"rateLimits":{
+                "limitId":"codex","planType":"pro",
+                "primary":{"usedPercent":99,"resetsAt":1_800_003_600}
+            }}),
+            "other-profile",
+            now,
+        )
+        .unwrap();
+        let event = store
+            .insert_event(now, None, None, "quota", "fixture", "reported", &json!({}))
+            .unwrap();
+        store
+            .insert_auto_quota(event.seq, "other-profile", "fixture", &tighter)
+            .unwrap();
+        let mut routes = vec![route("efficient", &pool)];
+        let generations = BTreeMap::from([("profile".into(), 1)]);
+        let (inputs, _) =
+            apply_scoped_fit_with_inputs(&store, &work(), &mut routes, &generations, now);
+        assert_eq!(routes[0].fit, Fit::Unaffordable);
+        let saved = serde_json::to_value(&inputs).unwrap();
+        let mut restored: Vec<FitEvidenceInput> = serde_json::from_value(saved).unwrap();
+        assert_eq!(
+            evaluate_fit(&work(), &routes[0], &restored[0], now).fit,
+            Fit::Unaffordable
+        );
+        if let FitEvidenceInput::Observed { snapshots, .. } = &mut restored[0] {
+            let tight = snapshots
+                .iter_mut()
+                .find(|snapshot| {
+                    snapshot
+                        .windows
+                        .iter()
+                        .any(|window| window.used_percent == 99.0)
+                })
+                .unwrap();
+            tight.windows[0].used_percent = 90.0;
+        } else {
+            panic!("expected normalized meter inputs");
+        }
+        assert_eq!(
+            evaluate_fit(&work(), &routes[0], &restored[0], now).fit,
+            Fit::Fits
+        );
+    }
+
+    #[test]
+    fn oversized_evidence_never_retains_a_numeric_fit_without_its_inputs() {
+        let now = 1_800_000_000_000_i64;
+        let (store, pool) = seeded(now);
+        let snapshot = store
+            .latest_auto_quota("profile")
+            .unwrap()
+            .unwrap()
+            .snapshot;
+        let mut inputs = vec![FitEvidenceInput::Observed {
+            snapshots: vec![snapshot; 17],
+            estimate: Some(estimate(&pool, "efficient", 3.0, now)),
+        }];
+        bound_fit_inputs(&mut inputs);
+        let route = route("efficient", &pool);
+        assert_eq!(
+            evaluate_fit(&work(), &route, &inputs[0], now).fit,
+            Fit::Unknown
+        );
+        assert!(
+            matches!(&inputs[0], FitEvidenceInput::Unavailable { reason }
+            if reason == "fit_trace_budget_exceeded")
+        );
     }
 }

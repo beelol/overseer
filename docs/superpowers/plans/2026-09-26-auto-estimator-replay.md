@@ -34,10 +34,10 @@
 
 **Interfaces:** `FitEvidenceInput` is a serde-serializable, content-free enum for unavailable evidence or normalized quota snapshots plus one scoped estimate. `evaluate_fit(work: &WorkUnit, route: &Route, input: &FitEvidenceInput, now_ms: i64) -> FitEvidenceResult` returns fit, reason, and public provenance. Collection reads the store and returns one input per route. A bounded trace budget downgrades all numeric fits to unknown before selection when complete inputs cannot be retained.
 
-- [ ] Add a red test: a controlled predictive envelope and two same-account meters select the suitable route; serialized inputs reproduce both fits, and changing one saved meter changes the recomputed result.
-- [ ] Add a red test: missing prediction, learning lock, and oversized evidence remain unknown with no partial numeric trace.
-- [ ] Extract the pure evaluator and bounded collector without changing the source-of-truth scope gates or unknown-draw admission.
-- [ ] Run focused tests and commit the self-contained evidence contract.
+- [x] Add a red test: a controlled predictive envelope and two same-account meters select the suitable route; serialized inputs reproduce both fits, and changing one saved meter changes the recomputed result.
+- [x] Add a red test: missing prediction, learning lock, and oversized evidence remain unknown with no partial numeric trace.
+- [x] Extract the pure evaluator and bounded collector without changing the source-of-truth scope gates or unknown-draw admission.
+- [x] Run focused tests and commit the self-contained evidence contract.
 
 ### Task 2: Versioned full replay
 
