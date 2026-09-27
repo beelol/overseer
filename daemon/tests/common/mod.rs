@@ -33,6 +33,10 @@ impl Daemon {
         }
         let enable_auto = !env.iter().any(|(key, value)|
             key == "OVERSEER_TEST_AUTO_DISABLED" && value == "1");
+        // Nor the network: Continuity's probes stay off unless a test brings its own network fixture.
+        if !env.iter().any(|(k, _)| k == "OVERSEER_TEST_NET" || k == "OVERSEER_CONTINUITY_PROBES") {
+            env.push(("OVERSEER_CONTINUITY_PROBES".to_string(), "off".to_string()));
+        }
         let mut d = Daemon { home, child: None, env };
         d.spawn();
         if enable_auto {

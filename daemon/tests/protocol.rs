@@ -889,6 +889,34 @@ fn ac14_fixture_claude_background_task_finishing_before_the_interim_result_still
 }
 
 #[test]
+fn ac14_fixture_claude_subagents_own_background_child_does_not_hold_the_run_open() {
+    // Regression for a live Claude Code 2.1.246 run (2026-09-27, claude-live scenario): a
+    // subagent launched its child in the background (spawn depth 2). Claude reports that child
+    // to the subagent, not with another top-level turn, so the run must end at the result.
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("background-nested");
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let dones = d.events(&run).into_iter().filter(|e| e["kind"] == "turn_done").count();
+    assert_eq!(dones, 1);
+}
+
+#[test]
+fn ac14_fixture_claude_background_notice_read_within_the_turn_does_not_hold_the_run_open() {
+    // Regression for a live Claude Code 2.1.246 run (2026-09-27, claude-live scenario): a
+    // background task was reported mid-turn and the main agent read it in its next model call,
+    // so Claude started no further turn.
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("background-read-in-turn");
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "bg", "title": "bg"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+}
+
+#[test]
 fn ac19_fixture_codex_app_child_threads_nest_and_do_not_end_the_parent() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

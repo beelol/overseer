@@ -46,7 +46,7 @@ under `overseer.continuity.*`. The chat still uses the owner's verb for the mome
 | Permission modes | Carried over on every handoff, never loosened. The OpenCode adapter gains Plan only, Accept edits, Auto and Ask first; until Ask first is verified, such a run waits and offers the move instead. |
 | Failover target | Among several accounts, the one with the most quota left, then the most recently used. The model is the one last picked for that harness, otherwise its default. |
 | Back online | Local runs offer Switch back; new agents go online automatically. |
-| Stall | Overseer interrupts a turn after 90 seconds of silence while offline. |
+| Stall | Overseer interrupts a turn after 90 seconds of silence while offline, and a turn that only keeps reconnecting after 30 seconds with its provider unreachable. |
 | After 36 hours | The run fails with the reason, keeps its message and offers Retry now. |
 | No verified model fits | Wait and say why; a setting can allow unverified models. |
 | Quota and rate limits | Not part of this gate; they come with quota-aware routing. |
@@ -196,12 +196,12 @@ implementation behind it:
 
 | Platform | Total | Available now | Pressure |
 | --- | --- | --- | --- |
-| macOS (Rust asks the kernel directly) | `sysctl hw.memsize` | `host_statistics64(HOST_VM_INFO64)`: free + inactive + purgeable pages × `vm.pagesize`, the numbers `vm_stat` prints | `sysctl kern.memorystatus_level` (the system's own percentage; 77 on this machine while writing) |
+| macOS (Rust asks the kernel directly) | `sysctl hw.memsize` | `host_statistics64(HOST_VM_INFO64)`: free + inactive + purgeable pages × the page size, the numbers `vm_stat` prints | `sysctl kern.memorystatus_vm_pressure_level` (normal, warning, critical), with `kern.memorystatus_level`, the system's own free percentage, reported beside it |
 | Linux | `/proc/meminfo` `MemTotal` | `/proc/meminfo` `MemAvailable` | `/proc/pressure/memory` (PSI) |
 | Windows | later | later | later |
 
-A cross-platform crate (`sysinfo`) is acceptable where its numbers match the kernel's within 5%
-(checked in AC-85); where they do not, the direct calls stay. Available memory is sampled at every
+As built, both platforms read the numbers directly (`daemon/src/sys.rs`), with no extra crate; the
+macOS numbers are tested against `vm_stat` and `sysctl` and sit within 5% of them. Available memory is sampled at every
 pick and smoothed over three samples, so a momentary dip does not flip a decision. Apple silicon has
 unified memory, so RAM is the GPU memory; discrete GPUs on Linux come with AC-41.
 
@@ -227,7 +227,8 @@ owner's "28 GB" in the request is this 128 GiB machine; nothing in the design de
 ```
 ceiling_share   = total × continuity.ramCeilingPercent / 100     default 40%, hard maximum 50%
 ceiling_now     = available_now − headroom                        headroom = max(4 GiB, 10% of total)
-budget          = min(ceiling_share, ceiling_now)
+ceiling_level   = total × (system_free_level − 45) / 100          where the system gives a level (macOS)
+budget          = min(ceiling_share, ceiling_now, ceiling_level)
 ```
 
 - **Why 40%.** An idle machine already uses 10–20% of its memory; VS Code, the harness, a browser and
@@ -236,6 +237,16 @@ budget          = min(ceiling_share, ceiling_now)
 - **Why two terms.** The share protects the machine from the model; the free-memory term protects the
   model from everything else running right now. Either alone is wrong: 40% of 128 GiB is 51 GiB, but
   with Xcode and Docker holding 90 GiB the honest answer is a much smaller model.
+- **Why a third term (added 2026-09-26, from a live run).** "Available" counts pages the system
+  could give back, and on a busy machine that overstates what a model can take. With another
+  session's 24 GiB model loaded, an emulator and two builds running, this machine read 30.5 GiB
+  available and the two terms allowed 17.7 GiB; a 14.2 GiB load then took the system to its
+  warning level (its own free level fell from 47% to 26%), and the check stopped and unloaded.
+  macOS gives its own account of free memory (`kern.memorystatus_level`), and it reported pressure
+  from about 40% down. The budget now also keeps that level at 45% or more: the same load is
+  refused with the numbers (2.6 GiB would have been left). On an idle 128 GiB machine (75% free by
+  the system's count) this term is 38.4 GiB and it decides, under the 40% share. Where the system
+  gives no level (Linux today), the two terms decide alone.
 - **Reassessment.** The budget is computed for every new run and every new turn (OpenCode starts one
   process per turn, and the model choice is per turn), never in the middle of a turn. A working turn
   is never stopped for a tighter budget (only critical memory pressure pauses local runs, see
@@ -258,25 +269,36 @@ fits                 = size(model, ctx) ≤ budget
 - A **measured** size from `/api/ps` at the same tag and context replaces the estimate as soon as it
   exists, and is recorded (`local_models_measured`) so later picks use real numbers. The estimate for
   `qwen3-coder:30b` at 64k is 24.3 GiB against 23.7 GiB measured.
-- **Context is the lever.** If the preferred model does not fit at the target context
-  (`continuity.contextTarget`, default 65,536), Overseer tries 32k, then 16k (`continuity.contextFloor`).
+- **Context is the lever.** A model is tried at the target context (`continuity.contextTarget`,
+  default 65,536, or the model's own maximum when that is smaller), then at half of it, down to the
+  floor (`continuity.contextFloor`, default 16,384): 64k, 32k, 16k.
   Below 16k a coding agent cannot hold the tool schema, the handoff and a few files, so the model is
   skipped instead.
-- **Ranking.** Catalogue tier first, then the largest context that fits. A model that only fits below
-  32k is considered after every model that fits at 32k or more. Within a tier, prefer what is
-  installed over what needs a download.
+- **Ranking.** A model that only fits below 32k is considered after every model that fits at 32k or
+  more. Then the catalogue tier (the owner's `preferredModels` first, in the owner's order); within
+  a tier what is installed before what needs a download, then the longest context that fits, then
+  the larger model.
 
 ### Worked examples (40% ceiling, memory otherwise free)
 
 Machine profiles, not one machine. Estimates from the formula; disk sizes from Ollama (approximate
-for models not measured here).
+for models not measured here). The order follows the ranking above: a model that fits at 32k comes
+before a larger one that only fits at 16k, because OpenCode's own instructions and tool list
+already take about 10,600 tokens (measured in the spike), which leaves little of a 16k context.
+The rows assume every model has passed its check. **They have not:** the verification of
+2026-09-26 passed `qwen3-coder:30b` and failed every `qwen2.5-coder` size (see
+[Model catalogue](#model-catalogue)), so on its own Overseer picks `qwen3-coder:30b` or nothing.
+A machine whose budget is under about 20 GiB (the 16 and 32 GiB rows) has no eligible model
+today: a run there waits and says why, unless the owner turns on `allowUnverifiedModels`. (Corrected on 2026-09-26 while building the pick: the first version
+of this table listed the 16k fits first and gave 128k for the last row, against the rule and the
+64k target.)
 
 | Total memory | Budget | Picks, in order | Not chosen |
 | --- | --- | --- | --- |
-| 16 GiB | 6.4 GiB | `qwen2.5-coder:7b` at 16k (≈6.3 GiB); `qwen2.5-coder:3b` at 32k (≈3.9 GiB) | `7b` at 32k (≈7.2 GiB) |
-| 32 GiB | 12.8 GiB | `qwen2.5-coder:14b` at 16k (≈12.4 GiB); `qwen2.5-coder:7b` at 32k (≈7.2 GiB) | `14b` at 32k (≈15.4 GiB) |
+| 16 GiB | 6.4 GiB | `qwen2.5-coder:3b` at 32k (≈3.9 GiB); `qwen2.5-coder:1.5b` at 32k; then `qwen2.5-coder:7b` at 16k (≈6.3 GiB) | `7b` at 32k (≈7.2 GiB) |
+| 32 GiB | 12.8 GiB | `qwen2.5-coder:7b` at 32k (≈7.2 GiB); `qwen2.5-coder:3b` at 32k; then `qwen2.5-coder:14b` at 16k (≈12.4 GiB) | `14b` at 32k (≈15.4 GiB) |
 | 64 GiB | 25.6 GiB | `qwen3-coder:30b` at 64k (≈24.3 GiB, measured 23.7) | `qwen2.5-coder:32b` at 32k (≈27.6 GiB) |
-| 128 GiB | 51.2 GiB | `qwen3-coder:30b` at 128k (≈30.3 GiB); `qwen2.5-coder:32b` at 32k | anything over 51 GiB, for example `qwen3.5:122b` (75.8 GiB on disk) |
+| 128 GiB | 51.2 GiB | `qwen3-coder:30b` at 64k (≈24.3 GiB; at 128k, ≈30.3 GiB, when `contextTarget` is raised to 131072); `qwen2.5-coder:32b` at 32k | anything over 51 GiB, for example `qwen3.5:122b` (75.8 GiB on disk) |
 
 With 40 GiB of other work running on a 128 GiB machine, `ceiling_now` is about 75 GiB, so the share
 still decides; with 100 GiB in use it is about 15 GiB and the pick drops to a 14B-class model at 16k,
@@ -286,7 +308,8 @@ exactly as on a 32 GiB machine.
 
 Ollama's default context is small and per model. Overseer sets the context it picked by creating a
 derived tag with a two-line Modelfile (`FROM qwen3-coder:30b` / `PARAMETER num_ctx 65536`), named
-`overseer/qwen3-coder-30b-64k`. `ollama create` shares the weight blobs, takes no extra disk and is
+`overseer/qwen3-coder-30b:64k` (the context is the tag itself: Ollama turns a name without a tag
+into `<name>:latest`, which the first live run showed). `ollama create` shares the weight blobs, takes no extra disk and is
 instant; the owner's own `-64k` and `-32k` tags were made the same way. Derived tags are listed under
 the base model in the UI and removed with **Clean up local models**. When Overseer starts the Ollama
 server itself, `OLLAMA_CONTEXT_LENGTH` is the fallback.
@@ -310,7 +333,8 @@ The owner's condition: Overseer must never open a model that could crash the com
   `waiting_for_memory`) and unloads the model; they resume when the pressure is back to normal. This
   is the only case in which Overseer stops a working local turn.
 - **One model at a time during verification**, smallest first, each unloaded after its check, with
-  memory recorded before and after.
+  memory recorded before and after. A verification stops at once when the system reports
+  pressure, and starts no model while it does.
 - **Out of reach.** Overseer cannot stop a model the user starts in Ollama themselves. It sees that
   model in `/api/ps` and in available memory, counts it as used, and shrinks its own pick.
 
@@ -322,14 +346,22 @@ for automatic picks only when Ollama reports the `tools` capability *and* the ca
 verified with the local harness; `continuity.allowUnverifiedModels` widens that to any installed
 model with `tools`. Ranking within a tier is by parameter count.
 
-| Tier | Model (Ollama tag) | Disk | Status |
+| Tier | Model (Ollama tag) | Disk | Result on 2026-09-26 (OpenCode 1.15.13 through `opencode serve`, Ollama 0.34.2) |
 | --- | --- | --- | --- |
-| 1 | `qwen3-coder:30b` (MoE, 3B active) | 17.3 GiB | **verified**: completed a write through OpenCode ([log](../verification/evidence/ac-14/opencode-ollama.log)); fast for its size |
-| 1 | `qwen2.5-coder:32b` | ≈20 GB | to verify |
-| 2 | `qwen2.5-coder:14b` | 8.4 GiB | **failed** on 2026-09-25: emitted its tool call as text through OpenCode; excluded until it passes a retest with a derived-tag context |
-| 3 | `qwen2.5-coder:7b` | ≈4.7 GB | to verify |
-| 4 | `qwen2.5-coder:3b` | ≈1.9 GB | to verify; for 16 GiB machines |
-| 4 | `qwen2.5-coder:1.5b` | ≈1 GB | to verify; last resort for 8 GiB machines |
+| 1 | `qwen3-coder:30b` (MoE, 3B active) | 17.3 GiB | **passed**, 3 of 3, at a 64k context (23.7 GiB loaded), 22 to 28 s a turn |
+| 1 | `qwen2.5-coder:32b` | 18.5 GiB | **failed**, 0 of 3, at 32k (26.5 GiB loaded): wrote its tool calls as text |
+| 2 | `qwen2.5-coder:14b` | 8.4 GiB | **failed**, 0 of 3, at 32k: tool calls as text, or "done" with nothing written |
+| 3 | `qwen2.5-coder:7b` | 4.4 GiB | **failed**, 0 of 3, at 32k: said "done" without calling a tool |
+| 4 | `qwen2.5-coder:3b` | 1.8 GiB | **failed**, 0 of 3, at 32k: tool calls as text |
+| 4 | `qwen2.5-coder:1.5b` | 0.9 GiB | **failed**, 0 of 3, at 32k: tool calls as text |
+
+The whole `qwen2.5-coder` family fails the same way through OpenCode: the model writes the call
+(`{"name": "write", "arguments": …}`) into its reply instead of calling the tool, so nothing runs,
+and the smaller sizes sometimes reply "done" with nothing written. Overseer's one nudge does not
+change it. They are excluded from automatic picks and shown as unverified; a user may still name
+one. What this means for small machines is said under
+[Worked examples](#worked-examples-40-ceiling-memory-otherwise-free), and a family that does call
+tools at 8 to 16 GiB is the first thing to look for next ([log](../verification/evidence/ac-87/opencode-serve.txt)).
 
 Later candidates, added only after the Qwen coders are verified: `qwen3.5:35b-a3b` (installed here;
 tools, thinking, vision), `gpt-oss:20b` (Codex's own `--oss` default) and `gpt-oss:120b`,
@@ -345,52 +377,100 @@ can reorder with `continuity.preferredModels`.
 
 | Harness | How | Status |
 | --- | --- | --- |
-| **OpenCode** | The `local` account's `opencode.json` (in its `XDG_CONFIG_HOME`) gets an `ollama` provider (`@ai-sdk/openai-compatible`, `baseURL http://127.0.0.1:11434/v1`) listing the derived tags with `tool_call: true`; `model` and `small_model` point at the pick; `autoupdate: false`, `share: disabled`, `agent.general.permission.task: allow` as in the mock fixture. Model per turn with `-m ollama/<tag>` (already supported). | verified path; the config writer is new |
+| **OpenCode** | Through `opencode serve` (harness id `opencode-serve`, chosen by the spike below). The `local` account's `opencode.json` (in its own `XDG_CONFIG_HOME`) gets an `ollama` provider (`@ai-sdk/openai-compatible`, `baseURL http://127.0.0.1:11434/v1`) listing the derived tags with `tool_call: true`; `enabled_providers: ["ollama"]`; `model` and `small_model` point at the pick; `autoupdate: false`, `share: disabled`. The model and agent are chosen per prompt. | transport verified by the spike; the bridge and the config writer are new |
 | **Codex** | `codex exec --oss --local-provider ollama -m <tag>` (flags present in the installed 0.155 binary). Keeps Codex's file-change and child telemetry with a local model. | to verify (AC-87); second choice until then |
 | **Claude Code** | Would need `ANTHROPIC_BASE_URL` and a placeholder token in the harness environment. Overseer never forwards `ANTHROPIC_*` or token variables (AC-16), so this is **not in scope**; see [Open questions](#open-questions). | out of scope |
 
 ### The spike comes first (AC-139)
 
-Before any adapter work, the goal finds out how OpenCode's session transports behave in the
-installed version, with a local model inside the budget:
+Done on 2026-09-26 with OpenCode 1.15.13, Ollama 0.34.2 and `qwen3-coder:30b-64k` (23.7 GiB
+loaded, inside a budget of 42.7 GiB at the time), in an isolated OpenCode profile and two
+disposable repositories. Drivers: [`test/spike/opencode-serve.js`](../../test/spike/opencode-serve.js)
+and [`test/spike/opencode-acp.js`](../../test/spike/opencode-acp.js). Evidence:
+[`docs/verification/evidence/ac-139/`](../verification/evidence/ac-139/).
 
-- how a session starts with a chosen model and agent, and how a prompt is sent;
-- the message a permission request arrives as, and how Allow and Deny are answered;
-- interrupt, and resuming an existing session after the daemon restarts;
-- child sessions, file activity and usage, compared with what `opencode run` reports today;
-- what a long-lived session process means for the supervisor (as with `codex-app` and Claude Code).
+**Decision: local runs use `opencode serve`.** It answers every question below. `opencode acp` is
+not used: it cannot interrupt a running turn, and a turn that delegated to a child never finished.
 
-The result is a written decision in this section (which transport, or why neither and what the
-fallback is), redacted transcripts, and a fixture recorded from the chosen transport for the adapter
-tests. It is a research criterion, like AC-01 to AC-03: an investigated blocker completes it, but
-does not pass AC-138.
+| Question | `opencode serve` (HTTP and an event stream on loopback) | `opencode acp` (JSON-RPC on stdin and stdout) |
+| --- | --- | --- |
+| Start a session with a model and an agent | `POST /session` with `agent`, `model` and `permission` rules; the model and agent can also change per prompt | `session/new`, then `session/set_config_option` for `model` and `mode` |
+| Send a prompt | `POST /session/{id}/prompt_async` (answers 204 at once; the turn reports through events) | `session/prompt` (answers when the turn ends) |
+| A permission request | event `permission.asked`: id, session, `permission` (`edit`, `bash`), patterns, and for edits the file path and a diff; also listed by `GET /permission` | request `session/request_permission` with the tool call, its diff and three options |
+| Allow and Deny | `POST /permission/{id}/reply` with `once` or `reject`; nothing is written before the answer; Deny blocks the write | answer with the option `once` or `reject`; same results |
+| Rules per session | yes, in `POST /session`; no file is written | no, only from the profile's configuration |
+| Interrupt | `POST /session/{id}/abort`: a 45 s command ended 56 ms later, the message carries `MessageAbortedError`, and the session took the next prompt | **none**: `session/cancel` answers "Method not found" as a notification and as a request, and the 45 s command ran to its end |
+| Resume after a restart | a restarted server still has the session and continues it with its history | `session/load` in a new process works |
+| Child sessions | event `session.created` with `parentID`, their events on the same stream, `GET /session/{id}/children` | only an id inside the task tool call; a turn that delegated in plan mode never finished (300 s) and no request reached the client |
+| File activity and usage | tool parts with the file path, `file.edited`, `session.diff`; tokens and cost on the assistant message | tool call updates; token counts on the prompt result |
+| Several worktrees | one server serves any directory (`?directory=`); events and pending requests are scoped to it, `/global/event` carries all | one process per directory |
+
+What the adapter must do, learned the hard way:
+
+- **Rules travel with the session**, so Overseer writes no rules into any file. The profile's
+  configuration only names the local provider.
+- **Only `once` and `reject` are sent.** A `once` answer is not remembered: the next command in
+  the same turn asks again, which is what Ask first means. `always` is never sent.
+- **The `question` tool is denied** by a session rule. Without it a model may ask the user a
+  multiple-choice question and the session waits for an answer Overseer has no card for.
+- **Providers are pinned.** A fresh profile still offers eight online OpenCode Zen models.
+  Overseer's profile sets `enabled_providers: ["ollama"]` and points `model` and `small_model` at
+  the local pick, so a local run can never go online, not even to name a session.
+- **A tool call written as text is a failure to detect.** Once in the 49 prompts of the spike
+  the verified model wrote `<function=bash>…` as plain text and the turn ended without running
+  anything. The adapter
+  reports it as `tool_call_as_text` and repeats the turn once; the catalogue check (AC-87) runs
+  each model three times.
+- **Interrupting is a request, not a signal.** The run's process stays up between turns and after
+  an interrupt, as with `codex-app` and Claude Code.
+
+**How it fits the daemon (as built).** A new harness id, `opencode-serve`, beside the unchanged one-shot
+`opencode`. The run's supervisor starts a small bridge, a subcommand of `overseerd`
+(`overseerd opencode-bridge`), which starts `opencode serve` on a loopback port of its own, prints
+every server event as one JSON line on its standard output, and turns lines on its standard input
+(prompt, permission answer, interrupt) into requests. The daemon's existing tail, parser and
+control path stay as they are; the bridge needs only a plain HTTP client for loopback. One bridge
+and one server per turn, like every other harness, so a turn's process tree is stopped as a unit
+and a crash affects one run; the session itself lives in the profile and is continued by the next
+turn's server. The bridge picks a free port itself and puts the server behind a password only it
+knows, so no other process on the machine can drive the agent. It also does the remembering the
+daemon's line parser cannot: which messages are the user's own, which sessions are this run's
+children, and which belong to something else on the same server.
+
+Before a local turn is launched the daemon chooses the model if none was named, gives it a context,
+passes it through the memory guard, loads it under the watchdog, and writes the profile's
+configuration. A refusal ends the run as failed with its reason; nothing is launched.
+
+Fixtures recorded from the chosen transport, for the adapter tests:
+`fixtures/transcripts/opencode-1.15.13-serve-{allow,deny,interrupt,children}-local.jsonl`.
 
 ### Permission modes carry over (AC-138)
 
 A handoff keeps the run's permission mode and never loosens it. Local models have nothing to do
 with this: OpenCode has its own permission system (allow, ask and deny rules per tool), a built-in
 `plan` agent that denies edits, and two session transports a client can answer requests over
-(`opencode serve` and `opencode acp`). The gap is in Overseer's adapter, which uses the one-shot
+(`opencode serve` and `opencode acp`; the spike chose the first). The gap is in Overseer's adapter, which uses the one-shot
 `opencode run` transport: it passes no agent and no rules, and it has no channel for a permission
 request to come back, so asks are rejected. The same was true of Codex before the app-server
 transport ([compatibility](../compatibility.md)).
 
 | The run's mode | Claude Code | Codex | OpenCode (local), after this gate |
 | --- | --- | --- | --- |
-| Plan only | `--permission-mode plan` | sandbox read-only | `--agent plan` |
-| Ask first | `--permission-mode manual` with the permission prompt tool | `codex-app` approval requests | rules `edit: ask`, `bash: ask` over a session transport; requests appear as Allow and Deny cards in the chat |
-| Accept edits | `--permission-mode acceptEdits` | sandbox workspace-write | rules `edit: allow`, `bash: ask` over a session transport |
-| Auto | `--permission-mode auto` | sandbox workspace-write | the `build` agent as shipped |
+| Plan only | `--permission-mode plan` | sandbox read-only | the `plan` agent (edits denied) |
+| Ask first | `--permission-mode manual` with the permission prompt tool | `codex-app` approval requests | session rules `edit: ask`, `bash: ask`; requests appear as Allow and Deny cards in the chat |
+| Accept edits | `--permission-mode acceptEdits` | sandbox workspace-write | session rules `edit: allow`, `bash: ask` |
+| Auto | `--permission-mode auto` | sandbox workspace-write | the `build` agent as shipped (it still asks before leaving the worktree) |
 
-- **Rules are written by Overseer** into the local account's `opencode.json` per turn; the user's own
-  OpenCode configuration is never edited.
+- **Rules travel with the session** (`POST /session`), and every mode also denies the `question`
+  tool. Overseer writes no rules into any file, and the user's own OpenCode configuration is never
+  edited or read.
 - **Never looser.** If the target cannot honour the run's mode, Overseer does not transition on its
   own: the run waits (as with Continuity off) and the chat offers the move with the difference
   stated, for example *The local agent cannot ask before running commands yet. Continue locally in
   Accept edits?*
-- **Spike first (AC-139).** How permission requests appear over `opencode serve` and `opencode acp`
-  in OpenCode 1.15 is not yet verified. Until it is, Plan only and Auto carry over and Ask first and
-  Accept edits use the fallback above.
+- **Settled by the spike (AC-139).** All four modes carry over through `opencode serve`. The
+  fallback above remains for a machine whose OpenCode is too old to have the server, or where the
+  server does not start.
 
 The local account is the existing `local` provider ("OpenCode (local models)", `daemon/src/accounts.rs`),
 renamed **Local (Ollama)**, created automatically when Ollama is found, with no sign-in. Its status
@@ -421,6 +501,12 @@ gate it, both off by default and both offered in the first-use notice.
 - Overseer starts `ollama serve` itself only when nothing answers on `127.0.0.1:11434`, as a
   supervised child bound to loopback, and stops it after `continuity.ollamaIdleMinutes` (default 30)
   without local runs. An Ollama the user runs (the menu-bar app) is used as is and never stopped.
+- As built: the archive is unpacked into Overseer's own folder (`<data>/ollama/Ollama.app`), never
+  into `/Applications`; the user's own copy is preferred when there is one. Starting the server
+  needs the same setting as installing. The server is kept by its process id in the daemon's store
+  and outlives a restart of the daemon, as the agents do; before it is stopped the process is
+  checked to be that program still. An install that a waiting run needs happens in the background,
+  and the run looks again when it is due.
 - Linux uses the distribution package or the official install script, behind the same setting
   (AC-41 remains deferred).
 
@@ -473,6 +559,21 @@ workspace. It is the one mechanism behind failover, going local, and switching b
 Failover reads *OpenAI is unreachable; continuing with **Claude Code** (account "Work") because it is
 the best working option.* A handoff never reuses the failed provider's credentials for anything.
 
+As built (2026-09-26):
+
+- A failed turn does not end its run. The run is **parked** (`waiting_for_connection`, or
+  `waiting_for_memory` after the critical-pressure valve) with its message kept, and one scheduler
+  looks at every parked run when it is due, and at once when the connection state has changed.
+- A sign-in failure (`auth` class) while the state is offline is treated as the connection's
+  failure: a sign-in cannot be checked without a connection.
+- `run.targets` says where a run's work could go now without moving anything; `run.handoff` moves
+  it (`to`: `local`, `back` or a provider). A move whose permission mode would be looser needs
+  `accept_mode` with the mode named, so the difference is accepted knowingly.
+- An OpenCode without the headless server (`opencode serve --help` does not describe the command)
+  can only run one-shot, where nothing can be asked. That is looser than every mode but Auto, so
+  such a move is offered with the difference stated and is automatic only for a run already in
+  Auto. It passes the memory guard like every local run.
+
 ## Wait and retry (Continuity off, or no target)
 
 - The failed turn's run becomes **`waiting_for_connection`**, a new active lifecycle state. It is
@@ -493,6 +594,15 @@ the best working option.* A handoff never reuses the failed provider's credentia
   running turn has produced no event for `continuity.stallSeconds` (default 90), Overseer interrupts
   it (recorded as Overseer's action, not the harness's) and applies the policy as if the turn had
   failed.
+- **Reconnecting in vain** (as built, from the live check). The real Codex never fails such a turn:
+  with its hosts unreachable it prints *Reconnecting... waiting for network* every few seconds for as
+  long as it is left, so neither the failed-turn rule nor the silence rule ever fires. When a run's
+  provider is unreachable (the state is offline, or degraded with that provider's probe failing) and
+  the run has produced nothing but network-class errors since its last progress for 30 seconds
+  (`OVERSEER_TEST_RECONNECT_MS` in tests; never longer than `stallSeconds`), Overseer interrupts the
+  turn the same way. The `stall` event carries the reason, and the parked run reads *no progress
+  while OpenAI could not be reached; the turn was interrupted by Overseer*. A turn that reconnects
+  while its provider still answers the probe is left alone.
 - **Shown as** one quiet system card, updated in place: *Offline. Retrying the connection every 2
   minutes (attempt 4). Nothing is lost; your message is sent when the connection returns.* with
   **Use a local model now** and **Stop**. Runs in this state are not dimmed and are not per-run items
@@ -524,6 +634,11 @@ agent is started with Continuity on, while the user is looking, not at the momen
 
 - One card above the composer (and in New Task); dismissing it records `continuity.notice_shown` in the
   daemon's `meta` table, so it appears once across windows and reinstalls.
+- As built (2026-09-27, for AC-54's text budget: the composer may carry no more visible text than
+  Gate J's 133 characters, and the full card put it at 491): the card is **one line until opened**,
+  *Continuity is on* with **Got it**; the explanation, the two settings with their **Allow** and *Turn
+  Continuity off* unfold from that line (a details disclosure, its tooltip saying what is behind it).
+  Allow is one click once the line is open.
 - Turning Continuity off later is the one **Continuity** switch in the Accounts view and in settings.
 - The first actual transition is announced in the chat as described above; the notice is not repeated
   there.
@@ -538,6 +653,10 @@ agent is started with Continuity on, while the user is looking, not at the momen
 - If available memory falls under the headroom while a model is loaded, no turn is stopped for it
   (only the critical-pressure valve in [Memory safety](#memory-safety-ac-140) pauses runs); the next
   turn's pick shrinks (smaller context first, then a smaller model) with one note in the chat.
+- A smaller copy can only be loaded after the larger one is unloaded. Overseer unloads a copy only
+  when it loaded that copy itself (it keeps a record of its own loads) and no other local agent is
+  working on it. Any other copy, one the user loaded in their own Ollama or one another agent is
+  working on, is shared as it is, which loads nothing.
 - Local runs report usage as tokens with cost 0 and the provider mark **Local**; no quota windows.
 
 ## Settings
@@ -564,7 +683,7 @@ state, the budget and the current pick.
 | `returnOnline` | `"offer"` | `offer`, `auto` or `stay`. |
 | `retryCapSeconds` | `120` | Longest wait between retries. |
 | `retryForHours` | `36` | Give up waiting after this long (the run then fails with the reason and offers Retry now). |
-| `stallSeconds` | `90` | Silence while offline before Overseer interrupts a turn. |
+| `stallSeconds` | `90` | Silence while offline before Overseer interrupts a turn. A turn that only reconnects with its provider unreachable is interrupted after 30 seconds, or after `stallSeconds` when that is shorter. |
 | `probes` | `true` | Credential-free reachability probes. Off: the system and the agents drive the state. |
 | `ollamaIdleMinutes` | `30` | Stop an Overseer-started Ollama after this idle time. |
 | `registry` | `""` | Mirror for model downloads (empty: Ollama's registry). |
@@ -611,6 +730,41 @@ Follows the Gate J principles (less text, quiet until it needs you) and the Gate
   limit; transitions are not attention items.
 - **Grid:** waiting tiles show the retry countdown quietly; local tiles carry the Local mark.
 
+As built (2026-09-26), in `extension/src/continuity.js` (the host), `extension/media/continuity.js`
+(the webviews) and `extension/media/continuity-text.js` (the words, shared with the unit tests):
+
+- **Status bar:** its own item, `$(cloud)` alone while online; `$(cloud) OpenAI unreachable` while
+  degraded; `$(cloud) Offline · 2 waiting` on the warning background while offline. Its tooltip is
+  the sentence, what the system said, each provider's health and what Continuity does now. It opens
+  a pick with the connection, the Continuity switch, the waiting agents, Check now, Local models,
+  the two Allow switches and the settings.
+- **Side bar:** the Agents view's message says *Overseer is offline: no network (system). 1 agent
+  waiting.* while not online, and nothing while online. Waiting agents keep their provider's mark
+  with a `☁` badge; a handed-off agent folds under the agent that took over as *Earlier: Codex ·
+  handed off · the connection was lost*. One Needs-you row, *2 agents waiting for a connection*,
+  stands for every waiting agent. The Continuity switch is in the status bar's pick and in the
+  settings, not in Accounts.
+- **Composer and New Task:** the Agent menu ends with **Local models · Ollama**: *Best fit ·
+  qwen3-coder:30b*, then each installed model with its badge (*fits at 64k*, *fits at 32k · failed
+  its check*, *too big · 77.2 GiB of 51.2 GiB*), and the models the catalogue knows but that are
+  not installed behind one entry. The badge is the guard's own answer (`local.models`). Offline, the
+  online agents are disabled with the reason, a line above the field says so, and one click moves
+  to the best local model; back online, the last online agent is the default again. A local agent
+  needs no account. The first-use notice sits above the field, once per machine, one line until
+  opened, with the two Allow switches and *Turn Continuity off* behind it.
+- **Chat and tiles:** the announcements are one quiet line each. A waiting agent shows one card:
+  the title, *Your message is kept*, *Next check in 40 s · waiting 2 min · gives up after 36 hours*,
+  and **Use a local model now** (or *Continue with Claude Code*), **Retry now**, **Stop**; a move
+  that would ask less often is offered with the difference and made after a confirmation. Back
+  online, a local or failed-over agent shows **Switch back to Codex** and **Stay here**.
+  When downloads are first allowed, one message offers to keep the best-fitting model ready
+  (*Keep qwen3-coder:30b ready for offline? (17.3 GiB download)*); Not now leaves prefetch off, and
+  the daemon records the offer so it is made once. Downloads in progress show above the composer
+  and in the Local models pick, with Cancel. The turn
+  of a waiting agent never reads *Failed*. Tiles show the same, compact. The settings are 19
+  `overseer.continuity.*` entries with the daemon's ranges; VS Code pushes what the user sets and
+  mirrors what the daemon has.
+
 ## Security and privacy
 
 - Probes send no credentials and no payload beyond a TLS handshake or an empty `HEAD`; the system
@@ -653,7 +807,7 @@ Left to the implementation, with the owner's agreement:
 
 | Question | Approach |
 | --- | --- |
-| How permission requests appear over OpenCode's session transports | The spike (AC-139): `opencode acp` first (a documented client protocol), then `opencode serve`; pick the one whose requests map cleanly onto Overseer's Allow and Deny cards. |
+| How permission requests appear over OpenCode's session transports | Settled by the spike (AC-139): `opencode serve`; see [the decision](#the-spike-comes-first-ac-139). |
 | Codex `--oss` as the local harness | Tested during catalogue verification (AC-87); OpenCode stays the default and Codex is offered as `localHarness: codex` if it passes. |
 | Derived tags versus per-request `num_ctx` | Derived tags: the OpenAI-compatible route OpenCode uses cannot carry `num_ctx`. |
 | Change notifications versus polling for the system check | Polling every 5 seconds first; the SystemConfiguration and NetworkManager subscriptions if the delay is noticeable in AC-83. |
@@ -674,7 +828,14 @@ own worktree and lands through a pull request.
 
 ## Implementation goal
 
-Written on 2026-09-26 at the owner's request, ready to start. Not started by this RFC revision.
+Written on 2026-09-26 at the owner's request. Built on 2026-09-26 and 2026-09-27 in pull request
+[#9](https://github.com/beelol/overseer/pull/9), marked ready for review once every criterion that does not
+wait for the owner was verified; what waits for the owner is the Wi-Fi step of AC-83 and the offline
+session of AC-97. (AC-84's live check ran on 2026-09-27 once Claude Code was signed in; it found and
+fixed the reconnecting-in-vain gap above.) Both owner steps are scripted so that the daemon's own record
+becomes the evidence: `node test/local/wifi-live.js` watches a real daemon while the owner turns Wi-Fi
+off and on and measures the gap; `node test/local/owner-session.js start` opens an isolated VS Code with
+the branch's VSIX for the owner's session, and `report` writes what the daemon recorded afterwards.
 
 > Implement Continuity (Gate L) in `beelol/overseer`: AC-139 first, then AC-83 to AC-98, AC-138 and
 > AC-140, as written in `docs/overseer-rfc.md` (Gate L) and designed in `docs/rfcs/offline-mode.md`.
@@ -777,7 +938,8 @@ Not granted: purchases, login changes, automatic merges, editing the user's own 
 configuration, and **turning the network off**. The implementing session needs the network itself,
 so the Wi-Fi steps of AC-83 and AC-97 are the owner's: the session asks the exact question, ends
 its turn, continues independent work, and reads the daemon's event log afterwards. It never blocks
-on a foreground wait.
+on a foreground wait. As built, the two scripts above only read Wi-Fi power and the daemon's events;
+neither changes the network.
 
 ## Acceptance
 

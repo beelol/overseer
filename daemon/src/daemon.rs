@@ -15,7 +15,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
-pub const ACTIVE: &[&str] = &["queued", "starting", "running", "waiting_for_user"];
+/// `waiting_for_connection` and `waiting_for_memory` are Continuity's: the run has no process,
+/// keeps its message and its worktree, and is started again by Overseer (daemon/src/handoff.rs).
+pub const ACTIVE: &[&str] = &["queued", "starting", "running", "waiting_for_user", "waiting_for_connection", "waiting_for_memory"];
 const RAW_SEGMENTS_KEPT: u64 = 4;
 pub const DEFAULT_AUTO_EXECUTION_BUDGET_MS: u64 = 300_000;
 pub const DEFAULT_AUTO_PARENT_BUDGET_MS: u64 = 1_800_000;
@@ -79,6 +81,10 @@ pub struct TurnOpts {
     pub mode: Option<String>,
     /// (media type, bytes)
     pub images: Vec<(String, Vec<u8>)>,
+    /// Continuity: the turn that is sent again after a wait, in place of a new one.
+    pub retry_of: Option<String>,
+    /// Continuity: the first turn of a successor run, which may continue an earlier session.
+    pub handoff: bool,
 }
 
 impl TurnOpts {
@@ -102,7 +108,7 @@ impl TurnOpts {
                 images.push((mime, bytes));
             }
         }
-        Ok(Self { model: text("model"), effort: text("effort"), mode: text("permission_mode"), images })
+        Ok(Self { model: text("model"), effort: text("effort"), mode: text("permission_mode"), images, retry_of: None, handoff: false })
     }
 }
 
@@ -439,7 +445,7 @@ impl Daemon {
     pub fn create_task(self: &Arc<Self>, p: &Value) -> Result<Value> {
         let repo_in = p["repo"].as_str().ok_or_else(|| anyhow!("repo is required"))?;
         let harness = p["harness"].as_str().unwrap_or("codex");
-        if !["codex", "codex-app", "claude", "opencode", "generic"].contains(&harness) {
+        if !["codex", "codex-app", "claude", "opencode", "opencode-serve", "generic"].contains(&harness) {
             bail!("unknown harness {harness}");
         }
         let effort = match p.get("effort") {
@@ -466,6 +472,8 @@ impl Daemon {
         let repo = git::toplevel(Path::new(repo_in)).context("repository not found")?;
         let common = git::common_dir(&repo)?;
         let profile = match p["profile_id"].as_str() {
+            // Local runs use Overseer's own OpenCode profile, never the user's own configuration; it is made on first use.
+            Some(crate::opencode_bridge::LOCAL_PROFILE) | None if harness == "opencode-serve" => Some(crate::opencode_bridge::local_profile(self)?),
             Some(id) => Some(self.profile(id)?),
             None if harness != "generic" => Some(self.profile(&format!("system-{}", profile_harness(harness)))?),
             None => None,
@@ -1171,6 +1179,15 @@ impl Daemon {
     /// Start a work turn: fresh run-start snapshot, then launch (or stdin for live generic processes).
     pub fn start_turn(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts) -> Result<Turn> {
         let initial = self.run(run_id)?;
+        let continuity = opts.retry_of.is_some() || opts.handoff;
+        if follow_up && !continuity && initial.parent_run_id.is_none() {
+            // Continuity may route this message to a successor, recursively
+            // calling start_turn. Do that before taking either Auto admission
+            // gate; neither gate is reentrant.
+            if let Some(turn) = crate::handoff::before_follow_up(self, &initial, prompt, opts)? {
+                return Ok(turn);
+            }
+        }
         let profile_gate = initial.profile_id.as_deref().map(|id| self.profile_gate(id));
         let _profile_guard = profile_gate.as_ref().map(|gate| gate.lock().unwrap());
         let workspace_gate = self.workspace_gate(&initial.workspace_id);
@@ -1205,7 +1222,10 @@ impl Daemon {
         if ws.removed_ms.is_some() {
             bail!("workspace was removed");
         }
-        if follow_up {
+        if follow_up && !continuity && run.status == crate::handoff::HANDED_OFF {
+            bail!("run handoff changed while preparing the follow-up; retry it");
+        }
+        if follow_up && !continuity {
             if ACTIVE.contains(&run.status.as_str()) && adapters::follow_up_via_stdin(&run.harness, prompt).is_none() {
                 bail!("run is still working; interrupt it or wait for it to finish before sending a follow-up");
             }
@@ -1291,12 +1311,23 @@ impl Daemon {
             generic_meta = json!({});
         }
         generic_meta["opts"] = json!({"effort": effort, "mode": mode});
-        let snap = self.take_snapshot(&ws, "run-start")?;
-        let n = self.store.lock().unwrap().turns(run_id)?.len() as i64 + 1;
-        let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt.into(), snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
-        self.store.lock().unwrap().insert_turn(&turn)?;
-        self.emit(Some(&run.task_id), Some(run_id), "turn_started", "daemon", "exact", json!({"turn": turn, "snapshot": snap.commit_sha}))?;
-        if follow_up && ACTIVE.contains(&run.status.as_str()) {
+        let turn = match &opts.retry_of {
+            // A turn sent again after a wait is the same turn: no new record and no new snapshot.
+            Some(id) => {
+                let store = self.store.lock().unwrap();
+                store.conn.execute("UPDATE turns SET status='running', ended_ms=NULL WHERE id=?1 AND run_id=?2", rusqlite::params![id, run_id])?;
+                store.turns(run_id)?.into_iter().find(|t| &t.id == id).ok_or_else(|| anyhow!("turn {id} is not a turn of this run"))?
+            }
+            None => {
+                let snap = self.take_snapshot(&ws, "run-start")?;
+                let n = self.store.lock().unwrap().turns(run_id)?.len() as i64 + 1;
+                let turn = Turn { id: format!("u-{}", short_id()), run_id: run_id.into(), n, prompt: prompt.into(), snapshot_id: Some(snap.id.clone()), started_ms: now(), ended_ms: None, status: "running".into() };
+                self.store.lock().unwrap().insert_turn(&turn)?;
+                self.emit(Some(&run.task_id), Some(run_id), "turn_started", "daemon", "exact", json!({"turn": turn, "snapshot": snap.commit_sha}))?;
+                turn
+            }
+        };
+        if follow_up && !continuity && ACTIVE.contains(&run.status.as_str()) {
             if let Some(line) = adapters::follow_up_via_stdin(&run.harness, prompt) {
                 self.send_stdin(&run, &line)?;
                 return Ok(turn);
@@ -1345,6 +1376,14 @@ impl Daemon {
         let resume = if follow_up { run.native_id.clone() } else { None };
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
+        }
+        if crate::continuity::is_local(&run) {
+            // The guard, the context and the profile of a local run (Continuity, AC-138 and AC-140).
+            if let Err(e) = crate::continuity::prepare_local_run(self, &mut run, &profile_env) {
+                // A refused local run ends with its reason; it is never left waiting to launch.
+                self.mark_ended(&run, "failed", &format!("not launched: {e}"))?;
+                return Err(e);
+            }
         }
         let sandbox = generic_meta["sandbox"].as_str().unwrap_or("workspace-write").to_string();
         if !matches!(sandbox.as_str(), "read-only" | "workspace-write") {
@@ -1547,6 +1586,10 @@ impl Daemon {
         }
         if !ACTIVE.contains(&run.status.as_str()) {
             bail!("run is not active (status {})", run.status);
+        }
+        if run.status == crate::handoff::WAITING_FOR_CONNECTION || run.status == crate::handoff::WAITING_FOR_MEMORY {
+            // Nothing is running: Stop ends the wait.
+            return crate::handoff::stop_waiting(self, &run);
         }
         let mut child_interrupt_errors = Vec::new();
         if run.parent_run_id.is_none() || run.relation_source.as_deref() == Some("managed-continuation") {
@@ -1877,6 +1920,9 @@ impl Daemon {
             out.push(store.insert_event(now(), task, run_override.or(rid), kind, source, conf, &redact_value(payload))?);
             Ok(())
         };
+        if matches!(norm, Norm::Running | Norm::Tool { .. } | Norm::Text { .. }) {
+            state.between_turns = false;
+        }
         match norm {
             Norm::Session(id) => {
                 if !id.is_empty() && state.session.as_deref() != Some(&id) {
@@ -2071,18 +2117,23 @@ impl Daemon {
             }
             Norm::BackgroundNotified(id) => {
                 if state.backgrounded.remove(&id) {
-                    state.expected_turns += 1;
+                    // Between turns, the notice itself starts the next one.
+                    if state.between_turns { state.expected_turns += 1 } else { state.unread_notices += 1 }
                 }
             }
+            // A notice reported mid-turn is read by the main agent's next model call in that
+            // same turn; only one still unread when the turn ends brings another turn.
+            Norm::MainContinues => state.unread_notices = 0,
             Norm::TurnDone { ok, summary } => {
                 let interrupted = store.run_process(&run.id)?.map(|(dir, _, _)| Path::new(&dir).join("interrupt.requested").exists()).unwrap_or(false);
                 if run.harness == "claude" {
-                    state.expected_turns = state.expected_turns.saturating_sub(1);
+                    state.expected_turns = state.expected_turns.saturating_sub(1) + std::mem::take(&mut state.unread_notices);
                     if !interrupted && (state.background > 0 || state.expected_turns > 0) {
                         // Claude reports an interim result while background subagents run, and
                         // continues with another turn for each finished one (even one that
                         // finished before this result). The session must stay open so those
                         // turns' permission requests can be answered.
+                        state.between_turns = true;
                         let why = if state.background > 0 { format!("{} background task(s) still running", state.background) } else { "Claude continues after a background task finished".to_string() };
                         ev("output", "harness", "exact", json!({"role": "system", "text": format!("interim result; {why}: {}", summary.unwrap_or_default())}), None)?;
                         return Ok(());
@@ -2335,10 +2386,14 @@ impl Daemon {
         } else {
             ("failed", format!("exit {}{}", describe_exit(exit), error_suffix(state)))
         };
+        // Continuity: a turn that failed on the connection parks its run instead of ending it.
+        if crate::handoff::park(self, run, status, state.last_error.as_ref(), dir)? {
+            return Ok(());
+        }
         self.mark_ended(run, status, &reason)
     }
 
-    fn mark_ended(&self, run: &Run, status: &str, reason: &str) -> Result<()> {
+    pub(crate) fn mark_ended(&self, run: &Run, status: &str, reason: &str) -> Result<()> {
         let mut emitted = Vec::new();
         {
             let store = self.store.lock().unwrap();
@@ -2641,12 +2696,16 @@ struct TailState {
     /// Claude turns still expected from this process: the user's turn plus one continuation per
     /// reported backgrounded task. The session closes only when all have produced a result.
     expected_turns: usize,
+    /// Backgrounded tasks reported since the main agent last called the model.
+    unread_notices: usize,
+    /// After an interim result, before Claude's next turn starts.
+    between_turns: bool,
     backgrounded: std::collections::HashSet<String>,
 }
 
 impl Default for TailState {
     fn default() -> Self {
-        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new(), background: 0, expected_turns: 1, backgrounded: Default::default() }
+        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new(), background: 0, expected_turns: 1, unread_notices: 0, between_turns: false, backgrounded: Default::default() }
     }
 }
 
@@ -2691,7 +2750,11 @@ fn find_in_tree(store: &Store, root: &str, native: &str) -> Result<Option<Run>> 
 
 /// Account profiles belong to the harness family (codex-app shares Codex logins).
 fn profile_harness(harness: &str) -> &str {
-    if harness == "codex-app" { "codex" } else { harness }
+    match harness {
+        "codex-app" => "codex",
+        "opencode-serve" => "opencode",
+        h => h,
+    }
 }
 
 fn classify(msg: &str) -> String {

@@ -1,0 +1,55 @@
+{
+  "checks": [
+    {
+      "name": "the daemon starts with its defaults, and reports them",
+      "ok": true,
+      "detail": {
+        "enabled": true
+      }
+    },
+    {
+      "name": "every Continuity setting edited in VS Code is read back from the daemon",
+      "ok": true,
+      "detail": "19 settings"
+    },
+    {
+      "name": "a value out of range is refused with the reason, the daemon keeps its value, and VS Code shows it again",
+      "ok": true,
+      "detail": {
+        "toast": "Overseer: ramCeilingPercent must be between 10 and 50 percent (one model never takes more than half of the memory); 80 was refused",
+        "kept": 35,
+        "shown": 35
+      }
+    },
+    {
+      "name": "`overseerd ctl continuity.status` prints the state, the budget and the pick",
+      "ok": true,
+      "detail": {
+        "state": "online",
+        "budget": 48103633690,
+        "pick": "qwen3-coder:30b"
+      }
+    },
+    {
+      "name": "the daemon keeps running after VS Code quits",
+      "ok": true
+    },
+    {
+      "name": "with Continuity off (set in VS Code) an offline agent waits instead of transitioning, VS Code closed",
+      "ok": true,
+      "detail": {
+        "st": "waiting_for_connection",
+        "later": "waiting_for_connection",
+        "handoffs": 0
+      }
+    },
+    {
+      "name": "the download setting is the daemon's too (allowed, first pull not yet confirmed)",
+      "ok": true,
+      "detail": {
+        "downloads": [],
+        "first_pull_confirmed": false
+      }
+    }
+  ]
+}

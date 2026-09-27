@@ -195,7 +195,7 @@ pub fn recent_local_observations(
         let signal = match value.get("class").and_then(Value::as_str) {
             Some("rate_limit") => Signal::Throttled,
             Some("auth") => Signal::AuthenticationFailure,
-            Some("service_unavailable") => Signal::EndpointFailure,
+            Some("service_unavailable" | "network") => Signal::EndpointFailure,
             Some("host_offline") => Signal::HostOffline,
             _ => continue,
         };
@@ -323,6 +323,16 @@ mod tests {
         assert_eq!(evaluate(&scoped, &observations, 1100), Health::Unavailable);
         assert_eq!(evaluate(&independent, &observations, 1100), Health::Unknown);
         assert!(!format!("{observations:?}").contains("secret-endpoint-error"));
+
+        // Continuity's destination-specific connection class is still only
+        // evidence against this endpoint, never a host-wide outage.
+        store.conn.execute("INSERT INTO events(ts,task_id,run_id,kind,source,confidence,payload)
+            VALUES(1001,'t','r','error','harness','exact',?1)",
+            [serde_json::json!({"class":"network","message":"connection refused"}).to_string()]).unwrap();
+        let observations = recent_local_observations(&store, 1100).unwrap();
+        assert_eq!(observations.len(), 2);
+        assert_eq!(evaluate(&scoped, &observations, 1100), Health::Unavailable);
+        assert_eq!(evaluate(&independent, &observations, 1100), Health::Unknown);
     }
 
     #[test]

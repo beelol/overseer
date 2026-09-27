@@ -15,9 +15,10 @@ function fixture(reply) {
     update: async (key, value) => { saved.set(key, value); } } };
   const model = { accounts: [{ id: 'p-codex', harnesses: ['codex'], name: 'Codex' },
     { id: 'p-claude', harnesses: ['claude'], name: 'Claude' },
-    { id: 'p-local', harnesses: ['opencode'], name: 'Local OpenCode' }],
+    { id: 'p-local', harnesses: ['opencode'], name: 'Local OpenCode' },
+    { id: 'local-ollama', harnesses: ['opencode'], name: 'Continuity local models' }],
     profileStatus: new Map([['p-codex', { logged_in: true }], ['p-claude', { logged_in: true }],
-      ['p-local', { installed: true, logged_in: false }]]),
+      ['p-local', { installed: true, logged_in: false }], ['local-ollama', { installed: true, logged_in: false }]]),
     refresh: async () => { calls.push(['refresh']); } };
   const client = { request: async (method, params) => { calls.push([method, params]);
     if (method === 'auto.start') return reply;

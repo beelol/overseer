@@ -129,7 +129,7 @@
       const canSend = !child && msg.followUpSupported && msg.trusted;
       this.sendBtn.disabled = !canSend; this.prompt.disabled = !canSend;
       this.prompt.placeholder = child ? 'Sub-agents are steered through their parent' : !msg.trusted ? 'Trust this workspace to talk to agents'
-        : !msg.followUpSupported ? `${ui.HARNESS[run.harness] || run.harness} does not take follow-ups` : busy ? 'Message for when it finishes · ⌥⏎ stops and sends' : 'Reply…  (@ to mention a file)';
+        : !msg.followUpSupported ? `${ui.HARNESS[run.harness] || run.harness} does not take follow-ups` : busy ? (window.OverseerContinuityText && window.OverseerContinuityText.isWaiting(run.status) ? 'Message for when it continues' : 'Message for when it finishes · ⌥⏎ stops and sends') : 'Reply…  (@ to mention a file)';
       this.sendBtn.replaceChildren(ui.icon(busy ? 'history' : 'arrow-up'));
       this.sendBtn.title = !canSend ? this.prompt.placeholder : busy ? 'Send when this turn ends (Enter) · stop and send now (⌥Enter)' : 'Send (Enter)';
       this.sendBtn.setAttribute('aria-label', busy ? 'Queue message' : 'Send');

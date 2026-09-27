@@ -1,0 +1,4 @@
+overseerd 0.1.0; Codex codex-cli 0.155.0-alpha.16.4 (real, every connection of its process sent to 127.0.0.1:60581, where nothing listens); Claude Code 2.1.246 (Claude Code) (real, existing login); probe answers: fixture
+FAIL  the live check ran to its end  — Claude Code is not signed in: 
+
+0 passed, 1 failed

@@ -14,7 +14,7 @@ pub fn provider_of(harness: &str) -> &'static str {
     match harness {
         "codex" | "codex-app" => "openai",
         "claude" => "anthropic",
-        "opencode" => "local",
+        "opencode" | "opencode-serve" => "local",
         _ => "none",
     }
 }
@@ -35,7 +35,7 @@ pub fn providers() -> Value {
          "sign_in": "ChatGPT sign-in in the browser, or a device code", "why": if installed("codex") { Value::Null } else { json!("Codex CLI is not installed") }},
         {"id": "anthropic", "label": "Anthropic / Claude", "harnesses": ["claude"], "available": installed("claude"),
          "sign_in": "Claude account sign-in (claude auth login)", "why": if installed("claude") { Value::Null } else { json!("Claude Code is not installed") }},
-        {"id": "local", "label": "OpenCode (local models)", "harnesses": ["opencode"], "available": installed("opencode"),
+        {"id": "local", "label": "OpenCode (local models)", "harnesses": ["opencode", "opencode-serve"], "available": installed("opencode"),
          "sign_in": "none: local providers and mocks (owner decision 2026-09-25)", "why": if installed("opencode") { Value::Null } else { json!("OpenCode is not installed") }},
         {"id": "devin", "label": "Devin", "harnesses": [], "available": false, "why": "Devin has no account-login CLI yet (only API keys, which Overseer does not use)"},
     ])

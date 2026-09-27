@@ -1,0 +1,49 @@
+overseerd 0.1.0; Ollama 0.34.2; free disk 5506.55 GiB; installed: 8 models
+PASS  with downloads off the pull is refused and says why  — qwen2.5-coder:1.5b is not installed, and model downloads are off (overseer.continuity.allowModelDownloads)
+PASS  the first pull ever asks for a confirmation, with the size  — qwen2.5-coder:1.5b: 0.92 GiB
+PASS  nothing was downloaded before the confirmation
+
+== qwen2.5-coder:1.5b
+    03:12:39  qwen2.5-coder:1.5b: downloading 0%  (0 of 0.92 GiB)
+    03:12:45  qwen2.5-coder:1.5b: downloading 70%  (0.64 of 0.92 GiB)
+    03:12:49  qwen2.5-coder:1.5b: done 100%  (0.92 of 0.92 GiB)
+PASS  qwen2.5-coder:1.5b is downloaded, with progress shown  — 0.92 GiB in 11 s
+PASS  qwen2.5-coder:1.5b is installed and reports tool calling  — 0.92 GiB on disk, 1.5B, Q4_K_M, context up to 32768
+
+== qwen2.5-coder:3b
+    03:12:50  qwen2.5-coder:3b: downloading 0%  (0 of 1.8 GiB)
+    03:12:57  qwen2.5-coder:3b: cancelled 36%  (0.65 of 1.8 GiB)
+PASS  a download is cancelled midway and the model is not installed  — cancelled at 36% (0.65 GiB)
+    03:13:09  qwen2.5-coder:3b: done 100%  (1.8 of 1.8 GiB)
+PASS  the next pull continues from what was downloaded  — the second pull's first progress was 0.7 GiB; the cancelled one had reached 0.65 GiB
+PASS  qwen2.5-coder:3b is installed and reports tool calling  — 1.8 GiB on disk, 3.1B, Q4_K_M, context up to 32768
+
+== qwen2.5-coder:7b
+    03:13:11  qwen2.5-coder:7b: downloading 0%  (0 of 4.36 GiB)
+    03:13:19  qwen2.5-coder:7b: downloading 20%  (0.87 of 4.36 GiB)
+    03:13:23  qwen2.5-coder:7b: downloading 30%  (1.31 of 4.36 GiB)
+    03:13:27  qwen2.5-coder:7b: downloading 40%  (1.76 of 4.36 GiB)
+    03:13:31  qwen2.5-coder:7b: downloading 50%  (2.21 of 4.36 GiB)
+    03:13:35  qwen2.5-coder:7b: downloading 60%  (2.65 of 4.36 GiB)
+    03:13:52  qwen2.5-coder:7b: downloading 100%  (4.36 of 4.36 GiB)
+PASS  qwen2.5-coder:7b is downloaded, with progress shown  — 4.36 GiB in 45 s
+PASS  qwen2.5-coder:7b is installed and reports tool calling  — 4.36 GiB on disk, 7.6B, Q4_K_M, context up to 32768
+
+== qwen2.5-coder:32b
+    03:13:55  qwen2.5-coder:32b: downloading 0%  (0 of 18.49 GiB)
+    03:14:13  qwen2.5-coder:32b: downloading 10%  (1.86 of 18.49 GiB)
+    03:14:29  qwen2.5-coder:32b: downloading 20%  (3.7 of 18.49 GiB)
+    03:14:46  qwen2.5-coder:32b: downloading 30%  (5.55 of 18.49 GiB)
+    03:15:04  qwen2.5-coder:32b: downloading 40%  (7.4 of 18.49 GiB)
+    03:15:20  qwen2.5-coder:32b: downloading 50%  (9.25 of 18.49 GiB)
+    03:15:38  qwen2.5-coder:32b: downloading 60%  (11.1 of 18.49 GiB)
+    03:15:55  qwen2.5-coder:32b: downloading 70%  (12.94 of 18.49 GiB)
+    03:16:11  qwen2.5-coder:32b: downloading 80%  (14.79 of 18.49 GiB)
+    03:16:29  qwen2.5-coder:32b: downloading 90%  (16.64 of 18.49 GiB)
+    03:16:49  qwen2.5-coder:32b: downloading 100%  (18.49 of 18.49 GiB)
+PASS  qwen2.5-coder:32b is downloaded, with progress shown  — 18.49 GiB in 183 s
+PASS  qwen2.5-coder:32b is installed and reports tool calling  — 18.49 GiB on disk, 32.8B, Q4_K_M, context up to 32768
+PASS  progress was recorded as events  — 184 local_download events
+PASS  nothing was loaded into memory
+
+14 passed, 0 failed

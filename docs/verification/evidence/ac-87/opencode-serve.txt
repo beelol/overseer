@@ -1,0 +1,67 @@
+overseerd 0.1.0; OpenCode 1.15.13 through the opencode-serve harness; Ollama 0.34.2; Darwin 25.6.0 arm64
+memory: 128 GiB installed; budget now 49.8 GiB (40% of total is 51.2 GiB; headroom 12.8 GiB)
+order (smallest first): qwen2.5-coder:1.5b 0.9 GiB, qwen2.5-coder:3b 1.8 GiB, qwen2.5-coder:7b 4.4 GiB, qwen2.5-coder:14b 8.4 GiB, qwen3-coder:30b 17.3 GiB, qwen2.5-coder:32b 18.5 GiB
+
+== qwen2.5-coder:1.5b (tier 4, 0.9 GiB on disk)
+    memory before: 62.3 GiB available, pressure normal, level 75%, loaded: nothing
+    the guard allowed overseer/qwen2.5-coder-1.5b:32k at a 32k context: 2.8 GiB of a 49.5 GiB budget, loaded under the watchdog
+    attempt 1: FAIL  completed in 5.6 s; file: missing; tools: 0; reply: "write:verified 1."
+    attempt 2: FAIL  failed in 7.9 s; file: missing; tools: 0; reply: "{\"name\": \"write\", \"arguments\": {\"content\": \"verified 2\", \"filePath\": \"check-2.tx"; tool_call_as_text: overseer/qwen2.5-coder-1.5b:32k wrote its tool call as text twice; nothing ran
+    attempt 3: FAIL  completed in 6.5 s; file: missing; tools: 0; reply: "write contents=\"Verified 3.\" filePath=\"/TMP/…"
+    memory while it worked: lowest 58.6 GiB available, lowest level 73%, pressure normal; one model of this check loaded at a time: true
+    memory after: 60.7 GiB available, pressure normal, level 75%, loaded: nothing; unloaded: true
+    RESULT qwen2.5-coder:1.5b: failed (0 of 3 write checks: turn completed; exit 0; tool_call_as_text: overseer/qwen2.5-coder-1.5b:32k wrote its tool call as text twice; nothing ran)
+
+== qwen2.5-coder:3b (tier 4, 1.8 GiB on disk)
+    memory before: 60.7 GiB available, pressure normal, level 75%, loaded: nothing
+    the guard allowed overseer/qwen2.5-coder-3b:32k at a 32k context: 3.9 GiB of a 50.3 GiB budget, loaded under the watchdog
+    attempt 1: FAIL  failed in 11.7 s; file: missing; tools: 0; reply: "```json\n{\"name\": \"write\", \"arguments\": {\"content\": \"verified 1\", \"filePath\": \"./"; tool_call_as_text: overseer/qwen2.5-coder-3b:32k wrote its tool call as text twice; nothing ran
+    attempt 2: FAIL  completed in 9.6 s; file: missing; tools: 0; reply: "done"
+    attempt 3: FAIL  failed in 10.2 s; file: missing; tools: 0; reply: "{\"name\": \"write\", \"arguments\": {\"content\": \"verified 3\", \"filePath\": \"/private/v"; tool_call_as_text: overseer/qwen2.5-coder-3b:32k wrote its tool call as text twice; nothing ran
+    memory while it worked: lowest 55.9 GiB available, lowest level 72%, pressure normal; one model of this check loaded at a time: true
+    memory after: 58.5 GiB available, pressure normal, level 75%, loaded: nothing; unloaded: true
+    RESULT qwen2.5-coder:3b: failed (0 of 3 write checks: tool_call_as_text: overseer/qwen2.5-coder-3b:32k wrote its tool call as text twice; nothing ran; turn completed; exit 0)
+
+== qwen2.5-coder:7b (tier 3, 4.4 GiB on disk)
+    memory before: 58.5 GiB available, pressure normal, level 75%, loaded: nothing
+    the guard allowed overseer/qwen2.5-coder-7b:32k at a 32k context: 7.1 GiB of a 46.1 GiB budget, loaded under the watchdog
+    attempt 1: FAIL  completed in 17.5 s; file: missing; tools: 0; reply: "done"
+    attempt 2: FAIL  completed in 16.8 s; file: missing; tools: 0; reply: "done"
+    attempt 3: FAIL  completed in 16.3 s; file: missing; tools: 0; reply: "done"
+    memory while it worked: lowest 49.2 GiB available, lowest level 69%, pressure normal; one model of this check loaded at a time: true
+    memory after: 59 GiB available, pressure normal, level 75%, loaded: nothing; unloaded: true
+    RESULT qwen2.5-coder:7b: failed (0 of 3 write checks: turn completed; exit 0)
+
+== qwen2.5-coder:14b (tier 2, 8.4 GiB on disk)
+    memory before: 59 GiB available, pressure normal, level 75%, loaded: nothing
+    the guard allowed overseer/qwen2.5-coder-14b:32k at a 32k context: 15.4 GiB of a 45.7 GiB budget, loaded under the watchdog
+    attempt 1: FAIL  completed in 34.5 s; file: missing; tools: 0; reply: "```json\n{\n  \"name\": \"write\",\n  \"arguments\": {\n    \"content\": \"verified 1\",\n    \""
+    attempt 2: FAIL  completed in 27.2 s; file: missing; tools: 0; reply: "done"
+    attempt 3: FAIL  failed in 39.7 s; file: missing; tools: 0; reply: "{\n  \"name\": \"write\",\n  \"arguments\": {\n    \"content\": \"verified 3\",\n    \"filePath"; tool_call_as_text: overseer/qwen2.5-coder-14b:32k wrote its tool call as text twice; nothing ran
+    memory while it worked: lowest 42.7 GiB available, lowest level 63%, pressure normal; one model of this check loaded at a time: true
+    memory after: 52.8 GiB available, pressure normal, level 75%, loaded: nothing; unloaded: true
+    RESULT qwen2.5-coder:14b: failed (0 of 3 write checks: turn completed; exit 0; tool_call_as_text: overseer/qwen2.5-coder-14b:32k wrote its tool call as text twice; nothing ran)
+
+== qwen3-coder:30b (tier 1, 17.3 GiB on disk)
+    memory before: 52.8 GiB available, pressure normal, level 75%, loaded: nothing
+    the guard allowed qwen3-coder:30b-64k at a 64k context: 24.3 GiB of a 40.1 GiB budget, loaded under the watchdog
+    attempt 1: PASS  completed in 28 s; file: "verified 1"; tools: 4; reply: "done"
+    attempt 2: PASS  completed in 22 s; file: "verified 2"; tools: 4; reply: "done"
+    attempt 3: PASS  completed in 23 s; file: "verified 3"; tools: 4; reply: "done"
+    memory while it worked: lowest 33.6 GiB available, lowest level 54%, pressure normal; one model of this check loaded at a time: true
+    memory after: 51.3 GiB available, pressure normal, level 73%, loaded: nothing; unloaded: true
+    RESULT qwen3-coder:30b: passed (3 of 3 write checks)
+
+== qwen2.5-coder:32b (tier 1, 18.5 GiB on disk)
+    memory before: 51.3 GiB available, pressure normal, level 73%, loaded: nothing
+    the guard allowed overseer/qwen2.5-coder-32b:32k at a 32k context: 27.5 GiB of a 39.6 GiB budget, loaded under the watchdog
+    attempt 1: FAIL  failed in 79 s; file: missing; tools: 0; reply: "{\"name\": \"bash\", \"arguments\": {\"command\": \"touch check-1.txt && echo 'verified 1"; tool_call_as_text: overseer/qwen2.5-coder-32b:32k wrote its tool call as text twice; nothing ran
+    attempt 2: FAIL  completed in 68 s; file: missing; tools: 0; reply: "read /TMP/ovs-catalogue-C5uX"
+    attempt 3: FAIL  completed in 62.3 s; file: missing; tools: 0; reply: "{\"name\": \"write\", \"arguments\": {\"content\": \"verified 3.\", \"filePath\": \"/private/"
+    memory while it worked: lowest 28.5 GiB available, lowest level 44%, pressure normal; one model of this check loaded at a time: true
+    memory after: 47.6 GiB available, pressure normal, level 67%, loaded: nothing; unloaded: true
+    RESULT qwen2.5-coder:32b: failed (0 of 3 write checks: tool_call_as_text: overseer/qwen2.5-coder-32b:32k wrote its tool call as text twice; nothing ran; turn completed; exit 0)
+
+at the end: 47.5 GiB available, pressure normal, level 67%, loaded: nothing
+tags of Overseer's own in Ollama (they share the weights and take no disk): overseer/qwen2.5-coder-32b:32k, overseer/qwen2.5-coder-14b:32k, overseer/qwen2.5-coder-7b:32k, overseer/qwen2.5-coder-3b:32k, overseer/qwen2.5-coder-1.5b:32k
+summary: qwen2.5-coder:1.5b failed; qwen2.5-coder:3b failed; qwen2.5-coder:7b failed; qwen2.5-coder:14b failed; qwen3-coder:30b passed; qwen2.5-coder:32b failed

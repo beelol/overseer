@@ -643,6 +643,9 @@ fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
     budget: Duration) -> Result<AutoProfileDiscovery> {
     let deadline = Instant::now() + budget;
     let profile = d.profile(profile_id)?;
+    if profile.id == crate::opencode_bridge::LOCAL_PROFILE {
+        return Err(anyhow!("Continuity's local model profile needs a verified Auto memory and capability adapter"));
+    }
     if profile.harness == "codex" {
         let store = d.store.lock().unwrap();
         let active = store.runs()?.into_iter().filter(|run|
@@ -1188,7 +1191,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "audio.import_commander" => crate::audio::import_commander(d, p)?,
         "audio.voices" => crate::audio::voices()?,
         "harness.list" => {
-            let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "generic"]
+            let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "opencode-serve", "generic"]
                 .iter()
                 .map(|h| {
                     let program = crate::adapters::resolve_program(h);
@@ -1389,7 +1392,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             auto_root_response(d, work_unit_id, &request_hash, false)?
         }
         "run.delegate" => d.delegate_run(p, false)?,
-        "run.handoff" => d.handoff_run(p)?,
+        // The two pre-merge handoff contracts share a method name. A completed
+        // Auto checkpoint names its source; Continuity names the waiting run.
+        // Keep both request shapes until they have a single admission owner.
+        "run.handoff" if p.get("source_run_id").is_some() => d.handoff_run(p)?,
         "auto.mode.get" => json!({"enabled":d.store.lock().unwrap().auto_mode_enabled()?}),
         "auto.mode.set" => {
             if p.as_object().is_none_or(|fields| fields.len() != 1)
@@ -2425,6 +2431,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let n = d.ui_clients.load(std::sync::atomic::Ordering::SeqCst);
             json!({"vscode": n, "ui": n})
         }
+        // Continuity (Gate L): connection state, settings, local inventory, pick and guard.
+        m if crate::continuity::handles(m) => crate::continuity::dispatch(d, m, p)?,
         other => return Err(anyhow!("unknown method {other}")),
     })
 }

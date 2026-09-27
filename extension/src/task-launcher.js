@@ -51,7 +51,8 @@ class TaskLauncher {
     const harnesses = (await this.client.request('harness.list')).map(h => ({ harness: h.harness, installed: h.installed, version: h.version, hints: hints(h.capabilities || {}), install_url: INSTALL[h.harness] }));
     await this.refreshAccounts();
     return { repos: await this.repos(), harnesses, accounts: this.accounts(), trusted: vscode.workspace.isTrusted, defaults: this.defaults(),
-      showAppServer: vscode.workspace.getConfiguration('overseer').get('showCodexAppServer', false) };
+      showAppServer: vscode.workspace.getConfiguration('overseer').get('showCodexAppServer', false),
+      continuity: this.continuity ? this.continuity() : undefined };
   }
 
   async browse() {
@@ -101,10 +102,12 @@ class TaskLauncher {
   }
 
   async startAuto(f, repo, prompt) {
-    const accounts = this.accounts().filter(a => (a.signedIn &&
+    // Continuity's isolated Ollama profile needs its own verified Auto route
+    // adapter and memory admission; project-configured OpenCode already has one.
+    const accounts = this.accounts().filter(a => a.id !== 'local-ollama' && ((a.signedIn &&
       (a.harnesses || []).some(h => ['codex', 'claude'].includes(h))) ||
-      (a.installed && (a.harnesses || []).includes('opencode')));
-    if (!accounts.length) throw new Error('Sign in to an agent account or install local OpenCode to use Auto routing.');
+      (a.installed && (a.harnesses || []).includes('opencode'))));
+    if (!accounts.length) throw new Error('Connect Codex or Claude Code, or set up a project-local OpenCode route for Auto routing.');
     if (accounts.length > 8) throw new Error('Auto routing currently supports up to eight signed-in accounts.');
     const preferred = String(f.preferredHarness || '');
     if (preferred && !['codex-app', 'claude', 'opencode'].includes(preferred)) throw new Error('Unsupported Auto harness preference.');

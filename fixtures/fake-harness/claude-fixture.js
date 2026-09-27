@@ -118,6 +118,38 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   } else if (mode === 'ordinary-failure') {
     assistant([{ type: 'text', text: 'The requested check failed.' }]);
     result(true, 'fixture assertion failed during requested work');
+  } else if (mode === 'background-nested') {
+    // As a live Claude Code 2.1.246 run: a foreground subagent launches its own child in the
+    // background (spawn depth 2), is told when it finishes, and returns; the main agent then
+    // ends its turn. Claude starts no further top-level turn for the grandchild.
+    assistant([{ type: 'tool_use', id: 'toolu_c', name: 'Agent', input: { description: 'child', prompt: 'hi' } }]);
+    out({ type: 'system', subtype: 'task_started', session_id: sid, task_id: 'c1', tool_use_id: 'toolu_c', is_backgrounded: false, spawn_depth: 1 });
+    assistant([{ type: 'tool_use', id: 'toolu_g', name: 'Agent', input: { description: 'grandchild', prompt: 'hi', run_in_background: true } }], 'toolu_c');
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [{ task_id: 'g1', task_type: 'local_agent' }] });
+    out({ type: 'system', subtype: 'task_started', session_id: sid, task_id: 'g1', tool_use_id: 'toolu_g', is_backgrounded: true, spawn_depth: 2 });
+    user([{ type: 'tool_result', tool_use_id: 'toolu_g', content: 'Async agent launched successfully.' }], 'toolu_c');
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [] });
+    out({ type: 'system', subtype: 'task_notification', session_id: sid, task_id: 'g1', tool_use_id: 'toolu_g', status: 'completed', summary: 'hi' });
+    out({ type: 'system', subtype: 'task_notification', session_id: sid, task_id: 'c1', tool_use_id: 'toolu_c', status: 'completed', summary: 'child done' });
+    user([{ type: 'tool_result', tool_use_id: 'toolu_c', content: 'child done' }]);
+    assistant([{ type: 'text', text: 'done' }]);
+    result(false, 'done');
+  } else if (mode === 'background-read-in-turn') {
+    // As a live Claude Code 2.1.246 run: the main agent messages a finished subagent, which runs
+    // again in the background (spawn depth 1) and is reported mid-turn; the main agent reads the
+    // notice in its next model call and ends the turn. No further turn follows.
+    assistant([{ type: 'tool_use', id: 'toolu_msg', name: 'SendMessage', input: { to: 'c1', message: 'Status check' } }]);
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [{ task_id: 'c1', task_type: 'local_agent' }] });
+    out({ type: 'system', subtype: 'task_started', session_id: sid, task_id: 'c1', tool_use_id: 'toolu_c', is_backgrounded: true, spawn_depth: 1 });
+    user([{ type: 'tool_result', tool_use_id: 'toolu_msg', content: 'Message queued.' }]);
+    out({ type: 'system', subtype: 'background_tasks_changed', session_id: sid, tasks: [] });
+    out({ type: 'system', subtype: 'task_notification', session_id: sid, task_id: 'c1', tool_use_id: 'toolu_c', status: 'completed', summary: 'status' });
+    const file = path.join(process.cwd(), 'bg.txt');
+    assistant([{ type: 'tool_use', id: 'toolu_w', name: 'Write', input: { file_path: file, content: 'after notice\n' } }]);
+    fs.writeFileSync(file, 'after notice\n');
+    user([{ type: 'tool_result', tool_use_id: 'toolu_w', content: 'File created successfully at: ' + file }]);
+    assistant([{ type: 'text', text: 'done' }]);
+    result(false, 'done');
   } else if (mode === 'showcase' || mode === 'showcase-permission') {
     // A realistic session for UI checks: reads, a search, an edit, a new file, a test run and a
     // Markdown summary (heading, list, table, code block, inline code, link, long path).

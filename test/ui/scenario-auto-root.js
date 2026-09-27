@@ -69,7 +69,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // Leaving a webview textarea focused can swallow the command-palette shortcut.
     const statusPoint = await cdp.evalWorkbench(`(() => { const r = document.querySelector('.part.statusbar').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
     await cdp.click(statusPoint.x, statusPoint.y);
-    await cdp.command('Overseer: New Agent');
+    s.note('command row', await cdp.command('Overseer: New Agent'));
     await dash.waitFor(`document.body.dataset.mode === 'composer' && !document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);
     const autoDefault = await dash.eval(`document.querySelector('[data-chip="agent"]').getAttribute('aria-label')`);
     const nextPoint = await s.webviewPoint(dash, '#task');
