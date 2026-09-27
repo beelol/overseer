@@ -472,6 +472,43 @@ impl Daemon {
                 bail!("profile {} belongs to {}, not {harness}", prof.name, prof.harness);
             }
         }
+        let auto_routing = match p.get("auto_routing") {
+            None => false,
+            Some(Value::Bool(enabled)) => *enabled,
+            _ => bail!("auto_routing must be a boolean"),
+        };
+        let auto_allowed_profiles = if auto_routing {
+            if harness != "codex-app" {
+                bail!("run-bound Auto delegation is not yet available for this harness");
+            }
+            if !self.store.lock().unwrap().auto_mode_enabled()? {
+                bail!("Auto Mode is disabled");
+            }
+            let ids = match p.get("auto_allowed_profiles") {
+                None => vec![profile.as_ref().ok_or_else(|| anyhow!("Auto parent has no profile"))?.id.clone()],
+                Some(Value::Array(ids)) if !ids.is_empty() && ids.len() <= 8 => {
+                    let mut checked = Vec::new();
+                    for id in ids {
+                        let id = id.as_str().filter(|id| !id.is_empty() && id.len() <= 120)
+                            .ok_or_else(|| anyhow!("invalid Auto allowed profile"))?;
+                        let candidate = self.profile(id)?;
+                        if !matches!(candidate.harness.as_str(), "codex" | "claude" | "opencode")
+                            || checked.iter().any(|existing| existing == id) {
+                            bail!("invalid or duplicate Auto allowed profile");
+                        }
+                        checked.push(id.to_string());
+                    }
+                    checked
+                }
+                _ => bail!("auto_allowed_profiles must be a bounded nonempty list"),
+            };
+            Some(ids)
+        } else {
+            if p.get("auto_allowed_profiles").is_some() {
+                bail!("auto_allowed_profiles requires auto_routing");
+            }
+            None
+        };
         let target_ref = p["target_ref"].as_str().filter(|s| !s.is_empty()).map(str::to_string);
         if let Some(t) = &target_ref {
             if git::rev_parse(&repo, t).is_none() {
@@ -584,7 +621,8 @@ impl Daemon {
             store.insert_run(&run)?;
             store.set_workspace_owner(&ws.id, Some(&run.id))?;
         }
-        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "sandbox":sandbox, "extra_args": p["extra_args"].clone()});
+        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "sandbox":sandbox, "extra_args": p["extra_args"].clone(),
+            "auto_routing":auto_routing,"auto_allowed_profiles":auto_allowed_profiles});
         let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };
         {
             let store = self.store.lock().unwrap();
@@ -1115,6 +1153,11 @@ impl Daemon {
             store.conn.query_row("SELECT launch FROM runs WHERE id=?1", [run_id], |r| r.get::<_, Option<String>>(0))?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null)
         };
         let mut generic_meta = launch_meta.get("generic").cloned().unwrap_or(launch_meta.clone());
+        if generic_meta["auto_routing"] == true {
+            if !self.store.lock().unwrap().auto_mode_enabled()? {
+                bail!("Auto Mode was disabled before the parent turn started");
+            }
+        }
         // Turn options: this turn's choices, else the run's last ones (a model change sticks).
         let effort = opts.effort.clone().or_else(|| generic_meta["opts"]["effort"].as_str().map(str::to_string));
         let mode = opts.mode.clone().or_else(|| generic_meta["opts"]["mode"].as_str().map(str::to_string));
@@ -1196,18 +1239,18 @@ impl Daemon {
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
         }
-        let sandbox = generic_meta["sandbox"].as_str().unwrap_or("workspace-write");
-        if !matches!(sandbox, "read-only" | "workspace-write") {
+        let sandbox = generic_meta["sandbox"].as_str().unwrap_or("workspace-write").to_string();
+        if !matches!(sandbox.as_str(), "read-only" | "workspace-write") {
             bail!("saved run sandbox is unsupported");
         }
-        let launch = adapters::launch(
+        let mut launch = adapters::launch(
             &run.harness,
             &LaunchReq {
                 cwd: Path::new(&ws.path),
                 prompt,
                 model: run.model.as_deref(),
                 effort: effort.as_deref().or(run.effort.as_deref()),
-                sandbox: Some(sandbox),
+                sandbox: Some(&sandbox),
                 profile_env,
                 resume_session: resume.as_deref(),
                 program_override: generic_meta["program"].as_str(),
@@ -1217,6 +1260,31 @@ impl Daemon {
                 images: &images,
             },
         )?;
+        if generic_meta["auto_routing"] == true {
+            let generation = run.process_generation + 1;
+            let dir = paths::runs_dir().join(run_id).join(format!("p{generation}"));
+            paths::ensure_private_dir(&dir)?;
+            let capability = format!("{}{}", uuid::Uuid::new_v4().simple(), uuid::Uuid::new_v4().simple());
+            let capability_path = dir.join("auto-bridge.cap");
+            {
+                use std::io::Write;
+                use std::os::unix::fs::OpenOptionsExt;
+                let mut file = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600)
+                    .open(&capability_path)?;
+                file.write_all(capability.as_bytes())?;
+            }
+            use sha2::Digest;
+            generic_meta["auto_bridge_hash"] = json!(format!("{:x}", sha2::Sha256::digest(capability.as_bytes())));
+            generic_meta["auto_bridge_generation"] = json!(generation);
+            // Codex app-server accepts per-process MCP overrides. Keep the
+            // bearer value in a private file, never in argv or launch.json.
+            let command = serde_json::to_string(&self.exe.display().to_string())?;
+            let args = serde_json::to_string(&vec!["auto-mcp".to_string(), run.id.clone(),
+                capability_path.display().to_string(), paths::socket_path().display().to_string()])?;
+            launch.args.extend(["-c".into(), format!("mcp_servers.overseer_auto.command={command}"),
+                "-c".into(), format!("mcp_servers.overseer_auto.args={args}"),
+                "-c".into(), "mcp_servers.overseer_auto.required=true".into()]);
+        }
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(run_id))?;
         let app = json!({"prompt": prompt, "cwd": ws.path, "model": run.model, "effort": effort.as_deref().or(run.effort.as_deref()), "resume": resume, "approval": generic_meta["approval"].as_str().unwrap_or("on-request"),
             "sandbox":sandbox,
@@ -1273,7 +1341,8 @@ impl Daemon {
         recorded_meta["env_keys"] = json!(launch.env.keys().collect::<Vec<_>>());
         let auto_child = recorded_meta["generic"]["auto_selected"] == true
             && run.relation_source.as_deref() == Some("managed-delegation");
-        if auto_child {
+        let record_before_spawn = auto_child || recorded_meta["generic"]["auto_routing"] == true;
+        if record_before_spawn {
             // A crash or write failure after cmd.spawn must not leave a live
             // Auto supervisor with no durable identity to reconcile.
             self.store.lock().unwrap().set_run_process(&run.id,
@@ -1282,7 +1351,7 @@ impl Daemon {
         let mut child = match cmd.spawn().context("starting run supervisor") {
             Ok(child) => child,
             Err(error) => {
-                if auto_child {
+                if record_before_spawn {
                     let store = self.store.lock().unwrap();
                     let cleared = store.conn.execute(
                         "UPDATE runs SET run_dir=NULL WHERE id=?1 AND run_dir=?2 AND process_generation=?3",
@@ -1296,7 +1365,7 @@ impl Daemon {
         std::thread::spawn(move || {
             let _ = child.wait();
         });
-        if !auto_child {
+        if !record_before_spawn {
             self.store.lock().unwrap().set_run_process(&run.id,
                 &run_dir.display().to_string(), generation, &recorded_meta)?;
         }

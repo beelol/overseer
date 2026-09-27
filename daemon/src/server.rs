@@ -221,6 +221,30 @@ fn s<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
     p[key].as_str().ok_or_else(|| anyhow!("missing string parameter {key}"))
 }
 
+fn auto_bridge_parent(d: &Arc<Daemon>, p: &Value) -> Result<(crate::store::Run, Value)> {
+    use sha2::{Digest, Sha256};
+    let run = d.run(s(p, "run_id")?)?;
+    if run.parent_run_id.is_some() || run.process_generation < 1 {
+        return Err(anyhow!("Auto bridge requires a launched top-level parent"));
+    }
+    let capability = s(p, "capability")?;
+    if capability.len() != 64 || !capability.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(anyhow!("invalid Auto bridge capability"));
+    }
+    let launch: Option<String> = d.store.lock().unwrap().conn.query_row(
+        "SELECT launch FROM runs WHERE id=?1", [&run.id], |row| row.get(0))?;
+    let launch: Value = launch.as_deref().and_then(|value| serde_json::from_str(value).ok())
+        .unwrap_or(Value::Null);
+    let generic = launch.get("generic").unwrap_or(&launch);
+    let actual_hash = format!("{:x}", Sha256::digest(capability.as_bytes()));
+    if generic["auto_routing"] != true
+        || generic["auto_bridge_generation"].as_i64() != Some(run.process_generation)
+        || generic["auto_bridge_hash"].as_str() != Some(actual_hash.as_str()) {
+        return Err(anyhow!("Auto bridge capability is not bound to this run"));
+    }
+    Ok((run, generic.clone()))
+}
+
 fn metadata_deadline(p: &Value) -> Result<Instant> {
     let ms = match p.get("timeout_ms") {
         None => 5000,
@@ -668,6 +692,44 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let enabled = p["enabled"].as_bool().unwrap();
             d.store.lock().unwrap().set_auto_mode_enabled(enabled)?;
             json!({"enabled":enabled})
+        }
+        "auto.bridge.submit" => {
+            let (parent, generic) = auto_bridge_parent(d, p)?;
+            if parent.status != "running" || !d.store.lock().unwrap().auto_mode_enabled()? {
+                return Err(anyhow!("Auto parent is not running or Auto Mode is disabled"));
+            }
+            if p.get("parent_run_id").is_some() || p.get("allowed_profiles").is_some()
+                || p.get("pinned_route").is_some() || p.get("preferred_harness").is_some() {
+                return Err(anyhow!("Auto bridge cannot change its parent or account authority"));
+            }
+            let mut request = p.clone();
+            let fields = request.as_object_mut().ok_or_else(|| anyhow!("Auto bridge request must be an object"))?;
+            fields.remove("run_id");
+            fields.remove("capability");
+            fields.insert("parent_run_id".into(), json!(parent.id));
+            fields.insert("allowed_profiles".into(), generic["auto_allowed_profiles"].clone());
+            let budget = match request.get("execution_budget_ms") {
+                None => crate::daemon::DEFAULT_AUTO_EXECUTION_BUDGET_MS,
+                Some(value) => value.as_u64().ok_or_else(|| anyhow!("invalid child execution budget"))?,
+            };
+            if !(1_000..=crate::daemon::DEFAULT_AUTO_EXECUTION_BUDGET_MS).contains(&budget) {
+                return Err(anyhow!("child execution budget exceeds the Auto parent limit"));
+            }
+            request["execution_budget_ms"] = json!(budget);
+            dispatch(d, "auto.dispatch", &request)?
+        }
+        "auto.bridge.result" => {
+            let (parent, _) = auto_bridge_parent(d, p)?;
+            if p.as_object().is_none_or(|fields| fields.keys().any(|field|
+                !matches!(field.as_str(), "run_id" | "capability" | "child_run_id"))) {
+                return Err(anyhow!("unsupported Auto bridge result field"));
+            }
+            let child = d.run(s(p, "child_run_id")?)?;
+            if child.parent_run_id.as_deref() != Some(parent.id.as_str())
+                || child.relation_source.as_deref() != Some("managed-delegation") {
+                return Err(anyhow!("child result is outside this Auto parent"));
+            }
+            d.delegated_result(&child.id)?
         }
         "auto.dispatch" => {
             use crate::auto_select::{CapabilityTier, Sandbox, WorkUnit};

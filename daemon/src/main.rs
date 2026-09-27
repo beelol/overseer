@@ -9,6 +9,7 @@ mod auto_fit;
 mod auto_select;
 mod auto_health;
 mod auto_maintenance;
+mod auto_mcp;
 mod audio;
 mod adapters;
 mod background;
@@ -37,7 +38,7 @@ pub fn log(msg: &str) {
 }
 
 fn usage() -> ! {
-    eprintln!("usage: overseerd serve | overseerd ctl <method> [json-params] | overseerd shim <run-dir> | overseerd version");
+    eprintln!("usage: overseerd serve | overseerd ctl <method> [json-params] | overseerd shim <run-dir> | overseerd auto-mcp <run-id> <capability-file> <socket> | overseerd version");
     std::process::exit(2);
 }
 
@@ -60,6 +61,15 @@ fn main() {
             let dir = args.get(2).unwrap_or_else(|| usage());
             if let Err(e) = shim::run(dir.into()) {
                 eprintln!("shim error: {e:#}");
+                std::process::exit(1);
+            }
+        }
+        Some("auto-mcp") => {
+            let run_id = args.get(2).unwrap_or_else(|| usage());
+            let capability = args.get(3).unwrap_or_else(|| usage());
+            let socket = args.get(4).unwrap_or_else(|| usage());
+            if let Err(error) = auto_mcp::run(run_id, std::path::Path::new(capability), std::path::Path::new(socket)) {
+                eprintln!("Auto tool server stopped: {error:#}");
                 std::process::exit(1);
             }
         }

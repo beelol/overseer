@@ -3433,6 +3433,100 @@ fn auto_dispatch_can_snapshot_a_working_parent_into_an_isolated_child() {
 }
 
 #[test]
+fn auto_bridge_binds_dispatch_and_result_to_the_issued_parent_run() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "6000")]);
+    let child_profile = d.call("profile.create", json!({"name":"bridge child account","harness":"codex"}));
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"hold parent",
+        "approval_policy":"never","auto_routing":true,
+        "auto_allowed_profiles":[child_profile["id"]]})));
+    assert_eq!(d.wait_status(&parent, |s| s == "running", 10)["status"], "running");
+    let (_, launch_dir) = launch_info(&d, &parent);
+    let capability_path = launch_dir.join("auto-bridge.cap");
+    let capability = std::fs::read_to_string(&capability_path).unwrap();
+    assert!(!capability.trim().is_empty());
+    let manifest: serde_json::Value = serde_json::from_slice(&std::fs::read(launch_dir.join("launch.json")).unwrap()).unwrap();
+    assert!(!manifest.to_string().contains(capability.trim()),
+        "the launch manifest must not carry the bearer capability");
+    assert!(manifest["args"].to_string().contains("mcp_servers.overseer_auto.command"),
+        "the parent harness needs a per-process Auto tool server");
+    let request = json!({"run_id":parent,"capability":capability.trim(),
+        "work_unit_id":"bridge-child-1","min_tier":"general","required_tools":[],
+        "prompt":"bounded child","title":"bounded child"});
+    let mut forged_parent = request.clone();
+    forged_parent["parent_run_id"] = json!("r-forged");
+    assert!(d.try_call("auto.bridge.submit", forged_parent).is_err());
+    let mut widened_accounts = request.clone();
+    widened_accounts["allowed_profiles"] = json!(["system-codex"]);
+    assert!(d.try_call("auto.bridge.submit", widened_accounts).is_err());
+    let mut bad_capability = request.clone();
+    bad_capability["capability"] = json!("forged");
+    assert!(d.try_call("auto.bridge.submit", bad_capability).is_err());
+    assert_eq!(d.runs().len(), 1, "forged bridge calls must start no child");
+    let mut bridge = std::process::Command::new(BIN).arg("auto-mcp").arg(&parent)
+        .arg(&capability_path).arg(d.socket()).stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null()).spawn().unwrap();
+    let mut input = bridge.stdin.take().unwrap();
+    let mut output = std::io::BufReader::new(bridge.stdout.take().unwrap());
+    let mut mcp_call = |message: serde_json::Value| -> serde_json::Value {
+        use std::io::{BufRead, Write};
+        input.write_all(format!("{message}\n").as_bytes()).unwrap();
+        let mut line = String::new();
+        output.read_line(&mut line).unwrap();
+        serde_json::from_str(&line).unwrap()
+    };
+    let initialized = mcp_call(json!({"jsonrpc":"2.0","id":1,"method":"initialize",
+        "params":{"protocolVersion":"2025-03-26","capabilities":{},
+        "clientInfo":{"name":"fixture","version":"1"}}}));
+    assert_eq!(initialized["result"]["serverInfo"]["name"], "overseer-auto");
+    let tools = mcp_call(json!({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}));
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 2);
+    let submitted = mcp_call(json!({"jsonrpc":"2.0","id":3,"method":"tools/call",
+        "params":{"name":"auto_submit","arguments":{"work_unit_id":"bridge-child-1",
+        "min_tier":"general","required_tools":[],"prompt":"bounded child","title":"bounded child"}}}));
+    let selected: serde_json::Value = serde_json::from_str(submitted["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    assert_eq!(selected["run"]["profile_id"], child_profile["id"]);
+    let child = run_id(&selected);
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert!(d.try_call("auto.bridge.result", json!({"run_id":parent,
+        "capability":capability.trim(),"child_run_id":parent})).is_err());
+    let returned = mcp_call(json!({"jsonrpc":"2.0","id":4,"method":"tools/call",
+        "params":{"name":"auto_result","arguments":{"child_run_id":child}}}));
+    let result: serde_json::Value = serde_json::from_str(returned["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(result["state"], "ready", "{result}");
+    assert_eq!(result["parent_run_id"], parent);
+    assert_eq!(d.call("auto.bridge.submit", request)["run"]["id"], child,
+        "a lost submit response reuses the same child");
+    d.call("auto.mode.set", json!({"enabled":false}));
+    assert!(d.try_call("auto.bridge.submit", json!({"run_id":parent,
+        "capability":capability.trim(),"work_unit_id":"bridge-disabled-2",
+        "min_tier":"general","required_tools":[],"prompt":"new work"})).is_err());
+    assert_eq!(d.call("auto.bridge.result", json!({"run_id":parent,
+        "capability":capability.trim(),"child_run_id":child}))["state"], "ready",
+        "disabling Auto still permits reading an accepted child's result");
+    d.call("auto.mode.set", json!({"enabled":true}));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    d.call("run.follow_up", json!({"run_id":parent,"prompt":"hold parent"}));
+    assert_eq!(d.wait_status(&parent, |s| s == "running", 10)["status"], "running");
+    let new_capability = std::fs::read_to_string(d.home.path().join("runs").join(&parent)
+        .join("p2").join("auto-bridge.cap")).unwrap();
+    assert_ne!(new_capability, capability);
+    assert!(d.try_call("auto.bridge.result", json!({"run_id":parent,
+        "capability":capability.trim(),"child_run_id":child})).is_err(),
+        "an old turn capability is revoked on the next process generation");
+    assert_eq!(d.call("auto.bridge.result", json!({"run_id":parent,
+        "capability":new_capability.trim(),"child_run_id":child}))["state"], "ready");
+    drop(mcp_call);
+    drop(input);
+    bridge.wait().unwrap();
+}
+
+#[test]
 fn auto_cold_start_discloses_unknown_allowance_and_rejects_invented_inference() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
