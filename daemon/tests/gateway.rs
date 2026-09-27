@@ -384,9 +384,10 @@ async fn ac119_devices_scopes_and_revoking() {
     assert_eq!(d.run(&run)["status"], "running");
     assert_eq!(d.call("gateway.status", json!({}))["enabled"], true);
     assert!(d.call("state", json!({}))["tasks"].as_array().unwrap().iter().all(|t| t["archived_ms"].is_null()));
-    // Unknown and planned methods are refused.
-    for method in ["no.such_method", "workspace.file", "review.reject"] {
-        assert_eq!(Phone::code(&full.act(method, json!({})).await), "unknown_method", "{method}");
+    // Unknown methods, and methods the description only plans, are refused.
+    let planned: Vec<String> = description["methods"].as_object().unwrap().iter().filter(|(_, m)| m["planned"].as_bool() == Some(true)).map(|(k, _)| k.clone()).collect();
+    for method in ["no.such_method".to_string(), "gateway".to_string(), "state.".to_string()].into_iter().chain(planned) {
+        assert_eq!(Phone::code(&full.act(&method, json!({})).await), "unknown_method", "{method}");
     }
     // A changing request without a request id is refused.
     let bare = full.ask("run.interrupt", json!({"run_id": run}), None).await.unwrap();
