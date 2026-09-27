@@ -293,6 +293,10 @@ impl Daemon {
     /// The subject's turn ended, or it finished: each watcher is woken with what is new. Nothing
     /// new means no wake; a finished subject always gets its one last wake, then the watch ends.
     pub fn subject_changed(self: &Arc<Self>, subject: &str, reason: &str) -> Result<()> {
+        // One wake decision at a time (the event loop and the ticker both get here), each on the
+        // watch as it is now, so two wakes never take the same number or overlap.
+        static WAKES: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _one = WAKES.lock().unwrap_or_else(|e| e.into_inner());
         let finished = reason == "finished";
         for w in self.open_watches_on(subject)? {
             let events = self.store.lock().unwrap().events_after(w.last_seq, Some(subject), 4000)?;
