@@ -854,8 +854,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 if !d.store.lock().unwrap().auto_mode_enabled()? {
                     return Err(anyhow!("Auto Mode is disabled; enable it before dispatch"));
                 }
-                if parent.status != "completed" {
-                    return Err(anyhow!("automatic delegation requires a completed top-level parent"));
+                if !matches!(parent.status.as_str(), "running" | "completed") {
+                    return Err(anyhow!("automatic delegation requires a running or completed top-level parent"));
                 }
                 let mut routes = Vec::new();
                 let mut evidence = Vec::new();

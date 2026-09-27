@@ -3400,6 +3400,39 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
 }
 
 #[test]
+fn auto_dispatch_can_snapshot_a_working_parent_into_an_isolated_child() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "6000")]);
+    let child_profile = d.call("profile.create", json!({"name":"isolated child account","harness":"codex"}));
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"hold parent",
+        "approval_policy":"never"})));
+    assert_eq!(d.wait_status(&parent, |s| s == "running", 10)["status"], "running");
+    assert!(d.try_call("run.delegate", json!({"work_unit_id":"manual-live-parent-denied",
+        "parent_run_id":parent,"harness":"codex-app","profile_id":child_profile["id"],
+        "model":"gpt-6-sol","effort":"medium","prompt":"browser check"})).is_err(),
+        "ordinary manual delegation still requires a completed checkpoint");
+    let selected = d.call("auto.dispatch", json!({"work_unit_id":"working-parent-browser-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":["browser/navigate"],
+        "allowed_profiles":[child_profile["id"]],"prompt":"browser check","title":"browser check"}));
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    assert_eq!(d.run(&parent)["status"], "running", "the parent was still working at dispatch");
+    let child = run_id(&selected);
+    assert_ne!(d.run(&child)["workspace_id"], d.run(&parent)["workspace_id"]);
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert_eq!(std::fs::read_to_string(std::path::Path::new(
+        selected["workspace"]["path"].as_str().unwrap()).join("browser-report.txt")).unwrap(),
+        "browser result: context missing\n");
+    let result = d.call("run.result", json!({"run_id":child}));
+    assert_eq!(result["state"], "ready", "{result}");
+    assert_eq!(result["parent_run_id"], parent);
+    assert_eq!(d.runs().iter().filter(|run| run["parent_run_id"] == parent).count(), 1);
+}
+
+#[test]
 fn auto_cold_start_discloses_unknown_allowance_and_rejects_invented_inference() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

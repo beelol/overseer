@@ -601,7 +601,7 @@ impl Daemon {
     }
 
     /// Execute a bounded work unit in a separately supervised workspace made
-    /// from a settled parent's exact snapshot. Route selection happens before
+    /// from the parent's captured snapshot. Route selection happens before
     /// this execution boundary; this method never guesses a model or account.
     pub fn delegate_run(self: &Arc<Self>, p: &Value, auto_launch_claimed: bool) -> Result<Value> {
         if auto_launch_claimed && p["auto_selected"] != true {
@@ -718,11 +718,14 @@ impl Daemon {
             return Ok(json!({"work_unit_id":work_unit_id,"run":child,"workspace":workspace,"replayed":true}));
         }
         let parent = self.run(parent_id)?;
-        if (parent.parent_run_id.is_some() && parent.relation_source.as_deref() != Some("managed-continuation")) || parent.status != "completed" {
-            bail!("delegation requires a completed top-level parent checkpoint");
+        if (parent.parent_run_id.is_some() && parent.relation_source.as_deref() != Some("managed-continuation"))
+            || (parent.status != "completed" && !(auto_launch_claimed && parent.status == "running")) {
+            bail!("delegation requires a completed parent, or a running parent with an automatic launch claim");
         }
         let parent_ws = self.workspace(&parent.workspace_id)?;
-        if parent_ws.removed_ms.is_some() || self.active_writer(&parent_ws.path)?.is_some() {
+        let active_writer = self.active_writer(&parent_ws.path)?;
+        if parent_ws.removed_ms.is_some() || active_writer.as_ref().is_some_and(|writer|
+            !(auto_launch_claimed && parent.status == "running" && writer.id == parent.id)) {
             bail!("parent workspace is unavailable or has an active writer");
         }
         let profile = self.profile(&profile_id)?;
