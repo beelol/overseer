@@ -24,6 +24,9 @@ pub fn put(store: &mut Store, p: &Value) -> Result<Value> {
     {
         bail!("invalid or oversized artifact");
     }
+    if crate::redact::redact(id) != id || crate::redact::redact(kind) != kind {
+        bail!("artifact identifier or kind contains sensitive text");
+    }
     let attempt_revision = broker::check_attempt(store, run, job, attempt, token)?;
     if revision != attempt_revision {
         bail!("artifact source revision does not match attempt");

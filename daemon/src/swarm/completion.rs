@@ -54,6 +54,9 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
     {
         bail!("invalid completion request");
     }
+    if crate::redact::redact(request_id) != request_id {
+        bail!("completion request id contains sensitive text");
+    }
     let checks = p["checks"]
         .as_array()
         .ok_or_else(|| anyhow!("checks must be an array"))?;
@@ -62,7 +65,20 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
     }
     let mut covered = HashSet::new();
     for check in checks {
+        let fields = check
+            .as_object()
+            .ok_or_else(|| anyhow!("completion check must be an object"))?;
+        if fields.len() != 3
+            || fields
+                .keys()
+                .any(|key| !["job_id", "outcome", "evidence"].contains(&key.as_str()))
+        {
+            bail!("unknown completion check field");
+        }
         let job = required(check, "job_id")?;
+        if crate::redact::redact(job) != job {
+            bail!("completion job id contains sensitive text");
+        }
         if job.is_empty() || job.len() > 128 || !covered.insert(job) || check["outcome"] != "passed"
         {
             bail!("completion requires one passed check per job");
@@ -80,6 +96,9 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
                 .ok_or_else(|| anyhow!("evidence id must be a string"))?;
             if id.is_empty() || id.len() > 128 || !unique.insert(id) {
                 bail!("completion check has invalid or duplicate evidence");
+            }
+            if crate::redact::redact(id) != id {
+                bail!("completion evidence id contains sensitive text");
             }
         }
     }

@@ -96,6 +96,9 @@ fn validate_envelope(p: &Value) -> Result<(&str, &str, i64, String)> {
     if id.is_empty() || id.len() > 128 {
         bail!("invalid message id");
     }
+    if crate::redact::redact(id) != id {
+        bail!("message id contains sensitive text");
+    }
     let kind = required(p, "type")?;
     if ![
         "progress",
