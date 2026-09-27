@@ -230,8 +230,17 @@ impl Daemon {
     /// user's own configuration; OpenCode reads a project file, so it gets no channel yet.
     pub fn channel_launch_args(&self, run_id: &str, harness: &str) -> Result<Vec<String>> {
         let (_, channel) = self.channel_of(run_id)?;
-        if !channel || !["claude", "codex"].contains(&harness) {
+        let watcher = self.run_role(run_id) == "agent" && self.is_watcher(run_id);
+        if (!channel && !watcher) || !["claude", "codex"].contains(&harness) {
             return Ok(Vec::new());
+        }
+        let mut tools: Vec<&str> = if channel { CHANNEL_TOOLS.to_vec() } else { vec!["roster"] };
+        if watcher {
+            for t in super::watch::WATCHER_TOOLS {
+                if !tools.contains(t) {
+                    tools.push(t);
+                }
+            }
         }
         let dir = crate::paths::runs_dir().join(run_id);
         crate::paths::ensure_private_dir(&dir)?;
@@ -251,10 +260,10 @@ impl Daemon {
             }
         };
         Ok(match harness {
-            "claude" => vec!["--mcp-config".into(), config.display().to_string(), "--allowedTools".into(), CHANNEL_TOOLS.iter().map(|t| format!("mcp__overseer__{t}")).collect::<Vec<_>>().join(",")],
+            "claude" => vec!["--mcp-config".into(), config.display().to_string(), "--allowedTools".into(), tools.iter().map(|t| format!("mcp__overseer__{t}")).collect::<Vec<_>>().join(",")],
             "codex" => {
                 let mut args = vec!["-c".to_string(), format!("mcp_servers.overseer.command={}", json!(exe)), "-c".into(), format!("mcp_servers.overseer.args=[\"mcp\",\"--socket\",{}]", json!(socket)), "-c".into(), format!("mcp_servers.overseer.env={{ OVERSEER_MCP_TOKEN = {} }}", json!(token))];
-                for t in CHANNEL_TOOLS {
+                for t in &tools {
                     args.extend(["-c".into(), format!("mcp_servers.overseer.tools.{t}.approval_mode=\"approve\"")]);
                 }
                 args

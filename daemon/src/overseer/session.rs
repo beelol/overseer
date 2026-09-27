@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 pub const LEVELS: &[&str] = &["ask_first", "steer", "auto"];
 /// Actions Overseer may ask for today; watch arrives with its step.
-pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "release", "guardrail", "redirect", "archive", "cadence", "answer", "report", "area", "share", "withdraw"];
+pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "release", "guardrail", "redirect", "archive", "cadence", "answer", "report", "area", "share", "withdraw", "watch"];
 /// The settle window in which what the owner asked for can still be cancelled (AC-170's).
 pub const SETTLE_MS: i64 = 2000;
 const TURN_BYTES: usize = 32 * 1024;
@@ -156,31 +156,43 @@ impl Daemon {
     /// The harness arguments and files that give Overseer's run its tools and take away its
     /// shell, file and network tools (the spike's decisions, AC-180).
     fn overseer_launch(&self, harness: &str, scratch: &Path, token: &str) -> Result<(Vec<String>, Option<&'static str>)> {
+        self.tools_launch(harness, scratch, token, "overseer", true)
+    }
+
+    /// The harness arguments and files that give a run of the daemon's own (Overseer, a watcher)
+    /// the tools of its role, read-only when asked (no shell, file or network tools).
+    pub(crate) fn tools_launch(&self, harness: &str, dir: &Path, token: &str, role: &str, read_only: bool) -> Result<(Vec<String>, Option<&'static str>)> {
         let socket = crate::paths::socket_path().display().to_string();
         let exe = self.exe.display().to_string();
         Ok(match harness {
             "claude" => {
-                let config = scratch.join("mcp.json");
+                let config = dir.join("mcp.json");
                 std::fs::write(&config, serde_json::to_vec_pretty(&json!({"mcpServers": {"overseer": {"type": "stdio", "command": exe, "args": ["mcp", "--socket", socket], "env": {"OVERSEER_MCP_TOKEN": token}}}}))?)?;
                 {
                     use std::os::unix::fs::PermissionsExt;
                     std::fs::set_permissions(&config, std::fs::Permissions::from_mode(0o600))?;
                 }
-                let allowed = super::tool_list("overseer").iter().map(|t| format!("mcp__overseer__{}", t["name"].as_str().unwrap_or(""))).collect::<Vec<_>>().join(",");
-                (vec!["--mcp-config".into(), config.display().to_string(), "--strict-mcp-config".into(), "--allowedTools".into(), allowed,
-                    "--disallowedTools".into(), "Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Agent,Task,TodoWrite,KillShell,BashOutput,ToolSearch,AskUserQuestion,EnterPlanMode,ExitPlanMode".into()], None)
+                let allowed = super::tool_list(role).iter().map(|t| format!("mcp__overseer__{}", t["name"].as_str().unwrap_or(""))).collect::<Vec<_>>().join(",");
+                let mut args = vec!["--mcp-config".into(), config.display().to_string(), "--strict-mcp-config".into(), "--allowedTools".into(), allowed];
+                if read_only {
+                    args.extend(["--disallowedTools".into(), "Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch,Agent,Task,TodoWrite,KillShell,BashOutput,ToolSearch,AskUserQuestion,EnterPlanMode,ExitPlanMode".into()]);
+                }
+                (args, None)
             }
             "codex" => {
                 let mut args = vec!["-c".to_string(), format!("mcp_servers.overseer.command={}", json!(exe)), "-c".into(), format!("mcp_servers.overseer.args=[\"mcp\",\"--socket\",{}]", json!(socket)), "-c".into(), format!("mcp_servers.overseer.env={{ OVERSEER_MCP_TOKEN = {} }}", json!(token))];
-                for t in super::tool_list("overseer") {
+                for t in super::tool_list(role) {
                     args.extend(["-c".into(), format!("mcp_servers.overseer.tools.{}.approval_mode=\"approve\"", t["name"].as_str().unwrap_or(""))]);
                 }
-                (args, Some("read-only"))
+                (args, if read_only { Some("read-only") } else { None })
             }
             "opencode" => {
-                let config = scratch.join("opencode.json");
-                std::fs::write(&config, serde_json::to_vec_pretty(&json!({"$schema": "https://opencode.ai/config.json", "mcp": {"overseer": {"type": "local", "command": [exe, "mcp", "--socket", socket], "environment": {"OVERSEER_MCP_TOKEN": token}, "enabled": true}},
-                    "tools": {"bash": false, "write": false, "edit": false, "patch": false, "multiedit": false, "task": false, "webfetch": false}}))?)?;
+                let config = dir.join("opencode.json");
+                let mut body = json!({"$schema": "https://opencode.ai/config.json", "mcp": {"overseer": {"type": "local", "command": [exe, "mcp", "--socket", socket], "environment": {"OVERSEER_MCP_TOKEN": token}, "enabled": true}}});
+                if read_only {
+                    body["tools"] = json!({"bash": false, "write": false, "edit": false, "patch": false, "multiedit": false, "task": false, "webfetch": false});
+                }
+                std::fs::write(&config, serde_json::to_vec_pretty(&body)?)?;
                 (Vec::new(), None)
             }
             _ => (Vec::new(), None),
@@ -391,8 +403,46 @@ impl Daemon {
             "area" => format!("Set {}'s area to {}", who(a["agent"].as_str().unwrap_or("?")), a["paths"].as_array().map(|p| p.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default()),
             "share" => format!("Share {} with {}", match a["from"].as_str().filter(|s| !s.is_empty()) { Some(f) => format!("{}'s {}{}", who(f), a["what"].as_str().unwrap_or("report"), a["path"].as_str().map(|p| format!(" of {p}")).unwrap_or_default()), None => format!("a {}", a["what"].as_str().unwrap_or("note")) }, who(a["to"].as_str().or(a["agent"].as_str()).unwrap_or("?"))),
             "withdraw" => format!("Withdraw share {}", a["share"].as_str().unwrap_or("?")),
+            "watch" => format!("Watch {} ({}): “{}”{}", who(a["agent"].as_str().or(a["subject"].as_str()).unwrap_or("?")), a["mode"].as_str().unwrap_or("watch"), a["brief"].as_str().or(a["text"].as_str()).unwrap_or(""), if a["hold_on_stop"] == true { ", hold on stop" } else { "" }),
             other => format!("{other} (not an action Overseer has)"),
         }
+    }
+
+    /// A denied permission of the last day whose command or path these words would repeat.
+    fn denied_match(&self, words: &str) -> Result<Option<(String, String, String)>> {
+        let rows: Vec<(String, String, String)> = {
+            let store = self.store.lock().unwrap();
+            let mut stmt = store.conn.prepare("SELECT run_id, tool, detail FROM denied_permissions WHERE ts > ?1 ORDER BY ts DESC")?;
+            let rows = stmt.query_map([crate::daemon::now() - 86_400_000], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<_>>()?;
+            rows
+        };
+        for (run, tool, detail) in rows {
+            let base = detail.rsplit('/').next().unwrap_or(&detail).to_string();
+            let repeats = (detail.len() >= 6 && words.contains(&detail)) || (base.len() >= 6 && base != detail && words.contains(&base));
+            if repeats {
+                let title = self.run(&run).map(|r| r.title).unwrap_or(run);
+                return Ok(Some((tool, detail, title)));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Overseer's run failed: the conversation says why, and what keeps working without a model.
+    fn overseer_cannot_answer(&self, run_id: &str) -> Result<()> {
+        let session = self.overseer_session()?;
+        if session["run_id"].as_str() != Some(run_id) {
+            return Ok(());
+        }
+        let sid = session["id"].as_str().unwrap().to_string();
+        let events = self.store.lock().unwrap().events_after(0, Some(run_id), crate::store::EVENTS_PER_RUN)?;
+        let last_turn = events.iter().rev().find(|e| e.kind == "turn_started").map(|e| e.seq).unwrap_or(0);
+        let reason = events.iter().rev().find(|e| e.kind == "error" && e.seq > last_turn).map(|e| e.payload["message"].as_str().unwrap_or("").chars().take(300).collect::<String>()).filter(|m| !m.is_empty()).unwrap_or_else(|| "its harness failed".into());
+        let text = format!("Overseer cannot answer right now: {reason}. What needs no model keeps working: digests, the free checks, conflicts and their cards, holds, guardrails, and stopping one agent or all.");
+        let said: i64 = self.store.lock().unwrap().conn.query_row("SELECT COUNT(*) FROM overseer_messages WHERE session_id=?1 AND source='system' AND text=?2", rusqlite::params![sid, text], |r| r.get(0))?;
+        if said == 0 {
+            self.append_session_message(&sid, "system", None, &text, Some(&json!({"kind": "cannot_answer", "reason": reason})))?;
+        }
+        Ok(())
     }
 
     /// Overseer asks the daemon for actions. Checked here, whatever the model claims; then a
@@ -451,6 +501,11 @@ impl Daemon {
                         }
                     }
                 }
+                "watch" => {
+                    if a["agent"].as_str().unwrap_or("").is_empty() {
+                        a["agent"] = a["subject"].clone();
+                    }
+                }
                 "withdraw" => {
                     use rusqlite::OptionalExtension;
                     let share = a["share"].as_str().unwrap_or("").to_string();
@@ -483,6 +538,17 @@ impl Daemon {
         let text_len: usize = checked.iter().map(|a| a["text"].as_str().map(str::len).unwrap_or(0) + a["prompt"].as_str().map(str::len).unwrap_or(0)).sum();
         if text_len > 16 * 1024 {
             bail!("the messages are too long (16 KiB in all)");
+        }
+        // A permission the owner denied is never worked around through another agent (AC-196):
+        // words that would have an agent do the refused thing are refused here.
+        for a in &checked {
+            let words = format!("{} {}", a["text"].as_str().unwrap_or(""), a["prompt"].as_str().unwrap_or(""));
+            if words.trim().is_empty() {
+                continue;
+            }
+            if let Some((tool, detail, title)) = self.denied_match(&words)? {
+                bail!("the owner denied {tool} {detail} to {title}; Overseer does not have another agent do it");
+            }
         }
         let confirm = checked.iter().any(|a| super::control::action_class(a["action"].as_str().unwrap_or("")) == Some(super::control::CONFIRM) || a["class"] == super::control::CONFIRM);
         // At Ask first everything waits for a yes. At Steer and Auto what the owner asked for goes
@@ -696,6 +762,13 @@ impl Daemon {
                 Ok(format!("set {title}'s area to {}", r["area"].as_array().map(|p| p.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default()))
             }
             "share" => self.share_perform(a, proposal, by),
+            "watch" => {
+                let mut p = a.clone();
+                p["subject"] = a["agent"].clone();
+                let w = self.watch_start(&p, by)?;
+                self.dispatch_record(proposal, a["agent"].as_str().unwrap_or(""), "watch", "watch", a["brief"].as_str().or(a["text"].as_str()).unwrap_or(""), a["why"].as_str().unwrap_or("named"), "sent")?;
+                Ok(format!("watching {title} ({})", w["id"].as_str().unwrap_or("")))
+            }
             "withdraw" => {
                 let r = self.share_withdraw(a["share"].as_str().unwrap_or(""), by)?;
                 Ok(format!("withdrew the share; {} agents told", r["told"].as_array().map(|t| t.len()).unwrap_or(0)))
@@ -846,6 +919,12 @@ pub fn start(daemon: Arc<Daemon>) {
                 if let Err(e) = d.run_due_check_ins() {
                     crate::log(&format!("check-ins: {e:#}"));
                 }
+                if let Err(e) = d.finish_due_subjects() {
+                    crate::log(&format!("watches: {e:#}"));
+                }
+                if let Err(e) = d.finish_ended_watches() {
+                    crate::log(&format!("watches: {e:#}"));
+                }
             })
             .await;
         }
@@ -867,10 +946,15 @@ pub fn start(daemon: Arc<Daemon>) {
                 let result = (|| -> Result<()> {
                     match (kind.as_str(), role.as_str()) {
                         ("output", "overseer") if payload["role"] == "assistant" => d.overseer_said(&run, payload["text"].as_str().unwrap_or(""))?,
+                        ("status", "overseer") if payload["status"] == "failed" => {
+                            d.overseer_cannot_answer(&run)?;
+                            d.overseer_turn_ended(&run)?;
+                        }
                         ("turn_done", "overseer") | ("status", "overseer") => d.overseer_turn_ended(&run)?,
                         ("turn_started", _) => {
                             d.dispatch_advance(&run, "delivered", payload["turn"]["id"].as_str())?;
                             d.turn_started_for_check_in(&run)?;
+                            d.subject_turn_started(&run)?;
                         }
                         // A second agent in a repository: the ones already working there get their briefing.
                         ("task_created", "agent") => d.brief_companions(&run)?,
@@ -878,11 +962,14 @@ pub fn start(daemon: Arc<Daemon>) {
                             d.dispatch_advance(&run, "answered", None)?;
                             d.deliver_queued(&run)?;
                             d.turn_ended_for_check_in(&run)?;
+                            d.subject_changed(&run, "the subject's turn ended")?;
                         }
                         ("status", _) => {
                             d.deliver_queued(&run)?;
                             d.release_due_holds("status", Some(&run), &payload)?;
-                            d.finished_for_check_in(&run, payload["status"].as_str().unwrap_or(""))?;
+                            let status = payload["status"].as_str().unwrap_or("");
+                            d.finished_for_check_in(&run, status)?;
+                            d.subject_finishing(&run, status)?;
                         }
                         ("file_activity", _) => {
                             let paths: Vec<String> = payload["paths"].as_array().map(|a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()).unwrap_or_default();

@@ -726,6 +726,12 @@ impl Daemon {
         }
         self.emit(Some(&run.task_id), Some(run_id), "permission_answered", "user", "exact", json!({"request_id": request_id, "allow": allow}))?;
         self.emit(Some(&run.task_id), Some(run_id), "status", "daemon", "exact", json!({"status": "running"}))?;
+        if !allow {
+            // What the owner refused is remembered, so Overseer never has another agent do it (AC-196).
+            let input = &attention["input"];
+            let detail = input["command"].as_str().or(input["file_path"].as_str()).or(input["path"].as_str()).map(str::to_string).unwrap_or_else(|| input.to_string().chars().take(200).collect());
+            self.store.lock().unwrap().conn.execute("INSERT INTO denied_permissions(run_id, tool, detail, ts) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![run_id, attention["tool"].as_str().unwrap_or(""), detail, now()])?;
+        }
         Ok(json!({"ok": true}))
     }
 

@@ -210,7 +210,7 @@ impl Daemon {
             area: self.area_of(run_id),
             holds: Vec::new(),
             guardrails: Vec::new(),
-            watches: Vec::new(),
+            watches: self.watches_of(run_id),
             conflicts: self.open_conflicts_of(run_id).unwrap_or_default(),
             updated_ms,
         })
@@ -257,6 +257,9 @@ impl Daemon {
         }
         for a in &d.asks {
             lines.push(format!("asked Overseer: {} → {}", a["question"].as_str().unwrap_or(""), a["answer"].as_str().unwrap_or("(no answer yet)")));
+        }
+        for w in &d.watches {
+            lines.push(if w["subject"] == d.id { format!("watched by {} ({}): {}", w["watcher_title"].as_str().unwrap_or("a watcher to come"), w["mode"].as_str().unwrap_or("watch"), w["brief"].as_str().unwrap_or("")) } else { format!("watching {}: {}", w["subject_title"].as_str().unwrap_or("?"), w["brief"].as_str().unwrap_or("")) });
         }
         if !d.conflicts.is_empty() {
             lines.push(format!("open conflicts: {}", d.conflicts.iter().map(|c| format!("{} with {} on {}", c["kind"].as_str().unwrap_or("?"), c["other_title"].as_str().unwrap_or("?"), c["paths"].as_array().map(|p| p.len()).unwrap_or(0))).collect::<Vec<_>>().join("; ")));

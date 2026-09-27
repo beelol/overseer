@@ -10,6 +10,7 @@ pub mod control;
 pub mod digest;
 pub mod mcp;
 pub mod session;
+pub mod watch;
 
 use crate::daemon::Daemon;
 use anyhow::{bail, Result};
@@ -40,6 +41,27 @@ pub(crate) fn tool_list(role: &str) -> Vec<Value> {
             "name": "claim",
             "description": "Claim the paths (files or directories, relative to the repository) you are taking as your area; another agent writing there is a conflict.",
             "inputSchema": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}}}, "required": ["paths"], "additionalProperties": false}
+        }));
+    }
+    if role == "watcher" {
+        // A watcher reads its subject (the daemon holds every read to it) and files findings.
+        tools.push(json!({
+            "name": "agent",
+            "description": "Your subject's digest: what was asked, status, changed files, last messages, what it waits for.",
+            "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"], "additionalProperties": false}
+        }));
+        for (name, description, props, required) in [
+            ("conversation", "A range of your subject's conversation: its messages and tool steps, oldest first, from an event sequence number (after) up to a limit.", json!({"id": {"type": "string"}, "after": {"type": "integer"}, "limit": {"type": "integer"}}), vec!["id"]),
+            ("changes", "Your subject's changed files with added and removed line counts, against its task's base.", json!({"id": {"type": "string"}}), vec!["id"]),
+            ("diff", "One file's diff in your subject's worktree against its task's base.", json!({"id": {"type": "string"}, "path": {"type": "string"}}), vec!["id", "path"]),
+            ("file", "One file's contents in your subject's worktree.", json!({"id": {"type": "string"}, "path": {"type": "string"}}), vec!["id", "path"]),
+        ] {
+            tools.push(json!({"name": name, "description": description, "inputSchema": {"type": "object", "properties": props, "required": required, "additionalProperties": false}}));
+        }
+        tools.push(json!({
+            "name": "finding",
+            "description": "Your finding on the subject after a wake: fine (nothing to report; stays silent), concern (say what and where) or stop (the subject must be stopped; say why, with the evidence). You only read; Overseer acts on it.",
+            "inputSchema": {"type": "object", "properties": {"result": {"type": "string", "enum": ["fine", "concern", "stop"]}, "text": {"type": "string"}}, "required": ["result"], "additionalProperties": false}
         }));
     }
     if role == "overseer" {
@@ -111,16 +133,38 @@ impl Daemon {
             .ok_or_else(|| anyhow::anyhow!("unknown token"))
     }
 
+    /// The tools a run has: its role's, and a watcher's while an agent the owner named watches.
+    pub(crate) fn tools_of_run(&self, run_id: &str, role: &str) -> Vec<Value> {
+        let mut tools = tool_list(role);
+        if role == "agent" && self.is_watcher(run_id) {
+            for t in tool_list("watcher") {
+                if !tools.iter().any(|x| x["name"] == t["name"]) {
+                    tools.push(t);
+                }
+            }
+        }
+        tools
+    }
+
     pub fn overseer_tools(&self, token: &str) -> Result<Value> {
-        let (_, role) = self.token_holder(token)?;
-        Ok(json!({"tools": tool_list(&role)}))
+        let (run_id, role) = self.token_holder(token)?;
+        Ok(json!({"tools": self.tools_of_run(&run_id, &role)}))
     }
 
     /// One tool call from a run. Every answer is bounded and redacted.
     pub fn overseer_tool(self: &std::sync::Arc<Self>, token: &str, name: &str, arguments: &Value) -> Result<Value> {
         let (run_id, role) = self.token_holder(token)?;
-        if !tool_list(&role).iter().any(|t| t["name"] == name) {
+        if !self.tools_of_run(&run_id, &role).iter().any(|t| t["name"] == name) {
             bail!("{role} runs have no tool {name}");
+        }
+        // A watcher reads only its subject.
+        if role != "overseer" && watch::SUBJECT_READS.contains(&name) {
+            let subject = self.watch_of_watcher(&run_id).map(|w| w.subject);
+            if subject.as_deref() != arguments["id"].as_str() {
+                let why = format!("a watcher reads only its subject{}", subject.map(|s| format!(" ({s})")).unwrap_or_default());
+                self.emit(None, Some(&run_id), "overseer_tool_call", "daemon", "exact", json!({"role": role, "name": name, "refused": why}))?;
+                return Ok(json!({"text": format!("refused: {why}"), "is_error": true}));
+            }
         }
         let text = match name {
             "roster" => self.roster_text()?,
@@ -141,6 +185,10 @@ impl Daemon {
                 Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
             },
             "claim" => match self.channel_claim(&run_id, arguments) {
+                Ok(t) => t,
+                Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
+            },
+            "finding" => match self.watch_finding(&run_id, arguments) {
                 Ok(t) => t,
                 Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
             },

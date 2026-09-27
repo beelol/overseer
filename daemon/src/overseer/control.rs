@@ -54,12 +54,12 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("daemon.background_notice", "read"), ("daemon.last_notice", "read"), ("daemon.clients", "read"), ("audio.get", "read"), ("audio.voices", "read"),
     ("agent.digest", "read"), ("agents.roster", "read"), ("conflicts.list", "read"), ("overseer.session", "read"), ("overseer.messages", "read"), ("agent.check_ins", "read"),
     ("overseer.tools", "read"), ("overseer.tool", "read"), ("run.queued", "read"), ("overseer.card", "read"), ("agent.holds", "read"), ("agent.guardrails", "read"),
-    ("channel.messages", "read"), ("agent.briefings", "read"), ("overseer.rally", "read"), ("share.list", "read"),
+    ("channel.messages", "read"), ("agent.briefings", "read"), ("overseer.rally", "read"), ("share.list", "read"), ("watch.list", "read"), ("watch.findings", "read"),
     // What Overseer's Steer actions reach.
     ("task.create", STEER), ("run.follow_up", STEER), ("run.queue", STEER), ("run.unqueue", STEER), ("run.redirect", STEER), ("run.interrupt", STEER),
     ("agent.hold", STEER), ("agent.release", STEER), ("agent.guardrail", STEER), ("agent.guardrail_remove", STEER), ("agent.redirect", STEER),
     ("conflict.dismiss", STEER), ("conflict.resolve", STEER), ("overseer.scan", STEER), ("overseer.propose", STEER), ("agent.cadence", STEER),
-    ("agent.channel", STEER), ("agent.area", STEER), ("share.withdraw", STEER),
+    ("agent.channel", STEER), ("agent.area", STEER), ("share.withdraw", STEER), ("watch.start", STEER), ("watch.end", STEER),
     // Confirm: only when the owner asked, read back, then a yes.
     ("run.permission", CONFIRM), ("task.archive", CONFIRM), ("workspace.merge_prepare", CONFIRM), ("workspace.merge_resolved", CONFIRM),
     ("workspace.merge_complete", CONFIRM), ("workspace.merge_abort", CONFIRM), ("workspace.pr_prepare", CONFIRM), ("workspace.pr_opened", CONFIRM),

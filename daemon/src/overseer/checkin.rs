@@ -288,8 +288,8 @@ impl Daemon {
         let harness = session["harness"].as_str().unwrap_or("claude").to_string();
         // Questions and reports from the agents' channel ride the same turn; a turn with nothing
         // else is theirs.
-        let is_channel = |r: &String| r.starts_with("ask:") || r.starts_with("report:");
-        let cause = if per.iter().any(|(_, reasons)| reasons.iter().any(|r| !is_channel(r))) { "check_in" } else if per.iter().any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("ask:"))) { "ask" } else { "report" };
+        let is_channel = |r: &String| r.starts_with("ask:") || r.starts_with("report:") || r.starts_with("finding:");
+        let cause = if per.iter().any(|(_, reasons)| reasons.iter().any(|r| !is_channel(r))) { "check_in" } else if per.iter().any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("finding:"))) { "finding" } else if per.iter().any(|(_, reasons)| reasons.iter().any(|r| r.starts_with("ask:"))) { "ask" } else { "report" };
         self.overseer_turn_with_cause(&session, &prompt, &harness, session["model"].as_str(), cause)?;
         for (run, reasons) in &per {
             let reasons: Vec<&String> = reasons.iter().filter(|r| !is_channel(r)).collect();
@@ -309,13 +309,22 @@ impl Daemon {
         let mut items = Vec::new();
         let mut questions = Vec::new();
         let mut reports = Vec::new();
+        let mut findings = Vec::new();
         let mut texts = Vec::new();
         for (run, reasons) in per {
             let d = self.digest(run)?;
             let last_check = d.last_check_in.clone();
-            let plain: Vec<&String> = reasons.iter().filter(|r| !r.starts_with("ask:") && !r.starts_with("report:")).collect();
+            let plain: Vec<&String> = reasons.iter().filter(|r| !r.starts_with("ask:") && !r.starts_with("report:") && !r.starts_with("finding:")).collect();
             for r in reasons {
-                if let Some(id) = r.strip_prefix("ask:") {
+                if let Some(id) = r.strip_prefix("finding:") {
+                    if let Some(mut f) = self.finding_json(id) {
+                        f["subject_title"] = json!(d.title);
+                        f["watcher_title"] = json!(self.run(f["watcher"].as_str().unwrap_or("")).map(|r| r.title).unwrap_or_default());
+                        f["held"] = json!(self.hold_of(run).is_some());
+                        f["hold_on_stop"] = json!(self.watch(f["watch"].as_str().unwrap_or("")).map(|w| w.hold_on_stop).unwrap_or(false));
+                        findings.push(f);
+                    }
+                } else if let Some(id) = r.strip_prefix("ask:") {
                     let q: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT body FROM agent_messages WHERE id=?1 AND answer IS NULL", [id], |r| r.get(0)).optional()?;
                     if let Some(body) = q.and_then(|b| serde_json::from_str::<Value>(&b).ok()) {
                         questions.push(json!({"id": id, "agent": d.id, "title": d.title, "question": body["question"], "area": d.area, "repository": d.repository}));
@@ -344,6 +353,9 @@ impl Daemon {
         }
         if !reports.is_empty() {
             out.push_str(&format!("Reports that came back from the agents you asked. Call rally for the repository's map, then propose in one proposal the areas (area actions) and shares it needs.\n\nReports (JSON):\n{}\n\n", serde_json::to_string_pretty(&reports)?));
+        }
+        if !findings.is_empty() {
+            out.push_str(&format!("Findings from watchers. The watcher only reads; you act on its subject at your level with propose: for stop, at Ask first propose a hold and say why, at Steer hold now (a redirect is a proposal), at Auto hold and redirect; for concern, a message to the subject or nothing, as you judge; when `held` is true the daemon already holds the subject (hold on stop) and what follows is still yours. Tell the owner what you did. The level is {level}.\n\nFindings (JSON):\n{}\n\n", serde_json::to_string_pretty(&findings)?));
         }
         out.push_str(&format!("Digests:\n{}\n{}\n", texts.join("\n\n"), super::session::CLOSE));
         out.push_str(if items.is_empty() { "\nAnswer the agents." } else { "\nCheck in on these agents." });

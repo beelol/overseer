@@ -56,7 +56,11 @@ async function mcpClient() {
 (async () => {
   const first = await next(m => m.type === 'user');
   const firstText = Array.isArray(first.message.content) ? first.message.content.filter(c => c.type === 'text').map(c => c.text).join('\n') : String(first.message.content);
-  if (firstText.includes('<overseer-state>')) mode = 'overseer';
+  if (firstText.includes('<overseer-state>')) {
+    // CLAUDE_FIXTURE_OVERSEER_MODE_FILE forces Overseer's own turns into another mode (a failing harness).
+    const forced = process.env.CLAUDE_FIXTURE_OVERSEER_MODE_FILE;
+    mode = (forced && fs.existsSync(forced) && fs.readFileSync(forced, 'utf8').trim()) || 'overseer';
+  }
   out({ type: 'system', subtype: 'init', session_id: sid, model: 'fixture', cwd: process.cwd(), tools: ['Agent', 'Write'] });
   if (mode === 'nested') {
     // Grandchild traffic arrives before the child's Agent tool_use is reported (delayed parent).
@@ -250,6 +254,22 @@ async function mcpClient() {
     const checkIn = /Check-in \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
     const questions = /Questions \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
     const reports = /Reports \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    const findings = /Findings \(JSON\):\n([\s\S]*?)\n\n/.exec(text);
+    // A watcher's finding: Overseer acts on the subject at its level. A stop is a hold (at Ask
+    // first a proposal) and then a redirect (a proposal at Steer, done at Auto); a concern is a
+    // message to the subject. Each goes in its own proposal so a quiet one is not held back.
+    const actOnFindings = async (list, level) => {
+      const lines = [];
+      for (const f of list) {
+        if (f.result === 'stop') {
+          lines.push(await call('propose', { actions: [{ action: 'hold', agent: f.subject, reason: 'stop finding from ' + f.watcher_title + ': ' + f.text }] }));
+          if (level !== 'ask_first') lines.push(await call('propose', { actions: [{ action: 'redirect', agent: f.subject, text: 'Stop: put the tests back and make them pass instead of deleting them.' }] }));
+        } else {
+          lines.push(await call('propose', { actions: [{ action: 'message', agent: f.subject, text: 'A watcher raised a concern: ' + f.text }] }));
+        }
+      }
+      return lines;
+    };
     const rallyAsk = /rally my agents(?: in (\S+))?/i.exec(said);
     // The rally's map: ask only the agents whose digests cannot answer (one report each, the cost
     // said first); once every digest answers, propose the areas in one proposal.
@@ -273,8 +293,10 @@ async function mcpClient() {
       await sleep(100);
       process.exit(0);
     }
-    if (mcp && (questions || reports) && !checkIn) {
+    if (mcp && (questions || reports || findings) && !checkIn) {
       const lines = [];
+      const level = (/The level is (\w+)\./.exec(text) || [])[1] || 'ask_first';
+      if (findings) lines.push(...await actOnFindings(JSON.parse(findings[1]), level));
       for (const q of questions ? JSON.parse(questions[1]) : []) lines.push(await call('answer', { ask: q.id, text: 'From the roster: ' + q.question.replace(/\?$/, '') + ' — see the other agents\' digests.' }));
       if (reports) { const list = JSON.parse(reports[1]); lines.push(await rally(list[0]?.repository)); }
       reply = lines.join(' ');
@@ -288,6 +310,7 @@ async function mcpClient() {
       const level = (/The level is (\w+)\./.exec(text) || [])[1] || 'ask_first';
       const items = JSON.parse(checkIn[1]);
       const lines = [];
+      if (findings) lines.push(...await actOnFindings(JSON.parse(findings[1]), level));
       for (const q of questions ? JSON.parse(questions[1]) : []) lines.push(await call('answer', { ask: q.id, text: 'From the roster: ' + q.question.replace(/\?$/, '') + ' — see the other agents\' digests.' }));
       for (const it of items) {
         const outside = it.area && it.area.length ? it.changed.filter(p => !it.area.some(a => p === a || p.startsWith(a.replace(/\/$/, '') + '/'))) : [];
@@ -382,6 +405,40 @@ async function mcpClient() {
     else if (/Answer to your question/.test(text)) reply = 'Got the answer from Overseer.';
     else if (/Briefing from Overseer/.test(text) && !claim && !rep && !ask) reply = 'Noted the briefing.';
     else reply = mcp ? 'channel: ' + lines.join(' | ') : 'no channel';
+    assistant([{ type: 'text', text: reply }]);
+    result(false, reply);
+    if (mcp) mcp.close();
+  } else if (mode === 'watcher') {
+    // A watcher (AC-193, AC-194): woken by the daemon with what changed in its subject, it files
+    // one finding through the finding tool. Deleting tests is a stop; a hesitation is a concern;
+    // a watch that checks runs the copy's test.sh and reports a failing one; else fine.
+    const text = firstText;
+    const mcp = await mcpClient();
+    let n = 0;
+    const call = async (name, args) => {
+      const id = `toolu_mcp_${++n}`;
+      assistant([{ type: 'tool_use', id, name: `mcp__overseer__${name}`, input: args }]);
+      out({ type: 'control_request', request_id: `req-mcp-${n}`, request: { subtype: 'can_use_tool', tool_name: `mcp__overseer__${name}`, input: args } });
+      const reply = await next(m => m.type === 'control_response' && m.response?.request_id === `req-mcp-${n}`);
+      if (reply.response.response.behavior !== 'allow') throw new Error('tool refused');
+      const r = await mcp.call(name, args);
+      user([{ type: 'tool_result', tool_use_id: id, content: r.content, is_error: !!r.isError }]);
+      return r.content.map(c => c.text || '').join('');
+    };
+    const changed = (/What changed since your last wake[^\n]*:\n([\s\S]*?)\n\nFile one finding/.exec(text) || [])[1] || '';
+    let finding = { result: 'fine', text: 'nothing to report' };
+    if (/delete/i.test(changed) && /tests?/i.test(changed)) finding = { result: 'stop', text: 'it is deleting tests so that the suite passes: ' + changed.split('\n').find(l => /delete/i.test(l)) };
+    else if (/hmm|not sure/i.test(changed)) finding = { result: 'concern', text: 'it sounds unsure: ' + changed.split('\n').find(l => /hmm|not sure/i.test(l)) };
+    if (/Your copy of the subject's worktree/.test(text) && fs.existsSync(path.join(process.cwd(), 'test.sh'))) {
+      const id = `toolu_sh_${++n}`;
+      assistant([{ type: 'tool_use', id, name: 'Bash', input: { command: 'sh test.sh' } }]);
+      let output = '', failed = false;
+      try { output = require('child_process').execSync('sh test.sh', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { failed = true; output = String(e.stdout || '') + String(e.stderr || ''); }
+      user([{ type: 'tool_result', tool_use_id: id, content: output, is_error: failed }]);
+      if (failed) finding = { result: 'concern', text: 'the tests do not pass in its worktree: ' + (output.split('\n').find(l => /FAIL/.test(l)) || output.trim()) };
+    }
+    const outcome = mcp ? await call('finding', finding) : 'no channel';
+    const reply = `finding: ${finding.result} (${outcome})`;
     assistant([{ type: 'text', text: reply }]);
     result(false, reply);
     if (mcp) mcp.close();

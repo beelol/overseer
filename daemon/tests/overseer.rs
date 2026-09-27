@@ -1306,7 +1306,7 @@ fn wait_event(d: &Daemon, run: &str, pred: impl Fn(&Value) -> bool, secs: u64) -
         if let Some(e) = d.events(run).into_iter().find(|e| pred(e)) {
             return e;
         }
-        assert!(std::time::Instant::now() < deadline, "{run}: no such event; kinds {:?}", d.events(run).iter().map(|e| e["kind"].clone()).collect::<Vec<_>>());
+        assert!(std::time::Instant::now() < deadline, "{run}: no such event; kinds {:?}; findings {:?}; watcher prompts {:?}", d.events(run).iter().map(|e| e["kind"].clone()).collect::<Vec<_>>(), d.events(run).iter().filter(|e| e["kind"] == "finding").map(|e| e["payload"]["text"].clone()).collect::<Vec<_>>(), d.events(run).iter().find(|e| e["kind"] == "watch_wake").and_then(|e| e["payload"]["watcher"].as_str().map(|w| turns(d, w).iter().map(|t| t["prompt"].as_str().unwrap_or("").chars().take(1500).collect::<String>()).collect::<Vec<_>>())));
         std::thread::sleep(Duration::from_millis(100));
     }
 }
@@ -1560,4 +1560,418 @@ fn ac191_context_passed_between_agents() {
         wait_turn_with(&d, id, "Withdrawn: what Overseer shared (Overseer's finding)", 15);
     }
     assert!(d.call("share.list", json!({}))["shares"].as_array().unwrap().iter().filter(|s| s["kind"] == "finding").all(|s| !s["withdrawn_ms"].is_null()));
+}
+
+fn wait_count(d: &Daemon, run: &str, kind: &str, n: usize, secs: u64) -> Vec<Value> {
+    let deadline = std::time::Instant::now() + Duration::from_secs(secs);
+    loop {
+        let found: Vec<Value> = d.events(run).into_iter().filter(|e| e["kind"] == kind).collect();
+        if found.len() >= n {
+            return found;
+        }
+        if std::time::Instant::now() >= deadline {
+            let watcher = d.events(run).iter().find(|e| e["kind"] == "watch_wake").and_then(|e| e["payload"]["watcher"].as_str().map(str::to_string));
+            let detail = watcher.map(|w| format!("watcher {w} status {:?}; turns {:?}; queued {}; events {:?}", d.call("agent.digest", json!({"run_id": w}))["digest"]["status"], turns(d, &w).iter().map(|t| (t["status"].clone(), t["prompt"].as_str().unwrap_or("").chars().take(120).collect::<String>())).collect::<Vec<_>>(), d.call("run.queued", json!({"run_id": w})), d.events(&w).iter().map(|e| format!("{} {}", e["kind"], e["payload"]["text"].as_str().unwrap_or("").chars().take(100).collect::<String>())).collect::<Vec<_>>())).unwrap_or_default();
+            panic!("{run}: {} of {n} {kind} events; {detail}", found.len());
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+/// Every file's bytes under a worktree, for a before-and-after comparison.
+fn tree_bytes(root: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+    let mut out = std::collections::BTreeMap::new();
+    fn walk(root: &Path, dir: &Path, out: &mut std::collections::BTreeMap<String, Vec<u8>>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.file_name().map(|n| n == ".git").unwrap_or(false) {
+                continue;
+            }
+            if path.is_dir() {
+                walk(root, &path, out);
+            } else {
+                out.insert(path.strip_prefix(root).unwrap().display().to_string(), std::fs::read(&path).unwrap());
+            }
+        }
+    }
+    walk(root, root, &mut out);
+    out
+}
+
+/// AC-193: a watcher wakes when its subject's turn ends and once when it finishes, each wake
+/// carrying only what is new; an idle subject causes no wake; a stop finding with hold on stop
+/// holds the subject within 2 s with no model turn in between, and without it Overseer acts at
+/// its level; a watcher only reads; no watcher of a watcher, no circle, two per subject, the cap.
+#[test]
+fn ac193_one_agent_watches_another() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    // A subject is finished when it stays idle for the grace period; one second here.
+    sql(&d, "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.grace_ms', '1000');");
+    // A subject with three turns, watched from its first: three wakes and one at the end.
+    std::fs::write(&mode_file, "slow").unwrap();
+    let subject = claude_task(&d, &repo, &mode_file, "slow", "Subject", "turn 1");
+    d.wait_status(&subject, |s| s == "running", 20);
+    let w = d.call("watch.start", json!({"subject": subject, "brief": "watch for deleted tests", "harness": "claude", "by": "owner"}));
+    let watch = w["id"].as_str().unwrap().to_string();
+    assert!(w["watcher"].is_null(), "the watcher comes with the first wake");
+    std::fs::write(&mode_file, "watcher").unwrap();
+    d.wait_done(&subject, 30);
+    let wake1 = wait_count(&d, &subject, "watch_wake", 1, 20);
+    let watcher = wake1[0]["payload"]["watcher"].as_str().unwrap().to_string();
+    assert_eq!(d.call("agent.digest", json!({"run_id": watcher}))["digest"]["role"], "watcher");
+    // Overseer's roster lists the watcher as such; the subject's digest names its watcher.
+    let digest = d.call("agent.digest", json!({"run_id": subject}))["digest"].clone();
+    assert_eq!(digest["watches"][0]["watcher"], watcher);
+    for i in 2..=3 {
+        // The watcher has filed on the last wake before the next turn, so no two wakes fold
+        // into one of its turns (they would when it is busy).
+        wait_count(&d, &subject, "finding", i - 1, 30);
+        std::fs::write(&mode_file, "slow").unwrap();
+        d.call("run.follow_up", json!({"run_id": subject, "prompt": format!("turn {i}")}));
+        d.wait_status(&subject, |s| s == "running", 20);
+        std::fs::write(&mode_file, "watcher").unwrap();
+        d.wait_done(&subject, 30);
+        wait_count(&d, &subject, "watch_wake", i, 20);
+    }
+    let wakes = wait_count(&d, &subject, "watch_wake", 4, 30);
+    let reasons: Vec<&str> = wakes.iter().map(|e| e["payload"]["reason"].as_str().unwrap()).collect();
+    assert_eq!(reasons.iter().filter(|r| r.contains("turn ended")).count(), 3, "{reasons:?}");
+    assert_eq!(reasons.iter().filter(|r| *r == &"finished").count(), 1, "{reasons:?}");
+    // Each wake carries only what is new: the end of turn 1 (the watch started mid-turn) is in
+    // the first wake and no later one; turn 2 is in the second, without a word of turn 3.
+    wait_count(&d, &subject, "finding", 4, 40);
+    d.wait_done(&watcher, 30);
+    let turns_w = turns(&d, &watcher);
+    assert!(turns_w.len() >= 4, "{}", turns_w.len());
+    let carrying: Vec<bool> = turns_w.iter().map(|t| t["prompt"].as_str().unwrap().contains("finished: turn 1")).collect();
+    assert_eq!(carrying[0], true, "{}", turns_w[0]["prompt"]);
+    assert!(carrying[1..].iter().all(|c| !c), "{carrying:?}");
+    assert!(turns_w[1]["prompt"].as_str().unwrap().contains("working on: turn 2") && !turns_w[1]["prompt"].as_str().unwrap().contains("turn 3"));
+    assert!(turns_w.iter().all(|t| t["prompt"].as_str().unwrap().len() <= 32 * 1024));
+    let findings = d.call("watch.findings", json!({"watch": watch}))["findings"].as_array().unwrap().clone();
+    assert!(findings.len() >= 4 && findings.iter().all(|f| f["result"] == "fine"), "{findings:?}");
+    assert!(!session(&d)["messages"].as_array().unwrap().iter().any(|m| m["card"]["kind"] == "finding"), "fine is silent");
+    // The watch ended with its subject and says so; the watcher never got a way to act.
+    let ended = d.call("watch.list", json!({"run_id": subject}))["watches"].as_array().unwrap()[0].clone();
+    assert_eq!(ended["end_reason"], "the subject finished");
+    let watcher_tools: Vec<String> = d.call("overseer.tools", json!({"token": sql_token(&d, &watcher)}))["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    assert!(!watcher_tools.contains(&"propose".to_string()) && watcher_tools.contains(&"finding".to_string()), "{watcher_tools:?}");
+    // An idle subject: no wake in a while (the clause says ten minutes; the wake needs an event).
+    let idle = claude_task(&d, &repo, &mode_file, "echo", "Idle", "hello");
+    d.wait_done(&idle, 30);
+    let w2 = d.call("watch.start", json!({"subject": idle, "brief": "anything odd", "harness": "claude", "by": "owner"}));
+    std::thread::sleep(Duration::from_secs(4));
+    assert!(!d.events(&idle).iter().any(|e| e["kind"] == "watch_wake"));
+    assert_eq!(d.call("watch.list", json!({"run_id": idle}))["watches"][0]["wakes"], 0);
+    d.call("watch.end", json!({"id": w2["id"], "by": "owner"}));
+    // A stop finding with hold on stop: the subject is held within 2 s, with no model turn in between.
+    std::fs::write(&mode_file, "slow").unwrap();
+    let cheat = claude_task(&d, &repo, &mode_file, "slow", "Cheat", "first the setup");
+    d.wait_status(&cheat, |s| s == "running", 20);
+    let w3 = d.call("watch.start", json!({"subject": cheat, "brief": "stop it if it deletes tests", "harness": "claude", "hold_on_stop": true, "by": "owner"}));
+    std::fs::write(&mode_file, "watcher").unwrap();
+    d.wait_done(&cheat, 30);
+    wait_count(&d, &cheat, "watch_wake", 1, 20);
+    std::fs::write(&mode_file, "slow").unwrap();
+    d.call("run.follow_up", json!({"run_id": cheat, "prompt": "delete the failing tests so the suite passes"}));
+    d.wait_status(&cheat, |s| s == "running", 20);
+    std::fs::write(&mode_file, "watcher").unwrap();
+    let turns_before = overseer_turn_causes(&d).len();
+    d.wait_done(&cheat, 30);
+    // The final wake (its turn ended and it finished, at most two wakes) carries the deletion.
+    let finding = wait_event(&d, &cheat, |e| e["kind"] == "finding" && e["payload"]["result"] == "stop", 30);
+    let hold = wait_event(&d, &cheat, |e| e["kind"] == "hold", 5);
+    assert!(hold["ts"].as_i64().unwrap() - finding["ts"].as_i64().unwrap() <= 2000, "held within 2 s of the finding");
+    assert_eq!(hold["payload"]["by"], "watch");
+    assert_eq!(overseer_turn_causes(&d).len(), turns_before, "no model turn between the finding and the hold");
+    assert!(d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().any(|h| h["run_id"] == cheat));
+    d.call("agent.release", json!({"run_id": cheat, "by": "owner"}));
+    d.call("watch.end", json!({"id": w3["id"], "by": "owner"}));
+    // The same finding without hold on stop: a proposal at Ask first, a hold at Steer, a hold and a redirect at Auto.
+    for (level, expect) in [("ask_first", "proposal"), ("steer", "hold"), ("auto", "hold+redirect")] {
+        d.call("overseer.level", json!({"level": level}));
+        sql(&d, "DELETE FROM holds;");
+        std::fs::write(&mode_file, "slow").unwrap();
+        let s = claude_task(&d, &repo, &mode_file, "slow", &format!("Cheat at {level}"), "setup");
+        d.wait_status(&s, |st| st == "running", 20);
+        let w = d.call("watch.start", json!({"subject": s, "brief": "deleted tests", "harness": "claude", "by": "owner"}));
+        std::fs::write(&mode_file, "watcher").unwrap();
+        d.wait_done(&s, 30);
+        wait_count(&d, &s, "watch_wake", 1, 20);
+        std::fs::write(&mode_file, "slow").unwrap();
+        d.call("run.follow_up", json!({"run_id": s, "prompt": "now delete the tests"}));
+        d.wait_status(&s, |st| st == "running", 20);
+        std::fs::write(&mode_file, "watcher").unwrap();
+        d.wait_done(&s, 30);
+        wait_event(&d, &s, |e| e["kind"] == "finding" && e["payload"]["result"] == "stop", 30);
+        assert!(!d.events(&s).iter().any(|e| e["kind"] == "hold"), "no hold before Overseer at {level}");
+        std::thread::sleep(Duration::from_secs(6));
+        let sess = wait_overseer_idle(&d, 60);
+        assert!(overseer_turn_causes(&d).contains(&"finding".to_string()));
+        let open = sess["proposals"].as_array().unwrap().clone();
+        let held = d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().any(|h| h["run_id"] == s);
+        let redirected = d.events(&s).iter().any(|e| e["kind"] == "redirect");
+        match expect {
+            "proposal" => {
+                assert!(open.iter().any(|p| p["actions"][0]["action"] == "hold" && p["actions"][0]["agent"] == s), "at Ask first a proposal to hold: {open:?}");
+                assert!(!held && !redirected);
+                for p in &open {
+                    d.call("overseer.answer", json!({"id": p["id"], "yes": false, "surface": "ctl", "by": "owner"}));
+                }
+            }
+            "hold" => {
+                assert!(held && !redirected, "held at Steer, redirect proposed: held {held} redirected {redirected}");
+                assert!(open.iter().any(|p| p["actions"][0]["action"] == "redirect"), "{open:?}");
+                for p in &open {
+                    d.call("overseer.answer", json!({"id": p["id"], "yes": false, "surface": "ctl", "by": "owner"}));
+                }
+            }
+            _ => assert!(held && redirected, "held and redirected at Auto: held {held} redirected {redirected}"),
+        }
+        d.call("watch.end", json!({"id": w["id"], "by": "owner"}));
+    }
+    d.call("overseer.level", json!({"level": "ask_first"}));
+    // A watcher's reads stay on its subject; it has no way to message or write.
+    let refused = d.call("overseer.tool", json!({"token": sql_token(&d, &watcher), "name": "agent", "arguments": {"id": idle}}));
+    assert!(refused["is_error"] == true && refused["text"].as_str().unwrap().contains("only its subject"), "{refused}");
+    let refused = d.try_call("overseer.tool", json!({"token": sql_token(&d, &watcher), "name": "propose", "arguments": {"actions": [{"action": "message", "agent": subject, "text": "hi"}]}}));
+    assert!(refused.is_err(), "a watcher cannot act");
+    // No watcher of a watcher, no circle, two per subject.
+    let e = d.try_call("watch.start", json!({"subject": watcher, "brief": "x", "harness": "claude", "by": "owner"})).unwrap_err();
+    assert!(e.contains("no watcher of a watcher"), "{e}");
+    let a = claude_task(&d, &repo, &mode_file, "echo", "A", "hello");
+    let b = claude_task(&d, &repo, &mode_file, "echo", "B", "hello");
+    d.wait_done(&a, 30);
+    d.wait_done(&b, 30);
+    let ab = d.call("watch.start", json!({"subject": b, "watcher": a, "brief": "look", "by": "owner"}));
+    let e = d.try_call("watch.start", json!({"subject": a, "watcher": b, "brief": "look back", "by": "owner"})).unwrap_err();
+    assert!(e.contains("circle"), "{e}");
+    d.call("watch.start", json!({"subject": b, "brief": "second", "harness": "claude", "by": "owner"}));
+    let e = d.try_call("watch.start", json!({"subject": b, "brief": "third", "harness": "claude", "by": "owner"})).unwrap_err();
+    assert!(e.contains("2 watchers"), "{e}");
+    // The named idle agent is woken as the watcher and files through its channel.
+    std::fs::write(&mode_file, "watcher").unwrap();
+    d.call("run.follow_up", json!({"run_id": b, "prompt": "hmm, not sure about this"}));
+    d.wait_done(&b, 30);
+    wait_event(&d, &a, |e| e["kind"] == "finding" && e["payload"]["result"] == "concern", 40);
+    // The cap: twelve wakes in an hour, then none until the hour turns.
+    let ab_id = ab["id"].as_str().unwrap().to_string();
+    for _ in 0..12 {
+        sql(&d, &format!("INSERT INTO watch_wakes(watch_id, ts, reason, seq) VALUES('{ab_id}', {}, 'x', 0);", now_ms()));
+    }
+    std::fs::write(&mode_file, "echo").unwrap();
+    d.call("run.follow_up", json!({"run_id": b, "prompt": "one more"}));
+    d.wait_done(&b, 30);
+    wait_event(&d, &b, |e| e["kind"] == "watch_capped" && e["payload"]["watch"] == ab_id, 10);
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64
+}
+
+/// The plain token of a run, for calling its tools from the test (the daemon keeps only the hash;
+/// the run's MCP config in its folder holds the token).
+fn sql_token(d: &Daemon, run: &str) -> String {
+    let file = d.home.path().join("runs").join(run).join("overseer-mcp.json");
+    let launch = d.call("run.turns", json!({"run_id": run}));
+    let _ = launch;
+    if file.exists() {
+        let v: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        return v["mcpServers"]["overseer"]["env"]["OVERSEER_MCP_TOKEN"].as_str().unwrap().to_string();
+    }
+    // A watcher of the daemon's own: its config is in its folder under the data dir.
+    for candidate in [d.home.path().join("overseer").join("watch")] {
+        if let Ok(entries) = std::fs::read_dir(&candidate) {
+            for e in entries.flatten() {
+                let f = e.path().join("mcp.json");
+                if let Ok(text) = std::fs::read_to_string(&f) {
+                    let v: Value = serde_json::from_str(&text).unwrap();
+                    let token = v["mcpServers"]["overseer"]["env"]["OVERSEER_MCP_TOKEN"].as_str().unwrap().to_string();
+                    if d.try_call("overseer.tools", json!({"token": token})).is_ok() {
+                        let tools = d.call("overseer.tools", json!({"token": token}));
+                        if tools["tools"].as_array().unwrap().iter().any(|t| t["name"] == "finding") {
+                            let wl = d.call("watch.list", json!({"run_id": run}));
+                            if wl["watches"].as_array().unwrap().iter().any(|w| w["watcher"] == run) {
+                                return token;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    panic!("no token file for {run}");
+}
+
+/// AC-194: a watch that checks runs the subject's tests in a copy at its latest snapshot; the
+/// finding names the failing test and the snapshot; the subject's worktree is untouched; the copy
+/// is listed by cleanup until the watch ends and removed then.
+#[test]
+fn ac194_a_watch_that_checks() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    sql(&d, "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.grace_ms', '1000');");
+    // The subject says its tests pass while one fails (a generic program, one turn).
+    let subject = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "printf 'echo FAIL test_login; exit 1\\n' > test.sh; echo 'all tests pass'; sleep 3"]));
+    d.wait_status(&subject, |s| s == "running", 20);
+    std::fs::write(&mode_file, "watcher").unwrap();
+    let w = d.call("watch.start", json!({"subject": subject, "brief": "check that the tests really pass", "mode": "check", "harness": "claude", "by": "owner"}));
+    let watch = w["id"].as_str().unwrap().to_string();
+    let copy = w["copy_path"].as_str().expect("a copy at the start").to_string();
+    assert!(Path::new(&copy).join(".git").exists() && copy.contains("watch-"));
+    let subject_ws = d.call("agent.digest", json!({"run_id": subject}))["digest"]["worktree"].as_str().unwrap().to_string();
+    d.wait_done(&subject, 30);
+    let before = tree_bytes(Path::new(&subject_ws));
+    assert!(before.contains_key("test.sh"));
+    let finding = wait_event(&d, &subject, |e| e["kind"] == "finding", 40);
+    assert_eq!(finding["payload"]["result"], "concern");
+    assert!(finding["payload"]["text"].as_str().unwrap().contains("FAIL test_login"), "{finding}");
+    let snapshot = finding["payload"]["snapshot"].as_str().expect("the finding names the snapshot").to_string();
+    assert_eq!(d.call("watch.list", json!({"run_id": subject}))["watches"][0]["last_snapshot"], snapshot);
+    assert_eq!(tree_bytes(Path::new(&subject_ws)), before, "the subject's worktree is byte-identical after the check");
+    // The copy was refreshed to the snapshot and carries test.sh; cleanup lists it while the watch's watcher works.
+    assert!(Path::new(&copy).join("test.sh").exists());
+    let ws = d.call("watch.list", json!({"run_id": subject}))["watches"][0]["copy_workspace"].as_str().unwrap().to_string();
+    let plan = d.call("workspace.cleanup_plan", json!({"workspace_id": ws}));
+    assert_eq!(plan["workspace"]["kind"], "worktree");
+    assert!(plan["workspace"]["initial_dirty"]["label"].as_str().unwrap().contains("watch copy"));
+    // The watch ended with its subject; once the watcher is idle the copy is removed.
+    let deadline = std::time::Instant::now() + Duration::from_secs(40);
+    loop {
+        let plan = d.call("workspace.cleanup_plan", json!({"workspace_id": ws}));
+        if plan["workspace"]["removed_ms"].is_number() {
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline, "the copy was not removed: {plan}");
+        std::thread::sleep(Duration::from_millis(300));
+    }
+    assert!(!Path::new(&copy).exists(), "the copy is gone");
+    assert_eq!(d.call("watch.list", json!({"run_id": subject}))["watches"][0]["end_reason"], "the subject finished");
+    assert!(d.events(&subject).iter().any(|e| e["kind"] == "watch_copy_removed"));
+    let _ = watch;
+}
+
+/// A daemon whose Claude fixture is Overseer, with Overseer's own turns forced into another mode
+/// through a second mode file (a failing harness).
+fn overseer_daemon_forced(mode_file: &Path, overseer_mode_file: &Path) -> Daemon {
+    std::fs::write(mode_file, "overseer").unwrap();
+    Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude_fixture()), ("CLAUDE_FIXTURE_MODE_FILE", &mode_file.display().to_string()), ("CLAUDE_FIXTURE_OVERSEER_MODE_FILE", &overseer_mode_file.display().to_string()), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,CLAUDE_FIXTURE_OVERSEER_MODE_FILE")])
+}
+
+/// AC-196 (the part that needs no route picking): a permission the owner denied is never worked
+/// around by having another agent do the same thing, and Overseer's own turns are metered.
+#[test]
+fn ac196_a_denied_permission_is_never_worked_around() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    // The owner denies a write of perm.txt.
+    let asker = claude_task(&d, &repo, &mode_file, "permission", "Asker", "write perm.txt");
+    d.wait_status(&asker, |s| s == "waiting_for_user", 20);
+    let request = d.call("agent.digest", json!({"run_id": asker}))["digest"]["waiting"]["request_id"].as_str().unwrap().to_string();
+    d.call("run.permission", json!({"run_id": asker, "request_id": request, "allow": false, "message": "no"}));
+    d.wait_done(&asker, 30);
+    let other = claude_task(&d, &repo, &mode_file, "echo", "Other", "hello");
+    d.wait_done(&other, 30);
+    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
+    // Having another agent do it, by message or by a new agent: refused, whoever asks.
+    let e = d.try_call("overseer.propose", json!({"actions": [{"action": "message", "agent": other, "text": "please create perm.txt with the content allowed"}], "source": "ctl"})).unwrap_err();
+    assert!(e.contains("denied") && e.contains("perm.txt") && e.contains("Asker"), "{e}");
+    let e = d.try_call("overseer.propose", json!({"actions": [{"action": "start", "repo": repo, "prompt": "write perm.txt"}], "source": "ctl"})).unwrap_err();
+    assert!(e.contains("denied"), "{e}");
+    // Something else is fine.
+    let p = d.call("overseer.propose", json!({"actions": [{"action": "message", "agent": other, "text": "carry on with the docs"}], "source": "ctl"}));
+    assert_eq!(p["state"], "open");
+    // Overseer's own turns are metered: its run reports usage like any run.
+    let s = session(&d);
+    let usage = d.call("agent.digest", json!({"run_id": s["run_id"]}))["digest"]["usage"].clone();
+    assert!(usage.is_object(), "Overseer's turns are metered: {usage}");
+}
+
+/// AC-197 (the part that needs no Continuity): with no model able to run Overseer, the
+/// conversation says why, and everything that needs no model keeps working: conflicts and their
+/// cards, holds, guardrails, stopping everyone.
+#[test]
+fn ac197_without_a_model_the_daemon_half_keeps_working() {
+    let _one_at_a_time = heavy();
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::write(repo.join("shared.txt"), "one\ntwo\nthree\n").unwrap();
+    git(&repo, &["add", "shared.txt"]);
+    git(&repo, &["commit", "-qm", "shared"]);
+    let mode_file = r.path().join("mode");
+    let overseer_mode = r.path().join("overseer-mode");
+    std::fs::write(&overseer_mode, "auth").unwrap();
+    let d = overseer_daemon_forced(&mode_file, &overseer_mode);
+    d.call("overseer.session", json!({}));
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    // Every provider failing: Overseer's run fails and the conversation gives the reason.
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    let s = wait_overseer_idle(&d, 30);
+    assert_eq!(s["run_status"], "failed");
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let said = loop {
+        let msgs = session(&d)["messages"].as_array().unwrap().clone();
+        if let Some(m) = msgs.iter().find(|m| m["card"]["kind"] == "cannot_answer") {
+            break m.clone();
+        }
+        assert!(std::time::Instant::now() < deadline, "no reason given: {msgs:?}");
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    assert!(said["text"].as_str().unwrap().contains("cannot answer") && said["text"].as_str().unwrap().contains("authenticate"), "{said}");
+    // A conflict is still found and resolved from its card.
+    let a = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "printf 'one\\nA\\nthree\\n' > shared.txt; sleep 60"]));
+    let b = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "printf 'one\\nB\\nthree\\n' > shared.txt; sleep 60"]));
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    let conflict = loop {
+        let list = d.call("conflicts.list", json!({}));
+        if let Some(c) = list["conflicts"].as_array().unwrap().iter().find(|c| c["kind"] == "same_lines") {
+            break c.clone();
+        }
+        assert!(std::time::Instant::now() < deadline, "no conflict: {list}");
+        std::thread::sleep(Duration::from_millis(200));
+    };
+    let resolved = d.call("conflict.resolve", json!({"id": conflict["id"], "how": "assign", "keeper": a, "by": "owner"}));
+    assert_eq!(resolved["state"], "resolved", "{resolved}");
+    assert!(!d.call("agent.guardrails", json!({"run_id": b}))["guardrails"].as_array().unwrap().is_empty(), "the other gets a guardrail");
+    // Holds and guardrails work; stop everyone stops four agents from one card.
+    d.call("agent.hold", json!({"run_id": a, "reason": "wait", "by": "owner"}));
+    assert!(d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().any(|h| h["run_id"] == a));
+    d.call("agent.release", json!({"run_id": a, "by": "owner"}));
+    let mut four = vec![a.clone(), b.clone()];
+    for _ in 0..2 {
+        four.push(run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "sleep 60"])));
+    }
+    for id in &four {
+        d.wait_status(id, |s| s == "running", 20);
+    }
+    sql(&d, "UPDATE overseer_sessions SET last_cause='owner';");
+    let stops: Vec<Value> = four.iter().map(|id| json!({"action": "stop", "agent": id})).collect();
+    let p = d.call("overseer.propose", json!({"actions": stops, "source": "ctl"}));
+    d.call("overseer.answer", json!({"id": p["proposal"], "yes": true, "surface": "ctl", "by": "owner"}));
+    for id in &four {
+        d.wait_status(id, |s| s == "interrupted", 10);
+    }
 }

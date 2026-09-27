@@ -214,6 +214,16 @@ impl Store {
               id TEXT PRIMARY KEY, ts INTEGER NOT NULL, from_run TEXT, to_run TEXT NOT NULL, kind TEXT NOT NULL, source TEXT NOT NULL,
               bytes INTEGER NOT NULL, inline_bytes INTEGER NOT NULL, file TEXT, proposal TEXT, content_id TEXT NOT NULL, withdrawn_ms INTEGER);
             CREATE TABLE IF NOT EXISTS share_denials(run_id TEXT PRIMARY KEY, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS watches(
+              id TEXT PRIMARY KEY, subject TEXT NOT NULL, watcher TEXT NOT NULL DEFAULT '', brief TEXT NOT NULL, mode TEXT NOT NULL, hold_on_stop INTEGER NOT NULL,
+              harness TEXT NOT NULL, model TEXT, set_by TEXT NOT NULL, created_ms INTEGER NOT NULL, last_seq INTEGER NOT NULL DEFAULT 0, last_snapshot TEXT,
+              wakes INTEGER NOT NULL DEFAULT 0, budget INTEGER NOT NULL, copy_workspace TEXT, copy_path TEXT, ended_ms INTEGER, end_reason TEXT);
+            CREATE TABLE IF NOT EXISTS watch_wakes(watch_id TEXT NOT NULL, ts INTEGER NOT NULL, reason TEXT NOT NULL, seq INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS watch_finish_queue(subject TEXT PRIMARY KEY, not_before INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS denied_permissions(run_id TEXT NOT NULL, tool TEXT NOT NULL, detail TEXT NOT NULL, ts INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS findings(
+              id TEXT PRIMARY KEY, watch_id TEXT NOT NULL, watcher TEXT NOT NULL, subject TEXT NOT NULL, ts INTEGER NOT NULL, result TEXT NOT NULL,
+              text TEXT NOT NULL, snapshot TEXT);
             "#,
         )?;
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;

@@ -363,6 +363,10 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             d.rally(p["repo"].as_str(), agents)?
         }
         "share.list" => d.shares_list(p["run_id"].as_str())?,
+        "watch.start" => d.watch_start(p, p["by"].as_str().unwrap_or("owner"))?,
+        "watch.end" => d.watch_end(s(p, "id")?, p["reason"].as_str().unwrap_or("ended by the owner"), p["by"].as_str().unwrap_or("owner"))?,
+        "watch.list" => d.watches_list(p["run_id"].as_str(), p["open_only"].as_bool().unwrap_or(false))?,
+        "watch.findings" => d.findings_list(p["watch"].as_str(), p["run_id"].as_str())?,
         "share.withdraw" => d.share_withdraw(s(p, "id")?, p["by"].as_str().unwrap_or("owner"))?,
         "agent.share_deny" => d.share_deny(s(p, "run_id")?, p["denied"].as_bool().unwrap_or(true), p["by"].as_str().unwrap_or("owner"))?,
         "overseer.cap" => match p["cap"].as_i64() {
