@@ -566,3 +566,95 @@ fn atlas_s5_director_death_recovers_one_dispatched_worker() {
         "checks":[{"job_id":"j2","outcome":"passed","evidence":[artifact]}]}));
     assert_eq!(completed["status"],"completed","{completed}");
 }
+
+// S5: the J4 worker is inside a real Atlas PostgreSQL probe when a redirect
+// arrives. Transport receipt precedes application; expiry holds dependent work.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_redirect_during_long_probe_interrupts_and_holds_review() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d=Daemon::start(&[]);
+    let temp=tmp();
+    let checkout=repo(&temp.path().join("atlas-redirect"));
+    let script=repo_root().join("fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs");
+    let database_url_file=temp.path().join("disposable-database-url");
+    let probe_marker=temp.path().join("j4-probe-active");
+    std::fs::write(&database_url_file,std::env::var("ATLAS_DATABASE_URL").unwrap()).unwrap();
+    let created=d.call("swarm.create",json!({"category":"Atlas redirect fault",
+        "objective":"Audit attachment isolation","allowed_targets":["fixture"]}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j4","title":"Attachments","acceptance":"foreign download evidence",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j4","mode":"write"}]},
+        {"id":"review","title":"Review attachment finding","acceptance":"validated J4 evidence",
+            "deps":["j4"]}
+    ]}));
+    let at=now();
+    let snapshot=json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"fixture","account_id":"account","pool_ids":["pool"],
+            "capabilities":["audit"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+120000}]}]});
+    let attempt=admit(&d,run,1,"j4","fixture",&snapshot,at);
+    assert_eq!(attempt["status"],"admitted","{attempt}");
+    let launched=d.call("swarm.worker.launch",json!({"run_id":run,"job_id":"j4",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "repo":checkout,"program":"/usr/bin/env",
+        "args":["node",script,database_url_file,probe_marker],
+        "prompt":"Audit Atlas attachment authorization","title":"Atlas J4"}));
+    let worker=launched["overseer_run_id"].as_str().unwrap();
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(8);
+    while !probe_marker.exists() {
+        assert!(std::time::Instant::now()<until,"J4 never entered its Atlas probe");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let marker:Value=serde_json::from_slice(&std::fs::read(&probe_marker).unwrap()).unwrap();
+    assert_eq!(marker["fixtureVersion"],1);
+    assert_eq!(marker["job"],"j4");
+    assert_eq!(marker["attachmentStatus"],200);
+    assert!(["queued","starting","running"].contains(&d.run(worker)["status"].as_str().unwrap()));
+    d.call("swarm.direct",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"j4","attempt_id":attempt["attempt_id"],"message_id":"j4-s5-redirect",
+        "type":"redirect","payload":{"focus":"signed URL boundary","owner":"j2"}}));
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let delivered_by=std::time::Instant::now()+std::time::Duration::from_secs(4);
+    loop {
+        let phase:String=db.query_row("SELECT phase FROM swarm_messages
+            WHERE run_id=?1 AND message_id='j4-s5-redirect'",[run],|r|r.get(0)).unwrap();
+        if phase=="delivered" { break; }
+        assert!(std::time::Instant::now()<delivered_by,"J4 did not acknowledge delivery: {phase}");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert!(probe_marker.exists());
+    let run_dir:String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[worker],|r|r.get(0)).unwrap();
+    let interrupt=std::path::Path::new(&run_dir).join("interrupt.requested");
+    assert!(!interrupt.exists());
+    db.execute("UPDATE swarm_messages SET updated_ms=?3 WHERE run_id=?1 AND message_id=?2",
+        rusqlite::params![run,"j4-s5-redirect",now()-30_001]).unwrap();
+    let stopped_by=std::time::Instant::now()+std::time::Duration::from_secs(4);
+    while !interrupt.exists() {
+        assert!(std::time::Instant::now()<stopped_by,"J4 was not interrupted after redirect timeout");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let phase:String=db.query_row("SELECT phase FROM swarm_messages
+        WHERE run_id=?1 AND message_id='j4-s5-redirect'",[run],|r|r.get(0)).unwrap();
+    assert_eq!(phase,"delivered");
+    let results:i64=db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1
+        AND job_id='j4' AND kind='result'",[run],|r|r.get(0)).unwrap();
+    let accepts:i64=db.query_row("SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1
+        AND job_id='j4' AND decision='accept'",[run],|r|r.get(0)).unwrap();
+    assert_eq!((results,accepts),(0,0));
+    let jobs=d.call("swarm.jobs",json!({"id":run}));
+    let j4=jobs["jobs"].as_array().unwrap().iter().find(|job|job["id"]=="j4").unwrap();
+    assert_eq!(j4["stop_reason"],"redirect_ack_timeout");
+    assert_ne!(j4["status"],"accepted");
+    let review=jobs["jobs"].as_array().unwrap().iter().find(|job|job["id"]=="review").unwrap();
+    assert_eq!(review["status"],"planned");
+    assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"s5-redirect-complete","summary":"Attachment audit passed",
+        "verification":"J4 probe","checks":[]})).is_err());
+    let messages=d.call("swarm.messages",json!({"run_id":run,"recipient":attempt["attempt_id"]}));
+    assert!(messages["messages"].as_array().unwrap().iter().any(|message|
+        message["type"]=="checkpoint" && message["payload"]["reason"]=="redirect_ack_timeout"));
+}
