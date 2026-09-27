@@ -132,9 +132,12 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
-        "docs/verification/swarm/milestone-4.md"
+        "daemon/tests/swarm_availability.rs",
+        "docs/verification/swarm/milestone-4.md",
+        "docs/verification/swarm/SWARM-14.md",
+        "docs/verification/swarm/CONTRACT-03.md"
       ],
-      "blocker": "Fixture outage/auth failures exclude only affected targets; rate limits, real adapters and running-job response are not implemented."
+      "blocker": "Local fixtures now distinguish rate limit, local harness failure, outage, auth failure and quota exhaustion on one route while an independent OpenCode-labeled route stays eligible; a rate-limit observation blocks A admission and preserves B's ongoing report. Live scoped Auto Mode observations, endpoint/model exclusion keys, actual harness failure/reconnect, and active process reconciliation remain unverified."
     },
     "SWARM-15": {
       "status": "partial",
