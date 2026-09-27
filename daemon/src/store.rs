@@ -186,7 +186,17 @@ impl Store {
         };
         let mut store = Self { conn, learning_conn, learning_persistent };
         store.migrate_main()?;
-        if store.migrate_learning().and_then(|_| store.prune_auto_work_observations(crate::daemon::now(), 5000).map(|_| ())).is_err() {
+        if store.migrate_learning().and_then(|_| {
+            let now = crate::daemon::now();
+            store.prune_auto_measurements(now, 50_000)?;
+            store.prune_auto_daily_aggregates(now, 10_000)?;
+            store.learning_conn.execute(
+                "DELETE FROM auto_thread_usage_observations WHERE observed_ms < ?1",
+                params![now.saturating_sub(30 * 86_400_000_i64)],
+            )?;
+            store.prune_auto_work_observations(now, 5000)?;
+            Ok(())
+        }).is_err() {
             store.learning_conn = Connection::open_in_memory()?;
             store.learning_persistent = false;
             store.migrate_learning()?;
@@ -1795,12 +1805,14 @@ mod schema_migration_tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("state.sqlite");
         let legacy = Connection::open(&path).unwrap();
-        legacy.execute_batch("CREATE TABLE auto_measurements(
+        let observed = crate::daemon::now();
+        let day = observed.div_euclid(86_400_000) * 86_400_000;
+        legacy.execute_batch(&format!("CREATE TABLE auto_measurements(
             event_seq INTEGER PRIMARY KEY, observed_ms INTEGER NOT NULL, task_id TEXT NOT NULL,
             run_id TEXT NOT NULL, harness TEXT NOT NULL, profile_id TEXT, model TEXT,
             input_tokens INTEGER, output_tokens INTEGER, cached_input_tokens INTEGER,
             reasoning_output_tokens INTEGER, cost_usd REAL);
-            INSERT INTO auto_measurements VALUES(7,1000,'t','r','codex','p','model',42,1,NULL,NULL,NULL);
+            INSERT INTO auto_measurements VALUES(7,{observed},'t','r','codex','p','model',42,1,NULL,NULL,NULL);
             CREATE TABLE auto_daily_aggregates(
             day_ms INTEGER NOT NULL, harness TEXT NOT NULL, profile_id TEXT NOT NULL,
             model TEXT NOT NULL, last_observed_ms INTEGER NOT NULL, samples INTEGER NOT NULL,
@@ -1810,7 +1822,7 @@ mod schema_migration_tests {
             reasoning_output_observations INTEGER NOT NULL, reasoning_output_tokens INTEGER NOT NULL,
             cost_observations INTEGER NOT NULL, cost_usd REAL NOT NULL,
             PRIMARY KEY(day_ms,harness,profile_id,model));
-            INSERT INTO auto_daily_aggregates VALUES(0,'codex','p','model',1000,1,1,42,1,1,0,0,0,0,0,0);").unwrap();
+            INSERT INTO auto_daily_aggregates VALUES({day},'codex','p','model',{observed},1,1,42,1,1,0,0,0,0,0,0);")).unwrap();
         drop(legacy);
         let store = Store::open(&path).unwrap();
         assert_eq!(store.auto_measurements(10).unwrap().len(), 1);
@@ -1980,13 +1992,15 @@ mod schema_migration_tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("state.sqlite");
         let store = Store::open(&path).unwrap();
-        store.conn.execute_batch("DELETE FROM meta WHERE key='auto_learning_split_migrated';
+        let observed = crate::daemon::now();
+        let day = observed.div_euclid(86_400_000) * 86_400_000;
+        store.conn.execute_batch(&format!("DELETE FROM meta WHERE key='auto_learning_split_migrated';
             INSERT INTO auto_measurements(event_seq,observed_ms,task_id,run_id,harness,profile_id,model,effort,input_tokens)
-              VALUES(7,1000,'t','r','codex','p','model','',42);
-            INSERT INTO auto_daily_aggregates VALUES(0,'codex','p','model','',1000,1,1,42,1,1,0,0,0,0,0,0);
+              VALUES(7,{observed},'t','r','codex','p','model','',42);
+            INSERT INTO auto_daily_aggregates VALUES({day},'codex','p','model','',{observed},1,1,42,1,1,0,0,0,0,0,0);
             CREATE TRIGGER stop_learning_marker BEFORE INSERT ON meta
               WHEN NEW.key='auto_learning_split_migrated'
-              BEGIN SELECT RAISE(FAIL,'injected migration marker failure'); END;").unwrap();
+              BEGIN SELECT RAISE(FAIL,'injected migration marker failure'); END;")).unwrap();
         drop(store);
 
         let interrupted = Store::open(&path).unwrap();
@@ -2182,6 +2196,42 @@ mod auto_measurement_tests {
     use super::*;
     use crate::auto_telemetry::{from_usage, from_usage_with_effort};
     use serde_json::json;
+
+    #[test]
+    fn reopening_after_inactivity_expires_learning_without_touching_execution_history() {
+        const DAY: i64 = 86_400_000;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let now = crate::daemon::now();
+        let store = Store::open(&path).unwrap();
+        store.insert_event(now - 91 * DAY, None, None, "usage", "fixture", "exact", &json!({"input_tokens": 1})).unwrap();
+        for (id, observed) in [(1, now - 31 * DAY), (2, now - 29 * DAY)] {
+            store.learning_conn.execute(
+                "INSERT INTO auto_measurements(event_seq,observed_ms,task_id,run_id,harness) VALUES(?1,?2,'task','run','codex')",
+                params![id, observed],
+            ).unwrap();
+            store.learning_conn.execute(
+                "INSERT INTO auto_thread_usage_observations(run_id,profile_id,read_account_generation,attribution,observed_ms,source,estimate) VALUES('run','profile',1,'unverified',?1,'fixture','{}')",
+                params![observed],
+            ).unwrap();
+        }
+        for (day, observed) in [(1, now - 91 * DAY), (2, now - 89 * DAY)] {
+            store.learning_conn.execute(
+                "INSERT INTO auto_daily_aggregates(day_ms,harness,profile_id,model,effort,last_observed_ms,samples,input_observations,input_tokens,output_observations,output_tokens,cached_input_observations,cached_input_tokens,reasoning_output_observations,reasoning_output_tokens,cost_observations,cost_usd) VALUES(?1,'codex','','','',?2,1,0,0,0,0,0,0,0,0,0,0)",
+                params![day, observed],
+            ).unwrap();
+        }
+        drop(store);
+
+        let reopened = Store::open(&path).unwrap();
+        for table in ["auto_measurements", "auto_daily_aggregates", "auto_thread_usage_observations"] {
+            let count: i64 = reopened.learning_conn.query_row(
+                &format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0),
+            ).unwrap();
+            assert_eq!(count, 1, "{table} must retain only its unexpired row");
+        }
+        assert_eq!(reopened.events_after(0, None, 10).unwrap().len(), 1);
+    }
 
     #[test]
     fn local_measurements_deduplicate_without_copying_event_content() {
