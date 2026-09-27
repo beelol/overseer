@@ -4,6 +4,11 @@ const path = require('path');
 
 const STATUS_ICON = {
   queued: ['clock', 'charts.yellow'], starting: ['loading~spin', 'charts.blue'], running: ['sync~spin', 'charts.blue'],
+  planned: ['clock', 'charts.yellow'], ready: ['clock', 'charts.yellow'], reserved: ['clock', 'charts.blue'],
+  launching: ['loading~spin', 'charts.blue'], submitted: ['inbox', 'charts.orange'], blocked: ['warning', 'charts.orange'],
+  accepted: ['pass', 'charts.green'], rejected: ['error', 'charts.red'],
+  cancel_requested: ['debug-stop', 'charts.orange'], cancelled: ['debug-stop', 'charts.orange'],
+  superseded: ['history', 'descriptionForeground'],
   waiting_for_user: ['bell-dot', 'charts.orange'], completed: ['pass', 'charts.green'], failed: ['error', 'charts.red'],
   interrupted: ['debug-stop', 'charts.orange'], disconnected: ['debug-disconnect', 'charts.red'], unknown: ['question', 'charts.purple'],
 };
@@ -28,11 +33,25 @@ class Model {
     this.emitter = new vscode.EventEmitter();
     this.onDidChange = this.emitter.event;
     this.profileStatus = new Map();
+    this.swarms = [];
+    this.swarmFetchMs = 0;
   }
-  async refresh() {
+  async refresh(forceSwarm = false) {
     try {
       this.all = await this.client.request('state'); for (const p of this.all.profiles || []) p.name = accountName(p);
       this.state = this.visible(this.all); this.error = undefined;
+      if (forceSwarm || Date.now() - this.swarmFetchMs >= 1000) {
+        try {
+          const page = await this.client.request('swarm.list', { limit: 20 });
+          this.swarms = page.runs || [];
+          this.swarmError = undefined;
+        } catch (error) {
+          // A newer extension can still view ordinary agents on an older daemon.
+          this.swarms = [];
+          this.swarmError = error.message;
+        }
+        this.swarmFetchMs = Date.now();
+      }
     }
     catch (error) { this.error = error.message; }
     this.emitter.fire();
@@ -86,6 +105,7 @@ class AgentsProvider {
     this.filter = undefined; // { query, taskIds: Set }
     this.showArchived = false;
     this.statusFilter = 'all'; // 'all' | 'working' | 'needs' | 'done' | 'failed' (the search field's filters)
+    this.swarmStatusFilter = 'all';
     this.emitter = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.emitter.event;
     // Redraw only when something the list shows changed: a redraw between a click's mouse-down and
@@ -110,11 +130,13 @@ class AgentsProvider {
     return JSON.stringify([Math.floor(Date.now() / 30000), (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
       (st.runs || []).map(r => [r.id, r.status, r.parent_run_id, r.attention?.kind, r.harness, r.model, r.profile_id, r.workspace_id, r.title, r.exit_reason, r.ended_ms ? 1 : 0]),
       (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
-      (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || []]);
+      (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [],
+      this.model.swarms.map(s => [s.id, s.status, s.revision, s.active_worker_processes, s.job_counts])]);
   }
   getTreeItem(node) { return node.item; }
   getParent(node) { return node.parent; }
   refresh() { if (this.indexed) this.indexed.visible.clear(); this.emitter.fire(); }
+  setSwarmStatusFilter(status) { this.swarmStatusFilter = status; this.refresh(); }
   setCollapsed(node, collapsed) {
     const id = node?.item?.id; if (!id) return;
     if (collapsed) this.collapsed.add(id); else this.collapsed.delete(id);
@@ -188,14 +210,67 @@ class AgentsProvider {
       const out = [];
       const needs = this.filter || this.showArchived || this.statusFilter !== 'all' ? [] : (this.handlers.attention?.() || []);
       if (needs.length) out.push(this.needsSection(needs));
+      if (m.swarms.length && !this.filter && !this.showArchived) out.push(this.swarmsSection());
       const repos = [...new Set(this.visibleTasks().map(t => t.repo_root))];
       for (const repo of repos) out.push(this.repoNode(repo));
       return out;
     }
     if (node.section === 'needs') return node.list.map(a => this.needsRow(a, node)).filter(Boolean);
+    if (node.section === 'swarms') return m.swarms.map(run => this.swarmNode(run, node));
+    if (node.swarm) return this.swarmPage(node.swarm, undefined, node, true);
+    if (node.swarmPage) return this.swarmPage(node.swarmPage.run, node.swarmPage.cursor, node, false);
     if (node.repo) return this.visibleTasks().filter(t => t.repo_root === node.repo).map(t => this.agentNode(t, node));
     if (node.run) return this.kidsOf(node.run.id).map(run => this.childNode(run, node));
     return [];
+  }
+  swarmsSection() {
+    const item = new vscode.TreeItem('Swarms', this.expansion('section:swarms'));
+    item.id = 'section:swarms';
+    item.iconPath = new vscode.ThemeIcon('organization');
+    item.description = String(this.model.swarms.length);
+    item.contextValue = 'section-swarms';
+    return { item, section: 'swarms' };
+  }
+  swarmNode(run, parent) {
+    const counts = run.job_counts?.by_status || {};
+    const working = run.active_worker_processes || 0;
+    const item = new vscode.TreeItem(run.category, this.expansion('swarm:' + run.id));
+    item.id = 'swarm:' + run.id;
+    item.iconPath = new vscode.ThemeIcon('organization');
+    item.description = `${working} working · ${counts.ready || 0} ready · ${counts.blocked || 0} blocked`;
+    item.tooltip = `${run.objective}\n${run.status} · ${run.job_counts?.total || 0} jobs`;
+    item.accessibilityInformation = { label: `${run.category} swarm, ${run.status}, ${item.description}` };
+    item.contextValue = 'swarm-run';
+    return { item, swarm: run, parent };
+  }
+  async swarmPage(run, cursor, parent, includeDirector) {
+    const page = await this.model.client.request('swarm.jobs', { id: run.id, cursor, limit: 50,
+      ...(this.swarmStatusFilter === 'all' ? {} : { status: this.swarmStatusFilter }) });
+    const rows = [];
+    if (includeDirector) {
+      const item = new vscode.TreeItem('Director');
+      item.id = 'swarm-director:' + run.id;
+      item.iconPath = new vscode.ThemeIcon('account');
+      item.description = run.director?.process_status || run.director?.owner_status || 'not started';
+      item.contextValue = 'swarm-director';
+      rows.push({ item, parent });
+    }
+    for (const job of page.jobs || []) {
+      const item = new vscode.TreeItem(job.title);
+      item.id = `swarm-job:${run.id}:${job.id}`;
+      item.iconPath = statusIcon(job.status);
+      item.description = job.status;
+      item.tooltip = `${job.acceptance}\n${job.status} · ${job.attempt_count} attempts`;
+      item.contextValue = 'swarm-job';
+      rows.push({ item, job, parent });
+    }
+    if (page.next_cursor) {
+      const item = new vscode.TreeItem('More jobs…', vscode.TreeItemCollapsibleState.Collapsed);
+      item.id = `swarm-page:${run.id}:${page.next_cursor}`;
+      item.iconPath = new vscode.ThemeIcon('list-unordered');
+      rows.push({ item, swarmPage: { run, cursor: page.next_cursor }, parent });
+    }
+    return rows;
   }
   needsSection(list) {
     const item = new vscode.TreeItem('Needs you', this.expansion('section:needs'));

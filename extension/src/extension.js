@@ -610,7 +610,14 @@ async function activate(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand('overseer.newTask', guard(async () => { requireTrust(); await model.refresh(); await newTaskPanel.open(); })),
     vscode.commands.registerCommand('overseer.newTaskQuick', guard(newTask)),
-    vscode.commands.registerCommand('overseer.refresh', guard(async () => { await model.refresh(); })),
+    vscode.commands.registerCommand('overseer.refresh', guard(async () => { await model.refresh(true); })),
+    vscode.commands.registerCommand('overseer.filterSwarmJobs', guard(async () => {
+      const choices = [['all', 'All jobs'], ['ready', 'Ready'], ['running', 'Running'],
+        ['submitted', 'Awaiting review'], ['blocked', 'Blocked'], ['accepted', 'Accepted'], ['failed', 'Failed']]
+        .map(([value, label]) => ({ value, label, description: agents.swarmStatusFilter === value ? '✓' : '' }));
+      const picked = await vscode.window.showQuickPick(choices, { title: 'Show Swarm jobs' });
+      if (picked) agents.setSwarmStatusFilter(picked.value);
+    })),
     vscode.commands.registerCommand('overseer.selectRun', guard(runId => selectRun(runId))),
     vscode.commands.registerCommand('overseer.openReview', guard(async arg => { const id = runArg(arg); if (!id) return; selectedRun = id; await arrangement.openReview(id); await center.select(id); })),
     vscode.commands.registerCommand('overseer.openEdit', guard(async (runId, rel) => {
