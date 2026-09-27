@@ -1056,6 +1056,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         "parent_run_id":parent.id,"harness":route.harness,"profile_id":route.profile_id,
                         "model":route.model,"effort":route.effort,"prompt":prompt,"title":title,
                         "required_tools":required,"auto_selected":true,
+                        "sandbox":sandbox,
                         "execution_budget_ms":execution_budget_ms,
                         "requirements_hash":requirements_hash,"expected_account_generation":generation,
                         "auto_local_endpoint":if route.harness == "opencode" {

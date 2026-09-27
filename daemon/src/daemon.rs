@@ -27,24 +27,38 @@ fn short_id() -> String {
     uuid::Uuid::new_v4().simple().to_string()[..12].to_string()
 }
 
-fn codex_thread_request(app: &Value) -> Value {
+fn codex_sandbox_name(mode: crate::auto_select::Sandbox) -> Result<&'static str> {
+    match mode {
+        crate::auto_select::Sandbox::ReadOnly => Ok("read-only"),
+        crate::auto_select::Sandbox::WorkspaceWrite => Ok("workspace-write"),
+        crate::auto_select::Sandbox::FullAccess => bail!("automatic full-access sandbox is unsupported"),
+    }
+}
+
+fn codex_thread_request(app: &Value) -> Result<Value> {
+    let sandbox = match app.get("sandbox") {
+        None => "workspace-write", // existing manual runs predate the saved field
+        Some(Value::String(value)) if value == "read-only" => "read-only",
+        Some(Value::String(value)) if value == "workspace-write" => "workspace-write",
+        _ => bail!("unsupported Codex sandbox for a saved run"),
+    };
     match app["resume"].as_str() {
-        Some(thread) => json!({"id": "ovs-thread", "method": "thread/resume", "params": {
-            "threadId": thread, "cwd": app["cwd"], "approvalPolicy": app["approval"], "sandbox": "workspace-write"}}),
+        Some(thread) => Ok(json!({"id": "ovs-thread", "method": "thread/resume", "params": {
+            "threadId": thread, "cwd": app["cwd"], "approvalPolicy": app["approval"], "sandbox": sandbox}})),
         None => {
-            let mut params = json!({"cwd": app["cwd"], "approvalPolicy": app["approval"], "sandbox": "workspace-write"});
+            let mut params = json!({"cwd": app["cwd"], "approvalPolicy": app["approval"], "sandbox": sandbox});
             if let Some(model) = app["model"].as_str() {
                 params["model"] = json!(model);
             }
-            json!({"id": "ovs-thread", "method": "thread/start", "params": params})
+            Ok(json!({"id": "ovs-thread", "method": "thread/start", "params": params}))
         }
     }
 }
 
-fn codex_child_next_request(app: &Value) -> Value {
+fn codex_child_next_request(app: &Value) -> Result<Value> {
     if app["required_tools"].as_array().is_some_and(|tools| !tools.is_empty()) {
-        json!({"id":"ovs-auto-tools","method":"mcpServerStatus/list",
-            "params":{"detail":"toolsAndAuthOnly"}})
+        Ok(json!({"id":"ovs-auto-tools","method":"mcpServerStatus/list",
+            "params":{"detail":"toolsAndAuthOnly"}}))
     } else {
         codex_thread_request(app)
     }
@@ -393,6 +407,15 @@ impl Daemon {
             _ => bail!("effort must be a nonempty string"),
         };
         adapters::validate_effort(harness, effort.as_deref())?;
+        let sandbox = match p.get("sandbox") {
+            None => "workspace-write",
+            Some(value) => {
+                if !matches!(harness, "codex" | "codex-app") {
+                    bail!("explicit task sandbox is unsupported for this harness");
+                }
+                codex_sandbox_name(serde_json::from_value(value.clone())?)?
+            }
+        };
         let prompt = p["prompt"].as_str().unwrap_or_default().to_string();
         if prompt.is_empty() && harness != "generic" {
             bail!("prompt is required");
@@ -522,7 +545,7 @@ impl Daemon {
             store.insert_run(&run)?;
             store.set_workspace_owner(&ws.id, Some(&run.id))?;
         }
-        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "extra_args": p["extra_args"].clone()});
+        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "sandbox":sandbox, "extra_args": p["extra_args"].clone()});
         {
             let store = self.store.lock().unwrap();
             store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![run.id, generic.to_string()])?;
@@ -584,11 +607,25 @@ impl Daemon {
         if !required_tools.is_empty() && harness != "codex-app" {
             bail!("required-tool preflight is not supported for this harness");
         }
+        let selected_sandbox = match p.get("sandbox") {
+            Some(value) => {
+                let mode: crate::auto_select::Sandbox = serde_json::from_value(value.clone())?;
+                let name = codex_sandbox_name(mode)?;
+                if mode == crate::auto_select::Sandbox::ReadOnly
+                    && !matches!(harness, "codex" | "codex-app" | "opencode") {
+                    bail!("read-only delegation is unsupported for this harness");
+                }
+                Some(name)
+            }
+            None if p["auto_selected"] == true => bail!("automatic delegation requires a sandbox"),
+            None => None,
+        };
         let profile_id = p["profile_id"].as_str().map(str::to_string)
             .unwrap_or_else(|| format!("system-{}", profile_harness(harness)));
         let request = json!({"parent_run_id":parent_id,"harness":harness,"profile_id":profile_id,
             "model":model,"effort":effort,"prompt":prompt,"title":title,"required_tools":required_tools});
         let mut request = request;
+        if let Some(mode) = selected_sandbox { request["sandbox"] = json!(mode); }
         if p["auto_selected"] == true {
             let execution_budget_ms = match p.get("execution_budget_ms") {
                 None => DEFAULT_AUTO_EXECUTION_BUDGET_MS,
@@ -661,16 +698,30 @@ impl Daemon {
                 bail!("selected local OpenCode endpoint is unavailable before child creation");
             }
         }
-        let parent_approval = {
+        let (parent_approval, parent_sandbox) = {
             let store = self.store.lock().unwrap();
             let launch: Option<String> = store.conn.query_row(
                 "SELECT launch FROM runs WHERE id=?1", [&parent.id], |row| row.get(0))?;
             let launch: Value = launch.as_deref().and_then(|value| serde_json::from_str(value).ok())
                 .unwrap_or(Value::Null);
             let generic = launch.get("generic").unwrap_or(&launch);
-            generic["approval"].as_str()
-                .ok_or_else(|| anyhow!("parent approval policy is unavailable"))?.to_string()
+            let approval = generic["approval"].as_str()
+                .ok_or_else(|| anyhow!("parent approval policy is unavailable"))?.to_string();
+            let sandbox = generic["sandbox"].as_str().unwrap_or("workspace-write");
+            if !matches!(sandbox, "read-only" | "workspace-write") {
+                bail!("parent sandbox policy is unavailable");
+            }
+            (approval, sandbox.to_string())
         };
+        let child_sandbox = selected_sandbox.unwrap_or(&parent_sandbox);
+        if parent_sandbox == "read-only" && child_sandbox != "read-only" {
+            bail!("delegation cannot widen the parent sandbox");
+        }
+        if child_sandbox == "read-only"
+            && !matches!(harness, "codex" | "codex-app")
+            && !(p["auto_selected"] == true && harness == "opencode") {
+            bail!("read-only delegation is unsupported for this harness");
+        }
         let snapshot = self.take_snapshot(&parent_ws, "managed-delegation")?;
         let repo = Path::new(&parent_ws.repo_root);
         let repo_name = repo.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "repo".into());
@@ -713,7 +764,7 @@ impl Daemon {
                 store.insert_managed_work_unit(work_unit_id, &parent.id, &run.id, &request_hash)?;
                 store.set_workspace_owner(&ws.id, Some(&run.id))?;
                 store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1",
-                    rusqlite::params![run.id, json!({"approval":parent_approval,"extra_args":[],"required_tools":required_tools,
+                    rusqlite::params![run.id, json!({"approval":parent_approval,"sandbox":child_sandbox,"extra_args":[],"required_tools":required_tools,
                         "auto_selected":p["auto_selected"] == true,"expected_account_generation":p["expected_account_generation"],
                         "execution_budget_ms":request["execution_budget_ms"],
                         "auto_local_endpoint":request["auto_local_endpoint"],
@@ -885,7 +936,7 @@ impl Daemon {
             || self.active_writer(&workspace.path)?.is_some() {
             bail!("workspace ownership has not been released");
         }
-        let approval = {
+        let (approval, sandbox) = {
             let saved: Option<String> = self.store.lock().unwrap().conn.query_row(
                 "SELECT launch FROM runs WHERE id=?1", [source_id], |row| row.get(0))?;
             let launch: Value = saved.as_deref().and_then(|text| serde_json::from_str(text).ok()).unwrap_or(Value::Null);
@@ -894,7 +945,13 @@ impl Daemon {
                 || generic["required_tools"].as_array().is_some_and(|items| !items.is_empty()) {
                 bail!("source launch constraints cannot yet be transferred safely");
             }
-            generic["approval"].as_str().ok_or_else(|| anyhow!("source approval policy is unavailable"))?.to_string()
+            let approval = generic["approval"].as_str()
+                .ok_or_else(|| anyhow!("source approval policy is unavailable"))?.to_string();
+            let sandbox = generic["sandbox"].as_str().unwrap_or("workspace-write");
+            if !matches!(sandbox, "read-only" | "workspace-write") {
+                bail!("source sandbox policy is unavailable");
+            }
+            (approval, sandbox.to_string())
         };
         let snapshot = self.take_snapshot(&workspace, "handoff-checkpoint")?;
         let run = Run {
@@ -915,7 +972,7 @@ impl Daemon {
                 store.insert_run(&run)?;
                 store.set_workspace_owner(&workspace.id, Some(&run.id))?;
                 store.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1",
-                    rusqlite::params![run.id, json!({"approval":approval,"extra_args":[],
+                    rusqlite::params![run.id, json!({"approval":approval,"sandbox":sandbox,"extra_args":[],
                         "handoff_hash":request_hash,"source_run_id":source.id,"snapshot_id":snapshot.id,
                         "handoff":p["handoff"]}).to_string()])?;
                 Ok(())
@@ -1053,6 +1110,10 @@ impl Daemon {
         if follow_up && resume.is_none() && run.harness != "generic" {
             bail!("no native session id was reported for this run, so it cannot be resumed");
         }
+        let sandbox = generic_meta["sandbox"].as_str().unwrap_or("workspace-write");
+        if !matches!(sandbox, "read-only" | "workspace-write") {
+            bail!("saved run sandbox is unsupported");
+        }
         let launch = adapters::launch(
             &run.harness,
             &LaunchReq {
@@ -1060,6 +1121,7 @@ impl Daemon {
                 prompt,
                 model: run.model.as_deref(),
                 effort: run.effort.as_deref(),
+                sandbox: Some(sandbox),
                 profile_env,
                 resume_session: resume.as_deref(),
                 program_override: generic_meta["program"].as_str(),
@@ -1069,6 +1131,7 @@ impl Daemon {
         )?;
         self.store.lock().unwrap().set_workspace_owner(&ws.id, Some(run_id))?;
         let app = json!({"prompt": prompt, "cwd": ws.path, "model": run.model, "effort": run.effort, "resume": resume, "approval": generic_meta["approval"].as_str().unwrap_or("on-request"),
+            "sandbox":sandbox,
             "required_tools":generic_meta["required_tools"], "auto_selected":generic_meta["auto_selected"],
             "expected_account_generation":generic_meta["expected_account_generation"]});
         self.spawn_process(&run, &ws, launch, json!({"generic": generic_meta, "app": app}))?;
@@ -1775,7 +1838,7 @@ impl Daemon {
                 if let Some(err) = error {
                     if id == "ovs-auto-quota" {
                         ev("auto_account_unknown", "harness", "exact", json!({"reason":"account quota metadata unavailable"}), None)?;
-                        state.sends.push(format!("{}\n", codex_child_next_request(app)));
+                        state.sends.push(format!("{}\n", codex_child_next_request(app)?));
                         return Ok(());
                     }
                     if id == "ovs-auto-tools" {
@@ -1797,7 +1860,7 @@ impl Daemon {
                     "ovs-init" => {
                         let msg = if run.relation_source.as_deref() == Some("managed-delegation") && run.harness == "codex-app" {
                             json!({"id":"ovs-account","method":"account/read","params":{"refreshToken":false}})
-                        } else { codex_thread_request(app) };
+                        } else { codex_thread_request(app)? };
                         state.sends.push(format!("{msg}\n"));
                     }
                     "ovs-account" => {
@@ -1866,7 +1929,7 @@ impl Daemon {
                                 "codex-app/managed-pre-turn", &snapshot)?;
                             out.push(event);
                         }
-                        state.sends.push(format!("{}\n", codex_child_next_request(app)));
+                        state.sends.push(format!("{}\n", codex_child_next_request(app)?));
                     }
                     "ovs-auto-tools" => {
                         let expected = app["required_tools"].as_array().cloned().unwrap_or_default();
@@ -1881,7 +1944,7 @@ impl Daemon {
                             state.close_stdin = true;
                             return Ok(());
                         }
-                        state.sends.push(format!("{}\n", codex_thread_request(app)));
+                        state.sends.push(format!("{}\n", codex_thread_request(app)?));
                     }
                     "ovs-thread" => {
                         let thread = result["thread"]["id"].as_str().unwrap_or_default().to_string();

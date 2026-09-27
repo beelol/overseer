@@ -425,6 +425,7 @@ mod tests {
             effort:"medium".into(),
             tier:CapabilityTier::General, tools:BTreeSet::new(), context_limit:None,
             supports_approvals:true, sandbox:Sandbox::WorkspaceWrite,
+            supported_sandboxes:None,
             recommended_default:true, quota:Allowance::ObservedNonExhausted,
             quota_blocks:Vec::new(), fit:Fit::Unknown, health:Health::Healthy,
             unresolved_quota_pool_identity:false, in_flight_pool_claim:false };

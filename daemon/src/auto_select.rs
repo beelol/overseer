@@ -218,6 +218,10 @@ pub struct Route {
     pub context_limit: Option<u64>,
     pub supports_approvals: bool,
     pub sandbox: Sandbox,
+    /// Explicit modes supported by this harness route. Older recorded routes
+    /// omit this field and retain their original single-mode interpretation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supported_sandboxes: Option<BTreeSet<Sandbox>>,
     pub recommended_default: bool,
     pub quota: Allowance,
     #[serde(default)]
@@ -340,7 +344,10 @@ fn excluded(work: &WorkUnit, route: &Route, blocks: &PoolBlocks<'_>) -> Option<&
     if work.requires_approvals && !route.supports_approvals {
         return Some("approvals_unsupported");
     }
-    if route.sandbox < work.min_sandbox || route.sandbox > work.max_sandbox {
+    let sandbox_supported = route.supported_sandboxes.as_ref()
+        .map(|modes| modes.iter().any(|mode| *mode >= work.min_sandbox && *mode <= work.max_sandbox))
+        .unwrap_or(route.sandbox >= work.min_sandbox && route.sandbox <= work.max_sandbox);
+    if !sandbox_supported {
         return Some("sandbox_incompatible");
     }
     None
@@ -461,6 +468,7 @@ mod tests {
             context_limit: Some(100_000),
             supports_approvals: true,
             sandbox: Sandbox::WorkspaceWrite,
+            supported_sandboxes:None,
             recommended_default: tier == CapabilityTier::General,
             quota: Allowance::ObservedNonExhausted,
             quota_blocks: Vec::new(),

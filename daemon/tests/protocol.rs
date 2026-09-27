@@ -2368,7 +2368,8 @@ fn auto_work_history_does_not_reappear_after_account_changes_during_child() {
     std::fs::write(&account_file, "account-B").unwrap();
     d.call("auto.tools.inspect", json!({"profile_id":profile_id,"workspace_id":workspace_id}));
     assert!(generation() > prior_generation, "metadata read must observe the new login while the child is active");
-    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    let done = d.wait_done(&child, 15);
+    assert_eq!(done["status"], "completed", "{done} events: {:?}", d.events(&child));
     assert!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().is_empty(),
         "a settled child must not recreate prior-account learning");
 }
@@ -2560,6 +2561,45 @@ fn handoff_refuses_a_failed_or_unresolved_source_without_starting_another_run() 
 }
 
 #[test]
+fn completed_read_only_codex_handoff_keeps_sandbox_and_account_boundary() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("handoff-sandbox-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium","sandbox":"read_only",
+        "prompt":"inspect without editing"}));
+    let source = run_id(&created);
+    assert_eq!(d.wait_done(&source, 15)["status"], "completed");
+    let inherited = d.try_call("run.delegate", json!({"work_unit_id":"read-only-unsupported-harness",
+        "parent_run_id":source,"harness":"claude","model":"claude-sonnet-4-5",
+        "effort":"medium","prompt":"continue inspection"}));
+    assert!(inherited.unwrap_err().contains("read-only delegation is unsupported"));
+    assert_eq!(d.runs().len(), 1, "rejected delegation must not create a child");
+    let other = d.call("profile.create", json!({"name":"Other Codex account","harness":"codex"}));
+    let other_id = other["id"].as_str().unwrap();
+    let request = json!({"source_run_id":source,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium",
+        "handoff":{"corrections":[],"completed":["inspection complete"],
+            "remaining":["review evidence"],"tests":[],"limitations":[],"unresolved_actions":[]}});
+    let mut switched = request.clone();
+    switched["profile_id"] = json!(other_id);
+    assert!(d.try_call("run.handoff", switched).is_err(), "handoff cannot switch accounts");
+    let mut alternate = request.clone();
+    alternate["harness"] = json!("claude");
+    assert!(d.try_call("run.handoff", alternate).is_err(), "handoff cannot switch providers");
+    assert_eq!(d.runs().len(), 1);
+    let continuation = d.call("run.handoff", request);
+    let next = run_id(&continuation);
+    assert_eq!(d.wait_done(&next, 15)["status"], "completed");
+    let output = std::fs::read_to_string(trace).unwrap();
+    assert_eq!(output.matches("thread_sandbox:read-only").count(), 2, "{output}");
+    assert_eq!(d.runs().len(), 2);
+}
+
+#[test]
 fn handoff_replay_does_not_launch_a_committed_but_unstarted_continuation() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
@@ -2741,7 +2781,7 @@ fn auto_selected_opencode_child_uses_guarded_alternate_local_endpoint() {
     let delegated = d.call("run.delegate", json!({"work_unit_id":"alternate-local-1",
         "parent_run_id":parent,"harness":"opencode","profile_id":profile["id"],
         "model":"local_b/fixture-b","effort":"default","prompt":"reply hello",
-        "title":"local child","auto_selected":true,
+        "title":"local child","auto_selected":true,"sandbox":"read_only",
         "requirements_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "auto_local_endpoint":alternate}));
     assert!(delegated.get("launch_error").is_none(), "{delegated}");
@@ -2760,7 +2800,7 @@ fn auto_selected_opencode_child_uses_guarded_alternate_local_endpoint() {
     let refused = d.try_call("run.delegate", json!({"work_unit_id":"refused-local-2",
         "parent_run_id":parent,"harness":"opencode","profile_id":refused_profile["id"],
         "model":"local_a/fixture-a","effort":"default","prompt":"reply hello",
-        "title":"unreachable local child","auto_selected":true,
+        "title":"unreachable local child","auto_selected":true,"sandbox":"read_only",
         "requirements_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "auto_local_endpoint":"http://127.0.0.1:1/v1"}));
     let refused = refused.unwrap_err();
@@ -2771,7 +2811,7 @@ fn auto_selected_opencode_child_uses_guarded_alternate_local_endpoint() {
     let credentialed = d.try_call("run.delegate", json!({"work_unit_id":"credentialed-local-3",
         "parent_run_id":parent,"harness":"opencode","profile_id":profile["id"],
         "model":"local_b/fixture-b","effort":"default","prompt":"reply hello",
-        "title":"credentialed local child","auto_selected":true,
+        "title":"credentialed local child","auto_selected":true,"sandbox":"read_only",
         "requirements_hash":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "auto_local_endpoint":alternate}));
     let credentialed = credentialed.unwrap_err();
@@ -3275,6 +3315,73 @@ fn auto_ordinary_child_failure_stays_failed_until_the_user_requests_new_work() {
     let next_child = run_id(&next);
     assert_eq!(d.wait_done(&next_child, 15)["status"], "completed");
     assert_eq!(d.runs().len(), 4);
+}
+
+#[test]
+fn auto_read_only_codex_child_keeps_its_selected_sandbox_through_launch_and_replay() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("sandbox-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"read-only-codex-child","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"sandbox":"read_only",
+        "allowed_profiles":["system-codex"],"prompt":"inspect without editing"});
+    let selected = d.call("auto.dispatch", request.clone());
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    let child = run_id(&selected);
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    let output = std::fs::read_to_string(&trace).unwrap();
+    assert_eq!(output.matches("thread_sandbox:read-only").count(), 1, "{output}");
+    assert_eq!(d.call("auto.dispatch", request)["run"]["id"], child);
+    assert_eq!(d.runs().len(), 2);
+}
+
+#[test]
+fn auto_permission_denial_does_not_select_an_alternate_or_continue_when_disabled() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let claude_mode = r.path().join("claude-mode.txt");
+    std::fs::write(&claude_mode, "prose").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE_FILE"),
+        ("FIXTURE_MODE", "managed-models"),
+        ("CLAUDE_FIXTURE_MODE_FILE", claude_mode.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let warmup = run_id(&d.call("task.create", json!({"repo":repo,"harness":"claude",
+        "model":"sonnet","effort":"medium","prompt":"independent check"})));
+    assert_eq!(d.wait_done(&warmup, 15)["status"], "completed");
+    std::fs::write(&claude_mode, "permission").unwrap();
+    let request = json!({"work_unit_id":"denied-child-1","parent_run_id":parent,
+        "min_tier":"general","required_tools":[],"requires_approvals":true,
+        "allowed_profiles":["system-claude","system-codex"],"preferred_harness":"claude",
+        "prompt":"inspect this work"});
+    let selected = d.call("auto.dispatch", request.clone());
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    assert_eq!(selected["run"]["harness"], "claude");
+    let child = run_id(&selected);
+    let waiting = d.wait_status(&child, |status| status == "waiting_for_user", 15);
+    let permission = waiting["attention"]["request_id"].as_str().unwrap();
+    d.call("run.permission", json!({"run_id":child,"request_id":permission,"allow":false}));
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert!(!ws_path(&d, &selected).join("perm.txt").exists());
+    assert!(d.events(&child).iter().any(|event|
+        event["kind"] == "permission_answered" && event["payload"]["allow"] == false));
+    let replay = d.call("auto.dispatch", request);
+    assert_eq!(replay["run"]["id"], child);
+    assert_eq!(d.runs().len(), 3, "denial must not dispatch an eligible Codex alternate");
+    d.call("auto.mode.set", json!({"enabled":false}));
+    assert!(d.try_call("auto.dispatch", json!({"work_unit_id":"denied-next-2",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-codex"],"prompt":"another check"})).is_err());
+    assert_eq!(d.runs().len(), 3);
 }
 
 #[test]
@@ -4353,7 +4460,8 @@ fn auto_managed_child_reattaches_after_daemon_restart_without_relaunch() {
     assert_eq!(repeated["run"]["id"], child);
     assert_eq!(repeated["replayed"], true);
     assert_eq!(d.runs().len(), 2);
-    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    let done = d.wait_done(&child, 15);
+    assert_eq!(done["status"], "completed", "{done} events: {:?}", d.events(&child));
     assert_eq!(d.run(&child)["process_generation"], 1);
     assert_eq!(d.call("run.result", json!({"run_id":child}))["text"], "browser result: parent context found");
     assert_eq!(d.events(&child).iter().filter(|event| event["kind"] == "output" && event["payload"]["role"] == "assistant").count(), 1);

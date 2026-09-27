@@ -52,6 +52,7 @@ pub struct LaunchReq<'a> {
     pub prompt: &'a str,
     pub model: Option<&'a str>,
     pub effort: Option<&'a str>,
+    pub sandbox: Option<&'a str>,
     pub profile_env: BTreeMap<String, String>,
     pub resume_session: Option<&'a str>,
     pub program_override: Option<&'a str>,
@@ -247,16 +248,21 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
     }
     let (mut args, initial_stdin, close_stdin) = match harness {
         "codex" => {
+            let sandbox = match req.sandbox.unwrap_or("workspace-write") {
+                "read-only" => "read-only",
+                "workspace-write" => "workspace-write",
+                _ => bail!("unsupported Codex CLI sandbox"),
+            };
             let mut args = vec!["exec".to_string()];
             if let Some(session) = req.resume_session {
                 args.extend(["resume".into(), session.into()]);
             }
             args.extend(["--json".into(), "--skip-git-repo-check".into()]);
             if req.resume_session.is_none() {
-                args.extend(["-s".into(), "workspace-write".into(), "-C".into(), req.cwd.display().to_string()]);
+                args.extend(["-s".into(), sandbox.into(), "-C".into(), req.cwd.display().to_string()]);
             } else {
                 // `exec resume` has no -s/-C; keep the same sandbox (cwd comes from the supervisor).
-                args.extend(["-c".into(), "sandbox_mode=\"workspace-write\"".into()]);
+                args.extend(["-c".into(), format!("sandbox_mode=\"{sandbox}\"")]);
             }
             if let Some(m) = model {
                 args.extend(["-m".into(), m.into()]);
@@ -896,7 +902,7 @@ mod tests {
         ] {
             let launch = launch(harness, &LaunchReq {
                 cwd: Path::new("/tmp"), prompt: "work", model: Some("fixture-model"),
-                effort: Some("medium"), profile_env: BTreeMap::new(),
+                effort: Some("medium"), sandbox: Some("workspace-write"), profile_env: BTreeMap::new(),
                 resume_session: None, program_override: Some("/bin/true"),
                 args_override: None, extra_args: &[],
             }).unwrap();
@@ -905,5 +911,23 @@ mod tests {
         }
         assert!(validate_effort("codex", Some("medium;touch /tmp/x")).is_err());
         assert!(validate_effort("generic", Some("medium")).is_err());
+    }
+
+    #[test]
+    fn codex_cli_keeps_selected_read_only_sandbox_on_start_and_resume() {
+        for resume in [None, Some("session-1")] {
+            let launch = launch("codex", &LaunchReq {
+                cwd: Path::new("/tmp"), prompt: "inspect", model: Some("fixture-model"),
+                effort: Some("medium"), sandbox: Some("read-only"), profile_env: BTreeMap::new(),
+                resume_session: resume, program_override: Some("/bin/true"),
+                args_override: None, extra_args: &[],
+            }).unwrap();
+            let args = &launch.args;
+            if resume.is_some() {
+                assert!(args.contains(&"sandbox_mode=\"read-only\"".to_string()), "{args:?}");
+            } else {
+                assert!(args.windows(2).any(|pair| pair == ["-s", "read-only"]), "{args:?}");
+            }
+        }
     }
 }

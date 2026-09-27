@@ -120,6 +120,7 @@ rl.on('line', line => {
   else if (m.method === 'thread/start' || m.method === 'thread/resume') {
     mark('thread_started');
     mark('thread_approval:' + (m.params.approvalPolicy ?? 'none'));
+    mark('thread_sandbox:' + (m.params.sandbox ?? 'none'));
     if (m.params.threadId) thread = m.params.threadId;
     out({ id: m.id, result: { thread: { id: thread }, model: 'fixture' } });
     out({ method: 'thread/started', params: { thread: { id: thread } } });

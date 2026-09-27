@@ -440,6 +440,7 @@ mod tests {
             context_limit: Some(100_000),
             supports_approvals: true,
             sandbox: Sandbox::WorkspaceWrite,
+            supported_sandboxes:None,
             recommended_default: true,
             quota: Allowance::ObservedNonExhausted,
             quota_blocks: Vec::new(),
