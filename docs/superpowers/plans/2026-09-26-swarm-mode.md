@@ -48,6 +48,43 @@ Only add a new adapter surface to `adapters.rs` when the existing one cannot del
 4. A worker receives a revision while inside a long tool call; delivery is not application and dependent work stays held: tested in Task 3 and Task 6.
 5. Results arrive during Stop, permission revocation or full storage; no new admission, no lost acknowledged artifact: tested in Tasks 3, 6 and 9.
 
+## Critical path after the fixture foundation (2026-09-27)
+
+The coverage ledger currently has four verified criteria, 57 partial and three
+unverified; S0 is unverified and S1–S5 are partial. The individual fault
+replays have produced useful daemon evidence, but more fixture-only variants
+will not turn the normal product path or shared-account criteria green. Work
+on the following joined path before adding another isolated edge-case replay:
+
+1. Make **S0 an ordinary launch**: category and objective with inherited
+   settings and an approved account pool create one run, select a qualified
+   director, then show its worker ceiling, route, waiting reason and durable
+   status in VS Code. An API created only by a fixture is not S0. Preserve
+   the fixture-only guard on native execution until that harness's delivery,
+   descendant and permission boundaries are qualified; a visible unsupported
+   state is honest progress, not a verified launch.
+2. Join **one account admission transaction** with Auto Mode for ordinary,
+   Auto child and Swarm launches. Consume Auto's actual scoped observations;
+   do not copy its collector or treat local token history as subscription
+   headroom. CONTRACT-01–05 are the common tests. Compare the separate Auto
+   branch read-only until its integration surface is stable; do not replace
+   the other agent's implementation.
+3. Run the **director/worker loop through a supported native path**: plan,
+   dispatch, broker receipt/application, review, checkpoint, stop and restart
+   must be tied to the same admitted account identity and process. Only then
+   qualify a claimed harness with separately authorized tiny live turns.
+4. Join Gate S **through the director**: owner-confirmed Swarm start/limit,
+   one shared claim and account authority, advisories to the director only,
+   and AC-195/196 contract tests. Its separate branch does not count as a
+   merged shared authority.
+5. Replay S1–S5 on that joined path, close remaining clause-level gaps, run
+   the repository's required suite and audit each checkbox against evidence.
+
+The earlier task checklists remain a map of subsystem work, not a reason to
+finish every independent fixture before S0 and shared admission. Preserve all
+partial evidence and leave criterion boxes open until their full Verify clauses
+are actually demonstrated.
+
 ---
 
 ### Task 1: Freeze inputs and set evidence discipline
