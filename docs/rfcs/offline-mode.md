@@ -54,7 +54,7 @@ under `overseer.continuity.*`. The chat still uses the owner's verb for the mome
 | Memory safety | Overseer must never open a model that could crash the computer (AC-140). |
 | Goal | One goal for all of Gate L; its first step is the spike on OpenCode's session transports (AC-139). |
 | Build-time permissions | Model downloads for verification (about 28 GB), an Ollama install test in an isolated folder, light paid turns. The owner turns Wi-Fi off and on for the live checks. |
-| Where it is built | In its own worktree and a new pull request, opened early as a draft, kept up to date with main and out of conflict with the other work in flight. |
+| Where it is built | In its own worktree and its own new pull request, which carries everything the goal produces (code, evidence, ledger and RFC updates). Opened early as a draft, kept up to date with main and out of conflict with the other work in flight. Nothing is pushed to main directly. |
 | Other proposals in this RFC | Accepted as written (budget, handoff, catalogue verification, out-of-scope items). |
 
 ## Goal
@@ -678,8 +678,9 @@ Written on 2026-09-26 at the owner's request, ready to start. Not started by thi
 
 > Implement Continuity (Gate L) in `beelol/overseer`: AC-139 first, then AC-83 to AC-98, AC-138 and
 > AC-140, as written in `docs/overseer-rfc.md` (Gate L) and designed in `docs/rfcs/offline-mode.md`.
-> Work in your own worktree on a branch and land the work through one pull request; updates to the
-> criteria, the ledger and the RFC go straight to main.
+> All of it happens in its own worktree, on its own branch, and lands only through its own new pull
+> request: code, tests, evidence, and the ledger and RFC updates. Nothing is pushed to main and
+> nothing to any other branch or pull request.
 >
 > 1. **Find out (AC-139).** Learn how OpenCode's session transports (`opencode acp`, `opencode serve`)
 >    carry permission requests and their answers, interrupt, resume, model and agent choice, and
@@ -713,8 +714,13 @@ Written on 2026-09-26 at the owner's request, ready to start. Not started by thi
 
 ### Pull request and work in flight
 
-The owner's condition (2026-09-26): a new pull request, kept up to date and out of conflict with
-everything else in flight.
+The owner's condition (2026-09-26): the work must happen in its own pull request, kept up to date
+and out of conflict with everything else in flight.
+
+- **Everything in the pull request.** Code, tests, evidence, the spike's write-up, and every ledger
+  and RFC update the goal makes land through this pull request. The goal pushes nothing to main and
+  nothing to another branch or pull request. Boxes are checked on main only when the pull request
+  merges.
 
 - **One new pull request**, opened as a draft right after the spike, so the work is visible from the
   start. It is marked ready when every criterion that does not wait for the owner is verified. The
@@ -764,7 +770,8 @@ Granted by the owner on 2026-09-26 for this goal:
 - **Light paid turns:** ChatGPT accounts on `gpt-5.6-luna` at low effort only; Claude lightly. One
   attempt per step, no retry loops against paid accounts.
 - **Commits, a branch and one new pull request** in `beelol/overseer`, kept current with main by
-  merging main into the branch; documents and the ledger straight to main.
+  merging main into the branch. Nothing from this goal goes to main except through that pull
+  request.
 
 Not granted: purchases, login changes, automatic merges, editing the user's own OpenCode or Ollama
 configuration, and **turning the network off**. The implementing session needs the network itself,
