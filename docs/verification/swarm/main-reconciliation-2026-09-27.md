@@ -373,3 +373,15 @@ allocation and worker-count defaults, and SWARM-01–64 wording unchanged. The
 normal start, shared Auto account transaction, Gate S advisories, and eventual
 Voice integration remain open; the published documentation verifies none of
 those joined paths.
+
+## Refresh against published main: `bacd5f54`
+
+This branch merged the new main tip after the Auto integration spike. The only
+new commit revises the prepared Voice Mode goal and RFC: its separate PR will
+branch from Gate S, build owner-free behavior with simulated audio first, then
+wait for the owner's live microphone/session checks while tracking its base.
+It changes no daemon or extension runtime and supplies no Swarm communication
+or admission authority. Voice will eventually touch `daemon.rs` and `server.rs`,
+so its spoken redirects and permission actions must still enter the existing
+owner-authorized director advisory/control path when integrated. No Swarm
+default, criterion wording or verified box changes from this main update.
