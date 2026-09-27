@@ -4,8 +4,8 @@ use crate::{
     auto_consumption::EstimateKey,
     auto_quota::QuotaSnapshot,
     auto_select::{
-        self, Allowance, AllowanceEstimate, DrawSource, Fit, Route, TaskSignature, WindowDraw,
-        WorkUnit,
+        self, Allowance, AllowanceEstimate, CompleteCost, Decision, DrawSource, Fit, Route,
+        TaskSignature, WindowDraw, WorkUnit,
     },
     store::Store,
 };
@@ -94,6 +94,35 @@ pub(crate) fn evaluate_fit(
     }
     .into();
     result
+}
+
+/// Ranking may use only a complete-work prediction that already passed the
+/// same strict allowance-fit evaluation. Older admission-only envelopes do
+/// not imply anything about context/cache or verification overhead.
+pub(crate) fn complete_costs(work: &WorkUnit, routes: &[Route],
+    inputs: &[FitEvidenceInput], now_ms: i64) -> Vec<Option<CompleteCost>> {
+    if routes.len() != inputs.len() {
+        return routes.iter().map(|_| None).collect();
+    }
+    routes.iter().zip(inputs).map(|(route, input)| {
+        if route.fit != Fit::Fits || evaluate_fit(work, route, input, now_ms).fit != Fit::Fits {
+            return None;
+        }
+        let FitEvidenceInput::Observed { estimate:Some(estimate), .. } = input else {
+            return None;
+        };
+        if estimate.prediction_basis.as_ref()?.method != "bounded_class_total_upper_v1" {
+            return None;
+        }
+        Some(CompleteCost { pool_id:estimate.pool_id.clone(),
+            plan_type:estimate.plan_type.clone()?, windows:estimate.windows.clone() })
+    }).collect()
+}
+
+pub(crate) fn select_with_estimates(work: &WorkUnit, routes: &[Route],
+    inputs: &[FitEvidenceInput], now_ms: i64) -> Decision {
+    auto_select::select_with_complete_costs(work, routes,
+        &complete_costs(work, routes, inputs, now_ms))
 }
 
 pub(crate) fn fit_inputs_within_bounds(inputs: &[FitEvidenceInput]) -> bool {
@@ -393,6 +422,56 @@ mod tests {
             "recorded normalized inputs reproduce the decision"
         );
         assert_eq!(evidence.len(), 2);
+    }
+
+    #[test]
+    fn comparable_complete_work_draw_changes_a_later_choice_without_churn() {
+        let now = 1_800_000_000_000_i64;
+        let (store, pool) = seeded(now);
+        for (model, draw) in [("costly", 3.0), ("efficient", 1.0)] {
+            let mut learned = estimate(&pool, model, draw, now);
+            learned.prediction_basis.as_mut().unwrap().method =
+                "bounded_class_total_upper_v1".into();
+            store.put_auto_allowance_estimate("profile", 1, &learned, now).unwrap();
+        }
+        let generations = BTreeMap::from([("profile".into(), 1)]);
+        let mut routes = vec![route("costly", &pool), route("efficient", &pool)];
+        let (inputs, _) = apply_scoped_fit_with_inputs(&store, &work(), &mut routes,
+            &generations, now);
+        assert_eq!(routes[0].fit, Fit::Fits);
+        assert_eq!(routes[1].fit, Fit::Fits);
+        let chosen = select_with_estimates(&work(), &routes, &inputs, now);
+        assert_eq!(chosen.selected.as_deref(), Some("efficient"), "{chosen:?}");
+        assert_eq!(chosen.reason, "comparable_complete_draw_lower");
+        assert_eq!(select_with_estimates(&work(), &routes, &inputs, now).selected,
+            chosen.selected, "identical evidence must not make the route oscillate");
+
+        routes[1].resolved_model_version = Some("efficient-v2".into());
+        let (changed_inputs, _) = apply_scoped_fit_with_inputs(&store, &work(), &mut routes,
+            &generations, now);
+        assert_eq!(routes[1].fit, Fit::Unknown);
+        assert_eq!(select_with_estimates(&work(), &routes, &changed_inputs, now)
+            .selected.as_deref(), Some("costly"),
+            "a new immutable model version cannot inherit the old draw estimate");
+    }
+
+    #[test]
+    fn small_or_incomparable_draw_changes_do_not_override_the_default() {
+        let now = 1_800_000_000_000_i64;
+        let (store, pool) = seeded(now);
+        for (model, draw) in [("costly", 3.0), ("efficient", 2.85)] {
+            let mut learned = estimate(&pool, model, draw, now);
+            learned.prediction_basis.as_mut().unwrap().method =
+                "bounded_class_total_upper_v1".into();
+            store.put_auto_allowance_estimate("profile", 1, &learned, now).unwrap();
+        }
+        let generations = BTreeMap::from([("profile".into(), 1)]);
+        let mut routes = vec![route("costly", &pool), route("efficient", &pool)];
+        let (inputs, _) = apply_scoped_fit_with_inputs(&store, &work(), &mut routes,
+            &generations, now);
+        assert_eq!(select_with_estimates(&work(), &routes, &inputs, now)
+            .selected.as_deref(), Some("costly"),
+            "a five-percent gap does not justify a context/cache switch");
     }
 
     #[test]

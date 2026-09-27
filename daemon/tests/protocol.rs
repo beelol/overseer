@@ -3408,9 +3408,10 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
         .find(|event| event["kind"] == "auto_decision").unwrap();
     let replay = d.call("auto.decision.replay", json!({"event_seq":decision_event["seq"]}));
     assert_eq!(replay["matches_recorded"], true, "{replay}");
-    assert_eq!(replay["replay_scope"], "selector_and_estimator", "{replay}");
+    assert_eq!(replay["replay_scope"], "selector_estimator_and_ranking", "{replay}");
     assert_eq!(replay["estimator_recomputed"], true, "{replay}");
     assert_eq!(replay["estimator_matches_recorded"], true, "{replay}");
+    assert_eq!(replay["ranking_matches_recorded"], true, "{replay}");
     assert_eq!(replay["decision"]["selected"], browser["decision"]["selected"]);
     let recorded = &decision_event["payload"];
     assert_eq!(recorded["selected_route"]["harness"], "codex-app");
@@ -3419,7 +3420,9 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
     assert_eq!(recorded["selected_route"]["fit"], "unknown");
     assert_eq!(recorded["estimator"]["state"], "scoped_fit");
     assert_eq!(recorded["estimator"]["version"], "v2");
-    assert_eq!(recorded["selector_version"], "multi-harness-preflight-v7");
+    assert_eq!(recorded["selector_version"], "multi-harness-preflight-v8");
+    assert_eq!(recorded["ranking"]["version"], "v1");
+    assert_eq!(recorded["ranking"]["complete_costs"].as_array().unwrap().len(), 2);
     assert_eq!(recorded["estimator"]["routes"].as_array().unwrap().len(), 2);
     assert_eq!(recorded["estimator"]["inputs"].as_array().unwrap().len(), 2);
     assert!(recorded["estimator"]["now_ms"].as_i64().is_some());
@@ -3450,19 +3453,35 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
     let wrong_model = d.call("auto.decision.replay", json!({"event_seq":seq}));
     assert_eq!(wrong_model["matches_recorded"], false,
         "the displayed selected model must agree with the replayed route: {wrong_model}");
+    let mut changed_ranking = original_trace.clone();
+    changed_ranking["ranking"]["complete_costs"][0] =
+        json!({"pool_id":"invented","plan_type":"pro","windows":[]});
+    db.execute("UPDATE events SET payload=?1 WHERE seq=?2",
+        rusqlite::params![changed_ranking.to_string(), seq]).unwrap();
+    let wrong_cost = d.call("auto.decision.replay", json!({"event_seq":seq}));
+    assert_eq!(wrong_cost["ranking_matches_recorded"], false, "{wrong_cost}");
+    assert_eq!(wrong_cost["matches_recorded"], false,
+        "saved ranking costs must be recomputed from their recorded evidence");
     let mut missing_inputs = original_trace.clone();
     missing_inputs["estimator"]["inputs"] = serde_json::Value::Null;
     db.execute("UPDATE events SET payload=?1 WHERE seq=?2",
         rusqlite::params![missing_inputs.to_string(), seq]).unwrap();
     assert!(d.try_call("auto.decision.replay", json!({"event_seq":seq})).is_err(),
-        "v7 replay must not trust saved fit when estimator inputs are missing");
+        "v8 replay must not trust saved fit when estimator inputs are missing");
     let mut oversized_inputs = original_trace.clone();
     oversized_inputs["estimator"]["inputs"][0]["ignored_padding"] =
         json!("x".repeat(129 * 1024));
     db.execute("UPDATE events SET payload=?1 WHERE seq=?2",
         rusqlite::params![oversized_inputs.to_string(), seq]).unwrap();
     assert!(d.try_call("auto.decision.replay", json!({"event_seq":seq})).is_err(),
-        "v7 replay must reject oversized raw inputs even when deserialization ignores a field");
+        "v8 replay must reject oversized raw inputs even when deserialization ignores a field");
+    let mut previous = original_trace.clone();
+    previous["selector_version"] = json!("multi-harness-preflight-v7");
+    db.execute("UPDATE events SET payload=?1 WHERE seq=?2",
+        rusqlite::params![previous.to_string(), seq]).unwrap();
+    let previous_replay = d.call("auto.decision.replay", json!({"event_seq":seq}));
+    assert_eq!(previous_replay["replay_scope"], "selector_and_estimator");
+    assert_eq!(previous_replay["matches_recorded"], true);
     let mut legacy = original_trace.clone();
     legacy["selector_version"] = json!("multi-harness-preflight-v6");
     db.execute("UPDATE events SET payload=?1 WHERE seq=?2",

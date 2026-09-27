@@ -128,7 +128,8 @@ pub fn assess_fit(
     let Some(basis) = estimate.prediction_basis.as_ref() else {
         return Fit::Unknown;
     };
-    if basis.method != "bounded_class_upper_v1" || basis.sample_count < 5
+    if !matches!(basis.method.as_str(), "bounded_class_upper_v1" | "bounded_class_total_upper_v1")
+        || basis.sample_count < 5
         || work.task_class.as_deref() != Some(basis.task_class.as_str())
         || work.execution_budget_ms.is_none_or(|budget| budget == 0
             || budget > basis.max_execution_budget_ms)
@@ -295,6 +296,82 @@ pub struct Decision {
     pub selected: Option<String>,
     pub exclusions: Vec<Exclusion>,
     pub reason: String,
+}
+
+/// A prediction of *complete* work-unit draw, including any context/cache
+/// transfer, retry, and verification overhead. Only a separately validated
+/// same-plan, same-pool producer may provide this for ranking. It is not an
+/// API token price or a cross-account exchange rate.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CompleteCost {
+    pub pool_id: String,
+    pub plan_type: String,
+    pub windows: Vec<WindowDraw>,
+}
+
+fn decisive_complete_savings(current: &CompleteCost, candidate: &CompleteCost) -> bool {
+    if current.pool_id.is_empty() || current.pool_id != candidate.pool_id
+        || current.plan_type.is_empty() || current.plan_type != candidate.plan_type
+        || current.windows.is_empty() || current.windows.len() != candidate.windows.len()
+        || current.windows.len() > 16 {
+        return false;
+    }
+    let mut seen = BTreeSet::new();
+    current.windows.iter().all(|window| {
+        if !seen.insert((&window.bucket_id, &window.window))
+            || !window.upper_percent.is_finite() || window.upper_percent <= 0.0 {
+            return false;
+        }
+        let matches = candidate.windows.iter().filter(|other|
+            other.bucket_id == window.bucket_id && other.window == window.window).collect::<Vec<_>>();
+        matches.len() == 1 && window.upper_percent <= 100.0
+            && matches[0].upper_percent.is_finite()
+            && (0.0..=100.0).contains(&matches[0].upper_percent)
+            && matches[0].upper_percent > 0.0
+            && matches[0].upper_percent <= window.upper_percent * 0.9
+    })
+}
+
+/// Preserve the ordinary task/health/allowance order unless two eligible,
+/// equally capable routes have comparable complete-work predictions. The
+/// ten-percent dominance margin prevents tiny estimate corrections from
+/// changing a route; complete-work bounds already include switch overhead.
+pub fn select_with_complete_costs(work: &WorkUnit, routes: &[Route],
+    costs: &[Option<CompleteCost>]) -> Decision {
+    let mut decision = select(work, routes);
+    if costs.len() != routes.len() { return decision; }
+    let Some(mut chosen_index) = decision.selected.as_deref()
+        .and_then(|id| routes.iter().position(|route| route.id == id)) else {
+        return decision;
+    };
+    if routes[chosen_index].fit != Fit::Fits || costs[chosen_index].as_ref()
+        .is_none_or(|cost| cost.pool_id != routes[chosen_index].pool_id) {
+        return decision;
+    }
+    let excluded = decision.exclusions.iter().map(|entry| entry.route_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut candidate_indices = (0..routes.len()).collect::<Vec<_>>();
+    candidate_indices.sort_by_key(|index| routes[*index].id.as_str());
+    for index in candidate_indices {
+        let route = &routes[index];
+        let current = &routes[chosen_index];
+        if excluded.contains(route.id.as_str()) || route.fit != Fit::Fits
+            || route.tier != current.tier || route.health != current.health
+            || route.quota != current.quota {
+            continue;
+        }
+        if let (Some(baseline), Some(candidate)) = (&costs[chosen_index], &costs[index]) {
+            if candidate.pool_id == route.pool_id
+                && decisive_complete_savings(baseline, candidate) {
+                chosen_index = index;
+            }
+        }
+    }
+    if decision.selected.as_deref() != Some(routes[chosen_index].id.as_str()) {
+        decision.selected = Some(routes[chosen_index].id.clone());
+        decision.reason = "comparable_complete_draw_lower".into();
+    }
+    decision
 }
 
 #[derive(Default)]
@@ -535,6 +612,48 @@ mod tests {
         assert_eq!(browser.selected.as_deref(), Some("sol-medium"));
         let diagnosis = select(&unit(CapabilityTier::Frontier, &["browser"]), &[astra, sol]);
         assert_eq!(diagnosis.selected.as_deref(), Some("astra-high"));
+    }
+
+    #[test]
+    fn complete_cost_ranking_respects_pool_pins_and_soft_harness_preference() {
+        let mut baseline = route("baseline", "codex", "pool-a", CapabilityTier::General,
+            "medium", &[]);
+        baseline.fit = Fit::Fits;
+        baseline.recommended_default = true;
+        let mut alternate = route("alternate", "claude", "pool-a", CapabilityTier::General,
+            "medium", &[]);
+        alternate.fit = Fit::Fits;
+        alternate.recommended_default = false;
+        let cost = |pool: &str, upper_percent| Some(CompleteCost {
+            pool_id:pool.into(), plan_type:"fixture-plan".into(),
+            windows:vec![WindowDraw { bucket_id:"shared".into(),
+                window:"primary".into(), upper_percent }],
+        });
+        let work = unit(CapabilityTier::General, &[]);
+        assert_eq!(select(&work, &[baseline.clone(), alternate.clone()])
+            .selected.as_deref(), Some("baseline"));
+        let saved = select_with_complete_costs(&work, &[baseline.clone(), alternate.clone()],
+            &[cost("pool-a", 8.0), cost("pool-a", 3.0)]);
+        assert_eq!(saved.selected.as_deref(), Some("alternate"), "{saved:?}");
+
+        let mut preferred = work.clone();
+        preferred.preferred_harness = Some("codex".into());
+        assert_eq!(select_with_complete_costs(&preferred,
+            &[baseline.clone(), alternate.clone()], &[cost("pool-a", 8.0), cost("pool-a", 3.0)])
+            .selected.as_deref(), Some("alternate"),
+            "a soft harness preference cannot hide a decisive comparable saving");
+        preferred.pinned_route = Some("baseline".into());
+        assert_eq!(select_with_complete_costs(&preferred,
+            &[baseline.clone(), alternate.clone()], &[cost("pool-a", 8.0), cost("pool-a", 3.0)])
+            .selected.as_deref(), Some("baseline"),
+            "the explicit pin remains a hard constraint");
+
+        alternate.pool_id = "pool-b".into();
+        alternate.profile_id = "pool-b".into();
+        assert_eq!(select_with_complete_costs(&work, &[baseline, alternate],
+            &[cost("pool-a", 8.0), cost("pool-b", 3.0)])
+            .selected.as_deref(), Some("baseline"),
+            "raw percentages from separate subscription pools are not prices");
     }
 
     #[test]
