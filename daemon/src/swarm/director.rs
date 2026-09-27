@@ -13,6 +13,33 @@ fn hash(token: &str) -> String {
     format!("{:x}", Sha256::digest(token.as_bytes()))
 }
 
+/// At daemon startup, an unlinked supervised owner still in `reserved` has
+/// never reached the task/run link or supervisor request. Only this exact
+/// state proves no process could have started; all later phases require the
+/// ordinary uncertain-spawn or confirmed-exit reconciliation path.
+pub fn recover_reserved_no_spawn(store: &mut Store) -> Result<usize> {
+    let mut stmt = store.conn.prepare(
+        "SELECT o.run_id,o.generation,s.revision FROM swarm_director_owners o
+         JOIN swarm_runs s ON s.id=o.run_id AND s.generation=o.generation
+         WHERE o.status='active' AND o.supervised_launch=1
+           AND o.launch_phase='reserved' AND o.overseer_run_id IS NULL
+           AND (s.status IN ('planning','running','paused','draining')
+                OR (s.status='stalled' AND s.stall_reason='director_termination_unknown'))
+         ORDER BY o.run_id",
+    )?;
+    let pending = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?))
+    })?.collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    let mut recovered = 0;
+    for (run, generation, revision) in pending {
+        recover(store, &json!({"run_id":run,"generation":generation,
+            "revision":revision,"termination":"confirmed_no_spawn"}))?;
+        recovered += 1;
+    }
+    Ok(recovered)
+}
+
 pub fn claim_batch(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
     super::owner::require(store,run,p)?;

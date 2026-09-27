@@ -5,6 +5,50 @@ use serde_json::json;
 use std::time::{Duration, Instant};
 
 #[test]
+fn restart_releases_director_ownership_when_capacity_rejected_before_any_spawn() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("director-capacity-source"));
+    d.call("agents.limit.set", json!({"max_active":1}));
+    let occupying = d.generic(&checkout, "worktree", "/bin/sleep", &["30"]);
+    let occupying_id = run_id(&occupying);
+    let swarm = d.call("swarm.create", json!({"category":"Capacity blocked director",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = swarm["id"].as_str().unwrap();
+    let launch = json!({"run_id":id,"generation":1,"repo":checkout,
+        "program":"/bin/sleep","args":["30"],"prompt":"Audit backend",
+        "title":"Capacity blocked director"});
+    let error = d.try_call("swarm.director.launch", launch).unwrap_err();
+    assert!(error.contains("agent limit"), "{error}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let (phase, linked): (String, Option<String>) = db.query_row(
+        "SELECT launch_phase,overseer_run_id FROM swarm_director_owners WHERE run_id=?1",
+        [id], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    assert_eq!(phase, "reserved");
+    assert!(linked.is_none());
+
+    d.kill9();
+    d.spawn();
+    let after = d.call("swarm.get", json!({"id":id}));
+    assert_eq!(after["generation"], 2);
+    assert_eq!(after["status"], "stalled");
+    assert_eq!(after["stall_reason"], "director_replacement_pending");
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["generation"], 2,
+        "a second restart cannot advance the generation again");
+    d.call("run.interrupt", json!({"run_id":occupying_id}));
+    d.wait_done(&occupying_id, 8);
+    let replacement = d.call("swarm.director.launch", json!({"run_id":id,
+        "generation":2,"repo":checkout,"program":"/bin/sleep",
+        "args":["30"],"prompt":"Audit backend","title":"Replacement director"}));
+    assert_eq!(replacement["status"], "launched");
+    let process = replacement["overseer_run_id"].as_str().unwrap();
+    d.call("run.interrupt", json!({"run_id":process}));
+    d.wait_done(process, 8);
+}
+
+#[test]
 fn active_category_director_uses_its_reserved_app_slot() {
     let d = Daemon::start(&[]);
     let temp = tmp();
@@ -358,10 +402,9 @@ fn failed_prelaunch_setup_cannot_be_confirmed_dead_by_caller() {
         "an unlinked supervised launch must remain reserved until reconciled");
     d.kill9();
     d.spawn();
-    let recovered = d.call("swarm.director.recover",json!({"run_id":id,
-        "generation":1,"revision":0,"termination":"confirmed_no_spawn"}));
+    let recovered = d.call("swarm.get",json!({"id":id}));
     assert_eq!(recovered["generation"],2);
-    assert_eq!(recovered["replacement_pending"],true);
+    assert_eq!(recovered["stall_reason"],"director_replacement_pending");
 }
 
 #[test]
