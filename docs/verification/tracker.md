@@ -12,8 +12,8 @@ Owners: **goal** = the agent running the everything goal. **owner** = only the o
 | AC-66 | Gate J design review | owner | review page (Gate J) | owner marks, or decides Gate K's review replaces it |
 | AC-81 | Gate J still holds | goal | main | Claude half of the live Gate J scenario once the owner signs in to Claude Code |
 | AC-82 | Gate K design review | owner + goal | review page (Gate K), PR #8 | owner's round-3 marks, then AC-154 and AC-155 |
-| AC-83 to AC-98 | Continuity: offline mode and local models (Gate L) | agent: Claude Continuity | branch `claude/continuity-gate-l` (its own pull request when ready) | watch; merge when finished; AC-97 needs the owner |
-| AC-99 to AC-107 | Overseer as the whole surface (Gate M) | goal | not started (AC-158 puts the theme and immersive look first) | build in its own pull request |
+| AC-83 to AC-98 | Continuity: offline mode and local models (Gate L) | agent: Claude Continuity | PR #9 (`claude/continuity-gate-l`, draft) | watch; merge when finished; AC-97 needs the owner |
+| AC-99 to AC-107 | Overseer as the whole surface (Gate M) | goal | AC-103 (the Overseer theme) in progress on branch `claude/gate-m-theme`, stacked on PR #8 (AC-158 puts the theme and immersive look first) | build in its own pull request |
 | AC-108 | Gate M design review | owner + goal | review page (Gate M), to publish | owner's marks |
 | AC-109 to AC-113 | Gate K follow-ups | goal | PR #8 (`claude/gate-k-followups`) | merge once the owner OKs round 3; record in the ledger |
 | AC-114 | Gate K in the owner's VS Code | owner | none | owner tries the build |
