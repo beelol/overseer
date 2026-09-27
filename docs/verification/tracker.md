@@ -13,16 +13,16 @@ Owners: **goal** = the agent running the everything goal. **owner** = only the o
 | AC-81 | Gate J still holds | goal | main | Claude half of the live Gate J scenario once the owner signs in to Claude Code |
 | AC-82 | Gate K design review | owner + goal | review page (Gate K), PR #8 | owner's round-3 marks, then AC-154 and AC-155 |
 | AC-83 to AC-98 | Continuity: offline mode and local models (Gate L) | agent: Claude Continuity | PR #9 (`claude/continuity-gate-l`, draft) | watch; merge when finished; AC-97 needs the owner |
-| AC-99 to AC-107 | Overseer as the whole surface (Gate M) | goal | AC-103 (the Overseer theme) in progress on branch `claude/gate-m-theme`, stacked on PR #8 (AC-158 puts the theme and immersive look first) | build in its own pull request |
+| AC-99 to AC-107 | Overseer as the whole surface (Gate M) | goal | branch `claude/gate-m-theme`, stacked on PR #8: AC-103 theme, AC-102 immersive editor area, AC-99 files in the review and AC-100 nothing shown twice built and their scenarios passing; AC-101 (Overseer's own reviewer) in progress; AC-104 to AC-107 next | build in its own pull request; the theme and the look wait on the owner's marks in the Gate M review (AC-108) |
 | AC-108 | Gate M design review | owner + goal | review page (Gate M), to publish | owner's marks |
 | AC-109 to AC-113 | Gate K follow-ups | goal | PR #8 (`claude/gate-k-followups`) | merge once the owner OKs round 3; record in the ledger |
 | AC-114 | Gate K in the owner's VS Code | owner | none | owner tries the build |
-| AC-115 to AC-141 | Phone remote (Gate N) | agent: Claude phone app | Gate N branch (its own pull request when ready) | watch; merge when finished; AC-133 needs the owner |
+| AC-115 to AC-137, AC-141 | Phone remote (Gate N) | agent: Claude phone app | PR #10 (`claude/phone-remote-vscode-control-b48a34`), a draft that says work continues | watch; merge when it is marked ready (the simulator milestone); AC-128 waits for AC-107; AC-133 and the iPhone parts need the owner |
 | AC-142 | One Overseer mark everywhere | goal + owner | none | owner adds the logo files to `docs/design/brand/`; then the goal wires them in everywhere |
 | AC-143 to AC-145, T-23, T-24 | Audio Mode (Gate O) | agent: Audio Mode | PR #5 (`codex/reactor-audio-mode`), PR #6 (`codex/audio-tui-controls`, stacked) | watch; merge #5 then #6 when finished; AC-145 needs the owner |
 | Swarm criteria | Category-directed Swarm mode | agent: Codex Swarm | PR #3 (`codex/swarm-mode`); criteria in `docs/rfcs/swarm-mode.md` on that branch | watch; merge when finished; its criteria join the ledger |
 | Auto criteria | Continuous task-aware agent selection | agent: Codex Auto | PR #2 (`codex/automode-rfc`); criteria in `docs/rfcs/auto-mode.md` on that branch | watch (it has 100+ commits not pushed: ask it to push); merge when finished; its criteria join the ledger |
-| AC-146 to AC-153 | Follow-through (Gate P) | goal | main, then small pull requests | build |
+| AC-146 to AC-153 | Follow-through (Gate P) | goal | branch `claude/gate-p-follow-through` (pull request drafted, waiting on the owner's OK to open): AC-147 `scripts/test-all` with its evidence; AC-148's workflow commit held for the `workflow` scope; AC-149 has a known flake: the keyboard scenario loses a shortcut or an Enter on PR #8's build and on Gate M's; AC-150 is the first-click problem seen again in the conversation scenario | build; merge after PR #8 so the full run on main is green |
 | AC-154 to AC-161 | Cover everything, oversee the agents (Gate Q) | goal | main and PR #8 | build; AC-161 closes last |
 
 New criteria or new agents get a row the pass they appear.

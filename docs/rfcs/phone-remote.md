@@ -2,7 +2,7 @@
 
 Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-115 to AC-137 and AC-141 (Gate N) in the
 [main RFC](../overseer-rfc.md#gate-n--phone-remote-on-the-same-network-added-by-the-owner-2026-09-26).
-Prepared goal: [phone-remote-goal.md](phone-remote-goal.md) (not activated).
+Wire format: [phone-remote-protocol.md](phone-remote-protocol.md). Goal: [phone-remote-goal.md](phone-remote-goal.md), activated by the owner on 2026-09-26; the work is in pull request #10.
 Builds on the daemon's event replay ([AC-10](../verification/AC-10.md)), the local access boundary
 ([AC-08](../verification/AC-08.md)), hunk accept and reject ([AC-42](../verification/AC-42.md)) and
 the chat with Overseer itself (AC-107, Gate M).
@@ -64,8 +64,9 @@ choices made. The owner can change any of them; a change is a recorded revision 
 - **No app lock by default.** The phone's own lock protects it. An app lock is a setting.
 - **Rust on the phone only for the encrypted session**, and only if the spike shows a clean
   binding. Everything else is written in the app's own language.
-- **Message-layer encryption** with an established handshake (Noise IK proposed), so the same
-  session can later cross a relay that sees only ciphertext. Chosen in AC-115.
+- **Message-layer encryption** with the Noise framework: IK for sessions and IKpsk1 for pairing
+  (see [the wire format](phone-remote-protocol.md)), so the same session can later cross a relay
+  that sees only ciphertext.
 - **Three things stay on the Mac**: pairing a device, managing devices, and stopping the daemon.
   A phone that could do these could lock itself out or let another device in.
 - **Review on the phone** reads diffs and accepts or rejects hunks. Editing files on the phone is
@@ -173,8 +174,12 @@ message layer, under the WebSocket. Properties required, whatever construction A
 - nothing of the protocol is readable on the wire, including method names and prompts;
 - the session layer does not depend on the transport, so a relay can carry it later unchanged.
 
-The proposal is the Noise framework's IK pattern (the phone knows the Mac's key from pairing), with
-the `snow` crate on the daemon and a vetted implementation on the phone. TLS with a pinned
+Built: the Noise framework's IK pattern for sessions (the phone knows the Mac's key from pairing)
+and IKpsk1 for pairing, with the `snow` crate on the daemon and an implementation on the phone
+that is checked against vectors the daemon's code produced. In pairing the secret is mixed into
+the first message. A first draft used IKpsk2, where it enters in the second message; a test
+showed that a phone without the pairing code then still reached the owner's confirmation, so it
+was changed before anything depended on it. TLS with a pinned
 self-signed certificate was considered: it protects a direct connection equally well, but a relay
 would end the TLS connection and could read everything, so the later gate would need a second
 scheme. One scheme for both is simpler to verify.
@@ -271,7 +276,8 @@ as the most sensitive surface in Overseer.
 - The app does not lock itself by default; the phone's own lock is its protection. An app lock
   and a device unlock before destructive actions are settings, both off by default.
 - Every command from a phone is recorded as an event with the device as its source.
-- The daemon's secret redaction applies to everything sent, as it does for VS Code.
+- The daemon's secret redaction applies to everything sent, as it does for VS Code, including the
+  text of a notification whose owner asked for text.
 - The gateway change gets a security review and a fuzz test of its handshake and frame parser.
 
 ## Reuse
@@ -477,7 +483,10 @@ The owner delegated these on 2026-09-26. Each can still be changed by the owner.
 | Text in notifications | Agent name and event kind only. A setting can add the agent's last line. |
 | Stop the daemon from the phone | Mac only. *Stop all agents* is available on the phone. |
 | Start an agent in a folder Overseer has never used | Not from the phone in this gate. |
-| Does a connected phone count as a watching UI (AC-45)? | Yes while the app is in the foreground; the Mac's banner is replaced by the phone's notification when the phone opted in. |
+| Does a connected phone count as a watching UI (AC-45)? | No (revised while building). A phone connects and disconnects every time the app comes and goes, which would post the Mac's "agents are still running" banner each time. AC-45 keeps counting VS Code windows and terminal UIs only. |
+| Where the gateway's key is kept | In the daemon's owner-only data folder (`gateway/identity.key`, mode 0600), like the daemon's other state. The Keychain was the first idea; a daemon binary that is rebuilt changes its identity to the Keychain, which would ask again or refuse, and a lost key means pairing again. Overseer's push key still goes in the Keychain. |
+| Starting a program from a phone | The Mac only. A phone starts agents (Claude Code, Codex, OpenCode), never an arbitrary program. |
+| How a notification names the agent | By harness and repository ("Claude · shop"). An agent's title starts as the first words of its prompt, so the title is text of the work and is shown only when the owner turned text on. |
 | Distribution | A development build on the owner's iPhone, then TestFlight. App Store with the relay gate. |
 | Android emulator | A new virtual device made for Overseer. The ones already on this Mac belong to other projects and are left alone. |
 
