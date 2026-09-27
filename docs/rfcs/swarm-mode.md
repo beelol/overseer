@@ -517,6 +517,9 @@ remaining integration/verification cost. Account capacity the user separately pr
 other work is unavailable before computing the task allocation. The completion reserve is
 not a second allowance: only finishing jobs may spend it. Never silently lower the reserve
 to keep workers busy. If finishing cannot fit, preserve results and report blocked/incomplete.
+The director's durable plan labels a job as ordinary or finishing. A worker's admission
+request cannot give an ordinary job finishing access; changing that label is a plan revision
+that invalidates affected work.
 
 Task allocations must be explicit or deterministically derived from fresh compatible quota
 data and the defaults/saved user limits above, and visible before worker admission. A window reset refreshes
@@ -601,7 +604,7 @@ fixture proves policy behavior, not live provider compatibility.
 | SWARM-07 | [ ] With app-level `agents.max_active=3`, reserve one director slot and allow at most two simultaneous top-level workers, ordinary agents, or separately launched reviewers/watchers. Native descendants stay within their parent's slot. Demonstrate no fourth admission across manual, Overseer-started and Swarm launches, director activation while both workers run, slot reuse after confirmed completion, and draining after max is lowered. Overseer's own coordinating run remains reachable but consumes allowance, not a slot. Max=1 performs serial director work. |
 | SWARM-08 | [ ] Concurrent swarm and non-swarm launch requests against one nearly depleted pool cannot both reserve the last capacity. Repeat across two tasks and two profiles known to share a subscription; prove atomic admission. |
 | SWARM-09 | [ ] Two harnesses using the same account share capacity; verified independent accounts retain separate capacity. Uncertain identity cannot produce a doubled allowance. |
-| SWARM-10 | [ ] With 100 compatible units allocated, a 20-unit reserve and 10 already reserved, admit a 60-unit worker and reject a further 11-unit worker. With finishing estimate=35, reject that 60-unit worker. Allow finishing work to draw on the reserve. |
+| SWARM-10 | [x] With 100 compatible units allocated, a 20-unit reserve and 10 already reserved, admit a 60-unit worker and reject a further 11-unit worker. With finishing estimate=35, reject that 60-unit worker. Allow finishing work to draw on the reserve. |
 | SWARM-11 | [ ] Test conflicting short/long quota windows, unlike units, and a reset. The most restrictive applicable limit binds, percentages are not added or converted without evidence, and reset does not enlarge approved task allocation. |
 | SWARM-12 | [ ] Unknown, stale, and inferred quota never appears as zero or unlimited and cannot enable default fan-out. Explicit bounded estimate permission changes eligibility with uncertainty visible; revocation stops new admissions. |
 | SWARM-13 | [ ] Demonstrate actual adapter enforcement before labeling a limit strict. For delayed usage/overshoot fixtures, show estimate-based labeling, stop admissions on overrun, retain uncertain reservations, and reconcile without double-counting parent/child totals. |

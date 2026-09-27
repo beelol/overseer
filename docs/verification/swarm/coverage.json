@@ -1,7 +1,7 @@
 {
   "base_commit": "19edf57ca4c30b0b4788b5416bb5d949a2cdff6c",
   "rfc_sha256": {
-    "swarm-mode.md": "8ac5b9600a4f09922422750a105d8e6baedf84ddd6cce5c7c82f78200436dea1",
+    "swarm-mode.md": "55909071b8062938ccf052db210c3b1185ce46b35766d0620bb7ad1fcccd561b",
     "swarm-mode-scenarios.md": "857ee07916d6d60b57435125dfc3547ecd37024a3948e6343a95a63cb972bbdf",
     "swarm-mode-goal.md": "fb1bcf183e39e2edeb27b6d5f641eb8daf639bbaf271f5a4afbc15bcb01de08a"
   },
@@ -99,7 +99,7 @@
       "blocker": "Fixture targets sharing a pool share reservations across categories, and targets labeled as one account with no common pool fail closed. An explicit revoked auth status now blocks every target alias with that account ID and cancels admitted jobs on both routes while an independent account stays eligible. Live account identity discovery, cross-mode shared quota authority, and proof of independent real accounts remain unavailable."
     },
     "SWARM-10": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
         "docs/verification/swarm/milestone-4.md",
@@ -108,7 +108,7 @@
         "docs/verification/swarm/milestone-16.md",
         "docs/verification/swarm/SWARM-10.md"
       ],
-      "blocker": "Fixture allocation freezes comparable approved pools at first successful admission, so a later target change, balance increase or new account cannot enlarge the run cap. Confirmed exit moves a reservation to uncertain while continuing to bind capacity; authoritative actual usage reconciliation and finishing-work draw are not implemented."
+      "blocker": null
     },
     "SWARM-11": {
       "status": "partial",
