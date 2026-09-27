@@ -31,7 +31,8 @@ const { spawn } = require('child_process');
 
 const args = process.argv.slice(2);
 if (args[0] === '--version') { console.log('1.15.13-fixture'); process.exit(0); }
-if (args[0] === 'serve' && args.includes('--help')) { console.log(process.env.OVERSEER_TEST_OPENCODE_NO_SERVE ? 'unknown command' : 'opencode serve\n\nstarts a headless opencode server'); process.exit(process.env.OVERSEER_TEST_OPENCODE_NO_SERVE ? 1 : 0); }
+// As OpenCode 1.15 does, the help of the command goes to the error stream.
+if (args[0] === 'serve' && args.includes('--help')) { console.error('opencode serve\n\nstarts a headless opencode server\n\nOptions:\n  -h, --help      show help  [boolean]\n      --port      port to listen on  [number] [default: 0]\n      --hostname  hostname to listen on  [string] [default: "127.0.0.1"]'); process.exit(0); }
 if (args[0] === 'run') {
   // The one-shot transport of an OpenCode without a server: it acts the script out and asks nothing.
   const prompt = args[args.indexOf('--') + 1] || '';
