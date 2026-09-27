@@ -148,12 +148,12 @@
       "detail": []
     },
     {
-      "name": "new-agent: at least 40% less visible text than today's UI (1037 → 109)",
+      "name": "new-agent: at least 40% less visible text than today's UI (1037 → 107)",
       "ok": true,
       "detail": {
         "before": 1037,
-        "after": 109,
-        "reduction": "89%"
+        "after": 107,
+        "reduction": "90%"
       }
     },
     {
@@ -222,12 +222,12 @@
       }
     },
     {
-      "name": "new-agent: no more visible text than Gate J (133 → 109)",
+      "name": "new-agent: no more visible text than Gate J (133 → 107)",
       "ok": true,
       "detail": {
         "view": "new-agent",
         "gatej": 133,
-        "gatek": 109
+        "gatek": 107
       }
     },
     {
@@ -543,51 +543,51 @@
     },
     "new-agent": {
       "Overseer Dark@1280": {
-        "chars": 109,
+        "chars": 107,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 922
       },
       "Overseer Dark@900": {
-        "chars": 109,
+        "chars": 107,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 542
       },
       "Overseer Light@1280": {
-        "chars": 109,
+        "chars": 107,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 922
       },
       "Overseer Light@900": {
-        "chars": 109,
+        "chars": 107,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 542
       },
       "Default Dark Modern@1280": {
-        "chars": 109,
+        "chars": 107,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 922
       },
       "Default Dark Modern@900": {
-        "chars": 109,
+        "chars": 107,
         "longRuns": [],
         "overflow": [],
         "unnamed": [],
-        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "sample": "What's next? | web-app | Codex · Your login | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Send off a task",
         "width": 542
       }
     },
@@ -680,7 +680,7 @@
       "unnamed": []
     },
     "new-agent": {
-      "chars": 109,
+      "chars": 107,
       "longRuns": [],
       "overflow": 0,
       "unnamed": []

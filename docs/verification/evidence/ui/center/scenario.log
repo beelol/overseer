@@ -1,19 +1,19 @@
-[2026-09-26T22:55:22.776Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-26T22:55:29.285Z] PASS the Overseer side bar replaces Explorer and lists repositories not open in the window {"explorerShown":false,"repos":["Needs you","repo-y","repo-x"]}
-[2026-09-26T22:55:29.362Z] screenshot docs/verification/evidence/ui/center/01-center-wide.png
-[2026-09-26T22:55:29.362Z] PASS agents list shows repository → task → native child → grandchild [["repo-x",1],["X nested agents",2],["child task",3],["grandchild task",4]]
-[2026-09-26T22:55:34.099Z] PASS expand/collapse at repository, task and native-child levels {"childCollapsed":true,"childExpanded":true,"taskCollapsed":true,"repoCollapsed":true}
-[2026-09-26T22:55:36.776Z] screenshot docs/verification/evidence/ui/center/02-selected-x.png
-[2026-09-26T22:55:39.378Z] PASS selecting a run in another repository switches the review and the conversation {"tabsX":["Review: X edits (1), Editor Group 1","Overseer, Editor Group 2"],"tabsY":["Review: Y live (1), Editor Group 1","Overseer, Editor Group 2"],"reviewX":true,"reviewY":true,"chatX":true,"chatY":true}
-[2026-09-26T22:55:39.466Z] screenshot docs/verification/evidence/ui/center/03-selected-y.png
-[2026-09-26T22:55:39.467Z] PASS live status shown in the agents list {"label":"Y live","description":"","level":2,"expanded":null,"selected":true,"focused":true,"aria":"Y live, working, generic"}
-[2026-09-26T22:55:45.198Z] screenshot docs/verification/evidence/ui/center/04-sidebar-closed.png
-[2026-09-26T22:55:45.198Z] PASS with the side bar closed, Switch Agent switches the review and the conversation across repositories
-[2026-09-26T22:55:52.985Z] PASS keyboard navigation: arrows move between labelled treeitems, Left collapses then goes to the parent, Right expands {"start":{"label":"X nested agents","description":"now","level":2,"expanded":"true","selected":true,"focused":true,"aria":"X nested agents, done, claude, claude (existing login)"},"down":{"label":"child task","description":"now","level":3,"expanded":"true","selected":false,"focused":true,"aria":"child task, done, native child"},"collapsedTask":"false","parent":{"label":"repo-x","description":"","level":1,"expanded":"true","selected":false,"focused":true,"aria":"repo-x, 2 agents"},"reopened":"true"}
-[2026-09-26T22:56:05.566Z] PASS Overseer restored after a window reload (same agent, its chat and review) {"restoredChat":true,"restoredReview":true,"selectedRows":["Y live"]}
-[2026-09-26T22:56:07.092Z] window narrow {"w":1024,"groups":[439,227]}
-[2026-09-26T22:56:07.177Z] screenshot docs/verification/evidence/ui/center/05-window-narrow.png
-[2026-09-26T22:56:07.177Z] PASS narrow window: review and chat columns remain usable and the chat does not overflow {"dims":{"w":1024,"groups":[439,227]},"fits":true}
-[2026-09-26T22:56:08.680Z] window wide {"w":1900,"groups":[1018,524]}
-[2026-09-26T22:56:08.774Z] screenshot docs/verification/evidence/ui/center/06-window-wide.png
-[2026-09-26T22:56:08.774Z] PASS wide window: review and chat columns remain usable and the chat does not overflow {"dims":{"w":1900,"groups":[1018,524]},"fits":true}
+[2026-09-27T00:46:31.583Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T00:46:38.378Z] PASS the Overseer side bar replaces Explorer and lists repositories not open in the window {"explorerShown":false,"repos":["Needs you","repo-y","repo-x"]}
+[2026-09-27T00:46:38.439Z] screenshot docs/verification/evidence/ui/center/01-center-wide.png
+[2026-09-27T00:46:38.439Z] PASS agents list shows repository → task → native child → grandchild [["repo-x",1],["X nested agents",2],["child task",3],["grandchild task",4]]
+[2026-09-27T00:46:43.179Z] PASS expand/collapse at repository, task and native-child levels {"childCollapsed":true,"childExpanded":true,"taskCollapsed":true,"repoCollapsed":true}
+[2026-09-27T00:46:45.852Z] screenshot docs/verification/evidence/ui/center/02-selected-x.png
+[2026-09-27T00:46:48.460Z] PASS selecting a run in another repository switches the review and the conversation {"tabsX":["Review: X edits (1), Editor Group 1","Overseer, Editor Group 2"],"tabsY":["Review: Y live (1), Editor Group 1","Overseer, Editor Group 2"],"reviewX":true,"reviewY":true,"chatX":true,"chatY":true}
+[2026-09-27T00:46:48.530Z] screenshot docs/verification/evidence/ui/center/03-selected-y.png
+[2026-09-27T00:46:48.531Z] PASS live status shown in the agents list {"label":"Y live","description":"","level":2,"expanded":null,"selected":true,"focused":true,"aria":"Y live, working, generic"}
+[2026-09-27T00:46:54.253Z] screenshot docs/verification/evidence/ui/center/04-sidebar-closed.png
+[2026-09-27T00:46:54.253Z] PASS with the side bar closed, Switch Agent switches the review and the conversation across repositories
+[2026-09-27T00:47:02.035Z] PASS keyboard navigation: arrows move between labelled treeitems, Left collapses then goes to the parent, Right expands {"start":{"label":"X nested agents","description":"now","level":2,"expanded":"true","selected":true,"focused":true,"aria":"X nested agents, done, claude, Your login"},"down":{"label":"child task","description":"now","level":3,"expanded":"true","selected":false,"focused":true,"aria":"child task, done, native child"},"collapsedTask":"false","parent":{"label":"repo-x","description":"","level":1,"expanded":"true","selected":false,"focused":true,"aria":"repo-x, 2 agents"},"reopened":"true"}
+[2026-09-27T00:47:14.598Z] PASS Overseer restored after a window reload (same agent, its chat and review) {"restoredChat":true,"restoredReview":true,"selectedRows":["Y live"]}
+[2026-09-27T00:47:16.118Z] window narrow {"w":1024,"groups":[439,227]}
+[2026-09-27T00:47:16.169Z] screenshot docs/verification/evidence/ui/center/05-window-narrow.png
+[2026-09-27T00:47:16.170Z] PASS narrow window: review and chat columns remain usable and the chat does not overflow {"dims":{"w":1024,"groups":[439,227]},"fits":true}
+[2026-09-27T00:47:17.673Z] window wide {"w":1900,"groups":[1018,524]}
+[2026-09-27T00:47:17.765Z] screenshot docs/verification/evidence/ui/center/06-window-wide.png
+[2026-09-27T00:47:17.765Z] PASS wide window: review and chat columns remain usable and the chat does not overflow {"dims":{"w":1900,"groups":[1018,524]},"fits":true}

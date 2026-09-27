@@ -9,7 +9,7 @@
       "ok": true,
       "detail": {
         "claudeChip": "Agent: Claude Code · Your login",
-        "run": "r-d721e2e3c5e6",
+        "run": "r-a582fd82507b",
         "shown": true
       }
     },
@@ -26,7 +26,7 @@
       "name": "Codex agent started keyboard-only",
       "ok": true,
       "detail": {
-        "run": "r-83dc0a873770",
+        "run": "r-f3fcbc485f78",
         "shown": true
       }
     },
@@ -34,7 +34,7 @@
       "name": "generic program started keyboard-only",
       "ok": true,
       "detail": {
-        "run": "r-1fcdd9dff258",
+        "run": "r-a7fec03582aa",
         "shown": true
       }
     },

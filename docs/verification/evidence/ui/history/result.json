@@ -4,15 +4,15 @@
       "name": "with 300 runs, search answers in under 200 ms, by title and by text only in the agent output",
       "ok": true,
       "detail": {
-        "shownAtStart": 16,
+        "shownAtStart": 18,
         "byTitle": {
-          "ms": 40,
+          "ms": 39,
           "titles": [
             "History task 123"
           ]
         },
         "byOutput": {
-          "ms": 30,
+          "ms": 38,
           "titles": [
             "History task 237"
           ]
@@ -23,7 +23,7 @@
       "name": "a finished agent is archived from the side bar by keyboard (hidden, listed under Show Archived) and restored",
       "ok": true,
       "detail": {
-        "archived": 1790468209303,
+        "archived": 1790471114384,
         "hidden": true,
         "inArchive": [
           "History task 005"

@@ -1,12 +1,12 @@
-[2026-09-27T00:14:19.160Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T00:16:35.751Z] created 300 runs {"ms":133749}
-[2026-09-27T00:16:42.039Z] screenshot docs/verification/evidence/ui/history/01-search.png
-[2026-09-27T00:16:42.039Z] PASS with 300 runs, search answers in under 200 ms, by title and by text only in the agent output {"shownAtStart":16,"byTitle":{"ms":40,"titles":["History task 123"]},"byOutput":{"ms":30,"titles":["History task 237"]}}
-[2026-09-27T00:16:57.339Z] screenshot docs/verification/evidence/ui/history/02-archived.png
-[2026-09-27T00:17:05.586Z] PASS a finished agent is archived from the side bar by keyboard (hidden, listed under Show Archived) and restored {"archived":1790468209303,"hidden":true,"inArchive":["History task 005"],"restored":true}
-[2026-09-27T00:17:09.840Z] after cleanup command {"dialog":"Remove All, Discarding Uncommitted Work\nCancel\nRemove 2 Clean\nClean up worktrees of 3 archived agents?\nBranches are kept, so committed work stays in Git.\n\nClean (2):\n• History task 010\n• History task 011\n\nWith uncommitted work (1), kept unless you choose to discard it:\n• History task 012 (1 file)","toasts":[],"quick":"none","quickValue":">Overseer: Clean Up Archived Worktrees"}
-[2026-09-27T00:17:12.060Z] screenshot docs/verification/evidence/ui/history/03-cleanup.png
-[2026-09-27T00:17:12.061Z] PASS bulk cleanup removes only the clean archived worktrees; uncommitted work is kept unless confirmed; branches stay {"cleaned":{"a":true,"b":true,"c":false,"cFile":true,"branchesKept":true},"dialog":"Remove All, Discarding Uncommitted Work\nCancel\nRemove 2 Clean\nClean up worktrees of 3 archived agents?\nBranches are kept, so committed work stays in Git.\n\nClean (2):\n• History task 010\n• History task 011\n\nWith uncommitted work (1), kept unless you choose to discard it:\n• History task 012 (1 file)"}
-[2026-09-27T00:17:16.614Z] PASS discarding uncommitted work needs an explicit second confirmation, then the worktree is removed (branch kept) {"removed":true}
-[2026-09-27T00:17:32.164Z] screenshot docs/verification/evidence/ui/history/04-auto-archived.png
-[2026-09-27T00:17:32.164Z] PASS finished runs older than overseer.history.autoArchiveDays are archived automatically; the side bar shows active and recent agents only {"archivedCount":300,"shown":0}
+[2026-09-27T01:02:33.812Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T01:05:00.794Z] created 300 runs {"ms":144184}
+[2026-09-27T01:05:07.138Z] screenshot docs/verification/evidence/ui/history/01-search.png
+[2026-09-27T01:05:07.138Z] PASS with 300 runs, search answers in under 200 ms, by title and by text only in the agent output {"shownAtStart":18,"byTitle":{"ms":39,"titles":["History task 123"]},"byOutput":{"ms":38,"titles":["History task 237"]}}
+[2026-09-27T01:05:22.360Z] screenshot docs/verification/evidence/ui/history/02-archived.png
+[2026-09-27T01:05:30.552Z] PASS a finished agent is archived from the side bar by keyboard (hidden, listed under Show Archived) and restored {"archived":1790471114384,"hidden":true,"inArchive":["History task 005"],"restored":true}
+[2026-09-27T01:05:34.806Z] after cleanup command {"dialog":"Remove All, Discarding Uncommitted Work\nCancel\nRemove 2 Clean\nClean up worktrees of 3 archived agents?\nBranches are kept, so committed work stays in Git.\n\nClean (2):\n• History task 010\n• History task 011\n\nWith uncommitted work (1), kept unless you choose to discard it:\n• History task 012 (1 file)","toasts":[],"quick":"none","quickValue":">Overseer: Clean Up Archived Worktrees"}
+[2026-09-27T01:05:36.988Z] screenshot docs/verification/evidence/ui/history/03-cleanup.png
+[2026-09-27T01:05:36.988Z] PASS bulk cleanup removes only the clean archived worktrees; uncommitted work is kept unless confirmed; branches stay {"cleaned":{"a":true,"b":true,"c":false,"cFile":true,"branchesKept":true},"dialog":"Remove All, Discarding Uncommitted Work\nCancel\nRemove 2 Clean\nClean up worktrees of 3 archived agents?\nBranches are kept, so committed work stays in Git.\n\nClean (2):\n• History task 010\n• History task 011\n\nWith uncommitted work (1), kept unless you choose to discard it:\n• History task 012 (1 file)"}
+[2026-09-27T01:05:41.556Z] PASS discarding uncommitted work needs an explicit second confirmation, then the worktree is removed (branch kept) {"removed":true}
+[2026-09-27T01:05:57.127Z] screenshot docs/verification/evidence/ui/history/04-auto-archived.png
+[2026-09-27T01:05:57.127Z] PASS finished runs older than overseer.history.autoArchiveDays are archived automatically; the side bar shows active and recent agents only {"archivedCount":300,"shown":0}

@@ -74,28 +74,38 @@
       }
     },
     {
-      "name": "⌥⌘F from the editor starts a search; the query is the first row of the Agents list with its match count, within 200 ms",
+      "name": "the side bar has a search field above the Agents list; ⌥⌘F from the editor puts the cursor in it; typing filters the list within 200 ms and the field says how many match",
       "ok": true,
       "detail": {
         "openedFromEditor": true,
-        "first": {
-          "label": "“beta”",
-          "description": "1 match",
-          "icon": "search"
+        "typed": {
+          "value": "beta",
+          "focused": true,
+          "count": "1 match",
+          "clearShown": true,
+          "input": true,
+          "placeholder": "Search agents",
+          "border": "1px",
+          "height": 26
         },
-        "ms": 37,
-        "labels": [
-          "“beta”",
+        "ms": 35,
+        "shown": [
           "followups-repo",
           "Beta docs"
+        ],
+        "panes": [
+          "Search",
+          "Agents",
+          "Accounts"
         ]
       }
     },
     {
-      "name": "⌥⌘F also works from the side bar; Escape and the row's ✕ each clear the search and bring the list back",
+      "name": "⌥⌘F also works from the side bar; Escape and the field's ✕ each clear the search and bring the list back",
       "ok": true,
       "detail": {
         "openedFromSide": true,
+        "narrowed": true,
         "clearedByKey": true,
         "clearedByMouse": true
       }
