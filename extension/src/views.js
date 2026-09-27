@@ -342,8 +342,6 @@ class AccountsProvider {
       }
       // Local models run through Ollama on this machine: there is no account to sign in to (AC-95).
       if (a.id === 'local-ollama') {
-        const item = new vscode.TreeItem(a.name);
-        item.id = 'profile:' + a.id;
         item.description = 'no account needed';
         item.iconPath = new vscode.ThemeIcon('server');
         item.accessibilityInformation = { label: `${a.name}, no account needed` };

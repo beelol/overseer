@@ -841,12 +841,13 @@ own worktree and lands through a pull request.
 
 Written on 2026-09-26 at the owner's request. Built on 2026-09-26 and 2026-09-27 in pull request
 [#9](https://github.com/beelol/overseer/pull/9), marked ready for review once every criterion that does not
-wait for the owner was verified; what waits for the owner is the Wi-Fi step of AC-83 and the offline
-session of AC-97. (AC-84's live check ran on 2026-09-27 once Claude Code was signed in; it found and
-fixed the reconnecting-in-vain gap above.) Both owner steps are scripted so that the daemon's own record
-becomes the evidence: `node test/local/wifi-live.js` watches a real daemon while the owner turns Wi-Fi
-off and on and measures the gap; `node test/local/owner-session.js start` opens an isolated VS Code with
-the branch's VSIX for the owner's session, and `report` writes what the daemon recorded afterwards.
+wait for the owner was verified. AC-84's live check ran on 2026-09-27 once Claude Code was signed in; it
+found and fixed the reconnecting-in-vain gap above. Follow-up pull request [#15](https://github.com/beelol/overseer/pull/15)
+simulated the network at the owner's direction (only the system's answer is replaced; probes,
+agents, the local model and VS Code are real): AC-97's offline session ran live and the owner
+confirmed its screenshots on 2026-09-27. What still waits for the owner is AC-83's one real Wi-Fi
+toggle, macOS's own signal, when no agents are in flight: `node test/local/wifi-live.js` records
+it.
 
 > Implement Continuity (Gate L) in `beelol/overseer`: AC-139 first, then AC-83 to AC-98, AC-138 and
 > AC-140, as written in `docs/overseer-rfc.md` (Gate L) and designed in `docs/rfcs/offline-mode.md`.
