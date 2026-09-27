@@ -25,3 +25,32 @@ second attempt. This is a **job** deadline, not SWARM-62's whole-run deadline; i
 not verify the run-deadline UI, live harness, native descendants or extension path.
 SWARM-62 remains partial.
 Replay: `cargo test --offline -q -p overseerd --test swarm_director_loop -- --test-threads=1`.
+
+Explicit extension follow-up at `ad74547` (fixture and packaged UI): a run starts
+with a 60-second deadline, three queued jobs, and one admitted job that freezes a
+synthetic `points` allocation and finishing reserve. An owner request adds 60 seconds
+using the observed deadline as a compare-and-set value and a stable request ID.
+Expected: one durable extension, no extra account allocation, no deadline Stop at
+the original boundary, and a deadline Stop at the new boundary. Actual: the
+extension is recorded in `swarm_deadline_extensions`, replay returns `duplicate`,
+changed-input replay and stale-deadline requests are rejected, and the updated
+policy survives daemon restart. An admission probe beyond the original deadline
+is blocked by the separate benefit gate, **not** `run_deadline`; a probe at the
+new deadline returns `run_deadline` and records Stop. The frozen allocation and
+reserve are byte-for-byte unchanged. A new extension after Stop is rejected.
+
+In isolated packaged VS Code, the category row's **Extend Swarm Deadline…**
+action adds 30 minutes (effective deadline 3,600,000 → 5,400,000 ms) and records
+`run_extension` as its source. The same scenario still passes Pause, Resume, Off
+and confirmed Stop. Evidence: `daemon/tests/swarm_admission.rs`,
+`test/unit/swarm-controls.js`, `test/ui/scenario-swarm-status.js`, and
+`docs/verification/evidence/ui/swarm-status/result.json` plus `scenario.log`.
+Replay: `cargo test --offline -q -p overseerd --test swarm_admission --test swarm_control --test swarm_settings --bin overseerd -- --test-threads=1`;
+`cargo test --workspace --offline -q -- --test-threads=1`;
+`node test/unit/swarm-controls.js`; `npm run check` in `extension`;
+`node extension/scripts/package.js`; `node test/ui/scenario-swarm-status.js`.
+The full offline Rust suite, focused fixture, extension check, package and
+packaged UI scenario passed. Unrelated regenerated TUI snapshots were restored.
+SWARM-62 stays partial: deadline-specific unconfirmed-exit UI, qualified live
+harness and native-descendant control, and a live blocked/active extension path
+are still unverified.

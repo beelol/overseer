@@ -717,9 +717,13 @@
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md",
-        "daemon/tests/swarm_director_loop.rs"
+        "daemon/tests/swarm_director_loop.rs",
+        "daemon/tests/swarm_admission.rs",
+        "test/unit/swarm-controls.js",
+        "test/ui/scenario-swarm-status.js",
+        "docs/verification/evidence/ui/swarm-status/result.json"
       ],
-      "blocker": "A daemon timer checks run deadlines without admission requests, records a deadline reason, cancels queued work, interrupts a linked scripted worker and delivers its terminal event. A joined Atlas blocked-deadline replay now queues a checkpoint request and Stop while a PostgreSQL-backed J4 call is held; the checkpoint is not confirmed. A related job-deadline fixture proves interruption retry for a linked director after daemon restart, but does not qualify the whole-run deadline. A stopping-run readout exposes unconfirmed workers in a Stop fixture; deadline-specific UI, live harness/descendant control and explicit extension remain unverified."
+      "blocker": "A daemon timer checks run deadlines without admission requests, records a deadline reason, cancels queued work, interrupts a linked scripted worker and delivers its terminal event. A joined Atlas blocked-deadline replay queues a checkpoint request and Stop while a PostgreSQL-backed J4 call is held; the checkpoint is not confirmed. A related job-deadline fixture proves interruption retry for a linked director after daemon restart. An explicit owner extension now survives restart, is idempotently recorded, moves the run-deadline boundary, and leaves the frozen account allocation unchanged; a packaged VS Code control exercises it. A stopping-run readout exposes unconfirmed workers in a Stop fixture. Deadline-specific unconfirmed-exit UI, live harness/descendant control, and live blocked/active extension remain unverified."
     },
     "SWARM-63": {
       "status": "unverified",
