@@ -383,6 +383,81 @@ fn a_platform_without_players_reports_unavailable_and_stays_silent() {
     );
 }
 
+fn cues(path: &std::path::Path) -> Vec<String> {
+    std::fs::read_to_string(path)
+        .unwrap_or_default()
+        .lines()
+        .map(str::to_owned)
+        .collect()
+}
+
+#[test]
+fn a_lost_session_plays_one_attention_cue() {
+    let root = tmp();
+    let repo = repo(&root.path().join("repo"));
+    let audio_log = root.path().join("audio.log");
+    let d = Daemon::start(&[("OVERSEER_TEST_AUDIO_LOG", audio_log.to_str().unwrap())]);
+    d.call("audio.set", json!({"enabled": true}));
+    let run = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "sleep 30"]));
+    d.wait_status(&run, |s| s == "running", 10);
+    wait_audio_lines(&audio_log, 1);
+    let (shim, _) = launch_info(&d, &run);
+    signal(shim["shim_pid"].as_i64().unwrap(), 9); // the supervisor is lost
+    assert_eq!(d.wait_done(&run, 15)["status"], "disconnected");
+    wait_audio_lines(&audio_log, 2);
+    signal(shim["child_pid"].as_i64().unwrap(), 9);
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    assert_eq!(d.run(&run)["status"], "disconnected");
+    assert_eq!(
+        cues(&audio_log),
+        ["reactor:agent_started", "reactor:agent_needs_attention"]
+    );
+}
+
+#[test]
+fn an_agent_stopped_on_request_stays_silent() {
+    let root = tmp();
+    let repo = repo(&root.path().join("repo"));
+    let audio_log = root.path().join("audio.log");
+    let d = Daemon::start(&[("OVERSEER_TEST_AUDIO_LOG", audio_log.to_str().unwrap())]);
+    d.call("audio.set", json!({"enabled": true}));
+    let run = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "sleep 30"]));
+    d.wait_status(&run, |s| s == "running", 10);
+    wait_audio_lines(&audio_log, 1);
+    d.call("run.interrupt", json!({"run_id": run}));
+    assert_eq!(d.wait_done(&run, 15)["status"], "interrupted");
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    assert_eq!(cues(&audio_log), ["reactor:agent_started"]);
+}
+
+#[test]
+fn a_session_lost_while_the_daemon_was_down_makes_no_sound() {
+    let root = tmp();
+    let repo = repo(&root.path().join("repo"));
+    let audio_log = root.path().join("audio.log");
+    let mut d = Daemon::start(&[("OVERSEER_TEST_AUDIO_LOG", audio_log.to_str().unwrap())]);
+    d.call("audio.set", json!({"enabled": true}));
+    let run = run_id(&d.generic(&repo, "worktree", "/bin/sh", &["-c", "sleep 30"]));
+    d.wait_status(&run, |s| s == "running", 10);
+    wait_audio_lines(&audio_log, 1);
+    let (shim, _) = launch_info(&d, &run);
+    d.kill9();
+    signal(shim["child_pid"].as_i64().unwrap(), 9);
+    signal(shim["shim_pid"].as_i64().unwrap(), 9);
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    d.spawn();
+    let lost = d.run(&run);
+    assert_eq!(lost["status"], "disconnected", "{lost}");
+    assert!(lost["exit_reason"].as_str().unwrap().contains("lost"), "{lost}");
+    assert_eq!(d.call("audio.get", json!({}))["enabled"], true);
+    std::thread::sleep(std::time::Duration::from_millis(800));
+    assert_eq!(
+        cues(&audio_log),
+        ["reactor:agent_started"],
+        "nothing is played for what happened while the daemon was down"
+    );
+}
+
 #[test]
 fn authentication_failure_makes_one_attention_cue() {
     let root = tmp();
