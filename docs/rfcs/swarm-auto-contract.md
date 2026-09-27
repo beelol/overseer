@@ -17,6 +17,12 @@ ledger and admission transaction for ordinary, Auto, and Swarm launches. It is t
 place a target becomes committed work. Swarm does not maintain a competing account
 allowance balance.
 No second quota collector, per-harness CLI scraper or user routing file is added by swarm.
+Gate S's Overseer-started agents and watchers are ordinary callers of this same
+transaction. Overseer's own coordinating model turns are metered against account
+allowance, though that coordinating run does not occupy an `agents.max_active` slot.
+Overseer's Auto permission level does not grant a route, a Swarm allocation or a
+worker launch; starting a swarm and raising its limit require the owner's recorded
+confirmation before the transaction can admit additional work.
 
 Continuity (Gate L) owns daemon-wide connectivity and local-model memory eligibility. Auto
 may rank its qualified route, but neither Auto nor Swarm may reinterpret a single provider
@@ -108,14 +114,14 @@ fields from `docs/verification/README.md`.
 
 | Shared contract criterion | Auto criterion | Swarm criterion |
 | --- | --- | --- |
-| [CONTRACT-01](../verification/swarm/CONTRACT-01.md): concurrent ordinary/Auto/Swarm launches and changed identity cannot double-commit a binding window or writer | AUTO-AC-17 | SWARM-08, SWARM-24 |
+| [CONTRACT-01](../verification/swarm/CONTRACT-01.md): concurrent ordinary (including Overseer-started)/Auto/Swarm launches and changed identity cannot double-commit a binding window or writer | AUTO-AC-17 | SWARM-08, SWARM-24; Gate S AC-196 |
 | [CONTRACT-02](../verification/swarm/CONTRACT-02.md): verified linked accounts share one pool; independent accounts do not; unresolved identity adds no capacity | AUTO-AC-04 | SWARM-09 |
 | [CONTRACT-03](../verification/swarm/CONTRACT-03.md): failure exclusions respect account, endpoint, model, and harness scope while unrelated targets continue | AUTO-AC-19 | SWARM-14 |
 | [CONTRACT-04](../verification/swarm/CONTRACT-04.md): confirmed pre-effect fallback has a durable logical-job attempt cap; uncertain effects do not reroute or spin | AUTO-AC-19, AUTO-AC-20 | SWARM-15 |
 | [CONTRACT-05](../verification/swarm/CONTRACT-05.md): crash/reconnect retains one intent and commitment, reconciles process/workspace effects, and does not duplicate a launch | AUTO-AC-24 | SWARM-22, SWARM-24 |
 
 - [ ] **CONTRACT-01:** Two concurrent launches from different callers, including
-  ordinary and Swarm, compete for one known limiting account window and one writer.
+  ordinary, Overseer-started and Swarm, compete for one known limiting account window and one writer.
   Exactly one commits. A profile/account generation change between route and launch
   blocks admission; replay returns the same intent. Repeat with short and long windows.
 - [ ] **CONTRACT-02:** Two linked profiles/harnesses with proven shared pool identity

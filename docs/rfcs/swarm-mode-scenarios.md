@@ -9,14 +9,17 @@ editor. The numbers below are declared scenario inputs, not asserted live accoun
 ## S0 — Start without filling out a configuration form
 
 User selects **Backend security**, enters “Audit Atlas tenant isolation; report bugs, don't
-change application code,” and starts. Saved permissions allow two account profiles. Both have
+change application code,” and chooses Start swarm. A compact read-back shows the effective
+account pool, allocation and ceiling; the user's yes commits the run. Saved permissions
+allow two account profiles. Both have
 fresh compatible usage estimates. No other advanced settings have been chosen.
 
 The director is selected automatically. Built-ins supply the worker ceiling of 8, global
 ceiling of 9, 4-admission waves, 60-minute deadline, and per-window allocation/reserve rules.
 The effective capacity in S1 below is only 4 workers because its declared account/resource
 limits are tighter. The user sees “Auto · up to 4 workers · 60 min” with expandable details.
-No per-worker model/account question appears.
+No per-worker model/account question or advanced-settings form appears. Overseer's
+Ask first, Steer or Auto level does not change this start confirmation.
 
 Variants: no approved accounts requires a one-time selection; unknown quota shows serial
 fallback under existing authorization rather than blocking the user behind ten settings.
@@ -221,6 +224,9 @@ Replay S1 through scripted harnesses, each fault in a named deterministic test:
 | User presses Stop as the last worker submits | Preserve its artifact, honor cancellation ordering, and do not auto-resume or silently publish a completed verdict |
 | User reduces worker ceiling below current activity | Drain to the new limit without starting replacements; never discard existing evidence |
 | Run deadline expires while blocked | Checkpoint, cancel queued work, interrupt active work as supported; show incomplete with remaining coverage |
+| Overseer tries to redirect or hold J2 directly | Refuse the worker action, offer a sourced advisory to the director, and let only that director change J2's assignment |
+| Ordinary agent and J2 claim the same exclusive path | One daemon claim ledger admits at most one owner; both agents see the conflict without a second decision-maker for the Swarm job |
+| Overseer asks to start another swarm or raise this one's active limit while on Auto | Require the owner's separate yes for the proposed allocation or limit; do not infer permission from Overseer's Auto level |
 
 Required: SWARM-08/13/20–22/30/31/41–43/48–51/53/56/58/61–64.
 
