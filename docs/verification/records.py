@@ -1319,9 +1319,12 @@ rec(150, "The first click always lands", "verified", commit="bc358a1", date="202
     expected="See the RFC criterion (Gate P).",
     actual="All seven first clicks acted: the composer's agent menu, the chat's More menu (after focus in the review and in the dashboard), the review's Changes only toggle both ways, the search field (and the typing after it), a grid tile's pin.",
     evidence="[first-click scenario](evidence/ui/first-click/)", live="—")
-rec(151, "Every live scenario rerun on the current build", "not started", date="—", commit="—",
+rec(151, "Every live scenario rerun on the current build", "partial", commit="f8d5df6", date="2026-09-27", harness="Claude Code 2.1.246 (haiku) and Codex (gpt-5.6-luna, low effort) on the owner's existing logins",
+    proven="rerun on current main and passing: background (AC-45), the live Gate J scenario (Claude half and Codex half, AC-81), merge (AC-44), Talk to Overseer live (AC-107), and conversation-live's Codex exec and Claude runs (every check but one whose wording expected Gate J's footer, fixed after the run)",
+    deferred="claude-live: Claude Code 2.1.246 runs the sub-agent in the background; the main turn ends with a success result saying it will notify, the sub-agent's child answers, and nothing more arrives for ten minutes, so the file is never written and the run stays running until interrupted (needs investigation: whether Claude resumes such a session and what Overseer must do); codex-live, codex-approval, codex-follow and conversation-live's app-server run are not rerun: the app-server transport cannot set reasoning effort, and the budget allows only low effort",
     expected="See the RFC criterion (Gate P).",
-    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+    actual="See proven and deferred.",
+    evidence="[background](evidence/ui/background/), [live Gate J, Claude](evidence/ui/live-gatej-claude/), [live Gate J, Codex](evidence/ui/live-gatej-codex/), [merge](evidence/ui/merge/), [talk-live](evidence/ui/talk-live/), [conversation-live](evidence/ui/conversation-live/), [claude-live](evidence/ui/claude-live/)", live="See evidence.", blocker="claude-live's background sub-agent behaviour on Claude Code 2.1.246 needs investigating; the app-server live runs need an allowance for default effort or effort support in that transport.")
 rec(152, "Performance re-measured", "verified", commit="4fb5d60", date="2026-09-27", harness="fixture harnesses; no paid tokens",
     steps="`node test/ui/scenario-perf.js` (the AC-35 load test): 10,000 tracked files, four active runs editing and printing for ten minutes, the review open on 100 changed files; while other agents ran their own VS Code scenarios on the same machine.",
     expected="AC-35's numbers: navigation p95 under 250 ms, an ordinary file refresh within 2 s under load with none missed, bounded daemon retention, extension-host memory stable (under 25% growth).",
@@ -1528,7 +1531,7 @@ SHORT_BLOCKERS = {
     148: "not started (Gate P, added by the owner on 2026-09-27)",
     149: "partial: the causes are fixed; three clean runs in a row need a machine where no other agent runs UI tests",
     150: "verified",
-    151: "not started (Gate P, added by the owner on 2026-09-27)",
+    151: "partial: most live scenarios rerun and pass; claude-live and the app-server runs remain",
     152: "verified",
     153: "verified",
     142: "verified",
