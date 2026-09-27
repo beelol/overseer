@@ -71,6 +71,22 @@ fn expected_tree(workspace: &Path, patch: &str) -> Result<String> {
         .map(|bytes| String::from_utf8_lossy(&bytes).trim().to_string())
 }
 
+fn disputed_integrated_patch(conn: &rusqlite::Connection, run: &str) -> Result<bool> {
+    conn.prepare("SELECT 1 FROM swarm_integrated_artifacts i
+        JOIN swarm_jobs j ON j.run_id=i.run_id AND j.id=i.job_id
+        WHERE i.run_id=?1 AND j.status='blocked' AND j.stop_reason='evidence_conflict'")?
+        .exists([run]).map_err(Into::into)
+}
+
+pub(super) fn ensure_no_disputed_integrated_patch(
+    conn: &rusqlite::Connection, run: &str,
+) -> Result<()> {
+    if disputed_integrated_patch(conn,run)? {
+        bail!("disputed integrated patch holds this integration branch");
+    }
+    Ok(())
+}
+
 fn acknowledge(
     store: &mut Store,
     run: &str,
@@ -96,6 +112,7 @@ fn acknowledge(
     if !accepted {
         bail!("job is not accepted after its evidence or control state changed");
     }
+    ensure_no_disputed_integrated_patch(&tx,run)?;
     let changed = tx.execute(
         "UPDATE swarm_integrations SET current_commit=?2,updated_ms=?3 WHERE run_id=?1 AND current_commit=?4",
         params![run,commit,now,prior],
@@ -130,6 +147,7 @@ fn ensure_current(store: &Store, run: &str, job: &str, generation: i64, revision
     if !accepted {
         bail!("job is not accepted after its evidence or control state changed");
     }
+    ensure_no_disputed_integrated_patch(&store.conn,run)?;
     Ok(())
 }
 
@@ -142,7 +160,11 @@ pub fn reconcile_invalidated(store: &mut Store) -> Result<usize> {
          FROM swarm_integration_intents i
          JOIN swarm_jobs j ON j.run_id=i.run_id AND j.id=i.job_id
          JOIN swarm_integrations g ON g.run_id=i.run_id
-         WHERE j.status='blocked' AND j.stop_reason='evidence_conflict'
+         WHERE (j.status='blocked' AND j.stop_reason='evidence_conflict')
+           OR EXISTS (SELECT 1 FROM swarm_integrated_artifacts a
+              JOIN swarm_jobs blocked ON blocked.run_id=a.run_id AND blocked.id=a.job_id
+              WHERE a.run_id=i.run_id AND blocked.status='blocked'
+                AND blocked.stop_reason='evidence_conflict')
          ORDER BY i.created_ms LIMIT 100")?;
     let rows=stmt.query_map([],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,
         r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,
@@ -191,9 +213,13 @@ pub fn reconcile_invalidated(store: &mut Store) -> Result<usize> {
             }
             let removed=store.conn.execute(
                 "DELETE FROM swarm_integration_intents WHERE run_id=?1 AND artifact_id=?2
-                   AND job_id=?3 AND prior_commit=?4 AND EXISTS
-                   (SELECT 1 FROM swarm_jobs WHERE run_id=?1 AND id=?3
-                    AND status='blocked' AND stop_reason='evidence_conflict')",
+                   AND job_id=?3 AND prior_commit=?4 AND (
+                   EXISTS (SELECT 1 FROM swarm_jobs WHERE run_id=?1 AND id=?3
+                    AND status='blocked' AND stop_reason='evidence_conflict') OR
+                   EXISTS (SELECT 1 FROM swarm_integrated_artifacts a
+                    JOIN swarm_jobs blocked ON blocked.run_id=a.run_id AND blocked.id=a.job_id
+                    WHERE a.run_id=?1 AND blocked.status='blocked'
+                      AND blocked.stop_reason='evidence_conflict'))",
                 params![run,artifact,job,prior])?;
             Ok(removed==1)
         })();
@@ -232,6 +258,7 @@ pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
     if current["source_change_permission"] != "isolated" {
         bail!("source changes are not permitted for this run");
     }
+    ensure_no_disputed_integrated_patch(&store.conn,run)?;
     let root = git::toplevel(repo)?;
     if root != std::fs::canonicalize(repo)? {
         bail!("integration repo must be its root");

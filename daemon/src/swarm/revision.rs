@@ -202,8 +202,12 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     for job in &affected {
         if old.get(job).and_then(|previous| previous.stop_reason.as_deref())
             == Some("evidence_conflict")
-            && tx.prepare("SELECT 1 FROM swarm_integration_intents
-                WHERE run_id=?1 AND job_id=?2")?.exists(params![id,job])? {
+            && (tx.prepare("SELECT 1 FROM swarm_integration_intents
+                WHERE run_id=?1 AND job_id=?2")?.exists(params![id,job])?
+                || (tx.prepare("SELECT 1 FROM swarm_integrated_artifacts
+                    WHERE run_id=?1 AND job_id=?2")?.exists(params![id,job])?
+                    && tx.prepare("SELECT 1 FROM swarm_integration_intents
+                        WHERE run_id=?1")?.exists([id])?)) {
             bail!("invalidated integration intent requires reconciliation before plan revision");
         }
     }

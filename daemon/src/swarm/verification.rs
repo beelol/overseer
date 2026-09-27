@@ -152,6 +152,7 @@ pub fn prepare(store: &mut Store, p: &Value) -> Result<PreparedVerification> {
     if current["status"] != "planning" && current["status"] != "running" {
         bail!("run cannot verify in this state");
     }
+    super::integration::ensure_no_disputed_integrated_patch(&store.conn,run)?;
     let (workspace, commit): (String, String) = store
         .conn
         .query_row(
@@ -347,6 +348,7 @@ pub fn record(
         && saved.as_ref().is_some_and(|(path, commit)| {
             path == &plan.workspace.to_string_lossy() && commit == &plan.commit
         })
+        && super::integration::ensure_no_disputed_integrated_patch(&store.conn,&plan.run).is_ok()
         && clean_at(&plan.workspace, &plan.commit).unwrap_or(false)
         && configured_verifier()
             .ok()
