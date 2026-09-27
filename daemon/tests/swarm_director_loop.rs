@@ -273,3 +273,95 @@ fn director_death_with_unknown_effect_blocks_self_job_retry() {
         |r|r.get(0)).unwrap();
     assert_eq!(reservation,"uncertain");
 }
+
+#[test]
+fn director_death_after_scope_narrowing_supersedes_self_job() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":1}));
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("director-self-scope-source"));
+    let ready = temp.path().join("self-scope-ready");
+    let fixture = repo_root().join("fixtures/swarm/director-loop-v1/serial.py");
+    let created = d.call("swarm.create",json!({"category":"Recover narrowed scope",
+        "objective":"Inspect a.txt", "allowed_targets":["fixture-local"]}));
+    let run = created["id"].as_str().unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":run,
+        "generation":1,"repo":checkout,"program":"/usr/bin/python3",
+        "args":[fixture,checkout,ready,"after_scope_narrowed"],
+        "prompt":"Inspect the file","title":"Self job before scope revision"}));
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    let deadline = Instant::now()+Duration::from_secs(8);
+    while !ready.exists() {
+        assert!(Instant::now()<deadline,"director did not narrow the plan");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let attempt = std::fs::read_to_string(&ready).unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let before: String = db.query_row("SELECT status FROM swarm_jobs WHERE run_id=?1 AND id='inspect'",
+        [run],|r|r.get(0)).unwrap();
+    assert_eq!(before,"cancel_requested");
+    d.call("run.interrupt",json!({"run_id":process}));
+    d.wait_done(process,8);
+    d.call("swarm.director.recover",json!({"run_id":run,
+        "generation":1,"revision":2,"termination":"confirmed_dead"}));
+    let (after,reason): (String,Option<String>) = db.query_row(
+        "SELECT status,stop_reason FROM swarm_jobs WHERE run_id=?1 AND id='inspect'",
+        [run],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!((after.as_str(),reason.as_deref()),("superseded",Some("scope_narrowed")));
+    let status: String = db.query_row("SELECT status FROM swarm_attempts WHERE id=?1",
+        [&attempt],|r|r.get(0)).unwrap();
+    assert_eq!(status,"finished");
+    let claims: i64 = db.query_row("SELECT COUNT(*) FROM swarm_claims WHERE run_id=?1 AND job_id='inspect' AND status='active'",
+        [run],|r|r.get(0)).unwrap();
+    assert_eq!(claims,0);
+}
+
+#[test]
+fn director_self_job_deadline_retries_interrupt_after_daemon_restart() {
+    let mut d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":1}));
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("director-self-deadline-source"));
+    let ready = temp.path().join("self-deadline-ready");
+    let fixture = repo_root().join("fixtures/swarm/director-loop-v1/serial.py");
+    let created = d.call("swarm.create",json!({"category":"Recover expired self job",
+        "objective":"Inspect a.txt", "allowed_targets":["fixture-local"]}));
+    let run = created["id"].as_str().unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":run,
+        "generation":1,"repo":checkout,"program":"/usr/bin/python3",
+        "args":[fixture,checkout,ready],"prompt":"Inspect the file",
+        "title":"Self job before deadline"}));
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    let deadline = Instant::now()+Duration::from_secs(8);
+    while !ready.exists() {
+        assert!(Instant::now()<deadline,"director did not admit its self job");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let attempt = std::fs::read_to_string(&ready).unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+        .unwrap().as_millis() as i64;
+    db.execute("UPDATE swarm_jobs SET deadline_at_ms=?2 WHERE run_id=?1 AND id='inspect'",
+        rusqlite::params![run,now-1]).unwrap();
+    let persisted = d.call("swarm.job.deadline.persist_due",json!({"now_ms":now}));
+    let pending = persisted["interrupt_pending"].as_array().unwrap();
+    if !pending.iter().any(|id|id == process) {
+        d.call("run.interrupt",json!({"run_id":process}));
+        d.wait_done(process,8);
+    }
+    assert!(pending.iter().any(|id|id == process),
+        "deadline transition must retain the director process to interrupt: {persisted}");
+    d.kill9();
+    d.spawn();
+    let finished = d.wait_done(process,8);
+    assert_eq!(finished["status"],"interrupted","{finished}");
+    d.call("swarm.director.recover",json!({"run_id":run,
+        "generation":1,"revision":1,"termination":"confirmed_dead"}));
+    let (job_status,reason): (String,Option<String>) = db.query_row(
+        "SELECT status,stop_reason FROM swarm_jobs WHERE run_id=?1 AND id='inspect'",
+        [run],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!((job_status.as_str(),reason.as_deref()),("failed",Some("job_deadline")));
+    let attempt_status: String = db.query_row("SELECT status FROM swarm_attempts WHERE id=?1",
+        [&attempt],|r|r.get(0)).unwrap();
+    assert_eq!(attempt_status,"finished");
+}

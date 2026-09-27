@@ -253,16 +253,27 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
             let unsafe_effects: i64 = tx.query_row(
                 "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2
                  AND outcome IN ('unknown','applied')",params![run,job], |r|r.get(0))?;
-            let (job_status,count,deadline,deps_raw): (String,i64,Option<i64>,String) = tx.query_row(
-                "SELECT status,attempt_count,deadline_at_ms,deps FROM swarm_jobs
+            let (job_status,stop_reason,count,deadline,deps_raw): (String,Option<String>,i64,Option<i64>,String) = tx.query_row(
+                "SELECT status,stop_reason,attempt_count,deadline_at_ms,deps FROM swarm_jobs
                  WHERE run_id=?1 AND id=?2",params![run,job],
-                |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)))?;
-            if ["reserved","launching","running"].contains(&job_status.as_str()) {
+                |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)))?;
+            if ["reserved","launching","running","cancel_requested"].contains(&job_status.as_str()) {
                 let deps: Vec<String> = serde_json::from_str(&deps_raw)?;
                 let deps_ready = deps.iter().try_fold(true, |ready, dep| {
                     Ok::<bool,anyhow::Error>(ready && super::artifacts::dep_satisfied(&tx,run,dep)?)
                 })?;
                 let next = if unsafe_effects > 0 { "blocked" }
+                    else if job_status == "cancel_requested" {
+                        match stop_reason.as_deref() {
+                            Some("scope_narrowed") => "superseded",
+                            Some("job_deadline") => "failed",
+                            Some("resource_contamination" | "account_identity_revoked") => {
+                                if count >= 2 || deadline.is_some_and(|at| now >= at) { "failed" }
+                                else if deps_ready { "ready" } else { "planned" }
+                            }
+                            _ => "blocked",
+                        }
+                    }
                     else if current["status"] == "draining" || current["stalled_from"] == "draining" { "cancelled" }
                     else if count >= 2 || deadline.is_some_and(|at| now >= at) { "failed" }
                     else if deps_ready { "ready" } else { "planned" };

@@ -166,7 +166,17 @@ pub fn expire_jobs_due(store: &mut Store, now: i64) -> Result<Vec<String>> {
         )?;
         workers.extend(linked.query_map(params![run,job], |row| row.get::<_,String>(0))?
             .collect::<rusqlite::Result<Vec<_>>>()?);
+        let mut director = store.conn.prepare(
+            "SELECT r.id FROM swarm_attempts a JOIN runs r ON r.id=a.executor_run_id
+             WHERE a.run_id=?1 AND a.job_id=?2 AND a.status='registered'
+               AND a.executor='director'
+               AND r.status IN ('queued','starting','running','waiting_for_user')",
+        )?;
+        workers.extend(director.query_map(params![run,job], |row| row.get::<_,String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?);
     }
+    workers.sort();
+    workers.dedup();
     Ok(workers)
 }
 

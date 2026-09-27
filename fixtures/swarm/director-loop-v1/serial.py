@@ -54,6 +54,12 @@ if len(sys.argv) > 3 and sys.argv[3] == "after_effect_begin":
     assert effect["outcome"] == "unknown", effect
     Path(sys.argv[2]).write_text(admission["attempt_id"])
     time.sleep(30)
+if len(sys.argv) > 3 and sys.argv[3] == "after_scope_narrowed":
+    revised = call("swarm.revise", {**auth, "id": run, "expected_revision": 1,
+        "reason": "Owner removed the inspect job", "jobs": []})
+    assert revised["revision"] == 2, revised
+    Path(sys.argv[2]).write_text(admission["attempt_id"])
+    time.sleep(30)
 if len(sys.argv) > 2 and (len(sys.argv) < 4 or sys.argv[3] == "after_admit"):
     Path(sys.argv[2]).write_text(admission["attempt_id"])
     time.sleep(30)
