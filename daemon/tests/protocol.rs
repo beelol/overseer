@@ -4758,6 +4758,98 @@ fn auto_native_structured_retry_after_reaches_scoped_health_without_exhausting_q
 }
 
 #[test]
+fn auto_route_recovery_leaves_active_alternate_alone_and_informs_the_next_unit() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE,FIXTURE_SLOW_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("CLAUDE_FIXTURE_MODE", "slow"),
+        ("FIXTURE_SLOW_MS", "4000")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let failed = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium",
+        "prompt":"simulate direct 429 with Retry-After","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&failed, 15)["status"], "failed");
+    let alternate = d.call("auto.dispatch", json!({"work_unit_id":"recovery-alternate",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-codex","system-claude"],
+        "preferred_harness":"codex-app","prompt":"complete the independent check"}));
+    assert_eq!(alternate["state"], "dispatched", "{alternate}");
+    assert_eq!(alternate["decision"]["selected"], "system-claude/sonnet/medium");
+    let alternate_id = run_id(&alternate);
+    d.wait_status(&alternate_id, |status| status == "running", 10);
+    let recovery = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium","prompt":"confirm service recovery",
+        "approval_policy":"never"})));
+    assert_eq!(d.wait_done(&recovery, 15)["status"], "completed");
+    let state = d.call("state", json!({}));
+    let active_alternate = state["runs"].as_array().unwrap().iter()
+        .find(|run| run["id"] == alternate_id).unwrap();
+    assert_eq!(active_alternate["status"], "running",
+        "service recovery must not interrupt an active alternate");
+    assert_eq!(d.wait_done(&alternate_id, 15)["status"], "completed");
+    let next = d.call("auto.dispatch", json!({"work_unit_id":"recovery-next",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-codex","system-claude"],
+        "preferred_harness":"codex-app","prompt":"next independent check"}));
+    assert_eq!(next["state"], "dispatched", "{next}");
+    assert_eq!(next["decision"]["selected"], "system-codex/gpt-6-sol/medium", "{next}");
+    assert_eq!(d.wait_done(&run_id(&next), 15)["status"], "completed");
+}
+
+#[test]
+fn auto_expired_cooldown_admits_one_shared_pool_recovery_attempt() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::sync::{Arc, Barrier};
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "4000")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let failed = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium",
+        "prompt":"simulate direct 429 with short Retry-After"})));
+    assert_eq!(d.wait_done(&failed, 15)["status"], "failed");
+    std::thread::sleep(Duration::from_millis(350));
+    let socket = d.socket();
+    let barrier = Arc::new(Barrier::new(3));
+    let handles = (0..2).map(|index| {
+        let socket = socket.clone();
+        let barrier = barrier.clone();
+        let params = json!({"work_unit_id":format!("recovery-race-{index}"),
+            "parent_run_id":parent,"min_tier":"general","required_tools":[],
+            "allowed_profiles":["system-codex"],"prompt":"browser check"});
+        std::thread::spawn(move || {
+            barrier.wait();
+            let mut conn = UnixStream::connect(socket).unwrap();
+            conn.set_read_timeout(Some(Duration::from_secs(15))).unwrap();
+            conn.write_all(format!("{}\n", json!({"id":1,"method":"auto.dispatch","params":params})).as_bytes()).unwrap();
+            let mut line = String::new();
+            BufReader::new(conn).read_line(&mut line).unwrap();
+            let reply: serde_json::Value = serde_json::from_str(&line).unwrap();
+            assert!(reply.get("error").is_none(), "{reply}");
+            reply["result"].clone()
+        })
+    }).collect::<Vec<_>>();
+    barrier.wait();
+    let results = handles.into_iter().map(|handle| handle.join().unwrap()).collect::<Vec<_>>();
+    assert_eq!(results.iter().filter(|result|
+        result["state"] == "dispatched" || result["state"] == "launch_pending").count(), 1,
+        "only one new unit may test the recovered account pool: {results:?}");
+    assert_eq!(results.iter().filter(|result| result["state"] == "paused").count(), 1,
+        "a concurrent unit must not stampede the recovering pool: {results:?}");
+    let admitted = results.iter().find(|result| result["state"] != "paused").unwrap();
+    assert_eq!(d.wait_done(&run_id(admitted), 15)["status"], "completed");
+}
+
+#[test]
 fn auto_recent_503_blocks_the_failed_endpoint_before_an_independent_child() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
