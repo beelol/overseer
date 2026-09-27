@@ -54,7 +54,7 @@
         "reason": "beneficial",
         "replay": false,
         "revision": 1,
-        "run_id": "sw-0c3fcf942265",
+        "run_id": "sw-52784e2d601d",
         "serial": {
           "affordable": true,
           "elapsed_ms": 3240,
@@ -93,7 +93,7 @@
       "name": "supervised category director is running alongside 32 workers",
       "ok": true,
       "detail": {
-        "overseer_run_id": "r-22108b229474",
+        "overseer_run_id": "r-491bb0708fe7",
         "owner_status": "active",
         "process_status": "running"
       }
@@ -329,7 +329,7 @@
       "detail": {
         "status": "paused",
         "active_worker_processes": 32,
-        "pause_ms": 94
+        "pause_ms": 91
       }
     },
     {
@@ -341,6 +341,30 @@
       }
     },
     {
+      "name": "Swarm off drains 32 active workers and cancels the queued backlog",
+      "ok": true,
+      "detail": {
+        "status": "draining",
+        "active_worker_processes": 32,
+        "job_counts": {
+          "by_status": {
+            "blocked": 4,
+            "cancelled": 64,
+            "reserved": 32
+          },
+          "total": 100
+        }
+      }
+    },
+    {
+      "name": "Swarm off rejects new worker admission",
+      "ok": true,
+      "detail": {
+        "reason": "run_not_admitting",
+        "status": "blocked"
+      }
+    },
+    {
       "name": "Stop waits for owner confirmation while workers remain active",
       "ok": true
     },
@@ -349,15 +373,15 @@
       "ok": true,
       "detail": {
         "status": "stopping",
-        "unconfirmed_exit_count": 6,
-        "stop_ms": 75
+        "unconfirmed_exit_count": 2,
+        "stop_ms": 82
       }
     },
     {
       "name": "the SIGINT-resistant fixture worker remains unconfirmed with its estimate reserved",
       "ok": true,
       "detail": {
-        "unconfirmed_exit_count": 6,
+        "unconfirmed_exit_count": 2,
         "capacity": {
           "provider_usage_state": "unknown",
           "selected_targets": [
@@ -441,7 +465,7 @@
       "ok": true,
       "detail": {
         "status": "interrupted",
-        "ended_ms": 1790508603224
+        "ended_ms": 1790509322683
       }
     },
     {

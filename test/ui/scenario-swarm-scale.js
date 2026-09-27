@@ -42,6 +42,15 @@ db.commit()`;
   cp.execFileSync('python3', ['-c', code, path.join(home, 'overseer.sqlite'), runId, ...ids]);
 }
 
+function fixtureDirectorToken(home, directorRunId) {
+  const code = `import json, pathlib, sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+run_dir = db.execute("SELECT run_dir FROM runs WHERE id=?", (sys.argv[2],)).fetchone()[0]
+print(json.loads((pathlib.Path(run_dir) / 'launch.json').read_text())['env']['OVERSEER_SWARM_DIRECTOR_TOKEN'])`;
+  return cp.execFileSync('python3', ['-c', code, path.join(home, 'overseer.sqlite'), directorRunId],
+    { encoding: 'utf8' }).trim();
+}
+
 (async () => {
   const s = new Session('swarm-scale');
   const result = { checks: [] };
@@ -230,6 +239,21 @@ db.commit()`;
     check('Resume preserves the same 32 supervised workers',
       resumed.status === 'running' && resumed.active_worker_processes === 32,
       { status: resumed.status, active_worker_processes: resumed.active_worker_processes });
+    await chooseControl('Turn Swarm Off');
+    const draining = await waitStatus(['draining']);
+    check('Swarm off drains 32 active workers and cancels the queued backlog',
+      draining.status === 'draining' && draining.active_worker_processes === 32 &&
+      draining.job_counts.by_status.cancelled === 64 && draining.job_counts.by_status.blocked === 4 &&
+      liveWorkerPids(s.home, runId).live === 32,
+      { status: draining.status, active_worker_processes: draining.active_worker_processes,
+        job_counts: draining.job_counts });
+    const afterOff = s.ctl('swarm.admit', { run_id: runId, generation: 1, revision: 1,
+      owner_token: fixtureDirectorToken(s.home, directorRunId),
+      job_id: 'j036', target_id: 'fixture-local', request_id: 'after-swarm-off',
+      now_ms: now(), snapshot, required_capabilities: ['code'],
+      estimate_milli: { points: 100 }, purpose: 'worker' });
+    check('Swarm off rejects new worker admission',
+      afterOff.status === 'blocked' && afterOff.reason === 'run_not_admitting', afterOff);
     await chooseControl('Stop Swarm…');
     await cdp.waitFor(`document.body.innerText.includes('Stop Large backend audit swarm?')`, 10000,
       'Stop confirmation');
