@@ -381,3 +381,164 @@ fn shipment_incident_stops_waking_when_no_qualified_selected_account_remains() {
         .unwrap();
     assert_eq!(retained, 1);
 }
+
+#[test]
+#[ignore = "requires disposable Dispatch PostgreSQL fixture and local socket permission"]
+fn shipment_incident_revokes_bundle_from_active_replacement() {
+    let fixture = repo_root().join("fixtures/swarm/dispatch-v1");
+    let output = Command::new("go")
+        .args(["run", "-mod=mod", "."])
+        .current_dir(&fixture)
+        .env("GOCACHE", "/private/tmp/overseer-swarm-gocache")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .env("GOTOOLCHAIN", "local")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let bundle: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(bundle["fixtureVersion"], 1);
+    assert_eq!(bundle["sql"]["openTransactions"], 1);
+    assert_eq!(bundle["queue"]["deliveries"], 2);
+
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("dispatch-revocation"));
+    std::fs::copy(fixture.join("shipment.go"), checkout.join("shipment.go")).unwrap();
+    git(&checkout, &["add", "shipment.go"]);
+    git(
+        &checkout,
+        &["commit", "-q", "-m", "shipment fixture snapshot"],
+    );
+    let created = d.call(
+        "swarm.create",
+        json!({"category":"Shipment bundle revocation",
+        "objective":"Inspect sanitized shipment evidence without changing services",
+        "allowed_targets":["audit-a","audit-b"]}),
+    );
+    let run = created["id"].as_str().unwrap();
+    assert_eq!(created["source_change_permission"], "none");
+    d.call(
+        "swarm.plan",
+        json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"l2","title":"SQL and pool",
+            "acceptance":"held transaction evidence","deps":[]}]}),
+    );
+    let at = now();
+    let first = admit(
+        &d,
+        run,
+        "l2",
+        "audit-a",
+        &snapshot(at, true, true),
+        at,
+        "s4-revoke-a",
+    );
+    assert_eq!(first["status"], "admitted");
+    let content = json!({"sanitized_bundle":bundle,
+        "source":"shipment.go:consumeWithRetry",
+        "question":"Does retry hold the pool connection?"})
+    .to_string();
+    d.call(
+        "swarm.artifact.put",
+        json!({"run_id":run,"job_id":"l2",
+        "attempt_id":first["attempt_id"],"token":first["token"],
+        "artifact_id":"s4-revoke-checkpoint","source_revision":1,
+        "kind":"checkpoint","content":content}),
+    );
+    let failed = d.call(
+        "swarm.worker.launch",
+        json!({"run_id":run,"job_id":"l2",
+        "attempt_id":first["attempt_id"],"token":first["token"],"repo":checkout,
+        "program":"/definitely/missing/dispatch-worker","args":[],
+        "prompt":"Inspect SQL and pool evidence","title":"L2 account A"}),
+    );
+    assert_eq!(
+        d.wait_done(failed["overseer_run_id"].as_str().unwrap(), 5)["status"],
+        "failed"
+    );
+    d.call(
+        "swarm.worker.reconcile",
+        json!({"run_id":run,"job_id":"l2",
+        "attempt_id":first["attempt_id"],"generation":1,"revision":1}),
+    );
+    let after = snapshot(at + 1000, false, true);
+    assert_eq!(
+        admit(
+            &d,
+            run,
+            "l2",
+            "audit-b",
+            &after,
+            at + 1000,
+            "s4-before-grant"
+        )["reason"],
+        "checkpoint_permission_required"
+    );
+    let grant = d.call(
+        "swarm.context.grant",
+        json!({"run_id":run,"generation":1,
+        "revision":1,"artifact_id":"s4-revoke-checkpoint","target_id":"audit-b"}),
+    );
+    assert_eq!(grant["status"], "granted");
+    let second = admit(&d, run, "l2", "audit-b", &after, at + 1000, "s4-revoke-b");
+    assert_eq!(second["status"], "admitted", "{second}");
+    let context = json!({"run_id":run,"job_id":"l2",
+        "attempt_id":second["attempt_id"],"token":second["token"],
+        "artifact_id":"s4-revoke-checkpoint"});
+    assert_eq!(
+        d.call("swarm.context.get", context.clone())["content"],
+        content
+    );
+    let replacement = d.call(
+        "swarm.worker.launch",
+        json!({"run_id":run,"job_id":"l2",
+        "attempt_id":second["attempt_id"],"token":second["token"],"repo":checkout,
+        "program":"/bin/sleep","args":["30"],
+        "prompt":"Continue SQL investigation from sanitized checkpoint","title":"L2 account B"}),
+    );
+    let worker = replacement["overseer_run_id"].as_str().unwrap();
+    d.wait_status(worker, |status| status == "running", 10);
+    let revoked = d.call(
+        "swarm.context.revoke",
+        json!({"run_id":run,"generation":1,
+        "revision":1,"artifact_id":"s4-revoke-checkpoint","target_id":"audit-b"}),
+    );
+    assert_eq!(revoked["status"], "revoked");
+    assert!(revoked["interrupt_requested"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|id| id == worker));
+    assert_ne!(d.wait_done(worker, 10)["status"], "completed");
+    assert!(d.try_call("swarm.context.get", context).is_err());
+    assert_eq!(
+        d.call("swarm.jobs", json!({"id":run}))["jobs"][0]["status"],
+        "blocked"
+    );
+    assert_eq!(
+        admit(
+            &d,
+            run,
+            "l2",
+            "audit-b",
+            &after,
+            at + 1000,
+            "s4-after-revoke"
+        )["reason"],
+        "artifact_permission_revoked"
+    );
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let retained: String = db
+        .query_row(
+            "SELECT content FROM swarm_artifacts WHERE run_id=?1 AND id='s4-revoke-checkpoint'",
+            [run],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(retained, content);
+}
