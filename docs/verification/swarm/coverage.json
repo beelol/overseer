@@ -69,7 +69,7 @@
         "daemon/tests/swarm_director_process.rs",
         "test/ui/scenario-swarm-scale.js"
       ],
-      "blocker": "The app setting is the total-agent ceiling; fixtures cover manual reservations, native-child exclusion, lower-limit drain, a supervised director plus 32 live workers at a 33-slot cap, and director activation beside two registered workers at a three-slot cap. Separate reviewer/watch execution, Overseer-started admission and metering, and max=1 serial director work remain unverified."
+      "blocker": "The app setting is the total-agent ceiling; fixtures cover manual reservations, native-child exclusion, lower-limit drain, a supervised director plus 32 live workers at a 33-slot cap, and a supervised director plus two live workers at a three-slot cap with slot reuse only after confirmed exit. Separate reviewer/watch execution, Overseer-started admission and metering, and max=1 serial director work remain unverified."
     },
     "SWARM-08": {
       "status": "partial",

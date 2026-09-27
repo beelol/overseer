@@ -2,6 +2,7 @@ mod common;
 
 use common::*;
 use serde_json::{json, Value};
+use std::time::{Duration, Instant};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn now() -> i64 {
@@ -409,6 +410,71 @@ fn three_slot_limit_runs_director_and_two_workers_then_reuses_confirmed_slot() {
         "revision":1,"job_id":"j1","attempt_id":second["attempt_id"]}));
     d.call("run.interrupt",json!({"run_id":director}));
     d.wait_done(director,8);
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],0);
+}
+
+#[test]
+fn three_slot_limit_counts_live_director_and_workers_until_confirmed_exit() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":3}));
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("three-live-slots"));
+    let run = setup(&d,"Three live slots",2);
+    commit_beneficial_batch(&d,&run,&["j0".into(),"j1".into()]);
+    let at = now();
+    let first = admit(&d,&run,"j0","codex-a","live-slot-0",at,100000,100).unwrap();
+    let second = admit(&d,&run,"j1","codex-a","live-slot-1",at,100000,100).unwrap();
+    assert_eq!(first["status"],"admitted","{first}");
+    assert_eq!(second["status"],"admitted","{second}");
+
+    let director = d.call("swarm.director.launch",json!({"run_id":run,
+        "generation":1,"repo":checkout,"program":"/bin/sleep","args":["30"],
+        "prompt":"Direct the audit","title":"Live three-slot director"}));
+    assert_eq!(director["status"],"launched","{director}");
+    let director_run = director["overseer_run_id"].as_str().unwrap();
+    let launch = |job: &str, admitted: &Value| d.call("swarm.worker.launch",json!({
+        "run_id":run,"job_id":job,"attempt_id":admitted["attempt_id"],
+        "token":admitted["token"],"repo":checkout,"harness":"generic",
+        "program":"/bin/sleep","args":["30"],"prompt":"Audit the route",
+        "title":format!("Live worker {job}")}));
+    let worker0 = launch("j0",&first);
+    let worker1 = launch("j1",&second);
+    assert_eq!(worker0["status"],"launched","{worker0}");
+    assert_eq!(worker1["status"],"launched","{worker1}");
+    let first_run = worker0["overseer_run_id"].as_str().unwrap();
+    let second_run = worker1["overseer_run_id"].as_str().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(4);
+    while [director_run, first_run, second_run]
+        .iter().any(|id| d.run(id)["status"] != "running") {
+        assert!(Instant::now() < deadline,"all three supervised processes must be live");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],3);
+    assert!(d.try_call("task.create",json!({"repo":checkout,"harness":"generic",
+        "workspace_mode":"worktree","program":"/bin/sleep","args":["30"],
+        "prompt":"","title":"fourth agent"})).unwrap_err().contains("agent limit reached"));
+    assert!(d.try_call("swarm.attempt.confirm_exit",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"j0","attempt_id":first["attempt_id"]}))
+        .unwrap_err().contains("exit is not confirmed"));
+    d.call("run.interrupt",json!({"run_id":first_run}));
+    d.wait_done(first_run,8);
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],3,
+        "a stopped process retains its slot until attempt exit is confirmed");
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"j0","attempt_id":first["attempt_id"]}));
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],2);
+    let ordinary = d.generic(&checkout,"worktree","/bin/sleep", &["30"]);
+    assert!(ordinary["launch_error"].is_null(),"{ordinary}");
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],3);
+
+    d.call("run.interrupt",json!({"run_id":run_id(&ordinary)}));
+    d.wait_done(&run_id(&ordinary),8);
+    d.call("swarm.stop",json!({"run_id":run}));
+    d.wait_done(second_run,8);
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"j1","attempt_id":second["attempt_id"]}));
+    d.call("run.interrupt",json!({"run_id":director_run}));
+    d.wait_done(director_run,8);
     assert_eq!(d.call("agents.limit.get",json!({}))["active"],0);
 }
 
