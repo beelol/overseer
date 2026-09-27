@@ -3527,6 +3527,82 @@ fn auto_bridge_binds_dispatch_and_result_to_the_issued_parent_run() {
 }
 
 #[test]
+fn auto_bridge_rejects_a_child_that_widens_a_read_only_parent_before_admission() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "4000")]);
+    let child_profile = d.call("profile.create", json!({"name":"read-only child account","harness":"codex"}));
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","sandbox":"read_only","prompt":"hold parent",
+        "approval_policy":"never","auto_routing":true,
+        "auto_allowed_profiles":[child_profile["id"]]})));
+    assert_eq!(d.wait_status(&parent, |status| status == "running", 10)["status"], "running");
+    let (_, launch_dir) = launch_info(&d, &parent);
+    let capability = std::fs::read_to_string(launch_dir.join("auto-bridge.cap")).unwrap();
+    let request = json!({"run_id":parent,"capability":capability.trim(),
+        "work_unit_id":"read-only-parent-write-child","min_tier":"general",
+        "required_tools":[],"prompt":"write a file","title":"write a file"});
+    assert!(d.try_call("auto.bridge.submit", request).is_err(),
+        "a read-only parent cannot admit a write-capable child");
+    assert_eq!(d.runs().len(), 1);
+    let events = d.call("events.list", json!({"run_id":parent,"after":0,"limit":1000}));
+    assert_eq!(events["events"].as_array().unwrap().iter()
+        .filter(|event| event["kind"] == "auto_decision").count(), 0,
+        "the invalid request must fail before a route decision or launch intent");
+    let approval_request = json!({"run_id":parent,"capability":capability.trim(),
+        "work_unit_id":"never-parent-approval-child","min_tier":"general",
+        "required_tools":[],"sandbox":"read_only","requires_approvals":true,
+        "prompt":"ask for permission","title":"ask for permission"});
+    assert!(d.try_call("auto.bridge.submit", approval_request).is_err(),
+        "a parent with never approval cannot promise an interactive approval to a child");
+    assert_eq!(d.runs().len(), 1);
+    let events = d.call("events.list", json!({"run_id":parent,"after":0,"limit":1000}));
+    assert_eq!(events["events"].as_array().unwrap().iter()
+        .filter(|event| event["kind"] == "auto_decision").count(), 0);
+}
+
+#[test]
+fn auto_bridge_spends_a_bounded_parent_budget_across_distinct_children() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "8000")]);
+    let child_profile = d.call("profile.create", json!({"name":"budget child account","harness":"codex"}));
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"hold parent",
+        "approval_policy":"never","auto_routing":true,"auto_parent_budget_ms":1500,
+        "auto_allowed_profiles":[child_profile["id"]]})));
+    assert_eq!(d.wait_status(&parent, |status| status == "running", 10)["status"], "running");
+    let (_, launch_dir) = launch_info(&d, &parent);
+    let capability = std::fs::read_to_string(launch_dir.join("auto-bridge.cap")).unwrap();
+    let first = d.call("auto.bridge.submit", json!({"run_id":parent,
+        "capability":capability.trim(),"work_unit_id":"parent-budget-first",
+        "min_tier":"general","required_tools":[],"prompt":"first bounded unit",
+        "execution_budget_ms":1000}));
+    assert_eq!(first["state"], "dispatched", "{first}");
+    let child = run_id(&first);
+    d.wait_done(&child, 10);
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.runs().into_iter().find(|run| run["id"] == parent).unwrap()["status"], "running",
+        "the parent must still be able to delegate a second unit");
+    let second = d.try_call("auto.bridge.submit", json!({"run_id":parent,
+        "capability":capability.trim(),"work_unit_id":"parent-budget-second",
+        "min_tier":"general","required_tools":[],"prompt":"second bounded unit",
+        "execution_budget_ms":1000}));
+    let error = second.unwrap_err();
+    assert!(error.contains("parent Auto budget"), "{error}");
+    assert_eq!(d.runs().len(), 2, "a budget-exceeded child must not be launched");
+    let events = d.call("events.list", json!({"run_id":parent,"after":0,"limit":1000}));
+    assert_eq!(events["events"].as_array().unwrap().iter()
+        .filter(|event| event["kind"] == "auto_decision").count(), 1,
+        "budget rejection must happen before a second decision commits");
+}
+
+#[test]
 fn auto_cold_start_discloses_unknown_allowance_and_rejects_invented_inference() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

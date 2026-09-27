@@ -702,6 +702,12 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 || p.get("pinned_route").is_some() || p.get("preferred_harness").is_some() {
                 return Err(anyhow!("Auto bridge cannot change its parent or account authority"));
             }
+            if generic["sandbox"] == "read-only" && p["sandbox"] != "read_only" {
+                return Err(anyhow!("Auto child cannot widen the parent's read-only sandbox"));
+            }
+            if generic["approval"] == "never" && p["requires_approvals"] == true {
+                return Err(anyhow!("Auto child cannot require approvals disabled by its parent"));
+            }
             let mut request = p.clone();
             let fields = request.as_object_mut().ok_or_else(|| anyhow!("Auto bridge request must be an object"))?;
             fields.remove("run_id");
@@ -1112,7 +1118,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     };
                     let required = required_tools.iter().cloned().collect::<Vec<_>>();
                     let admitted = d.record_auto_selected_decision(work_unit_id, &parent,
-                        &requirements_hash, selected, &route.pool_id, generation.copied(), trace.clone())?;
+                        &requirements_hash, selected, &route.pool_id, generation.copied(),
+                        execution_budget_ms, trace.clone())?;
                     if admitted.is_none() {
                         // The pool was claimed after selection. This is an
                         // admission race, not evidence of provider failure or

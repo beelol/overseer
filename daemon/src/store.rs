@@ -282,6 +282,7 @@ impl Store {
               work_unit_id TEXT PRIMARY KEY, parent_run_id TEXT NOT NULL REFERENCES runs(id),
               requirements_hash TEXT NOT NULL, route_id TEXT NOT NULL,
               account_generation INTEGER, phase TEXT NOT NULL, created_ms INTEGER NOT NULL,
+              execution_budget_ms INTEGER,
               planned_branch TEXT, planned_path TEXT, snapshot_id TEXT, snapshot_commit TEXT,
               decision_event_seq INTEGER REFERENCES events(seq) ON DELETE SET NULL);
             CREATE TABLE IF NOT EXISTS auto_pool_claims(
@@ -327,6 +328,10 @@ impl Store {
         let has_decision_event: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_launch_intents') WHERE name='decision_event_seq'")?.exists([])?;
         if !has_decision_event {
             self.conn.execute_batch("ALTER TABLE auto_launch_intents ADD COLUMN decision_event_seq INTEGER REFERENCES events(seq) ON DELETE SET NULL;")?;
+        }
+        let has_execution_budget: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_launch_intents') WHERE name='execution_budget_ms'")?.exists([])?;
+        if !has_execution_budget {
+            self.conn.execute_batch("ALTER TABLE auto_launch_intents ADD COLUMN execution_budget_ms INTEGER;")?;
         }
         let has_measurement_effort: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_measurements') WHERE name='effort'")?.exists([])?;
         if !has_measurement_effort {
@@ -689,26 +694,48 @@ impl Store {
     }
 
     pub fn insert_auto_launch_intent(&self, id: &str, parent: &str, requirements_hash: &str,
-        route_id: &str, account_generation: Option<i64>) -> Result<()> {
+        route_id: &str, account_generation: Option<i64>, execution_budget_ms: u64) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO auto_launch_intents(work_unit_id,parent_run_id,requirements_hash,route_id,account_generation,phase,created_ms) VALUES(?1,?2,?3,?4,?5,'preparing',?6)",
-            params![id, parent, requirements_hash, route_id, account_generation, crate::daemon::now()],
+            "INSERT INTO auto_launch_intents(work_unit_id,parent_run_id,requirements_hash,route_id,account_generation,phase,created_ms,execution_budget_ms) VALUES(?1,?2,?3,?4,?5,'preparing',?6,?7)",
+            params![id, parent, requirements_hash, route_id, account_generation, crate::daemon::now(), execution_budget_ms],
         )?;
         Ok(())
     }
 
     pub fn insert_auto_selected_decision(&self, work_unit_id: &str, parent: &Run,
         requirements_hash: &str, route_id: &str, pool_id: &str,
-        account_generation: Option<i64>, payload: &Value) -> Result<Option<Event>> {
+        account_generation: Option<i64>, execution_budget_ms: u64,
+        payload: &Value) -> Result<Option<Event>> {
         if pool_id.is_empty() || pool_id.len() > 256 {
             return Err(anyhow!("automatic quota pool identity is invalid"));
         }
         let tx = self.conn.unchecked_transaction()?;
+        let launch: Option<String> = self.conn.query_row(
+            "SELECT launch FROM runs WHERE id=?1", [&parent.id], |row| row.get(0))?;
+        let launch: Value = launch.as_deref().and_then(|text| serde_json::from_str(text).ok())
+            .unwrap_or(Value::Null);
+        let generic = launch.get("generic").unwrap_or(&launch);
+        if generic["auto_routing"] == true {
+            let parent_budget = generic["auto_parent_budget_ms"].as_u64()
+                .unwrap_or(crate::daemon::DEFAULT_AUTO_PARENT_BUDGET_MS);
+            let (committed, missing): (i64, i64) = self.conn.query_row(
+                "SELECT COALESCE(SUM(i.execution_budget_ms),0),
+                    COALESCE(SUM(CASE WHEN i.execution_budget_ms IS NULL THEN 1 ELSE 0 END),0)
+                 FROM auto_launch_intents i
+                 LEFT JOIN auto_pool_claims c ON c.work_unit_id=i.work_unit_id
+                 WHERE i.parent_run_id=?1
+                   AND (COALESCE(c.state,'uncertain')!='released'
+                     OR EXISTS(SELECT 1 FROM managed_work_units m WHERE m.work_unit_id=i.work_unit_id))",
+                [&parent.id], |row| Ok((row.get(0)?, row.get(1)?)))?;
+            if missing != 0 || execution_budget_ms > parent_budget.saturating_sub(committed.max(0) as u64) {
+                return Err(anyhow!("parent Auto budget is exhausted"));
+            }
+        }
         if self.auto_pool_claimed(pool_id)? {
             return Ok(None);
         }
         self.insert_auto_launch_intent(work_unit_id, &parent.id, requirements_hash,
-            route_id, account_generation)?;
+            route_id, account_generation, execution_budget_ms)?;
         self.conn.execute(
             "INSERT INTO auto_pool_claims(work_unit_id,pool_id,account_generation,state,created_ms)
              VALUES(?1,?2,?3,'active',?4)",
@@ -2149,10 +2176,10 @@ mod schema_migration_tests {
         // Prove the first admission write still fits: the full error must
         // occur after an intent was inserted into the selected transaction.
         store.conn.execute_batch("SAVEPOINT admission_probe").unwrap();
-        store.insert_auto_launch_intent("probe", "parent", "hash", "route", None).unwrap();
+        store.insert_auto_launch_intent("probe", "parent", "hash", "route", None, 300_000).unwrap();
         store.conn.execute_batch("ROLLBACK TO admission_probe; RELEASE admission_probe").unwrap();
         let oversized_trace = serde_json::json!({"selection_input":"x".repeat(1024 * 1024)});
-        let error = store.insert_auto_selected_decision("unit", &parent, "hash", "route", "pool", None,
+        let error = store.insert_auto_selected_decision("unit", &parent, "hash", "route", "pool", None, 300_000,
             &oversized_trace).unwrap_err();
         assert!(matches!(error.downcast_ref::<rusqlite::Error>(),
             Some(rusqlite::Error::SqliteFailure(code, _)) if code.code == rusqlite::ErrorCode::DiskFull),
@@ -2166,7 +2193,7 @@ mod schema_migration_tests {
         assert_eq!(decisions, 0);
 
         store.conn.pragma_update(None, "max_page_count", original_pages + 1024).unwrap();
-        store.insert_auto_selected_decision("unit", &parent, "hash", "route", "pool", None,
+        store.insert_auto_selected_decision("unit", &parent, "hash", "route", "pool", None, 300_000,
             &serde_json::json!({"selected":"route"})).unwrap();
         assert!(store.auto_launch_intent("unit").unwrap().is_some());
         let decisions: i64 = store.conn.query_row(
@@ -2188,13 +2215,13 @@ mod schema_migration_tests {
             VALUES('parent','t','codex-app','w','completed',0,'parent','{}');").unwrap();
         let parent = store.run("parent").unwrap().unwrap();
         assert!(store.insert_auto_selected_decision("one", &parent, "hash", "route-a",
-            "account/shared", None, &serde_json::json!({"unit":"one"})).unwrap().is_some());
+            "account/shared", None, 300_000, &serde_json::json!({"unit":"one"})).unwrap().is_some());
         assert!(store.auto_pool_claimed("account/shared").unwrap());
         assert!(store.insert_auto_selected_decision("two", &parent, "hash", "route-b",
-            "account/shared", None, &serde_json::json!({"unit":"two"})).unwrap().is_none());
+            "account/shared", None, 300_000, &serde_json::json!({"unit":"two"})).unwrap().is_none());
         assert!(store.auto_launch_intent("two").unwrap().is_none());
         assert!(store.insert_auto_selected_decision("three", &parent, "hash", "route-c",
-            "account/independent", None, &serde_json::json!({"unit":"three"})).unwrap().is_some());
+            "account/independent", None, 300_000, &serde_json::json!({"unit":"three"})).unwrap().is_some());
         store.set_auto_launch_intent_phase("one", "paused").unwrap();
         drop(store);
 
@@ -2202,7 +2229,7 @@ mod schema_migration_tests {
         assert!(reopened.auto_pool_claimed("account/shared").unwrap(),
             "a launch with uncertain effects must continue blocking after restart");
         assert!(reopened.insert_auto_selected_decision("two", &parent, "hash", "route-b",
-            "account/shared", None, &serde_json::json!({"unit":"two"})).unwrap().is_none());
+            "account/shared", None, 300_000, &serde_json::json!({"unit":"two"})).unwrap().is_none());
         reopened.journal_auto_launch_worktree("three", "overseer/test", "/tmp/test",
             "snapshot", "commit").unwrap();
         assert!(reopened.release_unstarted_auto_pool_claim("three").unwrap(),
@@ -2218,7 +2245,7 @@ mod schema_migration_tests {
         reopened.release_settled_auto_pool_claim("child").unwrap();
         assert!(!reopened.auto_pool_claimed("account/shared").unwrap());
         assert!(reopened.insert_auto_selected_decision("two", &parent, "hash", "route-b",
-            "account/shared", None, &serde_json::json!({"unit":"two"})).unwrap().is_some());
+            "account/shared", None, 300_000, &serde_json::json!({"unit":"two"})).unwrap().is_some());
         assert!(reopened.release_unstarted_auto_pool_claim("two").unwrap(),
             "a worker proven never spawned may release its claim");
     }

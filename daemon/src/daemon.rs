@@ -18,6 +18,7 @@ use tokio::sync::broadcast;
 pub const ACTIVE: &[&str] = &["queued", "starting", "running", "waiting_for_user"];
 const RAW_SEGMENTS_KEPT: u64 = 4;
 pub const DEFAULT_AUTO_EXECUTION_BUDGET_MS: u64 = 300_000;
+pub const DEFAULT_AUTO_PARENT_BUDGET_MS: u64 = 1_800_000;
 
 pub fn now() -> i64 {
     shim::now_ms() as i64
@@ -177,13 +178,15 @@ impl Daemon {
 
     pub fn record_auto_selected_decision(&self, work_unit_id: &str, parent: &Run,
         requirements_hash: &str, route_id: &str, pool_id: &str,
-        account_generation: Option<i64>, trace: Value) -> Result<Option<Event>> {
+        account_generation: Option<i64>, execution_budget_ms: u64,
+        trace: Value) -> Result<Option<Event>> {
         let store = self.store.lock().unwrap();
         if !store.auto_mode_enabled()? {
             return Err(anyhow!("Auto Mode was disabled before admission"));
         }
         let event = store.insert_auto_selected_decision(work_unit_id,
-            parent, requirements_hash, route_id, pool_id, account_generation, &redact_value(trace))?;
+            parent, requirements_hash, route_id, pool_id, account_generation,
+            execution_budget_ms, &redact_value(trace))?;
         drop(store);
         if let Some(event) = &event { let _ = self.events.send(event.clone()); }
         Ok(event)
@@ -509,6 +512,18 @@ impl Daemon {
             }
             None
         };
+        let auto_parent_budget_ms = if auto_routing {
+            match p.get("auto_parent_budget_ms") {
+                None => DEFAULT_AUTO_PARENT_BUDGET_MS,
+                Some(value) => value.as_u64().filter(|ms| (1_000..=86_400_000).contains(ms))
+                    .ok_or_else(|| anyhow!("auto_parent_budget_ms must be 1000-86400000"))?,
+            }
+        } else {
+            if p.get("auto_parent_budget_ms").is_some() {
+                bail!("auto_parent_budget_ms requires auto_routing");
+            }
+            0
+        };
         let target_ref = p["target_ref"].as_str().filter(|s| !s.is_empty()).map(str::to_string);
         if let Some(t) = &target_ref {
             if git::rev_parse(&repo, t).is_none() {
@@ -622,7 +637,8 @@ impl Daemon {
             store.set_workspace_owner(&ws.id, Some(&run.id))?;
         }
         let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "sandbox":sandbox, "extra_args": p["extra_args"].clone(),
-            "auto_routing":auto_routing,"auto_allowed_profiles":auto_allowed_profiles});
+            "auto_routing":auto_routing,"auto_allowed_profiles":auto_allowed_profiles,
+            "auto_parent_budget_ms":auto_parent_budget_ms});
         let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };
         {
             let store = self.store.lock().unwrap();
