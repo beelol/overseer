@@ -7,3 +7,5 @@ test ac184_overseer_reads_on_demand_and_only_reads ... ok
 test ac181_the_conversation_lives_in_the_daemon ... ok
 test ac183_roster_equals_state_and_digests_stay_bounded_and_clean ... ok
 test ac187_holds_and_guardrails ... ok
+test ac184_quotes_diffs_bounds_turns_and_falls_back_without_tools ... ok
+test ac186_levels_decide_how_steer_actions_happen ... ok
