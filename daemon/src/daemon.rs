@@ -1824,7 +1824,10 @@ impl Daemon {
                     if let Some(limits) = event.payload.get("rate_limits") {
                         let pool_id = run.profile_id.as_deref().unwrap_or("system-codex");
                         let payload = json!({"rateLimits": limits});
-                        if let Ok(snapshot) = crate::auto_quota::parse_codex_rate_limits(&payload, pool_id, event.ts) {
+                        if let Ok(mut snapshot) = crate::auto_quota::parse_codex_rate_limits(&payload, pool_id, event.ts) {
+                            if let Some(prior) = store.latest_auto_quota(pool_id)? {
+                                snapshot.reconcile_unordered_native_evidence(&prior.snapshot, event.ts);
+                            }
                             let _ = store.insert_auto_quota(event.seq, pool_id, "codex-app/native-update", &snapshot);
                         }
                     }
@@ -1856,10 +1859,11 @@ impl Daemon {
                             Err(_) => crate::auto_quota::QuotaSnapshot {
                                 ordinary_usage_allowed:None, observed_ms,
                                 expires_ms:observed_ms.saturating_add(60_000), windows:Vec::new(),
+                                native_uncertain_until_ms:None,
                             },
                         };
                         if let Some(prior) = store.latest_auto_quota(pool_id)? {
-                            snapshot.preserve_uncleared_blocks(&prior.snapshot, observed_ms);
+                            snapshot.reconcile_unordered_native_evidence(&prior.snapshot, observed_ms);
                         }
                         let event = store.insert_event(observed_ms, task, rid, "auto_quota", "harness", "normalized",
                             &json!({"pool_id":pool_id,"snapshot":snapshot}))?;

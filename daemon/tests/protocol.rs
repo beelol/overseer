@@ -3220,6 +3220,21 @@ fn auto_claude_malformed_new_meter_supersedes_older_capacity_with_unknown() {
 }
 
 #[test]
+fn auto_claude_late_lower_native_meter_does_not_create_capacity() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("native-quota-regressed");
+    let created = d.call("task.create", json!({"repo":repo,"harness":"claude",
+        "prompt":"inspect quota order","title":"quota order"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let state = d.call("auto.quota.state", json!({"profile_id":"system-claude",
+        "harness":"claude","model":"claude-sonnet-4-5"}));
+    assert_eq!(state["state"], "unknown", "a lower same-reset frame has no source order proof: {state}");
+    assert!(!state.to_string().contains("secret-regressed-meter"));
+}
+
+#[test]
 fn auto_claude_malformed_followup_does_not_clear_a_native_rejection() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
@@ -5147,6 +5162,24 @@ fn auto_codex_native_allowance_update_is_scoped_and_not_usage() {
     assert_eq!(other["state"], "unknown");
     assert!(!result.to_string().contains("secret-credit-sentinel"));
     assert!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn auto_codex_late_lower_native_meter_does_not_create_capacity() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "quota-regressed")]);
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "prompt":"inspect quota order","title":"quota order"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let state = d.call("auto.quota.state", json!({"profile_id":"system-codex",
+        "harness":"codex-app","model":"gpt-6-sol"}));
+    assert_eq!(state["state"], "unknown",
+        "a lower same-reset native update cannot claim new headroom: {state}");
+    assert!(!state.to_string().contains("secret-regressed-credit"));
 }
 
 

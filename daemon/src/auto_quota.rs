@@ -30,6 +30,8 @@ pub struct QuotaSnapshot {
     pub observed_ms: i64,
     pub expires_ms: i64,
     pub windows: Vec<QuotaWindow>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_uncertain_until_ms: Option<i64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -64,10 +66,38 @@ impl QuotaSnapshot {
             .then_some(first)
     }
 
-    /// A missing or malformed newer meter cannot clear an explicit quota
-    /// rejection. Only a fresh reading of that same scoped window, its reset,
-    /// or an explicit account-wide allow clears the corresponding block.
-    pub fn preserve_uncleared_blocks(&mut self, prior: &QuotaSnapshot, now_ms: i64) {
+    /// Native notifications have arrival times but no proven provider order.
+    /// A lower reading for the same window/reset, or a backward local clock,
+    /// cannot establish fresh capacity. Keep explicit active blocks; a
+    /// separate account-scoped metadata read may establish a real correction.
+    pub fn reconcile_unordered_native_evidence(&mut self, prior: &QuotaSnapshot, now_ms: i64) {
+        let decreased_until = prior.windows.iter().filter_map(|previous| {
+            previous.reset_ms.is_none_or(|reset| reset > now_ms)
+                .then_some(())
+                .filter(|_| self.windows.iter().any(|current| {
+                    current.pool_id == previous.pool_id
+                        && current.bucket_id == previous.bucket_id
+                        && current.window == previous.window
+                        && current.model == previous.model
+                        && current.model_family == previous.model_family
+                        && current.plan_type == previous.plan_type
+                        && current.reset_ms == previous.reset_ms
+                        && current.used_percent < previous.used_percent
+                }))
+                .map(|_| previous.reset_ms.unwrap_or(i64::MAX))
+        }).max();
+        let backwards_until = (now_ms < prior.observed_ms).then(||
+            prior.windows.iter().filter_map(|window| window.reset_ms)
+                .filter(|reset| *reset > now_ms).max().unwrap_or(i64::MAX));
+        self.native_uncertain_until_ms = prior.native_uncertain_until_ms
+            .filter(|until| now_ms < *until)
+            .into_iter().chain(decreased_until).chain(backwards_until).max();
+        if self.native_uncertain_until_ms.is_some() {
+            self.windows.retain(|window| window.used_percent >= 100.0);
+            if self.ordinary_usage_allowed == Some(true) {
+                self.ordinary_usage_allowed = None;
+            }
+        }
         if prior.ordinary_usage_allowed == Some(false) && self.ordinary_usage_allowed != Some(true) {
             self.ordinary_usage_allowed = Some(false);
         }
@@ -129,6 +159,9 @@ impl QuotaSnapshot {
             .any(|w| w.used_percent >= 100.0 && w.reset_ms.is_none_or(|reset| reset > now_ms))
         {
             return QuotaState::Exhausted;
+        }
+        if self.native_uncertain_until_ms.is_some_and(|until| now_ms < until) {
+            return QuotaState::Unknown;
         }
         if now_ms < self.observed_ms {
             return QuotaState::Unknown;
@@ -342,7 +375,8 @@ pub fn parse_claude_rate_limit_event(value: &Value, pool_id: &str, observed_ms: 
         }
     }
     Ok(QuotaSnapshot { ordinary_usage_allowed:(rejected && current.and_then(claude_window).is_none()).then_some(false),
-        observed_ms, expires_ms:observed_ms.saturating_add(FRESH_MS), windows:out })
+        observed_ms, expires_ms:observed_ms.saturating_add(FRESH_MS), windows:out,
+        native_uncertain_until_ms:None })
 }
 
 /// Parse an account-scoped Codex app-server response. Token totals and credits
@@ -383,6 +417,7 @@ pub fn parse_codex_rate_limits(
         observed_ms,
         expires_ms: observed_ms.saturating_add(FRESH_MS),
         windows: out,
+        native_uncertain_until_ms: None,
     })
 }
 
@@ -438,10 +473,38 @@ mod tests {
             "a known rejection persists beyond the 60-second freshness of nonblocking meters");
         let mut unknown = parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
             "rate_limit_info":{"status":"allowed"}}), "pool", now + 120_000).unwrap();
-        unknown.preserve_uncleared_blocks(&blocked, now + 120_000);
+        unknown.reconcile_unordered_native_evidence(&blocked, now + 120_000);
         assert_eq!(unknown.state_for("claude-opus-4-5", now + 120_000), QuotaState::Exhausted);
         assert_eq!(unknown.state_for("claude-sonnet-4-5", now + 120_000), QuotaState::Unknown);
         assert_eq!(unknown.state_for("claude-opus-4-5", now + 3_600_000), QuotaState::Unknown);
+    }
+
+    #[test]
+    fn unordered_native_meter_decrease_is_unknown_until_a_new_window() {
+        let at = 1_800_000_000_000_i64;
+        let frame = |used: f64, reset: i64, observed: i64| {
+            parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+                "rate_limit_info":{"status":"allowed","rateLimitType":"five_hour",
+                    "utilization":used,"resetsAt":reset}}), "pool", observed).unwrap()
+        };
+        let prior = frame(0.8, 1_800_003_600, at);
+        let mut late = frame(0.2, 1_800_003_600, at + 10);
+        late.reconcile_unordered_native_evidence(&prior, at + 10);
+        assert_eq!(late.state_for("claude-sonnet", at + 10), QuotaState::Unknown);
+
+        let mut following = frame(0.25, 1_800_003_600, at + 20);
+        following.reconcile_unordered_native_evidence(&late, at + 20);
+        assert_eq!(following.state_for("claude-sonnet", at + 20), QuotaState::Unknown,
+            "another same-reset notification cannot erase the uncertain ordering");
+
+        let mut reset = frame(0.2, 1_800_007_200, at + 3_600_010);
+        reset.reconcile_unordered_native_evidence(&following, at + 3_600_010);
+        assert_eq!(reset.state_for("claude-sonnet", at + 3_600_010),
+            QuotaState::ObservedNonExhausted);
+
+        let mut clock_back = frame(0.9, 1_800_003_600, at - 10);
+        clock_back.reconcile_unordered_native_evidence(&prior, at - 10);
+        assert_eq!(clock_back.state_for("claude-sonnet", at - 10), QuotaState::Unknown);
     }
 
     #[test]

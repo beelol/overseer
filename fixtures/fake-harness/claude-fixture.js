@@ -215,6 +215,16 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
       rateLimitType: 'five_hour', utilization: 1.2, providerNote: 'secret-invalid-meter' } });
     result(false, 'invalid meter observed');
+  } else if (mode === 'native-quota-regressed') {
+    const reset = Math.floor(Date.now() / 1000) + 3600;
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.8, resetsAt: reset } });
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.2, resetsAt: reset,
+      providerNote: 'secret-regressed-meter' } });
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.25, resetsAt: reset } });
+    result(false, 'native meter decreased without a reset');
   } else if (mode === 'native-quota-block-invalid') {
     const weekly = Math.floor(Date.now() / 1000) + 7 * 86400;
     out({ type: 'rate_limit_event', rate_limit_info: { status: 'rejected',

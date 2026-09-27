@@ -174,6 +174,18 @@ rl.on('line', line => {
       out({ method: 'turn/completed', params: { threadId: thread, turn: { id: turn, status: 'completed', error: null } } });
       return;
     }
+    if (process.env.FIXTURE_MODE === 'quota-regressed') {
+      const reset = Math.floor(Date.now() / 1000) + 3600;
+      for (const usedPercent of [80, 20, 25]) {
+        out({ method: 'account/rateLimits/updated', params: { rateLimits: {
+          limitId: 'codex', primary: { usedPercent, windowDurationMins: 300, resetsAt: reset },
+          credits: { balance: 'secret-regressed-credit' }
+        } } });
+      }
+      out({ method: 'turn/completed', params: { threadId: thread,
+        turn: { id: turn, status: 'completed', error: null } } });
+      return;
+    }
     if (process.env.FIXTURE_MODE === 'quota') {
       out({ method: 'account/rateLimits/updated', params: { rateLimits: {
         limitId: 'codex', primary: { usedPercent: 40, windowDurationMins: 300, resetsAt: 1800003600 },
