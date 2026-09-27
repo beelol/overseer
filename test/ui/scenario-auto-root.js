@@ -26,7 +26,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     s.install(latestVsix());
     s.launch(repo, { OVERSEER_CODEX_PATH: app, OVERSEER_CLAUDE_PATH: '/nonexistent/claude', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode',
       OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_MODE: 'managed-models', FIXTURE_TRACE_FILE: trace, FIXTURE_QUOTA_MODE_FILE: quota,
-      OVERSEER_HARNESS_ENV_PASSTHROUGH: 'FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_QUOTA_MODE_FILE,OVERSEER_TEST_SYSTEM_HOME' });
+      FIXTURE_EMIT_USAGE: '1',
+      OVERSEER_HARNESS_ENV_PASSTHROUGH: 'FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_QUOTA_MODE_FILE,FIXTURE_EMIT_USAGE,OVERSEER_TEST_SYSTEM_HOME' });
     let cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     check('Auto gate is off before an explicit UI choice', s.ctl('auto.mode.get').enabled === false);
@@ -106,6 +107,10 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const excludedDetail = await dash.eval(`[...document.querySelectorAll('.auto-decision')].find(e => /gpt-6-astra/.test(e.textContent))?.querySelector('details')?.textContent || ''`);
     check('the diagnosis explanation identifies why another route was excluded',
       /gpt-6-sol/.test(excludedDetail) && /capability/i.test(excludedDetail), excludedDetail);
+    const childUsage = await dash.eval(`[...document.querySelectorAll('.child-head')].map(e => ({ run: e.parentElement.dataset.run, text: e.textContent, title: e.title }))`);
+    check('the parent chat shows each child’s reported token activity without calling it subscription allowance',
+      children.every(c => childUsage.some(u => u.run === c.id && /49 reported tokens/.test(u.text) && /activity, not subscription allowance/.test(u.title))),
+      childUsage);
     await s.screenshot('auto-delegation');
     await cdp.command('Developer: Reload Window'); await delay(6000);
     cdp = await s.connect(); s.cdp = cdp;
@@ -114,6 +119,10 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const reloadedCards = await dash.eval(`[...document.querySelectorAll('.auto-decision')].map(e => e.textContent)`);
     check('window reload restores the same child decision history', reloadedCards.length === childDecisionCards.length &&
       reloadedCards.every((text, i) => text === childDecisionCards[i]), reloadedCards);
+    const reloadedChildUsage = await dash.eval(`[...document.querySelectorAll('.child-head')].map(e => ({ run: e.parentElement.dataset.run, text: e.textContent, title: e.title }))`);
+    check('window reload restores each child’s reported token activity',
+      children.every(c => reloadedChildUsage.some(u => u.run === c.id && /49 reported tokens/.test(u.text) && /activity, not subscription allowance/.test(u.title))),
+      reloadedChildUsage);
     const after = s.ctl('state').runs.filter(r => !r.parent_run_id && r.title === 'seed context');
     await cdp.command('Overseer: New Agent');
     await dash.waitFor(`document.body.dataset.mode === 'composer' && !document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);

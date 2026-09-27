@@ -61,7 +61,7 @@
     constructor(root, opts) {
       this.root = root; this.opts = opts || {};
       this.seen = new Set(); this.turns = []; this.tools = new Map(); this.perms = new Map(); this.children = new Map();
-      this.childInfo = new Map(); this.rootId = undefined; this.attention = undefined; this.active = false;
+      this.childInfo = new Map(); this.childUsage = new Map(); this.rootId = undefined; this.attention = undefined; this.active = false;
       this.banner = el('div', 'conv-banner'); this.banner.hidden = true; this.banner.setAttribute('role', 'status');
       this.list = el('div', 'conv-turns');
       this.working = el('div', 'working'); this.working.hidden = true; this.working.setAttribute('aria-live', 'polite');
@@ -183,8 +183,10 @@
       const info = this.childInfo.get(runId) || {};
       const st = info.status || 'unknown';
       const title = el('span', 'child-title', info.title || 'Sub-agent');
-      block.summary.replaceChildren(ui.icon('type-hierarchy-sub', 'sm child-mark'), title, ui.status(st));
-      block.summary.title = [info.title, ui.statusText(st), info.evidence || info.relation_source].filter(Boolean).join('\n');
+      const usage = this.childUsage.get(runId);
+      block.summary.replaceChildren(ui.icon('type-hierarchy-sub', 'sm child-mark'), title,
+        ...(usage ? [el('span', 'child-usage', usage.label)] : []), ui.status(st));
+      block.summary.title = [info.title, ui.statusText(st), usage?.detail, info.evidence || info.relation_source].filter(Boolean).join('\n');
     }
 
     toolCard(ev, id, name) {
@@ -480,11 +482,24 @@
     }
 
     usage_(ev, p, child) {
-      if (child) return;
-      const t = this.turn();
       const u = p.usage || p.total || p.tokens || p;
       const pick = (...keys) => keys.map(k => u && u[k]).find(v => typeof v === 'number');
       const input = pick('input_tokens', 'inputTokens', 'input'), output = pick('output_tokens', 'outputTokens', 'output');
+      if (child) {
+        const counts = [input, output];
+        if (counts.every(v => v === undefined) || counts.some(v => v !== undefined && (!Number.isSafeInteger(v) || v < 0))) return;
+        const total = (input || 0) + (output || 0);
+        if (!Number.isSafeInteger(total)) return;
+        const label = input !== undefined && output !== undefined
+          ? `${ui.compact(total)} reported tokens`
+          : `${ui.compact(total)} reported ${input !== undefined ? 'input' : 'output'} tokens`;
+        const detail = [input !== undefined && `${input.toLocaleString()} input`, output !== undefined && `${output.toLocaleString()} output`,
+          'activity, not subscription allowance'].filter(Boolean).join(' · ');
+        this.childUsage.set(ev.run_id, { label, detail });
+        this.renderChildHeader(ev.run_id, this.childBlock(ev.run_id));
+        return;
+      }
+      const t = this.turn();
       const cached = pick('cache_read_input_tokens', 'cached_input_tokens', 'cachedInputTokens');
       const cost = typeof p.total_cost_usd === 'number' ? p.total_cost_usd : typeof p.cost === 'number' ? p.cost : undefined;
       if (input === undefined && output === undefined && cost === undefined) { if (p.rate_limits) t.limits = p.rate_limits; return; }

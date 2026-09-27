@@ -128,6 +128,7 @@ pre.code.error { color: var(--ov-failed); }
 .child > summary { margin-left: 0; }
 .child-mark { color: var(--ov-icon); }
 .child-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ov-text); }
+.child-usage { flex: none; color: var(--ov-muted); font-size: var(--ov-font-xs); white-space: nowrap; }
 .child-body { display: flex; flex-direction: column; gap: var(--ov-chat-block-gap); padding: 4px 0 4px; }
 .thinking > .text { padding: 4px 0 4px var(--ov-space-6); color: var(--ov-muted); }
 .thinking > pre { margin-left: var(--ov-space-6); }
