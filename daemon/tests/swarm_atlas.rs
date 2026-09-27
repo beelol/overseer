@@ -1084,3 +1084,78 @@ fn atlas_s5_stop_as_last_result_arrives_preserves_evidence_without_completion() 
         assert_eq!(d.call("swarm.get",json!({"id":run}))["status"],"stopped");
     }
 }
+
+// S5: a full durable store must not acknowledge an Atlas reproduction
+// artifact. The sender keeps the same artifact and result IDs across restart.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_full_storage_replays_unacknowledged_evidence_after_recovery() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let mut d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Atlas full-storage fault",
+        "objective":"Audit foreign task mutation","allowed_targets":["fixture"]}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Tasks","acceptance":"foreign patch before-after rows",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j2","mode":"write"}]},
+        {"id":"j4","title":"Attachments","acceptance":"foreign signed URL",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j4","mode":"write"}]}
+    ]}));
+    let attempt=register(&d,run,"j2");
+    let evidence=atlas_probe("j2");
+    assert_eq!(evidence["foreignPatchStatus"],200);
+    assert_eq!(evidence["taskBefore"],"Bob task");
+    assert_eq!(evidence["taskAfter"],"changed-by-alice");
+    let at=now();
+    let snapshot=json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"fixture","account_id":"account","pool_ids":["pool"],
+            "capabilities":["audit"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+120000}]}]});
+    let artifact="atlas-j2-full-storage-proof";
+    let artifact_request=json!({"run_id":run,"job_id":"j2",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "artifact_id":artifact,"source_revision":1,"kind":"reproduction",
+        "content":json!({"probe":evidence,"padding":"x".repeat(28_000)}).to_string()});
+    d.call("swarm.storage.limit_pages",json!({"mode":"current"}));
+    assert!(d.try_call("swarm.artifact.put",artifact_request.clone()).is_err());
+    assert_eq!(d.call("swarm.storage.status",json!({}))["state"],"blocked");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let saved:i64=db.query_row("SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1",
+        [run],|r|r.get(0)).unwrap();
+    assert_eq!(saved,0,"failed durable artifact write was acknowledged");
+    let admission=json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j4","target_id":"fixture",
+        "request_id":"atlas-full-storage-held","snapshot":snapshot,
+        "now_ms":at,"required_capabilities":["audit"],
+        "estimate_milli":{"points":100},"purpose":"worker"});
+    assert!(d.try_call("swarm.admit",admission.clone()).unwrap_err().contains("storage"));
+    d.env.push(("OVERSEER_TEST_SWARM_STORAGE_PAGE_LIMIT".into(),"current".into()));
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.storage.status",json!({}))["state"],"blocked");
+    assert!(d.try_call("swarm.admit",admission.clone()).unwrap_err().contains("storage"));
+    assert!(d.try_call("swarm.storage.recover",json!({})).is_err());
+    d.call("swarm.storage.limit_pages",json!({"mode":"unlimited"}));
+    assert_eq!(d.call("swarm.storage.recover",json!({}))["state"],"ready");
+    assert_eq!(d.call("swarm.artifact.put",artifact_request.clone())["duplicate"],false);
+    assert_eq!(d.call("swarm.artifact.put",artifact_request)["duplicate"],true);
+    let result=json!({"run_id":run,"job_id":"j2",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "message_id":"atlas-j2-after-full-result","type":"result","revision":1,
+        "payload":{"audit_outcome":"confirmed_defect","artifact_ids":[artifact]}});
+    assert_eq!(d.call("swarm.report",result.clone())["duplicate"],false);
+    assert_eq!(d.call("swarm.report",result)["duplicate"],true);
+    let counts:(i64,i64)=db.query_row("SELECT
+        (SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1),
+        (SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND kind='result')",
+        [run],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!(counts,(1,1));
+    assert_eq!(d.call("swarm.decide",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j2","decision":"accept",
+        "evidence":[artifact]}))["status"],"accepted");
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j2","attempt_id":attempt["attempt_id"]}));
+    assert_eq!(d.call("swarm.admit",admission)["status"],"admitted");
+}
