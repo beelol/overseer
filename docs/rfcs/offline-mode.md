@@ -54,7 +54,7 @@ under `overseer.continuity.*`. The chat still uses the owner's verb for the mome
 | Memory safety | Overseer must never open a model that could crash the computer (AC-140). |
 | Goal | One goal for all of Gate L; its first step is the spike on OpenCode's session transports (AC-139). |
 | Build-time permissions | Model downloads for verification (about 28 GB), an Ollama install test in an isolated folder, light paid turns. The owner turns Wi-Fi off and on for the live checks. |
-| Where it is built | In its own worktree, landing through a pull request. |
+| Where it is built | In its own worktree and a new pull request, opened early as a draft, kept up to date with main and out of conflict with the other work in flight. |
 | Other proposals in this RFC | Accepted as written (budget, handoff, catalogue verification, out-of-scope items). |
 
 ## Goal
@@ -694,6 +694,12 @@ Written on 2026-09-26 at the owner's request, ready to start. Not started by thi
 >    retry, back online, several local agents.
 > 5. **Confirm (AC-95, AC-97).** The honest offline UI and the owner's offline session.
 >
+> Open the pull request early, as a draft, right after the spike, and keep it current: bring main
+> into the branch at the start of every step and before every push, resolve conflicts at once, and
+> never leave the pull request conflicted or stale. Stay clear of the other work in flight: put
+> Continuity in new modules, keep edits to shared files small and additive, check the open pull
+> requests before touching a file they change, and never push to another session's branch.
+>
 > Memory safety comes before everything. Never load a local model whose measured or estimated size
 > is above the budget, by any path. Never load `qwen3.5:122b`. During catalogue verification load
 > one model at a time, smallest first, unload each after its check, and record memory before and
@@ -705,6 +711,49 @@ Written on 2026-09-26 at the owner's request, ready to start. Not started by thi
 > criterion is blocked, record the blocker and the next action in its record and continue with the
 > others. A partial milestone is progress, not completion.
 
+### Pull request and work in flight
+
+The owner's condition (2026-09-26): a new pull request, kept up to date and out of conflict with
+everything else in flight.
+
+- **One new pull request**, opened as a draft right after the spike, so the work is visible from the
+  start. It is marked ready when every criterion that does not wait for the owner is verified. The
+  description follows the `open-pr` skill and is updated as steps land.
+- **Kept current.** Main is brought into the branch at the start of every step, before every push,
+  and whenever main gains a commit that touches the daemon or the extension. Main is merged into
+  the branch rather than the branch rebased, so review comments keep their place and nothing is
+  force-pushed once the pull request is open. `cargo test` and the affected UI scenarios are rerun
+  after each sync.
+- **Never conflicted.** A conflict is resolved in the same sitting it appears. Generated files (the
+  README list, the ledger README, the `AC-NN.md` records) are never merged by hand: take main's
+  side and rerun `docs/verification/records.py`.
+- **Shaped to stay out of the way.** Continuity lives in new files: `daemon/src/net.rs`, `sys.rs`,
+  `continuity.rs` (state and policy), `local.rs` (Ollama inventory, catalogue, downloads),
+  `handoff.rs`, and `extension/src/continuity.js` with its webview script. Shared files
+  (`daemon.rs`, `adapters.rs`, `server.rs`, `store.rs`, `extension.js`, `composer.js`,
+  `package.json`) get small additive edits: one dispatch line, one hook call, one settings block.
+  No reformatting and no moving of code that Continuity does not own.
+- **Look before touching.** At the start of every step the session lists the open pull requests and
+  the files they change. A shared file that an open pull request changes is edited last and as
+  little as possible, or after that pull request merges. The session never pushes to another
+  session's branch or pull request.
+- **The order helps.** Steps 0 and 1 are almost entirely new daemon modules. The steps that change
+  the composer and the chat come later, when the UI work in flight has most likely merged.
+- **New run states must not break other surfaces.** `waiting_for_connection`, `waiting_for_memory`
+  and `handed_off` are checked in the terminal UI (`tui/`) and the grid: an unknown state reads as
+  plain text, never as a crash or as "failed".
+
+In flight on 2026-09-26 (a snapshot; the session rechecks at every step):
+
+| Pull request | Touches | What it means for Continuity |
+| --- | --- | --- |
+| #8 Gate K follow-ups | composer, account names, search, grid | The composer work (AC-94, AC-98) builds on it after it merges. |
+| #5 Reactor audio cues | 3 daemon files, `extension/package.json`, extension source | Settings block and daemon hooks sit next to Continuity's; keep both additive. |
+| #3 Swarm mode (draft) | 30 daemon files, 27 daemon tests | The largest overlap (`daemon.rs`, `store.rs`, `server.rs`). The owner reviews it through inline comments; do not push to it. New modules keep Continuity clear of it. |
+| #2 Auto mode RFC (draft) | one RFC on task-aware routing | Read it before building failover (AC-84). Handoff stays a mechanism routing can reuse; Continuity decides only on connection state. |
+| #6 TUI audio controls (draft) | `tui/` | No overlap expected. |
+| Gate M and Gate N (criteria on main, not started) | the whole UI surface; the phone remote | Continuity's UI builds on the merged Gate K layout and keeps to its own cards and badges. |
+
 ### Start gate and authority
 
 Granted by the owner on 2026-09-26 for this goal:
@@ -714,8 +763,8 @@ Granted by the owner on 2026-09-26 for this goal:
 - **Ollama install test:** in an isolated folder, with the owner's own Ollama untouched.
 - **Light paid turns:** ChatGPT accounts on `gpt-5.6-luna` at low effort only; Claude lightly. One
   attempt per step, no retry loops against paid accounts.
-- **Commits, branches and one pull request** in `beelol/overseer`; documents and the ledger straight
-  to main.
+- **Commits, a branch and one new pull request** in `beelol/overseer`, kept current with main by
+  merging main into the branch; documents and the ledger straight to main.
 
 Not granted: purchases, login changes, automatic merges, editing the user's own OpenCode or Ollama
 configuration, and **turning the network off**. The implementing session needs the network itself,
