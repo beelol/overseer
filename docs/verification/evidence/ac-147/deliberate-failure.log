@@ -1,0 +1,8 @@
+▶ Rust (cargo test --workspace) … ok (74s) 92 passed, 0 failed
+▶ Unit (test/unit) … FAILED (0s) 2 of 3 passed
+    FAILED zz-deliberate-failure.js
+▶ Check (extension sources) … ok (0s)
+▶ Build the VSIX … ok (5s)
+
+3 of 4 passed; failed: Unit (test/unit)
+exit 1
