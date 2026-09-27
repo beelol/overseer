@@ -559,6 +559,13 @@ fn admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart() {
     let launched = d.call("swarm.worker.launch", request.clone());
     assert_eq!(launched["status"], "launched");
     let worker_run = launched["overseer_run_id"].as_str().unwrap();
+    for prefix in ["terminal-", "stop-", "deadline-checkpoint-", "contamination-"] {
+        assert!(d.try_call("swarm.report",json!({"run_id":id,"job_id":"inspect",
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "message_id":format!("{prefix}{}",admitted["attempt_id"].as_str().unwrap()),
+            "type":"progress","revision":1,"payload":{"note":"still running"}})).is_err(),
+            "worker could claim daemon-owned {prefix} message id");
+    }
     assert!(
         ["queued", "starting", "running"].contains(&d.run(worker_run)["status"].as_str().unwrap())
     );
