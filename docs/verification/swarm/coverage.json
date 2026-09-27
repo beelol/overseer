@@ -413,9 +413,10 @@
         "daemon/tests/swarm_integration.rs",
         "docs/verification/swarm/SWARM-35.md",
         "daemon/tests/swarm_scenarios.rs",
-        "docs/verification/swarm/S3.md"
+        "docs/verification/swarm/S3.md",
+        "daemon/tests/swarm_broker.rs"
       ],
-      "blocker": "Dependency readiness now waits for accepted patch integration across review and plan revision paths. S3 contract repair uses attempt 2 of the same logical job, redirects one stale module result and integrates 24 module patches. Applied revision acknowledgement, director conflict resolution, qualified session reuse and the complete S3 workflow remain unverified."
+      "blocker": "Dependency readiness waits for accepted patch integration across review and plan revision paths. Local acceptance and completion now require applied director redirect/advisory/retraction receipts for the accepted attempt, with queued/delivered holds surviving restart. S3 contract repair uses attempt 2 of the same logical job, redirects one stale module result and integrates 24 module patches. Qualified live application, director conflict repair, session reuse and the complete S3 workflow remain unverified."
     },
     "SWARM-36": {
       "status": "partial",
@@ -514,7 +515,7 @@
         "docs/verification/swarm/SWARM-43.md",
         "fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs"
       ],
-      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect. Daemon fixtures enforce the 30-second applied-ack timeout, and a joined Atlas S5 replay now sends a revision-2 plan redirect while J4's PostgreSQL attachment probe is held: receipt remains delivered, dependent review is held, a checkpoint is queued and the linked worker is interrupted without accepting a result. The complete six-job S1 revision-2 and stale-output trace, qualified live provider delivery/acknowledgement, and exclusion of unsupported harness paths remain unverified."
+      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect. Local acceptance and final completion hold unapplied director redirects, advisories and retractions; new directives to finished attempts are rejected while exact receipts replay. Daemon fixtures enforce the 30-second applied-ack timeout, and a joined Atlas S5 replay sends a revision-2 plan redirect while J4\u2019s PostgreSQL attachment probe is held: receipt remains delivered, dependent review stays held, a checkpoint is queued and the linked worker is interrupted without accepting a result. The complete six-job S1 revision-2 and stale-output trace, qualified live provider delivery/application, and exclusion of unsupported harness paths remain unverified."
     },
     "SWARM-44": {
       "status": "partial",

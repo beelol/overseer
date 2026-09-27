@@ -21,3 +21,13 @@ Follow-up with `catalog-v1`: the versioned S3 fixture revises a timestamp-only c
 Remaining: applied redirect acknowledgement, qualified session reuse, director-led conflict repair and the complete adaptive S3 run are not implemented. No live worker path has been replayed. This criterion stays unchecked.
 
 Follow-up at `498932c`: dependency eligibility now has one check for accepted status, no active attempt, and no pending accepted patch integration. Two new fixtures reproduced premature readiness before the fix: accepting an unrelated prerequisite and revising a plan to add or change dependents. Both stay `planned` until integration and become `ready` afterward. The complete offline workspace suite passed 207 tests, with 11 intentionally ignored. The remaining gaps above keep this criterion partial.
+
+Applied-directive gate at `9759b031`: a submitted result cannot be accepted
+while its attempt has a queued or delivered director redirect, advisory or
+retraction. A local broker regression keeps the dependent planned across a
+daemon restart, then makes it ready only after the directive's applied receipt,
+acceptance and confirmed exit. A final report also refuses an unapplied
+directive sent after review. The affected suites passed 70 tests; exact inputs,
+red failures and replay command are in [SWARM-43](SWARM-43.md). This is local
+receipt-state evidence, not qualified live session application or complete S3
+contract repair. SWARM-35 remains partial.

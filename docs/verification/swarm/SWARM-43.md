@@ -27,3 +27,22 @@ control, and supervised-director suites passed 19 + 6 + 8 tests with
 --test swarm_control --offline -- --test-threads=1`. This closes one local
 stale-delivery path, not the live mid-tool-call acknowledgement or complete S1
 trace. SWARM-43 remains partial.
+
+Application gates at `9759b031` (2026-09-27): the focused
+`acceptance_waits_for_directive_application_before_unlocking_dependents` test
+first accepted a result while its redirect was still queued. Acceptance now
+holds an attempt with any unapplied director redirect, advisory or retraction.
+For each message kind, the test verifies queued and delivered phases block
+acceptance, including restart after delivery; application allows acceptance,
+and confirmed exit then releases the dependent job. A second regression,
+`completion_does_not_hide_a_directive_sent_after_review`, first completed a run
+with an advisory still queued after review. Completion now checks directives
+for the accepted attempt and refuses that report; the applied variant succeeds.
+
+Validation: `cargo test -p overseerd --test swarm_broker --test swarm_plan
+--test swarm_director_loop --test swarm_integration --test swarm_context
+--offline -- --test-threads=1` passed 21 + 11 + 8 + 25 + 5 tests, 70 total.
+`git diff --check` passed. These tests use the local fixture broker and simulated
+application receipts. They do not prove the recipient actually followed a
+directive through a qualified provider transport, autonomous correction, or
+the complete S1 trace; SWARM-43 remains partial.
