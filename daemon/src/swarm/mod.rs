@@ -71,6 +71,35 @@ fn required<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
         .ok_or_else(|| anyhow!("missing string parameter {key}"))
 }
 
+/// A recorded repository list is an authorization boundary for director and
+/// worker process launches. Historical fixture runs have no list; normal
+/// launch must supply one and may later revise it only through owner approval.
+fn require_repository_scope(store: &Store, run: &str, repo: &str) -> Result<()> {
+    let raw: Option<String> = store.conn.query_row(
+        "SELECT repository_scope FROM swarm_runs WHERE id=?1", [run], |r| r.get(0),
+    )?;
+    let Some(raw) = raw else {
+        if std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() == Ok("1") {
+            return Ok(());
+        }
+        bail!("Swarm run has no approved repository scope");
+    };
+    let scoped: Vec<Value> = serde_json::from_str(&raw)?;
+    let top = crate::git::toplevel(std::path::Path::new(repo))?;
+    let common = crate::git::common_dir(&top)?;
+    let same_repo = scoped.iter().filter(|entry|
+        entry["common_dir"].as_str() == common.to_str()).collect::<Vec<_>>();
+    if same_repo.is_empty() {
+        bail!("repository is outside the approved Swarm scope");
+    }
+    let head = crate::git::rev_parse(&top, "HEAD")
+        .ok_or_else(|| anyhow!("repository has no source revision"))?;
+    if !same_repo.iter().any(|entry| entry["source_commit"] == head) {
+        bail!("repository source revision changed since Swarm approval");
+    }
+    Ok(())
+}
+
 fn record_operation(conn: &rusqlite::Connection, run: &str, kind: &str) -> Result<()> {
     conn.execute(
         "INSERT INTO swarm_operation_order(run_id,kind,created_ms) VALUES(?1,?2,?3)",
@@ -202,10 +231,12 @@ fn finalize_control_if_idle(conn: &rusqlite::Connection, run: &str, now: i64) ->
 fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
     let targets: String = row.get("allowed_targets")?;
     let policy: String = row.get("policy")?;
+    let repositories: Option<String> = row.get("repository_scope")?;
     Ok(json!({
         "id": row.get::<_, String>("id")?,
         "category": row.get::<_, String>("category")?,
         "objective": row.get::<_, String>("objective")?,
+        "repositories": repositories.and_then(|raw| serde_json::from_str::<Value>(&raw).ok()),
         "source_change_permission": row.get::<_, String>("source_change_permission")?,
         "status": row.get::<_, String>("status")?,
         "stop_reason": row.get::<_, Option<String>>("stop_reason")?,
@@ -241,6 +272,29 @@ pub fn create(store: &mut Store, p: &Value) -> Result<Value> {
     if !["none", "isolated"].contains(&source_change_permission) {
         bail!("invalid source change permission");
     }
+    let repositories = p.get("repositories").map(|value| -> Result<Value> {
+        let paths = value.as_array().ok_or_else(|| anyhow!("repositories must be an array"))?;
+        if paths.is_empty() || paths.len() > 16 {
+            bail!("repositories must contain 1-16 approved Git sources");
+        }
+        let mut rows = Vec::with_capacity(paths.len());
+        let mut seen = std::collections::HashSet::new();
+        for path in paths {
+            let path = path.as_str().ok_or_else(|| anyhow!("repository path must be a string"))?;
+            if !std::path::Path::new(path).is_absolute() {
+                bail!("repository path must be absolute");
+            }
+            let top = crate::git::toplevel(std::path::Path::new(path))?;
+            let common = crate::git::common_dir(&top)?;
+            if !seen.insert(common.clone()) {
+                bail!("duplicate repository in Swarm scope");
+            }
+            let commit = crate::git::rev_parse(&top,"HEAD")
+                .ok_or_else(|| anyhow!("repository has no source revision"))?;
+            rows.push(json!({"repo_root":top,"common_dir":common,"source_commit":commit}));
+        }
+        Ok(json!(rows))
+    }).transpose()?;
     let request_id = p.get("request_id").map(|v| v.as_str()
         .ok_or_else(|| anyhow!("invalid create request id"))).transpose()?;
     let request_scope = p.get("request_scope").map(|v| v.as_str()
@@ -291,8 +345,8 @@ pub fn create(store: &mut Store, p: &Value) -> Result<Value> {
     let id = format!("sw-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
     let now = crate::daemon::now();
     tx.execute(
-        "INSERT INTO swarm_runs(id,category,category_key,objective,source_change_permission,status,generation,revision,allowed_targets,policy,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,'planning',1,0,?6,?7,?8,?8)",
-        params![id,category,key,objective,source_change_permission,targets.to_string(),policy.to_string(),now],
+        "INSERT INTO swarm_runs(id,category,category_key,objective,repository_scope,source_change_permission,status,generation,revision,allowed_targets,policy,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,'planning',1,0,?7,?8,?9,?9)",
+        params![id,category,key,objective,repositories.map(|v|v.to_string()),source_change_permission,targets.to_string(),policy.to_string(),now],
     )?;
     if let Some(request_id) = request_id {
         tx.execute("INSERT INTO swarm_create_requests(request_scope,request_id,request_sha256,run_id,created_ms)

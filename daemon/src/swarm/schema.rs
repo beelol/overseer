@@ -9,6 +9,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           category TEXT NOT NULL,
           category_key TEXT NOT NULL,
           objective TEXT NOT NULL,
+          repository_scope TEXT,
           source_change_permission TEXT NOT NULL DEFAULT 'none'
             CHECK(source_change_permission IN ('none','isolated')),
           status TEXT NOT NULL,
@@ -530,6 +531,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         // happens to describe implementation work.
         conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN source_change_permission TEXT NOT NULL DEFAULT 'none' CHECK(source_change_permission IN ('none','isolated'));")?;
     }
+    let has_repository_scope = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='repository_scope'")?
+        .exists([])?;
+    if !has_repository_scope {
+        // Legacy fixture runs have no recorded repository authorization. Do not
+        // infer a grant from their objective or from an existing process path.
+        conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN repository_scope TEXT;")?;
+    }
     let has_stalled_from = conn
         .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='stalled_from'")?
         .exists([])?;
@@ -778,6 +787,11 @@ mod tests {
             [], |row| row.get(0),
         ).unwrap();
         assert_eq!(permission, "none");
+        let repository_scope: Option<String> = conn.query_row(
+            "SELECT repository_scope FROM swarm_runs WHERE id='old-run'",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert!(repository_scope.is_none(), "migration must not invent an approved repository");
         let limit_revision: i64 = conn.query_row(
             "SELECT limit_revision FROM swarm_runs WHERE id='old-run'",
             [], |row| row.get(0),

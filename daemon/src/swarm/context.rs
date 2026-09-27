@@ -441,6 +441,7 @@ pub fn worker_brief(store: &Store, p: &Value) -> Result<Value> {
     }
     let mut result = json!({"run_id":run,"category":current["category"],"objective":current["objective"],
         "source_change_permission":current["source_change_permission"],
+        "repositories":current["repositories"],
         "plan_revision":job_revision,"target_id":target,
         "target_constraints":{"assigned_target":target,"allowed_targets":current["allowed_targets"]},
         "job":{"id":job,"title":title,"acceptance":acceptance,"deps":deps,
@@ -550,6 +551,9 @@ pub fn director_summary(store: &Store, p: &Value) -> Result<Value> {
     let cursor = p["cursor"].as_str().unwrap_or("");
     let mut result = json!({"run_id":run,"generation":current["generation"],
         "revision":current["revision"],"status":current["status"],
+        "category":current["category"],"objective":current["objective"],
+        "source_change_permission":current["source_change_permission"],
+        "repositories":current["repositories"],
         "counts":counts,"jobs":[],"next_cursor":Value::Null});
     if result.to_string().len() > limit {
         bail!("required director summary exceeds inline context limit");

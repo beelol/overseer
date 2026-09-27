@@ -13,6 +13,81 @@ fn now() -> i64 {
 }
 
 #[test]
+fn repository_scope_blocks_director_and_worker_launch_outside_approved_repo() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let approved = repo(&temp.path().join("approved-source"));
+    let unrelated = repo(&temp.path().join("unrelated-source"));
+    let run = d.call("swarm.create", json!({"category":"Scoped backend",
+        "objective":"Inspect approved repository", "allowed_targets":["fixture-local"],
+        "repositories":[approved]}));
+    let id = run["id"].as_str().unwrap();
+    assert_eq!(run["repositories"].as_array().unwrap().len(),1);
+    let denied = d.try_call("swarm.director.launch",json!({"run_id":id,
+        "generation":1,"repo":unrelated,"program":"/bin/sleep","args":["1"],
+        "prompt":"Inspect","title":"Out of scope director"})).unwrap_err();
+    assert!(denied.contains("repository is outside the approved Swarm scope"),"{denied}");
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let at=now();
+    let admitted=d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"inspect","target_id":"fixture-local","request_id":"scoped-worker",
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(admitted["status"],"admitted","{admitted}");
+    let brief=d.call("swarm.worker.brief",json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"]}));
+    assert_eq!(brief["repositories"],run["repositories"]);
+    let denied=d.try_call("swarm.worker.launch",json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "repo":unrelated,"harness":"generic","program":"/bin/sleep","args":["1"],
+        "prompt":"Inspect","title":"Out of scope worker"})).unwrap_err();
+    assert!(denied.contains("repository is outside the approved Swarm scope"),"{denied}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let owners:i64=db.query_row("SELECT COUNT(*) FROM swarm_director_owners WHERE run_id=?1",
+        [id],|r|r.get(0)).unwrap();
+    let launches:i64=db.query_row("SELECT COUNT(*) FROM swarm_worker_launches WHERE run_id=?1",
+        [id],|r|r.get(0)).unwrap();
+    assert_eq!((owners,launches),(0,0));
+    let sibling=temp.path().join("approved-sibling");
+    git(&approved,&["worktree","add","--detach",sibling.to_str().unwrap(),"HEAD"]);
+    let launched=d.call("swarm.worker.launch",json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "repo":sibling,"harness":"generic","program":"/bin/sleep","args":["1"],
+        "prompt":"Inspect","title":"Approved worker"}));
+    assert_eq!(launched["status"],"launched","{launched}");
+}
+
+#[test]
+fn repository_scope_pins_source_revision_across_daemon_restart() {
+    let mut d=Daemon::start(&[]);
+    let temp=tmp();
+    let approved=repo(&temp.path().join("pinned-source"));
+    let initial=git(&approved,&["rev-parse","HEAD"]);
+    let run=d.call("swarm.create",json!({"category":"Pinned audit",
+        "objective":"Inspect pinned source","allowed_targets":["fixture-local"],
+        "repositories":[approved]}));
+    let id=run["id"].as_str().unwrap();
+    assert_eq!(run["repositories"][0]["source_commit"],initial);
+    std::fs::write(approved.join("changed.txt"),"new source\n").unwrap();
+    git(&approved,&["add","changed.txt"]);
+    git(&approved,&["commit","-q","-m","advance source"]);
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["repositories"][0]["source_commit"],initial);
+    let denied=d.try_call("swarm.director.launch",json!({"run_id":id,
+        "generation":1,"repo":approved,"program":"/bin/sleep","args":["1"],
+        "prompt":"Inspect","title":"Changed source director"})).unwrap_err();
+    assert!(denied.contains("source revision changed since Swarm approval"),"{denied}");
+}
+
+#[test]
 fn uncontrolled_native_delegation_blocks_admission_before_reserving_or_launching() {
     let d = Daemon::start(&[]);
     let run = d.call("swarm.create", json!({"category":"Uncontrolled delegation",

@@ -88,6 +88,7 @@ pub fn launch_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         bail!("invalid scripted director launch");
     }
     crate::git::toplevel(std::path::Path::new(repo))?;
+    super::require_repository_scope(&d.store.lock().unwrap(), run, repo)?;
     let owner = super::owner::begin(&mut d.store.lock().unwrap(),
         &json!({"run_id":run,"generation":generation,"supervised_launch":true}))?;
     let token = owner["owner_token"].as_str().unwrap();
@@ -256,6 +257,7 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
     let attempt_revision;
     {
         let store = d.store.lock().unwrap();
+        super::require_repository_scope(&store, run, repo)?;
         attempt_revision = broker::check_attempt(&store, run, job, attempt, token)?;
         let executor: String = store.conn.query_row(
             "SELECT executor FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3",
