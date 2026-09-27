@@ -40,7 +40,11 @@ impl Daemon {
         }
         // OVERSEER_TEST_PHONE_ACCESS=on runs a whole suite with phone access turned on (AC-116):
         // what passed with it off must pass with it on.
-        let phone_access = std::env::var("OVERSEER_TEST_PHONE_ACCESS").as_deref() == Ok("on");
+        // The suites that switch phone access themselves (gateway, phone_methods) start from
+        // off, as the owner's daemon does: for them the setting changes nothing.
+        let own = std::env::current_exe().ok().and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string())).unwrap_or_default();
+        let switches_itself = own.starts_with("gateway-") || own.starts_with("phone_methods-");
+        let phone_access = !switches_itself && std::env::var("OVERSEER_TEST_PHONE_ACCESS").as_deref() == Ok("on");
         if phone_access && !env.iter().any(|(k, _)| k == "OVERSEER_GATEWAY_MDNS") {
             env.push(("OVERSEER_GATEWAY_MDNS".to_string(), "off".to_string()));
         }

@@ -263,6 +263,20 @@ describe('the session', () => {
     expect(session.getSnapshot().scope).toBe('watch');
   });
 
+  test('reviewed marks are asked of the Mac once and then follow its events', async () => {
+    const { session, connection, frame } = make();
+    connection.gateway = GATEWAY;
+    connection.answers['review.marks'] = () => ({ run_id: 'r1', keys: ['k1'], marks: [{ key: 'k1', path: 'a.txt', at_ms: 5, by: 'the Mac' }] });
+    await session.start();
+    connection.go('online');
+    await settle();
+    await session.loadMarks('r1');
+    expect(store.marksOf(session.getSnapshot().state, 'r1').map((m) => m.key)).toEqual(['k1']);
+    connection.emit('event', { ...event(11, 'review_mark', { key: 'k2', path: 'b.txt', reviewed: true }), source: 'phone:Phone' }, { live: true });
+    frame();
+    expect(store.marksOf(session.getSnapshot().state, 'r1').map((m) => m.key).sort()).toEqual(['k1', 'k2']);
+  });
+
   test('coming to the front tries the Mac at once', async () => {
     const { session, connection } = make();
     await session.start();

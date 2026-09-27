@@ -31,6 +31,8 @@ export interface SessionDeps {
 type PhoneState = store.PhoneState;
 type Listener = () => void;
 
+/** How long a conversation nobody looks at is kept: going back and forth does not load twice. */
+const KEEP_CLOSED_MS = 30_000;
 const HISTORY_PAGE = 5000;
 const HISTORY_PAGES = 20;
 
@@ -58,6 +60,7 @@ export class Session {
   private cacheTimer: ReturnType<typeof setTimeout> | null = null;
   private loadGeneration = 0;
   private started = false;
+  private readonly closing = new Set<ReturnType<typeof setTimeout>>();
   private switches: NotificationSwitches = ALL_ON;
 
   constructor(private readonly deps: SessionDeps) {
@@ -106,6 +109,12 @@ export class Session {
 
   async stop(): Promise<void> {
     for (const off of this.subscriptions.splice(0)) off();
+    for (const timer of this.closing) clearTimeout(timer);
+    this.closing.clear();
+    if (this.cacheTimer !== null) {
+      clearTimeout(this.cacheTimer);
+      this.cacheTimer = null;
+    }
     this.cancelFrame?.();
     this.cancelFrame = null;
     this.flush();
@@ -187,10 +196,33 @@ export class Session {
         return () => {
           entry.listeners.delete(listener);
           // Kept for a moment: going back and forth between two agents does not load twice.
-          if (entry.listeners.size === 0) setTimeout(() => entry.listeners.size === 0 && this.open.get(runId) === entry && this.open.delete(runId), 30_000);
+          if (entry.listeners.size === 0) this.closeLater(runId, entry);
         };
       },
     };
+  }
+
+  private closeLater(runId: string, entry: OpenConversation): void {
+    const timer = setTimeout(() => {
+      this.closing.delete(timer);
+      if (entry.listeners.size === 0 && this.open.get(runId) === entry) this.open.delete(runId);
+    }, KEEP_CLOSED_MS);
+    // A timer that only tidies up never keeps a process alive (Node, in tests).
+    (timer as unknown as { unref?: () => void }).unref?.();
+    this.closing.add(timer);
+  }
+
+  // ------------------------------------------------------------------ review marks
+
+  /**
+   * The reviewed marks of a run, asked of the Mac once and kept current from its events
+   * afterwards, whoever made them: the phone, VS Code or the terminal. Read them with
+   * `store.marksOf(state, runId)`.
+   */
+  async loadMarks(runId: string): Promise<void> {
+    const answered = await this.request('review.marks', { run_id: runId });
+    this.flush();
+    this.update({ state: store.loadMarks(this.snapshot.state, runId, answered.marks) });
   }
 
   private ensure(runId: string): OpenConversation {
@@ -395,6 +427,7 @@ export class Session {
     if (this.cacheTimer !== null) return;
     const wait = Math.max(0, every - (this.deps.now() - this.cacheWrittenAt));
     this.cacheTimer = setTimeout(write, wait);
+    (this.cacheTimer as unknown as { unref?: () => void }).unref?.();
   }
 }
 
