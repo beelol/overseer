@@ -16,11 +16,19 @@ pub fn get(store: &Store, run: &str) -> Result<Value> {
         )
         .optional()?;
     match saved {
-        Some((generation, revision, summary, verification, checks, created_ms)) => Ok(json!({
-            "generation":generation,"revision":revision,"summary":summary,
-            "verification":verification,"checks":serde_json::from_str::<Value>(&checks)?,
-            "created_ms":created_ms
-        })),
+        Some((generation, revision, summary, verification, checks, created_ms)) => {
+            let invalidation: Option<(String,String,i64)> = store.conn.query_row(
+                "SELECT reason,resource,created_ms FROM swarm_completion_invalidations WHERE run_id=?1",
+                [run], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+            ).optional()?;
+            Ok(json!({
+                "generation":generation,"revision":revision,"summary":summary,
+                "verification":verification,"checks":serde_json::from_str::<Value>(&checks)?,
+                "created_ms":created_ms,"valid":invalidation.is_none(),
+                "invalidation":invalidation.map(|(reason,resource,at)|
+                    json!({"reason":reason,"resource":resource,"created_ms":at}))
+            }))
+        },
         None => Ok(Value::Null),
     }
 }
@@ -85,6 +93,11 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
         )
         .optional()?;
     if let Some(old_hash) = old {
+        let invalidated = tx.prepare("SELECT 1 FROM swarm_completion_invalidations WHERE run_id=?1")?
+            .exists([run])?;
+        if invalidated {
+            bail!("completion was invalidated by later resource contamination");
+        }
         if old_hash != request_sha256 {
             bail!("completion replay changes the accepted request");
         }

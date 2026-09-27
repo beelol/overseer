@@ -78,7 +78,7 @@ pub fn decide(store: &mut Store, p: &Value) -> Result<Value> {
     if current["revision"] != revision {
         bail!("stale plan revision");
     }
-    if current["status"] == "stopping" || current["status"] == "stopped" || current["status"] == "stalled" {
+    if current["status"] == "stopping" || current["status"] == "stopped" || current["status"] == "stalled" || current["status"] == "invalidated" {
         bail!("run cannot accept director decisions in this state");
     }
     let evidence = p["evidence"]

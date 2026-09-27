@@ -546,6 +546,16 @@ fn historical_shared_database_use_revokes_accepted_evidence_after_exit() {
         "revision":1,"job_id":"j0","attempt_id":a["attempt_id"]}));
     assert_eq!(d.call("swarm.coverage",json!({"run_id":first}))["rows"][0]["coverage_state"],
         "checked_negative");
+    let batch=d.call("swarm.director.claim_batch",json!({"run_id":first,
+        "generation":1,"revision":1,"now_ms":now()+6000}));
+    d.call("swarm.director.complete_batch",json!({"run_id":first,"generation":1,
+        "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"no_progress"}));
+    let completion=json!({"run_id":first,"generation":1,"revision":1,
+        "request_id":"historical-complete","summary":"Checked the path",
+        "verification":"Fixture evidence reviewed",
+        "checks":[{"job_id":"j0","outcome":"passed","evidence":["historical-evidence"]}]});
+    assert_eq!(d.call("swarm.complete",completion.clone())["status"],"completed");
+    assert_eq!(d.call("swarm.get",json!({"id":first}))["completion"]["valid"],true);
     d.kill9();
     d.spawn();
 
@@ -554,10 +564,23 @@ fn historical_shared_database_use_revokes_accepted_evidence_after_exit() {
     assert_eq!(conflict["status"],"contaminated", "{conflict}");
     assert_eq!(d.call("swarm.coverage",json!({"run_id":first}))["rows"][0]["coverage_state"],
         "contaminated");
+    let prior=d.call("swarm.get",json!({"id":first}));
+    assert_eq!(prior["status"],"invalidated");
+    assert_eq!(prior["completion"]["valid"],false);
+    assert_eq!(prior["completion"]["summary"],"Checked the path");
+    assert_eq!(prior["completion"]["invalidation"]["reason"],"resource_contamination");
+    assert_eq!(prior["completion"]["invalidation"]["resource"],"db:historical");
     assert_ne!(d.call("swarm.jobs",json!({"id":first}))["jobs"][0]["status"],"accepted");
     assert_ne!(d.call("swarm.jobs",json!({"id":second}))["jobs"][0]["status"],"accepted");
-    assert!(d.try_call("swarm.complete",json!({"id":first,"generation":1,"revision":1,
-        "summary":"Done"})).is_err());
+    d.kill9();
+    d.spawn();
+    let replay=d.call("swarm.get",json!({"id":first}));
+    assert_eq!(replay["status"],"invalidated");
+    assert_eq!(replay["completion"]["valid"],false);
+    assert_eq!(d.call("swarm.director.claim_batch",json!({"run_id":first,
+        "generation":1,"revision":1,"now_ms":now()+7000}))["status"],"halted");
+    assert!(d.try_call("swarm.stop",json!({"run_id":first})).is_err());
+    assert!(d.try_call("swarm.complete",completion).is_err());
 }
 
 #[test]

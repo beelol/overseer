@@ -446,7 +446,7 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
     if current["status"] == "stopped" && !current["stop_reason"].is_null() {
         return Ok(json!({"id":id,"status":"stopped","duplicate":true}));
     }
-    if current["status"] == "stopped" || current["status"] == "completed" {
+    if ["stopped","completed","invalidated"].contains(&current["status"].as_str().unwrap_or("")) {
         bail!("swarm run is terminal");
     }
     let now = crate::daemon::now();
@@ -619,6 +619,15 @@ pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {
                         stop_reason='resource_contamination',updated_ms=?3
                         WHERE run_id=?1 AND id=?2 AND status='accepted'",
                         params![affected_run,affected_job,now])?;
+                    tx.execute("INSERT OR IGNORE INTO swarm_completion_invalidations
+                        (run_id,reason,resource,created_ms)
+                        SELECT run_id,'resource_contamination',?2,?3
+                        FROM swarm_completions WHERE run_id=?1",
+                        params![affected_run,resource,now])?;
+                    tx.execute("UPDATE swarm_runs SET status='invalidated',
+                        stop_reason='resource_contamination',updated_ms=?2
+                        WHERE id=?1 AND status='completed'",
+                        params![affected_run,now])?;
                     tx.execute("INSERT OR IGNORE INTO swarm_messages
                         (run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
                         SELECT a.run_id,'contamination-'||a.id,a.job_id,a.id,'control',a.id,'stop',a.revision,?2,'queued',?3,?3

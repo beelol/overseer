@@ -160,7 +160,7 @@ pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         if current["generation"] != generation || current["revision"] != revision {
             bail!("stale director generation or plan revision");
         }
-        if current["status"] == "completed" || current["status"] == "stopped" {
+        if current["status"] == "completed" || current["status"] == "stopped" || current["status"] == "invalidated" {
             bail!("swarm run is terminal");
         }
         if !current["allowed_targets"]

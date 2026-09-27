@@ -35,7 +35,7 @@ pub fn claim_batch(store: &mut Store, p: &Value) -> Result<Value> {
     if current["status"] == "stalled" {
         return Ok(json!({"status":"stalled","messages":[]}));
     }
-    if current["status"] == "stopping" || current["status"] == "stopped" {
+    if current["status"] == "stopping" || current["status"] == "stopped" || current["status"] == "invalidated" {
         return Ok(json!({"status":"halted","messages":[]}));
     }
     let tx = store.conn.transaction()?;
@@ -299,7 +299,7 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     // A claimed batch is only delivery. A terminal report remains reviewable until
     // a durable decision covers that particular report sequence. Otherwise a
     // completed model turn could silently consume the only result notification.
-    let pending_review = if current["status"] == "stopping" || current["status"] == "stopped" {
+    let pending_review = if current["status"] == "stopping" || current["status"] == "stopped" || current["status"] == "invalidated" {
         0
     } else {
         tx.execute(
@@ -316,7 +316,7 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     tx.execute("UPDATE swarm_director_turns SET status='complete',completed_ms=?2,
         applied_count=?3,pending_review_count=?4 WHERE id=?1 AND status='active'",
         params![id,now,applied as i64,pending_review as i64])?;
-    if current["status"] == "stopping" || current["status"] == "stopped" {
+    if current["status"] == "stopping" || current["status"] == "stopped" || current["status"] == "invalidated" {
         tx.commit()?;
         return Ok(json!({"turn_id":id,"applied":applied,"pending_review":0,"duplicate":false,
             "status":current["status"],"no_progress_turns":current["no_progress_turns"]}));

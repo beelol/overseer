@@ -255,6 +255,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           checks TEXT NOT NULL,
           created_ms INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS swarm_completion_invalidations(
+          run_id TEXT PRIMARY KEY REFERENCES swarm_completions(run_id),
+          reason TEXT NOT NULL,
+          resource TEXT NOT NULL,
+          created_ms INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS swarm_director_turns(
           id TEXT PRIMARY KEY,
           run_id TEXT NOT NULL REFERENCES swarm_runs(id),

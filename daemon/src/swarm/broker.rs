@@ -178,7 +178,7 @@ fn insert_message(
         }
         return Ok(json!({"message_id":id,"seq":seq,"phase":phase,"duplicate":true}));
     }
-    if current["status"] == "stopped" || current["status"] == "completed" {
+    if current["status"] == "stopped" || current["status"] == "completed" || current["status"] == "invalidated" {
         bail!("swarm run is terminal");
     }
     if recipient == "director" {
