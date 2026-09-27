@@ -491,7 +491,7 @@
         "docs/verification/swarm/milestone-9.md",
         "docs/verification/swarm/SWARM-50.md"
       ],
-      "blocker": "Injected SQLite failures roll back result and reservation writes. A real SQLITE_FULL now blocks admissions and scripted launches until a write probe succeeds; same-ID result replay commits once. Discovery and dispatch-intent fault replay, restart-time storage re-probe, in-flight process creation under full storage, and live paths remain unverified."
+      "blocker": "Injected result, reservation, discovery and dispatch-intent write faults roll back without an acknowledgement or premature launch; identical retries commit once. A real SQLITE_FULL blocks admissions across daemon restart until a write-capacity probe succeeds. Full storage during external process creation, real filesystem-full migration/restart, sender-held replay in live harnesses and the joined Atlas S5 trace remain unverified."
     },
     "SWARM-51": {
       "status": "partial",
@@ -723,9 +723,10 @@
       "evidence": [
         "fixtures/swarm/atlas-v1/",
         "daemon/tests/swarm_atlas.rs",
+        "daemon/tests/swarm_faults.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Atlas v1 J2 replays lost-result-receipt and director death after dispatch admission: restart deduplicates the result retry, while startup recovers one supervised worker, retains its database-backed result and rejects old-generation commands. Both one-job audits complete with accepted evidence. The other named S5 faults and full S1-sized ordered replay remain unverified; live harness communication is absent."
+      "blocker": "Atlas v1 J2 replays lost-result-receipt and director death after dispatch admission: restart deduplicates the result retry, while startup recovers one supervised worker, retains its database-backed result and rejects old-generation commands. A separate daemon fixture covers SQLite-full admission blocking and result replay across restart. Both one-job Atlas audits complete with accepted evidence; the other named S5 faults, Atlas-backed full storage, and full S1-sized ordered replay remain unverified. Live harness communication is absent."
     }
   }
 }
