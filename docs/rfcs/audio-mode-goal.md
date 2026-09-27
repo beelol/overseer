@@ -1,12 +1,12 @@
 # Prepared goal: finish Audio Mode (terminal UI and the loose ends)
 
-Status: not activated. This file is a reusable instruction for a future implementation session.
+Status: done. Activated on 2026-09-26; T-23, T-24, AC-144 and AC-145 are verified, and pull requests #5 and #6 were merged by the owner on 2026-09-27.
 Scope: T-23 and T-24 in the [TUI RFC](tui.md), and AC-144 and AC-145 under
 [Gate O](../overseer-rfc.md#gate-o--audio-mode-added-by-the-owner-2026-09-26) in the main RFC,
 following the [Audio Mode RFC](audio-mode.md). AC-143 is done in pull request #5 and is not part
 of this goal, except that its evidence must still hold at the end.
 
-The goal command takes at most 4,000 characters. The text below has 3,461. Paste it as it is.
+The goal command takes at most 4,000 characters. The text below has 3,474. Paste it as it is.
 
 ## Goal text
 
@@ -45,7 +45,7 @@ Also prove
 * T-19's test passes as it is on main.
 * In the combined tree with a real daemon: Audio Mode off gives one terminal bell and no cue; on gives one cue and no bell; a daemon without audio.get, or one that does not answer, gives the bell; the title and Needs you never wait for audio.
 * PR #5 merges into current main without conflicts, PR #6 into its declared base, and the combined tree into main.
-* The 12 MP3s still equal the approved pack: check-pack.py --approved with a folder the owner provides. Tools cannot read ~/Downloads, so ask the owner for a copy in /private/tmp.
+* The 12 MP3s still equal the approved pack: check-pack.py --approved with a folder the owner provides. The tools cannot read the voice lab's folder, so ask the owner for a copy they can read.
 * Git tracks no WAV, Commander recording or generated voice file.
 
 Check a box only when the whole criterion has evidence. If a live macOS check or an owner step cannot happen, leave the box unchecked and name the exact blocker. Finish with both PR links, exact test totals, merge status, and every criterion still unchecked with its reason.
@@ -64,6 +64,6 @@ Check a box only when the whole criterion has evidence. If a live macOS check or
 
 - Pull request #5 should be merged, or still merge cleanly into main. If main has moved, merge
   it into the branch first.
-- The owner's approved pack must be readable by the session for the pack check: a copy in
-  `/private/tmp`, made by the owner.
+- The owner's approved pack must be readable by the session for the pack check: a copy made
+  by the owner in a folder the tools can read.
 - The goal needs the owner twice: for that copy, and for the listening session of AC-145.

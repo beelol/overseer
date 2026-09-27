@@ -1,0 +1,177 @@
+{
+  "date": "2026-09-27",
+  "heard": [
+    "05:58:28 announced: Your Commander folder. You should hear your recordings for started, complete, and then started and needs attention.",
+    "05:58:37 an agent started; it completes in 3 s  [Audio Mode on · commander · VS Code open]",
+    "05:58:40 the agent completed",
+    "05:58:45 an agent needs you  [Audio Mode on · commander · VS Code open]",
+    "05:58:49 fixture agents stopped",
+    "05:58:50 announced: Audio Mode is off now. Two agents run, and you should hear nothing until the next announcement.",
+    "05:58:58 an agent started; it completes in 3 s  [Audio Mode off · reactor · VS Code open]",
+    "05:59:01 the agent completed",
+    "05:59:07 an agent needs you  [Audio Mode off · reactor · VS Code open]",
+    "05:59:11 fixture agents stopped",
+    "05:59:13 announced: Back to the Reactor cues. You should hear a start cue and a complete cue, then a start cue and an attention cue.",
+    "05:59:23 an agent started; it completes in 3 s  [Audio Mode on · reactor · VS Code open]",
+    "05:59:26 the agent completed",
+    "05:59:31 an agent needs you  [Audio Mode on · reactor · VS Code open]",
+    "05:59:35 fixture agents stopped",
+    "05:59:39 announced: System voice, spoken by Daniel. You should hear: Agent started. Agent complete. Then: Agent started. An agent needs your attention.",
+    "05:59:51 an agent started; it completes in 3 s  [Audio Mode on · system · VS Code open]",
+    "05:59:54 the agent completed",
+    "06:00:00 an agent needs you  [Audio Mode on · system · VS Code open]",
+    "06:00:03 fixture agents stopped"
+  ],
+  "events": [
+    {
+      "key": "s",
+      "enabled": true,
+      "track": "commander",
+      "commander_folder_set": true,
+      "vscode": "open"
+    },
+    {
+      "key": "n",
+      "enabled": true,
+      "track": "commander",
+      "commander_folder_set": true,
+      "vscode": "open"
+    },
+    {
+      "key": "s",
+      "enabled": false,
+      "track": "reactor",
+      "commander_folder_set": true,
+      "vscode": "open"
+    },
+    {
+      "key": "n",
+      "enabled": false,
+      "track": "reactor",
+      "commander_folder_set": true,
+      "vscode": "open"
+    },
+    {
+      "key": "s",
+      "enabled": true,
+      "track": "reactor",
+      "commander_folder_set": true,
+      "vscode": "open"
+    },
+    {
+      "key": "n",
+      "enabled": true,
+      "track": "reactor",
+      "commander_folder_set": true,
+      "vscode": "open"
+    },
+    {
+      "key": "s",
+      "enabled": true,
+      "track": "system",
+      "commander_folder_set": true,
+      "vscode": "open"
+    },
+    {
+      "key": "n",
+      "enabled": true,
+      "track": "system",
+      "commander_folder_set": true,
+      "vscode": "open"
+    }
+  ],
+  "marks": {},
+  "steps": {
+    "open": "not played in this session",
+    "closed": "not played in this session",
+    "once": "not played in this session",
+    "system": "played; waits for the owner to say what was heard",
+    "commander": "played; waits for the owner to say what was heard",
+    "off": "played; waits for the owner to say what was heard",
+    "reactor": "played; waits for the owner to say what was heard"
+  },
+  "played": [
+    "commander",
+    "off",
+    "reactor",
+    "system"
+  ],
+  "players": {
+    "1. commander": [
+      "/usr/bin/afplay <commander folder>/agent_started/transmission/commander.wav",
+      "/usr/bin/afplay <commander folder>/agent_complete/transmission/commander.wav",
+      "/usr/bin/afplay <commander folder>/agent_started/transmission/commander.wav",
+      "/usr/bin/afplay <commander folder>/agent_needs_attention/transmission/commander.wav"
+    ],
+    "2. off": [],
+    "3. reactor": [
+      "/usr/bin/afplay <daemon folder>/audio/reactor-v1/agent_started.mp3",
+      "/usr/bin/afplay <daemon folder>/audio/reactor-v1/agent_complete.mp3",
+      "/usr/bin/afplay <daemon folder>/audio/reactor-v1/agent_started.mp3",
+      "/usr/bin/afplay <daemon folder>/audio/reactor-v1/agent_needs_attention.mp3"
+    ],
+    "4. system": [
+      "/usr/bin/say -v ?",
+      "/usr/bin/say -v ?",
+      "/usr/bin/say -v Daniel Agent started.",
+      "/usr/bin/say -v Daniel Agent complete.",
+      "/usr/bin/say -v Daniel Agent started.",
+      "/usr/bin/say -v Daniel An agent needs your attention."
+    ]
+  },
+  "commit": "63acaa5",
+  "macos": "26.6.2",
+  "arch": "arm64",
+  "daemon_sha256": "f7dc26e779c89859f786193d8d102c4ce3243ee152f5c0aa5b7b3e0ba83ef0e3",
+  "pack": [
+    {
+      "key": "agent_queued",
+      "sha256": "37fe68af5b1f3782a285d90428d90345645c529fa8f2f9182cb64be2a945dd11"
+    },
+    {
+      "key": "agent_started",
+      "sha256": "7f8416a67056f790241bb7296ec8d35d47196c08d6f900aac16cfbf9bdcdf64c"
+    },
+    {
+      "key": "agent_resumed",
+      "sha256": "d76daca3fa30650fca55505102871be2a5119c54a30e9ff2191658286321fe5a"
+    },
+    {
+      "key": "agent_progress",
+      "sha256": "246dfd07208475625c7f71c41f86be4938f11d3bd213c72f9eee3f9e117ea829"
+    },
+    {
+      "key": "agent_complete",
+      "sha256": "167d213ae6b976d9f4bb8ed233352c1bc5cc0eb090c9e6c37ae3808efd0eaa7d"
+    },
+    {
+      "key": "agent_stopped",
+      "sha256": "f3fabcc836a4b470b15e96e0dade012e62bd71d0fe00696dd6635d2bfd561a7d"
+    },
+    {
+      "key": "agent_needs_attention",
+      "sha256": "d35944ae8f64d8fb0476551f9a6ba948f9ef18b0e821b119b3e2cd4ae5aebda6"
+    },
+    {
+      "key": "agent_failed",
+      "sha256": "b3df4298da0afed2bf3ee10fa27b7387db823d8ad62c6be9c8693b55d709bdfd"
+    },
+    {
+      "key": "agent_unblocked",
+      "sha256": "7b75354a71059ff7f83eb9765686359c67f4a571924c18f392c4900e0aa1b5cd"
+    },
+    {
+      "key": "review_ready",
+      "sha256": "f5e5036c4fdcde894c81a913514c29ae06c908d5a88eb04c3e15274681134cee"
+    },
+    {
+      "key": "delivery_ready",
+      "sha256": "75a6e03d29ccf3888b7ff2b317c460b519805950d2a848169ea0653bf21ac9cb"
+    },
+    {
+      "key": "verification_passed",
+      "sha256": "648b499f4fd4072345153853c75c6299521ef095968bd75176929fe5bb3145a4"
+    }
+  ],
+  "commander_folder_set": true
+}

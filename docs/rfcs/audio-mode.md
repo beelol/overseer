@@ -1,10 +1,10 @@
 # Side RFC: Audio Mode — opt-in cues from the daemon
 
-Status: owner request (2026-09-26). Tracked by AC-143 to AC-145 under
+Status: built and merged (2026-09-27). Tracked by AC-143 to AC-145 under
 [Gate O](../overseer-rfc.md#gate-o--audio-mode-added-by-the-owner-2026-09-26) in the main RFC and
-by T-23 and T-24 in the [TUI RFC](tui.md). The daemon and VS Code are built in pull request #5,
-which carries the evidence; the terminal UI follows in pull request #6. What remains is in the
-[prepared goal](audio-mode-goal.md).
+by T-23 and T-24 in the [TUI RFC](tui.md); all five are verified. The daemon and VS Code came
+with pull request #5, the terminal UI with pull request #6. Evidence:
+[the audio ledger](../verification/audio-mode.md).
 
 ## Why
 
@@ -107,12 +107,10 @@ palette. It never plays sound itself.
 ## Out of scope
 
 Streaming or online voices, per-event customization and spoken detail for every event.
-Controls in the terminal UI are not part of pull request #5; they are T-23 and T-24, built in
-pull request #6.
+Controls in the terminal UI are T-23 and T-24.
 
 ## Acceptance
 
-AC-143 is the criterion for the daemon and VS Code; the audio ledger
-(`docs/verification/audio-mode.md`, in pull request #5) maps each part of it to a test or a live
-check. AC-144 and AC-145 are the two loose ends of that pull request; T-23 and T-24 are the
+AC-143 is the criterion for the daemon and VS Code; the [audio ledger](../verification/audio-mode.md)
+maps each part of it to a test or a live check. AC-144 and AC-145 are the two loose ends of that pull request; T-23 and T-24 are the
 terminal UI.

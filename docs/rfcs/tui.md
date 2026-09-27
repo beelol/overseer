@@ -57,6 +57,7 @@ answer what they ask without leaving the keyboard. It must stay a view onto the 
 | f | Filter: All → Active → Needs you |
 | / | Search agents by title, repository, harness, model, account or prompt (Esc clears) |
 | A | Accounts: sign-in status; `s` signs in (the provider's own login, in this terminal), `S` device code for ChatGPT |
+| S | Audio Mode: on or off, track, system voice, a private Commander folder, preview (the daemon plays) |
 | ? | Help |
 | q | Quit (agents keep running) |
 
@@ -191,7 +192,7 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   push and `gh` run off the event loop. **Verify:** against a local stand-in for github.com and a
   recording `gh`: the branch on the remote equals the worktree HEAD, `gh` got the repository,
   head, base, title and body, the run has a `pull_request` event, and the target is unchanged.
-- [ ] **T-23 — Audio Mode from the terminal.** `S` opens Audio Mode (Gate O in the main RFC). It
+- [x] **T-23 — Audio Mode from the terminal.** `S` opens Audio Mode (Gate O in the main RFC). It
   shows what the daemon reports: on or off, whether playback is available, the track, the system
   voice and whether a private Commander folder is set. From there the user turns Audio Mode on or
   off, chooses Reactor, System voice or Commander, chooses an installed voice, enters a private
@@ -206,7 +207,7 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   synthetic pack is accepted with no file copied under the daemon's folder; a setting changed
   through `ctl` shows in the open panel within 2 s; with a client that answers `audio.get` with an
   error the panel says unavailable; snapshots of the panel at 80×24 and 140×40, dark and light.
-- [ ] **T-24 — One signal when an agent needs you.** When a top-level agent starts waiting, one
+- [x] **T-24 — One signal when an agent needs you.** When a top-level agent starts waiting, one
   signal reaches the user: the daemon's cue, or else the terminal bell of T-19, never both and
   never neither. The bell is withheld only while the daemon's latest answer says that Audio Mode
   is on and playback is available. In every other case it rings in the same pass as the state:
@@ -221,3 +222,8 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   answers, the bell rings in the same pass. The real binary in a terminal writes a bell with Audio
   Mode off and none beyond the title's terminators with it on. The daemon and TUI suites pass on
   main with pull requests #5 and #6 together.
+
+T-23 and T-24 came with pull request #6 (code at 47312f3, merged into main as ea6a6c2 on 2026-09-27). Their evidence is in
+[the evidence index](../verification/evidence/tui/README.md):
+[both suites on main with pull requests #5 and #6](../verification/evidence/tui/t23-t24-suites.txt) and
+[the run against a daemon without Audio Mode](../verification/evidence/tui/t24-old-daemon.txt).
