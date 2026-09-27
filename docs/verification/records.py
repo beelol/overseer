@@ -1239,25 +1239,25 @@ rec(144, "A lost session asks for attention", "verified", date="2026-09-26",
     evidence="[daemon tests](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/cargo-test-overseerd.txt), [requirement by requirement](https://github.com/beelol/overseer/blob/0d01397/docs/verification/audio-mode.md)",
     live="Fixtures with a real daemon.",
     limits="Not merged: the tests are on the branch of pull request #5. A lost child agent staying silent is covered by AC-143's nested-child test, not by a test of its own here.")
-rec(145, "Audio Mode by ear (owner-confirmed)", "partial", date="2026-09-27 UTC (the owner's sessions and confirmation)",
+rec(145, "Audio Mode by ear (owner-confirmed)", "verified", date="2026-09-27 UTC (the owner's sessions and confirmations)",
     commit="106d3e8 (branch codex/reactor-audio-mode, pull request #5, not merged yet)",
-    proven="the owner marked all twelve Reactor cues Right; heard start, completion and attention with VS Code open and with it closed; heard one attention cue for two agents that asked at the same moment; heard System voice with an installed voice; and heard nothing with Audio Mode off",
-    deferred="the owner's own Commander folder has not been played: no session was given a folder",
     harness="Fixture agents only (generic programs and the Claude fixture); no accounts, no paid tokens",
-    fixture="`node test/ui/listen-audio.js` on the branch of pull request #5: VS Code with its own profile and its own Overseer home, so the owner's VS Code, daemon and agents are not touched",
-    steps="""1. The owner's own session: `node test/ui/listen-audio.js`, with the keys typed in its terminal. `o` on; `s` an agent that completes; `n` an agent that asks for permission; `f` off, then `s` and `n` again; `m` for the marks.
-2. Two sessions run by the agent at the owner's request, the owner listening: `node test/ui/listen-audio.js --play once,system,closed`. Each step is said aloud before it is played: two agents ask for permission at the same moment; System voice; the VS Code window is quit and agents run again.
-3. Still to do, the owner's Commander folder: `node test/ui/listen-audio.js --play commander=<the owner's folder>`, or in the session's VS Code window *Audio Mode and Reactor Cues…*, *Import private Commander pack…*, then `p`, `s` and `n`. The files stay where they are.""",
+    fixture="`node test/ui/listen-audio.js` on the branch of pull request #5: VS Code with its own profile and its own Overseer home, so the owner's VS Code, daemon and agents are not touched. The build is the VSIX packaged from 106d3e8",
+    steps="""1. The owner's own session: `node test/ui/listen-audio.js`, with the keys typed in its terminal. `o` on; `s` an agent that completes; `n` an agent that asks for permission; `f` off, then `s` and `n` again; `m` plays each of the twelve cues and asks for its mark.
+2. Sessions run by the agent at the owner's request, the owner listening. Each step is said aloud before it is played, and the record lists the players the daemon started:
+   - `--play once,system,closed`, twice: two agents ask for permission at the same moment; System voice; the VS Code window is quit and agents run again.
+   - `--play off,reactor,system`: Audio Mode off; back to Reactor; System voice.
+   - `--play commander=<folder>,off,reactor,system`: the owner's Commander recordings; off; back to Reactor; System voice.""",
     expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
     actual="""- **The twelve cues:** each was played and marked in the owner's session; all twelve are *Right*. Nothing needs replacing.
 - **Audio Mode on, VS Code open:** start, completion and attention heard in the owner's session.
-- **Audio Mode off:** the same agents made no sound in the owner's session.
-- **Two agents at the same moment, System voice, VS Code closed:** played twice for the owner, each step said aloud first. The owner confirmed afterwards: "ok yes it all worked as you described."
-- **The Commander folder:** not played. The record of the owner's own session holds a yes for it, but no folder was set in that session; the evidence sets each answer beside what its session did.""",
-    evidence="[the records and what each session did](https://github.com/beelol/overseer/blob/63acaa5/docs/verification/evidence/ui/audio-listening/README.md), [the owner's marks](https://github.com/beelol/overseer/blob/63acaa5/docs/verification/evidence/ui/audio-listening/marks.json), [the session script](https://github.com/beelol/overseer/blob/63acaa5/test/ui/listen-audio.js)",
+- **VS Code closed, two agents at the same moment, System voice:** played twice for the owner. The owner: "ok yes it all worked as you described."
+- **Off, then back to Reactor and System voice:** with Audio Mode off the daemon started no player; then `afplay` four times for Reactor and `say -v Daniel` four times for System voice. The owner: "that worked".
+- **The owner's Commander recordings:** the daemon ran `afplay` on `<commander folder>/<key>/transmission/commander.wav` four times (start, complete, start, attention), then nothing while off, then Reactor and System voice again. The owner: "worked".
+- **Nothing copied by Overseer:** after the session the recordings were unchanged, no WAV was under the session's daemon folder and none was in the repository; the record holds a flag that a folder was set, never its path.""",
+    evidence="[the records and what each session did](https://github.com/beelol/overseer/blob/a6c05f7/docs/verification/evidence/ui/audio-listening/README.md), [the owner's marks](https://github.com/beelol/overseer/blob/a6c05f7/docs/verification/evidence/ui/audio-listening/marks.json), [the Commander session](https://github.com/beelol/overseer/blob/a6c05f7/docs/verification/evidence/ui/audio-listening/marks-20260927-055821.json), [the session script](https://github.com/beelol/overseer/blob/a6c05f7/test/ui/listen-audio.js)",
     live="Real sound on the owner's Mac; agents are fixtures.",
-    limits="A cue marked Needs work is replaced only by a file the owner selects in the voice lab; nothing is regenerated here. The owner's confirmation of the three played steps was given in conversation, not written by the script.",
-    blocker="Waits for the owner's Commander folder to be played and heard (step 3), or for the owner to decide that the criterion does not need it.")
+    limits="The owner's confirmations of the played steps were given in conversation, not written by the script; the record of the owner's own session says yes to steps that session did not do, and the evidence says which answers count. The Commander folder that was played is a copy the owner made of the three recordings, in a private folder in the home directory, because macOS does not let a process started by the agent open files in the folder the voice lab is in. Not merged: the feature is on the branch of pull request #5.")
 
 # Gate P, follow-through (added by the owner on 2026-09-27). Not started.
 rec(146, "Reconcile and merge the work in flight", "not started", date="—", commit="—",
