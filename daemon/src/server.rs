@@ -357,7 +357,7 @@ struct AutoFlight<T> {
 }
 
 static AUTO_DISCOVERY_FLIGHTS: OnceLock<Mutex<std::collections::BTreeMap<
-    (usize, String, String), Arc<AutoFlight<AutoProfileDiscovery>>>>> = OnceLock::new();
+    (usize, String, String, String), Arc<AutoFlight<AutoProfileDiscovery>>>>> = OnceLock::new();
 
 #[derive(Clone)]
 struct CodexModelRead {
@@ -423,11 +423,13 @@ where K: Ord + Clone, T: Clone, F: FnOnce() -> Result<T> {
 /// read, including its source timestamps and account generation. A completed
 /// read is removed immediately; later decisions must collect fresh evidence.
 fn discover_auto_profile_shared(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
+    parent_run_id: &str,
     budget: Duration) -> Result<AutoProfileDiscovery> {
-    let key = (Arc::as_ptr(d) as usize, profile_id.to_string(), workspace_id.to_string());
+    let key = (Arc::as_ptr(d) as usize, profile_id.to_string(),
+        workspace_id.to_string(), parent_run_id.to_string());
     let flights = AUTO_DISCOVERY_FLIGHTS.get_or_init(|| Mutex::new(std::collections::BTreeMap::new()));
     collect_shared(flights, key, budget,
-        || discover_auto_profile(d, profile_id, workspace_id, budget))
+        || discover_auto_profile(d, profile_id, workspace_id, parent_run_id, budget))
 }
 
 /// Public status has no account or workspace scope. Share only overlapping
@@ -494,9 +496,58 @@ fn apply_account_pool(routes: &mut [crate::auto_select::Route], pool_id: &str,
 }
 
 fn discover_auto_profile(d: &Arc<Daemon>, profile_id: &str, workspace_id: &str,
+    parent_run_id: &str,
     budget: Duration) -> Result<AutoProfileDiscovery> {
     let deadline = Instant::now() + budget;
     let profile = d.profile(profile_id)?;
+    if profile.harness == "codex" {
+        let store = d.store.lock().unwrap();
+        let active = store.runs()?.into_iter().filter(|run|
+            run.profile_id.as_deref() == Some(profile_id) && ACTIVE.contains(&run.status.as_str()))
+            .collect::<Vec<_>>();
+        if !active.is_empty() {
+            if active.len() != 1 || active[0].id != parent_run_id {
+                return Err(anyhow!("account profile has another active run"));
+            }
+            let saved: Option<String> = store.conn.query_row(
+                "SELECT launch FROM runs WHERE id=?1", [parent_run_id], |row| row.get(0))?;
+            let launch: Value = saved.as_deref().and_then(|text| serde_json::from_str(text).ok())
+                .ok_or_else(|| anyhow!("parent Auto route preflight is unavailable"))?;
+            let generic = launch.get("generic").unwrap_or(&launch);
+            if generic["auto_routing"] != true {
+                return Err(anyhow!("parent Auto routing is disabled"));
+            }
+            let saved = &generic["auto_parent_discovery"];
+            let generation = saved["account_generation"].as_i64()
+                .ok_or_else(|| anyhow!("parent Auto account preflight is unavailable"))?;
+            if saved["workspace_id"].as_str() != Some(workspace_id)
+                || store.auto_account_generation(profile_id)? != Some(generation) {
+                return Err(anyhow!("parent Auto route preflight changed account or workspace"));
+            }
+            let catalog: crate::auto_route::ModelCatalog =
+                serde_json::from_value(saved["model_catalog"].clone())?;
+            let tools: crate::auto_route::ToolCatalog =
+                serde_json::from_value(saved["tool_catalog"].clone())?;
+            let now_ms = crate::daemon::now();
+            if now_ms < catalog.observed_ms || now_ms >= catalog.expires_ms
+                || now_ms < tools.observed_ms || now_ms >= tools.expires_ms {
+                return Err(anyhow!("parent Auto route preflight expired"));
+            }
+            let observations = store.auto_account_quota_observations(profile_id)?;
+            let observation = observations.iter().find(|value| value.pool_id == profile_id).cloned();
+            let pool_id = store.auto_account_pool_id(profile_id)?
+                .ok_or_else(|| anyhow!("Codex account pool identity unavailable"))?;
+            let mut routes = crate::auto_route::codex_auto_routes(&catalog, &tools,
+                observation.as_ref().map(|value| &value.snapshot), profile_id, now_ms);
+            apply_account_pool(&mut routes, &pool_id, &observations, now_ms);
+            return Ok(AutoProfileDiscovery { routes, generation: Some(generation),
+                evidence:json!({"profile_id":profile_id,
+                    "source":"parent/codex-app/pre-turn-model-and-tool-metadata",
+                    "model_observed_ms":catalog.observed_ms,"tool_observed_ms":tools.observed_ms,
+                    "quota_observed_ms":observation.as_ref().map(|value| value.snapshot.observed_ms),
+                    "account_generation":generation}) });
+        }
+    }
     match profile.harness.as_str() {
         "codex" => {
             let flights = AUTO_CODEX_MODEL_FLIGHTS.get_or_init(||
@@ -933,7 +984,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let candidate_ids = allowed_profiles.iter().cloned().collect::<Vec<_>>();
                 for (candidate_id, discovered) in collect_unique_bounded(&candidate_ids,
                     Duration::from_secs(8).min(decision_deadline.saturating_duration_since(Instant::now())), |id, budget|
-                        discover_auto_profile_shared(d, id, &parent.workspace_id, budget)) {
+                        discover_auto_profile_shared(d, id, &parent.workspace_id, &parent.id, budget)) {
                     match discovered {
                         Ok(discovered) => {
                             routes.extend(discovered.routes);

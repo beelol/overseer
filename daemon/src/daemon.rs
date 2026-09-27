@@ -629,6 +629,33 @@ impl Daemon {
             process_generation: 0,
             attention: None,
         };
+        let mut generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "sandbox":sandbox, "extra_args": p["extra_args"].clone(),
+            "auto_routing":auto_routing,"auto_allowed_profiles":auto_allowed_profiles,
+            "auto_parent_budget_ms":auto_parent_budget_ms});
+        // Capture this parent's own route metadata before its app-server turn
+        // owns the profile. A second metadata session during that turn is not
+        // safe; the child still verifies its own account and tools at launch.
+        if auto_routing && profile.as_ref().is_some_and(|profile|
+            generic["auto_allowed_profiles"].as_array().is_some_and(|allowed|
+                allowed.iter().any(|id| id.as_str() == Some(profile.id.as_str())))) {
+            let profile_id = profile.as_ref().unwrap().id.as_str();
+            let preflight = (|| -> Result<Value> {
+                let models = crate::server::dispatch(self, "auto.models.refresh",
+                    &json!({"profile_id":profile_id,"timeout_ms":4000}))?;
+                let first_generation = self.store.lock().unwrap().auto_account_generation(profile_id)?;
+                let tools = crate::server::dispatch(self, "auto.tools.inspect",
+                    &json!({"profile_id":profile_id,"workspace_id":ws.id,"timeout_ms":4000}))?;
+                let generation = self.store.lock().unwrap().auto_account_generation(profile_id)?;
+                if generation.is_none() || generation != first_generation {
+                    bail!("parent Auto account changed during route preflight");
+                }
+                Ok(json!({"workspace_id":ws.id,"account_generation":generation,
+                    "model_catalog":models["catalog"],"tool_catalog":tools["catalog"]}))
+            })();
+            if let Ok(catalogs) = preflight {
+                generic["auto_parent_discovery"] = catalogs;
+            }
+        }
         {
             // Task and run appear together: a state snapshot never shows a task without its run.
             let store = self.store.lock().unwrap();
@@ -636,9 +663,6 @@ impl Daemon {
             store.insert_run(&run)?;
             store.set_workspace_owner(&ws.id, Some(&run.id))?;
         }
-        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "sandbox":sandbox, "extra_args": p["extra_args"].clone(),
-            "auto_routing":auto_routing,"auto_allowed_profiles":auto_allowed_profiles,
-            "auto_parent_budget_ms":auto_parent_budget_ms});
         let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };
         {
             let store = self.store.lock().unwrap();
@@ -1110,7 +1134,14 @@ impl Daemon {
                 .unwrap_or(Value::Null);
             if launch["auto_selected"] == true && store.runs()?.iter().any(|other|
                 other.id != run.id && other.profile_id == run.profile_id
-                    && ACTIVE.contains(&other.status.as_str())) {
+                    && ACTIVE.contains(&other.status.as_str())
+                    && !(Some(other.id.as_str()) == run.parent_run_id.as_deref()
+                        && store.run(&other.id).ok().flatten().is_some_and(|parent| {
+                            let parent_launch: Option<String> = store.conn.query_row(
+                                "SELECT launch FROM runs WHERE id=?1", [&parent.id], |row| row.get(0)).ok().flatten();
+                            parent_launch.as_deref().and_then(|text| serde_json::from_str::<Value>(text).ok())
+                                .is_some_and(|meta| meta["generic"]["auto_routing"] == true)
+                        }))) {
                 bail!("automatic child profile has another active run");
             }
         }

@@ -3527,6 +3527,33 @@ fn auto_bridge_binds_dispatch_and_result_to_the_issued_parent_run() {
 }
 
 #[test]
+fn auto_running_parent_can_delegate_to_suitable_model_on_its_own_profile() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "6000")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"hold parent",
+        "approval_policy":"never","auto_routing":true})));
+    assert_eq!(d.wait_status(&parent, |s| s == "running", 10)["status"], "running");
+    let (_, launch_dir) = launch_info(&d, &parent);
+    let capability = std::fs::read_to_string(launch_dir.join("auto-bridge.cap")).unwrap();
+    let selected = d.call("auto.bridge.submit", json!({"run_id":parent,
+        "capability":capability.trim(),"work_unit_id":"same-profile-browser",
+        "min_tier":"general","required_tools":["browser/navigate"],
+        "prompt":"bounded browser audit","title":"browser audit"}));
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    assert_eq!(selected["run"]["profile_id"], "system-codex");
+    assert_eq!(selected["run"]["model"], "gpt-6-sol");
+    assert_eq!(selected["run"]["effort"], "medium");
+    let child = run_id(&selected);
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert_eq!(d.call("auto.bridge.result", json!({"run_id":parent,
+        "capability":capability.trim(),"child_run_id":child}))["state"], "ready");
+}
+
+#[test]
 fn auto_bridge_rejects_a_child_that_widens_a_read_only_parent_before_admission() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
