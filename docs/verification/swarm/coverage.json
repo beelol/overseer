@@ -201,9 +201,11 @@
         "daemon/tests/swarm_scenarios.rs",
         "docs/verification/swarm/S3.md",
         "daemon/tests/swarm_conflict.rs",
-        "daemon/tests/swarm_state.rs"
+        "daemon/tests/swarm_state.rs",
+        "daemon/src/swarm/completion.rs",
+        "daemon/src/swarm/schema.rs"
       ],
-      "blocker": "The versioned S3 fixture integrates both a full 24-module branch and a scoped 12-module branch. In the scoped run, completion refuses an accepted retained patch before integration, the combined check fails at 11 routes and passes at 12, and excluded routes keep working. A local daemon-crash replay holds an orphaned checker until exit and requires a fresh check. Stop remains responsive during a delayed integration and prevents acknowledgement, leaving an unresolved durable intent. A stopped unresolved run now reads incomplete with its accepted and disputed coverage after restart; a completed run reads complete only through its evidence-gated completion record. Live sandboxed verification, operator reconciliation of stopped integrations, termination of a permanently hung orphan, director conflict resolution and normal adapter integration remain unqualified."
+      "blocker": "The versioned S3 fixture integrates both a full 24-module branch and a scoped 12-module branch. In the scoped run, completion refuses an accepted retained patch before integration, the combined check fails at 11 routes and passes at 12, and excluded routes keep working. A local daemon-crash replay holds an orphaned checker until exit and requires a fresh check. Stop remains responsive during a delayed integration and prevents acknowledgement, leaving an unresolved durable intent. A director can now close an unresolved or two-attempt-exhausted fixture run with a durable incomplete report in the Stop transaction; restart preserves it and the exhausted private patch without changing the source checkout. A completed run still reads complete only through its evidence-gated completion record. Live sandboxed verification, operator reconciliation of stopped integrations, termination of a permanently hung orphan, director conflict resolution and normal adapter integration remain unqualified."
     },
     "SWARM-20": {
       "status": "partial",
@@ -544,9 +546,13 @@
         "daemon/src/swarm/runtime.rs",
         "daemon/tests/swarm_integration.rs",
         "daemon/src/swarm/artifacts.rs",
-        "docs/verification/swarm/SWARM-47.md"
+        "docs/verification/swarm/SWARM-47.md",
+        "daemon/src/swarm/completion.rs",
+        "daemon/src/swarm/mod.rs",
+        "daemon/src/swarm/schema.rs",
+        "daemon/tests/swarm_state.rs"
       ],
-      "blocker": "A durable J2/J7 conflict preserves both chains, blocks acceptance and completion, and resolves only after one independent accepted J8 reproduction and confirmed exit; explicit unresolved state stays visible and blocked. A separate fixture registers a conflict after both findings were accepted, survives restart, and refuses to resolve against an accepted contradicted job until that job is revised. A transitive ready dependent is demoted and held at admission while its ancestor is disputed. A registered active dependent gets a durable checkpoint and targeted interrupt; confirmed exit leaves it blocked while unrelated work continues. Previously accepted dependent conclusions are invalidated as current coverage, kept as historical evidence, and require explicit revision and fresh review before descendants resume. A late conflict before a dependent patch's Git commit prevents acknowledgement. A post-commit/pre-ack restart reconciles the exact private patch effect; unfamiliar edits remain held for review and prevent plan revision. Acknowledged dependent patches remain in the private branch; an in-flight second integration is reconciled, and conflict ancestry plus artifact revision hold later integration and verification until fresh accepted repairs. A two-job integrated dependency chain repairs in order, retaining historical commits. A separate fixture exhausts two actual attempts, then shows a failed job and attempts_exhausted coverage after late conflict, refusing a third attempt and stale branch verification even after reproduction resolves the disagreement. A stopped unresolved run now reads incomplete after restart with both artifact chains and unrelated accepted coverage. Independent overlapping multi-patch repair, a director-authored partial/no-code disposition, autonomous semantic judgment and qualified live director review remain unverified."
+      "blocker": "A durable J2/J7 conflict preserves both chains, blocks acceptance and completion, and resolves only after one independent accepted J8 reproduction and confirmed exit; explicit unresolved state stays visible and blocked. A separate fixture registers a conflict after both findings were accepted, survives restart, and refuses to resolve against an accepted contradicted job until that job is revised. A transitive ready dependent is demoted and held at admission while its ancestor is disputed. A registered active dependent gets a durable checkpoint and targeted interrupt; confirmed exit leaves it blocked while unrelated work continues. Previously accepted dependent conclusions are invalidated as current coverage, kept as historical evidence, and require explicit revision and fresh review before descendants resume. A late conflict before a dependent patch's Git commit prevents acknowledgement. A post-commit/pre-ack restart reconciles the exact private patch effect; unfamiliar edits remain held for review and prevent plan revision. Acknowledged dependent patches remain in the private branch; an in-flight second integration is reconciled, and conflict ancestry plus artifact revision hold later integration and verification until fresh accepted repairs. A two-job integrated dependency chain repairs in order, retaining historical commits. A separate fixture exhausts two actual attempts, then shows a failed job and attempts_exhausted coverage after late conflict, refusing a third attempt and stale branch verification even after reproduction resolves the disagreement. A stopped unresolved run now reads incomplete after restart with both artifact chains and unrelated accepted coverage. A director-authored unresolved or attempts-exhausted partial report now closes the fixture run atomically with Stop, survives restart and cannot invent its reason from absent evidence. Independent overlapping multi-patch repair, a no-code disposition, autonomous semantic judgment and qualified live director review remain unverified."
     },
     "SWARM-48": {
       "status": "partial",
@@ -742,9 +748,12 @@
         "daemon/tests/swarm_atlas.rs",
         "daemon/tests/swarm_create.rs",
         "daemon/tests/swarm_stop_replay.rs",
-        "docs/verification/swarm/S5.md"
+        "docs/verification/swarm/S5.md",
+        "daemon/tests/swarm_state.rs",
+        "daemon/tests/swarm_conflict.rs",
+        "daemon/tests/swarm_integration.rs"
       ],
-      "blocker": "Scripted local and Atlas-backed final-result/Stop orderings persist one operation sequence, preserve the artifact and result, reject acceptance/completion, and deduplicate replay. Local selected-account revocation/result/review/Stop orderings record revocation in the same cancellation transaction. Start and versioned Stop request IDs now replay one durable effect across daemon restart; a stale phone-style Stop loses to newer Pause/Resume, limit or plan state in a local fixture. No phone gateway yet derives request scope from an authenticated device or proves joined Full control/Watch only permissions, cross-surface races, native descendants, qualified live paths or explicit user resume."
+      "blocker": "Scripted local and Atlas-backed final-result/Stop orderings persist one operation sequence, preserve the artifact and result, reject acceptance/completion, and deduplicate replay. Local selected-account revocation/result/review/Stop orderings record revocation in the same cancellation transaction. Start and versioned Stop request IDs now replay one durable effect across daemon restart; a stale phone-style Stop loses to newer Pause/Resume, limit or plan state in a local fixture. A director partial close uses the same ordered Stop transaction and request replay, and cannot attach a report after user Stop in an ordered fixture. No phone gateway yet derives request scope from an authenticated device or proves joined Full control/Watch only permissions, cross-surface races, native descendants, qualified live paths or explicit user resume."
     },
     "SWARM-62": {
       "status": "partial",

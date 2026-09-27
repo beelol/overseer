@@ -282,3 +282,36 @@ conflict-list endpoint rejects that size. Coverage now carries a bounded
 flag; it still returns `incomplete` and job rows. The state (20) and conflict
 (9) suites passed. This preserves the terminal readout under a long history;
 full conflict-history pagination is still a separate open requirement.
+
+Director partial close at `dedd7721` (2026-09-27): `swarm.partial` records a
+director-authored summary and limitations in the same SQLite transaction as
+the Stop control revision. It accepts only an `unresolved_conflict` or
+`attempts_exhausted` reason backed by current durable records, a current
+director generation and control revision, confirmed worker exits, a drained
+director inbox, and no running verifier. The method is fixture-gated. A
+request ID replays to one result after daemon restart; changing its input is
+refused. An active owner token is required when the run has an owner, while
+the exact committed request remains replayable after that lease expires.
+`swarm.get` and `swarm.coverage` expose the redacted report and label it
+finalized only after the run reaches `stopped`; neither path calls it a
+successful completion.
+
+One fixture closes an explicitly unresolved left/right disagreement after
+both attempts exit and the director acknowledges their results. A second
+extends the integrated-patch exhaustion replay: two attempts are spent, a
+late contradiction invalidates the accepted private commit, independent
+reproduction resolves the route, and combined verification still refuses
+the stale branch. The director then closes with `attempts_exhausted`; restart
+preserves the incomplete report, the failed coverage row, the exact private
+commit and the unchanged user checkout. A no-evidence reason and a partial
+report racing behind a user Stop are refused without attaching a report.
+The new unresolved-close test was red for the missing method before the
+implementation. The affected broker (18), conflict (10), control (6), owner
+(3), integration (25), runtime (24) and state (21) suites passed; the full
+offline Rust workspace suite also passed, with its existing ignored tests.
+
+This closes the scripted unresolved and exhausted paths, but the director's
+semantic choice and wording remain fixture supplied. Only those two reasons
+are supported by this new closeout method; unavailable targets, unknown
+effects and other incomplete causes still need joined closure flows. No live
+director or supported UI path was qualified. SWARM-47 remains partial.

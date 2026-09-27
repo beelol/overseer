@@ -66,3 +66,11 @@ Full control/Watch only permissions and confirmations; the current local
 protocol accepts a caller-supplied scope. Race replays across an actual phone
 reconnect and a simultaneous VS Code/CLI action remain open. SWARM-61 stays
 partial.
+
+At `dedd7721`, a director's versioned partial-close request now shares the
+durable Stop transaction and request ledger. A fixture proves that a reason
+without recorded exhaustion changes nothing, and a later user Stop wins:
+the stale partial request cannot attach its report afterward. Replaying a
+successful partial close after daemon restart returns the one saved result;
+changing its input is rejected. These are local ordered fixture cases, not
+a simultaneous phone/VS Code race. SWARM-61 remains partial.

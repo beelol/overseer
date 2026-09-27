@@ -58,3 +58,15 @@ conflicts: it returns an exact count and a 100-item preview with a truncation
 flag instead of losing the incomplete coverage report. The focused state
 and conflict suites passed (20 + 9 tests). Full conflict-history paging is
 not yet qualified.
+
+At `dedd7721`, the exhausted integrated-patch fixture now ends through a
+director-submitted partial report and the same durable Stop transition. Its
+two attempts remain spent, the invalidated private commit and unchanged
+source checkout remain inspectable after restart, and coverage says
+`incomplete` with `attempts_exhausted` instead of promoting the individually
+accepted patch to a successful run. A separate unresolved audit fixture
+proves the analogous closeout for contradictory evidence. The affected
+broker, conflict, control, owner, integration, runtime and state suites and
+the full offline Rust workspace suite passed. This is fixture-only; normal
+launch, live verifier sandboxing and recovery of a stopped integration
+intent are still open. SWARM-19 remains partial.
