@@ -21,18 +21,22 @@ fn snapshot(at: i64) -> Value {
 }
 
 fn make_run(d: &Daemon, category: &str, jobs: usize) -> String {
-    let run = d.call(
-        "swarm.create",
-        json!({"category":category,"objective":"Audit backend",
-        "allowed_targets":["fixture"]}),
-    );
-    let id = run["id"].as_str().unwrap().to_string();
     let backlog = (0..jobs)
         .map(|n| {
             json!({"id":format!("j{n:03}"),"title":format!("Inspect {n}"),
         "acceptance":"Record evidence","deps":[]})
         })
         .collect::<Vec<_>>();
+    make_run_with_jobs(d, category, backlog)
+}
+
+fn make_run_with_jobs(d: &Daemon, category: &str, backlog: Vec<Value>) -> String {
+    let run = d.call(
+        "swarm.create",
+        json!({"category":category,"objective":"Audit backend",
+        "allowed_targets":["fixture"]}),
+    );
+    let id = run["id"].as_str().unwrap().to_string();
     d.call(
         "swarm.plan",
         json!({"id":id,"generation":1,"revision":0,"jobs":backlog}),
@@ -89,4 +93,39 @@ fn round_robin_admission_is_durable_and_replay_safe_across_unequal_categories() 
         .query_row("SELECT COUNT(*) FROM swarm_attempts", [], |r| r.get(0))
         .unwrap();
     assert_eq!(attempts, 4);
+}
+
+#[test]
+fn blocked_first_job_does_not_skip_an_eligible_job_in_the_same_category() {
+    let mut d = Daemon::start(&[]);
+    let jobs = || vec![
+        json!({"id":"j000","title":"Shared database","acceptance":"Evidence",
+            "deps":[],"resource_claims":[{"resource":"db:shared","mode":"write"}]}),
+        json!({"id":"j001","title":"Independent route","acceptance":"Evidence",
+            "deps":[],"resource_claims":[{"resource":"route:independent","mode":"read"}]}),
+    ];
+    let first = make_run_with_jobs(&d, "A first category", jobs());
+    let second = make_run_with_jobs(&d, "B second category", jobs());
+    commit_beneficial_batch(&d, &first, &["j000".into(), "j001".into()]);
+    commit_beneficial_batch(&d, &second, &["j000".into(), "j001".into()]);
+    let at = now();
+    let initial = next(&d, "first-shared-claim", at);
+    assert_eq!(initial["status"], "admitted", "{initial}");
+    assert_eq!(initial["run_id"], first);
+    assert_eq!(initial["job_id"], "j000");
+    d.kill9();
+    d.spawn();
+    let independent = next(&d, "second-independent", at);
+    assert_eq!(independent["status"], "admitted", "{independent}");
+    assert_eq!(independent["run_id"], second);
+    assert_eq!(independent["job_id"], "j001");
+    assert_eq!(next(&d, "second-independent", at)["attempt_id"], independent["attempt_id"]);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let attempts: i64 = db.query_row("SELECT COUNT(*) FROM swarm_attempts", [], |r| r.get(0)).unwrap();
+    let blocked_job_status: String = db.query_row(
+        "SELECT status FROM swarm_jobs WHERE run_id=?1 AND id='j000'",
+        [&second], |r| r.get(0),
+    ).unwrap();
+    assert_eq!(attempts, 2, "the conflicting job must not consume an attempt");
+    assert_eq!(blocked_job_status, "ready");
 }

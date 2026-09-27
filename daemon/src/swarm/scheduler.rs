@@ -80,34 +80,44 @@ pub fn next(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
         {
             continue;
         }
-        let job: String = store.conn.query_row(
-            "SELECT id FROM swarm_jobs WHERE run_id=?1 AND status='ready' ORDER BY id LIMIT 1",
-            params![run],
-            |r| r.get(0),
-        )?;
-        let mut attempt = p.clone();
-        attempt["run_id"] = json!(run);
-        attempt["job_id"] = json!(job);
-        attempt["generation"] = json!(generation);
-        attempt["revision"] = json!(revision);
-        let result = admission::admit_scheduled(
-            store,
-            &attempt,
-            admission::ScheduledCommit {
-                request_id,
-                request_sha256: &digest,
-                category_key: key,
-            },
-            pending_slots,
-        )?;
-        if result["status"] == "admitted" {
-            let mut result = result;
-            result["run_id"] = json!(run);
-            result["job_id"] = json!(job);
-            return Ok(result);
+        let jobs = {
+            let mut stmt = store.conn.prepare(
+                "SELECT id FROM swarm_jobs WHERE run_id=?1 AND status='ready' ORDER BY id",
+            )?;
+            let ready = stmt.query_map(params![run], |r| r.get::<_, String>(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            ready
+        };
+        let mut first_blocked = None;
+        for job in jobs {
+            let mut attempt = p.clone();
+            attempt["run_id"] = json!(run);
+            attempt["job_id"] = json!(job);
+            attempt["generation"] = json!(generation);
+            attempt["revision"] = json!(revision);
+            let result = admission::admit_scheduled(
+                store,
+                &attempt,
+                admission::ScheduledCommit {
+                    request_id,
+                    request_sha256: &digest,
+                    category_key: key,
+                },
+                pending_slots,
+            )?;
+            if result["status"] == "admitted" {
+                let mut result = result;
+                result["run_id"] = json!(run);
+                result["job_id"] = json!(job);
+                return Ok(result);
+            }
+            if first_blocked.is_none() {
+                first_blocked = Some(result["reason"].clone());
+            }
         }
         if blocked.len() < 20 {
-            blocked.push(json!({"run_id":run,"reason":result["reason"]}));
+            blocked.push(json!({"run_id":run,
+                "reason":first_blocked.unwrap_or_else(||json!("no_ready_job"))}));
         }
     }
     Ok(json!({"status":"blocked","reason":"all_categories_blocked","candidates":blocked}))
