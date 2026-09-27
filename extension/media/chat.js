@@ -242,6 +242,8 @@
       this.restored = true;
       if (restore && restore.stick === false && typeof restore.scrollTop === 'number') { this.stick = false; this.scroll.scrollTop = restore.scrollTop; this.jump.hidden = false; }
       else this.toBottom();
+      // An unsent message comes back after a reload or restart (AC-49), unless one was typed since.
+      if (restore && restore.draft && !this.prompt.value) { this.prompt.value = restore.draft; this.drafts.set(this.runId, restore.draft); this.grow(); }
     }
     events(items) { for (const x of items) this.add(x.event, x.label); }
     notice(text) { this.noticeEl.textContent = text || ''; this.noticeEl.classList.toggle('error', !!text); }

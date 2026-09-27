@@ -17,7 +17,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-zp6d7c/overseer-home/worktrees/chat-repo-7ea0490b/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-GnP5Az/overseer-home/worktrees/chat-repo-2db78aac/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -44,7 +44,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-zp6d7c/overseer-home/worktrees/chat-repo-7ea0490b/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-GnP5Az/overseer-home/worktrees/chat-repo-2db78aac/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -71,7 +71,7 @@
         "highlighted": true,
         "link": "https://datatracker.ietf.org/doc/html/rfc6749#section-6",
         "longPath": "…/auth/session-refresh-coordinator.ts",
-        "longPathTitle": "/private/tmp/ovs-ui-zp6d7c/overseer-home/worktrees/chat-repo-7ea0490b/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
+        "longPathTitle": "/private/tmp/ovs-ui-GnP5Az/overseer-home/worktrees/chat-repo-2db78aac/refresh-sessions-once/src/auth/session-refresh-coordinator.ts",
         "steps": "6 stepsRead · Searched · Found files · Created · Edited · Ran",
         "edits": [
           "session-refresh-coordinator.ts",
@@ -116,11 +116,11 @@
       "ok": true,
       "detail": {
         "frames": 235,
-        "p95": 17.5,
-        "median": 16.7,
-        "max": 18,
+        "p95": 8.8,
+        "median": 8.3,
+        "max": 9,
         "workP95": 0.3,
-        "workMax": 0.4
+        "workMax": 0.5
       }
     },
     {
@@ -128,7 +128,7 @@
       "ok": true,
       "detail": {
         "found": 20,
-        "perAppendMs": 3
+        "perAppendMs": 2.6
       }
     }
   ]

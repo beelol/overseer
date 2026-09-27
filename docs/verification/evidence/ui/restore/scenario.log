@@ -1,28 +1,27 @@
-[2026-09-26T10:02:05.264Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-26T10:02:09.057Z] runs {"r1":"r-e9d6fa4608b3","r2":"r-c56579717b89","r3":"r-7988510f098b","ws1":"/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoA-fd0fc365/r1-long-review","ws2":"/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoB-039fe8ac/r2-other-repo","ws3":"/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoA-fd0fc365/r3-removed-later"}
-[2026-09-26T10:02:17.139Z] comparison pick {"title":"Compare the working tree with…","rows":["git-compare  Since task start, c06a5e41a0, task-start snapshot s-66d5ba23b76a (HEAD 3880ccf1bf471d6cd3888ab88359178dbfcea2dc plus dirty contents at creation)"],"value":"task start"}
-[2026-09-26T10:02:19.907Z] before {"reviewTop":1200,"comparison":"Since task start","outputY":400,"tabs":["Review: R3 removed later (1), Editor Group 1","Review: R2 other repo (1), Editor Group 1","Review: R1 long review (2), Editor Group 1","R3 removed later, Editor Group 2","R2 other repo, Editor Group 2","R1 long review, Editor Group 2"]}
-[2026-09-26T10:02:19.993Z] screenshot docs/verification/evidence/ui/restore/01-before-reload.png
-[2026-09-26T10:02:31.454Z] PASS after-reload: review and run panels reopened ["Review: R3 removed later (1), Editor Group 1","Review: R2 other repo (1), Editor Group 1","Review: R1 long review (2), Editor Group 1","R3 removed later, Editor Group 2","R2 other repo, Editor Group 2","R1 long review, Editor Group 2"]
-[2026-09-26T10:02:31.455Z] PASS after-reload: selected run and collapsed task restored in the Agents view {"r1Selected":true,"r2Collapsed":true,"r2RunHidden":true}
-[2026-09-26T10:02:34.260Z] PASS after-reload: review comparison mode restored "Since task start"
-[2026-09-26T10:02:34.260Z] PASS after-reload: review scroll position restored {"before":1200,"after":1200,"restore":"reached","rows":[["a.txt",0,6013,"rendered"],["b.txt",6013,263,"reading"]]}
-[2026-09-26T10:02:34.260Z] PASS after-reload: Follow restored paused, not auto-resumed {"rows":[["a.txt",0,6013,"rendered"],["b.txt",6013,263,"reading"]],"restore":"reached","top":1200,"comparison":"Since task start","follow":true,"resume":true,"followState":"Follow was on before VS Code reloaded. It stays paused until you resume it."}
-[2026-09-26T10:02:36.767Z] PASS after-reload: run panel scroll position and unsent draft restored {"before":400,"after":{"y":400,"draft":"unsent follow-up draft"}}
-[2026-09-26T10:02:38.073Z] PASS after-reload: review for a run in another repository (not open in the window) restored "/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoB-039fe8ac/r2-other-repo"
-[2026-09-26T10:02:38.079Z] PASS after-reload: active run kept running "running"
-[2026-09-26T10:02:38.148Z] screenshot docs/verification/evidence/ui/restore/02-after-reload.png
-[2026-09-26T10:02:38.205Z] PASS R3 worktree removed before restart "/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoA-fd0fc365/r3-removed-later"
-[2026-09-26T10:02:54.152Z] VS Code did not quit on Cmd+Q; sending SIGTERM 9
-[2026-09-26T10:03:15.352Z] killing leftover VS Code helper processes 3
-[2026-09-26T10:03:24.132Z] PASS after-restart: review and run panels reopened ["Review: R3 removed later (1), Editor Group 1","Review: R2 other repo (1), Editor Group 1","Review: R1 long review (2), Editor Group 1","R3 removed later, Editor Group 2","R2 other repo, Editor Group 2","R1 long review, Editor Group 2"]
-[2026-09-26T10:03:25.041Z] PASS after-restart: selected run and collapsed task restored in the Agents view {"r1Selected":true,"r2Collapsed":true,"r2RunHidden":true}
-[2026-09-26T10:03:27.848Z] PASS after-restart: review comparison mode restored "Since task start"
-[2026-09-26T10:03:27.848Z] PASS after-restart: review scroll position restored {"before":1200,"after":1200,"restore":"reached","rows":[["a.txt",0,6013,"rendered"],["b.txt",6013,263,"reading"]]}
-[2026-09-26T10:03:27.849Z] PASS after-restart: Follow restored paused, not auto-resumed {"rows":[["a.txt",0,6013,"rendered"],["b.txt",6013,263,"reading"]],"restore":"reached","top":1200,"comparison":"Since task start","follow":true,"resume":true,"followState":"Follow was on before VS Code reloaded. It stays paused until you resume it."}
-[2026-09-26T10:03:30.358Z] PASS after-restart: run panel scroll position and unsent draft restored {"before":400,"after":{"y":400,"draft":"unsent follow-up draft"}}
-[2026-09-26T10:03:31.665Z] PASS after-restart: review for a run in another repository (not open in the window) restored "/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoB-039fe8ac/r2-other-repo"
-[2026-09-26T10:03:31.685Z] PASS after-restart: active run kept running "running"
-[2026-09-26T10:03:31.770Z] screenshot docs/verification/evidence/ui/restore/03-after-restart.png
-[2026-09-26T10:03:33.071Z] PASS removed worktree is explained instead of failing {"tab":"Review: R3 removed later (1), Editor Group 1","text":"The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoA-fd0fc365/r3-removed-later) was removed on 9/26/2026, 3:02:38 AM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."}
-[2026-09-26T10:03:33.149Z] screenshot docs/verification/evidence/ui/restore/04-removed-worktree-explained.png
+[2026-09-27T00:41:36.758Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T00:41:41.101Z] runs {"r1":"r-540eb42c84a1","r2":"r-613c97109416","r3":"r-1f415bb9391e","ws1":"/private/tmp/ovs-ui-KWvxSY/overseer-home/worktrees/repoA-d23a655d/r1-long-review","ws2":"/private/tmp/ovs-ui-KWvxSY/overseer-home/worktrees/repoB-002c33ee/r2-other-repo","ws3":"/private/tmp/ovs-ui-KWvxSY/overseer-home/worktrees/repoA-d23a655d/r3-removed-later"}
+[2026-09-27T00:41:58.302Z] before {"reviewTop":1200,"comparison":"Since task start","chatY":400,"repoB":{"selected":false,"expanded":"false"},"tabs":["Review: R1 long review (2), Editor Group 1","Overseer, Editor Group 2","R2 other repo, Editor Group 2","R3 removed later, Editor Group 2"]}
+[2026-09-27T00:41:58.387Z] screenshot docs/verification/evidence/ui/restore/01-before-reload.png
+[2026-09-27T00:42:10.348Z] PASS after-reload: the review and the two side chats reopened ["Review: R1 long review (2), Editor Group 1","Overseer, Editor Group 2","R2 other repo, Editor Group 2","R3 removed later, Editor Group 2"]
+[2026-09-27T00:42:10.348Z] PASS after-reload: one Overseer view (no second copy) ["Review: R1 long review (2), Editor Group 1","Overseer, Editor Group 2","R2 other repo, Editor Group 2","R3 removed later, Editor Group 2"]
+[2026-09-27T00:42:11.151Z] PASS after-reload: the selected agent and the collapsed repository restored in the side bar {"r1":{"selected":true,"expanded":null},"repoB":{"selected":false,"expanded":"false"}}
+[2026-09-27T00:42:13.970Z] PASS after-reload: review comparison restored "Since task start"
+[2026-09-27T00:42:13.970Z] PASS after-reload: review scroll position restored {"before":1200,"after":1200}
+[2026-09-27T00:42:13.970Z] PASS after-reload: Follow restored paused, not auto-resumed "paused"
+[2026-09-27T00:42:16.490Z] PASS after-reload: chat scroll position and unsent draft restored {"before":400,"after":{"y":400,"draft":"unsent follow-up draft"}}
+[2026-09-27T00:42:17.803Z] PASS after-reload: a side chat for a run in another repository (not open in the window) restored
+[2026-09-27T00:42:17.812Z] PASS after-reload: active run kept running "running"
+[2026-09-27T00:42:17.892Z] screenshot docs/verification/evidence/ui/restore/02-after-reload.png
+[2026-09-27T00:42:17.952Z] PASS R3 worktree removed before restart "/private/tmp/ovs-ui-KWvxSY/overseer-home/worktrees/repoA-d23a655d/r3-removed-later"
+[2026-09-27T00:42:28.716Z] PASS after-restart: the review and the two side chats reopened ["Review: R1 long review (2), Editor Group 1","Overseer, Editor Group 2","R2 other repo, Editor Group 2","R3 removed later, Editor Group 2"]
+[2026-09-27T00:42:28.716Z] PASS after-restart: one Overseer view (no second copy) ["Review: R1 long review (2), Editor Group 1","Overseer, Editor Group 2","R2 other repo, Editor Group 2","R3 removed later, Editor Group 2"]
+[2026-09-27T00:42:30.431Z] PASS after-restart: the selected agent and the collapsed repository restored in the side bar {"r1":{"selected":true,"expanded":null},"repoB":{"selected":false,"expanded":"false"}}
+[2026-09-27T00:42:33.246Z] PASS after-restart: review comparison restored "Since task start"
+[2026-09-27T00:42:33.246Z] PASS after-restart: review scroll position restored {"before":1200,"after":1200}
+[2026-09-27T00:42:33.246Z] PASS after-restart: Follow restored paused, not auto-resumed "paused"
+[2026-09-27T00:42:35.756Z] PASS after-restart: chat scroll position and unsent draft restored {"before":400,"after":{"y":400,"draft":"unsent follow-up draft"}}
+[2026-09-27T00:42:37.064Z] PASS after-restart: a side chat for a run in another repository (not open in the window) restored
+[2026-09-27T00:42:37.071Z] PASS after-restart: active run kept running "running"
+[2026-09-27T00:42:37.164Z] screenshot docs/verification/evidence/ui/restore/03-after-restart.png
+[2026-09-27T00:42:43.103Z] screenshot docs/verification/evidence/ui/restore/04-removed-explained.png
+[2026-09-27T00:42:43.103Z] PASS removed worktree is explained instead of failing (its chat keeps its history) {"side3":1,"text":"Overseer: The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-KWvxSY/overseer-home/worktrees/repoA-d23a655d/r3-removed-later) was removed on 9/26/2026, 5:42:17 PM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."}

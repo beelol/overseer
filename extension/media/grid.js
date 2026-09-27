@@ -101,7 +101,9 @@
         update(tile, run, state);
         board.append(tile.el);
       }
-      empty.hidden = runs.length > 0; board.hidden = runs.length === 0;
+      empty.hidden = true; board.hidden = runs.length === 0;
+      // No empty grid (AC-113): the host takes the user home instead.
+      if (visible && runs.length === 0) post({ type: 'gridEmpty' });
       if (visible) post({ type: 'gridSubscribe', runIds: order });
     }
 

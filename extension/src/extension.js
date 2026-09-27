@@ -4,7 +4,8 @@ const vscode = require('vscode');
 const path = require('path');
 const { execFile } = require('child_process');
 const { DaemonClient, resolveBinary } = require('./daemon-client');
-const { Model, AgentsProvider, AccountsProvider, ACTIVE } = require('./views');
+const { Model, AgentsProvider, AccountsProvider, ACTIVE, accountName } = require('./views');
+const { SearchView } = require('./search-view');
 const { OutputPanels } = require('./output-panel');
 const { Review } = require('./review');
 const { CommandCenter } = require('./command-center');
@@ -33,6 +34,25 @@ async function activate(context) {
   const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned() });
   const accounts = new AccountsProvider(model, context.extensionUri);
   const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true, dragAndDropController: agentDrag() });
+  // The search field above the Agents list (AC-112): typing filters the list through the daemon's search.
+  const searchView = new SearchView(context.extensionUri, { onQuery: q => runAgentSearch(q), onFilter: kind => setStatusFilter(kind), onFilterMenu: () => filterMenu() });
+  /** The filter icon's menu (a native pick: a menu inside the short search pane would be clipped). */
+  async function filterMenu() {
+    const now = agents.showArchived ? 'archived' : agents.statusFilter;
+    const items = [['all', 'All', 'list-flat'], ['working', 'Working', 'sync'], ['needs', 'Needs you', 'bell'], ['done', 'Done', 'check'], ['failed', 'Failed', 'error'], ['archived', 'Archived', 'archive']]
+      .map(([value, label, icon]) => ({ value, label: `$(${icon}) ${label}`, description: value === now ? '✓' : '' }));
+    const picked = await vscode.window.showQuickPick(items, { title: 'Show agents', placeHolder: 'Filter the Agents list' });
+    if (!picked) return;
+    setStatusFilter(picked.value); searchView.setFilter(picked.value);
+  }
+  /** The search field's filters: All, Working, Needs you, Done, Failed, Archived. */
+  function setStatusFilter(kind) {
+    agents.showArchived = kind === 'archived';
+    agents.statusFilter = ['working', 'needs', 'done', 'failed'].includes(kind) ? kind : 'all';
+    vscode.commands.executeCommand('setContext', 'overseer.showArchived', agents.showArchived);
+    setAgentFilter(agents.filter);
+  }
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider('overseer.search', searchView, { webviewOptions: { retainContextWhenHidden: true } }));
   const accountsView = vscode.window.createTreeView('overseer.accounts', { treeDataProvider: accounts });
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(agents.decorations));
   const outputs = new OutputPanels(context, client, model);
@@ -75,7 +95,9 @@ async function activate(context) {
   // With the dashboard open, the chat stays inside it and reviews go to the column on its right.
   const center = new CommandCenter(context, model, { select: (runId, opts) => selectRun(runId, opts), selected: () => selectedRun, client, model, launcher, attention, pinned, setPinned, archived: archivedTasks, search, steering,
     // The grid takes the editor area and gives it back as it was (AC-79).
-    onMode: async (mode, was) => { if (mode === 'grid') await arrangement.enterGrid(); else if (was === 'grid') await arrangement.leaveGrid(); } });
+    onMode: async (mode, was) => { if (mode === 'grid') await arrangement.enterGrid(); else if (was === 'grid') await arrangement.leaveGrid(); },
+    // No empty grid (AC-113): when its last tile goes, the grid gives way to the home composer.
+    gridEmpty: () => goHome('The grid is empty: no agent is working or pinned. Start one here.') });
   centerRef = center;
   const arrangement = new Arrangement({ context, center, review, model, client, log: say });
   outputs.column = () => vscode.ViewColumn.Beside;
@@ -138,6 +160,14 @@ async function activate(context) {
   };
   const runArg = arg => (typeof arg === 'string' ? arg : arg?.run?.id) || selectedRun;
 
+  const gridHasAgents = () => (model.state.runs || []).some(r => !r.parent_run_id && ACTIVE.has(r.status)) || pinned().length > 0;
+  /** The home view: the composer alone in the middle, with an optional one-line note. */
+  async function goHome(note) {
+    await arrangement.chatOnly();
+    center.setMode('composer');
+    if (note) center.panel?.webview.postMessage({ type: 'notice', scope: 'composer', kind: 'info', message: note });
+  }
+
   /** Shows an agent: its chat, and its review beside it when it has changes (Gate K). */
   async function selectRun(runId, { follow, reveal = true } = {}) {
     const picked = model.run(runId) || (await model.refresh(), model.run(runId));
@@ -189,35 +219,29 @@ async function activate(context) {
     agents.refresh();
     // The match count sits beside the view title (not the debounced tree message).
     // Matches in the list shown (active agents, or archived ones under Show Archived).
-    const shown = filter ? [...filter.taskIds].filter(id => { const t = model.task(id); return t && !!t.archived_ms === !!agents.showArchived; }).length : 0;
-    agentsView.description = filter ? `${shown} match${shown === 1 ? '' : 'es'} for “${filter.query}”` : undefined;
+    // How many agents the list shows, said in the search field while a search or a filter is on.
+    const narrowed = filter || agents.statusFilter !== 'all' || agents.showArchived;
+    const shown = narrowed ? agents.visibleTasks().length : 0;
+    agentsView.description = undefined;
+    searchView.setCount(narrowed ? `${shown} ${filter ? `match${shown === 1 ? '' : 'es'}` : `agent${shown === 1 ? '' : 's'}`}` : '');
     vscode.commands.executeCommand('setContext', 'overseer.agentsFiltered', !!filter);
     // Keep the selected agent in view (and selected) when the list changes shape.
     if (selectedRun && (!filter || filter.taskIds.has(model.run(selectedRun)?.task_id))) setTimeout(() => revealInTree(selectedRun), 150);
   }
 
   /** Search agents by title, prompt, message text, file, repository, account or status (daemon search). */
-  async function searchAgents() {
-    const input = vscode.window.createInputBox();
-    input.title = 'Search agents';
-    input.placeholder = 'Title, message, file, repository, account or status';
-    input.value = agents.filter?.query || '';
-    let seq = 0, accepted = false, timer;
-    const run = async q => {
-      const mine = ++seq;
-      if (!q) { setAgentFilter(undefined); return; }
-      const lower = q.toLowerCase();
-      // One tree update with titles and the daemon's matches (messages, files, repository, account, status).
-      const local = (model.state.tasks || []).filter(t => (t.title || '').toLowerCase().includes(lower)).map(t => t.id);
-      const ids = await search(q);
-      if (mine === seq) setAgentFilter({ query: q, taskIds: new Set([...local, ...ids]) });
-    };
-    // Typing again right after clearing supersedes the clear, so the list updates once.
-    input.onDidChangeValue(q => { clearTimeout(timer); timer = setTimeout(() => run(q.trim()), q.trim() ? 25 : 200); });
-    input.onDidAccept(() => { accepted = true; input.hide(); });
-    input.onDidHide(() => { clearTimeout(timer); if (!accepted) setAgentFilter(undefined); input.dispose(); });
-    input.show();
+  let searchSeq = 0;
+  /** Filters the Agents list: titles at once plus the daemon's matches (messages, files, repository, account, status). */
+  async function runAgentSearch(q) {
+    const mine = ++searchSeq;
+    if (!q) { setAgentFilter(undefined); return; }
+    const lower = q.toLowerCase();
+    const local = (model.state.tasks || []).filter(t => (t.title || '').toLowerCase().includes(lower)).map(t => t.id);
+    const ids = await search(q);
+    if (mine === searchSeq) setAgentFilter({ query: q, taskIds: new Set([...local, ...ids]) });
   }
+  /** Search Agents (⌥⌘F, command palette): puts the cursor in the side bar's search field. */
+  async function searchAgents() { await searchView.focus(); }
 
   /** Read-only, empty files: the custom editor shows the chat instead of their content. */
   function chatFileSystem() {
@@ -487,7 +511,7 @@ async function activate(context) {
 
   async function refreshAccounts() {
     await model.refresh();
-    try { const list = await client.request('account.list'); model.accounts = list.accounts; model.providers = list.providers; } catch (e) { say('account.list: ' + e.message); }
+    try { const list = await client.request('account.list'); model.accounts = list.accounts.map(a => ({ ...a, name: accountName(a) })); model.providers = list.providers; } catch (e) { say('account.list: ' + e.message); }
     await Promise.all(model.state.profiles.map(async p => {
       try { model.profileStatus.set(p.id, await client.request('profile.status', { id: p.id })); } catch (e) { say(e.message); }
       try { (model.accountUsage ||= new Map()).set(p.id, await client.request('account.usage', { id: p.id })); } catch { /* older daemon */ }
@@ -641,11 +665,16 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.toggleDashboard', guard(async () => { if (dashboard.inDashboard) await dashboard.exit(); else { await model.refresh(); await dashboard.enter(); } })),
     vscode.commands.registerCommand('overseer.openDashboardWindow', guard(() => dashboard.openWindow())),
     vscode.commands.registerCommand('overseer.newAgent', guard(async () => { requireTrust(); await arrangement.chatOnly(); center.setMode('composer'); center.focus('composer'); })),
-    vscode.commands.registerCommand('overseer.toggleGrid', guard(async () => { if (center.mode === 'grid') { center.setMode(selectedRun ? 'chat' : 'composer'); } else { await arrangement.enterGrid(); center.setMode('grid'); } })),
+    vscode.commands.registerCommand('overseer.toggleGrid', guard(async () => {
+      if (center.mode === 'grid') { center.setMode(selectedRun ? 'chat' : 'composer'); return; }
+      // The grid opens only with something to show (AC-113); otherwise home, with a one-line note.
+      if (!gridHasAgents()) { await goHome('No agent is working or pinned yet, so the grid has nothing to show. Start one here.'); return; }
+      await arrangement.enterGrid(); center.setMode('grid');
+    })),
     vscode.commands.registerCommand('overseer.searchAgents', guard(searchAgents)),
-    vscode.commands.registerCommand('overseer.clearAgentSearch', guard(async () => setAgentFilter(undefined))),
-    vscode.commands.registerCommand('overseer.showArchived', guard(async () => { agents.showArchived = true; setAgentFilter(undefined); vscode.commands.executeCommand('setContext', 'overseer.showArchived', true); })),
-    vscode.commands.registerCommand('overseer.hideArchived', guard(async () => { agents.showArchived = false; agents.refresh(); vscode.commands.executeCommand('setContext', 'overseer.showArchived', false); })),
+    vscode.commands.registerCommand('overseer.clearAgentSearch', guard(async () => { searchSeq++; setAgentFilter(undefined); searchView.clear(); })),
+    vscode.commands.registerCommand('overseer.showArchived', guard(async () => { searchView.setFilter('archived'); setStatusFilter('archived'); vscode.commands.executeCommand('setContext', 'overseer.showArchived', true); })),
+    vscode.commands.registerCommand('overseer.hideArchived', guard(async () => { searchView.setFilter('all'); setStatusFilter('all'); vscode.commands.executeCommand('setContext', 'overseer.showArchived', false); })),
     // Delete on an archived row (Show Archived) restores it, as it did in the Gate J rail.
     vscode.commands.registerCommand('overseer.archiveAgent', guard(async arg => { const task = agentTask(arg); if (task) { await client.request('task.archive', { task_id: task.id, archived: !task.archived_ms }); await model.refresh(); } })),
     vscode.commands.registerCommand('overseer.restoreAgent', guard(async arg => { const task = agentTask(arg); if (task) { await client.request('task.archive', { task_id: task.id, archived: false }); await model.refresh(); } })),

@@ -30,8 +30,9 @@
     },
     "views": {
       "overseer": [
-        { "id": "overseer.agents", "name": "Agents" },
-        { "id": "overseer.accounts", "name": "Accounts" }
+        { "type": "webview", "id": "overseer.search", "name": "Search", "initialSize": 1 },
+        { "id": "overseer.agents", "name": "Agents", "initialSize": 14 },
+        { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 }
       ]
     },
     "viewsWelcome": [
@@ -89,6 +90,8 @@
     ],
     "keybindings": [
       { "command": "overseer.archiveAgent", "key": "delete", "mac": "cmd+backspace", "when": "focusedView == overseer.agents" },
+      { "command": "overseer.searchAgents", "key": "ctrl+alt+f", "mac": "cmd+alt+f", "when": "!editorTextFocus" },
+      { "command": "overseer.clearAgentSearch", "key": "escape", "when": "focusedView == overseer.agents && overseer.agentsFiltered" },
       { "command": "overseer.toggleDashboard", "key": "ctrl+alt+o", "mac": "cmd+alt+o" },
       { "command": "overseer.newAgent", "key": "ctrl+alt+n", "mac": "cmd+alt+n" },
       { "command": "overseer.toggleGrid", "key": "ctrl+alt+g", "mac": "cmd+alt+g" },
