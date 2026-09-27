@@ -61,6 +61,10 @@ Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 (Gate N) in the
 > push key, Face ID, the final session): prepare everything first, ask one precise question, and
 > continue independent work while waiting. Never block on a foreground wait.
 >
+> Other gates are being built at the same time. Before changing shared daemon code, fetch `main`
+> and build on what is there; define the file, review and pull request methods once and let other
+> surfaces use them. Gate M is ignored for now.
+>
 > Build the implementation in its own worktree and pull request. Criteria, records and RFC
 > revisions go to `main`. Keep the license and notice of anything adopted from another project.
 > Make no purchases, change no logins on the owner's behalf, and publish no app to a store.

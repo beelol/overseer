@@ -38,6 +38,7 @@ already replays its event log from a cursor.
 | Motion | Cool animations, with a signature launch: a sci-fi gradient door carrying a grayscale logo that splits open diagonally when the app is ready. |
 | The door | On a cold start only. |
 | Themes | Light and dark, following the phone's system setting. The app looks the same as Overseer Light and Overseer Dark in VS Code. |
+| Gate M | Ignored for now. No third theme on the phone. The chat with Overseer on the phone (AC-128) waits for AC-107 and does not hold up the rest. |
 
 ## Proposed defaults, distinguished from the decisions above
 
@@ -176,6 +177,13 @@ The session state is never in the connection.
   daemon holds a power assertion that prevents idle sleep, and releases it afterwards. A closed lid
   on battery sleeps anyway; the README says so. When the Mac cannot be reached the phone says *Mac
   unreachable* with the last contact time.
+
+## Several surfaces at once
+
+The phone, VS Code and the terminal UI can all be connected at the same time. They share one
+daemon and one event stream, so what is done on one shows on the others at once. When two
+surfaces answer the same permission request, the daemon takes the first answer and refuses the
+second with the first one's outcome. No surface ever shows a request as open after it was answered.
 
 ## What the phone can do
 
@@ -377,6 +385,20 @@ springs as tokens, drives every transition. Motion explains where a thing came f
 changed. It can be interrupted, follows the finger, and is replaced by fades under Reduce Motion.
 The owner marks the door and each transition on a review page until they look right.
 
+## Working alongside the other gates
+
+Other gates are being built while this one is planned. Where they meet:
+
+- **Phases 1 to 3** add a new module to the daemon and change little existing code. They can be
+  built while anything else is in flight.
+- **Phase 4** moves file reading, reviewed marks and pull request creation behind daemon methods.
+  Gate M reworks the review in VS Code (AC-99). The daemon methods are the contract between them:
+  this gate defines them, and whichever lands second builds on the first.
+- **Continuity (Gate L)** adds a connection state. The phone shows it when it exists.
+- **The terminal UI** does merge back, pull requests and cleanup in its own code today. It can
+  use the daemon methods after phase 4; this gate does not require it.
+- **Gate M is ignored for now** (the owner's decision). Only AC-128 depends on it.
+
 ## Testing
 
 - **Daemon:** gateway protocol tests in `cargo test` with a real daemon binary, as today.
@@ -407,7 +429,6 @@ The owner marks the door and each transition on a review page until they look ri
 | --- | --- |
 | App stack | Expo when it meets the speed budget on the owner's iPhone, Flutter if it does not (AC-115). The owner can name the stack instead and skip the measurement. |
 | Where Rust is used on the phone | Only the encrypted session, if the binding is clean. Otherwise a vetted library with shared test vectors. |
-| Gate M's third theme (AC-103) on the phone | Not in this gate. The phone follows the system setting with two themes. |
 | Sound with the door | None. |
 | Default scope of a new device | Full control, as the owner asked. |
 | Which addresses may connect | Private and link-local ranges only. A setting can add the VPN range. |
@@ -448,7 +469,8 @@ AC-115 to AC-137 in the main RFC are the acceptance criteria. Their Verify claus
 - requests that act once no matter how often they are retried;
 - a power assertion that is held during runs and released after;
 - the phone's list and conversations equal to the daemon's state and VS Code's chat;
-- the same launch records from the phone as from VS Code, and one tiny live turn per harness;
+- the same launch records from the phone as from VS Code, one answer when two surfaces answer
+  at once, and one tiny live turn per harness;
 - diffs equal to Git's, hunk actions checked on disk, and file methods that cannot leave the workspace;
 - no credential in any traffic, and every daemon method listed with its phone status;
 - a notification on a locked iPhone within five seconds, answered from the notification;
