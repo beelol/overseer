@@ -445,6 +445,21 @@ fn dependent_job_waits_for_accepted_patch_to_integrate() {
         .find(|j| j["id"] == "consumer")
         .unwrap();
     assert_eq!(consumer_before["status"], "planned", "{before}");
+    let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+        .unwrap().as_millis() as i64;
+    let blocked = d.call("swarm.admit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"consumer","target_id":"system-codex",
+        "request_id":"before-contract-integration","now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"system-codex","account_id":"fixture","pool_ids":["pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":1000},
+        "purpose":"worker"}));
+    assert_eq!(blocked["reason"],"dependency_pending","{blocked}");
+    assert_eq!(blocked["waiting_on"],json!(["contract"]));
     d.call(
         "swarm.integrate",
         json!({"run_id":run,"generation":1,"revision":1,

@@ -236,7 +236,7 @@ fn run_pair(case: Case, candidate: bool) -> ResultRow {
         assert_eq!(
             held["reason"],
             match case {
-                Case::SerialDependency => "job_not_ready",
+                Case::SerialDependency => "dependency_pending",
                 Case::ExclusiveConflict => "resource_conflict",
                 Case::Independent | Case::ConstrainedBudget if !candidate => "worker_limit",
                 Case::Independent | Case::ConstrainedBudget => "benefit_serial",

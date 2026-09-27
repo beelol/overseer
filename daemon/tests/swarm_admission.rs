@@ -88,6 +88,97 @@ fn audit_only_run_holds_native_worker_without_source_write_enforcement() {
 }
 
 #[test]
+fn dependency_chain_explains_serial_work_while_independent_jobs_admit() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Dependency and resource replay",
+        "objective":"Audit the backend","allowed_targets":["codex-a"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"root","title":"Check contract","acceptance":"contract evidence","deps":[]},
+        {"id":"child","title":"Check consumer","acceptance":"consumer evidence","deps":["root"]},
+        {"id":"leaf","title":"Check integration","acceptance":"integration evidence","deps":["child"]},
+        {"id":"ind-a","title":"Check API","acceptance":"API evidence","deps":[]},
+        {"id":"ind-b","title":"Check queue","acceptance":"queue evidence","deps":[]},
+        {"id":"ind-c","title":"Check storage","acceptance":"storage evidence","deps":[]},
+        {"id":"writer-a","title":"Use fixture DB","acceptance":"DB evidence","deps":[],
+            "resource_claims":[{"resource":"db:shared","mode":"write"}]},
+        {"id":"writer-b","title":"Use same fixture DB","acceptance":"DB evidence","deps":[],
+            "resource_claims":[{"resource":"db:shared","mode":"write"}]}
+    ]}));
+    commit_beneficial_batch(&d,id,&["root".into(),"ind-a".into(),"ind-b".into(),
+        "ind-c".into(),"writer-a".into()]);
+    let at = now();
+    let child = admit(&d,id,"child","codex-a","early-child",at,100000,1000).unwrap();
+    assert_eq!(child["reason"],"dependency_pending","{child}");
+    assert_eq!(child["waiting_on"],json!(["root"]));
+    let leaf = admit(&d,id,"leaf","codex-a","early-leaf",at,100000,1000).unwrap();
+    assert_eq!(leaf["waiting_on"],json!(["child"]));
+    for job in ["root","ind-a","ind-b","ind-c"] {
+        let result = admit(&d,id,job,"codex-a",job,at,100000,1000).unwrap();
+        assert_eq!(result["status"],"admitted","{job}: {result}");
+    }
+    let writer = admit(&d,id,"writer-a","codex-a","writer-a",at+5000,100000,1000).unwrap();
+    assert_eq!(writer["status"],"admitted","{writer}");
+    let conflict = admit(&d,id,"writer-b","codex-a","writer-b",at+5000,100000,1000).unwrap();
+    assert_eq!(conflict["reason"],"resource_conflict","{conflict}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let attempts: i64 = db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1",
+        [id],|r|r.get(0)).unwrap();
+    assert_eq!(attempts,5,"blocked dependencies and writer must not consume attempts");
+    let jobs = d.call("swarm.jobs",json!({"id":id}))["jobs"].as_array().unwrap().clone();
+    for job in ["child","leaf"] {
+        assert_eq!(jobs.iter().find(|item| item["id"]==job).unwrap()["status"],"planned");
+    }
+
+    let serial = Daemon::start(&[]);
+    let chain = serial.call("swarm.create",json!({"category":"Serial chain replay",
+        "objective":"Check contract then consumer then integration",
+        "allowed_targets":["codex-a"]}));
+    let chain_id = chain["id"].as_str().unwrap();
+    serial.call("swarm.plan",json!({"id":chain_id,"generation":1,"revision":0,
+        "jobs":[
+            {"id":"root","title":"Contract","acceptance":"contract evidence","deps":[]},
+            {"id":"child","title":"Consumer","acceptance":"consumer evidence","deps":["root"]},
+            {"id":"leaf","title":"Integration","acceptance":"integration evidence","deps":["child"]}
+        ]}));
+    let finish = |job: &str, attempt: &Value| {
+        let artifact = format!("{job}-evidence");
+        serial.call("swarm.artifact.put",json!({"run_id":chain_id,"job_id":job,
+            "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+            "artifact_id":artifact,"source_revision":1,"kind":"finding",
+            "content":format!("checked {job}")}));
+        serial.call("swarm.report",json!({"run_id":chain_id,"job_id":job,
+            "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+            "message_id":format!("{job}-result"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[artifact]}}));
+        serial.call("swarm.decide",json!({"run_id":chain_id,"generation":1,
+            "revision":1,"job_id":job,"decision":"accept","evidence":[artifact]}));
+        if let Some(next) = match job { "root" => Some("child"),
+            "child" => Some("leaf"), _ => None } {
+            let held = admit(&serial,chain_id,next,"codex-a",
+                &format!("{next}-before-parent-exit"),at,100000,1000).unwrap();
+            assert_eq!(held["reason"],"dependency_pending","{held}");
+            assert_eq!(held["waiting_on"],json!([job]));
+        }
+        serial.call("swarm.attempt.confirm_exit",json!({"run_id":chain_id,
+            "generation":1,"revision":1,"job_id":job,
+            "attempt_id":attempt["attempt_id"]}));
+    };
+    for (index,job) in ["root","child","leaf"].into_iter().enumerate() {
+        let attempt = admit(&serial,chain_id,job,"codex-a",job,at+index as i64*5000,
+            100000,1000).unwrap();
+        assert_eq!(attempt["status"],"admitted","{job}: {attempt}");
+        finish(job,&attempt);
+        let next = ["child","leaf"].get(index);
+        if let Some(next) = next {
+            let jobs = serial.call("swarm.jobs",json!({"id":chain_id}))["jobs"]
+                .as_array().unwrap().clone();
+            assert_eq!(jobs.iter().find(|item| item["id"]==*next).unwrap()["status"],"ready");
+        }
+    }
+}
+
+#[test]
 fn one_run_freezes_allocation_and_dedupes_replayed_admission() {
     let d = Daemon::start(&[]);
     let id = setup(&d, "Backend admission", 3);
@@ -496,8 +587,20 @@ fn three_slot_limit_counts_live_director_and_workers_until_confirmed_exit() {
         .unwrap_err().contains("exit is not confirmed"));
     d.call("run.interrupt",json!({"run_id":first_run}));
     d.wait_done(first_run,8);
-    assert_eq!(d.call("agents.limit.get",json!({}))["active"],3,
-        "a stopped process retains its slot until attempt exit is confirmed");
+    let active = d.call("agents.limit.get",json!({}))["active"].as_i64().unwrap();
+    if active == 2 {
+        // The daemon's background reconciler may confirm this terminal
+        // supervisor before the explicit fixture call below reaches it.
+        let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let status: String = db.query_row("SELECT status FROM swarm_attempts WHERE id=?1",
+            [first["attempt_id"].as_str().unwrap()],|r|r.get(0)).unwrap();
+        let ended: Option<i64> = db.query_row("SELECT ended_ms FROM runs WHERE id=?1",
+            [first_run],|r|r.get(0)).unwrap();
+        assert_eq!(status,"finished","slot may release only after daemon confirmation");
+        assert!(ended.is_some(),"the linked process must have a terminal receipt");
+    } else {
+        assert_eq!(active,3,"an unconfirmed attempt must retain its slot");
+    }
     d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
         "generation":1,"revision":1,"job_id":"j0","attempt_id":first["attempt_id"]}));
     assert_eq!(d.call("agents.limit.get",json!({}))["active"],2);
