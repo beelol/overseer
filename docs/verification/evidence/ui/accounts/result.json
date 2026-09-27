@@ -45,11 +45,11 @@
       "ok": true,
       "detail": {
         "codexChoices": [
-          "codex (existing login), signed in · pro · follows the desktop app (can change), Logged in using ChatGPT",
+          "Your login, signed in · pro · follows the desktop app (can change), Logged in using ChatGPT",
           "Work ChatGPT, signed in · team · fixed account, Logged in using ChatGPT"
         ],
         "claudeChoices": [
-          "claude (existing login), signed in · max · follows the desktop app (can change)",
+          "Your login, signed in · max · follows the desktop app (can change)",
           "Claude fixed, signed in · max · fixed account"
         ]
       }
@@ -92,12 +92,12 @@
         "removeText": "Cancel\nRemove Account\nRemove the account Claude fixed?\nIts own credential folder is deleted. Runs keep their history. No other account, and no desktop-app login, is affected.",
         "afterRemove": [
           "OpenAI / ChatGPT\nSign-in: ChatGPT sign-in in the browser, or a device code. Account login only; no API keys., has actions",
-          "codex (existing login), signed in, plus · d1dddc49, follows the desktop app",
+          "Your login, signed in, plus · d1dddc49, follows the desktop app",
           "Work ChatGPT, signed in, plus · 5ac9196f",
           "Anthropic / Claude\nSign-in: Claude account sign-in (claude auth login). Account login only; no API keys., has actions",
-          "claude (existing login), signed in, max · 49d8e90c, follows the desktop app",
+          "Your login, signed in, max · 49d8e90c, follows the desktop app",
           "OpenCode (local models)\nSign-in: none: local providers and mocks (owner decision 2026-09-25). Account login only; no API keys.",
-          "opencode (existing login), not signed in, follows the desktop app"
+          "Your login, not signed in, follows the desktop app"
         ]
       }
     },

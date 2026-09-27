@@ -11,6 +11,8 @@
     return e;
   };
   ui.icon = (name, cls = '') => { const i = ui.el('span', `codicon codicon-${name} ${cls}`.trim()); i.setAttribute('aria-hidden', 'true'); return i; };
+  /** Overseer's own mark in full colour (AC-142; the image is media/overseer-logo.png, set in base.css). Sizes: sm, lg, xl. */
+  ui.mark = (cls = '', label) => { const m = ui.el('span', `overseer-mark ${cls}`.trim()); if (label) { m.setAttribute('role', 'img'); m.setAttribute('aria-label', label); } else m.setAttribute('aria-hidden', 'true'); return m; };
 
   /** Icon-only button: always has an accessible name and a tooltip. */
   ui.iconButton = (icon, label, { cls = '', action, pressed, shortcut } = {}) => {

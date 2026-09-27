@@ -1,0 +1,104 @@
+{
+  "checks": [
+    {
+      "name": "chat and review: reached in Overseer Dark, Overseer Light, Overseer",
+      "ok": true,
+      "detail": {
+        "Overseer Dark": true,
+        "Overseer Light": true,
+        "Overseer": true
+      }
+    },
+    {
+      "name": "review, all files: reached in Overseer Dark, Overseer Light, Overseer",
+      "ok": true,
+      "detail": {
+        "Overseer Dark": true,
+        "Overseer Light": true,
+        "Overseer": true
+      }
+    },
+    {
+      "name": "grid tracking: reached in Overseer Dark, Overseer Light, Overseer",
+      "ok": true,
+      "detail": {
+        "Overseer Dark": true,
+        "Overseer Light": true,
+        "Overseer": true
+      }
+    },
+    {
+      "name": "composer: reached in Overseer Dark, Overseer Light, Overseer",
+      "ok": true,
+      "detail": {
+        "Overseer Dark": true,
+        "Overseer Light": true,
+        "Overseer": true
+      }
+    },
+    {
+      "name": "talk to Overseer: reached in Overseer Dark, Overseer Light, Overseer",
+      "ok": true,
+      "detail": {
+        "Overseer Dark": true,
+        "Overseer Light": true,
+        "Overseer": true
+      }
+    },
+    {
+      "name": "where am I: reached in Overseer Dark, Overseer Light, Overseer",
+      "ok": true,
+      "detail": {
+        "Overseer Dark": true,
+        "Overseer Light": true,
+        "Overseer": true
+      }
+    },
+    {
+      "name": "dashboard: reached in Overseer Dark, Overseer Light, Overseer",
+      "ok": true,
+      "detail": {
+        "Overseer Dark": true,
+        "Overseer Light": true,
+        "Overseer": true
+      }
+    }
+  ],
+  "reached": {
+    "chat and review": {
+      "Overseer Dark": true,
+      "Overseer Light": true,
+      "Overseer": true
+    },
+    "review, all files": {
+      "Overseer Dark": true,
+      "Overseer Light": true,
+      "Overseer": true
+    },
+    "grid tracking": {
+      "Overseer Dark": true,
+      "Overseer Light": true,
+      "Overseer": true
+    },
+    "composer": {
+      "Overseer Dark": true,
+      "Overseer Light": true,
+      "Overseer": true
+    },
+    "talk to Overseer": {
+      "Overseer Dark": true,
+      "Overseer Light": true,
+      "Overseer": true
+    },
+    "where am I": {
+      "Overseer Dark": true,
+      "Overseer Light": true,
+      "Overseer": true
+    },
+    "dashboard": {
+      "Overseer Dark": true,
+      "Overseer Light": true,
+      "Overseer": true
+    }
+  }
+}

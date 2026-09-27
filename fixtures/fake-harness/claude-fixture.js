@@ -12,6 +12,8 @@
 //   native-quota: emits scoped structured rate-limit windows and a model-family rejection
 //   native-quota-invalid: a newer malformed meter must invalidate older apparent capacity
 //   native-quota-block-invalid: a malformed follow-up cannot clear a scoped rejection
+//   overseer:    answers as Talk to Overseer (AC-107) from the agents' state in the prompt: a summary
+//                for "what is everyone doing?", and for "tell <agent> to <task>" a proposal block
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
@@ -241,6 +243,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // A failed turn whose reason arrives once, as the result text.
     assistant([{ type: 'text', text: 'Trying the migration…' }]);
     result(true, 'Migration failed: relation users_v2 does not exist');
+  } else if (mode === 'overseer') {
+    const content = first.message.content;
+    const text = Array.isArray(content) ? content.filter(c => c.type === 'text').map(c => c.text).join('\n') : String(content);
+    const state = /Agents \(JSON\):\n([\s\S]*?)\n<\/overseer-state>/.exec(text);
+    const agents = state ? JSON.parse(state[1]) : [];
+    const said = text.replace(/^<overseer-state>[\s\S]*?<\/overseer-state>\s*/, '').trim();
+    let reply;
+    const tell = /tell (.+?) to (.+)/i.exec(said);
+    if (/what is everyone doing/i.test(said)) reply = agents.length ? 'Here is what everyone is doing:\n\n' + agents.map(a => `- **${a.title}**: ${a.status}`).join('\n') : 'No agents are running.';
+    else if (tell) {
+      const who = agents.find(a => a.title.toLowerCase().includes(tell[1].toLowerCase()));
+      const task = tell[2].replace(/[.!?]+$/, '');
+      reply = who ? `I will send ${who.title} this follow-up: "Please ${task}."\n\n\`\`\`overseer-actions\n${JSON.stringify([{ action: 'follow_up', agent: who.id, title: who.title, text: `Please ${task}.` }])}\n\`\`\`` : `I could not find an agent called ${tell[1]}.`;
+    } else reply = 'I can tell you what your agents are doing, or pass a message to one of them.';
+    assistant([{ type: 'text', text: reply }]);
+    result(false, reply);
   } else if (mode === 'prose') {
     assistant([{ type: 'text', text: 'I delegated this to a sub-agent and it finished.' }]);
     result(false, 'I delegated this to a sub-agent and it finished.');

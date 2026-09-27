@@ -1,0 +1,94 @@
+// Packaged-UI scenario for AC-107 (Claude Code fixture, no paid tokens): Talk to Overseer. The chat
+// docked in the panel runs on the Claude harness as a task Overseer keeps for itself (hidden from the
+// side bar). "What is everyone doing?" gets a summary that matches the daemon's state; "tell API
+// tests to add tests" gets a proposal, and on Yes that agent's chat shows the follow-up as coming from
+// Overseer; a declined proposal changes nothing. (The one live run on the Claude account waits for
+// the owner's Claude sign-in.)
+const fs = require('fs');
+const path = require('path');
+const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+
+(async () => {
+  const s = new Session('talk');
+  const result = { checks: [] };
+  const check = (name, ok, detail) => { result.checks.push({ name, ok: !!ok, detail }); s.note(`${ok ? 'PASS' : 'FAIL'} ${name}`, detail); };
+  const modeFile = path.join(s.root, 'claude-mode');
+  try {
+    const repo = makeRepo(path.join(s.root, 'talk-repo'), { dirty: false });
+    s.settings({ 'workbench.colorTheme': 'Overseer' });
+    s.install(latestVsix());
+    fs.writeFileSync(modeFile, 'echo');
+    s.launch(repo, { OVERSEER_CLAUDE_PATH: path.join(repoRoot, 'fixtures/fake-harness/claude-fixture.js'), OVERSEER_CODEX_PATH: '/nonexistent/codex', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode',
+      CLAUDE_FIXTURE_MODE_FILE: modeFile, OVERSEER_HARNESS_ENV_PASSTHROUGH: 'CLAUDE_FIXTURE_MODE_FILE' });
+    const cdp = await s.connect();
+    await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
+    const api = s.ctl('task.create', { repo, harness: 'claude', prompt: 'write the API', title: 'API tests' });
+    const front = s.ctl('task.create', { repo, harness: 'claude', prompt: 'fix the header', title: 'Frontend fixer' });
+    const watch = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'echo watching; sleep 600'], prompt: '', title: 'Build watcher' });
+    for (let i = 0; i < 40 && [api, front].some(t => s.ctl('state').runs.find(r => r.id === t.run.id).status !== 'completed'); i++) await delay(300);
+    fs.writeFileSync(modeFile, 'overseer');
+    const turns = id => s.ctl('run.turns', { run_id: id });
+
+    // Open the chat and ask.
+    await cdp.command('Overseer: Talk to Overseer'); await delay(2000);
+    const intro = await cdp.webview(`!!document.querySelector('.talk-intro')`, 20000);
+    { const p = await s.webviewPoint(intro, '#prompt'); await cdp.click(p.x, p.y); await delay(150); await cdp.click(p.x, p.y); }
+    await cdp.type('What is everyone doing?'); await cdp.key('Enter');
+    const chat = await cdp.webview(`!!document.querySelector('#conv') && /What is everyone doing/.test(document.querySelector('#conv').textContent)`, 30000);
+    await chat.waitFor(`/Here is what everyone is doing/.test(document.querySelector('#conv').textContent)`, 20000);
+    const summary = await chat.eval(`document.querySelector('#conv').innerText`);
+    const state = s.ctl('state');
+    const wanted = [api, front, watch].map(t => { const r = state.runs.find(x => x.id === t.run.id); return { title: r.title, status: r.status }; });
+    await s.screenshot('summary');
+    check('"What is everyone doing?" gets a summary that matches the daemon\'s state (each agent and its status)', wanted.every(w => summary.includes(`${w.title}: ${w.status}`)), { wanted, summary: summary.slice(0, 600) });
+    const shared = await chat.eval(`[...document.querySelectorAll('.msg-context')].map(e => e.textContent)`);
+    check('the agents\' state goes with the message but is shown as one line, not as text', shared.some(t => /Shared the state of 3 agents/.test(t)) && !summary.includes('overseer-state'), shared);
+    await s.openOverseerView(); await delay(1000);
+    const sideBar = await cdp.evalWorkbench(`[...document.querySelectorAll('.part.sidebar .monaco-list-row .label-name')].map(e => e.textContent.trim())`);
+    check('Overseer\'s own conversation is not listed as an agent', !sideBar.includes('Talk to Overseer') && sideBar.includes('API tests'), sideBar);
+
+    // A proposal accepted.
+    const send = async text => { const p = await s.webviewPoint(chat, '#prompt'); await cdp.click(p.x, p.y); await delay(150); await cdp.click(p.x, p.y); await cdp.type(text); await delay(200); await cdp.key('Enter'); };
+    const before = { api: turns(api.run.id).length, front: turns(front.run.id).length };
+    await send('Tell API tests to add tests');
+    await chat.waitFor(`document.querySelectorAll('.proposal:not(.answered)').length === 1`, 20000);
+    const card = await chat.eval(`document.querySelector('.proposal:not(.answered)').innerText`);
+    await s.screenshot('proposal');
+    check('asking Overseer to act gets a proposal saying exactly what it will do, and nothing happens yet', /Send API tests: “Please add tests\.”/.test(card) && turns(api.run.id).length === before.api, { card, turns: turns(api.run.id).length });
+    await chat.eval(`document.querySelector('.proposal:not(.answered)').scrollIntoView({ block: 'center' })`); await delay(300);
+    { const c = await s.webviewPoint(chat, '.proposal:not(.answered) .proposal-head'); await cdp.click(c.x, c.y); await delay(200);
+      const p = await s.webviewPoint(chat, '.proposal:not(.answered) [data-proposal="yes"]'); await cdp.click(p.x, p.y); }
+    await chat.waitFor(`/Done: sent/.test(document.querySelector('.proposal.answered .proposal-status')?.textContent || '')`, 20000);
+    let t = []; for (let i = 0; i < 30 && t.length <= before.api; i++) { await delay(300); t = turns(api.run.id); }
+    const last = t[t.length - 1];
+    check('on Yes, the follow-up goes to that agent as coming from Overseer', t.length === before.api + 1 && /^From Overseer: Please add tests\./.test(last?.prompt || ''), { turns: t.length, prompt: last?.prompt });
+    await s.selectAgent('API tests', { settle: 2500 });
+    const agentChat = await s.editorView(`!!document.querySelector('#conv .msg.user.from-overseer')`);
+    const shown = await agentChat.eval(`(() => { const m = [...document.querySelectorAll('#conv .msg.user.from-overseer')].pop(); return { who: m.querySelector('.msg-from')?.textContent, text: m.querySelector('.text')?.textContent }; })()`);
+    await s.screenshot('agent-chat-from-overseer');
+    check('the agent\'s chat shows the message as coming from Overseer', /From Overseer/.test(shown.who || '') && shown.text === 'Please add tests.', shown);
+
+    // A proposal declined.
+    await cdp.command('Overseer: Talk to Overseer'); await delay(1200);
+    await send('Tell Frontend fixer to update the docs');
+    await chat.waitFor(`document.querySelectorAll('.proposal:not(.answered)').length === 1`, 20000);
+    await chat.eval(`document.querySelector('.proposal:not(.answered)').scrollIntoView({ block: 'center' })`); await delay(300);
+    { const c = await s.webviewPoint(chat, '.proposal:not(.answered) .proposal-head'); await cdp.click(c.x, c.y); await delay(200);
+      const p = await s.webviewPoint(chat, '.proposal:not(.answered) [data-proposal="no"]'); await cdp.click(p.x, p.y); }
+    await chat.waitFor(`[...document.querySelectorAll('.proposal.answered .proposal-status')].some(e => /Declined/.test(e.textContent))`, 20000);
+    await delay(2000);
+    await s.screenshot('declined');
+    check('a declined proposal changes nothing', turns(front.run.id).length === before.front, { turns: turns(front.run.id).length });
+    s.ctl('run.interrupt', { run_id: watch.run.id });
+  } catch (error) {
+    s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
+    try { await s.screenshot('error'); } catch {}
+  } finally {
+    s.writeLog();
+    fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
+    if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }
+    const failed = result.error || result.checks.some(c => !c.ok);
+    console.log(failed ? 'SCENARIO FAILED' : 'SCENARIO PASSED', s.root);
+    process.exit(failed ? 1 : 0);
+  }
+})();

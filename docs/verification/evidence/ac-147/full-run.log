@@ -1,0 +1,50 @@
+▶ Rust (cargo test --workspace) … ok (68s) 92 passed, 0 failed
+▶ Unit (test/unit) … ok (0s) 2 of 2 passed
+▶ Check (extension sources) … ok (0s)
+▶ Build the VSIX … ok (21s)
+▶ UI accounts … ok (58s)
+▶ UI arrangement … ok (73s)
+▶ UI audit … ok (84s)
+▶ UI center … ok (85s)
+▶ UI chat … ok (33s)
+▶ UI composer … ok (81s)
+▶ UI conversation … ok (28s)
+▶ UI dashboard … ok (40s)
+▶ UI dragout … ok (25s)
+▶ UI endings … ok (37s)
+▶ UI files … ok (35s)
+▶ UI follow … ok (35s)
+▶ UI grid … ok (36s)
+▶ UI history … ok (221s)
+▶ UI hunks … ok (42s)
+▶ UI keyboard … ok (33s)
+▶ UI look … ok (79s)
+▶ UI main … FAILED (79s)
+    [2026-09-27T02:29:46.292Z] ERROR Error: Timed out waiting for grandchild row (last: null)
+    [2026-09-27T02:29:46.372Z] screenshot docs/verification/evidence/ui/main/09-error.png
+    SCENARIO FAILED <scenario tmp>
+    (node:79792) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+▶ UI modes … ok (54s)
+▶ UI narrow-chat … ok (45s)
+▶ UI notify … ok (16s)
+▶ UI parity … ok (28s)
+▶ UI place … ok (110s)
+▶ UI pr … ok (62s)
+▶ UI restore … FAILED (31s)
+    [2026-09-27T02:35:31.156Z] ERROR Error: Timed out waiting for run row R3 removed later (last: null)
+    [2026-09-27T02:35:31.233Z] screenshot docs/verification/evidence/ui/restore/01-error.png
+    SCENARIO FAILED <scenario tmp>
+    (node:37821) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.
+▶ UI review … ok (82s)
+▶ UI review-width … ok (31s)
+▶ UI scopes … ok (48s)
+▶ UI sidebar … ok (35s)
+▶ UI sidebar-search … ok (185s)
+▶ UI signin … ok (35s)
+▶ UI theme … ok (61s)
+▶ UI trust … ok (11s)
+▶ UI usage … ok (26s)
+(not run: background, claude-live, codex-approval, codex-follow, codex-live, conversation-live, live-gatej, merge, perf; LIVE ones need --live, perf needs --perf)
+
+36 of 38 passed; failed: UI main, UI restore
+exit 1

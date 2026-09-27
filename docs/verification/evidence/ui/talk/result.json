@@ -1,0 +1,75 @@
+{
+  "checks": [
+    {
+      "name": "\"What is everyone doing?\" gets a summary that matches the daemon's state (each agent and its status)",
+      "ok": true,
+      "detail": {
+        "wanted": [
+          {
+            "title": "API tests",
+            "status": "completed"
+          },
+          {
+            "title": "Frontend fixer",
+            "status": "completed"
+          },
+          {
+            "title": "Build watcher",
+            "status": "running"
+          }
+        ],
+        "summary": "What is everyone doing?\nShared the state of 3 agents\n\nHere is what everyone is doing:\n\nAPI tests: completed\nFrontend fixer: completed\nBuild watcher: running\nDone\n0s\n2 tokens\nWorking…"
+      }
+    },
+    {
+      "name": "the agents' state goes with the message but is shown as one line, not as text",
+      "ok": true,
+      "detail": [
+        "Shared the state of 3 agents"
+      ]
+    },
+    {
+      "name": "Overseer's own conversation is not listed as an agent",
+      "ok": true,
+      "detail": [
+        "talk-repo",
+        "Build watcher",
+        "Frontend fixer",
+        "API tests",
+        "Claude",
+        "Your login"
+      ]
+    },
+    {
+      "name": "asking Overseer to act gets a proposal saying exactly what it will do, and nothing happens yet",
+      "ok": true,
+      "detail": {
+        "card": "Overseer will\nSend API tests: “Please add tests.”\nYes\nNo",
+        "turns": 1
+      }
+    },
+    {
+      "name": "on Yes, the follow-up goes to that agent as coming from Overseer",
+      "ok": true,
+      "detail": {
+        "turns": 2,
+        "prompt": "From Overseer: Please add tests."
+      }
+    },
+    {
+      "name": "the agent's chat shows the message as coming from Overseer",
+      "ok": true,
+      "detail": {
+        "who": "From Overseer",
+        "text": "Please add tests."
+      }
+    },
+    {
+      "name": "a declined proposal changes nothing",
+      "ok": true,
+      "detail": {
+        "turns": 1
+      }
+    }
+  ]
+}
