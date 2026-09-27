@@ -15,7 +15,7 @@ which is out of scope for now. The full list is under [Acceptance criteria](#acc
 
 Only the owner can do these (AC-160). Each is one step; the criterion it unblocks is in brackets. The everything goal (`docs/goals/everything.md`) keeps this list current.
 
-- Mark round 3 of the Gate K design review: [review page](https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv) [AC-82, then PR #8 merges].
+- Mark round 4 of the Gate K design review (one-line search, pills filling the row): [review page](https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv) [AC-82, then PR #8 merges].
 - Decide where the one-line search should live: VS Code keeps every extension side-bar pane at least 120 px tall, so a separate search pane is never one line [AC-155].
 - Add the two logo images (full-colour icon and transparent mark) to `docs/design/brand/` [AC-142].
 - Sign in to Claude Code again (`claude`, then `/login`) [the Claude half of AC-81, AC-45].
