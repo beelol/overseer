@@ -1204,8 +1204,94 @@ rec(142, "One Overseer mark everywhere", "not started", date="—", commit="—"
     expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
     actual="Not started.", live="—", blocker="Not started: the owner's two images need to be added to docs/design/brand/ as files; then the single-colour glyph is drawn for VS Code and approved.")
 
+# Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code are built in pull
+# request #5, whose branch holds the evidence and the verified record for AC-143; the terminal UI is T-23 and T-24 (pull request #6).
+rec(143, "Opt-in audio cues owned by the daemon", "in progress", date="—", commit="—",
+    expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
+    actual="Built in pull request #5 and verified on its branch at d7be0a3 (daemon tests, the pack compared with the owner-approved files, live playback, the packaged VSIX in VS Code). Nothing of it is on main yet.", live="—",
+    blocker="Waits for pull request #5 to merge; its branch carries the evidence and the verified record.")
+rec(144, "A lost session asks for attention", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
+    actual="Not started. The daemon already plays the attention cue for a lost session; only a unit test touches it.", live="—",
+    blocker="Not started (Gate O, the owner's decision of 2026-09-26; the tests belong to pull request #5; see docs/rfcs/audio-mode-goal.md).")
+rec(145, "Audio Mode by ear (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
+    actual="Not started.", live="—",
+    blocker="Not started: needs the owner's listening session on the build of pull request #5 (see docs/rfcs/audio-mode-goal.md).")
+
+# Gate P, follow-through (added by the owner on 2026-09-27). Not started.
+rec(146, "Reconcile and merge the work in flight", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(147, "One command runs every test", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(148, "Checks on every pull request", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(149, "A steady UI suite", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(150, "The first click always lands", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(151, "Every live scenario rerun on the current build", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(152, "Performance re-measured", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(153, "A ledger that stays true", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+
+# Gate Q, cover everything and oversee the agents (added by the owner on 2026-09-27). Not started.
+rec(154, "Composer choices fill the row", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(155, "One-line search with a filter menu", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(156, "Every agent works from the same rules", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(157, "Oversee the other agents", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(158, "Gate M's theme and immersive look are back in scope", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(159, "The toolchain works without Xcode's license", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(160, "Owner actions in one place", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(161, "Everything merged into one main", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+
 SHORT_BLOCKERS = {
+    154: "not started (Gate Q, added by the owner on 2026-09-27)",
+    155: "not started (Gate Q, added by the owner on 2026-09-27)",
+    156: "not started (Gate Q, added by the owner on 2026-09-27)",
+    157: "not started (Gate Q, added by the owner on 2026-09-27)",
+    158: "not started (Gate Q, added by the owner on 2026-09-27)",
+    159: "not started (Gate Q, added by the owner on 2026-09-27)",
+    160: "not started (Gate Q, added by the owner on 2026-09-27)",
+    161: "not started (Gate Q, added by the owner on 2026-09-27)",
+    146: "not started (Gate P, added by the owner on 2026-09-27)",
+    147: "not started (Gate P, added by the owner on 2026-09-27)",
+    148: "not started (Gate P, added by the owner on 2026-09-27)",
+    149: "not started (Gate P, added by the owner on 2026-09-27)",
+    150: "not started (Gate P, added by the owner on 2026-09-27)",
+    151: "not started (Gate P, added by the owner on 2026-09-27)",
+    152: "not started (Gate P, added by the owner on 2026-09-27)",
+    153: "not started (Gate P, added by the owner on 2026-09-27)",
     142: "not started: waits for the owner\'s logo files",
+    143: "in progress: built and verified in pull request #5, not merged",
+    144: "not started (Gate O, the owner's decision of 2026-09-26)",
+    145: "not started: the owner's listening session",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
     41: "deferred: no Linux environment",

@@ -404,7 +404,9 @@ must stay within 10% of it. How the app meets the budget:
 
 - **Closed.** A sci-fi gradient built from the active theme's colors fills the screen: a dark
   door in dark mode and a light door in light mode, following the phone's system setting. A
-  grayscale Overseer logo (from `extension/media/overseer.svg`) sits across a diagonal seam.
+  grayscale version of Overseer's mark sits across a diagonal seam. The mark is the owner's logo
+  from AC-142 (`docs/design/brand/`). Until those files exist, the current mark
+  (`extension/media/overseer.svg`) stands in, read from one source so the swap is one change.
 - **Waiting.** A slow light travels along the seam, so the door is clearly alive.
 - **Opening.** When the first screen is drawn, the door splits along the seam. The halves slide
   apart and the logo splits with them. The app is already in place underneath.
@@ -504,23 +506,23 @@ the owner's Apple account.
 
 ### Now, so the iOS simulator can run
 
-Checked on this Mac on 2026-09-26: Xcode 27.0 is installed, its license has not been accepted,
-and the active developer directory is the command line tools. The Android tools and an Android 35
-system image are installed and need nothing from the owner.
+Done by the owner on 2026-09-26: the Xcode 27.0 license is accepted and the developer tools point
+at Xcode. Verified afterwards: the iOS 26.5 simulator runtime is installed, with iPhone 17,
+iPhone 17 Pro, iPhone 17 Pro Max, iPhone 17e and iPhone Air simulators available. The Android
+tools and an Android 35 system image are installed. Nothing more is needed for the simulator
+milestone.
 
-1. Accept the Xcode license:
+An Xcode update asks for its license again and can reset the developer directory. If the
+simulator tools stop working after an update, point the tools at Xcode first, then accept the
+license, in that order:
 
-   ```bash
-   sudo xcodebuild -license
-   ```
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
 
-2. Point the developer tools at Xcode:
-
-   ```bash
-   sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-   ```
-
-3. Open Xcode once and let it install the iOS simulator, if it offers to.
+```bash
+sudo xcodebuild -license
+```
 
 ### Later, for the real iPhone
 
@@ -539,6 +541,22 @@ Nothing here reuses an identifier, key or profile from another project.
 7. Tell the implementing agent the phone is paired. It runs the device checks: the speed budget,
    the door, a push on the locked phone, and a changed address.
 8. Do the phone session (AC-133) and mark the door and the transitions on the review page.
+
+## The first pull request
+
+The first pull request is the simulator milestone: phases 1 to 6 and 8 below. It covers 22 of the
+gate's 24 criteria.
+
+| Group | Criteria | What the pull request delivers |
+| --- | --- | --- |
+| Verified in full on the simulators | AC-116, AC-118, AC-119, AC-121, AC-122, AC-123, AC-124, AC-125, AC-126, AC-127, AC-130, AC-131, AC-132, AC-134, AC-141 | Checked boxes with evidence |
+| Simulator part now, iPhone part later | AC-115, AC-117, AC-120, AC-129, AC-135 | Partial: what is proven, and the owner's next step |
+| Waiting for the owner's marks | AC-136, AC-137 | Everything verified, a review page published, the owner asked. AC-136 also has an iPhone part. |
+| Outside this pull request | AC-128, AC-133 | Not started, with the blocker recorded: AC-107 for the first, the owner's iPhone for the second |
+
+The pull request stays a draft that says work continues until the milestone is done, so the
+monitor that merges finished work (AC-146) leaves it alone. It is marked ready at the end. Its
+tests join the one command that runs every test (AC-147) when that exists.
 
 ## Phases (goal candidates)
 
