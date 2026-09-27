@@ -425,7 +425,7 @@ pub fn jobs(store: &Store, p: &Value) -> Result<Value> {
         None | Some(Value::Null) => None,
         Some(Value::String(status)) if ["planned","ready","reserved","launching",
             "running","submitted","blocked","accepted","rejected","failed","cancel_requested",
-            "cancelled"].contains(&status.as_str()) => Some(status.as_str()),
+            "cancelled","superseded"].contains(&status.as_str()) => Some(status.as_str()),
         _ => bail!("invalid job status filter"),
     };
     let mut stmt = store

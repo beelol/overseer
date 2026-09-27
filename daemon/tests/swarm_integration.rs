@@ -43,6 +43,37 @@ fn accepted_patch(d: &Daemon, run: &str, job: &str, artifact: &str, patch: &str)
 }
 
 #[test]
+fn narrowing_scope_refuses_to_hide_an_already_integrated_patch() {
+    let d = Daemon::start(&[]);
+    let t = tmp();
+    let checkout = repo(&t.path().join("integrated-scope-source"));
+    let base = git(&checkout, &["rev-parse", "HEAD"]);
+    std::fs::write(checkout.join("a.txt"), "changed\n").unwrap();
+    let patch = format!("{}\n", git(&checkout, &["diff", "--", "a.txt"]));
+    std::fs::write(checkout.join("a.txt"), "a\n").unwrap();
+    let made = d.call("swarm.create",json!({"category":"Integrated scope",
+        "objective":"Change two modules","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"keep","title":"Keep","acceptance":"proof","deps":[]},
+        {"id":"omit","title":"Change a.txt","acceptance":"patch","deps":[]}
+    ]}));
+    accepted_patch(&d,run,"omit","omit-patch",&patch);
+    d.call("swarm.integrate",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"omit","artifact_id":"omit-patch","repo":checkout,
+        "base_revision":base}));
+    let error=d.try_call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Owner narrowed scope",
+        "jobs":[{"id":"keep","title":"Keep","acceptance":"proof","deps":[]}]}))
+        .unwrap_err();
+    assert!(error.contains("integrated or in-flight patch"),"{error}");
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["revision"],1);
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap().iter()
+        .find(|job|job["id"]=="omit").unwrap()["status"],"accepted");
+}
+
+#[test]
 fn accepting_an_unrelated_job_does_not_unlock_a_pending_patch_dependency() {
     let d = Daemon::start(&[]);
     let t = tmp();

@@ -88,6 +88,7 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
             .exists(params![run,job])?;
         let state = if contaminated { "contaminated" }
         else if conflict_unresolved { "conflict_unresolved" }
+        else if status == "superseded" { "excluded_by_scope" }
         else { match outcome {
             Some("environment_failure") => "environment_blocked",
             _ if review_stale => "review_stale",

@@ -4,6 +4,32 @@ use common::*;
 use serde_json::json;
 
 #[test]
+fn narrowing_scope_cannot_erase_an_uncertain_external_effect() {
+    let d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Effect scope",
+        "objective":"Investigate grant","allowed_targets":["fixture-local"]}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"keep","title":"Keep","acceptance":"proof","deps":[]},
+        {"id":"grant","title":"Grant","acceptance":"proof","deps":[]}
+    ]}));
+    let attempt=d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"grant"}));
+    let effect=d.call("swarm.effect.begin",json!({"run_id":run,"job_id":"grant",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "effect_id":"grant-1","operation_id":"fixture:grant:1","revision":1}));
+    assert_eq!(effect["outcome"],"unknown");
+    let error=d.try_call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Owner narrowed scope",
+        "jobs":[{"id":"keep","title":"Keep","acceptance":"proof","deps":[]}]}))
+        .unwrap_err();
+    assert!(error.contains("unreconciled side effect"),"{error}");
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["revision"],1);
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap().iter()
+        .find(|job|job["id"]=="grant").unwrap()["status"],"reserved");
+}
+
+#[test]
 fn lost_side_effect_ack_blocks_retry_until_outcome_is_reconciled() {
     let mut d = Daemon::start(&[]);
     let temp = tmp();

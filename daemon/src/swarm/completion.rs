@@ -140,7 +140,8 @@ pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
         .exists([run])? {
         bail!("open or unresolved evidence conflict blocks completion");
     }
-    let mut stmt = tx.prepare("SELECT id,plan_revision,status FROM swarm_jobs WHERE run_id=?1")?;
+    let mut stmt = tx.prepare("SELECT id,plan_revision,status FROM swarm_jobs
+        WHERE run_id=?1 AND status!='superseded'")?;
     let jobs = stmt
         .query_map(params![run], |r| {
             Ok((

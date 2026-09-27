@@ -72,6 +72,71 @@ fn accept_patch(d: &Daemon, run: &str, revision: i64, job: &str, artifact: &str,
     );
 }
 
+#[test]
+fn catalog_s3_narrowing_to_twelve_modules_supersedes_the_other_twelve() {
+    let manifest: serde_json::Value = serde_json::from_slice(&std::fs::read(
+        repo_root().join("fixtures/swarm/catalog-v1/manifest.json")).unwrap()).unwrap();
+    let names: Vec<&str> = manifest["resource_modules"].as_array().unwrap().iter()
+        .map(|name|name.as_str().unwrap()).collect();
+    assert_eq!(names.len(),24);
+    let d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Catalog scope variant",
+        "objective":"Migrate only twelve of twenty-four modules",
+        "allowed_targets":["system-codex"],"source_change_permission":"isolated"}));
+    let run=made["id"].as_str().unwrap();
+    let mut jobs=vec![json!({"id":"contract","title":"Cursor contract",
+        "acceptance":"tuple cursor","deps":[]})];
+    jobs.extend(names.iter().map(|name|json!({"id":name,
+        "title":format!("Migrate {name}"),"acceptance":"cursor check","deps":["contract"]})));
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":jobs}));
+    let contract=d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"contract"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"contract",
+        "attempt_id":contract["id"],"token":contract["token"],
+        "artifact_id":"cursor-contract","source_revision":1,"kind":"contract",
+        "content":"stable (createdAt,id) cursor"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"contract",
+        "attempt_id":contract["id"],"token":contract["token"],
+        "message_id":"contract-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["cursor-contract"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"contract","decision":"accept","evidence":["cursor-contract"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"contract","attempt_id":contract["id"]}));
+    let excluded=names[20];
+    let old=d.call("swarm.attempt.register",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":excluded}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":excluded,
+        "attempt_id":old["id"],"token":old["token"],
+        "message_id":"excluded-result","type":"result","revision":1,
+        "payload":{"note":"work started before scope change"}}));
+    let mut retained=vec![json!({"id":"contract","title":"Cursor contract",
+        "acceptance":"tuple cursor","deps":[]})];
+    retained.extend(names[..12].iter().map(|name|json!({"id":name,
+        "title":format!("Migrate {name}"),"acceptance":"cursor check","deps":["contract"]})));
+    let narrowed=d.call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Owner selected twelve modules",
+        "jobs":retained}));
+    assert_eq!(narrowed["superseded"],12);
+    let pending=d.call("swarm.jobs",json!({"id":run,"status":"cancel_requested"}));
+    assert_eq!(pending["jobs"].as_array().unwrap().len(),1);
+    let control=d.call("swarm.messages",json!({"run_id":run,"recipient":old["id"],
+        "token":old["token"]}));
+    assert!(control["messages"].as_array().unwrap().iter().any(|m|m["type"]=="stop"));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":2,"job_id":excluded,"attempt_id":old["id"]}));
+    let superseded=d.call("swarm.jobs",json!({"id":run,"status":"superseded"}));
+    assert_eq!(superseded["jobs"].as_array().unwrap().len(),12);
+    let all=d.call("swarm.jobs",json!({"id":run,"limit":100}));
+    assert_eq!(all["jobs"].as_array().unwrap().iter()
+        .filter(|job|job["status"]=="accepted").count(),1);
+    assert_eq!(all["jobs"].as_array().unwrap().iter()
+        .filter(|job|job["status"]=="ready").count(),12);
+    assert!(d.try_call("swarm.decide",json!({"run_id":run,"generation":1,
+        "revision":2,"job_id":excluded,"decision":"accept",
+        "evidence":["cursor-contract"]})).is_err());
+}
+
 // Explicitly opt in because this real TypeScript backend requires Node 24 and
 // opens a localhost socket. It never contacts a provider or external service.
 #[test]

@@ -12,6 +12,8 @@ struct OldJob {
     deps: Vec<String>,
     resource_claims: Vec<plan::ResourceClaim>,
     attempts: i64,
+    status: String,
+    stop_reason: Option<String>,
 }
 
 fn deps_satisfied(
@@ -83,7 +85,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         bail!("swarm run cannot be revised in this state");
     }
     let mut stmt = tx.prepare(
-        "SELECT id,title,acceptance,deps,resource_claims,attempt_count FROM swarm_jobs WHERE run_id=?1",
+        "SELECT id,title,acceptance,deps,resource_claims,attempt_count,status,stop_reason FROM swarm_jobs WHERE run_id=?1",
     )?;
     let rows = stmt
         .query_map(params![id], |r| {
@@ -94,12 +96,14 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
                 r.get::<_, String>(3)?,
                 r.get::<_, String>(4)?,
                 r.get::<_, i64>(5)?,
+                r.get::<_, String>(6)?,
+                r.get::<_, Option<String>>(7)?,
             ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
     let mut old = HashMap::new();
-    for (job_id, title, acceptance, raw_deps, raw_claims, attempts) in rows {
+    for (job_id, title, acceptance, raw_deps, raw_claims, attempts, status, stop_reason) in rows {
         old.insert(
             job_id,
             OldJob {
@@ -108,13 +112,24 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
                 deps: serde_json::from_str(&raw_deps)?,
                 resource_claims: serde_json::from_str(&raw_claims)?,
                 attempts,
+                status,
+                stop_reason,
             },
         );
     }
     let new_ids: HashSet<&str> = jobs.iter().map(|j| j.id.as_str()).collect();
-    if old.keys().any(|k| !new_ids.contains(k.as_str())) {
-        bail!("revision must retain existing job ids; removal needs a separate cancellation transition");
+    if jobs.iter().any(|job| old.get(&job.id).is_some_and(|previous|
+        previous.status == "superseded"
+        || (previous.status == "cancel_requested" && previous.stop_reason.as_deref() == Some("scope_narrowed")))) {
+        bail!("superseded job id cannot be reused in a later plan");
     }
+    let mut omitted: Vec<String> = old.iter().filter_map(|(job, previous)| {
+        (!new_ids.contains(job.as_str()) && previous.status != "superseded"
+            && !(previous.status == "cancel_requested"
+                && previous.stop_reason.as_deref() == Some("scope_narrowed")))
+            .then_some(job.clone())
+    }).collect();
+    omitted.sort();
     let mut affected: HashSet<String> = jobs
         .iter()
         .filter(|j| {
@@ -138,7 +153,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
             break;
         }
     }
-    if affected.is_empty() && new_ids.len() == old.len() {
+    if affected.is_empty() && omitted.is_empty() && jobs.iter().all(|job| old.contains_key(&job.id)) {
         return Ok(json!({"id":id,"generation":generation,"revision":expected,
             "affected":0,"redirected":0,"unchanged":true}));
     }
@@ -146,6 +161,41 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     let revision = expected + 1;
     let safe_reason = crate::redact::redact(reason);
     let mut redirected = 0;
+    for job in &omitted {
+        let integrated: bool = tx.prepare("SELECT 1 FROM swarm_integrated_artifacts
+            WHERE run_id=?1 AND job_id=?2")?.exists(params![id,job])?;
+        let integrating: bool = tx.prepare("SELECT 1 FROM swarm_integration_intents
+            WHERE run_id=?1 AND job_id=?2")?.exists(params![id,job])?;
+        if integrated || integrating {
+            bail!("integrated or in-flight patch cannot be silently excluded from scope");
+        }
+        let unsafe_effects: bool = tx.prepare("SELECT 1 FROM swarm_effects
+            WHERE run_id=?1 AND job_id=?2 AND outcome IN ('unknown','applied')")?
+            .exists(params![id,job])?;
+        if unsafe_effects {
+            bail!("unreconciled side effect blocks scope narrowing");
+        }
+        let mut stmt = tx.prepare("SELECT id,revision FROM swarm_attempts
+            WHERE run_id=?1 AND job_id=?2 AND status='registered'")?;
+        let live = stmt.query_map(params![id,job], |row| Ok((row.get::<_,String>(0)?,row.get::<_,i64>(1)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(stmt);
+        let status = if live.is_empty() { "superseded" } else { "cancel_requested" };
+        tx.execute("UPDATE swarm_jobs SET plan_revision=?3,status=?4,
+            stop_reason='scope_narrowed',updated_ms=?5 WHERE run_id=?1 AND id=?2",
+            params![id,job,revision,status,now])?;
+        if live.is_empty() {
+            tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3
+                WHERE run_id=?1 AND job_id=?2 AND status='active'",params![id,job,now])?;
+        }
+        for (attempt,attempt_revision) in live {
+            tx.execute("INSERT OR IGNORE INTO swarm_messages
+                (run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+                VALUES(?1,?2,?3,?4,'control',?4,'stop',?5,?6,'queued',?7,?7)",
+                params![id,format!("scope-stop-{revision}-{attempt}"),job,attempt,attempt_revision,
+                    json!({"reason":"scope_narrowed","new_revision":revision}).to_string(),now])?;
+        }
+    }
     for job in &jobs {
         let Some(previous) = old.get(&job.id) else {
             let ready = deps_satisfied(&tx, id, &job.deps, &affected)?;
@@ -199,7 +249,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     let backlog_limit = prior["policy"]["effective"]["backlog_max"]
         .as_i64().unwrap_or(1000).min(10_000);
     let nonterminal: i64 = tx.query_row(
-        "SELECT COUNT(*) FROM swarm_jobs WHERE run_id=?1 AND status NOT IN ('accepted','failed','cancelled')",
+        "SELECT COUNT(*) FROM swarm_jobs WHERE run_id=?1 AND status NOT IN ('accepted','failed','cancelled','superseded')",
         [id], |r| r.get(0),
     )?;
     if nonterminal > backlog_limit {
@@ -214,6 +264,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     super::materialize_ready(&tx, id, now)?;
     tx.commit()?;
     Ok(
-        json!({"id":id,"generation":generation,"revision":revision,"affected":affected.len(),"redirected":redirected}),
+        json!({"id":id,"generation":generation,"revision":revision,"affected":affected.len(),
+            "superseded":omitted.len(),"redirected":redirected}),
     )
 }

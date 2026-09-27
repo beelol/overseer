@@ -103,6 +103,108 @@ fn user_stop_needs_only_the_run_id_even_after_a_plan_revision() {
 }
 
 #[test]
+fn narrowing_scope_supersedes_queued_work_and_stops_an_active_excluded_attempt() {
+    let d = Daemon::start(&[]);
+    let made = d.call("swarm.create",json!({"category":"Catalog scope",
+        "objective":"Migrate resource modules","allowed_targets":["system-codex"]}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"keep","title":"Keep module","acceptance":"cursor check","deps":[]},
+        {"id":"omit_queued","title":"Omit queued","acceptance":"cursor check","deps":[]},
+        {"id":"omit_active","title":"Omit active","acceptance":"cursor check","deps":[]}
+    ]}));
+    d.call("swarm.claim",json!({"run_id":run,"job_id":"omit_queued",
+        "generation":1,"revision":1,"resource":"file:queued","mode":"write"}));
+    let active=d.call("swarm.attempt.register",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"omit_active"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"omit_active",
+        "attempt_id":active["id"],"token":active["token"],"artifact_id":"old-proof",
+        "source_revision":1,"kind":"finding","content":"old work remains inspectable"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"omit_active",
+        "attempt_id":active["id"],"token":active["token"],
+        "message_id":"old-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["old-proof"]}}));
+    let revised=d.call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Owner narrowed the migration",
+        "jobs":[{"id":"keep","title":"Keep module","acceptance":"cursor check","deps":[]}]}));
+    assert_eq!(revised["revision"],2);
+    assert_eq!(revised["superseded"],2);
+    let jobs=d.call("swarm.jobs",json!({"id":run,"limit":10}));
+    let status=|job:&str| jobs["jobs"].as_array().unwrap().iter()
+        .find(|row| row["id"]==job).unwrap()["status"].clone();
+    assert_eq!(status("keep"),"ready");
+    assert_eq!(status("omit_queued"),"superseded");
+    assert_eq!(status("omit_active"),"cancel_requested");
+    assert_eq!(d.call("swarm.jobs",json!({"id":run,"status":"superseded"}))["jobs"]
+        .as_array().unwrap().len(),1);
+    let control=d.call("swarm.messages",json!({"run_id":run,"recipient":active["id"],
+        "token":active["token"]}));
+    assert!(control["messages"].as_array().unwrap().iter().any(|m|m["type"]=="stop"));
+    assert!(d.try_call("swarm.decide",json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":"omit_active","decision":"accept","evidence":["old-proof"]})).is_err());
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"job_id":"omit_active",
+        "attempt_id":active["id"],"generation":1,"revision":2}));
+    let after=d.call("swarm.jobs",json!({"id":run,"limit":10}));
+    assert_eq!(after["jobs"].as_array().unwrap().iter()
+        .find(|row|row["id"]=="omit_active").unwrap()["status"],"superseded");
+    let coverage=d.call("swarm.coverage",json!({"run_id":run}));
+    assert_eq!(coverage["rows"].as_array().unwrap().iter()
+        .find(|row|row["job_id"]=="omit_active").unwrap()["coverage_state"],
+        "excluded_by_scope");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let proof: String=db.query_row("SELECT content FROM swarm_artifacts WHERE run_id=?1 AND id='old-proof'",
+        [run],|row|row.get(0)).unwrap();
+    assert_eq!(proof,"old work remains inspectable");
+    let claim: String=db.query_row("SELECT status FROM swarm_claims WHERE run_id=?1 AND job_id='omit_queued'",
+        [run],|row|row.get(0)).unwrap();
+    assert_eq!(claim,"released");
+}
+
+#[test]
+fn narrowed_scope_completion_requires_only_retained_jobs() {
+    let d = Daemon::start(&[]);
+    let made = d.call("swarm.create",json!({"category":"Narrowed completion",
+        "objective":"Inspect two modules","allowed_targets":["system-codex"]}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"keep","title":"Keep","acceptance":"proof","deps":[]},
+        {"id":"omit","title":"Omit","acceptance":"proof","deps":[]}
+    ]}));
+    d.call("swarm.revise",json!({"id":run,"generation":1,"expected_revision":1,
+        "reason":"Owner narrowed scope","jobs":[
+            {"id":"keep","title":"Keep","acceptance":"proof","deps":[]}]}));
+    let attempt=d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"keep"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"keep",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "artifact_id":"keep-proof","source_revision":1,"kind":"finding","content":"checked"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"keep",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "message_id":"keep-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["keep-proof"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":"keep","decision":"accept","evidence":["keep-proof"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"job_id":"keep",
+        "attempt_id":attempt["id"],"generation":1,"revision":2}));
+    d.call("swarm.ack",json!({"run_id":run,"message_id":"keep-result",
+        "recipient":"director","generation":1,"revision":1,"phase":"applied"}));
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap()
+        .execute("UPDATE swarm_runs SET status='running' WHERE id=?1",[run]).unwrap();
+    let check=json!({"job_id":"keep","outcome":"passed","evidence":["keep-proof"]});
+    let extra=json!({"job_id":"omit","outcome":"passed","evidence":["keep-proof"]});
+    let base=json!({"run_id":run,"generation":1,"revision":2,
+        "request_id":"narrow-complete","summary":"One module checked",
+        "verification":"Retained module evidence reviewed"});
+    let mut bad=base.clone();
+    bad["checks"]=json!([check.clone(),extra]);
+    assert!(d.try_call("swarm.complete",bad).unwrap_err()
+        .contains("every planned job"));
+    let mut good=base;
+    good["checks"]=json!([check]);
+    assert_eq!(d.call("swarm.complete",good)["status"],"completed");
+}
+
+#[test]
 fn cancelled_jobs_release_claims_for_later_swarms() {
     let d = Daemon::start(&[]);
     for (category, action) in [("Stop claim", "swarm.stop"), ("Off claim", "swarm.off")] {
