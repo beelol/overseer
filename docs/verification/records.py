@@ -1327,25 +1327,31 @@ rec(144, "A lost session asks for attention", "verified", date="2026-09-26",
     evidence="[daemon tests](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/cargo-test-overseerd.txt), [requirement by requirement](https://github.com/beelol/overseer/blob/0d01397/docs/verification/audio-mode.md)",
     live="Fixtures with a real daemon.",
     limits="Not merged: the tests are on the branch of pull request #5. A lost child agent staying silent is covered by AC-143's nested-child test, not by a test of its own here.")
-rec(145, "Audio Mode by ear (owner-confirmed)", "in progress", date="—",
+rec(145, "Audio Mode by ear (owner-confirmed)", "partial", date="2026-09-27 (the owner's session)",
     commit="106d3e8 (branch codex/reactor-audio-mode, pull request #5, not merged yet)",
+    proven="in the owner's session of 2026-09-27 the owner marked all twelve Reactor cues Right, heard start, completion and attention from fixture agents with Audio Mode on and VS Code open, and heard nothing from the same agents with Audio Mode off",
+    deferred="four steps the session did not do: start, completion and attention with VS Code closed; two agents at the same moment; System voice; the owner's own Commander folder. The record says yes to them, but the session's log shows that the window was never quit, that `t` and `v` were not pressed and that no folder was set",
     harness="Fixture agents only (generic programs and the Claude fixture); no accounts, no paid tokens",
     fixture="`node test/ui/listen-audio.js` on the branch of pull request #5: VS Code with its own profile and its own Overseer home, so the owner's VS Code, daemon and agents are not touched",
-    steps="""The owner's listening session, about ten minutes, on the branch of pull request #5:
+    steps="""The owner's listening session, about ten minutes, on the branch of pull request #5. What is still to do is steps 4 to 6.
 1. `node extension/scripts/package.js`, then `node test/ui/listen-audio.js`. A VS Code window opens; the keys below are typed in the terminal. Set the volume to what you work with.
 2. `o` turns Audio Mode on. `1` to `9`, `a`, `b`, `c` preview the twelve Reactor cues.
 3. `s`: an agent starts and completes 3 s later (start, then complete). `n`: an agent asks for permission (start, then attention). `t`: two agents ask at the same moment (one attention cue; VS Code counts 2).
-4. Quit that VS Code window (Cmd+Q in it) and press `s` and `n` again: the cues still play.
-5. `v` switches to System voice; press `s` and `n`.
-6. For your Commander folder, run the script again, and in its VS Code window choose *Audio Mode and Reactor Cues…* in the Agents view's menu, then *Import private Commander pack…* and your folder. `p` selects the track; press `s` and `n`. The files stay where they are.
+4. For your Commander folder, choose *Audio Mode and Reactor Cues…* in the Agents view's menu of that window, then *Import private Commander pack…* and your folder. `p` selects the track; press `s` and `n`. The files stay where they are.
+5. `v` switches to System voice; press `s` and `n`. `r` goes back to Reactor.
+6. Quit that VS Code window (Cmd+Q in it) and press `s` and `n` again: the cues still play.
 7. `f` turns Audio Mode off; `s` and `n` must be silent.
-8. `m` plays each cue again and asks for its mark (Right or Needs work), asks what you heard in steps 3 to 7, and writes `docs/verification/evidence/ui/audio-listening/marks.json`. `q` closes the window, the agents and the session's daemon.""",
+8. `m` plays each cue again and asks for its mark (Right or Needs work), then asks what you heard, only for the steps this session did, and writes the session's record to `docs/verification/evidence/ui/audio-listening/`. `q` closes the window, the agents and the session's daemon.""",
     expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
-    actual="Prepared, not confirmed. The session script was run through a pseudo-terminal: on, a preview, an agent that completes, one that needs you, off, and quit each did what the key says and left nothing running. The owner has not listened yet.",
-    evidence="[the session script](https://github.com/beelol/overseer/blob/0d01397/test/ui/listen-audio.js)",
+    actual="""- **The twelve cues:** each was played and marked; all twelve are *Right*. Nothing needs replacing.
+- **With Audio Mode on, VS Code open:** the session turned it on, started an agent that completed and one that asked for permission; the owner heard start, completion and attention.
+- **With Audio Mode off:** the session turned it off and started an agent that completed and two that asked for permission; the owner heard nothing.
+- **Not done in the session:** VS Code closed (the window stayed open until the session quit), two agents at the same moment (`t` was not pressed), System voice (`v` was not pressed), the Commander folder (none was set). The script of that session asked about every step, done or not, and the record holds a yes for these four; the evidence sets each answer beside the session's log.
+- The script has since been changed to ask only about the steps a session did and to keep each session's record.""",
+    evidence="[the owner's record and what its session did](https://github.com/beelol/overseer/blob/2ec98c9/docs/verification/evidence/ui/audio-listening/README.md), [marks.json](https://github.com/beelol/overseer/blob/2ec98c9/docs/verification/evidence/ui/audio-listening/marks.json), [the session script](https://github.com/beelol/overseer/blob/2ec98c9/test/ui/listen-audio.js)",
     live="Real sound on the owner's Mac; agents are fixtures.",
     limits="A cue marked Needs work is replaced only by a file the owner selects in the voice lab; nothing is regenerated here.",
-    blocker="Waits for the owner's listening session (the steps above) and the marks it writes.")
+    blocker="Waits for the owner to hear the four remaining steps (4 to 6 above, and `t`), in a session of a few minutes.")
 
 # Gate P, follow-through (added by the owner on 2026-09-27). Not started.
 rec(146, "Reconcile and merge the work in flight", "not started", date="—", commit="—",
@@ -1417,7 +1423,6 @@ SHORT_BLOCKERS = {
     152: "not started (Gate P, added by the owner on 2026-09-27)",
     153: "not started (Gate P, added by the owner on 2026-09-27)",
     142: "not started: waits for the owner\'s logo files",
-    145: "prepared: waits for the owner's listening session",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
     41: "deferred: no Linux environment",

@@ -85,7 +85,10 @@ UTF-8 JSON value: a message of the daemon's protocol. A frame that fails to decr
 of order or is malformed ends the session. Requests from a device are limited to 1 MiB after
 joining, the same as the local socket. Replies and events are limited to 64 MiB.
 
-The device sends a WebSocket ping every 20 s. The gateway ends a session that was silent for 60 s.
+The device sends the request `ping` every 20 s, encrypted like every other request, and the
+gateway answers it with its clock (`{"now_ms"}`). The gateway ends a session from which nothing
+arrived for 60 s. WebSocket ping frames are not used for this: they are outside the encrypted
+session, so anyone on the path could keep a dead session looking alive.
 
 ## Messages
 
@@ -95,10 +98,18 @@ The daemon's protocol, unchanged: requests `{"id", "method", "params"}`, replies
 
 Additions for devices:
 
-- **Request id.** A request whose method is of class *control* carries `"request_id"`, a UUID the
+- **Request id.** A request whose method is of class *control* carries `"request_id"` at the top
+  of the message, beside `"id"`, `"method"` and `"params"` (not inside `params`): a UUID the
   device creates once per action and repeats on every retry. The gateway stores the outcome per
-  device and request id for 24 hours and answers a retry with the stored outcome. A control
-  request without one is refused with `request_id_required`.
+  device and request id for 7 days and answers a retry with the stored outcome. A request that
+  was started and never finished (the daemon stopped in the middle) is not run again: a retry is
+  answered with `outcome_unknown`. The same id with another method or other parameters is
+  refused with `request_id_reused`. A control request without an id is refused with
+  `request_id_required`. Another device's request with the same id is a request of its own.
+- **Declared parameters only.** A device may send only the parameters `protocol/protocol.json`
+  declares for the method. Anything else is refused with `invalid_params` and names the
+  parameter. The local socket takes more (a program to run, its arguments, an approval policy);
+  a phone never chooses those.
 - **Classes.** Every method has a class in `protocol/protocol.json`: `self` (the calling device's
   own session and settings), `read`, `control` or `mac_only`. *Watch only* devices may call `self`
   and `read`. *Full control* devices may also call `control`. No device may call `mac_only`.
@@ -107,10 +118,17 @@ Additions for devices:
   `remote_command` with the source `phone:<device name>`.
 - **Gateway notices.** `{"method": "gateway", "params": {"state": "off"}}` is sent to every
   session before phone access is turned off. `{"state": "revoked"}` is sent to a device before
-  its session ends because it was revoked.
+  its session ends because it was revoked. A device that was revoked while it was away learns it
+  the next time it connects: the gateway completes the handshake with it, sends the `revoked`
+  notice as the only message, and closes. It answers no request of a revoked device. Without
+  this a removed phone could not tell "removed" from "unreachable" and would try forever.
+- **The cursor.** `events.subscribe` with a cursor beyond the newest event (the daemon's data
+  was replaced) answers `history_truncated` with `after` set to the newest event; the device
+  takes `after` as its cursor and loads the state again.
 
-Error codes added: `watch_only`, `mac_only`, `request_id_required`, `already_answered`
-(with `data`: the first answer), `unknown_method`.
+Error codes added: `watch_only`, `mac_only`, `request_id_required`, `request_id_reused`,
+`outcome_unknown`, `invalid_params`, `already_answered` (with `data`: the first answer, who gave
+it and when), `unknown_method`.
 
 ## Pairing code
 
