@@ -1,5 +1,6 @@
 # An agent's conversation, opened from the list: its row brought to the middle and tapped, again
-# while the list is still changing under the finger (a row that moves takes no tap).
+# while the list is still changing under the finger (a row that moves takes no tap). Each attempt
+# looks below and above, and taps only a row it found.
 appId: ${APP}
 ---
 - repeat:
@@ -18,14 +19,18 @@ appId: ${APP}
       - scrollUntilVisible:
           element:
             id: "agents.row.${RUN}"
-          direction: DOWN
-          timeout: 20000
+          direction: UP
+          timeout: 10000
+          optional: true
       - tapOn:
           id: "agents.row.${RUN}"
+          optional: true
       - extendedWaitUntil:
           visible:
             id: "agent.list"
-          timeout: 10000
+          timeout: 20000
           optional: true
-- assertVisible:
-    id: "agent.list"
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 30000
