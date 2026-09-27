@@ -199,6 +199,14 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
             break;
         }
     }
+    for job in &affected {
+        if old.get(job).and_then(|previous| previous.stop_reason.as_deref())
+            == Some("evidence_conflict")
+            && tx.prepare("SELECT 1 FROM swarm_integration_intents
+                WHERE run_id=?1 AND job_id=?2")?.exists(params![id,job])? {
+            bail!("invalidated integration intent requires reconciliation before plan revision");
+        }
+    }
     if affected.is_empty() && omitted.is_empty() && jobs.iter().all(|job| old.contains_key(&job.id)) {
         let mut result = json!({"id":id,"generation":generation,"revision":expected,
             "affected":0,"redirected":0,"unchanged":true});

@@ -41,7 +41,7 @@ pub use owner::mark_uncertain_spawn as mark_uncertain_director_spawn;
 pub use dispatch::next as dispatch_next;
 pub use dispatch::recover_pending as recover_pending_dispatches;
 pub use effects::{begin as begin_effect, reconcile as reconcile_effect};
-pub use integration::integrate;
+pub use integration::{integrate, reconcile_invalidated as reconcile_invalidated_integrations};
 pub use limits::set as set_run_limit;
 pub use verification::{prepare as prepare_verification, run as run_verification,
     record as record_verification, reconcile_control_verifications, PreparedVerification};

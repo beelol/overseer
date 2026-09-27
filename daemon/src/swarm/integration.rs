@@ -133,6 +133,79 @@ fn ensure_current(store: &Store, run: &str, job: &str, generation: i64, revision
     Ok(())
 }
 
+/// Rewind only an unacknowledged integration whose exact private patch effect
+/// is known. A conflicting or unfamiliar workspace is left intact for review.
+pub fn reconcile_invalidated(store: &mut Store) -> Result<usize> {
+    let mut stmt=store.conn.prepare(
+        "SELECT i.run_id,i.artifact_id,i.job_id,i.prior_commit,i.expected_tree,
+                g.workspace_path,g.current_commit
+         FROM swarm_integration_intents i
+         JOIN swarm_jobs j ON j.run_id=i.run_id AND j.id=i.job_id
+         JOIN swarm_integrations g ON g.run_id=i.run_id
+         WHERE j.status='blocked' AND j.stop_reason='evidence_conflict'
+         ORDER BY i.created_ms LIMIT 100")?;
+    let rows=stmt.query_map([],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,
+        r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,
+        r.get::<_,String>(5)?,r.get::<_,String>(6)?)))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    if rows.is_empty() { return Ok(0); }
+    let private_root=match std::fs::canonicalize(paths::data_dir().join("swarm-integrations")) {
+        Ok(path)=>path,
+        Err(_)=>return Ok(0),
+    };
+    let data_root=std::fs::canonicalize(paths::data_dir())?;
+    if private_root.parent()!=Some(data_root.as_path()) { return Ok(0); }
+    let mut cleared=0;
+    for (run,artifact,job,prior,tree,path,current) in rows {
+        let result=(|| -> Result<bool> {
+            if current!=prior { return Ok(false); }
+            let workspace=std::fs::canonicalize(&path)?;
+            if workspace==private_root || !workspace.starts_with(&private_root)
+                || git::toplevel(&workspace)?!=workspace {
+                return Ok(false);
+            }
+            let head=git::head(&workspace).ok_or_else(||anyhow!("integration workspace has no head"))?;
+            let clean=git::git(&workspace,&["status","--porcelain=v1"])?.is_empty();
+            if head==prior {
+                if !clean && (git::git(&workspace,&["write-tree"])?!=tree
+                    || !git::git(&workspace,&["diff","--name-only"])?.is_empty()
+                    || !git::git(&workspace,&["ls-files","--others","--exclude-standard"])?.is_empty()) {
+                    return Ok(false);
+                }
+            } else {
+                let parents=git::git(&workspace,&["rev-list","--parents","-n","1","HEAD"])?;
+                let committed_tree=git::git(&workspace,&["rev-parse","HEAD^{tree}"])?;
+                let message=git::git(&workspace,&["log","-1","--format=%s"])?;
+                if !clean || parents!=format!("{head} {prior}") || committed_tree!=tree
+                    || message!=format!("Integrate Swarm {run} {job} {artifact}") {
+                    return Ok(false);
+                }
+            }
+            if head!=prior || !clean {
+                git::git(&workspace,&["reset","--hard",&prior])?;
+            }
+            if git::head(&workspace).as_deref()!=Some(prior.as_str())
+                || !git::git(&workspace,&["status","--porcelain=v1"])?.is_empty() {
+                return Ok(false);
+            }
+            let removed=store.conn.execute(
+                "DELETE FROM swarm_integration_intents WHERE run_id=?1 AND artifact_id=?2
+                   AND job_id=?3 AND prior_commit=?4 AND EXISTS
+                   (SELECT 1 FROM swarm_jobs WHERE run_id=?1 AND id=?3
+                    AND status='blocked' AND stop_reason='evidence_conflict')",
+                params![run,artifact,job,prior])?;
+            Ok(removed==1)
+        })();
+        match result {
+            Ok(true)=>cleared+=1,
+            Ok(false)=>{},
+            Err(error)=>crate::log(&format!("swarm invalidated integration recovery held for {run}: {error}")),
+        }
+    }
+    Ok(cleared)
+}
+
 pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
     super::owner::require(store,run,p)?;

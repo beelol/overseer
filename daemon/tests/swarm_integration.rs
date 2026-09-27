@@ -441,7 +441,137 @@ fn late_dependency_conflict_cannot_commit_an_in_flight_patch() {
     let workspace:String=db.query_row("SELECT workspace_path FROM swarm_integrations
         WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
     assert_eq!(git(std::path::Path::new(&workspace),&["rev-parse","HEAD"]),base);
+    let until=Instant::now()+Duration::from_secs(5);
+    loop {
+        let pending:i64=db.query_row("SELECT COUNT(*) FROM swarm_integration_intents
+            WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
+        if pending==0 { break; }
+        assert!(Instant::now()<until,"staged invalidated patch was not reconciled");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert!(git(std::path::Path::new(&workspace),&["status","--porcelain=v1"]).is_empty());
     assert_eq!(fingerprint(&checkout),source_before);
+}
+
+#[test]
+fn late_conflict_reconciles_an_unacknowledged_isolated_commit_after_restart() {
+    use std::time::{Duration,Instant};
+
+    let mut d=Daemon::start(&[]);
+    let t=tmp();
+    let checkout=repo(&t.path().join("post-commit-conflict"));
+    let base=git(&checkout,&["rev-parse","HEAD"]);
+    std::fs::write(checkout.join("a.txt"),"changed\n").unwrap();
+    let patch=format!("{}\n",git(&checkout,&["diff","--","a.txt"]));
+    std::fs::write(checkout.join("a.txt"),"a\n").unwrap();
+    let source_before=fingerprint(&checkout);
+    let made=d.call("swarm.create",json!({"category":"Post-commit conflict",
+        "objective":"Update a.txt after route check","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run=made["id"].as_str().unwrap().to_string();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"Left probe","acceptance":"route proof"},
+        {"id":"right","title":"Right probe","acceptance":"route proof"},
+        {"id":"patch","title":"Change a.txt","acceptance":"patch","deps":["right"]}
+    ]}));
+    for (job,content,accepted) in [
+        ("right","guarded route returned 403",true),
+        ("left","unguarded route returned 200",false)
+    ] {
+        let attempt=d.call("swarm.attempt.register",json!({"run_id":run,
+            "generation":1,"revision":1,"job_id":job}));
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "artifact_id":format!("{job}-evidence"),"source_revision":1,
+            "kind":"finding","content":content}));
+        d.call("swarm.report",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["id"],"token":attempt["token"],
+            "message_id":format!("{job}-result"),"type":"result","revision":1,
+            "payload":{"artifact_ids":[format!("{job}-evidence")]}}));
+        if accepted {
+            d.call("swarm.decide",json!({"run_id":run,"generation":1,
+                "revision":1,"job_id":job,"decision":"accept",
+                "evidence":[format!("{job}-evidence")]}));
+            d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+                "generation":1,"revision":1,"job_id":job,"attempt_id":attempt["id"]}));
+        }
+    }
+    accepted_patch(&d,&run,"patch","dependent-patch",&patch);
+    let interrupted=d.try_call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"patch",
+        "artifact_id":"dependent-patch","repo":checkout,"base_revision":base,
+        "fixture_fault":"after_commit"})).unwrap_err();
+    assert!(interrupted.contains("fixture interruption"),"{interrupted}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let workspace:String=db.query_row("SELECT workspace_path FROM swarm_integrations
+        WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
+    assert_ne!(git(std::path::Path::new(&workspace),&["rev-parse","HEAD"]),base);
+    d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,
+        "revision":1,"conflict_id":"late-route-disagreement","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"Route results disagree"}));
+    d.kill9();
+    d.spawn();
+    let until=Instant::now()+Duration::from_secs(5);
+    loop {
+        let pending:i64=db.query_row("SELECT COUNT(*) FROM swarm_integration_intents
+            WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
+        if pending==0 { break; }
+        assert!(Instant::now()<until,"invalidated integration intent was not reconciled");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert_eq!(git(std::path::Path::new(&workspace),&["rev-parse","HEAD"]),base);
+    let integrated:i64=db.query_row("SELECT COUNT(*) FROM swarm_integrated_artifacts
+        WHERE run_id=?1",[&run],|r|r.get(0)).unwrap();
+    assert_eq!(integrated,0);
+    assert_eq!(fingerprint(&checkout),source_before);
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|j|j["id"]=="patch").unwrap()["status"],"blocked");
+}
+
+#[test]
+fn invalidated_integration_recovery_preserves_an_unexpected_workspace_edit() {
+    let mut d=Daemon::start(&[]);
+    let t=tmp();
+    let checkout=repo(&t.path().join("tampered-conflict-integration"));
+    let base=git(&checkout,&["rev-parse","HEAD"]);
+    std::fs::write(checkout.join("a.txt"),"changed\n").unwrap();
+    let patch=format!("{}\n",git(&checkout,&["diff","--","a.txt"]));
+    std::fs::write(checkout.join("a.txt"),"a\n").unwrap();
+    let source_before=fingerprint(&checkout);
+    let made=d.call("swarm.create",json!({"category":"Tampered invalidated integration",
+        "objective":"Update a.txt","allowed_targets":["system-codex"],
+        "source_change_permission":"isolated"}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,
+        "jobs":[{"id":"patch","title":"Change a.txt","acceptance":"patch"}]}));
+    accepted_patch(&d,run,"patch","patch-proof",&patch);
+    let interrupted=d.try_call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":1,"job_id":"patch","artifact_id":"patch-proof",
+        "repo":checkout,"base_revision":base,"fixture_fault":"after_apply"})).unwrap_err();
+    assert!(interrupted.contains("fixture interruption"),"{interrupted}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let workspace:String=db.query_row("SELECT workspace_path FROM swarm_integrations
+        WHERE run_id=?1",[run],|r|r.get(0)).unwrap();
+    std::fs::write(std::path::Path::new(&workspace).join("a.txt"),"unrelated edit\n").unwrap();
+    db.execute("UPDATE swarm_jobs SET status='blocked',stop_reason='evidence_conflict'
+        WHERE run_id=?1 AND id='patch'",[run]).unwrap();
+    d.kill9();
+    d.spawn();
+    std::thread::sleep(std::time::Duration::from_millis(1500));
+    let pending:i64=db.query_row("SELECT COUNT(*) FROM swarm_integration_intents
+        WHERE run_id=?1",[run],|r|r.get(0)).unwrap();
+    assert_eq!(pending,1,"unexpected worktree edit must retain reconciliation intent");
+    assert_eq!(std::fs::read_to_string(std::path::Path::new(&workspace).join("a.txt")).unwrap(),
+        "unrelated edit\n");
+    assert_eq!(git(std::path::Path::new(&workspace),&["rev-parse","HEAD"]),base);
+    assert_eq!(fingerprint(&checkout),source_before);
+    let revision=d.try_call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Recheck invalidated patch","jobs":[
+            {"id":"patch","title":"Change a.txt","acceptance":"recheck patch"}
+        ]})).unwrap_err();
+    assert!(revision.contains("integration intent requires reconciliation"),"{revision}");
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["revision"],1);
 }
 
 #[test]

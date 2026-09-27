@@ -44,6 +44,10 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
             let daemon = deadline_daemon.clone();
             match tokio::task::spawn_blocking(move || {
                 crate::swarm::reconcile_control_verifications(&mut daemon.store.lock().unwrap())?;
+                if let Ok(_serial)=daemon.swarm_integration_lock.try_lock() {
+                    let mut store=crate::store::Store::connect_existing(&paths::db_path())?;
+                    crate::swarm::reconcile_invalidated_integrations(&mut store)?;
+                }
                 crate::swarm::refresh_linked_director_owners(&daemon)?;
                 crate::swarm::expire_director_owners(&mut daemon.store.lock().unwrap())?;
                 let (expired, timed_out_workers, redirect_timeouts) = {
