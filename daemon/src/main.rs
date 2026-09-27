@@ -7,6 +7,7 @@ mod downloads;
 mod files;
 mod usage;
 mod git;
+mod handoff;
 mod local;
 mod merge;
 mod net;

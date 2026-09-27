@@ -550,8 +550,31 @@ pub fn pick(mem: &Memory, models: &[Model], loaded: &[Loaded], catalogue: &[Entr
 // ------------------------------------------------------------------ measured sizes
 
 pub fn ensure_tables(conn: &rusqlite::Connection) -> Result<()> {
-    conn.execute_batch("CREATE TABLE IF NOT EXISTS local_models_measured(tag TEXT NOT NULL, ctx INTEGER NOT NULL, bytes INTEGER NOT NULL, ollama_version TEXT, at INTEGER NOT NULL, PRIMARY KEY(tag, ctx));")?;
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS local_models_measured(tag TEXT NOT NULL, ctx INTEGER NOT NULL, bytes INTEGER NOT NULL, ollama_version TEXT, at INTEGER NOT NULL, PRIMARY KEY(tag, ctx));
+         CREATE TABLE IF NOT EXISTS local_loads(tag TEXT PRIMARY KEY, at INTEGER NOT NULL);",
+    )?;
     Ok(())
+}
+
+/// The tags Overseer loaded itself. Only these are ever unloaded to make room: a model the user
+/// loaded in their own Ollama is left alone.
+pub fn loaded_by_overseer(conn: &rusqlite::Connection) -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    if let Ok(mut stmt) = conn.prepare("SELECT tag FROM local_loads") {
+        if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
+            out.extend(rows.flatten());
+        }
+    }
+    out
+}
+
+pub fn note_loaded(conn: &rusqlite::Connection, tag: &str, at: i64) {
+    let _ = conn.execute("INSERT INTO local_loads(tag, at) VALUES(?1, ?2) ON CONFLICT(tag) DO UPDATE SET at=excluded.at", rusqlite::params![tag, at]);
+}
+
+pub fn note_unloaded(conn: &rusqlite::Connection, tag: &str) {
+    let _ = conn.execute("DELETE FROM local_loads WHERE tag=?1", [tag]);
 }
 
 pub fn measured(conn: &rusqlite::Connection) -> Measured {
@@ -605,6 +628,12 @@ pub fn approve_with(mem: &Memory, tag: &str, context: u64, models: &[Model], loa
     let same_base = |l: &Loaded| l.tag == tag || l.tag == base || models.iter().any(|m| m.tag == l.tag && m.base == base);
     let held = loaded.iter().filter(|l| same_base(l) && l.context.unwrap_or(0) >= context).map(|l| l.size).max().unwrap_or(0);
     let b = budget(mem, opts, held);
+    // Another model that is loaded stays loaded: the two together must fit the share.
+    let beside: Vec<&Loaded> = loaded.iter().filter(|l| !same_base(l)).collect();
+    let others: u64 = beside.iter().map(|l| l.size).sum();
+    if held == 0 && others > 0 && bytes + others > b.ceiling_share {
+        bail!("{tag} does not fit beside {}: {} GiB and {} GiB together are over {}% of {} GiB ({} GiB)", beside.iter().map(|l| l.tag.as_str()).collect::<Vec<_>>().join(" and "), gib(bytes), gib(others), b.ceiling_percent, gib(b.total), gib(b.ceiling_share));
+    }
     if bytes > b.budget {
         bail!("{tag} is too big to load: {} GiB at a {}k context is over the budget of {} GiB ({}% of {} GiB is {} GiB; {} GiB available minus {} GiB headroom is {} GiB){}", gib(bytes), context / 1024, gib(b.budget), b.ceiling_percent, gib(b.total), gib(b.ceiling_share), gib(b.available + held), gib(b.headroom), gib(b.ceiling_now), b.note.as_ref().map(|n| format!("; {n}")).unwrap_or_default());
     }
@@ -889,6 +918,14 @@ mod tests {
         let err = approve_with(&idle(128), "mystery:latest", 16384, &models, &[], &cat, &Measured::new(), &o).unwrap_err().to_string();
         assert!(err.contains("its size is unknown"), "{err}");
         assert!(approve_with(&Memory { pressure: Pressure::Critical, ..idle(128) }, "qwen3-coder:30b", 16384, &models, &[], &cat, &Measured::new(), &o).is_err());
+        // A second, different model loads only when both fit the share together.
+        let e14 = cat.iter().find(|e| e.tag == "qwen2.5-coder:14b").unwrap();
+        let three = vec![installed("qwen3-coder:30b", e30), installed("qwen2.5-coder:14b", e14), models[1].clone()];
+        let big = [Loaded { tag: "qwen3-coder:30b".into(), size: 40 * GIB, size_vram: None, context: Some(131072), expires_at: None }];
+        let err = approve_with(&mem(128, 70.0), "qwen2.5-coder:14b", 32768, &three, &big, &cat, &Measured::new(), &o).unwrap_err().to_string();
+        assert_eq!(err, "qwen2.5-coder:14b does not fit beside qwen3-coder:30b: 15.4 GiB and 40 GiB together are over 40% of 128 GiB (51.2 GiB)");
+        let small = [Loaded { tag: "qwen3-coder:30b".into(), size: 25 * GIB, size_vram: None, context: Some(65536), expires_at: None }];
+        assert!(approve_with(&mem(128, 70.0), "qwen2.5-coder:14b", 32768, &three, &small, &cat, &Measured::new(), &o).is_ok(), "25 and 15.4 GiB fit 51.2 GiB");
     }
 
     #[test]

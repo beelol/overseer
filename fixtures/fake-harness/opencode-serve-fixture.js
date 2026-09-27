@@ -6,6 +6,7 @@
 //   write <file> <text>     the write tool (permission `edit`)
 //   bash <command>          the bash tool (permission `bash`); the command really runs in the cwd
 //   sleep <seconds>         the bash tool running `sleep <seconds>`; an abort ends it
+//   until <file>            the bash tool waiting until <file> exists; an abort ends it
 //   say <text>              a reply
 //   recall                  a reply naming the files this session wrote (also in earlier turns)
 //   child <text>            the task tool: a child session that replies <text>
@@ -14,6 +15,9 @@
 //                           file is written for real
 //   astext-always           the same, and again after the nudge
 //   fail <message>          the session fails with <message>
+//
+// A handoff prompt ("You are continuing a task…") is prose: its script is the line of the pending
+// message, or else the line of the task.
 //
 // Permission rules come from the session (POST or PATCH /session); the last rule naming a
 // permission wins. Without a rule the `build` agent allows and the `plan` agent denies edits.
@@ -27,7 +31,28 @@ const { spawn } = require('child_process');
 
 const args = process.argv.slice(2);
 if (args[0] === '--version') { console.log('1.15.13-fixture'); process.exit(0); }
-if (args[0] !== 'serve') { console.error('the fixture only serves'); process.exit(2); }
+if (args[0] === 'serve' && args.includes('--help')) { console.log(process.env.OVERSEER_TEST_OPENCODE_NO_SERVE ? 'unknown command' : 'opencode serve\n\nstarts a headless opencode server'); process.exit(process.env.OVERSEER_TEST_OPENCODE_NO_SERVE ? 1 : 0); }
+if (args[0] === 'run') {
+  // The one-shot transport of an OpenCode without a server: it acts the script out and asks nothing.
+  const prompt = args[args.indexOf('--') + 1] || '';
+  const handed = /^You are continuing a task/.test(prompt);
+  const script = !handed ? prompt : ((/^The user's last message, not yet answered: (.*)$/m.exec(prompt) || /^Task: (.*)$/m.exec(prompt) || [])[1] || 'say done');
+  const sessionID = args.includes('--session') ? args[args.indexOf('--session') + 1] : `ses_fixturerun${process.pid}`;
+  const say = o => process.stdout.write(JSON.stringify({ sessionID, timestamp: Date.now(), ...o }) + '\n');
+  fs.appendFileSync(path.join(process.env.XDG_DATA_HOME || '/tmp', 'fixture-run.jsonl'), JSON.stringify({ run: true, args, prompt }) + '\n');
+  say({ type: 'step_start', part: { type: 'step-start' } });
+  for (const step of script.split(';').map(s => s.trim()).filter(Boolean)) {
+    const [verb, ...rest] = step.split(' ');
+    if (verb === 'write') {
+      const abs = path.resolve(rest[0]);
+      fs.writeFileSync(abs, rest.slice(1).join(' ') + '\n');
+      say({ type: 'tool_use', part: { type: 'tool', tool: 'write', callID: `call_${rest[0]}`, state: { status: 'completed', input: { filePath: abs, content: rest.slice(1).join(' ') }, output: 'Wrote file successfully.' } } });
+    } else if (verb === 'say') say({ type: 'text', part: { type: 'text', text: rest.join(' ') } });
+  }
+  say({ type: 'step_finish', part: { type: 'step-finish', reason: 'stop', cost: 0, tokens: { total: 120, input: 100, output: 20, reasoning: 0, cache: { read: 0, write: 0 } } } });
+  process.exit(0);
+}
+if (args[0] !== 'serve') { console.error('the fixture only serves and runs'); process.exit(2); }
 const port = Number(args[args.indexOf('--port') + 1] || 0);
 const data = path.join(process.env.XDG_DATA_HOME || '/tmp', 'opencode');
 fs.mkdirSync(data, { recursive: true });
@@ -117,7 +142,10 @@ async function turn(sid, body) {
     child.on('close', code => { state.kill = null; resolve({ text: out, title: command, metadata: { exit: code } }); });
   }));
   let failed = null, nudged = /wrote a tool call out as text/.test(text);
-  const steps = nudged ? (session.afterNudge || ['say done']) : text.split(';').map(s => s.trim()).filter(Boolean);
+  // A handoff prompt is prose around the task; the script is its pending message, or else its task.
+  const handed = /^You are continuing a task/.test(text);
+  const script = !handed ? text : ((/^The user's last message, not yet answered: (.*)$/m.exec(text) || /^Task: (.*)$/m.exec(text) || [])[1] || 'say done');
+  const steps = nudged ? (session.afterNudge || ['say done']) : script.split(';').map(s => s.trim()).filter(Boolean);
   for (const step of steps) {
     if (state.aborted) break;
     const [verb, ...rest] = step.split(' ');
@@ -126,6 +154,7 @@ async function turn(sid, body) {
     if (verb === 'write') await write(rest[0], rest.slice(1).join(' '));
     else if (verb === 'bash') await bash(arg);
     else if (verb === 'sleep') await bash(`sleep ${arg}`);
+    else if (verb === 'until') await bash(`while [ ! -e ${arg} ]; do sleep 0.05; done`);
     else if (verb === 'say') say(arg);
     else if (verb === 'recall') say((session.files || []).join(', ') || 'nothing yet');
     else if (verb === 'astext' || verb === 'astext-always') {

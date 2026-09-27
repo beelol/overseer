@@ -13,7 +13,7 @@ use crate::accounts::provider_of;
 use crate::daemon::{now, Daemon, ACTIVE};
 use crate::local::{self, PickOptions};
 use crate::net::{self, Baseline, Probe, SystemAnswer, SystemNet};
-use crate::sys::{self, GIB};
+use crate::sys::{self, Pressure, GIB};
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -282,6 +282,8 @@ pub struct Status {
     pub probes: bool,
     /// When this state began, and when it was last checked.
     pub since_ms: i64,
+    /// When the state or what cannot be reached last changed.
+    pub changed_ms: i64,
     pub checked_ms: i64,
     pub probed_ms: Option<i64>,
 }
@@ -390,37 +392,53 @@ pub fn start(d: Arc<Daemon>) -> Result<()> {
     {
         let store = d.store.lock().unwrap();
         local::ensure_tables(&store.conn)?;
+        crate::handoff::ensure_tables(&store.conn)?;
     }
     let settings = load_settings(&d);
     let system = net::system();
     let probes_on = probes_allowed(&settings);
     let first = decide(&system, None, &BTreeMap::new(), false, &evidence(&d));
     let at = now();
-    let status = Status { state: first.state, reason: first.reason.clone(), unreachable: first.unreachable.clone(), acts_offline: first.acts_offline, providers: first.providers.clone(), system: system.clone(), baseline: None, probes: probes_on, since_ms: at, checked_ms: at, probed_ms: None };
+    let status = Status { state: first.state, reason: first.reason.clone(), unreachable: first.unreachable.clone(), acts_offline: first.acts_offline, providers: first.providers.clone(), system: system.clone(), baseline: None, probes: probes_on, since_ms: at, changed_ms: at, checked_ms: at, probed_ms: None };
     let shared = Shared { settings, status: status.clone(), pending: None, baseline: None, probes: BTreeMap::new(), last_probe: None, last_system: system.state, newest_error_ms: 0, force: true };
     if SHARED.set(Mutex::new(shared)).is_err() {
         bail!("Continuity was started twice");
     }
     crate::log(&format!("continuity: {:?} ({}); system: {}", status.state, status.reason, status.system.detail));
     d.emit(None, None, "connection", "daemon", "exact", json!({"status": status, "previous": Value::Null, "first": true}))?;
+    // Starting a run again needs the daemon's runtime; the thread carries its handle.
+    let runtime = tokio::runtime::Handle::try_current().ok();
     std::thread::Builder::new().name("continuity".into()).spawn(move || {
+        let _runtime = runtime.as_ref().map(|h| h.enter());
         let mut first = true;
         loop {
             if !std::mem::take(&mut first) {
                 std::thread::sleep(millis("OVERSEER_TEST_CONTINUITY_TICK_MS", 5000));
             }
-            if let Err(e) = tick(&d) {
-                crate::log(&format!("continuity: check failed: {e:#}"));
+            // One bad pass never ends the watch.
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tick(&d))) {
+                Ok(Ok(_)) => {}
+                Ok(Err(e)) => crate::log(&format!("continuity: check failed: {e:#}")),
+                Err(_) => crate::log("continuity: a check panicked; the watch goes on"),
             }
         }
     })?;
     Ok(())
 }
 
-/// One check. The system is asked every time; the probes run when they are due: every 30 seconds
+/// One check of the connection, then one pass over everything that waits on it.
+pub fn tick(d: &Arc<Daemon>) -> Result<Status> {
+    let status = check(d)?;
+    if let Err(e) = crate::handoff::tick(d) {
+        crate::log(&format!("continuity: the waiting runs could not be looked after: {e:#}"));
+    }
+    Ok(status)
+}
+
+/// The system is asked every time; the probes run when they are due: every 30 seconds
 /// while runs are active or waiting, every 5 minutes otherwise, and at once when the system's
 /// answer changes, an agent reports a network error, or a check is asked for.
-pub fn tick(d: &Arc<Daemon>) -> Result<Status> {
+fn check(d: &Arc<Daemon>) -> Result<Status> {
     let system = net::system();
     let agents = evidence(d);
     let (probes_on, due) = {
@@ -477,6 +495,7 @@ pub fn tick(d: &Arc<Daemon>) -> Result<Status> {
     if s.status.state != decision.state {
         s.status.since_ms = now();
     }
+    s.status.changed_ms = now();
     s.status.state = decision.state;
     s.status.reason = decision.reason;
     s.status.unreachable = decision.unreachable;
@@ -553,12 +572,24 @@ fn load(d: &Daemon, tag: &str, context: u64) -> Result<Value> {
     let measured = gather(d).inventory.loaded.into_iter().find(|l| l.tag == run_tag);
     let outcome = json!({"tag": tag, "run_tag": run_tag, "context": context, "approved": approved, "memory_before": before, "memory_after": after, "measured": measured, "error": loaded.as_ref().err().map(|e| e.to_string())});
     d.emit(None, None, "local_load", "daemon", "exact", outcome.clone())?;
+    if loaded.is_ok() {
+        local::note_loaded(&d.store.lock().unwrap().conn, &run_tag, now());
+    }
     loaded.map(|l| json!({"loaded": l, "detail": outcome}))
+}
+
+/// Is this a run on a local model?
+pub fn is_local(run: &crate::store::Run) -> bool {
+    run.harness == crate::opencode_bridge::HARNESS || (run.harness == "opencode" && run.profile_id.as_deref() == Some(crate::opencode_bridge::LOCAL_PROFILE))
 }
 
 /// Before a local turn is launched: the model is chosen if none was, given a context, passed
 /// through the guard, loaded under the watchdog, and named in Overseer's own OpenCode profile.
 /// A refusal is an error with its reason, and nothing is launched.
+///
+/// Memory is looked at again for every turn. A copy that is loaded and no longer fits is
+/// replaced by a smaller context or a smaller model, but only a copy Overseer loaded itself and
+/// no other agent is working on; any other copy is shared as it is, which loads nothing.
 pub fn prepare_local_run(d: &Daemon, run: &mut crate::store::Run, profile_env: &BTreeMap<String, String>) -> Result<()> {
     let config_home = std::path::PathBuf::from(crate::opencode_bridge::env_for(profile_env)?);
     let settings = settings();
@@ -567,36 +598,123 @@ pub fn prepare_local_run(d: &Daemon, run: &mut crate::store::Run, profile_env: &
         bail!("{}; a local model cannot run", l.inventory.ollama.detail);
     }
     let opts = settings.pick_options(false);
+    let memory = l.inventory.memory.clone().ok_or_else(|| anyhow!("memory cannot be read ({}), so no model is loaded", l.inventory.memory_error.clone().unwrap_or_default()))?;
+    if memory.pressure == Pressure::Critical {
+        bail!("the system reports critical memory pressure; nothing may be loaded and no local turn is started");
+    }
+    let fits = |tag: &str, context: u64| local::approve(tag, context, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts);
+    let eligible = |base: &str| settings.allow_unverified_models || l.catalogue.iter().any(|e| e.tag == base && e.verified_with(&settings.local_harness));
+    let base_of = |tag: &str| l.inventory.models.iter().find(|m| m.tag == tag).map(|m| m.base.clone()).unwrap_or_else(|| tag.to_string());
+    // The other local agents that are working now, by the tag they run.
+    let busy: Vec<String> = d.store.lock().unwrap().runs()?.iter().filter(|r| r.id != run.id && r.parent_run_id.is_none() && is_local(r) && ["starting", "running", "waiting_for_user"].contains(&r.status.as_str())).filter_map(|r| r.model.as_deref().map(|m| crate::opencode_bridge::tag_of(m).to_string())).collect();
+    let ours = local::loaded_by_overseer(&d.store.lock().unwrap().conn);
+    let replaceable = |x: &local::Loaded| ours.contains(&x.tag) && !busy.contains(&x.tag);
+    // Was this run's model chosen by Overseer? Then Overseer may choose again when memory is tighter.
+    let chosen_before: Option<(String, u64, bool)> = d.store.lock().unwrap().events_after(0, Some(&run.id), 5000)?.into_iter().rev().find(|e| e.kind == "local_model").map(|e| (e.payload["model"].as_str().unwrap_or_default().to_string(), e.payload["context"].as_u64().unwrap_or(0), e.payload["auto"] == true));
+    let named = run.model.clone().filter(|m| !m.is_empty());
+    let auto = named.is_none() || chosen_before.as_ref().is_some_and(|(m, _, a)| *a && Some(m) == named.as_ref());
+    // What the pick would be if the copies that can be replaced were unloaded first.
+    let pick_now = || -> Result<(String, String, u64)> {
+        // A model that is already loaded and may be used is shared before another is loaded.
+        for loaded in &l.inventory.loaded {
+            if let Some(m) = l.inventory.models.iter().find(|m| m.tag == loaded.tag) {
+                let context = loaded.context.unwrap_or(0);
+                if context >= opts.context_floor && m.capabilities.iter().any(|c| c == "tools") && eligible(&m.base) && fits(&m.tag, context).is_ok() {
+                    return Ok((m.tag.clone(), m.base.clone(), context));
+                }
+            }
+        }
+        let pick = local::pick(&memory, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts);
+        if let Some(c) = pick.chosen.clone().filter(|c| c.installed) {
+            return Ok((c.tag.clone(), c.tag, c.context));
+        }
+        let freed: u64 = l.inventory.loaded.iter().filter(|x| replaceable(x)).map(|x| x.size).sum();
+        if freed > 0 {
+            let mut after = memory.clone();
+            after.available += freed;
+            let kept: Vec<local::Loaded> = l.inventory.loaded.iter().filter(|x| !replaceable(x)).cloned().collect();
+            if let Some(c) = local::pick(&after, &l.inventory.models, &kept, &l.catalogue, &l.measured, &opts).chosen.filter(|c| c.installed) {
+                return Ok((c.tag.clone(), c.tag, c.context));
+            }
+        }
+        // Nothing can be loaded, but a copy that is loaded can be worked on as it is.
+        for loaded in &l.inventory.loaded {
+            if let Some(m) = l.inventory.models.iter().find(|m| m.tag == loaded.tag) {
+                if loaded.context.unwrap_or(0) >= opts.context_floor && m.capabilities.iter().any(|c| c == "tools") && eligible(&m.base) {
+                    return Ok((m.tag.clone(), m.base.clone(), loaded.context.unwrap_or(0)));
+                }
+            }
+        }
+        bail!("no local model that is installed and verified fits the memory budget of {} GiB{}", sys::gib(pick.budget.budget), pick.rejected.first().map(|r| format!(" ({}: {})", r.tag, r.reason)).unwrap_or_default())
+    };
     // The model: the one asked for, or the pick.
-    let (tag, base, context) = match run.model.as_deref().map(crate::opencode_bridge::tag_of).filter(|t| !t.is_empty()) {
+    let mut again = false;
+    let (tag, base, mut context) = match named.as_deref().map(crate::opencode_bridge::tag_of) {
         Some(tag) => {
             let model = l.inventory.models.iter().find(|m| m.tag == tag).ok_or_else(|| anyhow!("{tag} is not installed in Ollama"))?;
             let context = match model.configured_context {
-                Some(c) => c,
+                Some(c) => Some(c).filter(|c| fits(tag, *c).is_ok()),
                 // A tag that sets no context gets the longest one that fits.
-                None => local::context_steps(opts.context_target, opts.context_floor, model.max_context.unwrap_or(local::COMFORTABLE_CONTEXT))
-                    .into_iter()
-                    .find(|c| local::approve(tag, *c, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts).is_ok())
-                    .ok_or_else(|| local::approve(tag, opts.context_floor, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts).unwrap_err())?,
+                None => local::context_steps(opts.context_target, opts.context_floor, model.max_context.unwrap_or(local::COMFORTABLE_CONTEXT)).into_iter().find(|c| fits(tag, *c).is_ok()),
             };
-            (tag.to_string(), model.base.clone(), context)
+            let loaded_as_named = l.inventory.loaded.iter().find(|x| x.tag == tag && x.context.unwrap_or(0) >= opts.context_floor);
+            match (context, loaded_as_named) {
+                (Some(c), _) => (tag.to_string(), model.base.clone(), c),
+                // It is loaded and another agent works on it, or it is not Overseer's to unload:
+                // it is used as it is, which loads nothing.
+                (None, Some(copy)) if !replaceable(copy) || !auto => (tag.to_string(), model.base.clone(), copy.context.unwrap_or(0)),
+                // Overseer's own earlier choice no longer fits: it chooses again, and says so once.
+                (None, _) if auto => {
+                    again = true;
+                    pick_now()?
+                }
+                _ => return Err(fits(tag, model.configured_context.unwrap_or(opts.context_floor)).unwrap_err()),
+            }
         }
-        None => {
-            let memory = l.inventory.memory.clone().ok_or_else(|| anyhow!("memory cannot be read, so no model is picked"))?;
-            let pick = local::pick(&memory, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts);
-            let c = pick.chosen.ok_or_else(|| anyhow!("no local model that is installed and verified fits the memory budget of {} GiB{}", sys::gib(pick.budget.budget), pick.rejected.first().map(|r| format!(" ({}: {})", r.tag, r.reason)).unwrap_or_default()))?;
-            (c.tag.clone(), c.tag, c.context)
-        }
+        None => pick_now()?,
     };
-    let approved = local::approve(&tag, context, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts)?;
-    let run_tag = local::ensure_tag(&l.inventory.models, &tag, &base, context)?;
-    let already = l.inventory.loaded.iter().any(|x| x.tag == run_tag && x.context.unwrap_or(0) >= context);
+    let mut run_tag = local::ensure_tag(&l.inventory.models, &tag, &base, context)?;
+    let mut already = l.inventory.loaded.iter().any(|x| x.tag == run_tag && x.context.unwrap_or(0) >= context);
+    let mut unloaded: Vec<String> = Vec::new();
+    if !already {
+        // A copy of the same model that cannot be replaced is shared instead of loading a second one.
+        if let Some(copy) = l.inventory.loaded.iter().find(|x| base_of(&x.tag) == base && !replaceable(x) && x.context.unwrap_or(0) >= context.min(opts.context_floor)) {
+            run_tag = copy.tag.clone();
+            context = copy.context.unwrap_or(context);
+            already = true;
+            again = false;
+        } else {
+            // What this load replaces is unloaded first, so that its memory is back before the guard looks.
+            for copy in l.inventory.loaded.iter().filter(|x| replaceable(x) && (base_of(&x.tag) == base || fits(&run_tag, context).is_err())) {
+                local::unload(&copy.tag)?;
+                local::note_unloaded(&d.store.lock().unwrap().conn, &copy.tag);
+                unloaded.push(copy.tag.clone());
+                d.emit(Some(&run.task_id), Some(&run.id), "local_load", "daemon", "exact", json!({"tag": copy.tag, "unloaded": true, "why": "replaced by a copy that fits the memory there is now", "replaced_by": run_tag}))?;
+            }
+        }
+    }
+    // What the run's model was before, in words, for the note.
+    let before = chosen_before.as_ref().map(|(m, c, _)| (base_of(crate::opencode_bridge::tag_of(m)), *c));
+    // The guard, on fresh numbers.
+    let fresh = if unloaded.is_empty() { None } else { Some(gather(d)) };
+    let l = fresh.as_ref().unwrap_or(&l);
+    let approved = if already {
+        let copy = l.inventory.loaded.iter().find(|x| x.tag == run_tag).ok_or_else(|| anyhow!("{run_tag} is no longer loaded"))?;
+        let mem = sys::memory()?;
+        if mem.pressure == Pressure::Critical {
+            bail!("the system reports critical memory pressure; no local turn is started");
+        }
+        json!({"tag": run_tag, "base": base, "context": context, "bytes": copy.size, "measured": true, "already_loaded": true, "budget": local::budget(&mem, &opts, copy.size)})
+    } else {
+        local::approve(&run_tag, context, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts).or_else(|_| local::approve(&tag, context, &l.inventory.models, &l.inventory.loaded, &l.catalogue, &l.measured, &opts))?
+    };
     if !already {
         let memory = sys::memory()?;
         let loaded = local::load_guarded(&run_tag, context, local::headroom(memory.total, opts.headroom), &format!("{}m", settings.ollama_idle_minutes));
         let after = gather(d);
         d.emit(Some(&run.task_id), Some(&run.id), "local_load", "daemon", "exact", json!({"tag": tag, "run_tag": run_tag, "context": context, "approved": approved, "memory_before": {"available": memory.available, "pressure": memory.pressure}, "memory_after": after.inventory.memory.as_ref().map(|m| json!({"available": m.available, "pressure": m.pressure})), "measured": after.inventory.loaded.iter().find(|x| x.tag == run_tag), "error": loaded.as_ref().err().map(|e| e.to_string())}))?;
         loaded?;
+        local::note_loaded(&d.store.lock().unwrap().conn, &run_tag, now());
     }
     let mut tags: Vec<String> = l.inventory.models.iter().filter(|m| m.capabilities.iter().any(|c| c == "tools")).map(|m| m.tag.clone()).collect();
     if !tags.contains(&run_tag) {
@@ -604,23 +722,44 @@ pub fn prepare_local_run(d: &Daemon, run: &mut crate::store::Run, profile_env: &
     }
     crate::opencode_bridge::write_config(&config_home, &tags, &run_tag, &local::ollama_url()?)?;
     let model = format!("ollama/{run_tag}");
+    let note = (again && Some(&model) != named.as_ref()).then(|| {
+        let instead = match before.clone() {
+            Some((b, c)) if b == base && c > 0 => format!("a {}k context", c / 1024),
+            Some((b, _)) => b,
+            None => named.clone().unwrap_or_default(),
+        };
+        format!("Memory is tighter now ({} GiB available). This turn uses {} at a {}k context instead of {}.", sys::gib(memory.available), base, context / 1024, instead)
+    });
     if run.model.as_deref() != Some(model.as_str()) {
         d.store.lock().unwrap().conn.execute("UPDATE runs SET model=?2 WHERE id=?1", rusqlite::params![run.id, model])?;
         run.model = Some(model.clone());
     }
-    d.emit(Some(&run.task_id), Some(&run.id), "local_model", "daemon", "exact", json!({"model": model, "base": base, "context": context, "bytes": approved["bytes"], "measured": approved["measured"], "already_loaded": already, "budget": approved["budget"]}))?;
+    d.emit(Some(&run.task_id), Some(&run.id), "local_model", "daemon", "exact", json!({"model": model, "base": base, "context": context, "bytes": approved["bytes"], "measured": approved["measured"], "already_loaded": already, "auto": auto, "budget": approved["budget"], "replaced": unloaded}))?;
+    if let Some(text) = note {
+        d.emit(Some(&run.task_id), Some(&run.id), "output", "daemon", "exact", json!({"role": "system", "text": text, "continuity": true}))?;
+    }
+    // Local agents on one model share it; Ollama takes their requests in turn.
+    let ahead = busy.iter().filter(|t| **t == run_tag).count();
+    if ahead > 0 {
+        let text = format!("Queued behind {ahead} local agent{}: they share one loaded model.", if ahead == 1 { "" } else { "s" });
+        d.emit(Some(&run.task_id), Some(&run.id), "local_queue", "daemon", "exact", json!({"behind": ahead, "model": model}))?;
+        d.emit(Some(&run.task_id), Some(&run.id), "output", "daemon", "exact", json!({"role": "system", "text": text, "continuity": true}))?;
+    }
     Ok(())
 }
 
 // ------------------------------------------------------------------ protocol
 
 pub fn handles(method: &str) -> bool {
-    crate::downloads::handles(method) || matches!(method, "connection.status" | "connection.check" | "continuity.status" | "continuity.notice" | "settings.get" | "settings.set" | "local.inventory" | "local.pick" | "local.approve" | "local.catalogue" | "local.load" | "local.unload")
+    crate::downloads::handles(method) || crate::handoff::handles(method) || matches!(method, "connection.status" | "connection.check" | "continuity.status" | "continuity.notice" | "settings.get" | "settings.set" | "local.inventory" | "local.pick" | "local.approve" | "local.catalogue" | "local.load" | "local.unload")
 }
 
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     if crate::downloads::handles(method) {
         return crate::downloads::dispatch(d, method, p);
+    }
+    if crate::handoff::handles(method) {
+        return crate::handoff::dispatch(d, method, p);
     }
     Ok(match method {
         "connection.status" => json!({"status": status(), "enabled": settings().enabled}),
@@ -657,6 +796,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "local.unload" => {
             let tag = p["tag"].as_str().ok_or_else(|| anyhow!("missing string parameter tag"))?;
             local::unload(tag)?;
+            local::note_unloaded(&d.store.lock().unwrap().conn, tag);
             d.emit(None, None, "local_load", "daemon", "exact", json!({"tag": tag, "unloaded": true}))?;
             json!({"unloaded": tag})
         }
@@ -677,6 +817,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "pick_error": picked.as_ref().err().map(|e| e.to_string()),
                 "rejected": picked.as_ref().ok().map(|v| v["pick"]["rejected"].clone()),
                 "ollama": picked.as_ref().ok().map(|v| v["ollama"].clone()),
+                "new_agents": status().map(|st| crate::handoff::new_agents(d, &st)),
             })
         }
         other => bail!("unknown method {other}"),

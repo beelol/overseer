@@ -92,6 +92,15 @@ pub fn write_config(config_home: &Path, tags: &[String], model: &str, ollama_url
     Ok(path)
 }
 
+/// Does this OpenCode have the headless server? An older one does not; then a local run cannot
+/// ask before it edits or runs a command, and is only ever offered, never started on its own.
+pub fn server_available(opencode: &Path) -> bool {
+    if std::env::var_os("OVERSEER_TEST_OPENCODE_NO_SERVE").is_some() {
+        return false;
+    }
+    std::process::Command::new(opencode).args(["serve", "--help"]).stdin(std::process::Stdio::null()).stderr(std::process::Stdio::null()).output().is_ok_and(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).contains("serve"))
+}
+
 /// `ollama/<tag>` or a bare tag, as the tag.
 pub fn tag_of(model: &str) -> &str {
     model.strip_prefix("ollama/").unwrap_or(model)

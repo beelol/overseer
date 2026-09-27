@@ -31,6 +31,28 @@ pub struct State {
     /// A pull reports its progress in this many steps, this far apart.
     pub pull_steps: u64,
     pub pull_step_ms: u64,
+    /// The machine whose memory follows what is loaded here, when a test asks for that.
+    pub machine: Option<Machine>,
+}
+
+/// A machine's memory as a file the daemon reads (`OVERSEER_TEST_MEMORY`): what is available is
+/// the total, less what everything else uses, less the models loaded here.
+pub struct Machine {
+    pub file: std::path::PathBuf,
+    pub total: u64,
+    pub others: u64,
+    pub pressure: String,
+}
+
+impl State {
+    pub fn write_memory(&self) {
+        let Some(m) = &self.machine else { return };
+        let held: u64 = self.loaded.iter().filter_map(|l| l["size"].as_u64()).sum();
+        let available = m.total.saturating_sub(m.others).saturating_sub(held);
+        let tmp = m.file.with_extension("tmp");
+        std::fs::write(&tmp, json!({"total": m.total, "available": available, "pressure": m.pressure}).to_string()).unwrap();
+        std::fs::rename(&tmp, &m.file).unwrap();
+    }
 }
 
 pub struct Ollama {
@@ -62,6 +84,9 @@ pub fn qwen3_coder_30b_64k() -> (Value, Value) {
 }
 pub fn qwen25_coder_14b() -> (Value, Value) {
     model("qwen2.5-coder:14b", "", 8_988_124_069, "qwen2", 48, json!(8), 128, 14_770_033_664, 32_768, None, &["completion", "tools", "insert"])
+}
+pub fn qwen25_coder_32b() -> (Value, Value) {
+    model("qwen2.5-coder:32b", "", 19_851_349_856, "qwen2", 64, json!(8), 128, 32_763_876_352, 32_768, None, &["completion", "tools", "insert"])
 }
 pub fn qwen35_122b() -> (Value, Value) {
     let mut kv = vec![0u64; 48];
@@ -109,6 +134,28 @@ impl Ollama {
         let mut s = self.state.lock().unwrap();
         s.loaded.retain(|m| m["name"] != tag);
         s.loaded.push(json!({"name": tag, "model": tag, "size": bytes, "size_vram": bytes, "context_length": context, "expires_at": "2026-09-27T00:00:00Z"}));
+    }
+
+    /// From now on the machine's memory follows what is loaded: `others` GiB are used by
+    /// everything else.
+    pub fn machine(&self, file: &std::path::Path, total_gib: f64, others_gib: f64) {
+        let mut s = self.state.lock().unwrap();
+        s.machine = Some(Machine { file: file.to_path_buf(), total: (total_gib * GIB as f64) as u64, others: (others_gib * GIB as f64) as u64, pressure: "normal".into() });
+        s.write_memory();
+    }
+
+    /// Everything else on the machine now uses this much, at this pressure.
+    pub fn others(&self, others_gib: f64, pressure: &str) {
+        let mut s = self.state.lock().unwrap();
+        if let Some(m) = s.machine.as_mut() {
+            m.others = (others_gib * GIB as f64) as u64;
+            m.pressure = pressure.into();
+        }
+        s.write_memory();
+    }
+
+    pub fn loaded(&self) -> Vec<String> {
+        self.state.lock().unwrap().loaded.iter().map(|l| l["name"].as_str().unwrap().to_string()).collect()
     }
 
     /// Offers a model for download.
@@ -189,7 +236,9 @@ fn respond(method: &str, path: &str, body: &Value, state: &Arc<Mutex<State>>) ->
         ("POST", "/api/generate") => {
             let tag = body["model"].as_str().unwrap_or_default().to_string();
             if body["keep_alive"] == 0 {
-                state.lock().unwrap().loaded.retain(|m| m["name"] != tag.as_str());
+                let mut s = state.lock().unwrap();
+                s.loaded.retain(|m| m["name"] != tag.as_str());
+                s.write_memory();
                 return (200, json!({"model": tag, "done": true, "done_reason": "unload"}));
             }
             let (wait, known) = {
@@ -206,6 +255,7 @@ fn respond(method: &str, path: &str, body: &Value, state: &Arc<Mutex<State>>) ->
             let context = body["options"]["num_ctx"].as_u64().unwrap_or(4096);
             s.loaded.retain(|m| m["name"] != tag.as_str());
             s.loaded.push(json!({"name": tag, "model": tag, "size": bytes, "size_vram": bytes, "context_length": context, "expires_at": "2026-09-27T00:00:00Z"}));
+            s.write_memory();
             (200, json!({"model": tag, "done": true, "done_reason": "load"}))
         }
         _ => (404, json!({"error": format!("the fixture does not answer {method} {path}")})),
