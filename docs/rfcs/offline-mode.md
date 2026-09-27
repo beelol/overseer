@@ -1,7 +1,7 @@
 # Side RFC: Continuity — offline mode and local models
 
 Status: proposed by the owner on 2026-09-26; decisions taken the same day (below). Acceptance
-criteria: AC-83 to AC-98 and AC-138 (Gate L) in the
+criteria: AC-83 to AC-98 and AC-138 to AC-140 (Gate L) in the
 [main RFC](../overseer-rfc.md#gate-l--continuity-offline-mode-and-local-models-added-by-the-owner-2026-09-26).
 Implementation: **its own worktree and pull request** (owner, 2026-09-26). Builds on the verified OpenCode + Ollama
 path ([AC-14](../verification/AC-14.md), the [Ollama log](../verification/evidence/ac-14/opencode-ollama.log)),
@@ -44,6 +44,16 @@ under `overseer.continuity.*`. The chat still uses the owner's verb for the mome
 | Prefetch | Kept as a feature, **off until asked**: Overseer offers it once when downloads are first allowed, and only then keeps a fitting local model downloaded. |
 | Downloads and Ollama install | Opt-in settings, off by default, offered in the first-use notice. |
 | Permission modes | Carried over on every handoff, never loosened. The OpenCode adapter gains Plan only, Accept edits, Auto and Ask first; until Ask first is verified, such a run waits and offers the move instead. |
+| Failover target | Among several accounts, the one with the most quota left, then the most recently used. The model is the one last picked for that harness, otherwise its default. |
+| Back online | Local runs offer Switch back; new agents go online automatically. |
+| Stall | Overseer interrupts a turn after 90 seconds of silence while offline. |
+| After 36 hours | The run fails with the reason, keeps its message and offers Retry now. |
+| No verified model fits | Wait and say why; a setting can allow unverified models. |
+| Quota and rate limits | Not part of this gate; they come with quota-aware routing. |
+| Claude Code on local models | No. |
+| Memory safety | Overseer must never open a model that could crash the computer (AC-140). |
+| Goal | One goal for all of Gate L; its first step is the spike on OpenCode's session transports (AC-139). |
+| Build-time permissions | Model downloads for verification (about 28 GB), an Ollama install test in an isolated folder, light paid turns. The owner turns Wi-Fi off and on for the live checks. |
 | Where it is built | In its own worktree, landing through a pull request. |
 | Other proposals in this RFC | Accepted as written (budget, handoff, catalogue verification, out-of-scope items). |
 
@@ -228,7 +238,8 @@ budget          = min(ceiling_share, ceiling_now)
   with Xcode and Docker holding 90 GiB the honest answer is a much smaller model.
 - **Reassessment.** The budget is computed for every new run and every new turn (OpenCode starts one
   process per turn, and the model choice is per turn), never in the middle of a turn. A working turn
-  is never killed to free memory. If the budget shrank, the next turn uses a smaller model or a
+  is never stopped for a tighter budget (only critical memory pressure pauses local runs, see
+  [Memory safety](#memory-safety-ac-140)). If the budget shrank, the next turn uses a smaller model or a
   smaller context and the chat says so once.
 
 ### Fit
@@ -280,6 +291,29 @@ instant; the owner's own `-64k` and `-32k` tags were made the same way. Derived 
 the base model in the UI and removed with **Clean up local models**. When Overseer starts the Ollama
 server itself, `OLLAMA_CONTEXT_LENGTH` is the fallback.
 
+## Memory safety (AC-140)
+
+The owner's condition: Overseer must never open a model that could crash the computer.
+
+- **No path around the budget.** A model whose measured or estimated size is above the budget cannot
+  be started from Overseer at all: not by an automatic pick, not from the composer, not by prefetch,
+  not during catalogue verification. It is shown as *too big* with the numbers, and this gate has no
+  override. On a 128 GiB machine that includes `qwen3.5:122b` (75.8 GiB on disk), even though it
+  is installed.
+- **Fresh numbers before every load.** The budget is recomputed from new memory readings immediately
+  before a load, never reused from an earlier pick.
+- **Load watchdog.** While a model loads, memory is sampled every second. If available memory falls
+  under half the headroom, or the system reports critical memory pressure, Overseer cancels the
+  load, unloads the model (`keep_alive: 0`) and says so; the run waits or takes a smaller pick.
+- **Critical pressure valve.** If the system reports critical memory pressure while local runs are
+  working, Overseer pauses them (the same interrupt as Stop, message kept, state
+  `waiting_for_memory`) and unloads the model; they resume when the pressure is back to normal. This
+  is the only case in which Overseer stops a working local turn.
+- **One model at a time during verification**, smallest first, each unloaded after its check, with
+  memory recorded before and after.
+- **Out of reach.** Overseer cannot stop a model the user starts in Ollama themselves. It sees that
+  model in `/api/ps` and in available memory, counts it as used, and shrinks its own pick.
+
 ## Model catalogue
 
 Overseer ships a small catalogue of coding models known to work as agents. The owner's direction is
@@ -315,6 +349,22 @@ can reorder with `continuity.preferredModels`.
 | **Codex** | `codex exec --oss --local-provider ollama -m <tag>` (flags present in the installed 0.155 binary). Keeps Codex's file-change and child telemetry with a local model. | to verify (AC-87); second choice until then |
 | **Claude Code** | Would need `ANTHROPIC_BASE_URL` and a placeholder token in the harness environment. Overseer never forwards `ANTHROPIC_*` or token variables (AC-16), so this is **not in scope**; see [Open questions](#open-questions). | out of scope |
 
+### The spike comes first (AC-139)
+
+Before any adapter work, the goal finds out how OpenCode's session transports behave in the
+installed version, with a local model inside the budget:
+
+- how a session starts with a chosen model and agent, and how a prompt is sent;
+- the message a permission request arrives as, and how Allow and Deny are answered;
+- interrupt, and resuming an existing session after the daemon restarts;
+- child sessions, file activity and usage, compared with what `opencode run` reports today;
+- what a long-lived session process means for the supervisor (as with `codex-app` and Claude Code).
+
+The result is a written decision in this section (which transport, or why neither and what the
+fallback is), redacted transcripts, and a fixture recorded from the chosen transport for the adapter
+tests. It is a research criterion, like AC-01 to AC-03: an investigated blocker completes it, but
+does not pass AC-138.
+
 ### Permission modes carry over (AC-138)
 
 A handoff keeps the run's permission mode and never loosens it. Local models have nothing to do
@@ -338,8 +388,8 @@ transport ([compatibility](../compatibility.md)).
   own: the run waits (as with Continuity off) and the chat offers the move with the difference
   stated, for example *The local agent cannot ask before running commands yet. Continue locally in
   Accept edits?*
-- **Spike first.** How permission requests appear over `opencode serve` and `opencode acp` in
-  OpenCode 1.15 is not yet verified. Until it is, Plan only and Auto carry over and Ask first and
+- **Spike first (AC-139).** How permission requests appear over `opencode serve` and `opencode acp`
+  in OpenCode 1.15 is not yet verified. Until it is, Plan only and Auto carry over and Ask first and
   Accept edits use the fallback above.
 
 The local account is the existing `local` provider ("OpenCode (local models)", `daemon/src/accounts.rs`),
@@ -387,7 +437,10 @@ workspace. It is the one mechanism behind failover, going local, and switching b
 2. **Snapshot** the workspace (a run-start snapshot, as for any turn), so the review's *Latest run*
    base is the moment of the handoff and the successor's edits show on their own.
 3. **Pick** the target: the best working online provider's harness and a signed-in account, or the
-   local harness with the budget's model (the pick and its reasons are an event).
+   local harness with the budget's model (the pick and its reasons are an event). Among several
+   accounts of that provider, the one with the most quota left in usage reporting (AC-62), then the
+   most recently used; the model is the one last picked for that harness in the composer, otherwise
+   the harness default.
 4. **Compose the handoff prompt** from the daemon's own records, bounded to about 6k tokens so it fits
    the smallest context Overseer runs (16k):
 
@@ -482,7 +535,8 @@ agent is started with Continuity on, while the user is looking, not at the momen
   local agent* on the waiting tile rather than pretending both stream.
 - A second, different model loads only if the sum of both fits the budget; otherwise the new run uses
   the already-loaded model when it is eligible, or waits with *Waiting for local model* shown.
-- If available memory falls under the headroom while a model is loaded, no turn is killed; the next
+- If available memory falls under the headroom while a model is loaded, no turn is stopped for it
+  (only the critical-pressure valve in [Memory safety](#memory-safety-ac-140) pauses runs); the next
   turn's pick shrinks (smaller context first, then a smaller model) with one note in the chat.
 - Local runs report usage as tokens with cost 0 and the provider mark **Local**; no quota windows.
 
@@ -528,7 +582,8 @@ state, the budget and the current pick.
 - **Store:** `runs.predecessor_run_id`, `runs.handoff_reason`; `turns.attempts` and
   `turns.pending_prompt`; table `local_models_measured(tag, ctx, bytes, ollama_version, at)`;
   settings and `continuity.notice_shown` in `meta`.
-- **Lifecycle:** `ACTIVE` gains `waiting_for_connection`; terminal states gain `handed_off`.
+- **Lifecycle:** `ACTIVE` gains `waiting_for_connection` and `waiting_for_memory`; terminal states
+  gain `handed_off`.
   Statuses still come only from real signals (AC-06); the retry scheduler, the 36-hour limit and the
   stall interrupt are Overseer's own recorded actions.
 - **Platform modules:** `daemon/src/net.rs` (connection, one trait, macOS and Linux) and
@@ -588,33 +643,89 @@ Follows the Gate J principles (less text, quiet until it needs you) and the Gate
 
 ## Open questions
 
-Resolved on 2026-09-26: the default (on), the name (Continuity), the provider order, the retry limit,
-prefetch and the catalogue's starting family. Still open:
+None for the owner. Decided on 2026-09-26: the default (on), the name (Continuity), the provider
+order, the retry limit, prefetch (off until asked), the catalogue's starting family, permission
+modes on handoff, the failover account and model, the way back online, the stall interrupt, the
+36-hour ending, waiting when no verified model fits, no quota-driven failover in this gate, no
+Claude Code on local models, memory safety, and one goal with the spike first.
 
-| Question | Recommendation |
+Left to the implementation, with the owner's agreement:
+
+| Question | Approach |
 | --- | --- |
-| Claude Code with local models via `ANTHROPIC_BASE_URL` | No for now: it needs a token variable Overseer refuses to forward, and OpenCode already covers local. Revisit with a narrow, explicit exception if Claude Code becomes the only harness with a wanted capability. |
-| Fail over on quota or rate limit too? | Not in Gate L. Add a separate criterion under quota-aware routing; the handoff mechanism will be reusable. |
-| Codex `--oss` as the local harness | Verify under AC-87; if it passes, offer it as `localHarness: codex` because it keeps Codex's telemetry. |
-| Derived tags versus per-request `num_ctx` | Derived tags: the OpenAI-compatible route OpenCode uses cannot carry `num_ctx`. Revisit if OpenCode gains native Ollama options. |
-| How permission requests appear over OpenCode's session transports | Spike `opencode acp` first (a documented client protocol), then `opencode serve`; pick the one whose requests map cleanly onto Overseer's Allow and Deny cards. |
-| Change notifications versus polling for the system check | Start with polling every 5 seconds (cheap, portable); add the SystemConfiguration and NetworkManager subscriptions if the polling delay is noticeable in AC-83. |
+| How permission requests appear over OpenCode's session transports | The spike (AC-139): `opencode acp` first (a documented client protocol), then `opencode serve`; pick the one whose requests map cleanly onto Overseer's Allow and Deny cards. |
+| Codex `--oss` as the local harness | Tested during catalogue verification (AC-87); OpenCode stays the default and Codex is offered as `localHarness: codex` if it passes. |
+| Derived tags versus per-request `num_ctx` | Derived tags: the OpenAI-compatible route OpenCode uses cannot carry `num_ctx`. |
+| Change notifications versus polling for the system check | Polling every 5 seconds first; the SystemConfiguration and NetworkManager subscriptions if the delay is noticeable in AC-83. |
 
-## Phases (goal candidates)
+## Order of work (one goal)
 
-Each phase is independently useful and verifiable; the criteria are in the main RFC. All of it is
-built in its own worktree and lands through a pull request.
+The owner's decision: all of Gate L is **one goal**, and its first step is the spike. The steps
+below are the order inside that goal; each is independently verifiable. All of it is built in its
+own worktree and lands through a pull request.
 
-| Phase | Criteria | Outcome |
+| Step | Criteria | Outcome |
 | --- | --- | --- |
-| 1. See | AC-83, AC-85, AC-86, AC-87, AC-88, AC-98 | Connection state from the system, probes and agents; memory read from the machine; budget and fit; verified Qwen coder catalogue; settings owned by the daemon; Continuity on by default with its one-time notice. Nothing changes routing yet. |
+| 0. Find out | AC-139 | The spike: how OpenCode's session transports carry permission requests, written down as a decision with a recorded fixture. Nothing else starts before it. |
+| 1. See | AC-83, AC-85, AC-86, AC-87, AC-88, AC-98, AC-140 | Connection state from the system, probes and agents; memory read from the machine; budget and fit; the memory safety guard; verified Qwen coder catalogue; settings owned by the daemon; Continuity on by default with its one-time notice. Nothing changes routing yet. |
 | 2. Choose local | AC-89, AC-90, AC-94, AC-138 | Local models are a first-class choice online, with downloads, prefetch and the Ollama install behind settings, and the OpenCode adapter honours permission modes. |
 | 3. Keep working | AC-84, AC-91, AC-92, AC-93, AC-96 | Failover, transition to local, wait and retry for up to 36 hours, back online, several local agents. |
 | 4. Confirm | AC-95, AC-97 | Honest UI at every state; the owner turns the network off during a real run and sees the transition. |
 
+## Implementation goal
+
+Written on 2026-09-26 at the owner's request, ready to start. Not started by this RFC revision.
+
+> Implement Continuity (Gate L) in `beelol/overseer`: AC-139 first, then AC-83 to AC-98, AC-138 and
+> AC-140, as written in `docs/overseer-rfc.md` (Gate L) and designed in `docs/rfcs/offline-mode.md`.
+> Work in your own worktree on a branch and land the work through one pull request; updates to the
+> criteria, the ledger and the RFC go straight to main.
+>
+> 1. **Find out (AC-139).** Learn how OpenCode's session transports (`opencode acp`, `opencode serve`)
+>    carry permission requests and their answers, interrupt, resume, model and agent choice, and
+>    child sessions, using a local model within the memory budget. Write the decision into the RFC
+>    and record a fixture. Nothing else starts before this is written down.
+> 2. **See (AC-83, AC-85, AC-86, AC-87, AC-88, AC-98, AC-140).** Connection state, local inventory,
+>    memory budget and fit, the memory safety guard, the verified Qwen coder catalogue, the settings,
+>    and the first-use notice.
+> 3. **Choose local (AC-89, AC-90, AC-94, AC-138).** Downloads, the Ollama install, local models in
+>    the composer, and permission modes through OpenCode.
+> 4. **Keep working (AC-84, AC-91, AC-92, AC-93, AC-96).** Failover, transition to local, wait and
+>    retry, back online, several local agents.
+> 5. **Confirm (AC-95, AC-97).** The honest offline UI and the owner's offline session.
+>
+> Memory safety comes before everything. Never load a local model whose measured or estimated size
+> is above the budget, by any path. Never load `qwen3.5:122b`. During catalogue verification load
+> one model at a time, smallest first, unload each after its check, and record memory before and
+> after.
+>
+> Keep the checklist, the README list and the verification ledger current through
+> `docs/verification/records.py`. Check a box only with reproducible evidence. Never weaken, rename
+> or delete a criterion to finish; a scope change needs the owner's recorded decision. When a
+> criterion is blocked, record the blocker and the next action in its record and continue with the
+> others. A partial milestone is progress, not completion.
+
+### Start gate and authority
+
+Granted by the owner on 2026-09-26 for this goal:
+
+- **Model downloads for verification:** the Qwen coders that are not installed (`qwen2.5-coder` 32b,
+  7b, 3b and 1.5b), about 28 GB.
+- **Ollama install test:** in an isolated folder, with the owner's own Ollama untouched.
+- **Light paid turns:** ChatGPT accounts on `gpt-5.6-luna` at low effort only; Claude lightly. One
+  attempt per step, no retry loops against paid accounts.
+- **Commits, branches and one pull request** in `beelol/overseer`; documents and the ledger straight
+  to main.
+
+Not granted: purchases, login changes, automatic merges, editing the user's own OpenCode or Ollama
+configuration, and **turning the network off**. The implementing session needs the network itself,
+so the Wi-Fi steps of AC-83 and AC-97 are the owner's: the session asks the exact question, ends
+its turn, continues independent work, and reads the daemon's event log afterwards. It never blocks
+on a foreground wait.
+
 ## Acceptance
 
-AC-83 to AC-98 and AC-138 in the main RFC are the acceptance criteria. Their Verify clauses cover, in short:
+AC-83 to AC-98 and AC-138 to AC-140 in the main RFC are the acceptance criteria. Their Verify clauses cover, in short:
 
 - the three connection states from the system's answer, fixture-controlled probes and harness errors,
   including Wi-Fi turned off on a real machine, a captive portal, a DNS failure, and a 429 that is
@@ -635,6 +746,8 @@ AC-83 to AC-98 and AC-138 in the main RFC are the acceptance criteria. Their Ver
 - back online: new agents default to online, Switch back and Stay local both work;
 - local models offered in the composer with fit badges; several local agents sharing one model;
 - Continuity on by default with the one-time notice, and off with one switch;
+- the spike's written decision, transcripts and fixture;
+- no model above the budget loadable by any path, the load watchdog and the critical-pressure valve;
 - permission modes carried over on handoff and never loosened, with Plan only, Ask first, Accept
   edits and Auto working through OpenCode;
 - the owner's dated confirmation after disconnecting during a real run.
