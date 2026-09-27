@@ -152,6 +152,11 @@ with a reason and a per-provider breakdown, changed only by evidence, and every 
   active or waiting, and every 60 seconds idle. Probes run every 30 seconds while runs are active or
   waiting, every 5 minutes idle, and immediately on a network-class error. `continuity.probes =
   false` turns probes off; the system and the agents still drive the state.
+- **Rounds are ordered** (as built, 2026-09-27). Probe rounds can overlap (Check now beside the
+  periodic check), and a round that waits on a host's 5-second timeout can end after a later one.
+  Its answer is older, so it is dropped rather than kept. Found with the simulated network: a
+  stale timeout put the state back to *Claude and OpenAI unreachable* after both had answered,
+  for up to the 5-minute idle interval.
 - **What is never offline.** `auth`, `rate_limit` and `quota` errors do not change the connection
   state; they are account states with their own handling (Sign in again, usage and limits). A
   provider that answers 429 is reachable.
