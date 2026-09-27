@@ -1224,9 +1224,13 @@ rec(142, "One Overseer mark everywhere", "verified", date="2026-09-27", commit="
 rec(178, "The phone app uses the owner's mark", "not started", date="—", commit="—",
     expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
     actual="Not started.", live="—", blocker="Not started: the phone app's agent (Gate N) replaces its placeholder marks with the owner's files in docs/design/brand/.")
-rec(179, "The Mac surfaces use the owner's mark", "not started", date="—", commit="—",
+rec(179, "The Mac surfaces use the owner's mark", "partial", commit="8653510", date="2026-09-27", harness="none (the packaged VSIX and the helper's build)",
+    proven="the notification helper's `.icns` is built from `docs/design/brand/exports/overseer-app-icon-macos-1024.png` by `extension/notifier/build.js` (sips for every macOS size, iconutil); the brand scenario unpacks the installed helper's icon and finds every size, the owner's violet tile (`node test/ui/scenario-brand.js`); Overseer has no menu-bar item and no other Mac app, so those parts do not apply yet",
+    deferred="a screenshot of a real notification banner and of the helper in Finder: macOS asks the owner to allow the helper's notifications, and screenshots of the desktop need the owner's screen-recording permission; the menu-bar image when a menu-bar item exists",
     expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
-    actual="Not started: the notification helper's icon is done on branch claude/brand-mark (AC-142); a menu-bar item does not exist yet.", live="—", blocker="Not started: verified with AC-142's merge for the helper; the menu-bar part waits for a menu-bar item.")
+    actual="See proven and deferred.",
+    evidence="[helper icon as installed](evidence/ui/brand/notifier-app-icon.png), [brand scenario](evidence/ui/brand/)", live="—",
+    blocker="Owner: run Overseer: Test Notification in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder.")
 
 # Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code came with pull
 # request #5 (merged as e0db692) and the terminal UI (T-23, T-24) with pull request #6 (merged as ea6a6c2).
@@ -1660,7 +1664,7 @@ SHORT_BLOCKERS = {
     176: "not started (Gate R, added by the owner on 2026-09-27)",
     177: "not started (Gate R, added by the owner on 2026-09-27)",
     178: "not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files",
-    179: "not started (Brand, added by the owner on 2026-09-27): the Mac helper's icon is built with AC-142; a menu-bar item does not exist yet",
+    179: "partial: the helper's icon is built from the owner's mark and checked as installed; the banner and Finder screenshots need the owner",
     180: "verified",
     181: "verified",
     182: "not started (Gate S, added by the owner on 2026-09-27)",
