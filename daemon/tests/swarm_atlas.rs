@@ -321,7 +321,7 @@ fn atlas_s1_contradictory_j7_retracts_claim_pending_environment_review() {
     let j4=atlas_probe("j4");
     let j4_artifact=submit(&d,run,"j4",&a4,1,&j4,"confirmed_defect");
     let batch=d.call("swarm.director.claim_batch",json!({"run_id":run,
-        "generation":1,"revision":1,"now_ms":at+6000}));
+        "generation":1,"revision":1,"now_ms":now()+6000}));
     assert_eq!(batch["status"],"claimed","{batch}");
     let messages=batch["messages"].as_array().unwrap();
     assert!(messages.iter().any(|message| message["message_id"] == "atlas-j2-result"));
@@ -943,4 +943,80 @@ fn atlas_s5_shared_database_contamination_quarantines_and_retries() {
         "checks":[{"job_id":"j2","outcome":"passed","evidence":["atlas-j2-retry-evidence"]},
             {"job_id":"j7","outcome":"passed","evidence":["atlas-j7-retry-evidence"]}]}));
     assert_eq!(completed["status"],"completed","{completed}");
+}
+
+// S5: duplicate progress from a worker with real Atlas probe evidence must
+// collapse to one director envelope while a user Stop cuts through the flood.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_two_thousand_duplicate_progress_messages_do_not_starve_stop() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Atlas duplicate progress fault",
+        "objective":"Audit foreign task mutation","allowed_targets":["fixture"]}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Tasks","acceptance":"foreign patch before-after rows",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j2","mode":"write"}]}
+    ]}));
+    let attempt=register(&d,run,"j2");
+    let evidence=atlas_probe("j2");
+    assert_eq!(evidence["foreignPatchStatus"],200);
+    assert_eq!(evidence["taskBefore"],"Bob task");
+    assert_eq!(evidence["taskAfter"],"changed-by-alice");
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"j2",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "artifact_id":"atlas-j2-progress-probe","source_revision":1,
+        "kind":"reproduction","content":evidence.to_string()}));
+    let report=json!({"run_id":run,"job_id":"j2","attempt_id":attempt["attempt_id"],
+        "token":attempt["token"],"message_id":"atlas-j2-replayed-progress",
+        "type":"progress","revision":1,
+        "payload":{"step":"backend probe complete","artifact_id":"atlas-j2-progress-probe"}});
+    assert_eq!(d.call("swarm.report",report.clone())["duplicate"],false);
+    let socket=d.socket();
+    let (started_tx,started_rx)=mpsc::channel();
+    let flood=std::thread::spawn(move || {
+        for index in 0..2000 {
+            let mut conn=UnixStream::connect(&socket).unwrap();
+            conn.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            writeln!(conn,"{}",json!({"id":index,"method":"swarm.report",
+                "params":report})).unwrap();
+            let mut line=String::new();
+            BufReader::new(conn).read_line(&mut line).unwrap();
+            let reply:Value=serde_json::from_str(&line).unwrap();
+            assert_eq!(reply["result"]["duplicate"],true,"{reply}");
+            if index==20 { started_tx.send(()).unwrap(); }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    });
+    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let begin=Instant::now();
+    let stopped=d.call("swarm.stop",json!({"run_id":run}));
+    let stop_elapsed=begin.elapsed();
+    eprintln!("Atlas duplicate-flood Stop acknowledged in {} ms",stop_elapsed.as_millis());
+    assert!(stop_elapsed<Duration::from_secs(2),"Stop was starved by duplicate updates");
+    assert_eq!(stopped["status"],"stopping","{stopped}");
+    flood.join().unwrap();
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let counts:(i64,i64,i64)=db.query_row("SELECT
+        (SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND kind='progress'),
+        (SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1),
+        (SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1)",
+        [run],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+    assert_eq!(counts,(1,1,0));
+    let inbox=d.call("swarm.messages",json!({"run_id":run,"recipient":"director"}));
+    assert_eq!(inbox["messages"].as_array().unwrap().len(),1);
+    assert_eq!(inbox["messages"][0]["message_id"],"atlas-j2-replayed-progress");
+    assert_ne!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"accepted");
+    assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"atlas-duplicate-progress-complete",
+        "summary":"Task audit complete","verification":"Backend probe","checks":[]})).is_err());
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"j2","attempt_id":attempt["attempt_id"]}));
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["status"],"stopped");
 }
