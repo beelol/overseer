@@ -425,6 +425,11 @@ fn catalog_s3_twenty_four_patches_need_a_combined_cursor_check() {
         "generation":1,"turn_id":final_review["turn_id"],"token":final_review["token"],
         "outcome":"no_progress"}),
     );
+    let old_result_phase: String = db.query_row(
+        "SELECT phase FROM swarm_messages WHERE run_id=?1 AND message_id='stale-accounts-result'",
+        [run], |row| row.get(0),
+    ).unwrap();
+    assert_eq!(old_result_phase, "applied");
     let checks = std::iter::once(json!({"job_id":"contract","outcome":"passed",
         "evidence":["contract-patch-v2"]}))
     .chain(names.iter().map(|name| {

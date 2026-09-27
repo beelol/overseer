@@ -296,12 +296,12 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     }
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
-    // A claimed batch is only delivery. A terminal report remains reviewable until
-    // a durable decision covers that particular report sequence. A contaminated
-    // attempt is already quarantined and cannot receive a review decision, so
-    // retaining its result in the inbox would block an isolated retry forever.
-    // Otherwise a completed model turn could silently consume the only result
-    // notification.
+    // A claimed batch is only delivery. A current terminal report remains reviewable
+    // until a durable decision covers that report sequence. A superseded report
+    // cannot receive a decision for the revised job, but the director still sees
+    // its original revision once before this acknowledgement. Contaminated attempts
+    // are similarly quarantined. Otherwise a completed turn could silently consume
+    // the only notification for a result that can still be reviewed.
     let pending_review = if current["status"] == "stopping" || current["status"] == "stopped" || current["status"] == "invalidated" {
         0
     } else {
@@ -309,6 +309,8 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
             "UPDATE swarm_messages AS m SET phase='queued',updated_ms=?2
              WHERE m.seq IN (SELECT seq FROM swarm_director_turn_messages WHERE turn_id=?1)
              AND m.phase='delivered' AND m.kind IN ('result','submit')
+             AND EXISTS (SELECT 1 FROM swarm_jobs j WHERE j.run_id=m.run_id
+                 AND j.id=m.job_id AND j.plan_revision=m.revision)
              AND NOT EXISTS (SELECT 1 FROM swarm_resource_contamination c
                  WHERE c.run_id=m.run_id AND c.job_id=m.job_id AND c.attempt_id=m.attempt_id)
              AND NOT EXISTS (SELECT 1 FROM swarm_decisions d WHERE d.run_id=m.run_id

@@ -72,6 +72,42 @@ fn unreviewed_result_returns_to_director_after_batch_completion_and_restart() {
 }
 
 #[test]
+fn superseded_result_is_applied_after_delivery_without_accepting_old_evidence() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Revision inbox",
+        "objective":"Audit","allowed_targets":["system-codex"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j","title":"Inspect","acceptance":"old evidence","deps":[]}]}));
+    let attempt = d.call("swarm.attempt.register", json!({"run_id":id,
+        "generation":1,"revision":1,"job_id":"j"}));
+    d.call("swarm.report", json!({"run_id":id,"job_id":"j",
+        "attempt_id":attempt["id"],"token":attempt["token"],
+        "message_id":"old-result","type":"result","revision":1,
+        "payload":{"note":"before revision"}}));
+    d.call("swarm.revise", json!({"id":id,"generation":1,"expected_revision":1,
+        "reason":"Evidence requirement changed","jobs":[
+        {"id":"j","title":"Inspect","acceptance":"new evidence","deps":[]}]}));
+    let turn = d.call("swarm.director.claim_batch", json!({"run_id":id,
+        "generation":1,"revision":2,"now_ms":now()+6000}));
+    assert_eq!(turn["status"], "claimed");
+    assert_eq!(turn["messages"][0]["message_id"], "old-result");
+    assert_eq!(turn["messages"][0]["revision"], 1);
+    let done = d.call("swarm.director.complete_batch", json!({"run_id":id,
+        "generation":1,"turn_id":turn["turn_id"],"token":turn["token"]}));
+    assert_eq!(done["pending_review"], 0);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let (phase, decisions): (String, i64) = (
+        db.query_row("SELECT phase FROM swarm_messages WHERE run_id=?1 AND message_id='old-result'",
+            [id], |r| r.get(0)).unwrap(),
+        db.query_row("SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1 AND job_id='j'",
+            [id], |r| r.get(0)).unwrap(),
+    );
+    assert_eq!(phase, "applied");
+    assert_eq!(decisions, 0);
+}
+
+#[test]
 fn director_batches_twenty_events_and_never_claims_two_active_turns() {
     let mut d = Daemon::start(&[]);
     let run = d.call(
