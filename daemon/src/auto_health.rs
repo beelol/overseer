@@ -433,6 +433,7 @@ mod tests {
             profile_id: profile.into(),
             pool_id: profile.into(),
             model: "general".into(),
+            resolved_model_version: None,
             effort: "medium".into(),
             tier: CapabilityTier::General,
             tools: BTreeSet::new(),

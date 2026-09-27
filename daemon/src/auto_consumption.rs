@@ -288,6 +288,7 @@ pub fn estimate_from_actual_window_delta(
             window:window.window, upper_percent:window.upper_percent });
     }
     Some(AllowanceEstimate { pool_id, model:model.into(), effort:effort.into(),
+        model_version:None, task_signature:None,
         plan_type:Some(plan_type), source:DrawSource::AttributedActualWork,
         observed_ms:after.observed_ms, windows })
 }
@@ -352,7 +353,8 @@ mod tests {
     #[test]
     fn verified_actual_work_delta_becomes_a_scoped_positive_fit_estimate() {
         use crate::auto_quota::parse_codex_rate_limits;
-        use crate::auto_select::{assess_fit, Allowance, CapabilityTier, Fit, Health, Route, Sandbox};
+        use crate::auto_select::{assess_fit, Allowance, CapabilityTier, Fit, Health, Route, Sandbox,
+            TaskSignature, WorkUnit};
         use std::collections::BTreeSet;
         let at = 1_800_000_000_000_i64;
         let reading = |used: f64, observed| parse_codex_rate_limits(
@@ -365,8 +367,15 @@ mod tests {
             same_account_generation:true, model_version_stable:true,
             local_overlap_excluded:true, external_usage_excluded:true,
             reporting_settled:true, meter_error_percent:Some(0.1) };
-        let estimate = estimate_from_actual_window_delta(Some(&before), &after, &trusted)
+        let mut estimate = estimate_from_actual_window_delta(Some(&before), &after, &trusted)
             .expect("credible actual work should yield a scoped estimate");
+        estimate.model_version = Some("gpt-6-sol-resolved-v1".into());
+        let work = WorkUnit { id:"actual-unit".into(), min_tier:CapabilityTier::General,
+            required_tools:BTreeSet::new(), context_needed:0, requires_approvals:false,
+            min_sandbox:Sandbox::WorkspaceWrite, max_sandbox:Sandbox::WorkspaceWrite,
+            allowed_profiles:["profile".into()].into(), pinned_route:None,
+            preferred_harness:None };
+        estimate.task_signature = Some(TaskSignature::from(&work));
         assert_eq!(estimate.pool_id, "pool-1");
         assert_eq!(estimate.model, "gpt-6-sol");
         assert_eq!(estimate.effort, "medium");
@@ -376,15 +385,17 @@ mod tests {
         assert!((estimate.windows[0].upper_percent - 2.2).abs() < 1e-9);
         let route = Route { id:"sol".into(), harness:"codex-app".into(),
             provider:"openai".into(), endpoint:"codex".into(), profile_id:"profile".into(),
-            pool_id:"pool-1".into(), model:"gpt-6-sol".into(), effort:"medium".into(),
+            pool_id:"pool-1".into(), model:"gpt-6-sol".into(),
+            resolved_model_version:Some("gpt-6-sol-resolved-v1".into()),
+            effort:"medium".into(),
             tier:CapabilityTier::General, tools:BTreeSet::new(), context_limit:None,
             supports_approvals:true, sandbox:Sandbox::WorkspaceWrite,
             recommended_default:true, quota:Allowance::ObservedNonExhausted,
             quota_blocks:Vec::new(), fit:Fit::Unknown, health:Health::Healthy,
             unresolved_quota_pool_identity:false, in_flight_pool_claim:false };
-        assert_eq!(assess_fit(&reading(96.0, at + 30_000), &route,
+        assert_eq!(assess_fit(&reading(96.0, at + 30_000), &work, &route,
             Some(&estimate), &[], at + 30_000), Fit::Fits);
-        assert_eq!(assess_fit(&reading(98.0, at + 30_000), &route,
+        assert_eq!(assess_fit(&reading(98.0, at + 30_000), &work, &route,
             Some(&estimate), &[], at + 30_000), Fit::Unaffordable);
     }
 

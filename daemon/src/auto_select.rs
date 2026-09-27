@@ -76,6 +76,12 @@ pub struct AllowanceEstimate {
     pub pool_id: String,
     pub model: String,
     pub effort: String,
+    /// A provider- or harness-resolved immutable model identity. A moving
+    /// alias alone cannot make an old draw estimate comparable.
+    #[serde(default)]
+    pub model_version: Option<String>,
+    #[serde(default)]
+    pub task_signature: Option<TaskSignature>,
     #[serde(default)]
     pub plan_type: Option<String>,
     pub source: DrawSource,
@@ -89,6 +95,7 @@ pub struct AllowanceEstimate {
 /// requirements before this can authorize a launch.
 pub fn assess_fit(
     snapshot: &QuotaSnapshot,
+    work: &WorkUnit,
     route: &Route,
     estimate: Option<&AllowanceEstimate>,
     in_flight: &[WindowDraw],
@@ -106,6 +113,9 @@ pub fn assess_fit(
     if estimate.pool_id != route.pool_id
         || estimate.model != route.model
         || estimate.effort != route.effort
+        || !matches!((&estimate.model_version, &route.resolved_model_version),
+            (Some(left), Some(right)) if !left.is_empty() && left == right)
+        || estimate.task_signature.as_ref() != Some(&TaskSignature::from(work))
         || now_ms < estimate.observed_ms
         || now_ms.saturating_sub(estimate.observed_ms) >= MAX_ESTIMATE_AGE_MS
     {
@@ -174,6 +184,8 @@ pub struct Route {
     pub profile_id: String,
     pub pool_id: String,
     pub model: String,
+    #[serde(default)]
+    pub resolved_model_version: Option<String>,
     pub effort: String,
     pub tier: CapabilityTier,
     pub tools: BTreeSet<String>,
@@ -209,6 +221,27 @@ pub struct WorkUnit {
     pub allowed_profiles: BTreeSet<String>,
     pub pinned_route: Option<String>,
     pub preferred_harness: Option<String>,
+}
+
+/// Exact structured requirements for conservative comparison of completed
+/// work. IDs, account allowlists, pins and harness preference are routing
+/// choices, not a claim that two work units consume the same allowance.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct TaskSignature {
+    pub min_tier: CapabilityTier,
+    pub required_tools: BTreeSet<String>,
+    pub context_needed: u64,
+    pub requires_approvals: bool,
+    pub min_sandbox: Sandbox,
+    pub max_sandbox: Sandbox,
+}
+
+impl From<&WorkUnit> for TaskSignature {
+    fn from(work: &WorkUnit) -> Self {
+        Self { min_tier:work.min_tier, required_tools:work.required_tools.clone(),
+            context_needed:work.context_needed, requires_approvals:work.requires_approvals,
+            min_sandbox:work.min_sandbox, max_sandbox:work.max_sandbox }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -386,6 +419,7 @@ mod tests {
             profile_id: pool.into(),
             pool_id: pool.into(),
             model: id.into(),
+            resolved_model_version: Some(format!("{id}-v1")),
             effort: effort.into(),
             tier,
             tools: tools.iter().map(|s| s.to_string()).collect(),
@@ -707,6 +741,8 @@ mod tests {
             pool_id: "pool-a".into(),
             model: "sol".into(),
             effort: "medium".into(),
+            model_version: Some("sol-v1".into()),
+            task_signature: Some(TaskSignature::from(&unit(CapabilityTier::General, &["browser"]))),
             plan_type: Some("pro".into()),
             source: DrawSource::AttributedActualWork,
             observed_ms: now,
@@ -724,13 +760,13 @@ mod tests {
             ],
         };
         assert_eq!(
-            assess_fit(&quota, &route, Some(&estimate), &[], now),
+            assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, Some(&estimate), &[], now),
             Fit::Unaffordable
         );
         let mut partial = estimate.clone();
         partial.windows.pop();
         assert_eq!(
-            assess_fit(&quota, &route, Some(&partial), &[], now),
+            assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, Some(&partial), &[], now),
             Fit::Unaffordable
         );
         partial.windows.clear();
@@ -740,7 +776,7 @@ mod tests {
             upper_percent: 60.0,
         });
         assert_eq!(
-            assess_fit(&quota, &route, Some(&partial), &[], now),
+            assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, Some(&partial), &[], now),
             Fit::Unaffordable
         );
         partial.windows[0].upper_percent = 45.0;
@@ -750,12 +786,12 @@ mod tests {
             upper_percent: 10.0,
         }];
         assert_eq!(
-            assess_fit(&quota, &route, Some(&partial), &prior, now),
+            assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, Some(&partial), &prior, now),
             Fit::Unaffordable
         );
         estimate.windows[0].upper_percent = 5.0;
         assert_eq!(
-            assess_fit(&quota, &route, Some(&estimate), &[], now),
+            assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, Some(&estimate), &[], now),
             Fit::Fits
         );
         let in_flight = [WindowDraw {
@@ -764,7 +800,7 @@ mod tests {
             upper_percent: 6.0,
         }];
         assert_eq!(
-            assess_fit(&quota, &route, Some(&estimate), &in_flight, now),
+            assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, Some(&estimate), &in_flight, now),
             Fit::Unaffordable
         );
     }
@@ -788,11 +824,13 @@ mod tests {
             "medium",
             &["browser"],
         );
-        assert_eq!(assess_fit(&quota, &route, None, &[], now), Fit::Unknown);
+        assert_eq!(assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, None, &[], now), Fit::Unknown);
         let mut estimate = AllowanceEstimate {
             pool_id: "pool-a".into(),
             model: "sol".into(),
             effort: "medium".into(),
+            model_version: Some("sol-v1".into()),
+            task_signature: Some(TaskSignature::from(&unit(CapabilityTier::General, &["browser"]))),
             plan_type: Some("pro".into()),
             source: DrawSource::ProviderReported,
             observed_ms: now,
@@ -803,17 +841,17 @@ mod tests {
             }],
         };
         assert_eq!(
-            assess_fit(&quota, &route, Some(&estimate), &[], now),
+            assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, Some(&estimate), &[], now),
             Fit::Unknown
         );
         estimate.windows[0].upper_percent = 5.0;
         assert_eq!(
-            assess_fit(&quota, &route, Some(&estimate), &[], now + 10_000),
+            assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, Some(&estimate), &[], now + 10_000),
             Fit::Unknown
         );
         estimate.pool_id = "other-account".into();
         assert_eq!(
-            assess_fit(&quota, &route, Some(&estimate), &[], now),
+            assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, Some(&estimate), &[], now),
             Fit::Unknown
         );
     }
@@ -832,13 +870,77 @@ mod tests {
         let estimate = |plan: Option<&str>| -> AllowanceEstimate {
             serde_json::from_value(json!({"pool_id":"pool-a","model":"sol",
                 "effort":"medium","source":"provider_reported","observed_ms":now,
+                "model_version":"sol-v1",
+                "task_signature":{"min_tier":"general","required_tools":["browser"],
+                    "context_needed":1000,"requires_approvals":false,
+                    "min_sandbox":"read_only","max_sandbox":"workspace_write"},
                 "plan_type":plan,
                 "windows":[{"bucket_id":"codex","window":"primary","upper_percent":5.0}]
             })).unwrap()
         };
-        assert_eq!(assess_fit(&quota, &route, Some(&estimate(Some("pro"))), &[], now), Fit::Fits);
-        assert_eq!(assess_fit(&quota, &route, Some(&estimate(Some("plus"))), &[], now), Fit::Unknown);
-        assert_eq!(assess_fit(&quota, &route, Some(&estimate(None)), &[], now), Fit::Unknown);
+        let work = unit(CapabilityTier::General, &["browser"]);
+        assert_eq!(assess_fit(&quota, &work, &route, Some(&estimate(Some("pro"))), &[], now), Fit::Fits);
+        assert_eq!(assess_fit(&quota, &work, &route, Some(&estimate(Some("plus"))), &[], now), Fit::Unknown);
+        assert_eq!(assess_fit(&quota, &work, &route, Some(&estimate(None)), &[], now), Fit::Unknown);
+    }
+
+    #[test]
+    fn alias_without_resolved_model_version_cannot_reuse_numeric_draw() {
+        use crate::auto_quota::parse_codex_rate_limits;
+        use serde_json::json;
+        let now = 1_800_000_000_000_i64;
+        let quota = parse_codex_rate_limits(&json!({"rateLimits":{
+            "limitId":"codex","planType":"pro",
+            "primary":{"usedPercent":40,"resetsAt":1800003600}
+        }}), "pool-a", now).unwrap();
+        let mut route = route("sol", "codex", "pool-a", CapabilityTier::General,
+            "medium", &["browser"]);
+        route.resolved_model_version = None;
+        let estimate: AllowanceEstimate = serde_json::from_value(json!({
+            "pool_id":"pool-a","model":"sol","model_version":"sol-v1",
+            "effort":"medium","task_signature":{
+                "min_tier":"general","required_tools":["browser"],"context_needed":1000,
+                "requires_approvals":false,"min_sandbox":"read_only",
+                "max_sandbox":"workspace_write"},
+            "source":"provider_reported","observed_ms":now,"plan_type":"pro",
+            "windows":[{"bucket_id":"codex","window":"primary","upper_percent":5.0}]
+        })).unwrap();
+        let work = unit(CapabilityTier::General, &["browser"]);
+        assert_eq!(assess_fit(&quota, &work, &route, Some(&estimate), &[], now), Fit::Unknown);
+        route.resolved_model_version = Some("sol-v2".into());
+        assert_eq!(assess_fit(&quota, &work, &route, Some(&estimate), &[], now), Fit::Unknown);
+        route.resolved_model_version = Some("sol-v1".into());
+        assert_eq!(assess_fit(&quota, &work, &route, Some(&estimate), &[], now), Fit::Fits);
+    }
+
+    #[test]
+    fn a_browser_estimate_cannot_price_a_different_task() {
+        use crate::auto_quota::parse_codex_rate_limits;
+        use serde_json::json;
+        let now = 1_800_000_000_000_i64;
+        let quota = parse_codex_rate_limits(&json!({"rateLimits":{
+            "limitId":"codex","planType":"pro",
+            "primary":{"usedPercent":40,"resetsAt":1800003600}
+        }}), "pool-a", now).unwrap();
+        let route = route("sol", "codex", "pool-a", CapabilityTier::General,
+            "medium", &["browser"]);
+        let estimate: AllowanceEstimate = serde_json::from_value(json!({
+            "pool_id":"pool-a","model":"sol","model_version":"sol-v1",
+            "effort":"medium","source":"provider_reported","observed_ms":now,
+            "plan_type":"pro","task_signature":{
+                "min_tier":"general","required_tools":["browser"],"context_needed":1000,
+                "requires_approvals":false,"min_sandbox":"read_only",
+                "max_sandbox":"workspace_write"},
+            "windows":[{"bucket_id":"codex","window":"primary","upper_percent":5.0}]
+        })).unwrap();
+        let browser = unit(CapabilityTier::General, &["browser"]);
+        assert_eq!(assess_fit(&quota, &browser, &route, Some(&estimate), &[], now), Fit::Fits);
+        let mut larger = browser.clone();
+        larger.context_needed = 20_000;
+        assert_eq!(assess_fit(&quota, &larger, &route, Some(&estimate), &[], now), Fit::Unknown);
+        let mut different_tool = browser;
+        different_tool.required_tools = ["terminal".into()].into();
+        assert_eq!(assess_fit(&quota, &different_tool, &route, Some(&estimate), &[], now), Fit::Unknown);
     }
 
     #[test]
