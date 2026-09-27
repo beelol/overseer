@@ -256,6 +256,42 @@ pub fn assess_window_delta(
     }
 }
 
+/// Promote only a fully bounded, attributed actual-work delta to the same
+/// window units used by admission. The caller must establish the context's
+/// non-overlap and settled-meter claims; absent proof leaves this unavailable.
+/// This deliberately does not convert thread credits or token counts.
+pub fn estimate_from_actual_window_delta(
+    before: Option<&crate::auto_quota::QuotaSnapshot>,
+    after: &crate::auto_quota::QuotaSnapshot,
+    context: &DeltaContext<'_>,
+) -> Option<crate::auto_select::AllowanceEstimate> {
+    use crate::auto_select::{AllowanceEstimate, DrawSource, WindowDraw};
+    let assessment = assess_window_delta(before, after, context);
+    if assessment.state != "bounded" || assessment.windows.is_empty() {
+        return None;
+    }
+    let model = context.model.filter(|value| !value.is_empty())?;
+    let effort = context.effort.filter(|value| !value.is_empty())?;
+    let plan_type = after.reported_plan_type()?.to_string();
+    let pool_id = assessment.windows.first()?.pool_id.clone();
+    if pool_id.is_empty() { return None; }
+    let mut seen = std::collections::BTreeSet::new();
+    let mut windows = Vec::with_capacity(assessment.windows.len());
+    for window in assessment.windows {
+        if window.pool_id != pool_id || window.bucket_id.is_empty() || window.window.is_empty()
+            || !window.upper_percent.is_finite() || window.upper_percent <= 0.0
+            || window.upper_percent > 100.0
+            || !seen.insert((window.bucket_id.clone(), window.window.clone())) {
+            return None;
+        }
+        windows.push(WindowDraw { bucket_id:window.bucket_id,
+            window:window.window, upper_percent:window.upper_percent });
+    }
+    Some(AllowanceEstimate { pool_id, model:model.into(), effort:effort.into(),
+        plan_type:Some(plan_type), source:DrawSource::AttributedActualWork,
+        observed_ms:after.observed_ms, windows })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,6 +347,72 @@ mod tests {
         assert_eq!(uncertain.state, "unverified");
         assert!(uncertain.reasons.contains(&"zero_visible_delta".to_string()));
         assert!(uncertain.windows.is_empty(), "zero visible change is not free work");
+    }
+
+    #[test]
+    fn verified_actual_work_delta_becomes_a_scoped_positive_fit_estimate() {
+        use crate::auto_quota::parse_codex_rate_limits;
+        use crate::auto_select::{assess_fit, Allowance, CapabilityTier, Fit, Health, Route, Sandbox};
+        use std::collections::BTreeSet;
+        let at = 1_800_000_000_000_i64;
+        let reading = |used: f64, observed| parse_codex_rate_limits(
+            &json!({"rateLimits":{"limitId":"codex","planType":"pro",
+                "primary":{"usedPercent":used,"resetsAt":1_800_003_600}}}),
+            "pool-1", observed).unwrap();
+        let before = reading(40.0, at);
+        let after = reading(42.0, at + 20_000);
+        let trusted = DeltaContext { model:Some("gpt-6-sol"), effort:Some("medium"),
+            same_account_generation:true, model_version_stable:true,
+            local_overlap_excluded:true, external_usage_excluded:true,
+            reporting_settled:true, meter_error_percent:Some(0.1) };
+        let estimate = estimate_from_actual_window_delta(Some(&before), &after, &trusted)
+            .expect("credible actual work should yield a scoped estimate");
+        assert_eq!(estimate.pool_id, "pool-1");
+        assert_eq!(estimate.model, "gpt-6-sol");
+        assert_eq!(estimate.effort, "medium");
+        assert_eq!(estimate.plan_type.as_deref(), Some("pro"));
+        assert_eq!(estimate.source, crate::auto_select::DrawSource::AttributedActualWork);
+        assert_eq!(estimate.windows.len(), 1);
+        assert!((estimate.windows[0].upper_percent - 2.2).abs() < 1e-9);
+        let route = Route { id:"sol".into(), harness:"codex-app".into(),
+            provider:"openai".into(), endpoint:"codex".into(), profile_id:"profile".into(),
+            pool_id:"pool-1".into(), model:"gpt-6-sol".into(), effort:"medium".into(),
+            tier:CapabilityTier::General, tools:BTreeSet::new(), context_limit:None,
+            supports_approvals:true, sandbox:Sandbox::WorkspaceWrite,
+            recommended_default:true, quota:Allowance::ObservedNonExhausted,
+            quota_blocks:Vec::new(), fit:Fit::Unknown, health:Health::Healthy,
+            unresolved_quota_pool_identity:false, in_flight_pool_claim:false };
+        assert_eq!(assess_fit(&reading(96.0, at + 30_000), &route,
+            Some(&estimate), &[], at + 30_000), Fit::Fits);
+        assert_eq!(assess_fit(&reading(98.0, at + 30_000), &route,
+            Some(&estimate), &[], at + 30_000), Fit::Unaffordable);
+    }
+
+    #[test]
+    fn actual_window_estimate_rejects_ambiguous_or_zero_draw() {
+        use crate::auto_quota::parse_codex_rate_limits;
+        let at = 1_800_000_000_000_i64;
+        let reading = |used: f64, observed| parse_codex_rate_limits(
+            &json!({"rateLimits":{"limitId":"codex","planType":"pro",
+                "primary":{"usedPercent":used,"resetsAt":1_800_003_600}}}),
+            "pool-1", observed).unwrap();
+        let before = reading(40.0, at);
+        let after = reading(42.0, at + 20_000);
+        let mut context = DeltaContext { model:Some("gpt-6-sol"), effort:Some("medium"),
+            same_account_generation:true, model_version_stable:true,
+            local_overlap_excluded:true, external_usage_excluded:true,
+            reporting_settled:true, meter_error_percent:Some(0.1) };
+        assert!(estimate_from_actual_window_delta(None, &after, &context).is_none());
+        assert!(estimate_from_actual_window_delta(Some(&before),
+            &reading(40.0, at + 20_000), &context).is_none());
+        context.external_usage_excluded = false;
+        assert!(estimate_from_actual_window_delta(Some(&before), &after, &context).is_none());
+        context.external_usage_excluded = true;
+        context.model_version_stable = false;
+        assert!(estimate_from_actual_window_delta(Some(&before), &after, &context).is_none());
+        context.model_version_stable = true;
+        context.effort = None;
+        assert!(estimate_from_actual_window_delta(Some(&before), &after, &context).is_none());
     }
 
     #[test]
