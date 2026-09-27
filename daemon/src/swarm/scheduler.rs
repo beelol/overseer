@@ -7,6 +7,7 @@ use anyhow::{bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::path::Path;
 
 pub fn next(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
     let request_id = required(p, "request_id")?;
@@ -15,6 +16,17 @@ pub fn next(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
         bail!("invalid scheduler request id");
     }
     let digest = format!("{:x}", Sha256::digest(p.to_string().as_bytes()));
+    // Dispatch knows the requested checkout before it chooses a category.
+    // Resolve it once, then exclude unrelated category scopes before admission;
+    // worker launch rechecks the same source authority after selection.
+    let requested_repo = p.get("repo").map(|value| -> Result<(String,String)> {
+        let path = value.as_str().ok_or_else(|| anyhow::anyhow!("invalid dispatch repository"))?;
+        let top = crate::git::toplevel(Path::new(path))?;
+        let common = crate::git::common_dir(&top)?;
+        let commit = crate::git::rev_parse(&top, "HEAD")
+            .ok_or_else(|| anyhow::anyhow!("repository has no source revision"))?;
+        Ok((common.to_string_lossy().into_owned(),commit))
+    }).transpose()?;
     let previous: Option<(String, String, String, String, String)> = store
         .conn
         .query_row(
@@ -43,7 +55,7 @@ pub fn next(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
         .optional()?
         .unwrap_or_default();
     let mut stmt = store.conn.prepare(
-        "SELECT id,category_key,generation,revision,allowed_targets FROM swarm_runs
+        "SELECT id,category_key,generation,revision,allowed_targets,repository_scope FROM swarm_runs
          WHERE status IN ('planning','running')
          AND NOT EXISTS(SELECT 1 FROM swarm_director_owners o
                         WHERE o.run_id=swarm_runs.id AND
@@ -62,6 +74,7 @@ pub fn next(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
                 r.get::<_, i64>(2)?,
                 r.get::<_, i64>(3)?,
                 r.get::<_, String>(4)?,
+                r.get::<_, Option<String>>(5)?,
             ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -72,7 +85,22 @@ pub fn next(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
     let start = runs.iter().position(|r| r.1 > last).unwrap_or(0);
     let mut blocked = Vec::new();
     for n in 0..runs.len() {
-        let (run, key, generation, revision, allowed) = &runs[(start + n) % runs.len()];
+        let (run, key, generation, revision, allowed, scope) = &runs[(start + n) % runs.len()];
+        let repo_allowed = match (&requested_repo, scope) {
+            (None, _) => true,
+            (Some((common,commit)), Some(raw)) => {
+                let approved: Vec<Value> = serde_json::from_str(raw)?;
+                approved.iter().any(|source| source["common_dir"] == *common
+                    && source["source_commit"] == *commit)
+            }
+            (Some(_), None) => std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() == Ok("1"),
+        };
+        if !repo_allowed {
+            if blocked.len() < 20 {
+                blocked.push(json!({"run_id":run,"reason":"repository_scope"}));
+            }
+            continue;
+        }
         let allowed: Value = serde_json::from_str(allowed)?;
         if !allowed
             .as_array()

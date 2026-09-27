@@ -34,3 +34,26 @@ requirement. This closes the fixture's per-job-capability gap; the target
 snapshot is still injected and the scheduler does not autonomously ask Auto
 for the next route. The four-test scheduler suite and full offline Rust
 workspace suite passed. SWARM-36 remains partial.
+
+Two-repository supervised dispatch follow-up (2026-09-27):
+`daemon/tests/swarm_dispatch.rs::dispatch_skips_category_outside_requested_repository_before_reserving_attempt`
+creates a 100-job category in repository A and a two-job category in repository B,
+then starts one supervised director for each under a four-agent ceiling. The
+first dispatch asks for B's approved checkout even though A sorts first. Before
+the fix, the scheduler reserved A's job and worker launch failed with
+`repository is outside the approved Swarm scope`. The dispatcher now resolves
+the requested source revision once and filters category scopes before
+admission. An unapproved third repository consumes no attempt; B launches
+first, A launches second, a replay returns B's existing worker, and a fifth
+ordinary process is refused. Both directors and workers are stopped and their
+process exits confirmed by the fixture. Worker launch still rechecks source
+authority after selection.
+
+Verification: the focused regression failed before the fix and passed after
+it. The affected dispatch, scheduler, admission and runtime suites passed
+(8 + 4 + 35 + 24 tests); after tightening the filter's error handling, the
+final dispatch and scheduler suites passed again (8 + 4 tests). This adds
+real supervised director/worker evidence with separate repository scopes.
+The dispatcher still takes an injected route, quota snapshot and requested
+checkout rather than obtaining those from Auto; cross-category handoffs and
+the shared live account authority remain unverified. SWARM-36 stays partial.

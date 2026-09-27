@@ -402,9 +402,10 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_scheduler.rs",
+        "daemon/tests/swarm_dispatch.rs",
         "docs/verification/swarm/SWARM-36.md"
       ],
-      "blocker": "A fixture-only central queue fairly admits unequal category backlogs, skips a conflicting first job to admit an independent job after restart, and applies each job's saved capability requirement. It does not yet start directors/workers automatically, request per-job routes from Auto Mode, reserve an actual director process, or prove cross-category scope and handoff isolation in a live run."
+      "blocker": "A fixture central queue fairly admits unequal category backlogs, skips a conflicting first job, and applies each saved capability requirement. A supervised two-repository replay starts both directors and workers, filters unapproved repository scopes before reservation, alternates B then A, and rejects a fifth process at a four-agent cap. It still takes injected route, quota snapshot and checkout inputs rather than selecting them from Auto Mode; cross-category handoffs and a shared live account authority remain unverified."
     },
     "SWARM-37": {
       "status": "partial",

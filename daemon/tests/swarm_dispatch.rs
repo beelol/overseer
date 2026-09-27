@@ -65,6 +65,91 @@ fn running_director_can_dispatch_first_worker_into_second_app_slot() {
 }
 
 #[test]
+fn dispatch_skips_category_outside_requested_repository_before_reserving_attempt() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set", json!({"max_active":4}));
+    let temp = tmp();
+    let source_a = repo(&temp.path().join("category-a-source"));
+    let source_b = repo(&temp.path().join("category-b-source"));
+    let source_other = repo(&temp.path().join("unapproved-source"));
+    let make_run = |category: &str, source: &std::path::Path, jobs: usize| {
+        let created = d.call("swarm.create", json!({"category":category,
+            "objective":"Audit this source","allowed_targets":["fixture"],
+            "repositories":[source]}));
+        let id = created["id"].as_str().unwrap().to_string();
+        let backlog: Vec<_> = (0..jobs).map(|n| json!({"id":format!("j{n:03}"),
+            "title":format!("Inspect {n}"),"acceptance":"Evidence","deps":[]})).collect();
+        d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":backlog}));
+        let director = d.call("swarm.director.launch",json!({"run_id":id,
+            "generation":1,"repo":source,"program":"/bin/sleep","args":["30"],
+            "prompt":"Direct this category","title":format!("{category} director")}));
+        assert_eq!(director["status"],"launched","{director}");
+        (id,director["overseer_run_id"].as_str().unwrap().to_string())
+    };
+    let (long, long_director) = make_run("A long category", &source_a, 100);
+    let (short, short_director) = make_run("B short category", &source_b, 2);
+    let at = now();
+    let request = |id: &str, source: &std::path::Path| json!({
+        "request_id":id,"target_id":"fixture","repo":source,
+        "program":"/bin/sleep","args":["30"],"now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture","account_id":"shared","pool_ids":["pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"});
+    let unapproved = d.call("swarm.dispatch.next",request("scoped-other",&source_other));
+    let attempts_after_unapproved: i64 = rusqlite::Connection::open(
+        d.home.path().join("overseer.sqlite")).unwrap().query_row(
+        "SELECT COUNT(*) FROM swarm_attempts",[],|r|r.get(0)).unwrap();
+    // B's repository is requested first even though A sorts first and has 100 jobs.
+    let first_request = request("scoped-b", &source_b);
+    let first = d.try_call("swarm.dispatch.next", first_request.clone());
+    let long_attempts_after_first: i64 = rusqlite::Connection::open(
+        d.home.path().join("overseer.sqlite")).unwrap().query_row(
+        "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1",[&long],|r|r.get(0)).unwrap();
+    let second = if first.as_ref().is_ok_and(|result| result["status"] == "launched") {
+        Some(d.try_call("swarm.dispatch.next",request("scoped-a", &source_a)))
+    } else { None };
+    let active = d.call("agents.limit.get",json!({}))["active"].clone();
+    let replay = if second.as_ref().is_some_and(|result| result.is_ok()) {
+        Some(d.try_call("swarm.dispatch.next", first_request))
+    } else { None };
+    let third_refused = if active == 4 {
+        d.try_call("task.create",json!({"repo":source_a,"harness":"generic",
+            "workspace_mode":"worktree","program":"/bin/sleep","args":["30"],
+            "prompt":"","title":"fifth agent"})).unwrap_err().contains("agent limit reached")
+    } else { false };
+    d.call("swarm.stop",json!({"run_id":long}));
+    d.call("swarm.stop",json!({"run_id":short}));
+    d.wait_done(&long_director,8);
+    d.wait_done(&short_director,8);
+    for result in std::iter::once(&first).chain(second.iter()) {
+        if let Ok(launched) = result {
+            if let Some(worker) = launched["overseer_run_id"].as_str() {
+                d.wait_done(worker,8);
+            }
+        }
+    }
+
+    let first = first.expect("B's approved source must be dispatchable");
+    assert_eq!(unapproved["status"],"blocked","{unapproved}");
+    assert_eq!(unapproved["reason"],"all_categories_blocked");
+    assert_eq!(attempts_after_unapproved,0);
+    assert_eq!(first["status"],"launched","{first}");
+    assert_eq!(first["run_id"],short);
+    assert_eq!(long_attempts_after_first,0,"A must not consume an attempt for B's source");
+    let second = second.unwrap().expect("A's approved source must be dispatchable");
+    assert_eq!(second["status"],"launched","{second}");
+    assert_eq!(second["run_id"],long);
+    assert_eq!(active,4);
+    assert_eq!(replay.unwrap().unwrap()["overseer_run_id"],first["overseer_run_id"]);
+    assert!(third_refused,"a fifth process must not exceed the four-slot cap");
+}
+
+#[test]
 fn worker_spawn_record_failure_keeps_one_attempt_and_reattaches_after_restart() {
     let mut d = Daemon::start(&[]);
     let temp = tmp();
