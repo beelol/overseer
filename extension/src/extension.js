@@ -15,6 +15,7 @@ const { PullRequests } = require('./pull-request');
 const { TaskLauncher } = require('./task-launcher');
 const { Steering } = require('./run-actions');
 const { Dashboard } = require('./dashboard-mode');
+const { Immersive } = require('./immersive');
 
 let client;
 let centerRef;
@@ -102,9 +103,12 @@ async function activate(context) {
   const arrangement = new Arrangement({ context, center, review, model, client, log: say });
   outputs.column = () => vscode.ViewColumn.Beside;
   context.subscriptions.push(vscode.window.registerWebviewPanelSerializer('overseer.center', center));
+  const immersive = new Immersive(context, say);
   const dashboard = new Dashboard(context, center, say, {
     arrange: () => (selectedRun && model.run(selectedRun) ? arrangement.show(selectedRun) : arrangement.chatOnly()),
-    agentsVisible: () => agentsView.visible });
+    agentsVisible: () => agentsView.visible, immersive });
+  // Another dashboard window may have put the immersive settings back on its exit: apply them again here.
+  context.subscriptions.push(vscode.window.onDidChangeWindowState(s => { if (s.focused && dashboard.inDashboard) immersive.apply().catch(() => {}); }));
   const pullRequests = new PullRequests(client, model, say);
   const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => vscode.ViewColumn.Beside });
   // An agent dragged from the side bar into the editor opens its chat there (AC-71): a read-only

@@ -3,8 +3,9 @@
 // agents list, and the editor area holds the agent (chat, or review and chat). Exit Dashboard puts
 // the previous layout back: the editor-group layout and each part that was open. Extensions cannot read part visibility, so the dashboard measures itself: a part was open
 // if closing it made the dashboard's webview larger. Reopening uses the focus commands, which open
-// a part without toggling it. Nothing is written to user or workspace settings. The dashboard can
-// also open in its own window with no folder, and optionally when VS Code starts.
+// a part without toggling it. The only settings written are the immersive ones (AC-102,
+// immersive.js), put back exactly on exit. The dashboard can also open in its own window with no
+// folder, and optionally when VS Code starts.
 const vscode = require('vscode');
 
 const PARTS = [
@@ -15,8 +16,8 @@ const PARTS = [
 const settle = ms => new Promise(r => setTimeout(r, ms));
 
 class Dashboard {
-  constructor(context, center, log, { arrange, agentsVisible } = {}) {
-    this.context = context; this.center = center; this.log = log;
+  constructor(context, center, log, { arrange, agentsVisible, immersive } = {}) {
+    this.context = context; this.center = center; this.log = log; this.immersive = immersive;
     this.arrange = arrange || (() => this.center.open());
     this.agentsVisible = agentsVisible || (() => false);
   }
@@ -52,6 +53,7 @@ class Dashboard {
     } else {
       await this.arrange();
     }
+    await this.immersive?.apply();
     await vscode.commands.executeCommand('setContext', 'overseer.inDashboard', true);
     this.center.setDashboard?.(true);
   }
@@ -61,6 +63,7 @@ class Dashboard {
     await this.context.workspaceState.update('overseer.dashboard.saved', undefined);
     await vscode.commands.executeCommand('setContext', 'overseer.inDashboard', false);
     this.center.setDashboard?.(false);
+    await this.immersive?.restore();
     if (saved && !saved.overseerOpen) {
       // The dashboard opened Overseer: close what it opened and put the editor layout back.
       const ours = [];
@@ -96,7 +99,8 @@ class Dashboard {
     const asked = this.context.globalState.get('overseer.dashboard.nextWindow', 0);
     const fresh = asked && Date.now() - asked < 60000 && !(vscode.workspace.workspaceFolders || []).length;
     if (fresh) { await this.context.globalState.update('overseer.dashboard.nextWindow', 0); await this.enter(); return; }
-    if (this.inDashboard) { await vscode.commands.executeCommand('setContext', 'overseer.inDashboard', true); this.center.setDashboard?.(true); return; }
+    if (this.inDashboard) { await vscode.commands.executeCommand('setContext', 'overseer.inDashboard', true); this.center.setDashboard?.(true); await this.immersive?.apply(); return; }
+    await this.immersive?.recover(false);
     if (vscode.workspace.getConfiguration('overseer').get('dashboard.openOnStartup', false)) await this.enter();
   }
 }

@@ -92,7 +92,8 @@ button.icon:hover { background: var(--vscode-toolbar-hoverBackground, var(--vsco
 #toolbar .spacer { flex: 1 1 0; min-width: 0; }
 /* Narrow reviews (beside the chat on a small window): icons first, words go to tooltips. */
 @media (max-width: 700px) { #base-label, #total { display: none; } #scope { max-width: 7.5em; } }
-@media (max-width: 520px) { #layout, #comparison { display: none; } }
+/* The agent's name stays at every width: with no tab strip (AC-102) it is what names the review. */
+@media (max-width: 520px) { #layout { display: none; } }
 @media (max-width: 760px) { #review { grid-template-columns: min(var(--nav-width), 32%) 5px minmax(0, 1fr); } }
 .file-header .file-path { min-width: 5em; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
