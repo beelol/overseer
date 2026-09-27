@@ -139,6 +139,17 @@ mod tests {
     }
 
     #[test]
+    fn the_readme_lists_every_method_with_its_phone_status() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let out = std::process::Command::new("python3").arg(root.join("protocol/capabilities.py")).arg("--check").output().expect("python3");
+        assert!(out.status.success(), "{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+        let readme = std::fs::read_to_string(root.join("README.md")).unwrap();
+        for (method, _) in methods() {
+            assert!(readme.contains(&format!("| `{method}` |")), "{method} is missing from the README's table");
+        }
+    }
+
+    #[test]
     fn scopes_follow_the_classes() {
         for (method, class) in methods() {
             let full = allowed(&method, Scope::Full);
