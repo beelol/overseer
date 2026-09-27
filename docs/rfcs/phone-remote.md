@@ -489,6 +489,12 @@ The owner delegated these on 2026-09-26. Each can still be changed by the owner.
 | How a notification names the agent | By harness and repository ("Claude · shop"). An agent's title starts as the first words of its prompt, so the title is text of the work and is shown only when the owner turned text on. |
 | Distribution | A development build on the owner's iPhone, then TestFlight. App Store with the relay gate. |
 | Android emulator | A new virtual device made for Overseer. The ones already on this Mac belong to other projects and are left alone. |
+| Rust on the phone (revised while building) | None. The encrypted session is `@noble` (audited primitives) behind the app's own library, proven against the daemon's `snow` with shared vectors; one event on a 5,000-row conversation costs about 7 microseconds in the view models, so no measurement asked for Rust. |
+| How the door is drawn (revised while building) | Plain views with Reanimated on the UI thread, no Skia: two halves of a rotated square, each carrying the same face, a gradient square to the seam, a light along it and plating lines. It opens once the first screen is drawn and the app's logic has come to rest, so the screen's own work never holds the opening back. |
+| When notifications are on (revised while building) | Off for a phone whose owner has not said yes. On iOS the app asks once after pairing, with the reason first, then the system asks; a yes turns them on at the Mac. On Android, where the app shows its own banners in this gate, they are on from pairing and the switches turn them off. |
+| Where a typed address lives | Settings, *The Mac's address*. Tried from the moment it is typed, next to the pairing code's addresses and the platform's own; the Mac is known by its key, so no pairing again. |
+| Words in the faint colour | Never: the faint colour failed WCAG AA for words in the light theme. It is decoration only; a changed line's tint is drawn at half strength so code keeps its contrast. The palette itself is VS Code's and unchanged. |
+| Which VS Code conversation code the phone shares | The view models are ported with parity tests against the extension's real `conversation.js`, `views.js` and Markdown pipeline (no difference over 18 recorded sessions), and Markdown is read by marked's own lexer. The phone draws them with its own components. |
 
 ## Simulators first
 
