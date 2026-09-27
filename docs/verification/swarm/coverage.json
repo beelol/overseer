@@ -1,8 +1,8 @@
 {
   "base_commit": "19edf57ca4c30b0b4788b5416bb5d949a2cdff6c",
   "rfc_sha256": {
-    "swarm-mode.md": "51ea058216c7daf96b33288b8e611313b4c72815f0a300dbeb7022a0e26f291f",
-    "swarm-mode-scenarios.md": "c937732f9053bd16ab92cd6968ed5b30837e7e01947f90e1f46d614b2c58a9cc",
+    "swarm-mode.md": "edaa7adf838e60ff02541662a0a81bc79f00cca120c37901cc2d944fb7ba8c8d",
+    "swarm-mode-scenarios.md": "e8386ac655291ba1331c77810a14a2e3a73639c8086b6327618b9970c53ed0c6",
     "swarm-mode-goal.md": "fb1bcf183e39e2edeb27b6d5f641eb8daf639bbaf271f5a4afbc15bcb01de08a"
   },
   "criteria": {
@@ -310,7 +310,7 @@
         "docs/verification/swarm/SWARM-31.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "A scripted local launch remains separate from completion, replays to one run, and emits a once-only terminal event automatically without accepting the job; native async receipts, silent/stale output, late append, descendants and usage reconciliation remain unverified."
+      "blocker": "A scripted local launch remains separate from completion and replays to one run. Known child/grandchild rows now hold confirmation and reservations until their terminal receipts; a failed child blocks an accepted parent result. Native async receipts, silent/stale output, late append, late-discovered descendants and usage reconciliation remain unverified."
     },
     "SWARM-32": {
       "status": "partial",

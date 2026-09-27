@@ -1,6 +1,6 @@
 # SWARM-31 — asynchronous launch is not completion
 
-Status: partial. Revision: `c37ca47`.
+Status: partial. Revisions: `c37ca47`, `2bcd0ed` (based on main `759c080`).
 
 Input: the same local scripted worker launches and remains active; a caller attempts to mark its logical attempt finished before process exit. The daemon restarts and replays the launch request. A second fixture replays a pending launch after Stop, and a third tries to launch an already finished attempt.
 
@@ -10,6 +10,10 @@ Actual: the tests first exposed an absent launch bridge, a pending launch that c
 
 Evidence: `daemon/tests/swarm_runtime.rs`, `daemon/src/swarm/runtime.rs`, `daemon/src/swarm/admission.rs`, `daemon/src/swarm/artifacts.rs`.
 
-Remaining: no native asynchronous harness receipt, stale/silent-output sampler, late output append, parent-before-descendant ordering, or once-only native usage reconciliation is tested. This criterion remains unchecked.
+Descendant-ordering follow-up at `2bcd0ed`: a new scripted runtime fixture inserts a known native child and grandchild under a supervised worker, then lets the parent process exit first. Before the change, reconciliation returned `terminal` while both descendants lacked receipts. The direct exit-confirmation method could bypass the same condition. The daemon now walks the known descendant tree before manual or background confirmation, reports `descendants_unconfirmed`, keeps the attempt registered and its allowance reservation active, and emits one terminal envelope only after every descendant has a terminal receipt. A second fixture submits and accepts a parent result before a known native child fails; the job becomes `blocked` with `native_descendant_failed`, retaining its artifact and uncertain reservation for review. The first red fixture and the failed-child fixture each failed before their corresponding fix and passed after it.
+
+Fresh checks after the follow-up: `cargo test -p overseerd --test swarm_runtime -- --test-threads=1` passed 15/15; `cargo test -p overseerd --test swarm_plan --test swarm_integration --test swarm_broker -- --test-threads=1` passed 8/8, 18/18 and 18/18. These run scripted workers only. Short wall-clock deadlines in two older fixtures were widened, and the crash fixture now marks its pending deadline due before restart; the 32-worker fixture keeps its supervised processes alive through the full verification on a busy host. Those timing changes do not establish a live performance bound.
+
+Remaining: no version-pinned native asynchronous harness receipt, stale/silent-output sampler, late output append, late-discovered descendant after a parent was confirmed, or once-only native usage reconciliation is tested. A known child row with a terminal receipt is not proof that every harness reports all children before its parent exits. This criterion remains unchecked.
 
 Control receipt collision follow-up: a registered worker could previously submit a progress message using the daemon's future `terminal-att-...` ID. Terminal reconciliation then found the ID with a different payload and could not confirm exit; the same technique could preempt the `stop-att-...` control message inserted with `INSERT OR IGNORE`. The focused `admitted_worker_launch_replays_to_one_supervised_run_after_daemon_restart` test reproduced the accepted spoof before the fix, then passed after broker validation reserved the daemon-generated terminal, Stop, deadline-checkpoint, and contamination ID shapes. The full `swarm_broker` suite passed (18 tests), including ordinary `terminal-0` report IDs. These are fixture-only control guarantees; the native receipt and descendant cases above remain open.
