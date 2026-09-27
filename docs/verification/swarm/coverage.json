@@ -537,11 +537,13 @@
         "fixtures/swarm/atlas-v1/src/probe.ts",
         "daemon/src/swarm/conflicts.rs",
         "daemon/src/swarm/coverage.rs",
+        "daemon/src/swarm/integration.rs",
         "daemon/src/swarm/runtime.rs",
+        "daemon/tests/swarm_integration.rs",
         "daemon/src/swarm/artifacts.rs",
         "docs/verification/swarm/SWARM-47.md"
       ],
-      "blocker": "A durable J2/J7 conflict preserves both chains, blocks acceptance and completion, and resolves only after one independent accepted J8 reproduction and confirmed exit; explicit unresolved state stays visible and blocked. A separate fixture registers a conflict after both findings were accepted, survives restart, and refuses to resolve against an accepted contradicted job until that job is revised. A transitive ready dependent is demoted and held at admission while its ancestor is disputed. A registered active dependent gets a durable checkpoint and targeted interrupt; confirmed exit leaves it blocked while unrelated work continues. Previously accepted dependent conclusions are invalidated as current coverage, kept as historical evidence, and require explicit revision and fresh review before descendants resume. Autonomous semantic judgment, integrated-patch dependent handling, unresolved partial reporting and qualified live director review remain unverified."
+      "blocker": "A durable J2/J7 conflict preserves both chains, blocks acceptance and completion, and resolves only after one independent accepted J8 reproduction and confirmed exit; explicit unresolved state stays visible and blocked. A separate fixture registers a conflict after both findings were accepted, survives restart, and refuses to resolve against an accepted contradicted job until that job is revised. A transitive ready dependent is demoted and held at admission while its ancestor is disputed. A registered active dependent gets a durable checkpoint and targeted interrupt; confirmed exit leaves it blocked while unrelated work continues. Previously accepted dependent conclusions are invalidated as current coverage, kept as historical evidence, and require explicit revision and fresh review before descendants resume. A late conflict before a dependent patch's Git commit prevents integration acknowledgement without touching the source checkout. Post-commit/pre-ack recovery, abandoned integration-intent cleanup, autonomous semantic judgment, unresolved partial reporting and qualified live director review remain unverified."
     },
     "SWARM-48": {
       "status": "partial",

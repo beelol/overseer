@@ -122,3 +122,21 @@ This evidence is fixture-only. A real director's semantic choice, a complete
 unresolved partial report, an integrated-patch dependent under late
 contradiction, and qualified live director behavior remain unverified. The
 criterion and RFC box remain partial/unchecked.
+
+Integration race follow-up at `f6ece94` (2026-09-27): an accepted dependent
+patch begins integration into Overseer's isolated worktree and records its
+durable intent. While the fixture holds it before Git commit, a conflicting
+route result opens in under one second and invalidates the dependent review.
+Before the change, integration still committed the patch and acknowledged it.
+The integration path now checks that the job remains accepted and has no stop
+reason immediately before Git commit and again within the acknowledgement
+transaction. The same fixture now refuses the stale patch: no integrated
+artifact is acknowledged, the isolated branch stays at its base commit, and
+the user's source checkout is unchanged. The complete integration (20) and
+conflict (8) suites passed; the focused fixture was red before and green after.
+
+An interrupted integration intent and staged patch remain in the isolated
+worktree for explicit reconciliation. A conflict after the Git commit but
+before durable acknowledgement also needs a recovery/cleanup fixture and
+safe path. This iteration therefore does not qualify automatic integration
+recovery under every conflict timing; SWARM-47 remains partial.
