@@ -174,6 +174,8 @@ Expose an explicit structured delegation interface for coordinators: submit a wo
 
 Where a harness has a supported native delegation hook, adapt that hook and preserve native child visibility. Otherwise use an Overseer-managed child through the existing harness launch path. Do not silently rewrite native children or claim arbitrary per-tool model switching. First prove tool availability and context transfer for a real browser work unit; the owner example is a release acceptance requirement.
 
+The current daemon RPC is not yet a model-facing delegation tool: it trusts the local owner's Unix-socket identity and accepts a caller-supplied parent run ID. A harness turn with shell access has that same local identity. The run-bound bridge must derive the parent from an unguessable per-run capability, expose only bounded submit/result methods, and reuse Gate S's proposed per-run tool transport and the daemon's single admission authority. A result handle must survive a lost tool response so the parent can inspect the same child after resume without rerunning it. See the [delegation bridge design and verification gaps](../verification/auto-mode/delegation-bridge-design.md). This does not mark AUTO-AC-31 or AUTO-AC-35 complete.
+
 Distinguish delegation from replacement: a parent may wait while a cheaper child performs a browser check and then consume its result. Replacing an executor's ongoing work or moving the coordinator requires the safe handoff rules below. Auto authorizes routine selection for new work units inside its account boundary; post-effect replacement uses the continuation consent and settlement rules.
 
 ### Durable launch boundary
