@@ -186,6 +186,24 @@ rl.on('line', line => {
         turn: { id: turn, status: 'completed', error: null } } });
       return;
     }
+    if (process.env.FIXTURE_MODE === 'quota-partial') {
+      const hourly = Math.floor(Date.now() / 1000) + 3600;
+      const weekly = Math.floor(Date.now() / 1000) + 7 * 86400;
+      out({ method: 'account/rateLimits/updated', params: { rateLimits: {
+        limitId: 'codex',
+        primary: { usedPercent: 20, windowDurationMins: 300, resetsAt: hourly },
+        secondary: { usedPercent: 40, windowDurationMins: 10080, resetsAt: weekly }
+      } } });
+      setTimeout(() => {
+        out({ method: 'account/rateLimits/updated', params: { rateLimits: {
+          limitId: 'codex', primary: { usedPercent: 30, windowDurationMins: 300,
+            resetsAt: hourly }, credits: { balance: 'secret-partial-credit' }
+        } } });
+        out({ method: 'turn/completed', params: { threadId: thread,
+          turn: { id: turn, status: 'completed', error: null } } });
+      }, 20);
+      return;
+    }
     if (process.env.FIXTURE_MODE === 'quota') {
       out({ method: 'account/rateLimits/updated', params: { rateLimits: {
         limitId: 'codex', primary: { usedPercent: 40, windowDurationMins: 300, resetsAt: 1800003600 },

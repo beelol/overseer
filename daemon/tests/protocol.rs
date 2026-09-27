@@ -3235,6 +3235,26 @@ fn auto_claude_late_lower_native_meter_does_not_create_capacity() {
 }
 
 #[test]
+fn auto_claude_partial_native_update_keeps_older_weekly_freshness() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = claude_daemon("native-quota-partial");
+    let created = d.call("task.create", json!({"repo":repo,"harness":"claude",
+        "prompt":"inspect partial quota","title":"partial quota"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let state = d.call("auto.quota.state", json!({"profile_id":"system-claude",
+        "harness":"claude","model":"claude-sonnet-4-5"}));
+    let windows = state["observation"]["snapshot"]["windows"].as_array().unwrap();
+    assert_eq!(windows.len(), 2, "both applicable windows must survive a partial update: {state}");
+    let hourly = windows.iter().find(|window| window["window"] == "five_hour").unwrap();
+    let weekly = windows.iter().find(|window| window["window"] == "seven_day").unwrap();
+    assert!(weekly["observed_ms"].as_i64().unwrap() < hourly["observed_ms"].as_i64().unwrap(),
+        "the partial update must not refresh the omitted weekly meter: {state}");
+    assert!(!state.to_string().contains("secret-partial-meter"));
+}
+
+#[test]
 fn auto_claude_malformed_followup_does_not_clear_a_native_rejection() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
@@ -5180,6 +5200,28 @@ fn auto_codex_late_lower_native_meter_does_not_create_capacity() {
     assert_eq!(state["state"], "unknown",
         "a lower same-reset native update cannot claim new headroom: {state}");
     assert!(!state.to_string().contains("secret-regressed-credit"));
+}
+
+#[test]
+fn auto_codex_partial_native_update_keeps_older_secondary_freshness() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "quota-partial")]);
+    let created = d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "prompt":"inspect partial quota","title":"partial quota"}));
+    let run = run_id(&created);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let state = d.call("auto.quota.state", json!({"profile_id":"system-codex",
+        "harness":"codex-app","model":"gpt-6-sol"}));
+    let windows = state["observation"]["snapshot"]["windows"].as_array().unwrap();
+    assert_eq!(windows.len(), 2, "a partial update must not erase the secondary window: {state}");
+    let primary = windows.iter().find(|window| window["window"] == "primary").unwrap();
+    let secondary = windows.iter().find(|window| window["window"] == "secondary").unwrap();
+    assert!(secondary["observed_ms"].as_i64().unwrap() < primary["observed_ms"].as_i64().unwrap(),
+        "an omitted secondary window keeps its original capture time: {state}");
+    assert!(!state.to_string().contains("secret-partial-credit"));
 }
 
 

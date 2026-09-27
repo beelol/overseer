@@ -92,6 +92,7 @@ impl QuotaSnapshot {
         self.native_uncertain_until_ms = prior.native_uncertain_until_ms
             .filter(|until| now_ms < *until)
             .into_iter().chain(decreased_until).chain(backwards_until).max();
+        let has_current_meter = !self.windows.is_empty();
         if self.native_uncertain_until_ms.is_some() {
             self.windows.retain(|window| window.used_percent >= 100.0);
             if self.ordinary_usage_allowed == Some(true) {
@@ -102,13 +103,18 @@ impl QuotaSnapshot {
             self.ordinary_usage_allowed = Some(false);
         }
         for window in &prior.windows {
-            if window.used_percent < 100.0 || window.reset_ms.is_some_and(|reset| reset <= now_ms) {
+            if window.used_percent >= 100.0 && window.reset_ms.is_some_and(|reset| reset <= now_ms) {
                 continue;
             }
             let refreshed = self.windows.iter().any(|current| current.pool_id == window.pool_id
                 && current.bucket_id == window.bucket_id && current.window == window.window
                 && current.model == window.model && current.model_family == window.model_family);
-            if !refreshed { self.windows.push(window.clone()); }
+            // A valid partial native frame may update one bucket while leaving
+            // another untouched. Carry the omitted bucket with its original
+            // freshness; an empty/malformed frame instead keeps only blocks.
+            if !refreshed && (window.used_percent >= 100.0 || has_current_meter) {
+                self.windows.push(window.clone());
+            }
         }
     }
 
@@ -172,7 +178,8 @@ impl QuotaSnapshot {
         if applicable.is_empty()
             || applicable
                 .iter()
-                .any(|w| w.reset_ms.is_some_and(|reset| reset <= now_ms))
+                .any(|w| now_ms < w.observed_ms || now_ms >= w.expires_ms
+                    || w.reset_ms.is_some_and(|reset| reset <= now_ms))
         {
             QuotaState::Unknown
         } else {
@@ -505,6 +512,59 @@ mod tests {
         let mut clock_back = frame(0.9, 1_800_003_600, at - 10);
         clock_back.reconcile_unordered_native_evidence(&prior, at - 10);
         assert_eq!(clock_back.state_for("claude-sonnet", at - 10), QuotaState::Unknown);
+    }
+
+    #[test]
+    fn partial_native_update_does_not_refresh_an_omitted_window() {
+        let at = 1_800_000_000_000_i64;
+        let frame = |used: f64, observed: i64, weekly: Option<f64>| {
+            let mut info = json!({"status":"allowed","rateLimitType":"five_hour",
+                "utilization":used,"resetsAt":1_800_003_600});
+            if let Some(weekly) = weekly {
+                info["unifiedWindows"] = json!({"seven_day":{
+                    "utilization":weekly,"resetsAt":1_800_500_000}});
+            }
+            parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+                "rate_limit_info":info}), "pool", observed).unwrap()
+        };
+        let full = frame(0.2, at, Some(0.4));
+        let mut partial = frame(0.3, at + 20, None);
+        partial.reconcile_unordered_native_evidence(&full, at + 20);
+        assert_eq!(partial.state_for("claude-sonnet", at + 20),
+            QuotaState::ObservedNonExhausted);
+        assert_eq!(partial.state_for("claude-sonnet", at + 60_005), QuotaState::Unknown,
+            "a fresh five-hour update cannot refresh an omitted seven-day meter");
+
+        let mut later_partial = frame(0.4, at + 60_010, None);
+        later_partial.reconcile_unordered_native_evidence(&partial, at + 60_010);
+        assert_eq!(later_partial.state_for("claude-sonnet", at + 60_010), QuotaState::Unknown);
+
+        let mut later_full = frame(0.45, at + 60_015, Some(0.5));
+        later_full.reconcile_unordered_native_evidence(&later_partial, at + 60_015);
+        assert_eq!(later_full.state_for("claude-sonnet", at + 60_015),
+            QuotaState::ObservedNonExhausted);
+    }
+
+    #[test]
+    fn reordered_native_meter_keeps_other_windows_unknown_after_its_reset() {
+        let at = 1_800_000_000_000_i64;
+        let mut first = parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+            "rate_limit_info":{"status":"allowed","rateLimitType":"five_hour",
+                "utilization":0.8,"resetsAt":1_800_003_600,
+                "unifiedWindows":{"seven_day":{"utilization":0.4,
+                    "resetsAt":1_800_500_000}}}}), "pool", at).unwrap();
+        let mut regressed = parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+            "rate_limit_info":{"status":"allowed","rateLimitType":"five_hour",
+                "utilization":0.2,"resetsAt":1_800_003_600}}), "pool", at + 10).unwrap();
+        regressed.reconcile_unordered_native_evidence(&first, at + 10);
+        assert_eq!(regressed.state_for("claude-sonnet", at + 10), QuotaState::Unknown);
+        first = parse_claude_rate_limit_event(&json!({"type":"rate_limit_event",
+            "rate_limit_info":{"status":"allowed","rateLimitType":"five_hour",
+                "utilization":0.1,"resetsAt":1_800_007_200}}),
+            "pool", at + 3_600_010).unwrap();
+        first.reconcile_unordered_native_evidence(&regressed, at + 3_600_010);
+        assert_eq!(first.state_for("claude-sonnet", at + 3_600_010), QuotaState::Unknown,
+            "a new five-hour window does not establish the omitted weekly window");
     }
 
     #[test]

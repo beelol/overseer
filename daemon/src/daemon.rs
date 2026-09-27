@@ -1649,7 +1649,8 @@ impl Daemon {
                     }
                 }
                 for norm in norms {
-                    self.apply_norm(&store, run, norm, state, &mut emitted, &mut pending_learning)?;
+                    self.apply_norm(&store, run, norm, rec["t"].as_i64(), state,
+                        &mut emitted, &mut pending_learning)?;
                 }
             }
             store.set_run_cursor(&run.id, seg, off)?;
@@ -1690,7 +1691,7 @@ impl Daemon {
         Ok(())
     }
 
-    fn apply_norm(&self, store: &Store, run: &Run, norm: Norm, state: &mut TailState,
+    fn apply_norm(&self, store: &Store, run: &Run, norm: Norm, captured_ms: Option<i64>, state: &mut TailState,
         out: &mut Vec<Event>, pending_learning: &mut Vec<(i64, crate::auto_telemetry::Measurement)>) -> Result<()> {
         let task = Some(run.task_id.as_str());
         let rid = Some(run.id.as_str());
@@ -1824,9 +1825,12 @@ impl Daemon {
                     if let Some(limits) = event.payload.get("rate_limits") {
                         let pool_id = run.profile_id.as_deref().unwrap_or("system-codex");
                         let payload = json!({"rateLimits": limits});
-                        if let Ok(mut snapshot) = crate::auto_quota::parse_codex_rate_limits(&payload, pool_id, event.ts) {
+                        // Supervisor line capture precedes daemon replay; a
+                        // delayed batch must not refresh an older native meter.
+                        let observed_ms = captured_ms.filter(|time| *time > 0).unwrap_or(event.ts);
+                        if let Ok(mut snapshot) = crate::auto_quota::parse_codex_rate_limits(&payload, pool_id, observed_ms) {
                             if let Some(prior) = store.latest_auto_quota(pool_id)? {
-                                snapshot.reconcile_unordered_native_evidence(&prior.snapshot, event.ts);
+                                snapshot.reconcile_unordered_native_evidence(&prior.snapshot, observed_ms);
                             }
                             let _ = store.insert_auto_quota(event.seq, pool_id, "codex-app/native-update", &snapshot);
                         }
@@ -1845,7 +1849,7 @@ impl Daemon {
             Norm::Quota(raw) => {
                 if run.harness == "claude" {
                     if let Some(pool_id) = run.profile_id.as_deref() {
-                        let observed_ms = now();
+                        let observed_ms = captured_ms.filter(|time| *time > 0).unwrap_or_else(now);
                         let parsed = crate::auto_quota::parse_claude_rate_limit_event(&raw, pool_id, observed_ms);
                         let mut snapshot = match parsed {
                             Ok(snapshot) => snapshot,
@@ -2098,7 +2102,8 @@ impl Daemon {
             let store = self.store.lock().unwrap();
             let tx = store.conn.unchecked_transaction()?;
             for norm in fresh {
-                self.apply_norm(&store, run, norm, state, &mut emitted, &mut pending_learning)?;
+                self.apply_norm(&store, run, norm, None, state,
+                    &mut emitted, &mut pending_learning)?;
             }
             tx.commit()?;
             let had_learning = !pending_learning.is_empty();

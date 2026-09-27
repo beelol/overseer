@@ -225,6 +225,17 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
       rateLimitType: 'five_hour', utilization: 0.25, resetsAt: reset } });
     result(false, 'native meter decreased without a reset');
+  } else if (mode === 'native-quota-partial') {
+    const hourly = Math.floor(Date.now() / 1000) + 3600;
+    const weekly = Math.floor(Date.now() / 1000) + 7 * 86400;
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.2, resetsAt: hourly,
+      unifiedWindows: { seven_day: { utilization: 0.4, resetsAt: weekly } } } });
+    await sleep(20);
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed',
+      rateLimitType: 'five_hour', utilization: 0.3, resetsAt: hourly,
+      providerNote: 'secret-partial-meter' } });
+    result(false, 'partial native meter observed');
   } else if (mode === 'native-quota-block-invalid') {
     const weekly = Math.floor(Date.now() / 1000) + 7 * 86400;
     out({ type: 'rate_limit_event', rate_limit_info: { status: 'rejected',
