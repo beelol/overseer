@@ -23,7 +23,6 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 
 ## Tests
 - `cargo test --workspace` (daemon and TUI); `node test/unit/*.js`; `node extension/scripts/package.js`, then `node test/ui/scenario-<name>.js` (isolated VS Code profiles). `scripts/test-all` runs everything (AC-147).
-- If `/usr/bin/git` refuses to run because Xcode's license is not accepted, run with `export DEVELOPER_DIR=/Library/Developer/CommandLineTools`.
 - Leave no test windows, daemons, shims or runs going.
 
 ## Where the designs are
@@ -31,4 +30,4 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 - Continuity, offline mode (Gate L): `docs/rfcs/offline-mode.md`
 - Phone remote (Gate N): `docs/rfcs/` (see Gate N in the RFC)
 - Audio Mode (Gate O), TUI (`docs/rfcs/tui.md`), Auto and Swarm: their RFCs under `docs/rfcs/`
-- Follow-through and agent oversight (Gates P and Q): `docs/overseer-rfc.md`; the goal is `docs/goals/everything.md`
+- Follow-through and agent oversight (Gates P and Q): `docs/overseer-rfc.md`; the goal is `docs/goals/everything.md` and what it tracks is `docs/verification/tracker.md`
