@@ -294,5 +294,6 @@ export const phone = {
     disabled: 0.45,
     scrim: 0.4,
     diffTint: 0.5,
+    doorStreak: 0.2,
   },
 } as const;

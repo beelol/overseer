@@ -74,6 +74,9 @@ const event = (seq: number, kind: string, payload: unknown, runId = 'r1'): Daemo
 function make(options: { cached?: State } = {}) {
   const platform = createFakePlatform();
   const cache = platform.capabilities.keyValue.scope<SessionCache>('cache');
+  const agents = platform.capabilities.keyValue.scope<{ seen: Record<string, number>; pinned: string[] }>('agents');
+  const offered = platform.capabilities.keyValue.scope<{ offered: { repos: string[] } }>('new');
+  let forgotten = 0;
   if (options.cached) {
     cache.set('state', JSON.stringify(options.cached));
     cache.set('stateAt', 500);
@@ -86,6 +89,10 @@ function make(options: { cached?: State } = {}) {
   const session = new Session({
     connection,
     cache,
+    learned: [agents, offered],
+    onForgotten: () => {
+      forgotten += 1;
+    },
     now: () => now,
     nextFrame: (callback) => {
       frames.push(callback);
@@ -94,6 +101,9 @@ function make(options: { cached?: State } = {}) {
     cacheEveryMs: 0,
   });
   return {
+    agents,
+    offered,
+    forgotten: () => forgotten,
     session,
     connection,
     cache,
@@ -240,16 +250,39 @@ describe('the session', () => {
   });
 
   test('forgetting the Mac removes what was stored about it', async () => {
-    const { session, connection, cache } = make();
+    const { session, connection, cache, agents, offered, forgotten } = make();
     connection.gateway = GATEWAY;
     await session.start();
     connection.go('online');
     await settle();
     expect(cache.get('state')).not.toBeNull();
+    // What the screens learned of the Mac while it was paired.
+    agents.set('seen', { r1: 1_000 });
+    agents.set('pinned', ['r1']);
+    offered.set('offered', { repos: ['/Users/owner/code/app'] });
     await session.forget();
     expect(cache.get('state')).toBeNull();
     expect(session.getSnapshot().paired).toBe(false);
     expect(session.getSnapshot().state.runs.byId.size).toBe(0);
+    expect(agents.keys()).toEqual([]);
+    expect(offered.keys()).toEqual([]);
+    expect(forgotten()).toBe(1);
+  });
+
+  test('revoked on the Mac, the phone holds nothing the screens learned of it', async () => {
+    const { session, connection, agents, offered, forgotten } = make();
+    connection.gateway = GATEWAY;
+    await session.start();
+    connection.go('online');
+    await settle();
+    agents.set('seen', { r1: 1_000 });
+    offered.set('offered', { repos: ['/Users/owner/code/app'] });
+    connection.go('revoked');
+    connection.gateway = null;
+    connection.emit('forgotten', 'revoked');
+    expect(agents.get('seen')).toBeNull();
+    expect(offered.get('offered')).toBeNull();
+    expect(forgotten()).toBe(1);
   });
 
   test('revoked on the Mac, a write of the cache that was waiting stores nothing again', async () => {

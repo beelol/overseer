@@ -61,6 +61,7 @@ function ios() {
     /** The system's text size: `small`, `standard` or `large` (the largest standard size). */
     textSize: (size) => void simctl('ui', udid, 'content_size', { small: 'extra-small', standard: 'large', large: 'extra-extra-extra-large' }[size]),
     read: (key) => quiet('sqlite3', [database(), `select value from storage where key=${sql(key)}`]),
+    keys: () => (quiet('sqlite3', [database(), 'select key from storage order by key']) || '').split('\n').filter(Boolean),
     write: (key, value) => void out('sqlite3', [database(), `create table if not exists storage (key text primary key not null, value text); insert or replace into storage(key, value) values(${sql(key)}, ${sql(JSON.stringify(value))})`]),
     remove: (key) => void quiet('sqlite3', [database(), `delete from storage where key=${sql(key)}`]),
     screenshot: (file) => void simctl('io', udid, 'screenshot', file),
@@ -100,6 +101,7 @@ function android() {
     appearance: (mode) => void shell(`cmd uimode night ${mode === 'dark' ? 'yes' : 'no'}`),
     textSize: (size) => void shell(`settings put system font_scale ${{ small: '0.85', standard: '1.0', large: '1.3' }[size]}`),
     read: (key) => quiet(ADB, ['-s', serial, 'shell', `sqlite3 ${database} "select value from storage where key=${sql(key)}"`]),
+    keys: () => (quiet(ADB, ['-s', serial, 'shell', `sqlite3 ${database} "select key from storage order by key"`]) || '').split('\n').map((line) => line.trim()).filter(Boolean),
     write(key, value) {
       const text = JSON.stringify(value).replaceAll('"', '\\"');
       shell(`mkdir -p /data/data/${BUNDLE}/files/SQLite && sqlite3 ${database} "create table if not exists storage (key text primary key not null, value text); insert or replace into storage(key, value) values(${sql(key)}, '${text}')" && chown -R ${owner()} /data/data/${BUNDLE}/files`);

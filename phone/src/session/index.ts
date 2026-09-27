@@ -6,3 +6,4 @@ export { SessionProvider, useConversation, useSession, useSessionValue } from '.
 export { createSession } from './create';
 export { Session, type SessionCache, type SessionDeps, type StreamStats } from './session';
 export type { Connection, ConversationSnapshot, NotificationSwitches, Scope, SessionSnapshot } from './types';
+export { LEARNED_SCOPES, PHONE_OWN_SCOPES } from './learned';

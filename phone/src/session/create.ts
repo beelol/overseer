@@ -2,6 +2,7 @@ import { PhoneClient, webSocketFactory, type KeyValueStore } from '@/core';
 import { perf } from '@/perf';
 import type { AsyncStore, Capabilities, SyncStore } from '@/platform';
 
+import { LEARNED_SCOPES } from './learned';
 import { Session, type SessionCache } from './session';
 import type { Connection } from './types';
 
@@ -66,6 +67,11 @@ export function createSession({ capabilities, app, log }: CreateSessionOptions):
   return new Session({
     connection: client as unknown as Connection,
     cache: capabilities.keyValue.scope<SessionCache>('cache'),
+    learned: LEARNED_SCOPES.map((name) => capabilities.keyValue.scope<Anything>(name)),
+    // The addresses the owner typed are the Mac's too.
+    onForgotten: () => {
+      for (const address of capabilities.discovery.manual.get()) capabilities.discovery.removeManual(address);
+    },
     // Read by the scenario run, which compares it with the Mac's own log.
     onStream: (stream) => {
       try {

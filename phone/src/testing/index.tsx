@@ -10,7 +10,7 @@ import type { DaemonEvent } from '@/model';
 import { PlatformProvider } from '@/platform';
 import { createFakePlatform, type FakeOptions, type FakePlatform } from '@/platform/fake';
 import type { State } from '@/protocol';
-import { Session, SessionProvider, type SessionCache } from '@/session';
+import { LEARNED_SCOPES, Session, SessionProvider, type SessionCache } from '@/session';
 
 import { FAKE_GATEWAY, FakeConnection } from './FakeConnection';
 
@@ -74,6 +74,10 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const session = new Session({
     connection,
     cache: platform.capabilities.keyValue.scope<SessionCache>('cache'),
+    learned: LEARNED_SCOPES.map((name) => platform.capabilities.keyValue.scope<Record<string, string>>(name)),
+    onForgotten: () => {
+      for (const address of platform.capabilities.discovery.manual.get()) platform.capabilities.discovery.removeManual(address);
+    },
     now: () => now,
     nextFrame: (callback) => {
       frames.push(callback);

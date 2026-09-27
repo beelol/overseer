@@ -3,6 +3,13 @@
 
 import net from 'node:net';
 
+/**
+ * The storage namespaces that hold things of the Mac: the cached state and what the screens
+ * learned (src/session/learned.ts). The connection library's pairing and the typed address are
+ * checked by name. All gone after a revoke.
+ */
+const OF_THE_MAC = ['cache', 'agents', 'new', 'review', 'drafts', 'held'];
+
 const ALLOWED_FIELDS = ['aps.alert.title', 'aps.alert.body', 'aps.category', 'aps.thread-id', 'aps.sound', 'aps.interruption-level', 'overseer.v', 'overseer.kind', 'overseer.run_id', 'overseer.task_id', 'overseer.request_id', 'overseer.device', 'Simulator Target Bundle'];
 const ACTIVE = ['queued', 'starting', 'running', 'waiting_for_user'];
 /** How long a flow takes to start watching the screen. */
@@ -461,11 +468,17 @@ export const scenarios = [
     unpairs: true,
     says: 'removed on the Mac, the phone is back on pairing and holds nothing of the Mac',
     async run(c) {
+      // The scenarios before this one opened agents, looked at the New agent form and typed an
+      // address: the phone holds things of the Mac beyond its pairing and the cached state.
+      expect(c.dev.read('agents.seen'), 'the phone holds nothing of the Mac yet: the check would prove nothing');
       c.lab.call('gateway.device_revoke', { id: c.deviceId });
       await c.flow('revoked');
       c.shot('revoked');
       expect(!c.dev.read('cache.state'), 'the phone still holds what it knew of the Mac');
       expect(!c.dev.read('overseer.pairing'), 'the phone still holds its pairing');
+      const kept = c.dev.keys().filter((key) => OF_THE_MAC.some((namespace) => key.startsWith(`${namespace}.`)) || key === 'discovery.manual');
+      expect(kept.length === 0, `the phone still holds ${kept.join(', ')}`);
+      c.log(`storage after the revoke: ${c.dev.keys().join(', ') || 'nothing'}`);
     },
   },
 ];

@@ -6,7 +6,7 @@ import Animated, { cancelAnimation, Easing, runOnJS, useAnimatedStyle, useShared
 import { useMotion } from '@/motion';
 import { perf, useFrameMonitor } from '@/perf';
 import { useCapabilities } from '@/platform';
-import { useTheme, type Theme } from '@/theme';
+import { faded, useTheme, type Theme } from '@/theme';
 
 const MARKS = {
   dark: require('../../assets/launch-mark-dark.png'),
@@ -24,11 +24,13 @@ export interface DoorProps {
 
 /**
  * The door's colours, from the active theme: deep at the far corners, lit towards the seam, the
- * same on both sides of it.
+ * same on both sides of it. The streak along the seam is the theme's accent laid thinly over
+ * the background, so it is the same purple in the light theme as in the dark one.
  */
 function gradient(theme: Theme): readonly [string, string, string, string, string] {
   const c = theme.colors;
-  return [c.chrome, c.bg, c.accentSoft, c.bg, c.chrome];
+  const streak = faded(c.accent, theme.phone.opacity.doorStreak);
+  return [c.chrome, c.bg, streak, c.bg, c.chrome];
 }
 
 const STOPS = [0, 0.3, 0.5, 0.7, 1] as const;

@@ -41,7 +41,21 @@ export interface SessionDeps {
    * stamped the event to the frame that shows it, in milliseconds. News only, never history.
    */
   readonly onDelay?: (ms: number) => void;
+  /**
+   * The stores the screens fill with what they learn from the Mac (which agents were opened,
+   * which repositories it offered, drafts). Emptied when the Mac is forgotten, so a revoked or
+   * forgotten phone holds nothing of it.
+   */
+  readonly learned?: readonly Learned[];
+  /** Told after the Mac is forgotten and every store is emptied: the app removes the rest. */
+  readonly onForgotten?: () => void;
   readonly log?: (message: string) => void;
+}
+
+/** A store of what the phone learned from the Mac: what a `SyncStore` offers for emptying it. */
+export interface Learned {
+  keys(): readonly string[];
+  delete(key: string): void;
 }
 
 /**
@@ -415,6 +429,15 @@ export class Session {
     this.deps.cache.delete('switches');
     this.clearOwed();
     this.switches = NOT_YET;
+    for (const learned of this.deps.learned ?? []) {
+      try {
+        for (const key of learned.keys()) learned.delete(key);
+      } catch {
+        // Storage that cannot be read holds nothing that can be shown.
+        this.deps.log?.('a store of what was learned from the Mac could not be emptied');
+      }
+    }
+    this.deps.onForgotten?.();
     this.update({ state: store.EMPTY, stateAt: null, fromCache: false, historyLost: false, paired: false, gateway: null, scope: null, outbox: [], notifications: NOT_YET });
   }
 
