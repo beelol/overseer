@@ -1,6 +1,6 @@
 # SWARM-20 — control actions and descendant exit
 
-Status: partial. Latest evidence revision: `dc1c880`.
+Status: partial. Latest evidence revision: `ce46780`.
 
 Input: a fixture run has an admitted, running `/bin/sleep` worker. A test-only fault simulates an unreachable control socket on Stop's first interrupt attempt, then kills and restarts the daemon. The fixture is `stop_retries_an_initially_unreachable_worker_after_daemon_restart` in `daemon/tests/swarm_runtime.rs`.
 
@@ -40,3 +40,7 @@ Main-branch Gate N alignment: Full control and Watch only phone scope, the phone
 Packaged sidebar controls (`a1d9104`): the isolated VS Code scenario creates a 100-ready-job category through the fixture daemon. From its real Agents-tree context menu, Pause changes durable daemon state in 591 ms, Resume restores it, Swarm off cancels all 100 queued jobs, and Stop waits for the owner's confirmation before cancelling a separate run in 69 ms. Both measured actions are under the two-second UI acknowledgement target on this test machine. `test/unit/swarm-controls.js` also verifies fresh generation/revision reads and refresh after a stale-version rejection. The full serialized offline Rust workspace suite, extension package check, and `node test/ui/scenario-swarm-status.js` passed. Evidence: `docs/verification/evidence/ui/swarm-status/result.json` and `scenario.log` in that directory.
 
 Remaining: this packaged scenario has no active worker. It does not qualify live Pause checkpoints, draining active workers on Swarm off, native descendant exit, or the UI's unconfirmed-exit readout. SWARM-20 stays partial.
+
+Packaged active-worker control (implementation `2e6ae20`, final fixture/evidence `ce46780`): `node test/ui/scenario-swarm-scale.js` now starts 32 supervised local fixture workers, one resistant to the first interrupt. From the existing Agents-tree menu, Pause is durably acknowledged in 100 ms with all 32 still active, Resume retains them, and confirmed Stop is acknowledged in 73 ms. During `stopping`, the daemon retains the unconfirmed worker's estimated reservation and the sidebar shows “1 exit unconfirmed” separately from the active count. The daemon's ten-second escalation then confirms its exit and the scenario proves all 32 child PIDs are gone without forced cleanup. Evidence: `docs/verification/evidence/ui/swarm-scale/05-stopping-unconfirmed.png`, `result.json`, and `scenario.log`. The packaged ordinary-sidebar regression and four UI unit suites passed; the daemon code is unchanged from the full offline Rust suite at `9142d2d`.
+
+Remaining: this is local fixture control, not a live harness checkpoint or native-descendant qualification. Swarm-off drain with active workers and the joined phone/Overseer paths remain open. SWARM-20 stays unchecked.
