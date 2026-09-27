@@ -1159,3 +1159,66 @@ fn atlas_s5_full_storage_replays_unacknowledged_evidence_after_recovery() {
         "revision":1,"job_id":"j2","attempt_id":attempt["attempt_id"]}));
     assert_eq!(d.call("swarm.admit",admission)["status"],"admitted");
 }
+
+// S5: an external allowance observation removes headroom while an Atlas probe
+// is active. New work must stay held, but its existing evidence is reviewable.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_external_allowance_drop_holds_new_work_without_losing_evidence() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Atlas allowance-drop fault",
+        "objective":"Audit cross-workspace endpoints","allowed_targets":["fixture"]}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Tasks","acceptance":"foreign task before-after rows",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j2","mode":"write"}]},
+        {"id":"j4","title":"Attachments","acceptance":"foreign signed URL",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j4","mode":"write"}]}
+    ]}));
+    let at=now();
+    let snapshot=|observed:i64,remaining:i64|json!({"version":1,
+        "observed_ms":observed,"expires_ms":observed+120000,
+        "targets":[{"id":"fixture","account_id":"account","pool_ids":["pool"],
+            "capabilities":["audit"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":remaining,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":observed+120000}]}]});
+    let observe=|when:i64,remaining:i64|d.call("swarm.availability.observe",json!({
+        "run_id":run,"snapshot":snapshot(when-1000,remaining),"now_ms":when,
+        "required_capabilities":["audit"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(observe(at,100000)["state"],"eligible");
+    let first=admit(&d,run,1,"j2","fixture",&snapshot(at-1000,100000),at);
+    assert_eq!(first["status"],"admitted","{first}");
+    let reduced=observe(at+2000,500);
+    assert_eq!(reduced["state"],"blocked","{reduced}");
+    assert_eq!(reduced["reason"],"finishing_reserve");
+    assert_eq!(reduced["woken"],false);
+    let readout=d.call("swarm.get",json!({"id":run}));
+    assert_eq!(readout["availability"]["observed_ms"],at+1000);
+    assert_eq!(readout["availability"]["reason"],"finishing_reserve");
+    let next=admit(&d,run,1,"j4","fixture",&snapshot(at-1000,100000),at+2000);
+    assert_eq!(next["status"],"blocked","{next}");
+    assert_eq!(next["reason"],"run_availability_blocked");
+    let evidence=atlas_probe("j2");
+    assert_eq!(evidence["foreignPatchStatus"],200);
+    assert_eq!(evidence["taskBefore"],"Bob task");
+    assert_eq!(evidence["taskAfter"],"changed-by-alice");
+    let artifact=submit(&d,run,"j2",&first,1,&evidence,"confirmed_defect");
+    accept_and_exit(&d,run,1,"j2",&first,&artifact);
+    assert_eq!(d.call("swarm.coverage",json!({"run_id":run}))["rows"][0]["coverage_state"],
+        "confirmed_application_defect");
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["availability"]["state"],"blocked");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let counts:(i64,i64,i64)=db.query_row("SELECT
+        (SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1),
+        (SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1 AND decision='accept'),
+        (SELECT COUNT(*) FROM swarm_admissions WHERE run_id=?1 AND job_id='j4')",
+        [run],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+    assert_eq!(counts,(1,1,0));
+    assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"atlas-allowance-drop-complete",
+        "summary":"Audit complete","verification":"Atlas PostgreSQL probe",
+        "checks":[{"job_id":"j2","outcome":"passed","evidence":[artifact]}]})).is_err());
+}
