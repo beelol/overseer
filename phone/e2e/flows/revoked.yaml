@@ -1,6 +1,9 @@
 # The Mac removed this phone: pairing is the only way on.
 appId: ${APP}
 ---
+# In front, as the owner would have it; not started again if it is running.
+- launchApp:
+    stopApp: false
 - extendedWaitUntil:
     visible:
       id: "pair.code"
