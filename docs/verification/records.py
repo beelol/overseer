@@ -1322,9 +1322,11 @@ rec(150, "The first click always lands", "verified", commit="bc358a1", date="202
 rec(151, "Every live scenario rerun on the current build", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate P).",
     actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
-rec(152, "Performance re-measured", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate P).",
-    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(152, "Performance re-measured", "verified", commit="4fb5d60", date="2026-09-27", harness="fixture harnesses; no paid tokens",
+    steps="`node test/ui/scenario-perf.js` (the AC-35 load test): 10,000 tracked files, four active runs editing and printing for ten minutes, the review open on 100 changed files; while other agents ran their own VS Code scenarios on the same machine.",
+    expected="AC-35's numbers: navigation p95 under 250 ms, an ordinary file refresh within 2 s under load with none missed, bounded daemon retention, extension-host memory stable (under 25% growth).",
+    actual="Navigation p95 22 ms (p50 16 ms, 243 samples); file refresh under load p95 1,628 ms, max 1,822 ms, none missed; daemon retention at most 1,416 events per run; extension-host memory growth 10%.",
+    evidence="[perf scenario](evidence/ui/perf/)", live="—")
 rec(153, "A ledger that stays true", "verified", commit="bc358a1", date="2026-09-27", harness="none (a script)",
     steps="`python3 docs/verification/records.py <commit>` regenerates without errors; `scripts/check-links` (also run by `scripts/test-all`) checks every relative link in the README and the ledger.",
     expected="See the RFC criterion (Gate P).",
@@ -1506,7 +1508,7 @@ SHORT_BLOCKERS = {
     149: "partial: the causes are fixed; three clean runs in a row need a machine where no other agent runs UI tests",
     150: "verified",
     151: "not started (Gate P, added by the owner on 2026-09-27)",
-    152: "not started (Gate P, added by the owner on 2026-09-27)",
+    152: "verified",
     153: "verified",
     142: "verified",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
