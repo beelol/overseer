@@ -74,13 +74,13 @@ fn required<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
 /// A recorded repository list is an authorization boundary for director and
 /// worker process launches. Historical fixture runs have no list; normal
 /// launch must supply one and may later revise it only through owner approval.
-fn require_repository_scope(store: &Store, run: &str, repo: &str) -> Result<()> {
+fn require_repository_scope(store: &Store, run: &str, repo: &str) -> Result<Option<String>> {
     let raw: Option<String> = store.conn.query_row(
         "SELECT repository_scope FROM swarm_runs WHERE id=?1", [run], |r| r.get(0),
     )?;
     let Some(raw) = raw else {
         if std::env::var("OVERSEER_SWARM_FIXTURE_API").as_deref() == Ok("1") {
-            return Ok(());
+            return Ok(None);
         }
         bail!("Swarm run has no approved repository scope");
     };
@@ -97,7 +97,7 @@ fn require_repository_scope(store: &Store, run: &str, repo: &str) -> Result<()> 
     if !same_repo.iter().any(|entry| entry["source_commit"] == head) {
         bail!("repository source revision changed since Swarm approval");
     }
-    Ok(())
+    Ok(Some(head))
 }
 
 fn record_operation(conn: &rusqlite::Connection, run: &str, kind: &str) -> Result<()> {

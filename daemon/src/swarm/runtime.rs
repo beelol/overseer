@@ -88,12 +88,13 @@ pub fn launch_director(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         bail!("invalid scripted director launch");
     }
     crate::git::toplevel(std::path::Path::new(repo))?;
-    super::require_repository_scope(&d.store.lock().unwrap(), run, repo)?;
+    let source_commit=super::require_repository_scope(&d.store.lock().unwrap(), run, repo)?;
     let owner = super::owner::begin(&mut d.store.lock().unwrap(),
         &json!({"run_id":run,"generation":generation,"supervised_launch":true}))?;
     let token = owner["owner_token"].as_str().unwrap();
     let task = d.create_task_for_swarm_director(&json!({
         "repo":repo,"harness":"generic","workspace_mode":"worktree",
+        "target_ref":source_commit,
         "program":program,"args":args,"prompt":prompt,"title":title,
     }), &SwarmDirectorIdentity { run_id:run.to_string(),generation,token:token.to_string() })?;
     let process = task["run"]["id"].as_str()
@@ -254,10 +255,11 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
     let digest = format!("{:x}", Sha256::digest(p.to_string().as_bytes()));
     let assigned_prompt;
     let assigned_route;
+    let source_commit;
     let attempt_revision;
     {
         let store = d.store.lock().unwrap();
-        super::require_repository_scope(&store, run, repo)?;
+        source_commit=super::require_repository_scope(&store, run, repo)?;
         attempt_revision = broker::check_attempt(&store, run, job, attempt, token)?;
         let executor: String = store.conn.query_row(
             "SELECT executor FROM swarm_attempts WHERE id=?1 AND run_id=?2 AND job_id=?3",
@@ -339,6 +341,7 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
     let task = d.create_task_for_swarm(
         &json!({
             "repo":repo,"harness":harness,"workspace_mode":"worktree",
+            "target_ref":source_commit,
             "profile_id":assigned_route.0,"model":assigned_route.1,"effort":assigned_route.2,
             "program":program_override,"args":args,"prompt":assigned_prompt,"title":title,
         }),

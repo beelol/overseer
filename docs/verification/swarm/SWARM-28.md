@@ -122,3 +122,11 @@ service. An authorized plan revision to change the pinned source is not yet
 implemented. Auto's live route/account identity, manual single-target pool,
 normal launch UI, and shared admission transaction remain open. SWARM-28 and
 SWARM-52 stay partial.
+
+Source-ref handoff follow-up: the scope check now passes the saved commit as
+`target_ref` to the daemon's actual task/worktree creation. A second focused
+test reads the created worker task's `fork_commit` and matches it to the
+approved commit; this closes the gap where HEAD could move between the scope
+check and the worktree command. The two `repository_scope_` tests and the
+eight-test scripted director-loop suite pass after this change. Live normal
+launch and source revisions authorized during a run remain unverified.

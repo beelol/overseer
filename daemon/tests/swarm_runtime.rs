@@ -62,6 +62,10 @@ fn repository_scope_blocks_director_and_worker_launch_outside_approved_repo() {
         "repo":sibling,"harness":"generic","program":"/bin/sleep","args":["1"],
         "prompt":"Inspect","title":"Approved worker"}));
     assert_eq!(launched["status"],"launched","{launched}");
+    let fork_commit:String=db.query_row(
+        "SELECT t.fork_commit FROM tasks t JOIN runs r ON r.task_id=t.id WHERE r.id=?1",
+        [launched["overseer_run_id"].as_str().unwrap()],|r|r.get(0)).unwrap();
+    assert_eq!(fork_commit,run["repositories"][0]["source_commit"]);
 }
 
 #[test]
