@@ -3,13 +3,12 @@
 // the review opens beside this view when the agent has changes. State survives reloads.
 (function () {
   const vscode = acquireVsCodeApi();
-  window.overseerApi = vscode; // shared with files.js
   const ui = window.OverseerUI, el = ui.el;
   const post = m => vscode.postMessage(m);
   const saved = vscode.getState() || {};
   let state = { tasks: [], runs: [], workspaces: [], profiles: [], accounts: [], attention: [], pinned: [], gridMax: 6, archived: [] };
-  let selected = saved.selected, mode = saved.mode || (saved.selected ? 'chat' : 'composer'), filesOpen = !!saved.filesOpen;
-  const persist = () => vscode.setState({ ...(vscode.getState() || {}), selected, mode, filesOpen, chat: chat && chat.state() });
+  let selected = saved.selected, mode = saved.mode || (saved.selected ? 'chat' : 'composer');
+  const persist = () => vscode.setState({ ...(vscode.getState() || {}), selected, mode, chat: chat && chat.state() });
 
   // ---------- Layout ----------
   // Gate K: the agents list lives in VS Code's side bar; this view is the chat, composer or grid.
@@ -17,27 +16,17 @@
   const chatHost = el('section', 'view-chat');
   const composerHost = el('section', 'view-composer'); composerHost.dataset.auditView = 'composer';
   const gridHost = el('section', 'view-grid'); gridHost.dataset.auditView = 'grid'; gridHost.setAttribute('aria-label', 'Agent grid');
-  const filesPanel = el('aside', 'files-panel'); filesPanel.dataset.auditView = 'files'; filesPanel.setAttribute('aria-label', 'Files');
-  const filesHead = el('div', 'files-head');
-  const filesTitle = el('span', 'files-title ellipsis'); filesTitle.id = 'files-for';
-  const filesRefresh = ui.iconButton('refresh', 'Refresh files', { cls: 'sm' }); filesRefresh.id = 'files-refresh';
-  const filesClose = ui.iconButton('close', 'Close files', { cls: 'sm' });
-  filesHead.append(ui.icon('list-tree', 'sm'), filesTitle, filesRefresh, filesClose);
-  const filesNote = el('p', 'files-note'); filesNote.id = 'files-note'; filesNote.setAttribute('role', 'status');
-  const filesTree = el('div', 'files-tree'); filesTree.id = 'files'; filesTree.setAttribute('role', 'tree'); filesTree.setAttribute('aria-label', 'Worktree files');
-  filesPanel.append(filesHead, filesNote, filesTree);
+  // AC-100: an agent's files live in the review (AC-99); the chat has no Files pane of its own.
   main.append(chatHost, composerHost, gridHost);
-  const body = el('div', 'dash'); body.append(main, filesPanel);
+  const body = el('div', 'dash'); body.append(main);
   document.body.append(body);
 
-  const chat = new window.OverseerChat(chatHost, { post: m => post({ ...m, runId: m.runId || selected, scope: 'chat' }), mode: 'dashboard', onState: persist,
-    onFiles: () => setFiles(!filesOpen) });
+  const chat = new window.OverseerChat(chatHost, { post: m => post({ ...m, runId: m.runId || selected, scope: 'chat' }), mode: 'dashboard', onState: persist });
 
   function selectRun(runId, { focusChat, fromHost } = {}) {
     if (!runId) return;
     selected = runId; setMode('chat', { quiet: true });
     if (!fromHost) post({ type: 'select', runId });
-    window.overseerFiles?.show(selected);
     persist();
     if (focusChat) chat.prompt.focus();
   }
@@ -49,18 +38,9 @@
     document.body.dataset.mode = m;
     if (m === 'composer') { composer.open(opts); }
     if (m === 'grid') { grid.open(); } else grid.close();
-    if (m !== 'chat') setFiles(false, true);
     post({ type: 'mode', mode: m, selected });
     persist();
   }
-  function setFiles(open, quiet) {
-    filesOpen = open && mode === 'chat' && !!selected;
-    filesPanel.hidden = !filesOpen;
-    chat.filesBtn.setAttribute('aria-pressed', String(filesOpen));
-    if (filesOpen) window.overseerFiles?.show(selected, true);
-    if (!quiet) persist();
-  }
-  filesClose.addEventListener('click', () => setFiles(false));
 
   // ---------- New-agent composer (AC-59) ----------
   const composer = window.OverseerComposer.create(composerHost, { post, onStarted: runId => { selected = runId; setMode('chat'); } });
@@ -75,7 +55,6 @@
       case 'state':
         state = m.state; if (m.selected && m.selected !== selected && mode !== 'composer') selected = m.selected;
         grid.onState(state); composer.onState(state);
-        window.overseerFiles?.onState(state, filesOpen ? selected : undefined);
         document.body.dataset.ready = '1';
         break;
       case 'selected': if (m.runId && (m.runId !== selected || mode !== 'chat')) selectRun(m.runId, { fromHost: true }); break;
@@ -103,6 +82,5 @@
   window.__overseer = { state: () => state, mode: () => mode, selected: () => selected };
   setMode(mode === 'chat' && !selected ? 'composer' : mode, { quiet: true });
   if (selected && mode === 'chat') post({ type: 'select', runId: selected, restore: true });
-  setFiles(filesOpen, true);
   post({ type: 'ready' });
 })();

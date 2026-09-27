@@ -24,6 +24,22 @@ function gitRoot(dir) {
   return new Promise(resolve => execFile('git', ['rev-parse', '--show-toplevel'], { cwd: dir }, (err, out) => resolve(err ? undefined : out.trim())));
 }
 
+// AC-100: the Overseer side bar is the one tree. Overseer offers once to take Explorer's place in the
+// primary side bar when VS Code opens (Explorer stays one click away in the activity bar); the answer
+// is the overseer.sideBar.openOnStartup setting.
+async function offerSideBar(context) {
+  const config = vscode.workspace.getConfiguration('overseer');
+  const choice = config.get('sideBar.openOnStartup', null);
+  if (choice === true) { await vscode.commands.executeCommand('workbench.view.extension.overseer'); return; }
+  if (choice === false || context.globalState.get('overseer.sideBarOffered')) return;
+  await context.globalState.update('overseer.sideBarOffered', true);
+  const pick = await vscode.window.showInformationMessage('Show Overseer in the side bar instead of Explorer when VS Code opens? Explorer stays one click away in the activity bar.', 'Use Overseer', 'Keep Explorer');
+  if (pick === 'Use Overseer') {
+    await config.update('sideBar.openOnStartup', true, vscode.ConfigurationTarget.Global);
+    await vscode.commands.executeCommand('workbench.view.extension.overseer');
+  } else if (pick === 'Keep Explorer') await config.update('sideBar.openOnStartup', false, vscode.ConfigurationTarget.Global);
+}
+
 async function activate(context) {
   const log = vscode.window.createOutputChannel('Overseer', { log: true });
   context.subscriptions.push(log);
@@ -672,6 +688,7 @@ async function activate(context) {
     refreshAccounts().catch(() => {});
     announceBackgroundAgents().catch(error => say('background notice check: ' + error.message));
     dashboard.startup().catch(error => say('dashboard startup: ' + error.message));
+    setTimeout(() => offerSideBar(context).catch(error => say('side bar offer: ' + error.message)), 3000);
     const remembered = context.workspaceState.get('overseer.selectedRun');
     // Reopen where the user left off (AC-80) when VS Code did not restore the Overseer editor itself.
     if (remembered && model.run(remembered) && context.workspaceState.get('overseer.editorOpen', false)) {

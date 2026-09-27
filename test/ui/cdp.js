@@ -223,6 +223,21 @@ class Cdp {
     throw new Error('Webview not found for probe ' + probe);
   }
 
+  /** Every live webview document that satisfies `probe` (by default: Overseer's views and the review). */
+  async webviews(probe = `!!(document.getElementById('diffs') || document.querySelector('.view-chat, .view-grid, .view-composer'))`) {
+    await this.webview('true', 2000).catch(() => {}); // attaches to every webview target first
+    const frames = [], seen = new Set();
+    for (const context of this.contexts.values()) {
+      try {
+        // One frame per document: a document can be reachable through more than one context.
+        const result = await this.call('Runtime.evaluate', { expression: `(${probe}) ? (window.__cdpDocId ||= Math.random().toString(36).slice(2)) : ''`, contextId: context.id, returnByValue: true }, context.sessionId);
+        const id = result.result?.value;
+        if (id && !seen.has(id)) { seen.add(id); frames.push(new Frame(this, context)); }
+      } catch {}
+    }
+    return frames;
+  }
+
   close() { this.socket.close(); }
 }
 

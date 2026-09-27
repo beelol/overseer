@@ -41,7 +41,7 @@ class CommandCenter {
     this.panel = panel;
     panel.webview.options = { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri) };
     panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer.svg');
-    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css'], js: ['composer.js', 'grid.js', 'dashboard.js', 'files.js'] });
+    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css'], js: ['composer.js', 'grid.js', 'dashboard.js'] });
     const post = m => panel.webview.postMessage(m);
     this.chatFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'chat' }));
     this.gridFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'grid' }));
@@ -79,8 +79,6 @@ class CommandCenter {
         await this.gridFeed.set(ids, { limit: 400 });
         return;
       }
-      case 'tree': return this.tree(String(m.runId || ''), String(m.dir || ''));
-      case 'openFile': return this.openFile(String(m.runId || ''), String(m.path || ''));
       case 'composerData': post({ type: 'composerData', data: await this.handlers.launcher.data() }); return;
       case 'composerDefaults': await this.handlers.launcher.saveDefaults(m.defaults || {}); return;
       case 'composerBrowse': { const repo = await this.handlers.launcher.browse(); if (repo) post({ type: 'notice', scope: 'composer', kind: 'repo', repo }); return; }
@@ -129,32 +127,6 @@ class CommandCenter {
     if (!run || run.parent_run_id) return;
     const changes = await this.changes(run.workspace_id, { force });
     if (changes) this.panel?.webview.postMessage({ type: 'changes', runId: run.id, changes });
-  }
-
-  /** One directory of the selected run's worktree (AC-51). */
-  async tree(runId, dir) {
-    const run = this.model.run(runId);
-    try {
-      if (!run) throw new Error('Unknown run.');
-      const data = await this.client.request('workspace.tree', { workspace_id: run.workspace_id, dir });
-      this.panel?.webview.postMessage({ type: 'treeData', runId, dir, data });
-    } catch (error) {
-      this.panel?.webview.postMessage({ type: 'treeError', runId, dir, message: `Files unavailable: ${error.message}` });
-    }
-  }
-
-  /** Opens a worktree file in the editor (review column), independent of the window's folder. */
-  async openFile(runId, rel) {
-    const run = this.model.run(runId);
-    const ws = run && this.model.workspace(run.workspace_id);
-    if (!ws || !rel || rel.startsWith('/') || rel.split('/').includes('..')) return;
-    const uri = vscode.Uri.joinPath(vscode.Uri.file(ws.path), ...rel.split('/'));
-    try { await vscode.workspace.fs.stat(uri); }
-    catch { vscode.window.showInformationMessage(`${rel} was deleted in this worktree; open the review to see its change.`); return; }
-    // Gate K: files open where code lives — the review's group left of the chat — never a third column.
-    const chat = this.panel?.viewColumn;
-    const other = vscode.window.tabGroups.all.map(g => g.viewColumn).find(c => c !== chat);
-    await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: other ?? vscode.ViewColumn.Beside, preview: false });
   }
 
   async push() {

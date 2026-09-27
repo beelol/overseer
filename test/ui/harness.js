@@ -72,7 +72,7 @@ class Session {
       'telemetry.telemetryLevel': 'off', 'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false,
       'git.autofetch': false, 'git.openRepositoryInParentFolders': 'always', 'workbench.startupEditor': 'none',
       'security.workspace.trust.enabled': false, 'files.autoSave': 'off', 'update.mode': 'none',
-      'workbench.tips.enabled': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
+      'workbench.tips.enabled': false, 'overseer.sideBar.openOnStartup': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
       'editor.minimap.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden', 'window.dialogStyle': 'custom', ...extra,
     }, null, 2));
   }

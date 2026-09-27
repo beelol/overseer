@@ -1,0 +1,93 @@
+{
+  "checks": [
+    {
+      "name": "the navigator starts on Changes only while the agent has changes, with the status and counts beside the changed file",
+      "ok": true,
+      "detail": [
+        "a.txt"
+      ]
+    },
+    {
+      "name": "All files lists the worktree top level (folders first, .git left out) and keeps the changed file marked",
+      "ok": true,
+      "detail": {
+        "folders": [
+          "src"
+        ],
+        "files": [
+          "a.txt",
+          "b.txt",
+          "c.txt",
+          "README.md"
+        ],
+        "changed": "M"
+      }
+    },
+    {
+      "name": "a nested unchanged file opens inside the review as its whole text (no hidden regions), not counted as a change",
+      "ok": true,
+      "detail": {
+        "lines": 31,
+        "first": true,
+        "last": true,
+        "hidden": false,
+        "total": "1",
+        "status": "",
+        "close": true
+      }
+    },
+    {
+      "name": "the unchanged file is edited and saved from the review (worktree file on disk)",
+      "ok": true,
+      "detail": [
+        "nested 4",
+        "nested 5 EDITED-UNCHANGED",
+        "nested 6"
+      ]
+    },
+    {
+      "name": "once saved with a change it is a changed file like any other (status M, counted)",
+      "ok": true,
+      "detail": {
+        "tree": "M",
+        "total": "2"
+      }
+    },
+    {
+      "name": "the changed file is edited and saved from the review too",
+      "ok": true,
+      "detail": [
+        "L1: original",
+        "L2: agent edit EDITED-CHANGED",
+        "L3: original"
+      ]
+    },
+    {
+      "name": "reading and editing the agent's files opened no editor tab",
+      "ok": true,
+      "detail": [
+        "Review: Files demo (2), Editor Group 1",
+        "Overseer, Editor Group 2"
+      ]
+    },
+    {
+      "name": "Changes only shows just the changed files again",
+      "ok": true,
+      "detail": [
+        "a.txt",
+        "src/deep/nested.txt"
+      ]
+    },
+    {
+      "name": "on a 10,000-file worktree the navigator's first level shows in under 500 ms",
+      "ok": true,
+      "detail": {
+        "ms": 5,
+        "folders": 100
+      }
+    }
+  ],
+  "timings": {
+    "firstLevel10k": 5
+  }
+}
