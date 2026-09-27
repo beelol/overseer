@@ -27,9 +27,11 @@
         "daemon/tests/swarm_benefit.rs",
         "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-2.md",
-        "docs/verification/swarm/SWARM-03.md"
+        "docs/verification/swarm/SWARM-03.md",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Exact planned resource claims survive restart, constrain parallel benefit and cannot be omitted or downgraded at admission. Full chain/independent replay, real worktree writer isolation and undeclared-resource discovery remain incomplete."
+      "blocker": "Exact planned resource claims survive restart, constrain parallel benefit and cannot be omitted or downgraded at admission. A joined Atlas replay rejects a cycle and unknown dependency before dispatch, then preserves an independent J2 job through real backend evidence with explicit partial-plan permission. Full serial-chain/three-independent replay, real worktree writer isolation and undeclared-resource discovery remain incomplete."
     },
     "SWARM-04": {
       "status": "partial",
@@ -670,7 +672,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins four named faults to Atlas v1: lost result receipt, director death after dispatch, held J4 redirect timeout, and repeated evidence-free J4 progress through its absolute job deadline. Other named faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins five named faults to Atlas v1: lost result receipt, director death after dispatch, held J4 redirect timeout, repeated evidence-free J4 progress through its absolute job deadline, and malformed dependencies with valid J2 continuation. Other named faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
     }
   },
   "scenarios": {
@@ -734,7 +736,7 @@
         "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Atlas v1 joins four named faults: J2 lost-result-receipt, director death after dispatch admission, J4 delivery without application during a held PostgreSQL attachment probe, and repeated evidence-free J4 progress through its unchanged job deadline. The J4 redirect timeout holds dependent review, queues a checkpoint and interrupts the worker; the heartbeat timeout accepts no result. Separate daemon fixtures cover SQLite-full replay and late shared-database contamination. Other named S5 faults, Atlas-backed contamination/full storage and a full S1-sized ordered replay remain unverified. Live provider harness communication is absent."
+      "blocker": "Atlas v1 joins five named faults: J2 lost-result-receipt, director death after dispatch admission, J4 delivery without application during a held PostgreSQL attachment probe, repeated evidence-free J4 progress through its unchanged job deadline, and invalid J8/J9/J99 dependencies rejected while valid J2 completes. Separate daemon fixtures cover SQLite-full replay and late shared-database contamination. Other named S5 faults, Atlas-backed contamination/full storage and a full S1-sized ordered replay remain unverified. Live provider harness communication is absent."
     }
   }
 }

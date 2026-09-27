@@ -13,3 +13,5 @@ Commands: `cargo test --offline -p overseerd --test swarm_benefit -q`; `cargo te
 Evidence: `daemon/tests/swarm_benefit.rs`, `daemon/tests/swarm_admission.rs`, `daemon/tests/swarm_plan.rs`, `daemon/src/swarm/plan.rs`, `daemon/src/swarm/benefit.rs`, `daemon/src/swarm/admission.rs`.
 
 Remaining: the complete serial-chain and three-independent-job replay has not been tied to this evidence record; real worktree write ownership and tool-level scope enforcement remain absent. The model can still fail to declare a needed resource, and the daemon cannot yet discover all actual mutable database/service aliases. The criterion stays unchecked.
+
+Follow-up at `be63985`: the joined Atlas S5 malformed-plan replay rejects a J8/J9 cycle and missing J99 dependency before any attempt can register. Explicit partial-plan permission retains an independent J2 audit through real backend evidence and completion. `./fixtures/swarm/atlas-v1/run-swarm.sh` passes nine joined tests. This checks graph isolation but does not close the serial-chain, three-independent-job, or live resource-enforcement gaps above.
