@@ -43,6 +43,7 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
             let daemon = deadline_daemon.clone();
             match tokio::task::spawn_blocking(move || {
                 crate::swarm::reconcile_control_verifications(&mut daemon.store.lock().unwrap())?;
+                crate::swarm::refresh_linked_director_owners(&daemon)?;
                 crate::swarm::expire_director_owners(&mut daemon.store.lock().unwrap())?;
                 let (expired, timed_out_workers, redirect_timeouts) = {
                     let _serial = daemon.swarm_launch_lock.lock().unwrap();
@@ -327,6 +328,10 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "swarm.director.owner.renew" => {
             fixture_only()?;
             crate::swarm::renew_director_owner(&mut d.store.lock().unwrap(), p)?
+        }
+        "swarm.director.owner.refresh_linked" => {
+            fixture_only()?;
+            json!({"renewed":crate::swarm::refresh_linked_director_owners(d)?})
         }
         "swarm.director.owner.expire_due" => {
             fixture_only()?;

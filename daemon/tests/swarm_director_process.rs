@@ -5,6 +5,62 @@ use serde_json::json;
 use std::time::{Duration, Instant};
 
 #[test]
+fn linked_healthy_director_renews_lease_but_exited_director_does_not() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("lease-director-source"));
+    let run = d.call("swarm.create", json!({"category":"Director lease refresh",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":id,
+        "generation":1,"repo":checkout,"program":"/bin/sleep",
+        "args":["30"],"prompt":"Audit backend","title":"Lease director"}));
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let deadline = Instant::now()+Duration::from_secs(3);
+    while d.run(process)["status"] != "running" {
+        assert!(Instant::now()<deadline,"director process did not start");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let before: i64 = db.query_row("SELECT lease_expires_ms FROM swarm_director_owners WHERE run_id=?1",
+        [id], |row| row.get(0)).unwrap();
+    db.execute("UPDATE swarm_director_owners SET lease_expires_ms=?2 WHERE run_id=?1",
+        rusqlite::params![id, crate_now()+2_000]).unwrap();
+    assert_eq!(d.call("swarm.director.owner.refresh_linked",json!({}))["renewed"],1);
+    let after: i64 = db.query_row("SELECT lease_expires_ms FROM swarm_director_owners WHERE run_id=?1",
+        [id], |row| row.get(0)).unwrap();
+    assert!(after > before-3_000,"healthy director lease was not extended");
+    db.execute("UPDATE swarm_director_owners SET lease_expires_ms=?2 WHERE run_id=?1",
+        rusqlite::params![id, crate_now()+5_000]).unwrap();
+    d.kill9();
+    d.spawn();
+    let refresh_deadline = Instant::now()+Duration::from_secs(3);
+    loop {
+        let expiry: i64 = db.query_row("SELECT lease_expires_ms FROM swarm_director_owners WHERE run_id=?1",
+            [id], |row| row.get(0)).unwrap();
+        if expiry > crate_now()+10_000 { break; }
+        assert!(Instant::now()<refresh_deadline,"background tick did not refresh the surviving director");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert_ne!(d.call("swarm.get",json!({"id":id}))["stall_reason"],
+        "director_termination_unknown");
+    db.execute("UPDATE swarm_director_owners SET lease_expires_ms=?2 WHERE run_id=?1",
+        rusqlite::params![id, crate_now()-1]).unwrap();
+    assert_eq!(d.call("swarm.director.owner.refresh_linked",json!({}))["renewed"],0,
+        "an expired owner must not be revived by a late ping");
+    d.call("run.interrupt",json!({"run_id":process}));
+    d.wait_done(process,8);
+    db.execute("UPDATE swarm_director_owners SET lease_expires_ms=?2 WHERE run_id=?1",
+        rusqlite::params![id, crate_now()+2_000]).unwrap();
+    assert_eq!(d.call("swarm.director.owner.refresh_linked",json!({}))["renewed"],0);
+}
+
+fn crate_now() -> i64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+        .unwrap().as_millis() as i64
+}
+
+#[test]
 fn supervised_director_needs_confirmed_exit_before_replacement() {
     let mut d = Daemon::start(&[]);
     let temp = tmp();

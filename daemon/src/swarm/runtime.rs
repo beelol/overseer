@@ -12,6 +12,56 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
+/// Extend a supervised director lease only after its linked local supervisor
+/// answers a control ping. An unlinked, exited, disconnected, or already
+/// expired owner remains uncertain and must go through reconciliation.
+pub fn refresh_linked_director_owners(d: &Arc<Daemon>) -> Result<usize> {
+    let now = crate::daemon::now();
+    let due = {
+        let store = d.store.lock().unwrap();
+        let mut stmt = store.conn.prepare(
+            "SELECT o.run_id,o.generation,o.overseer_run_id FROM swarm_director_owners o
+             JOIN swarm_runs s ON s.id=o.run_id AND s.generation=o.generation
+             JOIN runs r ON r.id=o.overseer_run_id
+             WHERE o.status='active' AND o.supervised_launch=1 AND o.launch_phase='spawn_requested'
+             AND o.lease_expires_ms>?1 AND o.lease_expires_ms<=?2
+             AND s.status IN ('planning','running','paused','draining')
+             AND r.run_dir IS NOT NULL AND r.ended_ms IS NULL
+             AND r.status IN ('queued','starting','running','waiting_for_user')
+             ORDER BY o.lease_expires_ms LIMIT 4")?;
+        let rows = stmt.query_map(params![now,now+15_000], |r| {
+            Ok((r.get::<_,String>(0)?,r.get::<_,i64>(1)?,r.get::<_,String>(2)?))
+        })?.collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
+    };
+    let mut renewed = 0;
+    for (run, generation, process) in due {
+        let director = d.run(&process)?;
+        if !["queued","starting","running","waiting_for_user"].contains(&director.status.as_str()) {
+            continue;
+        }
+        let reachable = d.control_socket(&director).ok()
+            .and_then(|socket| crate::shim::control_with_timeout(
+                &socket, &json!({"op":"ping"}), Duration::from_millis(250)).ok())
+            .is_some_and(|reply| reply["ok"] == true);
+        if !reachable {
+            continue;
+        }
+        let now = crate::daemon::now();
+        renewed += d.store.lock().unwrap().conn.execute(
+            "UPDATE swarm_director_owners SET renewed_ms=?4,lease_expires_ms=?5
+             WHERE run_id=?1 AND generation=?2 AND overseer_run_id=?3
+             AND status='active' AND supervised_launch=1 AND launch_phase='spawn_requested'
+             AND lease_expires_ms>?4
+             AND EXISTS (SELECT 1 FROM swarm_runs s WHERE s.id=?1 AND s.generation=?2
+                 AND s.status IN ('planning','running','paused','draining'))
+             AND EXISTS (SELECT 1 FROM runs r WHERE r.id=?3 AND r.run_dir IS NOT NULL
+                 AND r.ended_ms IS NULL AND r.status IN ('queued','starting','running','waiting_for_user'))",
+            params![run,generation,process,now,now+30_000])?;
+    }
+    Ok(renewed)
+}
+
 const UNKNOWN_AFTER_MS: i64 = 60_000;
 const SAMPLE_INTERVAL_MS: i64 = 15_000;
 const SUSPECT_RETRY_MS: i64 = 1_000;

@@ -50,6 +50,7 @@ pub use runtime::{interrupt_workers, launch_worker, liveness, reconcile_terminal
     reconcile_worker, retry_contaminated_interrupts, retry_stopping_interrupts,
     sample_due_workers, sample_liveness};
 pub use runtime::launch_director;
+pub use runtime::refresh_linked_director_owners;
 pub use runtime::interrupt_workers_with_fault;
 pub use scheduler::next as schedule_next;
 
