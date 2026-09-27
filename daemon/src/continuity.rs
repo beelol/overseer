@@ -311,12 +311,12 @@ fn millis(var: &str, default: u64) -> Duration {
 
 // ------------------------------------------------------------------ store
 
-fn meta_get(d: &Daemon, key: &str) -> Option<String> {
+pub fn meta_get(d: &Daemon, key: &str) -> Option<String> {
     use rusqlite::OptionalExtension;
     d.store.lock().unwrap().conn.query_row("SELECT value FROM meta WHERE key=?1", [key], |r| r.get::<_, String>(0)).optional().ok().flatten()
 }
 
-fn meta_set(d: &Daemon, key: &str, value: &str) -> Result<()> {
+pub fn meta_set(d: &Daemon, key: &str, value: &str) -> Result<()> {
     d.store.lock().unwrap().conn.execute("INSERT INTO meta(key, value) VALUES(?1, ?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [key, value])?;
     Ok(())
 }
@@ -457,7 +457,13 @@ pub fn tick(d: &Arc<Daemon>) -> Result<Status> {
     if same {
         s.pending = None;
         s.status.providers = decision.providers;
-        return Ok(s.status.clone());
+        let status = s.status.clone();
+        drop(s);
+        // While online, the pick that still needs a download is fetched, if the owner asked for that.
+        if let Some(tag) = crate::downloads::prefetch(d) {
+            crate::log(&format!("continuity: prefetching {tag}"));
+        }
+        return Ok(status);
     }
     // A change needs two readings that agree, except the system's own "no network", which is
     // trusted at once.
@@ -511,7 +517,7 @@ fn gather(d: &Daemon) -> Local {
     Local { inventory, catalogue: local::catalogue(), measured }
 }
 
-fn pick(d: &Daemon) -> Result<Value> {
+pub fn pick_value(d: &Daemon) -> Result<Value> {
     let settings = settings();
     let l = gather(d);
     let memory = l.inventory.memory.clone().ok_or_else(|| anyhow!("memory cannot be read ({}), so no model is picked", l.inventory.memory_error.clone().unwrap_or_default()))?;
@@ -609,10 +615,13 @@ pub fn prepare_local_run(d: &Daemon, run: &mut crate::store::Run, profile_env: &
 // ------------------------------------------------------------------ protocol
 
 pub fn handles(method: &str) -> bool {
-    matches!(method, "connection.status" | "connection.check" | "continuity.status" | "continuity.notice" | "settings.get" | "settings.set" | "local.inventory" | "local.pick" | "local.approve" | "local.catalogue" | "local.load" | "local.unload")
+    crate::downloads::handles(method) || matches!(method, "connection.status" | "connection.check" | "continuity.status" | "continuity.notice" | "settings.get" | "settings.set" | "local.inventory" | "local.pick" | "local.approve" | "local.catalogue" | "local.load" | "local.unload")
 }
 
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
+    if crate::downloads::handles(method) {
+        return crate::downloads::dispatch(d, method, p);
+    }
     Ok(match method {
         "connection.status" => json!({"status": status(), "enabled": settings().enabled}),
         "connection.check" => {
@@ -641,7 +650,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             json!({"show": s.enabled && shown.is_none(), "shown_ms": shown, "enabled": s.enabled, "allow_model_downloads": s.allow_model_downloads, "allow_ollama_install": s.allow_ollama_install})
         }
         "local.inventory" => serde_json::to_value(gather(d).inventory)?,
-        "local.pick" => pick(d)?,
+        "local.pick" => pick_value(d)?,
         "local.approve" => approve(d, p["tag"].as_str().ok_or_else(|| anyhow!("missing string parameter tag"))?, p["context"].as_u64().ok_or_else(|| anyhow!("missing number parameter context"))?)?,
         "local.catalogue" => json!({"models": local::catalogue(), "harness": settings().local_harness}),
         "local.load" => load(d, p["tag"].as_str().ok_or_else(|| anyhow!("missing string parameter tag"))?, p["context"].as_u64().ok_or_else(|| anyhow!("missing number parameter context"))?)?,
@@ -656,7 +665,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let shown = meta_get(d, "continuity.notice_shown").is_some();
             let memory = sys::memory();
             let budget = memory.as_ref().ok().map(|m| local::budget(m, &s.pick_options(false), 0));
-            let picked = pick(d);
+            let picked = pick_value(d);
             json!({
                 "connection": status(),
                 "settings": s,

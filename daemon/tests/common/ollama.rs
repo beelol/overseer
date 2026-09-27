@@ -24,6 +24,13 @@ pub struct State {
     pub load_ms: u64,
     /// (method, path, body) of every request, in order.
     pub requests: Vec<(String, String, Value)>,
+    /// Models the registry offers, by the name asked for.
+    pub registry: HashMap<String, (Value, Value)>,
+    /// Bytes each pull has reached; a later pull continues from there.
+    pub pulled: HashMap<String, u64>,
+    /// A pull reports its progress in this many steps, this far apart.
+    pub pull_steps: u64,
+    pub pull_step_ms: u64,
 }
 
 pub struct Ollama {
@@ -104,6 +111,12 @@ impl Ollama {
         s.loaded.push(json!({"name": tag, "model": tag, "size": bytes, "size_vram": bytes, "context_length": context, "expires_at": "2026-09-27T00:00:00Z"}));
     }
 
+    /// Offers a model for download.
+    pub fn offer(&self, (entry, show): (Value, Value)) -> &Self {
+        self.state.lock().unwrap().registry.insert(entry["name"].as_str().unwrap().to_string(), (entry, show));
+        self
+    }
+
     /// Bodies of the requests made to `path`.
     pub fn asked(&self, path: &str) -> Vec<Value> {
         self.state.lock().unwrap().requests.iter().filter(|(_, p, _)| p == path).map(|(_, _, b)| b.clone()).collect()
@@ -137,6 +150,9 @@ fn handle(conn: TcpStream, state: Arc<Mutex<State>>) -> std::io::Result<()> {
     reader.read_exact(&mut body)?;
     let body: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
     state.lock().unwrap().requests.push((method.clone(), path.clone(), body.clone()));
+    if method == "POST" && path == "/api/pull" {
+        return pull(conn, &body, &state);
+    }
     let (code, answer) = respond(&method, &path, &body, &state);
     let text = answer.to_string();
     let mut conn = conn;
@@ -194,4 +210,45 @@ fn respond(method: &str, path: &str, body: &Value, state: &Arc<Mutex<State>>) ->
         }
         _ => (404, json!({"error": format!("the fixture does not answer {method} {path}")})),
     }
+}
+
+/// `/api/pull`: progress lines over time, as Ollama streams them. A client that goes away stops
+/// the pull; what was reached is kept for the next one.
+fn pull(mut conn: TcpStream, body: &Value, state: &Arc<Mutex<State>>) -> std::io::Result<()> {
+    let name = body["model"].as_str().unwrap_or_default().to_string();
+    let (offered, steps, wait, start) = {
+        let s = state.lock().unwrap();
+        (s.registry.get(&name).cloned(), s.pull_steps.max(1), s.pull_step_ms, s.pulled.get(&name).copied().unwrap_or(0))
+    };
+    conn.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n")?;
+    let mut send = |conn: &mut TcpStream, v: Value| -> std::io::Result<()> {
+        let line = format!("{v}\n");
+        write!(conn, "{:x}\r\n{line}\r\n", line.len())?;
+        conn.flush()
+    };
+    let Some((entry, show)) = offered else {
+        send(&mut conn, json!({"error": "pull model manifest: file does not exist"}))?;
+        return conn.write_all(b"0\r\n\r\n");
+    };
+    let total = entry["size"].as_u64().unwrap_or(0);
+    let digest = format!("sha256:{:x}", total);
+    send(&mut conn, json!({"status": "pulling manifest"}))?;
+    let first = start * steps / total.max(1);
+    for i in first..=steps {
+        let completed = total * i / steps;
+        send(&mut conn, json!({"status": format!("pulling {}", &digest[7..]), "digest": digest, "total": total, "completed": completed}))?;
+        state.lock().unwrap().pulled.insert(name.clone(), completed);
+        std::thread::sleep(std::time::Duration::from_millis(wait));
+    }
+    for status in ["verifying sha256 digest", "writing manifest"] {
+        send(&mut conn, json!({"status": status}))?;
+    }
+    {
+        let mut s = state.lock().unwrap();
+        s.show.insert(name.clone(), show);
+        s.tags.retain(|t| t["name"] != name.as_str());
+        s.tags.push(entry);
+    }
+    send(&mut conn, json!({"status": "success"}))?;
+    conn.write_all(b"0\r\n\r\n")
 }

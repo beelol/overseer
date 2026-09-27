@@ -138,6 +138,10 @@ pub fn parse_psi(text: &str) -> Pressure {
 
 /// Free bytes on the filesystem holding `path` (its nearest existing parent), for downloads.
 pub fn disk_free(path: &Path) -> Option<u64> {
+    // Tests describe a disk that is nearly full.
+    if let Some(bytes) = std::env::var("OVERSEER_TEST_DISK_FREE").ok().and_then(|v| v.parse().ok()) {
+        return Some(bytes);
+    }
     let mut at = path;
     while !at.exists() {
         at = at.parent()?;
