@@ -97,7 +97,11 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
     // The agent's edits brought the review in beside the chat: click into the chat, then its prompt.
     await dash.eval(`(() => { if (!document.getElementById('focus-spot')) { const c = document.createElement('div'); c.id = 'focus-spot'; c.style.cssText = 'position:fixed;right:2px;top:60px;width:3px;height:3px;z-index:9'; document.body.append(c); } return true; })()`);
     { const f = await s.webviewPoint(dash, '#focus-spot'); await cdp.click(f.x, f.y); await delay(200); }
-    { const at = await s.webviewPoint(dash, '#prompt'); await cdp.click(at.x, at.y); await delay(200); }
+    // Click into the prompt until it has focus (the chat may still be settling after the review came in).
+    for (let i = 0; i < 3; i++) {
+      const at = await s.webviewPoint(dash, '#prompt'); await cdp.click(at.x, at.y);
+      if (await dash.waitFor(`document.activeElement?.id === 'prompt'`, 2000).then(() => true, () => false)) break;
+    }
     await cdp.type('And add a test'); await delay(200);
     s.note('prompt before Enter', await dash.eval(`({ value: document.getElementById('prompt').value, focused: document.activeElement?.id })`));
     await cdp.key('Enter');

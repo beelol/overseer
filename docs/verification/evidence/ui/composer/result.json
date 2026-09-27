@@ -8,8 +8,8 @@
       "name": "Claude agent started keyboard-only from the composer; it becomes selected and streams in place",
       "ok": true,
       "detail": {
-        "claudeChip": "Agent: Claude Code · claude (existing login)",
-        "run": "r-4c0d7619ba20",
+        "claudeChip": "Agent: Claude Code · Your login",
+        "run": "r-831edf46c14a",
         "shown": true
       }
     },
@@ -26,7 +26,7 @@
       "name": "Codex agent started keyboard-only",
       "ok": true,
       "detail": {
-        "run": "r-a001a6389e49",
+        "run": "r-9b9b5b4f34b9",
         "shown": true
       }
     },
@@ -34,7 +34,7 @@
       "name": "generic program started keyboard-only",
       "ok": true,
       "detail": {
-        "run": "r-6737c8e67892",
+        "run": "r-62f457c6f23c",
         "shown": true
       }
     },

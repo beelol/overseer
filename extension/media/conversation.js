@@ -95,9 +95,18 @@
       const done = el('span', 'done'); const dur = el('span', 'dur'); const usage = el('span', 'usage');
       foot.append(done, dur, usage);
       if (t.prompt) {
-        const p = el('div', 'msg user'); p.setAttribute('aria-label', 'You');
-        const text = el('div', 'text', t.prompt);
-        p.append(text); box.append(p);
+        // Talk to Overseer (AC-107): the agents' state sent with a message is summarized, not shown;
+        // a message Overseer sent to an agent says so.
+        let prompt = t.prompt, shared = 0, fromOverseer = false;
+        const state = /^<overseer-state>[\s\S]*?<\/overseer-state>\s*/.exec(prompt);
+        if (state) { prompt = prompt.slice(state[0].length); shared = (state[0].match(/"id":/g) || []).length; }
+        if (prompt.startsWith('From Overseer: ')) { prompt = prompt.slice('From Overseer: '.length); fromOverseer = true; }
+        const p = el('div', 'msg user' + (fromOverseer ? ' from-overseer' : '')); p.setAttribute('aria-label', fromOverseer ? 'Overseer' : 'You');
+        if (fromOverseer) { const who = el('div', 'msg-from'); who.append(ui.mark('sm'), el('span', null, 'From Overseer')); p.append(who); }
+        const text = el('div', 'text', prompt);
+        p.append(text);
+        if (state) p.append(el('div', 'msg-context', `Shared the state of ${shared} agent${shared === 1 ? '' : 's'}`));
+        box.append(p);
       }
       box.append(body, foot);
       this.list.append(box);

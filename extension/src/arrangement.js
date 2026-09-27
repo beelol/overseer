@@ -109,7 +109,34 @@ class Arrangement {
     this.current = 'grid';
   }
 
+  /** AC-105: clicking a tile tracks its agent: the review opens beside the grid, following it. */
+  async track(runId) {
+    if (this.current !== 'grid' && this.current !== 'grid-track') return;
+    const run = this.model.run(runId);
+    if (!run) return;
+    const root = this.model.rootRun(run) || run;
+    const first = this.current === 'grid';
+    this.tracked = root.id;
+    await this.closeReviews(root.id);
+    await this.review.open(root.id, { viewColumn: vscode.ViewColumn.Two, preserveFocus: true, follow: true });
+    if (first) await vscode.commands.executeCommand('vscode.setEditorLayout', { orientation: 0, groups: [{ size: 0.6 }, { size: 0.4 }] });
+    this.current = 'grid-track';
+    this.center.panel?.webview.postMessage({ type: 'tracked', runId: root.id });
+  }
+
+  /** Back to the grid alone (Escape or the grid's control); the grid's layout is untouched. */
+  async untrack() {
+    if (this.current !== 'grid-track') return;
+    this.tracked = undefined;
+    this.current = 'grid';
+    await this.closeReviews();
+    await vscode.commands.executeCommand('vscode.setEditorLayout', SINGLE);
+    this.center.panel?.reveal(vscode.ViewColumn.One, false);
+    this.center.panel?.webview.postMessage({ type: 'tracked', runId: null });
+  }
+
   async leaveGrid() {
+    if (this.current === 'grid-track') { this.tracked = undefined; await this.closeReviews(); this.current = 'grid'; }
     if (this.current !== 'grid') return;
     this.current = 'chat';
     if (this.beforeGrid === 'split' && this.runId) await this.split(this.runId);
@@ -124,6 +151,12 @@ class Arrangement {
   }
 
   onReviewClosed(runId) {
+    // Closing the tracked review is the same as going back to the grid alone.
+    if (!this.quiet && this.current === 'grid-track' && runId === this.tracked) {
+      this.tracked = undefined; this.current = 'grid';
+      this.center.panel?.webview.postMessage({ type: 'tracked', runId: null });
+      return;
+    }
     if (this.quiet || runId !== this.runId || this.current !== 'split') return;
     // The user closed the review: the chat goes back to the middle and stays there.
     this.setPreference('chat');
@@ -144,8 +177,12 @@ class Arrangement {
     const run = this.model.run(event.run_id);
     const root = run && this.model.rootRun(run);
     if (!root || root.id !== this.runId) return;
-    // The agent's first edit brings the review forward (AC-73).
-    if (await this.changes(root) > 0 && this.current === 'chat' && this.runId === root.id) await this.split(root.id, { follow: true });
+    // The agent's first edit brings the review forward (AC-73). A file_activity event is an edit by
+    // itself (the harness reports its Write/Edit, sometimes a moment before the file is on disk), so
+    // it does not wait for the workspace to show the change; the review's content follows the write.
+    const edited = event.kind === 'file_activity' || await this.changes(root) > 0;
+    if (edited && event.kind === 'file_activity') this.changed.set(root.id, Math.max(1, this.changed.get(root.id) || 0));
+    if (edited && this.current === 'chat' && this.runId === root.id) await this.split(root.id, { follow: true });
   }
 
   persist() {

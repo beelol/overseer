@@ -42,11 +42,12 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       return [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.getAttribute('aria-level') === '2').map(r => r.querySelector('.label-name')?.textContent.trim()); })()`);
     const selectedLabel = () => cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row.selected')].map(r => r.querySelector('.label-name')?.textContent.trim()).filter(Boolean).pop()`);
     const before = await labels(); const selBefore = await selectedLabel();
-    const message = () => cdp.evalWorkbench(`[...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || ''))?.querySelector('.pane-header .description')?.textContent.trim() || ''`);
+    // What the filtered list shows is said in the search field ("N matches").
+    const message = () => s.searchFrame().then(f => f.eval(`window.__overseerSearch.count()`)).catch(() => '');
 
     // Search: open with the command palette, type, measure until the tree shows the match.
     const searchFor = async (q, expect, exact) => {
-      await cdp.command('Overseer: Search Agents'); await cdp.waitQuickTitle('Search agents');
+      await cdp.command('Overseer: Search Agents'); await s.searchFocused();
       await cdp.key('a', { meta: true }); await cdp.key('Backspace');
       // Start the clock when the text is in the field (no helper pause), stop when the tree shows the match.
       await cdp.call('Input.insertText', { text: q }, cdp.workbench);
@@ -75,7 +76,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await s.screenshot('search-results');
     for (const o of out) check(`search ${o.label} ("${o.q}") shows ${o.expect} in the Agents view in under 200 ms`, o.labels.includes(o.expect) && o.count <= 2 && o.ms < 200, o);
     const narrowed = out.find(o => o.label === 'by message text (agent output)');
-    check('the filtered tree says what it shows ("N matches for …") and hides the rest', narrowed.count < 10 && /match/.test(narrowed.message), { count: narrowed.count, message: narrowed.message });
+    check('the search field says what the filtered list shows ("N matches") and the list hides the rest', narrowed.count < 10 && /match/.test(narrowed.message), { count: narrowed.count, message: narrowed.message });
 
     // Clear from the keyboard: the full tree and the selection come back.
     await cdp.command('Overseer: Clear Search'); await delay(1200);

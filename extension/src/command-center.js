@@ -25,6 +25,9 @@ class CommandCenter {
 
   /** Opens (or moves) the view into an editor column; the arrangement decides which (Gate K). */
   async open({ column = vscode.ViewColumn.One, preserveFocus = false, reveal = true } = {}) {
+    // VS Code restores a webview tab lazily: until the tab is shown there is no panel yet. Show the
+    // restored tab (it then comes back through deserializeWebviewPanel) rather than open a copy.
+    if (!this.panel) await this.showRestoredTab();
     if (this.panel) {
       if (reveal && (this.panel.viewColumn !== column || !this.panel.visible)) this.panel.reveal(column, preserveFocus);
       return this.panel;
@@ -37,8 +40,8 @@ class CommandCenter {
   attach(panel) {
     this.panel = panel;
     panel.webview.options = { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri) };
-    panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer.svg');
-    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css'], js: ['composer.js', 'grid.js', 'dashboard.js', 'files.js'] });
+    panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer-logo.png');
+    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css'], js: ['composer.js', 'grid.js', 'dashboard.js'] });
     const post = m => panel.webview.postMessage(m);
     this.chatFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'chat' }));
     this.gridFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'grid' }));
@@ -68,6 +71,9 @@ class CommandCenter {
       case 'select': if (typeof m.runId === 'string') { if (m.restore) await this.showChat(m.runId); else await this.handlers.select(m.runId); } return;
       case 'mode': { const was = this.mode; this.mode = m.mode; if (was !== m.mode) await this.handlers.onMode?.(m.mode, was); return; }
       case 'focusComposer': post({ type: 'mode', mode: 'composer' }); return;
+      case 'gridEmpty': if (this.mode === 'grid') await this.handlers.gridEmpty?.(); return;
+      case 'track': if (typeof m.runId === 'string') await this.handlers.track?.(m.runId); return;
+      case 'untrack': await this.handlers.untrack?.(); return;
       case 'gridSubscribe': {
         const ids = (m.runIds || []).filter(id => this.model.run(id));
         // Metadata first: the tile needs its root run id before history arrives.
@@ -75,8 +81,6 @@ class CommandCenter {
         await this.gridFeed.set(ids, { limit: 400 });
         return;
       }
-      case 'tree': return this.tree(String(m.runId || ''), String(m.dir || ''));
-      case 'openFile': return this.openFile(String(m.runId || ''), String(m.path || ''));
       case 'composerData': post({ type: 'composerData', data: await this.handlers.launcher.data() }); return;
       case 'composerDefaults': await this.handlers.launcher.saveDefaults(m.defaults || {}); return;
       case 'composerBrowse': { const repo = await this.handlers.launcher.browse(); if (repo) post({ type: 'notice', scope: 'composer', kind: 'repo', repo }); return; }
@@ -127,37 +131,11 @@ class CommandCenter {
     if (changes) this.panel?.webview.postMessage({ type: 'changes', runId: run.id, changes });
   }
 
-  /** One directory of the selected run's worktree (AC-51). */
-  async tree(runId, dir) {
-    const run = this.model.run(runId);
-    try {
-      if (!run) throw new Error('Unknown run.');
-      const data = await this.client.request('workspace.tree', { workspace_id: run.workspace_id, dir });
-      this.panel?.webview.postMessage({ type: 'treeData', runId, dir, data });
-    } catch (error) {
-      this.panel?.webview.postMessage({ type: 'treeError', runId, dir, message: `Files unavailable: ${error.message}` });
-    }
-  }
-
-  /** Opens a worktree file in the editor (review column), independent of the window's folder. */
-  async openFile(runId, rel) {
-    const run = this.model.run(runId);
-    const ws = run && this.model.workspace(run.workspace_id);
-    if (!ws || !rel || rel.startsWith('/') || rel.split('/').includes('..')) return;
-    const uri = vscode.Uri.joinPath(vscode.Uri.file(ws.path), ...rel.split('/'));
-    try { await vscode.workspace.fs.stat(uri); }
-    catch { vscode.window.showInformationMessage(`${rel} was deleted in this worktree; open the review to see its change.`); return; }
-    // Gate K: files open where code lives — the review's group left of the chat — never a third column.
-    const chat = this.panel?.viewColumn;
-    const other = vscode.window.tabGroups.all.map(g => g.viewColumn).find(c => c !== chat);
-    await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: other ?? vscode.ViewColumn.Beside, preview: false });
-  }
-
   async push() {
     if (!this.panel) return;
     const { tasks, runs, workspaces, profiles } = this.model.state;
     const state = { tasks, runs, workspaces, profiles, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), pinned: this.handlers.pinned(),
-      gridMax: Math.max(1, Math.min(9, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
+      gridMax: Math.max(1, Math.min(16, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
     await this.panel.webview.postMessage({ type: 'state', state, selected: this.handlers.selected() });
     if (this.chatRun) { const msg = runMessage(this.model, this.chatRun, this.handlers.steering); if (msg) { this.chatFeed.refreshDescendants(); this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg }); } }
     for (const id of this.gridFeed?.roots.keys() || []) { const msg = runMessage(this.model, id, this.handlers.steering); if (msg) this.panel.webview.postMessage({ type: 'run', channel: 'grid', ...msg }); }
@@ -186,7 +164,23 @@ class CommandCenter {
   focus(target) { this.panel?.webview.postMessage({ type: 'focus', target }); }
 
   async deserializeWebviewPanel(panel) {
+    // One Overseer view per window: a second restored copy (from an earlier session) is closed.
+    if (this.panel && this.panel !== panel) { panel.dispose(); return; }
     this.attach(panel);
+  }
+
+  /** Brings a restored-but-not-yet-shown Overseer tab forward and waits for VS Code to hand it over. */
+  async showRestoredTab() {
+    for (const group of vscode.window.tabGroups.all) {
+      const index = group.tabs.findIndex(t => t.input?.viewType?.endsWith('overseer.center'));
+      if (index < 0) continue;
+      const focus = ['workbench.action.focusFirstEditorGroup', 'workbench.action.focusSecondEditorGroup', 'workbench.action.focusThirdEditorGroup'][group.viewColumn - 1];
+      if (!focus) return;
+      await vscode.commands.executeCommand(focus);
+      await vscode.commands.executeCommand('workbench.action.openEditorAtIndex', index);
+      for (let i = 0; i < 40 && !this.panel; i++) await new Promise(r => setTimeout(r, 50));
+      return;
+    }
   }
 }
 

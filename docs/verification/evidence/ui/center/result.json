@@ -90,7 +90,7 @@
           "expanded": "true",
           "selected": true,
           "focused": true,
-          "aria": "X nested agents, done, claude, claude (existing login)"
+          "aria": "X nested agents, done, claude, Your login"
         },
         "down": {
           "label": "child task",
