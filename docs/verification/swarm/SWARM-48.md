@@ -39,3 +39,27 @@ plain test invocation; it was not counted as validation for this change.
 Remaining: other material-progress and repair-error classes, autonomous
 director repair, qualified live behavior and complete S3/S5 traces are still
 unverified. SWARM-48 remains partial.
+
+Semantic repair-loop follow-up at `462a13b` (2026-09-27):
+`daemon/tests/swarm_plan.rs::two_semantically_invalid_repair_turns_stall_after_restart`
+starts with a valid two-job plan, narrows scope so one logical job is superseded,
+then submits a repair that illegally reuses that ID twice with a daemon restart
+between attempts. Before the fix, the first rejection left
+`failed_planning_turns` at zero. The semantic rejection now records a failed
+planning turn after rolling back its revision transaction. The first rejection
+leaves revision 2 intact with one failed turn; the second durably sets
+`status: stalled` and `stall_reason: planning_failed`. Stale-generation and
+malformed-input guards still run before this counter path.
+
+Reproduction: `cargo test -p overseerd --test swarm_plan
+two_semantically_invalid_repair_turns_stall_after_restart --offline -- --nocapture`
+failed at the first expected count before the fix and passed afterward.
+`cargo test -p overseerd --test swarm_plan --test swarm_state --test
+swarm_director --offline -- --test-threads=1` passed 11 + 19 + 11 tests;
+the related integrated-patch scope-protection test passed separately.
+`git diff --check` passed. Repository-wide `cargo fmt --all -- --check`
+reports extensive existing formatting differences outside this edit; no
+bulk formatting was applied.
+
+Other semantic repair rejections, autonomous director repair, live behavior,
+and complete S3/S5 traces remain unverified. The RFC box stays unchecked.
