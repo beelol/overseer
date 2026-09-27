@@ -100,3 +100,44 @@ fn category_limit_without_account_override_keeps_application_approval() {
     assert_eq!(run["allowed_targets"], json!(["system-codex"]));
     assert_eq!(run["policy"]["allowed_targets_source"], "application");
 }
+
+#[test]
+fn active_run_backlog_cap_can_be_raised_without_changing_worker_ceiling() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Backlog adjustment",
+        "objective":"Audit three independent paths", "policy":{"backlog_max":2,"max_workers":3}}));
+    let id = run["id"].as_str().unwrap();
+    let jobs = json!([
+        {"id":"j1","title":"Path one","acceptance":"Evidence one","deps":[]},
+        {"id":"j2","title":"Path two","acceptance":"Evidence two","deps":[]},
+        {"id":"j3","title":"Path three","acceptance":"Evidence three","deps":[]}
+    ]);
+    assert!(d.try_call("swarm.plan", json!({"id":id,"generation":1,
+        "revision":0,"jobs":jobs})).unwrap_err().contains("backlog"));
+    let change = json!({"run_id":id,"request_id":"raise-backlog",
+        "expected_limit_revision":0,"backlog_max":3});
+    let raised = d.call("swarm.limit.set", change.clone());
+    assert_eq!(raised["backlog_max"], 3);
+    assert_eq!(raised["max_workers"], 3);
+    assert_eq!(raised["limit_revision"], 1);
+    let planned = d.call("swarm.plan", json!({"id":id,"generation":1,
+        "revision":0,"jobs":jobs}));
+    assert_eq!(planned["revision"], 1);
+    assert!(d.try_call("swarm.limit.set", json!({"run_id":id,
+        "request_id":"lower-too-far","expected_limit_revision":1,
+        "backlog_max":2})).unwrap_err().contains("existing nonterminal"));
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.limit.set", change)["duplicate"], true);
+    let current = d.call("swarm.get", json!({"id":id}));
+    assert_eq!(current["limit_revision"], 1);
+    assert_eq!(current["policy"]["effective"]["backlog_max"], 3);
+    assert_eq!(current["policy"]["effective"]["max_workers"], 3);
+    assert_eq!(current["policy"]["sources"]["backlog_max"], "run_update");
+    assert!(d.try_call("swarm.limit.set", json!({"run_id":id,
+        "request_id":"raise-backlog","expected_limit_revision":0,
+        "backlog_max":4})).unwrap_err().contains("reused"));
+    assert!(d.try_call("swarm.limit.set", json!({"run_id":id,
+        "request_id":"stale-backlog","expected_limit_revision":0,
+        "backlog_max":4})).unwrap_err().contains("stale limit revision"));
+}

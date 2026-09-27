@@ -36,6 +36,10 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           limit_revision INTEGER NOT NULL,
           old_max_workers INTEGER NOT NULL,
           new_max_workers INTEGER NOT NULL,
+          request_max_workers INTEGER,
+          request_backlog_max INTEGER,
+          old_backlog_max INTEGER,
+          new_backlog_max INTEGER,
           created_ms INTEGER NOT NULL,
           PRIMARY KEY(run_id,request_id),
           UNIQUE(run_id,limit_revision)
@@ -480,6 +484,13 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         conn.execute_batch(
             "ALTER TABLE swarm_runs ADD COLUMN limit_revision INTEGER NOT NULL DEFAULT 0;",
         )?;
+    }
+    for column in ["request_max_workers", "request_backlog_max", "old_backlog_max", "new_backlog_max"] {
+        let exists = conn.prepare("SELECT 1 FROM pragma_table_info('swarm_limit_events') WHERE name=?1")?
+            .exists([column])?;
+        if !exists {
+            conn.execute_batch(&format!("ALTER TABLE swarm_limit_events ADD COLUMN {column} INTEGER;"))?;
+        }
     }
     let has_no_progress_turns = conn
         .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='no_progress_turns'")?
