@@ -4,6 +4,7 @@
 //! Notifications: {"method": "event", "params": Event} and {"method": "resync", ...}.
 
 use crate::daemon::{Daemon, ACTIVE};
+use crate::store::Store;
 use crate::paths;
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
@@ -205,6 +206,12 @@ fn subscribe(daemon: Arc<Daemon>, id: Value, params: Value, tx: mpsc::Sender<Val
             }
         }
     });
+}
+
+fn maintain_visible_learning(d: &Daemon, store: &Store) -> bool {
+    let ready = store.prune_auto_learning_history(crate::daemon::now()).is_ok();
+    d.learning_maintenance_paused.store(!ready, std::sync::atomic::Ordering::Relaxed);
+    ready
 }
 
 fn s<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
@@ -1360,15 +1367,23 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "auto.usage.list" => {
             let store = d.store.lock().unwrap();
-            let rows = store.auto_measurements(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;
-            let paused = d.learning_is_paused() || store.auto_learning_is_paused()?;
-            json!({"measurements": rows, "learning_paused": paused})
+            if !maintain_visible_learning(d, &store) {
+                json!({"measurements": [], "learning_paused": true})
+            } else {
+                let rows = store.auto_measurements(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;
+                let paused = d.learning_is_paused() || store.auto_learning_is_paused()?;
+                json!({"measurements": rows, "learning_paused": paused})
+            }
         }
         "auto.usage.work.list" => {
             let store = d.store.lock().unwrap();
-            let rows = store.auto_work_observations(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;
-            let paused = d.learning_is_paused() || store.auto_learning_is_paused()?;
-            json!({"work_units":rows,"learning_paused":paused})
+            if !maintain_visible_learning(d, &store) {
+                json!({"work_units": [], "learning_paused": true})
+            } else {
+                let rows = store.auto_work_observations(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;
+                let paused = d.learning_is_paused() || store.auto_learning_is_paused()?;
+                json!({"work_units":rows,"learning_paused":paused})
+            }
         }
         "auto.usage.thread.refresh" => {
             let run = d.run(s(p, "run_id")?)?;
@@ -1444,12 +1459,22 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "observation":observation,"allowance_delta":allowance_delta})
         }
         "auto.usage.thread.list" => {
-            let rows = d.store.lock().unwrap().auto_thread_usage_observations(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;
-            json!({"observations":rows})
+            let store = d.store.lock().unwrap();
+            if !maintain_visible_learning(d, &store) {
+                json!({"observations": [], "learning_paused": true})
+            } else {
+                let rows = store.auto_thread_usage_observations(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;
+                json!({"observations":rows,"learning_paused":d.learning_is_paused() || store.auto_learning_is_paused()?})
+            }
         }
         "auto.usage.summary" => {
-            let rows = d.store.lock().unwrap().auto_daily_aggregates(p["limit"].as_i64().unwrap_or(100).clamp(1, 10_000))?;
-            json!({"aggregates": rows})
+            let store = d.store.lock().unwrap();
+            if !maintain_visible_learning(d, &store) {
+                json!({"aggregates": [], "learning_paused": true})
+            } else {
+                let rows = store.auto_daily_aggregates(p["limit"].as_i64().unwrap_or(100).clamp(1, 10_000))?;
+                json!({"aggregates": rows,"learning_paused":d.learning_is_paused() || store.auto_learning_is_paused()?})
+            }
         }
         "auto.usage.export" => {
             use std::io::Write;
@@ -1459,6 +1484,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 return Err(anyhow!("export path must be absolute"));
             }
             let store = d.store.lock().unwrap();
+            if !maintain_visible_learning(d, &store) {
+                return Err(anyhow!("Auto learning cleanup failed; export is unavailable until storage recovers"));
+            }
             let rows = store.auto_measurements(50_000)?;
             let aggregates = store.auto_daily_aggregates(10_000)?;
             let thread_usage_observations = store.auto_thread_usage_observations(5000)?;

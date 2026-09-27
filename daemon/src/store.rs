@@ -186,17 +186,7 @@ impl Store {
         };
         let mut store = Self { conn, learning_conn, learning_persistent };
         store.migrate_main()?;
-        if store.migrate_learning().and_then(|_| {
-            let now = crate::daemon::now();
-            store.prune_auto_measurements(now, 50_000)?;
-            store.prune_auto_daily_aggregates(now, 10_000)?;
-            store.learning_conn.execute(
-                "DELETE FROM auto_thread_usage_observations WHERE observed_ms < ?1",
-                params![now.saturating_sub(30 * 86_400_000_i64)],
-            )?;
-            store.prune_auto_work_observations(now, 5000)?;
-            Ok(())
-        }).is_err() {
+        if store.migrate_learning().and_then(|_| store.prune_auto_learning_history(crate::daemon::now())).is_err() {
             store.learning_conn = Connection::open_in_memory()?;
             store.learning_persistent = false;
             store.migrate_learning()?;
@@ -1493,6 +1483,19 @@ impl Store {
             None => 0,
         };
         Ok(expired + over_cap)
+    }
+
+    /// Apply age and row bounds when the daemon opens or a user inspects learning,
+    /// including periods with no new usage measurements.
+    pub fn prune_auto_learning_history(&self, now_ms: i64) -> Result<()> {
+        self.prune_auto_measurements(now_ms, 50_000)?;
+        self.prune_auto_daily_aggregates(now_ms, 10_000)?;
+        self.learning_conn.execute(
+            "DELETE FROM auto_thread_usage_observations WHERE observed_ms < ?1",
+            params![now_ms.saturating_sub(30 * 86_400_000_i64)],
+        )?;
+        self.prune_auto_work_observations(now_ms, 5000)?;
+        Ok(())
     }
 
     /// Keep detailed observations for 30 days and at most 50,000 rows. A caller

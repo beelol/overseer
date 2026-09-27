@@ -1537,6 +1537,69 @@ fn auto_usage_is_local_bounded_and_clear_does_not_erase_run_history() {
 }
 
 #[test]
+fn auto_usage_inspection_expires_idle_history_without_restarting_daemon() {
+    use rusqlite::params;
+    let d = Daemon::start(&[]);
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    const DAY: i64 = 86_400_000;
+    let learning = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
+    for (id, observed) in [(1, now - 31 * DAY), (2, now - 29 * DAY)] {
+        learning.execute("INSERT INTO auto_measurements(event_seq,observed_ms,task_id,run_id,harness) VALUES(?1,?2,'task','run','codex')",
+            params![id, observed]).unwrap();
+        learning.execute("INSERT INTO auto_thread_usage_observations(run_id,profile_id,read_account_generation,attribution,observed_ms,source,estimate) VALUES('run','profile',1,'unverified',?1,'fixture','{}')",
+            params![observed]).unwrap();
+    }
+    for (day, observed) in [(1, now - 91 * DAY), (2, now - 89 * DAY)] {
+        learning.execute("INSERT INTO auto_daily_aggregates(day_ms,harness,profile_id,model,effort,last_observed_ms,samples,input_observations,input_tokens,output_observations,output_tokens,cached_input_observations,cached_input_tokens,reasoning_output_observations,reasoning_output_tokens,cost_observations,cost_usd) VALUES(?1,'codex','','','',?2,1,0,0,0,0,0,0,0,0,0,0)",
+            params![day, observed]).unwrap();
+    }
+
+    let detail = d.call("auto.usage.list", json!({}));
+    assert_eq!(detail["measurements"].as_array().unwrap().len(), 1, "{detail}");
+    let summary = d.call("auto.usage.summary", json!({}));
+    assert_eq!(summary["aggregates"].as_array().unwrap().len(), 1, "{summary}");
+    for table in ["auto_measurements", "auto_daily_aggregates", "auto_thread_usage_observations"] {
+        let count: i64 = learning.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0)).unwrap();
+        assert_eq!(count, 1, "idle inspection must remove expired {table} rows from disk");
+    }
+}
+
+#[test]
+fn auto_usage_inspection_reports_paused_when_retention_cleanup_fails_then_recovers() {
+    use rusqlite::params;
+    let d = Daemon::start(&[]);
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as i64;
+    let learning = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
+    learning.execute("INSERT INTO auto_measurements(event_seq,observed_ms,task_id,run_id,harness) VALUES(1,?1,'task','run','codex')",
+        params![now - 31 * 86_400_000_i64]).unwrap();
+    learning.execute_batch("CREATE TRIGGER reject_idle_cleanup BEFORE DELETE ON auto_measurements
+        BEGIN SELECT RAISE(FAIL,'injected retention cleanup failure'); END;").unwrap();
+
+    let paused = d.call("auto.usage.list", json!({}));
+    assert_eq!(paused["learning_paused"], true, "{paused}");
+    assert!(paused["measurements"].as_array().unwrap().is_empty(),
+        "expired learning must not leak when maintenance fails: {paused}");
+    for (method, field) in [
+        ("auto.usage.summary", "aggregates"),
+        ("auto.usage.thread.list", "observations"),
+        ("auto.usage.work.list", "work_units"),
+    ] {
+        let response = d.call(method, json!({}));
+        assert_eq!(response["learning_paused"], true, "{method}: {response}");
+        assert!(response[field].as_array().unwrap().is_empty(), "{method}: {response}");
+    }
+    let export = d.home.path().join("expired-learning-export.json");
+    assert!(d.try_call("auto.usage.export", json!({"path":export})).is_err());
+    assert!(!export.exists(), "failed maintenance must not export expired history");
+
+    learning.execute_batch("DROP TRIGGER reject_idle_cleanup").unwrap();
+    let recovered = d.call("auto.usage.list", json!({}));
+    assert_eq!(recovered["learning_paused"], false, "{recovered}");
+    assert!(recovered["measurements"].as_array().unwrap().is_empty());
+    assert_eq!(learning.query_row("SELECT COUNT(*) FROM auto_measurements", [], |row| row.get::<_, i64>(0)).unwrap(), 0);
+}
+
+#[test]
 fn auto_clearing_learning_during_an_active_child_preserves_its_execution() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
