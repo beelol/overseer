@@ -40,3 +40,29 @@ replay-safe; it does not launch the director. A future phone gateway must supply
 the authenticated device as `request_scope` rather than trusting a device-provided
 scope. Phone authorization, confirmation, other control IDs, and stale queued
 phone commands still need joined tests. SWARM-61 remains partial.
+
+Versioned Stop follow-up (`eca5a05`): a remote caller may now send a bounded
+`request_id` and `request_scope` with the plan and control revisions it saw.
+Pause, Resume, Off, a limit change, deadline extension and Stop advance the
+durable control revision; plan changes retain their separate revision. A stale
+queued Stop is rejected before cancellation if either expected revision no
+longer matches. The local UI/CLI's existing ID-only Stop remains immediate
+and does not require a fresh view. A successful remote Stop saves its request
+fingerprint and response in the same SQLite transaction as cancellation and
+the ordered Stop operation; replay after daemon restart returns one recorded
+effect. Reusing its scoped ID with changed input is rejected.
+
+The new `daemon/tests/swarm_stop_replay.rs` fixture first failed because a
+run had no control revision. It then passed with Pause→Resume, a newer local
+limit, and a plan revision all fencing old phone-style requests. A fresh
+request stopped the run, replayed after restart, and left one Stop operation.
+The schema migration test passed; the affected control, plan-replay, runtime,
+state and Stop-replay suites passed 6 + 3 + 21 + 19 + 1 local tests, with no
+paid harness. `git diff --check` passed.
+
+This is a daemon protocol boundary, not a joined phone result. Gate N must
+derive `request_scope` from its authenticated device identity and enforce its
+Full control/Watch only permissions and confirmations; the current local
+protocol accepts a caller-supplied scope. Race replays across an actual phone
+reconnect and a simultaneous VS Code/CLI action remain open. SWARM-61 stays
+partial.
