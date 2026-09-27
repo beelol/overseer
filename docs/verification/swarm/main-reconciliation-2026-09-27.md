@@ -149,3 +149,29 @@ earlier partial live reruns. That administrative status change is not evidence
 that the observed Claude background-child lifecycle issue was fixed. Keep
 SWARM-17's version-pinned descendant-control qualification and fail-closed
 target eligibility; rerun it against any enabled harness before live fan-out.
+
+## Subsequent published main: `9667968`
+
+The branch merged main through `9667968` without conflicts. Gate S now records
+AC-185–189 as partial, with daemon implementation and fixture evidence on its
+separate pull request #14. Those actions, holds, redirects and check-ins are
+not yet on main. When they land, their target must be the Swarm director for
+one category; worker directives still go through the director and durable
+broker. Confirm actions, shared claims and an approved account pool remain
+subject to the Swarm run's own authority. Joined SWARM-24/27/44/60 and Gate S
+AC-195/196 are still open; the new ledger statuses verify none of them.
+
+Main also fixed Claude Code 2.1.246's base run completion after a depth-2
+background child or a notification read mid-turn (`06d6d75`) and records a
+passing live Claude scenario under AC-151, which remains partial for other
+app-server paths. The parser now counts only top-level background tasks for an
+expected next turn and clears notices read by the main agent. Swarm's synthetic
+Claude child fixture and its process/admission regressions passed after the
+merge: `cargo test -p overseerd --test protocol --test swarm_runtime --test
+swarm_admission --test swarm_dispatch --test swarm_director_process --bin
+overseerd` (53 + 22 + 33 + 6 + 13 + 30 tests). This improves the base parser,
+but it does not prove native delegation is disabled in a real Swarm worker or
+qualify a live director/worker communication path. SWARM-17/25/31 remain open.
+The audit-only native admission gate added at `8d9f328` continues to hold
+Claude before reservation; there is still no qualified read-only source/service
+boundary. No Swarm default or acceptance criterion wording changes.
