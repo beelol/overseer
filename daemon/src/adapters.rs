@@ -38,6 +38,9 @@ pub enum Norm {
     /// A task finished and was reported (`task_notification`); for a backgrounded task Claude
     /// continues with another turn after the current result, even if it finished before it.
     BackgroundNotified(String),
+    /// The main agent got a tool's result and calls the model again in the same turn (Claude
+    /// Code): task notifications reported before this are read in that call.
+    MainContinues,
     /// Line was recognized structurally but carries no user-visible content.
     Ignored,
     /// Line not understood by this parser version; retained as raw output.
@@ -647,7 +650,7 @@ pub fn scope_codex_app_child(thread: &str, norms: Vec<Norm>) -> Vec<Norm> {
             Norm::Tool { name, summary, .. } => Norm::Child { native_id: thread.into(), parent_native: None, title: None, status: None, text: Some(format!("[tool {name}] {summary}")), only_if_known: true, evidence: evidence.clone() },
             Norm::TurnDone { ok, .. } => Norm::Child { native_id: thread.into(), parent_native: None, title: None, status: Some(if ok { "completed" } else { "failed" }.into()), text: None, only_if_known: true, evidence: evidence.clone() },
             Norm::Child { native_id, parent_native: None, title, status, text, only_if_known, evidence } => Norm::Child { native_id, parent_native: Some(thread.into()), title, status, text, only_if_known, evidence },
-            Norm::TurnId(_) | Norm::Running | Norm::Session(_) | Norm::Usage(_) | Norm::ToolDetail { .. } | Norm::BackgroundLaunched(_) | Norm::BackgroundNotified(_) => Norm::Ignored,
+            Norm::TurnId(_) | Norm::Running | Norm::Session(_) | Norm::Usage(_) | Norm::ToolDetail { .. } | Norm::BackgroundLaunched(_) | Norm::BackgroundNotified(_) | Norm::MainContinues => Norm::Ignored,
             other => other,
         })
         .collect()
@@ -672,7 +675,11 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
                 // Claude 2.x does not stream a subagent's final reply; `task_notification` carries it as `summary`.
                 let text = if sub == "task_notification" { v["summary"].as_str().filter(|t| !t.is_empty()).map(|t| truncate(t, 8192)) } else { None };
                 let mut out = vec![Norm::Child { native_id: s(&v["tool_use_id"]), parent_native: None, title: v["description"].as_str().map(str::to_string), status, text, only_if_known: true, evidence: format!("claude system {sub}") }];
-                if sub == "task_started" && v["is_backgrounded"] == true {
+                // Only a background task the main agent launched (spawn depth 1) brings another
+                // top-level turn; a subagent's own background child is reported back to that
+                // subagent, so waiting for a turn on its account would hold the run open forever.
+                let top_level = v["spawn_depth"].as_u64().map_or(true, |d| d <= 1);
+                if sub == "task_started" && v["is_backgrounded"] == true && top_level {
                     out.push(Norm::BackgroundLaunched(s(&v["task_id"])));
                 } else if sub == "task_notification" {
                     out.push(Norm::BackgroundNotified(s(&v["task_id"])));
@@ -742,6 +749,7 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
                                 other => other.to_string(),
                             };
                             out.push(tool_detail(id.clone(), None, Some(&text), if failed { "failed" } else { "completed" }, failed));
+                            out.push(Norm::MainContinues);
                         }
                         out.push(Norm::Child { native_id: id, parent_native: parent.clone(), title: None, status: Some(if failed { "failed" } else { "completed" }.into()), text: None, only_if_known: true, evidence: "claude tool_result".into() });
                     }

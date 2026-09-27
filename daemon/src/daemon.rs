@@ -900,6 +900,9 @@ impl Daemon {
             out.push(store.insert_event(now(), task, run_override.or(rid), kind, source, conf, &redact_value(payload))?);
             Ok(())
         };
+        if matches!(norm, Norm::Running | Norm::Tool { .. } | Norm::Text { .. }) {
+            state.between_turns = false;
+        }
         match norm {
             Norm::Session(id) => {
                 if !id.is_empty() && state.session.as_deref() != Some(&id) {
@@ -1037,18 +1040,23 @@ impl Daemon {
             }
             Norm::BackgroundNotified(id) => {
                 if state.backgrounded.remove(&id) {
-                    state.expected_turns += 1;
+                    // Between turns, the notice itself starts the next one.
+                    if state.between_turns { state.expected_turns += 1 } else { state.unread_notices += 1 }
                 }
             }
+            // A notice reported mid-turn is read by the main agent's next model call in that
+            // same turn; only one still unread when the turn ends brings another turn.
+            Norm::MainContinues => state.unread_notices = 0,
             Norm::TurnDone { ok, summary } => {
                 let interrupted = store.run_process(&run.id)?.map(|(dir, _, _)| Path::new(&dir).join("interrupt.requested").exists()).unwrap_or(false);
                 if run.harness == "claude" {
-                    state.expected_turns = state.expected_turns.saturating_sub(1);
+                    state.expected_turns = state.expected_turns.saturating_sub(1) + std::mem::take(&mut state.unread_notices);
                     if !interrupted && (state.background > 0 || state.expected_turns > 0) {
                         // Claude reports an interim result while background subagents run, and
                         // continues with another turn for each finished one (even one that
                         // finished before this result). The session must stay open so those
                         // turns' permission requests can be answered.
+                        state.between_turns = true;
                         let why = if state.background > 0 { format!("{} background task(s) still running", state.background) } else { "Claude continues after a background task finished".to_string() };
                         ev("output", "harness", "exact", json!({"role": "system", "text": format!("interim result; {why}: {}", summary.unwrap_or_default())}), None)?;
                         return Ok(());
@@ -1448,12 +1456,16 @@ struct TailState {
     /// Claude turns still expected from this process: the user's turn plus one continuation per
     /// reported backgrounded task. The session closes only when all have produced a result.
     expected_turns: usize,
+    /// Backgrounded tasks reported since the main agent last called the model.
+    unread_notices: usize,
+    /// After an interim result, before Claude's next turn starts.
+    between_turns: bool,
     backgrounded: std::collections::HashSet<String>,
 }
 
 impl Default for TailState {
     fn default() -> Self {
-        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new(), background: 0, expected_turns: 1, backgrounded: Default::default() }
+        Self { session: None, turn_done: None, last_error: None, since_prune: 0, store_polled: std::time::Instant::now(), store_seen: Default::default(), close_stdin: false, sends: Vec::new(), background: 0, expected_turns: 1, unread_notices: 0, between_turns: false, backgrounded: Default::default() }
     }
 }
 
