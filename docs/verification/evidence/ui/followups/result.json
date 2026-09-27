@@ -20,7 +20,29 @@
           "editor": 358,
           "composer": 310,
           "inside": [],
-          "rows": 2,
+          "rows": 1,
+          "edges": {
+            "left": 0,
+            "right": 0
+          },
+          "clipped": [
+            {
+              "chip": "repo",
+              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+            },
+            {
+              "chip": "agent",
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+            },
+            {
+              "chip": "model",
+              "tooltip": "The harness default model"
+            },
+            {
+              "chip": "mode",
+              "tooltip": "A new branch and worktree; your checkout is untouched"
+            }
+          ],
           "overflow": 0,
           "docOverflow": false
         },
@@ -29,7 +51,29 @@
           "editor": 478,
           "composer": 430,
           "inside": [],
-          "rows": 2,
+          "rows": 1,
+          "edges": {
+            "left": 0,
+            "right": 0
+          },
+          "clipped": [
+            {
+              "chip": "repo",
+              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+            },
+            {
+              "chip": "agent",
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+            },
+            {
+              "chip": "model",
+              "tooltip": "The harness default model"
+            },
+            {
+              "chip": "mode",
+              "tooltip": "A new branch and worktree; your checkout is untouched"
+            }
+          ],
           "overflow": 0,
           "docOverflow": false
         },
@@ -38,7 +82,21 @@
           "editor": 638,
           "composer": 590,
           "inside": [],
-          "rows": 2,
+          "rows": 1,
+          "edges": {
+            "left": 0,
+            "right": 0
+          },
+          "clipped": [
+            {
+              "chip": "repo",
+              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+            },
+            {
+              "chip": "agent",
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+            }
+          ],
           "overflow": 0,
           "docOverflow": false
         },
@@ -48,8 +106,98 @@
           "composer": 720,
           "inside": [],
           "rows": 1,
+          "edges": {
+            "left": 0,
+            "right": 0
+          },
+          "clipped": [],
           "overflow": 0,
           "docOverflow": false
+        }
+      ]
+    },
+    {
+      "name": "the composer choices fill one row edge to edge with the field; a shortened label keeps its full text in the tooltip (AC-154)",
+      "ok": true,
+      "detail": [
+        {
+          "target": 360,
+          "rows": 1,
+          "edges": {
+            "left": 0,
+            "right": 0
+          },
+          "clipped": [
+            {
+              "chip": "repo",
+              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+            },
+            {
+              "chip": "agent",
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+            },
+            {
+              "chip": "model",
+              "tooltip": "The harness default model"
+            },
+            {
+              "chip": "mode",
+              "tooltip": "A new branch and worktree; your checkout is untouched"
+            }
+          ]
+        },
+        {
+          "target": 480,
+          "rows": 1,
+          "edges": {
+            "left": 0,
+            "right": 0
+          },
+          "clipped": [
+            {
+              "chip": "repo",
+              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+            },
+            {
+              "chip": "agent",
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+            },
+            {
+              "chip": "model",
+              "tooltip": "The harness default model"
+            },
+            {
+              "chip": "mode",
+              "tooltip": "A new branch and worktree; your checkout is untouched"
+            }
+          ]
+        },
+        {
+          "target": 640,
+          "rows": 1,
+          "edges": {
+            "left": 0,
+            "right": 0
+          },
+          "clipped": [
+            {
+              "chip": "repo",
+              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+            },
+            {
+              "chip": "agent",
+              "tooltip": "Codex account-fixture 0.0.0 (synthetic)\nYour login: signed in · pro\nUsage: not reported by this harness"
+            }
+          ]
+        },
+        {
+          "target": 900,
+          "rows": 1,
+          "edges": {
+            "left": 0,
+            "right": 0
+          },
+          "clipped": []
         }
       ]
     },
@@ -88,7 +236,7 @@
           "border": "1px",
           "height": 26
         },
-        "ms": 35,
+        "ms": 34,
         "shown": [
           "followups-repo",
           "Beta docs"
@@ -136,6 +284,22 @@
           "Beta docs",
           "Name check"
         ]
+      }
+    },
+    {
+      "name": "the search is one line with a filter icon (its menu picks the filter; the icon shows when one is on) and nothing under the field (AC-155); the pane keeps VS Code's minimum height for extension panes",
+      "ok": true,
+      "detail": {
+        "oneLine": {
+          "children": 1,
+          "fieldHeight": 26,
+          "filterIcon": true
+        },
+        "pane": {
+          "head": "Search",
+          "h": 148
+        },
+        "iconOnAfterAll": false
       }
     },
     {

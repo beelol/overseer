@@ -7,20 +7,18 @@
   q.addEventListener('input', () => { clearTimeout(timer); clear.hidden = !q.value; timer = setTimeout(send, q.value.trim() ? 25 : 150); });
   q.addEventListener('keydown', e => { if (e.key === 'Escape' && q.value) { e.preventDefault(); q.value = ''; count.textContent = ''; send(); } });
   clear.addEventListener('click', () => { q.value = ''; count.textContent = ''; send(); q.focus(); });
-  // Filters: one at a time (radio buttons; arrow keys move between them).
-  const filters = [...document.querySelectorAll('.filters [role=radio]')];
-  const pick = (value, notify) => { for (const b of filters) { const on = b.dataset.filter === value; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; } if (notify) vscode.postMessage({ type: 'filter', value }); };
-  filters.forEach((b, i) => {
-    b.addEventListener('click', () => pick(b.dataset.filter, true));
-    b.addEventListener('keydown', e => { const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!d) return; e.preventDefault(); const n = filters[(i + d + filters.length) % filters.length]; n.focus(); pick(n.dataset.filter, true); });
-  });
-  pick('all', false);
+  // Filters live behind the filter icon (a VS Code menu): the icon fills in while one is on.
+  const filterBtn = document.getElementById('filter'); let current = 'all';
+  const LABELS = { all: 'All', working: 'Working', needs: 'Needs you', done: 'Done', failed: 'Failed', archived: 'Archived' };
+  const pick = value => { current = value; const on = value !== 'all'; filterBtn.classList.toggle('on', on);
+    filterBtn.firstElementChild.className = 'codicon codicon-' + (on ? 'filter-filled' : 'filter'); filterBtn.setAttribute('aria-label', 'Filter agents: ' + LABELS[value]); };
+  filterBtn.addEventListener('click', () => vscode.postMessage({ type: 'filterMenu' }));
   window.addEventListener('message', e => {
     const m = e.data || {};
     if (m.type === 'focus') { q.focus(); q.select(); }
     else if (m.type === 'count') count.textContent = m.text || '';
-    else if (m.type === 'filter') pick(m.value || 'all', false);
+    else if (m.type === 'filter') pick(m.value || 'all');
     else if (m.type === 'set') { q.value = m.value || ''; clear.hidden = !q.value; if (!q.value) count.textContent = ''; }
   });
-  window.__overseerSearch = { value: () => q.value, count: () => count.textContent, filter: () => filters.find(b => b.getAttribute('aria-checked') === 'true')?.dataset.filter };
+  window.__overseerSearch = { value: () => q.value, count: () => count.textContent, filter: () => current };
 })();

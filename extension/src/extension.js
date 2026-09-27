@@ -35,7 +35,16 @@ async function activate(context) {
   const accounts = new AccountsProvider(model, context.extensionUri);
   const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true, dragAndDropController: agentDrag() });
   // The search field above the Agents list (AC-112): typing filters the list through the daemon's search.
-  const searchView = new SearchView(context.extensionUri, { onQuery: q => runAgentSearch(q), onFilter: kind => setStatusFilter(kind) });
+  const searchView = new SearchView(context.extensionUri, { onQuery: q => runAgentSearch(q), onFilter: kind => setStatusFilter(kind), onFilterMenu: () => filterMenu() });
+  /** The filter icon's menu (a native pick: a menu inside the short search pane would be clipped). */
+  async function filterMenu() {
+    const now = agents.showArchived ? 'archived' : agents.statusFilter;
+    const items = [['all', 'All', 'list-flat'], ['working', 'Working', 'sync'], ['needs', 'Needs you', 'bell'], ['done', 'Done', 'check'], ['failed', 'Failed', 'error'], ['archived', 'Archived', 'archive']]
+      .map(([value, label, icon]) => ({ value, label: `$(${icon}) ${label}`, description: value === now ? '✓' : '' }));
+    const picked = await vscode.window.showQuickPick(items, { title: 'Show agents', placeHolder: 'Filter the Agents list' });
+    if (!picked) return;
+    setStatusFilter(picked.value); searchView.setFilter(picked.value);
+  }
   /** The search field's filters: All, Working, Needs you, Done, Failed, Archived. */
   function setStatusFilter(kind) {
     agents.showArchived = kind === 'archived';

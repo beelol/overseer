@@ -54,8 +54,12 @@ const { auditExpression } = require('./audit');
         const chips = [...document.querySelectorAll('.view-composer [data-chip]')].filter(c => !c.hidden && c.offsetParent);
         const inside = chips.filter(c => { const r = c.getBoundingClientRect(); return r.top < box.bottom && r.bottom > box.top; }).map(c => c.dataset.chip);
         const rows = new Set(chips.map(c => Math.round(c.getBoundingClientRect().top))).size;
+        // AC-154: the row spans the field's width; shortened labels keep their full text in the tooltip.
+        const first = chips[0].getBoundingClientRect(), last = chips[chips.length - 1].getBoundingClientRect();
+        const edges = { left: Math.round(first.left - box.left), right: Math.round(box.right - last.right) };
+        const clipped = chips.filter(c => { const l = c.querySelector('.chip-label'); return l && l.scrollWidth > l.clientWidth + 1; }).map(c => ({ chip: c.dataset.chip, tooltip: c.title }));
         const audit = ${auditExpression({ root: '.view-composer' })};
-        return { editor: innerWidth, composer: Math.round(box.width), inside, rows, overflow: audit.overflow.length, docOverflow: document.documentElement.scrollWidth > innerWidth + 1 };
+        return { editor: innerWidth, composer: Math.round(box.width), inside, rows, edges, clipped, overflow: audit.overflow.length, docOverflow: document.documentElement.scrollWidth > innerWidth + 1 };
       })()`);
       widths.push({ target, ...m });
       await s.screenshot(`composer-${target}`);
@@ -64,6 +68,8 @@ const { auditExpression } = require('./audit');
     s.note('composer widths', widths);
     check('at editor widths 360, 480, 640 and 900 px no choice sits inside the text field, at most two rows of choices, nothing overflows',
       widths.every(w => w.inside.length === 0 && w.rows >= 1 && w.rows <= 2 && w.overflow === 0 && !w.docOverflow) && Math.abs(widths[0].editor - 360) <= 30 && Math.abs(widths[3].editor - 900) <= 30, widths);
+    check('the composer choices fill one row edge to edge with the field; a shortened label keeps its full text in the tooltip (AC-154)',
+      widths.every(w => w.rows === 1 && Math.abs(w.edges.left) <= 2 && Math.abs(w.edges.right) <= 2 && w.clipped.every(c => c.tooltip && c.tooltip.length > 3)), widths.map(w => ({ target: w.target, rows: w.rows, edges: w.edges, clipped: w.clipped })));
     await cdp.command('View: Show Overseer'); await delay(800);
 
     // AC-110: account names say the harness once. Start a Codex agent on the machine's own login.
@@ -127,7 +133,13 @@ const { auditExpression } = require('./audit');
     check('⌥⌘F also works from the side bar; Escape and the field\'s ✕ each clear the search and bring the list back', openedFromSide && narrowed && clearedByKey && clearedByMouse, { openedFromSide, narrowed, clearedByKey, clearedByMouse });
 
     // The space under the field holds the status filters (VS Code gives a webview pane a minimum height).
-    const clickFilter = async value => { const f = await s.searchFrame(); const at = await s.webviewPoint(f, `[data-filter="${value}"]`); await cdp.click(at.x, at.y); await delay(900); return f; };
+    // Filters live behind the field's filter icon (a VS Code menu).
+    const LABEL = { all: 'All', working: 'Working', needs: 'Needs you', done: 'Done', failed: 'Failed', archived: 'Archived' };
+    const clickFilter = async value => { const f = await s.searchFrame(); const at = await s.webviewPoint(f, '#filter'); await cdp.click(at.x, at.y);
+      await cdp.waitQuickTitle('Show agents'); await cdp.type(LABEL[value]); await delay(300); await cdp.key('Enter'); await delay(900); return f; };
+    // AC-155: one line; nothing under the field.
+    const oneLine = await (await s.searchFrame()).eval(`({ children: [...document.body.children].filter(e => e.tagName !== 'SCRIPT' && e.offsetParent !== null).length, fieldHeight: Math.round(document.querySelector('.search-field').getBoundingClientRect().height), filterIcon: !!document.querySelector('#filter .codicon-filter') })`);
+    const pane = await cdp.evalWorkbench(`[...document.querySelectorAll('.part.sidebar .pane')].map(p => ({ head: p.querySelector('.pane-header')?.textContent.trim().slice(0, 12), h: Math.round(p.getBoundingClientRect().height) }))[0]`);
     s.ctl('task.archive', { task_id: state().tasks.find(t => t.title === 'Alpha refactor').id, archived: true }); await delay(800);
     const running = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'sleep 60'], prompt: '', title: 'Still working' }); loops.push(running.run.id); await delay(1500);
     let ff = await clickFilter('working'); const onlyWorking = await agentLabels(); const workingCount = await ff.eval(`window.__overseerSearch.count()`);
@@ -139,6 +151,11 @@ const { auditExpression } = require('./audit');
       onlyWorking.includes('Still working') && !onlyWorking.includes('Beta docs') && workingCount === '1 agent' && onlyDone.includes('Beta docs') && !onlyDone.includes('Still working') &&
       onlyArchived.includes('Alpha refactor') && !onlyArchived.includes('Beta docs') && everything.includes('Beta docs') && everything.includes('Still working') && !everything.includes('Alpha refactor'),
       { onlyWorking, workingCount, onlyDone, onlyArchived, everything });
+    const iconOn = await (await s.searchFrame()).eval(`document.querySelector('#filter').classList.contains('on')`);
+    check('the search is one line with a filter icon (its menu picks the filter; the icon shows when one is on) and nothing under the field (AC-155); the pane keeps VS Code\'s minimum height for extension panes',
+      oneLine.children === 1 && oneLine.fieldHeight <= 30 && oneLine.filterIcon && workingCount === '1 agent' && iconOn === false, { oneLine, pane, iconOnAfterAll: iconOn });
+    await clickFilter('working'); await s.screenshot('filter-on');
+    await clickFilter('all');
     await theme('Overseer Light'); await s.screenshot('search-field-light'); await theme('Overseer Dark');
     s.ctl('run.interrupt', { run_id: running.run.id }); await delay(1500);
 

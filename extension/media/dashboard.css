@@ -74,7 +74,10 @@ body { overflow: hidden; background: var(--ov-bg); }
 @keyframes slide-in { from { transform: translateX(16px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .files-panel { animation: none; } }
 /* AC-109: choices sit in a row under the field (wrapping below it, never inside it). */
-.composer-hero > .composer-choices { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px; margin-top: calc(var(--ov-space-2) * -0.5); }
-.composer-hero > .composer-choices .chip { max-width: min(260px, calc(50% - 3px)); }
+/* AC-154: the choices share the full width under the field, one row; a narrow row shortens labels (ellipsis). */
+.composer-hero > .composer-choices { display: flex; flex-wrap: nowrap; gap: 6px; margin-top: calc(var(--ov-space-2) * -0.5); }
+.composer-hero > .composer-choices .chip { flex: 1 1 0; min-width: 0; max-width: none; justify-content: flex-start; }
+.composer-hero > .composer-choices .chip[hidden] { display: none; }
+.composer-hero > .composer-choices .chip .chip-label { flex: 1; text-align: left; white-space: nowrap; }
 .composer.big .composer-row .spacer { flex: 1; }
 .hero-mark svg { color: var(--ov-accent); }

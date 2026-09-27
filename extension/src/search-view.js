@@ -5,8 +5,8 @@ const { page, localRoots } = require('./webview-html');
 
 class SearchView {
   /** onQuery(text) runs a search ('' clears it). */
-  constructor(extensionUri, { onQuery, onFilter }) {
-    this.extensionUri = extensionUri; this.onQuery = onQuery; this.onFilter = onFilter;
+  constructor(extensionUri, { onQuery, onFilter, onFilterMenu }) {
+    this.extensionUri = extensionUri; this.onQuery = onQuery; this.onFilter = onFilter; this.onFilterMenu = onFilterMenu;
     this.view = undefined; this.pending = [];
   }
 
@@ -18,17 +18,11 @@ class SearchView {
   <span class="codicon codicon-search" aria-hidden="true"></span>
   <input id="q" type="text" spellcheck="false" autocomplete="off" placeholder="Search agents" aria-label="Search agents (title, message, file, repository, account or status)" title="Search agents: title, message, file, repository, account or status (⌥⌘F)">
   <span id="count" class="count" aria-live="polite"></span>
+  <button id="filter" type="button" class="icon" aria-haspopup="true" aria-label="Filter agents: All" title="Filter agents (All, Working, Needs you, Done, Failed, Archived)"><span class="codicon codicon-filter" aria-hidden="true"></span></button>
   <button id="clear" type="button" class="icon" aria-label="Clear search" title="Clear search (Escape)" hidden><span class="codicon codicon-close" aria-hidden="true"></span></button>
 </div>
-<div class="filters" role="radiogroup" aria-label="Show agents">
-  <button type="button" role="radio" data-filter="all" aria-checked="true">All</button>
-  <button type="button" role="radio" data-filter="working" aria-checked="false"><span class="dot working" aria-hidden="true"></span>Working</button>
-  <button type="button" role="radio" data-filter="needs" aria-checked="false"><span class="dot needs" aria-hidden="true"></span>Needs you</button>
-  <button type="button" role="radio" data-filter="done" aria-checked="false"><span class="dot done" aria-hidden="true"></span>Done</button>
-  <button type="button" role="radio" data-filter="failed" aria-checked="false"><span class="dot failed" aria-hidden="true"></span>Failed</button>
-  <button type="button" role="radio" data-filter="archived" aria-checked="false"><span class="codicon codicon-archive" aria-hidden="true"></span>Archived</button>
-</div>` });
-    view.webview.onDidReceiveMessage(m => { if (m.type === 'query') this.onQuery(String(m.value || '')); else if (m.type === 'filter') this.onFilter?.(String(m.value || 'all')); });
+` });
+    view.webview.onDidReceiveMessage(m => { if (m.type === 'query') this.onQuery(String(m.value || '')); else if (m.type === 'filter') this.onFilter?.(String(m.value || 'all')); else if (m.type === 'filterMenu') this.onFilterMenu?.(); });
     view.onDidDispose(() => { this.view = undefined; });
     for (const m of this.pending.splice(0)) view.webview.postMessage(m);
   }

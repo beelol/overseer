@@ -1,6 +1,6 @@
 /* The side bar's search field: one line, like VS Code's own search boxes, in Overseer's tokens. */
 html, body { height: auto; background: transparent; }
-body { padding: 6px 12px 8px 20px; overflow: hidden; }
+body { padding: 6px 12px 6px 20px; overflow: hidden; }
 .search-field { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px 0 8px; border-radius: var(--ov-radius-control, 4px);
   border: 1px solid var(--vscode-input-border, var(--ov-border)); background: var(--vscode-input-background); color: var(--vscode-input-foreground); }
 .search-field:focus-within { border-color: var(--vscode-focusBorder); }
@@ -11,16 +11,5 @@ body { padding: 6px 12px 8px 20px; overflow: hidden; }
 .search-field button.icon { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border: 0; border-radius: 3px; background: transparent; color: var(--vscode-icon-foreground); cursor: pointer; padding: 0; }
 .search-field button.icon:hover { background: var(--vscode-toolbar-hoverBackground); }
 .search-field button[hidden] { display: none; }
-/* Status filters under the field (All, Working, Needs you, Done, Failed, Archived). */
-.filters { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-.filters button { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 11px; border: 1px solid var(--vscode-input-border, var(--ov-border)); background: transparent;
-  color: var(--vscode-descriptionForeground); font: inherit; font-size: 11px; cursor: pointer; }
-.filters button:hover { color: var(--vscode-foreground); background: var(--vscode-toolbar-hoverBackground); }
-.filters button[aria-checked="true"] { color: var(--vscode-foreground); border-color: var(--vscode-focusBorder); background: var(--vscode-list-activeSelectionBackground, transparent); }
-.filters button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
-.filters .codicon { font-size: 12px; }
-.filters .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--vscode-descriptionForeground); }
-.filters .dot.working { background: var(--ov-running); }
-.filters .dot.needs { background: var(--ov-waiting); }
-.filters .dot.done { background: var(--ov-done); }
-.filters .dot.failed { background: var(--ov-failed); }
+/* The filter icon inside the field; filled while a filter is on. */
+.search-field button.icon.on { color: var(--ov-accent); }
