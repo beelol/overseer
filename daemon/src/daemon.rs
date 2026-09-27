@@ -472,6 +472,10 @@ impl Daemon {
             store.insert_task(&task)?;
             store.insert_run(&run)?;
             store.set_workspace_owner(&ws.id, Some(&run.id))?;
+            // A run of the daemon's own (Overseer, a watcher) carries its role from the start.
+            if let Some(role) = p["role"].as_str().filter(|r| ["overseer", "watcher"].contains(r)) {
+                store.conn.execute("INSERT OR REPLACE INTO run_roles(run_id, role) VALUES(?1, ?2)", rusqlite::params![run.id, role])?;
+            }
         }
         let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "extra_args": p["extra_args"].clone()});
         let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };

@@ -406,7 +406,7 @@ impl Daemon {
             }
         };
         let (extra_args, mode) = self.tools_launch(&w.harness, &dir, &token, "watcher", read_only)?;
-        let mut params = json!({"repo": dir.display().to_string(), "harness": w.harness, "prompt": first_prompt, "title": format!("Watching {}", subject.title), "workspace_mode": "current", "extra_args": extra_args});
+        let mut params = json!({"repo": dir.display().to_string(), "harness": w.harness, "prompt": first_prompt, "title": format!("Watching {}", subject.title), "workspace_mode": "current", "extra_args": extra_args, "role": "watcher"});
         if let Some(m) = &w.model {
             params["model"] = json!(m);
         }

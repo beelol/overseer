@@ -90,7 +90,13 @@ impl Daemon {
             "on" => (true, true),
             "off" => (false, false),
             _ => {
-                let many = !self.companions(run_id)?.is_empty();
+                // Auto: once the owner has spoken to Overseer (its run exists), and only when
+                // another agent works in the repository. Agents run without Overseer as before.
+                let overseer_in_use: bool = {
+                    use rusqlite::OptionalExtension;
+                    self.store.lock().unwrap().conn.query_row("SELECT run_id FROM overseer_sessions WHERE archived_ms IS NULL AND run_id IS NOT NULL LIMIT 1", [], |r| r.get::<_, Option<String>>(0)).optional()?.flatten().is_some()
+                };
+                let many = overseer_in_use && !self.companions(run_id)?.is_empty();
                 (many, many)
             }
         })
@@ -297,11 +303,13 @@ impl Daemon {
     /// report: what the agent is doing, has changed, needs and is blocked by.
     pub fn channel_report(self: &Arc<Self>, run_id: &str, args: &Value) -> Result<String> {
         let run = self.run(run_id)?;
-        let doing = args["doing"].as_str().unwrap_or("").trim().to_string();
+        // Redacted at the door: no credential enters a report (AC-200).
+        let clean = |s: &str| crate::redact::redact(s.trim());
+        let doing = clean(args["doing"].as_str().unwrap_or(""));
         if doing.is_empty() {
             bail!("a report says what you are doing (doing)");
         }
-        let body = json!({"doing": doing, "changed": strings(&args["changed"]), "needs": args["needs"].as_str().unwrap_or("").trim(), "blocked": args["blocked"].as_str().unwrap_or("").trim()});
+        let body = json!({"doing": doing, "changed": strings(&args["changed"]).iter().map(|s| clean(s)).collect::<Vec<_>>(), "needs": clean(args["needs"].as_str().unwrap_or("")), "blocked": clean(args["blocked"].as_str().unwrap_or(""))});
         let (id, new) = self.channel_message(run_id, "report", &body)?;
         self.picked_up(run_id)?;
         if new {
@@ -335,7 +343,7 @@ impl Daemon {
     /// ask: a question for Overseer; the answer comes back as a message from Overseer.
     pub fn channel_ask(self: &Arc<Self>, run_id: &str, args: &Value) -> Result<String> {
         let run = self.run(run_id)?;
-        let question = args["question"].as_str().unwrap_or("").trim().to_string();
+        let question = crate::redact::redact(args["question"].as_str().unwrap_or("").trim());
         if question.is_empty() {
             bail!("ask needs a question");
         }
@@ -418,7 +426,8 @@ impl Daemon {
     /// Overseer, and shown in the conversation with the question.
     pub fn answer_ask(self: &Arc<Self>, ask_id: &str, text: &str, proposal: &str, by: &str) -> Result<String> {
         use rusqlite::OptionalExtension;
-        let text = text.trim();
+        let text = crate::redact::redact(text.trim());
+        let text = text.as_str();
         if text.is_empty() {
             bail!("an answer needs text");
         }

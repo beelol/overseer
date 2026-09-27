@@ -43,8 +43,11 @@
     persist();
   }
 
-  // ---------- New-agent composer (AC-59) ----------
-  const composer = window.OverseerComposer.create(composerHost, { post, onStarted: runId => { selected = runId; setMode('chat'); } });
+  // ---------- New-agent composer (AC-59) and home's conversation with Overseer (AC-182) ----------
+  const agents = () => state.runs.filter(r => !r.parent_run_id).sort((a, b) => (ACTIVE_STATUS.has(b.status) - ACTIVE_STATUS.has(a.status)) || (b.created_ms - a.created_ms)).map(r => ({ id: r.id, title: r.title, status: r.status, harness: r.harness }));
+  const ACTIVE_STATUS = new Set(['queued', 'starting', 'running', 'waiting_for_user', 'waiting_for_connection', 'waiting_for_memory']);
+  const composer = window.OverseerComposer.create(composerHost, { post, agents, onStarted: runId => { selected = runId; if (!(vscode.getState() || {}).stayHome) setMode('chat'); } });
+  const home = window.OverseerHome.create(composerHost, { post, startWith: text => composer.startWith(text) });
 
   // ---------- Grid (AC-58) ----------
   const grid = window.OverseerGrid.create(gridHost, { post, open: runId => selectRun(runId, { focusChat: true }), getState: () => state,
@@ -71,6 +74,9 @@
       case 'raw': chat.raw(m.raw); break;
       case 'changes': if (m.runId === selected) chat.changes(m.changes); break;
       case 'composerData': composer.data(m.data); break;
+      case 'overseer': home.session(m.session); break;
+      case 'overseerNotice': if (m.id) home.proposalStatus(m.id, m.message); else composer.notice({ message: m.message }); break;
+      case 'askOverseer': setMode('composer'); composer.askOverseer(m.text || ''); break;
       case 'mentionFiles': if (m.scope === 'composer') composer.mentionFiles(m); else chat.mentionFiles(m); break;
       case 'measure': post({ type: 'measured', id: m.id, w: window.innerWidth, h: window.innerHeight }); break;
       case 'dashboard': document.body.dataset.dashboard = m.on ? '1' : ''; break;
@@ -85,7 +91,7 @@
   });
 
   // Read-only view of the dashboard's state for UI tests.
-  window.__overseer = { state: () => state, mode: () => mode, selected: () => selected };
+  window.__overseer = { state: () => state, mode: () => mode, selected: () => selected, home: () => home.current };
   setMode(mode === 'chat' && !selected ? 'composer' : mode, { quiet: true });
   if (selected && mode === 'chat') post({ type: 'select', runId: selected, restore: true });
   post({ type: 'ready' });

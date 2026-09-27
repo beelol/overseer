@@ -47,10 +47,22 @@ impl Daemon {
             }
         };
         let messages = Self::messages_of(&store, &id, 0, 50)?;
-        let proposals = Self::proposals_of(&store, &id, true)?;
+        let mut proposals = Self::proposals_of(&store, &id, true)?;
         let run_status = run_id.as_deref().and_then(|r| store.run(r).ok().flatten()).map(|r| r.status);
         let queued: i64 = store.conn.query_row("SELECT COUNT(*) FROM overseer_pending WHERE session_id=?1", [&id], |r| r.get(0)).unwrap_or(0);
-        Ok(json!({"id": id, "started_ms": started_ms, "harness": harness, "model": model, "run_id": run_id, "task_id": task_id, "run_status": run_status, "level": level, "levels": LEVELS, "messages": messages, "proposals": proposals, "pending": queued, "last_seq": last_seq, "cursor": store.max_seq()?}))
+        let cursor = store.max_seq()?;
+        drop(store);
+        for p in proposals.iter_mut() {
+            let lines: Vec<String> = p["actions"].as_array().map(|a| a.iter().map(|x| self.describe(x)).collect()).unwrap_or_default();
+            p["lines"] = json!(lines);
+        }
+        // What Overseer and the watchers have used: the harnesses' own numbers, or not reported.
+        let usage = json!({
+            "overseer": run_id.as_deref().and_then(|r| self.digest(r).ok()).map(|d| d.usage).unwrap_or(json!("not reported")),
+            "turns_today": self.self_started_today(),
+            "watchers": self.watches_list(None, false).ok().and_then(|w| w["watches"].as_array().cloned()).unwrap_or_default().iter().filter_map(|w| w["watcher"].as_str().map(str::to_string)).collect::<std::collections::BTreeSet<_>>().into_iter().map(|w| json!({"run_id": w, "usage": self.digest(&w).ok().map(|d| d.usage).unwrap_or(json!("not reported"))})).collect::<Vec<_>>(),
+        });
+        Ok(json!({"id": id, "started_ms": started_ms, "harness": harness, "model": model, "run_id": run_id, "task_id": task_id, "run_status": run_status, "level": level, "levels": LEVELS, "messages": messages, "proposals": proposals, "pending": queued, "last_seq": last_seq, "cursor": cursor, "usage": usage}))
     }
 
     fn messages_of(store: &crate::store::Store, session: &str, after: i64, limit: i64) -> Result<Vec<Value>> {
@@ -65,9 +77,10 @@ impl Daemon {
     }
 
     fn proposals_of(store: &crate::store::Store, session: &str, open_only: bool) -> Result<Vec<Value>> {
-        let mut stmt = store.conn.prepare("SELECT id, ts, actions, state, answered_by, answered_ms, result, message_id FROM overseer_proposals WHERE session_id=?1 AND (?2 = 0 OR state='open') ORDER BY ts")?;
+        let mut stmt = store.conn.prepare("SELECT id, ts, actions, state, answered_by, answered_ms, result, message_id, cause, settle_until, source FROM overseer_proposals WHERE session_id=?1 AND (?2 = 0 OR state='open') ORDER BY ts")?;
         let rows = stmt.query_map(rusqlite::params![session, if open_only { 1 } else { 0 }], |r| {
-            Ok(json!({"id": r.get::<_, String>(0)?, "ts": r.get::<_, i64>(1)?, "actions": serde_json::from_str::<Value>(&r.get::<_, String>(2)?).unwrap_or(json!([])), "state": r.get::<_, String>(3)?, "answered_by": r.get::<_, Option<String>>(4)?, "answered_ms": r.get::<_, Option<i64>>(5)?, "result": r.get::<_, Option<String>>(6)?, "message_id": r.get::<_, Option<String>>(7)?}))
+            Ok(json!({"id": r.get::<_, String>(0)?, "ts": r.get::<_, i64>(1)?, "actions": serde_json::from_str::<Value>(&r.get::<_, String>(2)?).unwrap_or(json!([])), "state": r.get::<_, String>(3)?, "answered_by": r.get::<_, Option<String>>(4)?, "answered_ms": r.get::<_, Option<i64>>(5)?, "result": r.get::<_, Option<String>>(6)?, "message_id": r.get::<_, Option<String>>(7)?,
+                "cause": r.get::<_, Option<String>>(8)?, "settle_until": r.get::<_, Option<i64>>(9)?, "via": r.get::<_, Option<String>>(10)?}))
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
@@ -216,7 +229,7 @@ impl Daemon {
         let scratch = self.scratch_dir()?;
         let token = self.overseer_token("pending", "overseer")?["token"].as_str().unwrap().to_string();
         let (extra_args, mode) = self.overseer_launch(harness, &scratch, &token)?;
-        let mut params = json!({"repo": scratch.display().to_string(), "harness": harness, "prompt": first_prompt, "title": "Talk to Overseer", "workspace_mode": "current", "extra_args": extra_args});
+        let mut params = json!({"repo": scratch.display().to_string(), "harness": harness, "prompt": first_prompt, "title": "Talk to Overseer", "workspace_mode": "current", "extra_args": extra_args, "role": "overseer"});
         if let Some(m) = model.filter(|m| !m.is_empty()) {
             params["model"] = json!(m);
         }
@@ -403,6 +416,11 @@ impl Daemon {
             "pin" => format!("Pin {} to the grid", who(a["agent"].as_str().unwrap_or("?"))),
             "start" => format!("Start “{}” in {}", a["title"].as_str().or(a["prompt"].as_str()).unwrap_or("an agent"), a["repo"].as_str().unwrap_or("?")),
             "cadence" => format!("Check in on {} {}", a["agent"].as_str().map(who).unwrap_or_else(|| "every agent".into()), a["cadence"].as_str().or(a["text"].as_str()).unwrap_or("")),
+            "hold" => format!("Hold {}{}", who(a["agent"].as_str().unwrap_or("?")), a["reason"].as_str().or(a["text"].as_str()).filter(|s| !s.is_empty()).map(|r| format!(": {r}")).unwrap_or_default()),
+            "release" => format!("Release {}", who(a["agent"].as_str().unwrap_or("?"))),
+            "guardrail" => format!("Guardrail on {}: {}{}{}", who(a["agent"].as_str().unwrap_or("?")), a["words"].as_str().or(a["text"].as_str()).unwrap_or(""), a["allow"].as_array().filter(|x| !x.is_empty()).map(|x| format!(" · stay inside {}", x.iter().filter_map(|p| p.as_str()).collect::<Vec<_>>().join(", "))).unwrap_or_default(), a["deny"].as_array().filter(|x| !x.is_empty()).map(|x| format!(" · do not change {}", x.iter().filter_map(|p| p.as_str()).collect::<Vec<_>>().join(", "))).unwrap_or_default()),
+            "redirect" => format!("Redirect {}: “{}”", who(a["agent"].as_str().unwrap_or("?")), a["text"].as_str().unwrap_or("")),
+            "archive" => format!("Archive {}", who(a["agent"].as_str().unwrap_or("?"))),
             "answer" => format!("Answer {}: “{}”", who(a["agent"].as_str().unwrap_or("?")), a["text"].as_str().unwrap_or("")),
             "report" => format!("Ask {} for a report (one agent turn)", who(a["agent"].as_str().unwrap_or("?"))),
             "area" => format!("Set {}'s area to {}", who(a["agent"].as_str().unwrap_or("?")), a["paths"].as_array().map(|p| p.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default()),

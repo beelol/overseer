@@ -1,0 +1,102 @@
+{
+  "checks": [
+    {
+      "name": "home shows the conversation with Overseer above the composer, whose target is New agent",
+      "ok": true,
+      "detail": {
+        "target": "agent"
+      }
+    },
+    {
+      "name": "Enter at home starts an agent exactly as before, with no Overseer turn in the event log",
+      "ok": true,
+      "detail": {
+        "started": "r-d2b568ae8a5c",
+        "overseerTurns": 0
+      }
+    },
+    {
+      "name": "the start appears in the conversation as a card",
+      "ok": true
+    },
+    {
+      "name": "typing @overseer first switches the target chip to Overseer",
+      "ok": true,
+      "detail": {
+        "chip": "overseer"
+      }
+    },
+    {
+      "name": "the same text sent to Overseer starts no agent and is answered in the conversation",
+      "ok": true,
+      "detail": {
+        "runs": 1,
+        "answer": "OverseerHere is what everyone is doing:\n\n- **tidy the docs**: completed"
+      }
+    },
+    {
+      "name": "`@` offers the agents by name, narrowed as you type",
+      "ok": true,
+      "detail": [
+        "tidy the docscompleted"
+      ]
+    },
+    {
+      "name": "Enter inserts the named agent",
+      "ok": true,
+      "detail": {
+        "inserted": "@overseer Tell @tidy the docs "
+      }
+    },
+    {
+      "name": "a named agent reaches Overseer as that agent's id",
+      "ok": true,
+      "detail": {
+        "sent": "Tell @tidy the docs (r-d2b568ae8a5c) to add a changelog"
+      }
+    },
+    {
+      "name": "*Start as an agent* starts one from a message sent to Overseer",
+      "ok": true,
+      "detail": {
+        "corrected": "r-a511263de928"
+      }
+    },
+    {
+      "name": "*Ask Overseer instead* stops the agent just started, removes its untouched worktree, and puts the words back for Overseer",
+      "ok": true,
+      "detail": {
+        "gone": true,
+        "back": "what is the plan for the docs?",
+        "chip2": "overseer"
+      }
+    },
+    {
+      "name": "the docked chat and home show the same conversation",
+      "ok": true,
+      "detail": {
+        "docked": "What is everyone doing?\nShared the state of 1 agent\nUsed\nmcp__overseer__check_in\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nDone\n0s\n2 tokens\nTell @tidy the docs (r-d2b568ae8a5c) to add a changelog\nShared the state of 1 agent\n\nI could not find an agent called @tidy the docs (r-d2b568a",
+        "home": "Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nStart as an agent\nOverseer\nHere is what everyone is doing:\n\n- **tidy the docs**: completed\nYou\nTell @tidy the docs (r-d2b568ae8a5c) to add a changelog\nStart as an agent\nOverseer\nI could not fin"
+      }
+    },
+    {
+      "name": "*Start fresh* begins a new conversation and leaves a hold in place",
+      "ok": true,
+      "detail": {
+        "holds": [
+          {
+            "by": "owner",
+            "card": null,
+            "reason": "kept through a fresh start",
+            "release_on": {
+              "kind": "release"
+            },
+            "run_id": "r-d2b568ae8a5c",
+            "set_ms": 1790528995477,
+            "title": "tidy the docs"
+          }
+        ]
+      }
+    }
+  ]
+}

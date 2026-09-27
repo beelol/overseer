@@ -8,7 +8,32 @@
   const ui = window.OverseerUI;
   const el = ui.el;
   const SPAWN_TOOLS = /^(Agent|Task|task|collab:spawn_agent|spawn_agent)$/;
-  const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'overseer_tool_call', 'overseer_action', 'overseer_message']);
+  const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'overseer_tool_call', 'overseer_action', 'outside_area', 'going_in_circles', 'check_in_started', 'watch_wake', 'watcher_started', 'watch_capped', 'watch_copy_removed', 'oversight_moved', 'dispatch', 'area']);
+  // What Overseer and the daemon do to an agent, as one quiet line each in its chat (AC-199).
+  const CARD_ICON = { started: 'rocket', report: 'note', ask: 'question', answer: 'comment', claim: 'symbol-folder', done: 'check', finding: 'eye', watch: 'eye', watch_ended: 'eye-closed', withdrawn: 'discard', cannot_answer: 'warning' };
+  function oversightLine(kind, p) {
+    const who = p && p.title ? p.title : 'an agent';
+    switch (kind) {
+      case 'hold': return ['debug-pause', `Held by Overseer${p && p.reason ? ': ' + p.reason : ''}`];
+      case 'release': return ['debug-continue', `Released${p && p.why ? ': ' + p.why : ''}`];
+      case 'guardrail': return ['shield', `Guardrail${p && p.words ? ': ' + ui.firstLine(p.words, 120) : ''}${p && p.enforcement ? ' (' + p.enforcement + ')' : ''}`];
+      case 'guardrail_crossed': return ['warning', `Wrote across a guardrail: ${((p && p.paths) || []).join(', ')}`];
+      case 'redirect': return ['arrow-swap', 'Redirected by Overseer'];
+      case 'check_in': return ['checklist', `Check-in: ${p && p.result ? p.result.replace('_', ' ') : ''}${p && p.reason ? ' — ' + p.reason : ''}${p && p.left_out ? ' · left out: ' + p.left_out : ''}`];
+      case 'report': return ['note', `Reported to Overseer: ${ui.firstLine((p && p.doing) || '', 120)}`];
+      case 'ask': return ['question', `Asked Overseer: ${ui.firstLine((p && p.question) || '', 120)}`];
+      case 'claim': return ['symbol-folder', `Claimed ${((p && p.paths) || []).join(', ')}`];
+      case 'share': return ['export', `Overseer shared ${(p && p.source) || 'a piece'}`];
+      case 'share_withdrawn': return ['discard', 'A share was withdrawn'];
+      case 'finding': return ['eye', `${(p && p.watcher_title) || 'A watcher'}: ${(p && p.result) || ''}${p && p.text ? ' — ' + ui.firstLine(p.text, 140) : ''}`];
+      case 'watch_started': return ['eye', `Watched${p && p.mode === 'check' ? ' and checked' : ''}: ${ui.firstLine((p && p.brief) || '', 120)}`];
+      case 'watch_ended': return ['eye-closed', `The watch ended: ${(p && p.reason) || ''}`];
+      case 'conflict': return ['warning', `Conflict (${(p && p.kind) || ''}) with ${who === 'an agent' ? 'another agent' : who}`];
+      case 'conflict_closed': return ['pass', 'A conflict closed'];
+      case 'handoff': return ['arrow-right', 'Handed off'];
+      default: return undefined;
+    }
+  }
 
   function parseInput(v) {
     if (v && typeof v === 'object') return v;
@@ -401,6 +426,10 @@
         case 'proposal': this.proposal(ev, p); break;
         case 'proposal_answered': { const card = this.proposals.get(p.id); if (card) this.settleProposal(card, p.result || p.state); break; }
         case 'queued': { const q = el('div', 'sys'); q.append(ui.icon('history', 'xs'), el('span', null, `Queued by ${p.detail && p.detail.by ? 'Overseer' : ev.source === 'overseer' ? 'Overseer' : 'you'}: ${ui.firstLine(p.text || '', 80)}`)); this.container(ev).append(q); break; }
+        // A briefing (AC-190): one line that opens to the full text.
+        case 'briefing': { const d = el('details', 'sys briefing'); const s = el('summary'); s.append(ui.icon('info', 'xs'), el('span', null, 'Overseer added a briefing')); d.append(s, el('div', 'briefing-text', p.text || '')); this.container(ev).append(d); break; }
+        // The daemon's conversation cards, in Overseer's own chat (AC-199): what agents and watchers said.
+        case 'overseer_message': { const m = p.message || {}; if (!m.card && ['owner', 'overseer'].includes(m.source)) break; const c = el('div', `card card-${m.card ? m.card.kind : m.source}`); c.dataset.kind = m.card ? m.card.kind : m.source; c.setAttribute('role', 'group'); const h = el('div', 'card-head'); h.append(ui.icon(CARD_ICON[m.card && m.card.kind] || 'info', 'sm'), el('span', 'card-text', m.text || '')); c.append(h); const k = m.card || {}; const detail = k.kind === 'ask' ? (k.answer ? 'Answer: ' + k.answer : 'Waiting for an answer') : k.kind === 'done' && k.left_out ? 'Left out: ' + k.left_out : k.kind === 'finding' ? `${k.result}${k.held ? ' · held at once' : ''}` : k.kind === 'report' && (k.needs || k.blocked) ? [k.needs && 'Needs: ' + k.needs, k.blocked && 'Blocked by: ' + k.blocked].filter(Boolean).join(' · ') : ''; if (detail) c.append(el('div', 'card-detail', detail)); this.container(ev).append(c); break; }
         case 'retention': this.truncated('Older history was trimmed. Raw output keeps everything.'); break;
         // Lines the parser does not understand stay in the event log and raw output, not the chat.
         case 'raw_unparsed': break;
@@ -408,7 +437,9 @@
       }
       if (ev.kind === 'status') this.status_(ev, p, child);
       if (ev.kind === 'usage') this.usage_(ev, p, child);
-      if (!QUIET.has(ev.kind) && !Conversation.KNOWN.has(ev.kind)) this.container(ev).append(el('div', 'sys', ev.kind.replace(/_/g, ' ')));
+      const line = oversightLine(ev.kind, p);
+      if (line) { const s = el('div', `sys oversight oversight-${ev.kind}`); s.append(ui.icon(line[0], 'xs'), el('span', null, line[1])); this.container(ev).append(s); }
+      else if (!QUIET.has(ev.kind) && !Conversation.KNOWN.has(ev.kind)) this.container(ev).append(el('div', 'sys', ev.kind.replace(/_/g, ' ')));
     }
 
     proposal(ev, p) {
@@ -498,7 +529,7 @@
       card.el.replaceChildren(...kids);
     }
   }
-  Conversation.KNOWN = new Set(['turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'proposal', 'proposal_answered', 'queued']);
+  Conversation.KNOWN = new Set(['turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'proposal', 'proposal_answered', 'queued', 'briefing', 'overseer_message']);
   Conversation.describe = describe;
 
   window.OverseerConversation = Conversation;

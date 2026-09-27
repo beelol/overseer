@@ -6,8 +6,8 @@
   const ui = window.OverseerUI, el = ui.el;
   const MODELS = { claude: ['sonnet', 'opus', 'haiku'], codex: ['gpt-5.6-luna', 'gpt-5.6', 'gpt-5.6-codex'], 'codex-app': ['gpt-5.6-luna', 'gpt-5.6', 'gpt-5.6-codex'], opencode: [] };
 
-  function create(host, { post, onStarted }) {
-    let data, form = {}, starting = false, requested = false;
+  function create(host, { post, onStarted, agents = () => [] }) {
+    let data, form = {}, starting = false, requested = false, target = 'agent';
     const wrap = el('div', 'composer-view');
     const hero = el('div', 'composer-hero');
     // Overseer's mark in full colour (AC-142) and a short question.
@@ -21,8 +21,10 @@
     generic.append(program, args);
     // The field holds only the text (with attach, options and Start); the choices sit in a row under it.
     const row = el('div', 'composer-row'); const chips = el('div', 'chips composer-choices'); chips.setAttribute('aria-label', 'Choices for the new agent');
+    // AC-182: where Enter sends the text. New agent by default; Overseer by the chip or `@overseer`.
+    const targetChip = chip('target', 'Send to'); targetChip.id = 'target';
     const repoChip = chip('repo', 'Repository'), agentChip = chip('agent', 'Agent'), modelChip = chip('model', 'Model'), modeChip = chip('mode', 'Workspace');
-    chips.append(repoChip, agentChip, modelChip, modeChip);
+    chips.append(targetChip, repoChip, agentChip, modelChip, modeChip);
     const toolsBar = el('div', 'composer-tools');
     const tray = el('div', 'composer-tray'); tray.hidden = true;
     const more = ui.iconButton('ellipsis', 'More options', { cls: 'sm', action: 'composer-more' }); more.setAttribute('aria-haspopup', 'menu');
@@ -49,7 +51,57 @@
     const account = () => data && data.accounts.find(a => a.id === form.account);
     const harness = () => data && data.harnesses.find(x => x.harness === form.harness);
 
+    const toOverseer = () => target === 'overseer' || /^@overseer\b/i.test(task.value.trim());
+    function renderTarget() {
+      const ov = toOverseer();
+      setChip(targetChip, ov ? ui.mark('sm') : 'rocket', ov ? 'Overseer' : 'New agent', ov ? 'Enter sends this to Overseer (the conversation above)' : 'Enter starts a new agent with this task; @overseer sends it to Overseer instead');
+      targetChip.dataset.target = ov ? 'overseer' : 'agent';
+      for (const c of [repoChip, agentChip, modelChip, modeChip]) c.hidden = ov && c !== repoChip ? true : c.hidden && !ov ? false : c.hidden;
+      if (!ov) { repoChip.hidden = false; agentChip.hidden = false; modelChip.hidden = form.harness === 'generic'; modeChip.hidden = false; }
+      start.title = ov ? 'Send to Overseer (Enter)' : start.title;
+      start.setAttribute('aria-label', ov ? 'Send to Overseer' : 'Start agent');
+      foot.firstChild.textContent = ov ? '⏎ send to Overseer · ⇧⏎ new line' : '⏎ start · ⇧⏎ new line';
+    }
+    function menuTarget() {
+      ui.menu(targetChip, [{ label: 'New agent', icon: 'rocket', checked: !toOverseer(), title: 'Enter starts an agent with the task', run: () => { target = 'agent'; task.value = task.value.replace(/^@overseer\s*/i, ''); render(); } },
+        { label: 'Overseer', icon: 'comment-discussion', checked: toOverseer(), title: 'Enter sends the message to Overseer', run: () => { target = 'overseer'; render(); } }], { label: 'Send to' });
+    }
+    // `@` offers the agents by name in a list under the text that never takes the keyboard: typing
+    // narrows it, arrows move, Enter or Tab inserts, Escape closes; a named agent reaches Overseer
+    // as its id.
+    const mentions = el('div', 'mentions'); mentions.hidden = true; mentions.setAttribute('role', 'listbox'); mentions.setAttribute('aria-label', 'Agents'); mentions.id = 'mentions';
+    let mentionAt = -1, mentionIndex = 0;
+    function mentionPrefix() {
+      const caret = task.selectionStart; const before = task.value.slice(0, caret);
+      const m = /(^|\s)@([^\s@]*)$/.exec(before);
+      return m ? { at: caret - m[2].length - 1, prefix: m[2] } : null;
+    }
+    function renderMentions() {
+      const m = mentionPrefix();
+      if (!m) { mentions.hidden = true; mentionAt = -1; return; }
+      const q = m.prefix.toLowerCase();
+      const items = [{ id: 'overseer', title: 'overseer', harness: '', status: 'Overseer' }, ...agents().slice(0, 12)].filter(a => a.title.toLowerCase().startsWith(q));
+      if (!items.length) { mentions.hidden = true; mentionAt = -1; return; }
+      mentionAt = m.at; mentionIndex = Math.min(mentionIndex, items.length - 1);
+      mentions.replaceChildren(...items.map((a, i) => { const b = el('button', 'mention-item' + (i === mentionIndex ? ' active' : '')); b.type = 'button'; b.setAttribute('role', 'option'); b.setAttribute('aria-selected', String(i === mentionIndex)); b.dataset.title = a.title;
+        b.append(a.harness ? ui.harnessMark(a.harness, 14) : ui.mark('sm'), el('span', 'mention-title', a.title), el('span', 'mention-hint', a.status || '')); b.addEventListener('mousedown', e => { e.preventDefault(); insertMention(a.title); }); return b; }));
+      mentions.hidden = false;
+    }
+    function insertMention(title) {
+      if (mentionAt < 0) return;
+      const v = task.value; const caret = task.selectionStart;
+      const text = `@${title} `;
+      task.value = v.slice(0, mentionAt) + text + v.slice(caret); task.focus(); task.selectionStart = task.selectionEnd = mentionAt + text.length;
+      mentions.hidden = true; mentionAt = -1; mentionIndex = 0; grow(); render();
+    }
+    /** The text as Overseer receives it: agent names as ids. */
+    function forOverseer(text) {
+      let out = text.replace(/^@overseer\s*/i, '');
+      for (const a of agents()) out = out.split('@' + a.title).join(`@${a.title} (${a.id})`);
+      return out;
+    }
     function render() {
+      renderTarget();
       if (!data) { setChip(repoChip, 'repo', 'Loading…'); return; }
       const repo = data.repos.find(r => r.path === form.repo);
       setChip(repoChip, 'repo', repo ? repo.name : 'Choose repository', repo ? `${repo.path}${repo.branch ? `\nOn ${repo.branch}` : ''}` : 'Choose a Git repository');
@@ -90,6 +142,7 @@
       return {};
     }
     function validate() {
+      if (toOverseer()) { note.replaceChildren(); note.className = 'composer-note'; start.disabled = !task.value.trim(); return true; }
       const p = problem();
       note.replaceChildren(); note.className = 'composer-note' + (p.text && !p.soft && !p.warn ? ' error' : p.warn ? ' warn' : '');
       if (p.text) {
@@ -139,6 +192,17 @@
       if (form.harness === 'codex-app') for (const p of ['on-request', 'untrusted', 'never']) items.push({ label: `Approvals: ${p}`, icon: 'shield', checked: (form.approval || 'on-request') === p, run: () => { form.approval = p; save(); } });
       ui.menu(more, items, { label: 'More options' });
     }
+    targetChip.addEventListener('click', menuTarget);
+    box.append(mentions);
+    task.addEventListener('keydown', e => {
+      if (mentions.hidden) return;
+      const n = mentions.children.length;
+      if (e.key === 'ArrowDown') { mentionIndex = (mentionIndex + 1) % n; renderMentions(); e.preventDefault(); }
+      else if (e.key === 'ArrowUp') { mentionIndex = (mentionIndex + n - 1) % n; renderMentions(); e.preventDefault(); }
+      else if (e.key === 'Enter' || e.key === 'Tab') { const b = mentions.children[mentionIndex]; if (b) { insertMention(b.dataset.title); e.preventDefault(); e.stopImmediatePropagation(); } }
+      else if (e.key === 'Escape') { mentions.hidden = true; mentionAt = -1; e.preventDefault(); e.stopImmediatePropagation(); }
+    }, true);
+    task.addEventListener('blur', () => setTimeout(() => { mentions.hidden = true; }, 150));
     repoChip.addEventListener('click', () => data && menuRepo());
     agentChip.addEventListener('click', () => data && menuAgent());
     modelChip.addEventListener('click', () => data && menuModel());
@@ -146,7 +210,7 @@
     more.addEventListener('click', () => data && menuMore());
     full.addEventListener('click', () => post({ type: 'command', command: 'overseer.newTask' }));
     const grow = () => { task.style.height = 'auto'; task.style.height = Math.min(320, Math.max(66, task.scrollHeight)) + 'px'; };
-    task.addEventListener('input', () => { grow(); validate(); });
+    task.addEventListener('input', () => { grow(); renderTarget(); renderMentions(); validate(); });
     program.addEventListener('input', validate);
     task.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); go(); } });
     start.addEventListener('click', go);
@@ -154,6 +218,13 @@
     // Choices become the defaults only when an agent starts with them (the launcher saves them then).
     function save() { render(); }
     function go() {
+      if (toOverseer()) {
+        const text = forOverseer(task.value.trim());
+        if (!text) return;
+        post({ type: 'overseerSend', text });
+        task.value = ''; grow(); render();
+        return;
+      }
       if (!validate() || starting) return;
       starting = true; start.disabled = true; note.className = 'composer-note'; note.replaceChildren(el('span', 'mini-dot'), el('span', null, 'Starting…'));
       const { prompt, options } = tools.take();
@@ -192,6 +263,10 @@
       },
       onState(s) { if (data && s.accounts) { data.accounts = s.accounts; render(); } },
       mentionFiles(m) { tools.files(m); },
+      /** Starts an agent from words that went to Overseer by mistake (AC-182's correction). */
+      startWith(text) { target = 'agent'; task.value = text; grow(); render(); go(); },
+      /** Puts words back in the composer for Overseer (after an agent was started by mistake). */
+      askOverseer(text) { target = 'overseer'; task.value = text; grow(); render(); task.focus(); },
     };
   }
   window.OverseerComposer = { create };

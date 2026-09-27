@@ -172,6 +172,12 @@
       const pinned = (state.pinned || []).includes(run.id);
       tile.pin.setAttribute('aria-pressed', String(pinned)); tile.pin.title = pinned ? 'Unpin' : 'Pin to grid'; tile.pin.setAttribute('aria-label', tile.pin.title);
       tile.el.classList.toggle('needs', run.status === 'waiting_for_user');
+      // Oversight marks (AC-199): held, watched, watching, in conflict.
+      const o = (state.oversight || {})[run.id] || {};
+      const marks = [o.held && ['debug-pause', 'held'], o.watched && ['eye', 'watched'], o.watching && o.watching.length && ['eye', 'watching'], o.conflicts && ['warning', `${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`]].filter(Boolean);
+      if (!tile.marks) { tile.marks = el('span', 'tile-marks'); tile.who.after(tile.marks); }
+      tile.marks.replaceChildren(...marks.map(([icon, text]) => { const s = el('span', 'tile-mark'); s.append(ui.icon(icon, 'xs'), el('span', null, text)); return s; }));
+      tile.el.classList.toggle('held', !!o.held); tile.el.classList.toggle('watched', !!o.watched); tile.el.classList.toggle('conflict', !!o.conflicts);
       const att = run.attention && run.attention.kind === 'permission' ? run.attention : undefined;
       tile.perm.hidden = !att;
       if (att) {

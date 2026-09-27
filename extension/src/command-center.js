@@ -18,7 +18,10 @@ class CommandCenter {
     this.client.on('event', event => {
       if (!this.panel) return;
       if (['file_activity', 'turn_done', 'status'].includes(event.kind) && this.chatRun && this.chatFeed?.roots.get(this.chatRun)?.has(event.run_id)) this.pushChanges();
+      // Home's conversation (AC-182): what the daemon's session gained.
+      if (['overseer_message', 'proposal', 'proposal_answered', 'overseer_level', 'overseer_session'].includes(event.kind)) this.pushOverseer();
     });
+    this.client.on('connected', () => this.pushOverseer());
   }
 
   get active() { return !!this.panel; }
@@ -41,7 +44,7 @@ class CommandCenter {
     this.panel = panel;
     panel.webview.options = { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri) };
     panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer-logo.png');
-    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css'], js: ['composer.js', 'grid.js', 'dashboard.js'] });
+    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'Overseer', chat: true, css: ['dashboard.css'], js: ['composer.js', 'home.js', 'grid.js', 'dashboard.js'] });
     const post = m => panel.webview.postMessage(m);
     this.chatFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'chat' }));
     this.gridFeed = new RunFeed(this.client, this.model, m => post({ ...m, channel: 'grid' }));
@@ -66,7 +69,36 @@ class CommandCenter {
     if (!m || typeof m !== 'object') return;
     const post = x => this.panel?.webview.postMessage(x);
     switch (m.type) {
-      case 'ready': await this.push(); if (this.inDashboard) post({ type: 'dashboard', on: true }); return;
+      case 'ready': await this.push(); await this.pushOverseer(); if (this.inDashboard) post({ type: 'dashboard', on: true }); return;
+      // Home (AC-182): the one conversation with Overseer, from the daemon.
+      case 'overseerSend': {
+        const text = String(m.text || '').trim(); if (!text) return;
+        const cfg = vscode.workspace.getConfiguration('overseer');
+        try { await this.client.request('overseer.send', { text, surface: 'vscode', harness: cfg.get('chat.harness', 'claude'), ...(cfg.get('chat.model', '') ? { model: cfg.get('chat.model', '') } : {}) }); }
+        catch (error) { post({ type: 'overseerNotice', message: error.message }); }
+        await this.model.refresh(); await this.pushOverseer(); return;
+      }
+      case 'overseerAnswer': {
+        try { await this.client.request('overseer.answer', { id: String(m.id || ''), yes: !!m.yes, surface: 'vscode', by: 'owner' }); }
+        catch (error) { post({ type: 'overseerNotice', id: m.id, message: error.message }); }
+        await this.pushOverseer(); return;
+      }
+      case 'overseerFresh': await this.client.request('overseer.fresh', {}); await this.pushOverseer(); return;
+      case 'overseerUndoStart': {
+        // Meant for Overseer: stop the agent just started, remove its untouched worktree, and put the words back for Overseer.
+        const runId = String(m.runId || ''); const run = this.model.run(runId);
+        if (run) {
+          try { if (ACTIVE.has(run.status)) await this.client.request('run.interrupt', { run_id: runId }); } catch { /* already done */ }
+          for (let i = 0; i < 40 && ACTIVE.has(this.model.run(runId)?.status); i++) { await new Promise(r => setTimeout(r, 250)); await this.model.refresh(); }
+          try {
+            const changes = await this.client.request('workspace.changes', { workspace_id: run.workspace_id });
+            if (!changes.files) { await this.client.request('task.archive', { task_id: run.task_id, archived: true }); await this.client.request('workspace.cleanup', { workspace_id: run.workspace_id, discard_dirty: false }); }
+          } catch (error) { post({ type: 'overseerNotice', message: `The agent was stopped; its worktree stays: ${error.message}` }); }
+          await this.model.refresh();
+        }
+        post({ type: 'askOverseer', text: String(m.text || '') });
+        return;
+      }
       case 'measured': { const done = this.measuring?.get(m.id); if (done) { this.measuring.delete(m.id); done({ w: Number(m.w), h: Number(m.h) }); } return; }
       case 'select': if (typeof m.runId === 'string') { if (m.restore) await this.showChat(m.runId); else await this.handlers.select(m.runId); } return;
       case 'mode': { const was = this.mode; this.mode = m.mode; if (was !== m.mode) await this.handlers.onMode?.(m.mode, was); return; }
@@ -114,6 +146,19 @@ class CommandCenter {
     }
   }
 
+  /** Home's conversation: the daemon's session, whole (its messages are few and their ids stable). */
+  async pushOverseer() {
+    if (!this.panel || !this.client.connected) return;
+    if (this.pushingOverseer) { this.pushOverseerAgain = true; return; }
+    this.pushingOverseer = true;
+    try {
+      const session = await this.client.request('overseer.session', {});
+      this.panel?.webview.postMessage({ type: 'overseer', session });
+    } catch (error) { this.handlers.log?.('home: ' + error.message); }
+    this.pushingOverseer = false;
+    if (this.pushOverseerAgain) { this.pushOverseerAgain = false; await this.pushOverseer(); }
+  }
+
   /** Shows a run's chat in the dashboard: its metadata, history and live events. */
   async showChat(runId) {
     if (!this.panel || !this.model.run(runId)) return;
@@ -134,7 +179,7 @@ class CommandCenter {
   async push() {
     if (!this.panel) return;
     const { tasks, runs, workspaces, profiles } = this.model.state;
-    const state = { tasks, runs, workspaces, profiles, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), pinned: this.handlers.pinned(),
+    const state = { tasks, runs, workspaces, profiles, oversight: this.model.state.oversight || {}, overseer: this.model.state.overseer || {}, accounts: this.handlers.launcher.accounts(), attention: this.handlers.attention(), pinned: this.handlers.pinned(),
       gridMax: Math.max(1, Math.min(16, vscode.workspace.getConfiguration('overseer').get('grid.maxTiles', 6))), archived: this.handlers.archived() };
     await this.panel.webview.postMessage({ type: 'state', state, selected: this.handlers.selected() });
     if (this.chatRun) { const msg = runMessage(this.model, this.chatRun, this.handlers.steering); if (msg) { this.chatFeed.refreshDescendants(); this.panel.webview.postMessage({ type: 'run', channel: 'chat', ...msg }); } }
