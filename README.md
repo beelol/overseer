@@ -20,6 +20,7 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 - Add the two logo images (full-colour icon and transparent mark) to `docs/design/brand/` [AC-142].
 - Sign in to Claude Code again (`claude`, then `/login`) [the Claude half of AC-81, AC-45].
 - Try the Gate K build in your own VS Code [AC-114].
+- Let the GitHub CLI push workflow files: `gh auth refresh -s workflow` (the checks for every pull request are written and waiting) [AC-148].
 - Say whether the Gate J design review still needs marks or the Gate K review replaces it [AC-66].
 - Work an hour using only Overseer [AC-64].
 - Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed sessions of Continuity, the phone app and Audio Mode when their agents finish [AC-97, AC-133, AC-145].
