@@ -1322,9 +1322,11 @@ rec(150, "The first click always lands", "verified", commit="bc358a1", date="202
 rec(151, "Every live scenario rerun on the current build", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate P).",
     actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
-rec(152, "Performance re-measured", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate P).",
-    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(152, "Performance re-measured", "verified", commit="4fb5d60", date="2026-09-27", harness="fixture harnesses; no paid tokens",
+    steps="`node test/ui/scenario-perf.js` (the AC-35 load test): 10,000 tracked files, four active runs editing and printing for ten minutes, the review open on 100 changed files; while other agents ran their own VS Code scenarios on the same machine.",
+    expected="AC-35's numbers: navigation p95 under 250 ms, an ordinary file refresh within 2 s under load with none missed, bounded daemon retention, extension-host memory stable (under 25% growth).",
+    actual="Navigation p95 22 ms (p50 16 ms, 243 samples); file refresh under load p95 1,628 ms, max 1,822 ms, none missed; daemon retention at most 1,416 events per run; extension-host memory growth 10%.",
+    evidence="[perf scenario](evidence/ui/perf/)", live="—")
 rec(153, "A ledger that stays true", "verified", commit="bc358a1", date="2026-09-27", harness="none (a script)",
     steps="`python3 docs/verification/records.py <commit>` regenerates without errors; `scripts/check-links` (also run by `scripts/test-all`) checks every relative link in the README and the ledger.",
     expected="See the RFC criterion (Gate P).",
@@ -1421,9 +1423,20 @@ rec(176, "Voice Mode by voice (owner-confirmed)", "not started", date="—", com
 rec(177, "The mark shows it is hearing you", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R).",
     actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
-rec(180, "Spikes before lock-in", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27; the goal's first step).")
+rec(180, "Spikes before lock-in", "verified (research criterion)", commit="aee0b5b (branch claude/orchestrator-agent-control-rfc-8e2009)", date="2026-09-27",
+    harness="Claude Code 2.1.246 on the owner's claude.ai login (haiku, 2 tiny turns); Codex 0.155.0-alpha.16.4 on the owner's ChatGPT login (gpt-5.6-luna, low effort, 2 tiny turns); OpenCode 1.15.13 with the mock model (no paid turn)",
+    fixture="An isolated OVERSEER_HOME with 4, then 16, fixture agents (Claude fixture, `showcase`); `overseerd mcp` as the MCP server; a generated 10,000-file repository with two agents' commits",
+    steps="""1. `overseerd mcp --socket <sock>` driven by hand: initialize, tools/list, tools/call roster (the exchange the test `ac180_mcp_shim_serves_overseers_tools_from_the_daemon` replays).
+2. Claude Code: `claude -p --output-format stream-json --input-format stream-json --mcp-config <run file> --strict-mcp-config --allowedTools mcp__overseer__roster,mcp__overseer__agent --disallowedTools Bash,Edit,Write,… --model haiku`, stdin kept open and `can_use_tool` answered by the driver as the daemon does.
+3. Codex: `codex exec --json -s read-only -m gpt-5.6-luna -c model_reasoning_effort="low" -c mcp_servers.overseer.command=… -c mcp_servers.overseer.tools.roster.approval_mode="approve" …` with stdin closed.
+4. OpenCode: `opencode run --format json -m mock/mock-coder` with `mcp.overseer` and `tools` off in the profile's own `opencode.json`; `opencode mcp list`.
+5. Roster and digest sizes with 4 and 16 agents through `overseer.tool`; `git merge-tree --write-tree --name-only` between two agents' commits in the 10,000-file repository, timed.
+6. The user's own harness configuration files inspected afterwards.""",
+    expected="For each installed harness: how a run takes tools from the daemon without its user configuration being edited, how it is kept read-only, how a message reaches it, whether a tool call shows a message was picked up; the cost of an Overseer turn and a check-in with 4 and 16 agents; the time of a trial merge on 10,000 files; the decisions written into the side RFC.",
+    actual="""All three harnesses take Overseer's tools from the daemon through the shim and stay read-only; the decisions are in the RFC's [Spike results](../rfcs/orchestrator.md#spike-results-ac-180). Claude Code: tools listed in `system/init`, roster called and answered; `can_use_tool` still arrives for an MCP tool and the daemon answers it; plan mode is not used for Overseer's run. Codex: the exec transport refuses an MCP call under its `never` approval policy unless `mcp_servers.<server>.tools.<tool>.approval_mode="approve"` is set per tool; with it the call completed ("There are 16 agents."); the app-server transport raises `mcp_tool_call_approval` instead. OpenCode: `mcp` and `tools` in the profile's `opencode.json`; the mock model called `overseer_roster`. A turn costs the harness's baseline (about 57k tokens per iteration on Claude Code, 69k per Codex exec turn, mostly cache reads); the roster (4.2 KB for 16 agents) and digests (≤ 4 KiB each) are small next to it, so Overseer's session is kept warm and resumed. A trial merge on 10,000 files: 15 ms. No user configuration gained an Overseer entry.""",
+    evidence="[evidence/ac-180/](evidence/ac-180/README.md): redacted transcripts per harness (both attempts where the first taught something), the OpenCode server list, the sizes, the timings; `daemon/tests/overseer.rs` replays the shim exchange and the token rules",
+    live="Claude Code and Codex live (tiny turns); OpenCode through the real runtime with the mock model; the shim exchange and the merge timing are fixtures.",
+    limits="Codex's shell stays available inside its read-only sandbox (no switch exists); an MCP call on the Codex exec transport needs the per-tool `approval_mode` override; a local model that calls tools through OpenCode was not part of this spike (the catalogue's verified model is not installed).")
 rec(181, "Overseer lives in the daemon", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
@@ -1506,7 +1519,7 @@ SHORT_BLOCKERS = {
     149: "partial: the causes are fixed; three clean runs in a row need a machine where no other agent runs UI tests",
     150: "verified",
     151: "not started (Gate P, added by the owner on 2026-09-27)",
-    152: "not started (Gate P, added by the owner on 2026-09-27)",
+    152: "verified",
     153: "verified",
     142: "verified",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
@@ -1610,7 +1623,7 @@ SHORT_BLOCKERS = {
     177: "not started (Gate R, added by the owner on 2026-09-27)",
     178: "not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files",
     179: "not started (Brand, added by the owner on 2026-09-27): the Mac helper's icon is built with AC-142; a menu-bar item does not exist yet",
-    180: "not started (Gate S, added by the owner on 2026-09-27; the goal's first step)",
+    180: "verified",
     181: "not started (Gate S, added by the owner on 2026-09-27)",
     182: "not started (Gate S, added by the owner on 2026-09-27)",
     183: "not started (Gate S, added by the owner on 2026-09-27)",
