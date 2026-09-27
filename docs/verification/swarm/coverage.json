@@ -71,7 +71,7 @@
         "daemon/tests/swarm_director_loop.rs",
         "fixtures/swarm/director-loop-v1/serial.py"
       ],
-      "blocker": "The app setting is the total-agent ceiling; fixtures cover manual reservations, native-child exclusion, lower-limit drain, a supervised director plus 32 live workers at a 33-slot cap, a supervised director plus two live workers at a three-slot cap with confirmed-exit reuse, and a one-slot scripted director completing its own metered job without a worker launch. Stop now interrupts an active one-slot director and safely closes its unreviewed self-attempt after confirmed exit. Separate reviewer/watch and Overseer-started admission, coordinating-run allowance accounting, live-harness qualification, and director-self crash recovery outside Stop remain unverified."
+      "blocker": "The app setting is the total-agent ceiling; fixtures cover manual reservations, native-child exclusion, lower-limit drain, a supervised director plus 32 live workers at a 33-slot cap, a supervised director plus two live workers at a three-slot cap with confirmed-exit reuse, and a one-slot scripted director completing its own metered job without a worker launch. Stop interrupts an active one-slot director; confirmed death outside Stop now reconciles unsubmitted self-work, preserves submitted evidence for replacement review, and blocks unknown effects. Separate reviewer/watch and Overseer-started admission, coordinating-run allowance accounting, and live-harness qualification remain unverified."
     },
     "SWARM-08": {
       "status": "partial",
@@ -322,10 +322,13 @@
         "daemon/tests/swarm_director.rs",
         "daemon/tests/swarm_director_owner.rs",
         "daemon/tests/swarm_director_process.rs",
+        "daemon/tests/swarm_director_loop.rs",
+        "fixtures/swarm/director-loop-v1/serial.py",
+        "fixtures/swarm/director-loop-v1/serial_review.py",
         "docs/verification/swarm/SWARM-30.md",
         "docs/verification/swarm/milestone-11.md"
       ],
-      "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result and prior Pause state, and requeues an unapplied batch after confirmed replacement. Durable owner-token and lease tests fence plan, directive, review and inbox actions across restart; timeout retains ownership and blocks admission, active unowned turns cannot be taken over, and confirmed replacement waits for a newly bound generation. A supervised local scripted director receives a private credential and requires its recorded process exit before replacement, including after daemon restart. The owner/run link commits before spawn; a durable phase permits explicit recovery of proven no-spawn failures. Startup reattaches a live or exited orphan supervisor only when its private launch identity and process evidence match; missing or mismatched evidence stays stalled and reserved. The daemon now refreshes a healthy linked scripted director's lease after a local control ping, including across restart, but will not revive an expired or exited owner. Model-director turns, qualified live process/descendant control, live replacement availability and provider-path death proof remain unverified."
+      "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result and prior Pause state, and requeues an unapplied batch after confirmed replacement. Durable owner-token and lease tests fence plan, directive, review and inbox actions across restart; timeout retains ownership and blocks admission, active unowned turns cannot be taken over, and confirmed replacement waits for a newly bound generation. A supervised local scripted director receives a private credential and requires its recorded process exit before replacement, including after daemon restart. The owner/run link commits before spawn; a durable phase permits explicit recovery of proven no-spawn failures. Startup reattaches a live or exited orphan supervisor only when its private launch identity and process evidence match; missing or mismatched evidence stays stalled and reserved. The daemon refreshes a healthy linked scripted director's lease after a local control ping, including across restart, but will not revive an expired or exited owner. Confirmed death now requeues unsubmitted director self-work within the original attempt cap, preserves submitted evidence for replacement review, blocks unknown effects, and waits for known native descendants. Model-director turns, qualified live process/descendant control, live replacement availability and provider-path death proof remain unverified."
     },
     "SWARM-31": {
       "status": "partial",
