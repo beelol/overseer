@@ -935,7 +935,7 @@ impl Daemon {
                 self.spawn_tail(&run.id);
                 let current = self.run(&run.id)?;
                 if current.harness == "codex-app" && current.native_id.is_none() {
-                    self.watch_managed_codex_handshake(run.id.clone(),
+                    self.watch_codex_account_handshake(run.id.clone(),
                         current.process_generation, PathBuf::from(dir));
                 }
             } else {
@@ -1465,7 +1465,8 @@ impl Daemon {
             auto_execution_deadline_ms,
         };
         std::fs::write(run_dir.join("launch.json"), serde_json::to_vec_pretty(&file)?)?;
-        if run.relation_source.as_deref() == Some("managed-delegation") && run.harness == "codex-app" {
+        if run.harness == "codex-app" && (run.relation_source.as_deref() == Some("managed-delegation")
+            || meta["generic"]["auto_selected"] == true) {
             std::fs::write(run_dir.join("auto-account-deadline"), now().saturating_add(5_000).to_string())?;
         }
         {
@@ -1521,16 +1522,17 @@ impl Daemon {
         }
         self.emit(Some(&run.task_id), Some(&run.id), "status", "daemon", "exact", json!({"status": "starting", "generation": generation, "program": launch.program}))?;
         self.spawn_tail(&run.id);
-        if run.relation_source.as_deref() == Some("managed-delegation") && run.harness == "codex-app" {
-            self.watch_managed_codex_handshake(run.id.clone(), generation, run_dir);
+        if run.harness == "codex-app" && (run.relation_source.as_deref() == Some("managed-delegation")
+            || recorded_meta["generic"]["auto_selected"] == true) {
+            self.watch_codex_account_handshake(run.id.clone(), generation, run_dir);
         }
         Ok(())
     }
 
-    /// Metadata calls must not leave an unstarted managed child holding its
+    /// Metadata calls must not leave an unstarted selected run holding its
     /// workspace indefinitely. The deadline lives beside the supervisor so a
     /// daemon restart cannot reset it or launch another child.
-    fn watch_managed_codex_handshake(self: &Arc<Self>, run_id: String, generation: i64, dir: PathBuf) {
+    fn watch_codex_account_handshake(self: &Arc<Self>, run_id: String, generation: i64, dir: PathBuf) {
         let daemon = self.clone();
         tokio::spawn(async move {
             let deadline = std::fs::read_to_string(dir.join("auto-account-deadline"))
@@ -1545,7 +1547,7 @@ impl Daemon {
             let _ = std::fs::write(dir.join("auto-account-timeout"), b"deadline exceeded\n");
             if let Ok(run) = daemon.run(&run_id) {
                 let _ = daemon.emit(Some(&run.task_id), Some(&run.id), "auto_account_timeout", "daemon", "exact",
-                    json!({"reason":"managed Codex metadata handshake timed out before model launch"}));
+                    json!({"reason":"Codex account metadata handshake timed out before model launch"}));
             }
             if let Some(sock) = daemon.run(&run_id).ok().and_then(|run| daemon.control_socket(&run).ok()) {
                 let _ = shim::control(&sock, &json!({"op":"signal","sig":libc::SIGTERM}));
@@ -2161,6 +2163,14 @@ impl Daemon {
                 let app = &meta["app"];
                 if let Some(err) = error {
                     if id == "ovs-auto-quota" {
+                        if app["auto_selected"] == true {
+                            let msg = "selected Codex account evidence unavailable";
+                            state.last_error = Some(("account".into(), msg.into()));
+                            ev("error", "daemon", "exact", json!({"class":"account","message":msg}), None)?;
+                            state.turn_done = Some(false);
+                            state.close_stdin = true;
+                            return Ok(());
+                        }
                         ev("auto_account_unknown", "harness", "exact", json!({"reason":"account quota metadata unavailable"}), None)?;
                         state.sends.push(format!("{}\n", codex_child_next_request(app)?));
                         return Ok(());
@@ -2182,14 +2192,15 @@ impl Daemon {
                 }
                 match id.as_str() {
                     "ovs-init" => {
-                        let msg = if run.relation_source.as_deref() == Some("managed-delegation") && run.harness == "codex-app" {
+                        let msg = if run.harness == "codex-app" &&
+                            (run.relation_source.as_deref() == Some("managed-delegation") || app["auto_selected"] == true) {
                             json!({"id":"ovs-account","method":"account/read","params":{"refreshToken":false}})
                         } else { codex_thread_request(app)? };
                         state.sends.push(format!("{msg}\n"));
                     }
                     "ovs-account" => {
                         if result["requiresOpenaiAuth"] != true || result["account"]["type"] != "chatgpt" {
-                            ev("error", "harness", "exact", json!({"class":"authentication","message":"managed Codex delegation requires ChatGPT account login"}), None)?;
+                            ev("error", "harness", "exact", json!({"class":"authentication","message":"Codex account check requires ChatGPT login"}), None)?;
                             state.turn_done = Some(false);
                             state.close_stdin = true;
                             return Ok(());
@@ -2484,8 +2495,9 @@ impl Daemon {
                 }
                 self.emit(Some(&run.task_id), Some(&run.id), "reattached", "daemon", "exact", json!({"note": "daemon restarted; supervisor still running"}))?;
                 self.spawn_tail(&run.id);
-                if run.relation_source.as_deref() == Some("managed-delegation") && run.harness == "codex-app" && run.native_id.is_none() {
-                    self.watch_managed_codex_handshake(run.id.clone(), run.process_generation, dir.clone());
+                if run.harness == "codex-app" && run.native_id.is_none()
+                    && dir.join("auto-account-deadline").exists() {
+                    self.watch_codex_account_handshake(run.id.clone(), run.process_generation, dir.clone());
                 }
                 report.push(json!({"run": run.id, "result": "reattached"}));
             } else if run.status != "disconnected" {

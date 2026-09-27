@@ -108,15 +108,18 @@ async function delegateBrowserThenDiagnose() {
 rl.on('line', line => {
   let m; try { m = JSON.parse(line); } catch { return; }
   if (m.method === 'initialize') out({ id: m.id, result: { userAgent: 'fixture' } });
-  else if (m.method === 'account/read' && process.env.FIXTURE_MODE === 'managed-silent-metadata') {
+  else if (m.method === 'account/read' && (process.env.FIXTURE_MODE === 'managed-silent-metadata' ||
+      (process.env.FIXTURE_SILENT_ON_AUTO_MCP === '1' && process.argv.some(arg => arg.includes('mcp_servers.overseer_auto.'))))) {
     mark('metadata_silent');
   } else if (m.method === 'account/read' && supportsMetadata()) {
     const keyAuth = process.env.FIXTURE_MODE === 'metadata-key' ||
+      (process.env.FIXTURE_KEY_ON_AUTO_MCP === '1' && process.argv.some(arg => arg.includes('mcp_servers.overseer_auto.'))) ||
       (process.env.FIXTURE_AUTH_FILE && fs.readFileSync(process.env.FIXTURE_AUTH_FILE, 'utf8').trim() === 'key');
     out({ id: m.id, result: { requiresOpenaiAuth: !keyAuth,
       account: { type: keyAuth ? 'apiKey' : 'chatgpt', email: 'private@example.invalid', planType: 'pro' } } });
   } else if (m.method === 'account/rateLimits/read' && supportsMetadata()) {
-    if (process.env.FIXTURE_MODE === 'managed-no-quota') {
+    if (process.env.FIXTURE_MODE === 'managed-no-quota' ||
+        (process.env.FIXTURE_NO_QUOTA_ON_AUTO_MCP === '1' && process.argv.some(arg => arg.includes('mcp_servers.overseer_auto.')))) {
       out({ id: m.id, error: { code: -32601, message: 'unsupported metadata method' } });
       return;
     }
@@ -125,8 +128,11 @@ rl.on('line', line => {
       const file = directory && profileKey ? path.join(directory, profileKey) : '';
       return file && fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim() : fallback;
     };
-    const accountId = profileValue(process.env.FIXTURE_ACCOUNT_IDS_DIR,
-      process.env.FIXTURE_ACCOUNT_ID_FILE ? fs.readFileSync(process.env.FIXTURE_ACCOUNT_ID_FILE, 'utf8').trim() : 'private-account-id');
+    const accountId = process.env.FIXTURE_ACCOUNT_ID_ON_AUTO_MCP &&
+      process.argv.some(arg => arg.includes('mcp_servers.overseer_auto.'))
+      ? process.env.FIXTURE_ACCOUNT_ID_ON_AUTO_MCP
+      : profileValue(process.env.FIXTURE_ACCOUNT_IDS_DIR,
+        process.env.FIXTURE_ACCOUNT_ID_FILE ? fs.readFileSync(process.env.FIXTURE_ACCOUNT_ID_FILE, 'utf8').trim() : 'private-account-id');
     const quotaMode = profileValue(process.env.FIXTURE_QUOTA_MODES_DIR,
       process.env.FIXTURE_QUOTA_MODE_FILE ? fs.readFileSync(process.env.FIXTURE_QUOTA_MODE_FILE, 'utf8').trim() : '');
     const quotaUsed = quotaMode === 'exhausted' ? 100 : 35;

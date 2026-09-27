@@ -6046,12 +6046,121 @@ fn auto_completed_root_records_one_content_free_work_observation() {
     assert_eq!(rows[0]["effort"], "medium");
     assert_eq!(rows[0]["status"], "completed");
     assert_eq!(rows[0]["usage"]["input_tokens"], 42);
+    assert_eq!(rows[0]["quota_before"]["source"], "codex-app/managed-pre-turn",
+        "an Auto root must link its actual executor's pre-turn account meter");
     assert_eq!(rows[0]["subscription_window_draw"], "unverified");
     assert_eq!(rows[0]["task_requirements"]["source"], "auto_decision");
     assert!(!history.to_string().contains("private-root-prompt-sentinel"));
     assert!(!history.to_string().contains("private-root-title-sentinel"));
     assert_eq!(d.call("auto.start", request)["run"]["id"], run);
     assert_eq!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn auto_codex_root_rejects_executor_api_key_before_a_model_turn() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("root-executor-account.trace");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_KEY_ON_AUTO_MCP,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_KEY_ON_AUTO_MCP", "1"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let started = d.call("auto.start", json!({"work_unit_id":"root-executor-account-change",
+        "repo":repo,"workspace_mode":"worktree","prompt":"bounded root result",
+        "title":"root account check","allowed_profiles":["system-codex"],
+        "min_tier":"general","required_tools":[],"sandbox":"read_only"}));
+    let run = run_id(&started);
+    assert_eq!(d.wait_done(&run, 15)["status"], "failed");
+    let calls = std::fs::read_to_string(&trace).unwrap_or_default();
+    assert!(!calls.contains("thread_started"), "changed executor account started a thread: {calls}");
+    assert!(!calls.contains("turn_model:"), "changed executor account started a model turn: {calls}");
+    let replay = d.call("auto.start", json!({"work_unit_id":"root-executor-account-change",
+        "repo":repo,"workspace_mode":"worktree","prompt":"bounded root result",
+        "title":"root account check","allowed_profiles":["system-codex"],
+        "min_tier":"general","required_tools":[],"sandbox":"read_only"}));
+    assert_eq!(replay["run"]["id"], run);
+    assert_eq!(d.runs().len(), 1);
+}
+
+#[test]
+fn auto_codex_root_rejects_a_different_executor_account_before_a_model_turn() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("root-account-switch.trace");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_ACCOUNT_ID_ON_AUTO_MCP,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"),
+        ("FIXTURE_ACCOUNT_ID_ON_AUTO_MCP", "different-chatgpt-account"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let started = d.call("auto.start", json!({"work_unit_id":"root-executor-account-switch",
+        "repo":repo,"workspace_mode":"worktree","prompt":"bounded root result",
+        "title":"root changed account","allowed_profiles":["system-codex"],
+        "min_tier":"general","required_tools":[],"sandbox":"read_only"}));
+    let run = run_id(&started);
+    assert_eq!(d.wait_done(&run, 15)["status"], "failed");
+    let calls = std::fs::read_to_string(&trace).unwrap_or_default();
+    assert!(!calls.contains("thread_started"), "changed executor account started a thread: {calls}");
+    assert!(!calls.contains("turn_model:"), "changed executor account started a model turn: {calls}");
+    assert_eq!(d.runs().len(), 1);
+}
+
+#[test]
+fn auto_codex_root_stops_when_executor_account_cannot_be_matched() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("root-missing-meter.trace");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_NO_QUOTA_ON_AUTO_MCP,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_NO_QUOTA_ON_AUTO_MCP", "1"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let started = d.call("auto.start", json!({"work_unit_id":"root-unmatched-account",
+        "repo":repo,"workspace_mode":"worktree","prompt":"bounded root result",
+        "title":"root account meter","allowed_profiles":["system-codex"],
+        "min_tier":"general","required_tools":[],"sandbox":"read_only"}));
+    let run = run_id(&started);
+    assert_eq!(d.wait_done(&run, 15)["status"], "failed");
+    let calls = std::fs::read_to_string(&trace).unwrap_or_default();
+    assert!(!calls.contains("thread_started"), "unmatched executor started a thread: {calls}");
+    assert!(!calls.contains("turn_model:"), "unmatched executor started a model turn: {calls}");
+    assert_eq!(d.runs().len(), 1);
+}
+
+#[test]
+fn auto_codex_root_account_deadline_survives_daemon_restart() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("root-silent-account.trace");
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_SILENT_ON_AUTO_MCP,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_SILENT_ON_AUTO_MCP", "1"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let request = json!({"work_unit_id":"root-silent-account",
+        "repo":repo,"workspace_mode":"worktree","prompt":"bounded root result",
+        "title":"root silent account","allowed_profiles":["system-codex"],
+        "min_tier":"general","required_tools":[],"sandbox":"read_only"});
+    let started = d.call("auto.start", request.clone());
+    let run = run_id(&started);
+    let deadline = std::time::Instant::now() + Duration::from_secs(8);
+    while !std::fs::read_to_string(&trace).unwrap_or_default().contains("metadata_silent") {
+        assert!(std::time::Instant::now() < deadline, "selected root did not begin its account check");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    d.kill9();
+    std::thread::sleep(Duration::from_secs(6));
+    d.spawn();
+    let done = d.wait_done(&run, 5);
+    assert_eq!(done["status"], "failed", "{done}");
+    assert!(done["exit_reason"].as_str().unwrap().contains("metadata handshake timed out"));
+    assert_eq!(done["process_generation"], 1);
+    let calls = std::fs::read_to_string(&trace).unwrap_or_default();
+    assert!(!calls.contains("thread_started"));
+    assert!(!calls.contains("turn_model:"));
+    assert_eq!(d.call("auto.start", request)["run"]["id"], run);
+    assert_eq!(d.runs().len(), 1);
 }
 
 #[test]
