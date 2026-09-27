@@ -1,4 +1,5 @@
 mod accounts;
+mod audio;
 mod adapters;
 mod background;
 mod daemon;

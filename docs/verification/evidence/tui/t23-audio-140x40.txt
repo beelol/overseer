@@ -1,0 +1,40 @@
+ ◆ Overseer  page 1/1 · 0 agents                                                                                                ● connected
+
+
+
+
+
+
+
+
+
+
+
+
+                                ╭ Audio Mode ──────────────────────────────────────────────────────────────╮
+                                │                                                                          │
+                                │  Audio Mode  ON · ready                                                  │
+                                │  Off by default. The daemon plays one shared cue.                        │
+                                │                                                                          │
+                                │  Track: reactor    1 Reactor    2 System voice    3 Commander            │
+                                │  Voice: Albert    v/V changes installed macOS voice                      │
+                                │  Commander: private folder ready    i imports a private folder           │
+                                │                                                                          │
+                                │  Preview: agent_complete    tab changes cue · p plays it                 │
+                                │                                                                          │
+                                │  space enable/disable    r refresh    esc close                          │
+                                │                                                                          │
+                                ╰───────────────────────────── selected for every UI · played by overseerd ╯
+
+
+
+
+
+
+
+
+
+
+
+
+ space on/off   1/2/3 track   tab cue   p preview   v voice   i import   esc close
