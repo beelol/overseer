@@ -3092,6 +3092,8 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
         .find(|event| event["kind"] == "auto_decision").unwrap();
     let replay = d.call("auto.decision.replay", json!({"event_seq":decision_event["seq"]}));
     assert_eq!(replay["matches_recorded"], true, "{replay}");
+    assert_eq!(replay["replay_scope"], "selector_only", "{replay}");
+    assert_eq!(replay["estimator_recomputed"], false, "{replay}");
     assert_eq!(replay["decision"]["selected"], browser["decision"]["selected"]);
     let recorded = &decision_event["payload"];
     assert_eq!(recorded["selected_route"]["harness"], "codex-app");

@@ -65,3 +65,12 @@
 ## Self-review
 
 The plan covers the scope and consumption gates needed before learned fit can influence Auto dispatch. It deliberately leaves quality-aware efficiency ranking, measured reservations, and live provider proof to the remaining RFC criteria; this slice alone cannot close AUTO-AC-13, AUTO-AC-32, or AUTO-AC-36. The current provider reads lack validated model-version and external-work attribution, so real account estimates remain unknown until the required evidence exists.
+
+### Task 4: Review corrections before declaring this slice ready
+
+The read-only review of `ada37af..93641bb` found three important boundaries. A completed unit's measured draw is not a predictive upper bound for later work with the same coarse requirements; multiple same-account meters must not hide a limiting reading; and replay currently checks only saved selector inputs. Resolve these without claiming that a live predictive model is available.
+
+- [x] Red-first test that one completed short task cannot authorize a longer task with the same tools/context; require an explicit validated task class, execution budget, and conservative predictive envelope before numeric fit.
+- [x] Red-first test that a stricter second same-account meter can make a candidate unaffordable and keep it unselected; evaluate all credible readings rather than discarding the limiting one.
+- [x] Label v6 replay as selector-only until estimator inputs can be safely replayed, and test the scope returned by the protocol.
+- [x] Re-run focused and full serial tests, ledger audit, and read-only review findings; update the ledger and commit.

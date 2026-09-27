@@ -922,7 +922,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     context_needed, requires_approvals, min_sandbox:sandbox,
                     max_sandbox:sandbox,
                     allowed_profiles:allowed_profiles.clone(),
-                    pinned_route, preferred_harness };
+                    pinned_route, preferred_harness, task_class:None,
+                    execution_budget_ms:Some(execution_budget_ms) };
                 let fit_evidence = if d.learning_is_paused() {
                     routes.iter().map(|route| json!({"route_id":route.id,"fit":"unknown",
                         "reason":"learning_paused","source":null,"observed_ms":null,
@@ -1166,7 +1167,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 _ => return Err(anyhow!("unsupported automatic selector version")),
             };
             let matches_recorded = serde_json::to_value(&decision)? == payload["decision"];
-            json!({"event_seq":event_seq,"matches_recorded":matches_recorded,"decision":decision})
+            json!({"event_seq":event_seq,"matches_recorded":matches_recorded,
+                "replay_scope":"selector_only","estimator_recomputed":false,
+                "decision":decision})
         }
         "run.result" => d.delegated_result(s(p, "run_id")?)?,
         "run.follow_up" => json!(d.start_turn(s(p, "run_id")?, s(p, "prompt")?, true)?),

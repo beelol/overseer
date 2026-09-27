@@ -87,6 +87,22 @@ pub struct AllowanceEstimate {
     pub source: DrawSource,
     pub observed_ms: i64,
     pub windows: Vec<WindowDraw>,
+    /// A validated predictive envelope for a bounded class of future work.
+    /// A single completed-work delta has no such basis.
+    #[serde(default)]
+    pub prediction_basis: Option<PredictionBasis>,
+}
+
+/// Reserved contract for a future validated aggregate of comparable work.
+/// The current completed-work delta producer leaves this absent, so its
+/// samples cannot authorize a later launch. Count/method fields alone are
+/// claims, not validation; the future producer must establish the bound.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PredictionBasis {
+    pub task_class: String,
+    pub max_execution_budget_ms: u64,
+    pub sample_count: u32,
+    pub method: String,
 }
 
 /// Missing, stale, reset, or mismatched evidence never establishes fit.
@@ -109,6 +125,16 @@ pub fn assess_fit(
     let Some(estimate) = estimate else {
         return Fit::Unknown;
     };
+    let Some(basis) = estimate.prediction_basis.as_ref() else {
+        return Fit::Unknown;
+    };
+    if basis.method != "bounded_class_upper_v1" || basis.sample_count < 5
+        || work.task_class.as_deref() != Some(basis.task_class.as_str())
+        || work.execution_budget_ms.is_none_or(|budget| budget == 0
+            || budget > basis.max_execution_budget_ms)
+    {
+        return Fit::Unknown;
+    }
     const MAX_ESTIMATE_AGE_MS: i64 = 30 * 86_400_000;
     if estimate.pool_id != route.pool_id
         || estimate.model != route.model
@@ -221,6 +247,10 @@ pub struct WorkUnit {
     pub allowed_profiles: BTreeSet<String>,
     pub pinned_route: Option<String>,
     pub preferred_harness: Option<String>,
+    #[serde(default)]
+    pub task_class: Option<String>,
+    #[serde(default)]
+    pub execution_budget_ms: Option<u64>,
 }
 
 /// Exact structured requirements for conservative comparison of completed
@@ -234,13 +264,18 @@ pub struct TaskSignature {
     pub requires_approvals: bool,
     pub min_sandbox: Sandbox,
     pub max_sandbox: Sandbox,
+    #[serde(default)]
+    pub task_class: Option<String>,
+    #[serde(default)]
+    pub execution_budget_ms: Option<u64>,
 }
 
 impl From<&WorkUnit> for TaskSignature {
     fn from(work: &WorkUnit) -> Self {
         Self { min_tier:work.min_tier, required_tools:work.required_tools.clone(),
             context_needed:work.context_needed, requires_approvals:work.requires_approvals,
-            min_sandbox:work.min_sandbox, max_sandbox:work.max_sandbox }
+            min_sandbox:work.min_sandbox, max_sandbox:work.max_sandbox,
+            task_class:work.task_class.clone(), execution_budget_ms:work.execution_budget_ms }
     }
 }
 
@@ -462,6 +497,8 @@ mod tests {
             allowed_profiles: ["pool-a", "pool-b"].iter().map(|s| s.to_string()).collect(),
             pinned_route: None,
             preferred_harness: None,
+            task_class: Some("fixture_browser".into()),
+            execution_budget_ms: Some(10_000),
         }
     }
 
@@ -758,6 +795,9 @@ mod tests {
                     upper_percent: 10.0,
                 },
             ],
+            prediction_basis: Some(PredictionBasis { task_class:"fixture_browser".into(),
+                max_execution_budget_ms:10_000, sample_count:5,
+                method:"bounded_class_upper_v1".into() }),
         };
         assert_eq!(
             assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, Some(&estimate), &[], now),
@@ -839,6 +879,9 @@ mod tests {
                 window: "primary".into(),
                 upper_percent: 0.0,
             }],
+            prediction_basis: Some(PredictionBasis { task_class:"fixture_browser".into(),
+                max_execution_budget_ms:10_000, sample_count:5,
+                method:"bounded_class_upper_v1".into() }),
         };
         assert_eq!(
             assess_fit(&quota, &unit(CapabilityTier::General, &["browser"]), &route, Some(&estimate), &[], now),
@@ -873,7 +916,11 @@ mod tests {
                 "model_version":"sol-v1",
                 "task_signature":{"min_tier":"general","required_tools":["browser"],
                     "context_needed":1000,"requires_approvals":false,
-                    "min_sandbox":"read_only","max_sandbox":"workspace_write"},
+                    "min_sandbox":"read_only","max_sandbox":"workspace_write",
+                    "task_class":"fixture_browser","execution_budget_ms":10000},
+                "prediction_basis":{"task_class":"fixture_browser",
+                    "max_execution_budget_ms":10000,"sample_count":5,
+                    "method":"bounded_class_upper_v1"},
                 "plan_type":plan,
                 "windows":[{"bucket_id":"codex","window":"primary","upper_percent":5.0}]
             })).unwrap()
@@ -882,6 +929,41 @@ mod tests {
         assert_eq!(assess_fit(&quota, &work, &route, Some(&estimate(Some("pro"))), &[], now), Fit::Fits);
         assert_eq!(assess_fit(&quota, &work, &route, Some(&estimate(Some("plus"))), &[], now), Fit::Unknown);
         assert_eq!(assess_fit(&quota, &work, &route, Some(&estimate(None)), &[], now), Fit::Unknown);
+    }
+
+    #[test]
+    fn one_completed_unit_is_not_a_prediction_for_later_work() {
+        use crate::auto_quota::parse_codex_rate_limits;
+        use serde_json::json;
+        let now = 1_800_000_000_000_i64;
+        let quota = parse_codex_rate_limits(&json!({"rateLimits":{
+            "limitId":"codex","planType":"pro",
+            "primary":{"usedPercent":97,"resetsAt":1800003600}
+        }}), "pool-a", now).unwrap();
+        let work = unit(CapabilityTier::General, &["browser"]);
+        let route = route("sol", "codex", "pool-a", CapabilityTier::General,
+            "medium", &["browser"]);
+        let short_sample: AllowanceEstimate = serde_json::from_value(json!({
+            "pool_id":"pool-a","model":"sol","effort":"medium",
+            "model_version":"sol-v1","task_signature":TaskSignature::from(&work),
+            "plan_type":"pro","source":"attributed_actual_work","observed_ms":now,
+            "windows":[{"bucket_id":"codex","window":"primary","upper_percent":2.0}]
+        })).unwrap();
+        assert_eq!(assess_fit(&quota, &work, &route, Some(&short_sample), &[], now),
+            Fit::Unknown, "one observed 2% draw cannot certify another browser unit fits in 3%");
+        let mut claimed = short_sample.clone();
+        claimed.prediction_basis = Some(PredictionBasis {
+            task_class:"fixture_browser".into(), max_execution_budget_ms:10_000,
+            sample_count:1, method:"bounded_class_upper_v1".into(),
+        });
+        assert_eq!(assess_fit(&quota, &work, &route, Some(&claimed), &[], now),
+            Fit::Unknown, "a one-sample claim is not a conservative prediction");
+        claimed.prediction_basis.as_mut().unwrap().sample_count = 5;
+        assert_eq!(assess_fit(&quota, &work, &route, Some(&claimed), &[], now), Fit::Fits);
+        let mut longer = work.clone();
+        longer.execution_budget_ms = Some(20_000);
+        assert_eq!(assess_fit(&quota, &longer, &route, Some(&claimed), &[], now),
+            Fit::Unknown, "a longer unit cannot inherit the short-budget envelope");
     }
 
     #[test]
@@ -901,7 +983,11 @@ mod tests {
             "effort":"medium","task_signature":{
                 "min_tier":"general","required_tools":["browser"],"context_needed":1000,
                 "requires_approvals":false,"min_sandbox":"read_only",
-                "max_sandbox":"workspace_write"},
+                "max_sandbox":"workspace_write","task_class":"fixture_browser",
+                "execution_budget_ms":10000},
+            "prediction_basis":{"task_class":"fixture_browser",
+                "max_execution_budget_ms":10000,"sample_count":5,
+                "method":"bounded_class_upper_v1"},
             "source":"provider_reported","observed_ms":now,"plan_type":"pro",
             "windows":[{"bucket_id":"codex","window":"primary","upper_percent":5.0}]
         })).unwrap();
@@ -930,7 +1016,11 @@ mod tests {
             "plan_type":"pro","task_signature":{
                 "min_tier":"general","required_tools":["browser"],"context_needed":1000,
                 "requires_approvals":false,"min_sandbox":"read_only",
-                "max_sandbox":"workspace_write"},
+                "max_sandbox":"workspace_write","task_class":"fixture_browser",
+                "execution_budget_ms":10000},
+            "prediction_basis":{"task_class":"fixture_browser",
+                "max_execution_budget_ms":10000,"sample_count":5,
+                "method":"bounded_class_upper_v1"},
             "windows":[{"bucket_id":"codex","window":"primary","upper_percent":5.0}]
         })).unwrap();
         let browser = unit(CapabilityTier::General, &["browser"]);

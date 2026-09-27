@@ -453,7 +453,8 @@ mod tests {
             required_tools:BTreeSet::from(["browser/navigate".into()]), context_needed:0,
             requires_approvals:false, min_sandbox:Sandbox::WorkspaceWrite,
             max_sandbox:Sandbox::WorkspaceWrite, allowed_profiles:BTreeSet::from(["system-codex".into()]),
-            pinned_route:None, preferred_harness:None };
+            pinned_route:None, preferred_harness:None,
+            task_class:None, execution_budget_ms:None };
         let browser = select(&work, &routes);
         assert_eq!(browser.selected.as_deref(), Some("system-codex/gpt-6-sol/medium"));
         work.id = "diagnosis-unit".into();

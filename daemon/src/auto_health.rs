@@ -465,6 +465,8 @@ mod tests {
                 .collect(),
             pinned_route: None,
             preferred_harness: None,
+            task_class: None,
+            execution_budget_ms: None,
         }
     }
 

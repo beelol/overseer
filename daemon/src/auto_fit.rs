@@ -11,9 +11,8 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 enum SnapshotEvidence {
-    Available(QuotaSnapshot),
+    Available(Vec<QuotaSnapshot>),
     Unavailable,
-    SharedPoolUnreconciled,
 }
 
 /// Apply only same-account, same-plan, same-task, resolved-version estimates.
@@ -37,25 +36,37 @@ pub fn apply_scoped_fit(
         let mut observed_ms = None;
         let mut estimated_windows = Vec::new();
         if route.quota == Allowance::ObservedNonExhausted {
+            if route.resolved_model_version.as_deref().is_none_or(str::is_empty) {
+                evidence.push(json!({"route_id":route.id,"fit":route.fit,
+                    "reason":"model_version_unverified","source":null,
+                    "observed_ms":null,"expected_windows":[]}));
+                continue;
+            }
+            if work.task_class.as_deref().is_none_or(str::is_empty)
+                || work.execution_budget_ms.is_none_or(|budget| budget == 0) {
+                evidence.push(json!({"route_id":route.id,"fit":route.fit,
+                    "reason":"predictive_task_class_unavailable","source":null,
+                    "observed_ms":null,"expected_windows":[]}));
+                continue;
+            }
             let snapshot_evidence = quota_by_profile
                 .entry(route.profile_id.clone())
                 .or_insert_with(|| {
                     match store.auto_account_quota_observations(&route.profile_id) {
-                        Ok(observations) if observations.len() > 1 => {
-                            SnapshotEvidence::SharedPoolUnreconciled
+                        Ok(observations) if !observations.is_empty() => {
+                            SnapshotEvidence::Available(
+                                observations
+                                    .into_iter()
+                                    .map(|reading| reading.snapshot)
+                                    .collect(),
+                            )
                         }
-                        Ok(observations) => observations
-                            .into_iter()
-                            .find(|reading| reading.pool_id == route.profile_id)
-                            .map(|reading| SnapshotEvidence::Available(reading.snapshot))
-                            .unwrap_or(SnapshotEvidence::Unavailable),
+                        Ok(_) => SnapshotEvidence::Unavailable,
                         Err(_) => SnapshotEvidence::Unavailable,
                     }
                 });
-            let shared_pool_unreconciled =
-                matches!(snapshot_evidence, SnapshotEvidence::SharedPoolUnreconciled);
-            let snapshot = match snapshot_evidence {
-                SnapshotEvidence::Available(snapshot) => Some(&*snapshot),
+            let snapshots = match snapshot_evidence {
+                SnapshotEvidence::Available(snapshots) => Some(&*snapshots),
                 _ => None,
             };
             let generation = account_generations.get(&route.profile_id);
@@ -63,7 +74,13 @@ pub fn apply_scoped_fit(
                 .resolved_model_version
                 .as_deref()
                 .filter(|value| !value.is_empty());
-            let plan = snapshot.and_then(QuotaSnapshot::reported_plan_type);
+            let plan = snapshots.and_then(|snapshots| {
+                let first = snapshots.first()?.reported_plan_type()?;
+                snapshots
+                    .iter()
+                    .all(|snapshot| snapshot.reported_plan_type() == Some(first))
+                    .then_some(first)
+            });
             let generation_changed = version.is_some()
                 && generation.is_some_and(|expected| {
                     store
@@ -78,19 +95,15 @@ pub fn apply_scoped_fit(
                 "account_generation_unavailable"
             } else if generation_changed {
                 "account_generation_changed"
-            } else if snapshot.is_none() {
-                if shared_pool_unreconciled {
-                    "shared_pool_meter_unreconciled"
-                } else {
-                    "quota_snapshot_unavailable"
-                }
+            } else if snapshots.is_none() {
+                "quota_snapshot_unavailable"
             } else if plan.is_none() {
-                "account_plan_unknown"
+                "account_plan_unreconciled"
             } else {
                 "no_comparable_estimate"
             };
-            if let (Some(snapshot), Some(generation), Some(version), Some(plan)) =
-                (snapshot.as_ref(), generation, version, plan)
+            if let (Some(snapshots), Some(generation), Some(version), Some(plan)) =
+                (snapshots, generation, version, plan)
             {
                 if !generation_changed {
                     let key = EstimateKey {
@@ -116,14 +129,27 @@ pub fn apply_scoped_fit(
                                 source = Some(estimate.source);
                                 observed_ms = Some(estimate.observed_ms);
                                 estimated_windows = estimate.windows.clone();
-                                route.fit = auto_select::assess_fit(
-                                    snapshot,
-                                    work,
-                                    route,
-                                    Some(&estimate),
-                                    &[],
-                                    now_ms,
-                                );
+                                let mut all_fit = true;
+                                for snapshot in snapshots {
+                                    match auto_select::assess_fit(
+                                        snapshot,
+                                        work,
+                                        route,
+                                        Some(&estimate),
+                                        &[],
+                                        now_ms,
+                                    ) {
+                                        Fit::Unaffordable => {
+                                            route.fit = Fit::Unaffordable;
+                                            break;
+                                        }
+                                        Fit::Unknown => all_fit = false,
+                                        Fit::Fits => {}
+                                    }
+                                }
+                                if route.fit != Fit::Unaffordable && all_fit {
+                                    route.fit = Fit::Fits;
+                                }
                                 reason = match route.fit {
                                     Fit::Fits => "bounded_estimate_fits",
                                     Fit::Unaffordable => "bounded_estimate_exceeds_allowance",
@@ -171,6 +197,8 @@ mod tests {
             allowed_profiles: ["profile".into()].into(),
             pinned_route: None,
             preferred_harness: None,
+            task_class: Some("fixture_browser".into()),
+            execution_budget_ms: Some(10_000),
         }
     }
 
@@ -234,7 +262,11 @@ mod tests {
             "model_version":format!("{model}-v1"),"effort":"medium","plan_type":"pro",
             "task_signature":{"min_tier":"general","required_tools":["browser"],
                 "context_needed":1000,"requires_approvals":false,
-                "min_sandbox":"read_only","max_sandbox":"workspace_write"},
+                "min_sandbox":"read_only","max_sandbox":"workspace_write",
+                "task_class":"fixture_browser","execution_budget_ms":10000},
+            "prediction_basis":{"task_class":"fixture_browser",
+                "max_execution_budget_ms":10000,"sample_count":5,
+                "method":"bounded_class_upper_v1"},
             "source":"attributed_actual_work","observed_ms":now,
             "windows":[{"bucket_id":"codex","window":"primary",
                 "upper_percent":upper_percent}]}))
@@ -325,9 +357,10 @@ mod tests {
         apply_scoped_fit(&store, &work(), &mut routes, &generations, now);
         assert_eq!(
             routes[0].fit,
-            Fit::Unknown,
-            "one of two same-account meters leaves only 1% room for a 3% estimate"
+            Fit::Unaffordable,
+            "the tighter same-account meter leaves only 1% room for a 3% bound"
         );
+        assert_eq!(select(&work(), &routes).selected, None);
     }
 
     #[test]

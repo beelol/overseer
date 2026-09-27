@@ -321,7 +321,7 @@ pub fn estimate_from_actual_window_delta(
     Some(AllowanceEstimate { pool_id, model:model.into(), effort:effort.into(),
         model_version:Some(model_version.into()), task_signature:Some(task_signature),
         plan_type:Some(plan_type), source:DrawSource::AttributedActualWork,
-        observed_ms:after.observed_ms, windows })
+        observed_ms:after.observed_ms, windows, prediction_basis:None })
 }
 
 #[cfg(test)]
@@ -399,7 +399,7 @@ mod tests {
             required_tools:BTreeSet::new(), context_needed:0, requires_approvals:false,
             min_sandbox:Sandbox::WorkspaceWrite, max_sandbox:Sandbox::WorkspaceWrite,
             allowed_profiles:["profile".into()].into(), pinned_route:None,
-            preferred_harness:None };
+            preferred_harness:None, task_class:None, execution_budget_ms:None };
         let task_signature = TaskSignature::from(&work);
         let trusted = DeltaContext { model:Some("gpt-6-sol"), effort:Some("medium"),
             resolved_model_version:Some("gpt-6-sol-resolved-v1"),
@@ -414,6 +414,8 @@ mod tests {
         assert_eq!(estimate.effort, "medium");
         assert_eq!(estimate.plan_type.as_deref(), Some("pro"));
         assert_eq!(estimate.source, crate::auto_select::DrawSource::AttributedActualWork);
+        assert!(estimate.prediction_basis.is_none(),
+            "an attributed completed-work interval is not a future-work prediction");
         assert_eq!(estimate.windows.len(), 1);
         assert!((estimate.windows[0].upper_percent - 2.2).abs() < 1e-9);
         let route = Route { id:"sol".into(), harness:"codex-app".into(),
@@ -427,9 +429,9 @@ mod tests {
             quota_blocks:Vec::new(), fit:Fit::Unknown, health:Health::Healthy,
             unresolved_quota_pool_identity:false, in_flight_pool_claim:false };
         assert_eq!(assess_fit(&reading(96.0, at + 30_000), &work, &route,
-            Some(&estimate), &[], at + 30_000), Fit::Fits);
+            Some(&estimate), &[], at + 30_000), Fit::Unknown);
         assert_eq!(assess_fit(&reading(98.0, at + 30_000), &work, &route,
-            Some(&estimate), &[], at + 30_000), Fit::Unaffordable);
+            Some(&estimate), &[], at + 30_000), Fit::Unknown);
     }
 
     #[test]
