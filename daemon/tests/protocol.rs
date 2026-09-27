@@ -2274,6 +2274,12 @@ fn auto_work_history_links_actual_usage_outcome_and_quota_without_content() {
     assert_eq!(work["model"], "gpt-6-sol");
     assert_eq!(work["effort"], "medium");
     assert_eq!(work["status"], "completed");
+    assert_eq!(work["task_requirements"]["min_tier"], "general");
+    assert_eq!(work["task_requirements"]["required_tools"], json!(["browser/navigate"]));
+    assert_eq!(work["task_requirements"]["context_needed"], 0);
+    assert_eq!(work["task_requirements"]["requires_approvals"], false);
+    assert_eq!(work["task_requirements"]["sandbox"], "workspace_write");
+    assert_eq!(work["task_requirements"]["source"], "auto_decision");
     assert_eq!(work["usage"]["input_tokens"], 42);
     assert_eq!(work["usage"]["output_tokens"], 7);
     assert_eq!(work["quota_before"]["source"], "codex-app/managed-pre-turn");
@@ -2292,6 +2298,16 @@ fn auto_work_history_links_actual_usage_outcome_and_quota_without_content() {
     assert!(exported.contains("measured-browser-unit"));
     assert!(!exported.contains("private-browser-sentinel"));
     assert!(!exported.contains("private-parent-sentinel"));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.pragma_update(None, "foreign_keys", "ON").unwrap();
+    let decision_seq: i64 = db.query_row(
+        "SELECT decision_event_seq FROM auto_launch_intents WHERE work_unit_id='measured-browser-unit'",
+        [], |row| row.get(0)).unwrap();
+    db.execute("DELETE FROM events WHERE seq=?1", [decision_seq]).unwrap();
+    let cleared_link: Option<i64> = db.query_row(
+        "SELECT decision_event_seq FROM auto_launch_intents WHERE work_unit_id='measured-browser-unit'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(cleared_link, None, "old decision-event retention must not pin the execution log");
     d.call("auto.usage.clear", json!({}));
     assert!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().is_empty());
     d.kill9();

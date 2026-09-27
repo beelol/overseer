@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-pub const SCHEMA_VERSION: i64 = 15;
+pub const SCHEMA_VERSION: i64 = 16;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -280,7 +280,8 @@ impl Store {
               work_unit_id TEXT PRIMARY KEY, parent_run_id TEXT NOT NULL REFERENCES runs(id),
               requirements_hash TEXT NOT NULL, route_id TEXT NOT NULL,
               account_generation INTEGER, phase TEXT NOT NULL, created_ms INTEGER NOT NULL,
-              planned_branch TEXT, planned_path TEXT, snapshot_id TEXT, snapshot_commit TEXT);
+              planned_branch TEXT, planned_path TEXT, snapshot_id TEXT, snapshot_commit TEXT,
+              decision_event_seq INTEGER REFERENCES events(seq) ON DELETE SET NULL);
             CREATE TABLE IF NOT EXISTS auto_pool_claims(
               work_unit_id TEXT PRIMARY KEY REFERENCES auto_launch_intents(work_unit_id),
               pool_id TEXT NOT NULL, account_generation INTEGER,
@@ -316,6 +317,10 @@ impl Store {
             if !present {
                 self.conn.execute_batch(&format!("ALTER TABLE auto_launch_intents ADD COLUMN {column} TEXT;"))?;
             }
+        }
+        let has_decision_event: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_launch_intents') WHERE name='decision_event_seq'")?.exists([])?;
+        if !has_decision_event {
+            self.conn.execute_batch("ALTER TABLE auto_launch_intents ADD COLUMN decision_event_seq INTEGER REFERENCES events(seq) ON DELETE SET NULL;")?;
         }
         let has_measurement_effort: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_measurements') WHERE name='effort'")?.exists([])?;
         if !has_measurement_effort {
@@ -674,6 +679,8 @@ impl Store {
         )?;
         let event = self.insert_event(crate::daemon::now(), Some(&parent.task_id), Some(&parent.id),
             "auto_decision", "daemon", "exact", payload)?;
+        self.conn.execute("UPDATE auto_launch_intents SET decision_event_seq=?2 WHERE work_unit_id=?1",
+            params![work_unit_id, event.seq])?;
         tx.commit()?;
         Ok(Some(event))
     }
@@ -1348,6 +1355,23 @@ impl Store {
             }
         }
         let Some(ended_ms) = run.ended_ms else { return Ok(None); };
+        let decision_payload: Option<String> = self.conn.query_row(
+            "SELECT e.payload FROM auto_launch_intents i JOIN events e ON e.seq=i.decision_event_seq
+             WHERE i.work_unit_id=?1 AND e.kind='auto_decision'",
+            [&work_unit_id], |row| row.get(0),
+        ).optional()?;
+        let task_requirements = decision_payload
+            .as_deref()
+            .and_then(|encoded| serde_json::from_str::<Value>(encoded).ok())
+            .and_then(|payload| serde_json::from_value::<crate::auto_select::WorkUnit>(
+                payload["selection_input"]["work"].clone()).ok())
+            .filter(|work| work.id == work_unit_id)
+            .map(|work| serde_json::json!({
+                "source":"auto_decision", "min_tier":work.min_tier,
+                "required_tools":work.required_tools, "context_needed":work.context_needed,
+                "requires_approvals":work.requires_approvals,
+                "sandbox":work.min_sandbox,
+            }));
         let started_ms: Option<i64> = self.conn.query_row(
             "SELECT MIN(started_ms) FROM turns WHERE run_id=?1", [run_id], |row| row.get(0))?;
         let quota_ref = |source: &str| -> Result<Option<Value>> {
@@ -1390,6 +1414,7 @@ impl Store {
             "harness_version":run.harness_version,"profile_id":run.profile_id,
             "pool_id":pool_id,"account_generation":account_generation,
             "model":run.model,"effort":run.effort,"status":run.status,
+            "task_requirements":task_requirements,
             "started_ms":started_ms,"ended_ms":ended_ms,
             "launch_overhead_ms":intent_ms.zip(started_ms).and_then(|(intent, start)|
                 start.checked_sub(intent).filter(|value| *value >= 0)),
