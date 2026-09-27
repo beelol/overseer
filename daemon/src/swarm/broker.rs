@@ -325,7 +325,7 @@ pub fn messages(store: &Store, p: &Value) -> Result<Value> {
     let mut stmt=store.conn.prepare("SELECT seq,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase FROM swarm_messages WHERE run_id=?1 AND recipient=?2 AND seq>?3 ORDER BY seq LIMIT ?4")?;
     let rows=stmt.query_map(params![run,recipient,cursor,limit+1],|r|{
         let payload:String=r.get(8)?;
-        Ok(json!({"seq":r.get::<_,i64>(0)?,"message_id":r.get::<_,String>(1)?,"job_id":r.get::<_,String>(2)?,"attempt_id":r.get::<_,String>(3)?,
+        Ok(json!({"seq":r.get::<_,i64>(0)?,"message_id":r.get::<_,String>(1)?,"job_id":r.get::<_,Option<String>>(2)?,"attempt_id":r.get::<_,Option<String>>(3)?,
             "sender":r.get::<_,String>(4)?,"recipient":r.get::<_,String>(5)?,"type":r.get::<_,String>(6)?,"revision":r.get::<_,i64>(7)?,
             "payload":serde_json::from_str::<Value>(&payload).unwrap_or(Value::Null),"phase":r.get::<_,String>(9)?}))
     })?.collect::<rusqlite::Result<Vec<_>>>()?;

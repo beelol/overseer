@@ -83,6 +83,103 @@ fn revoked_selected_identity_cancels_only_its_active_attempt_and_keeps_usage_unc
     let reservation:String=db.query_row("SELECT status FROM swarm_reservations
         WHERE attempt_id=?1 LIMIT 1",[a["attempt_id"].as_str().unwrap()],|r|r.get(0)).unwrap();
     assert_eq!(reservation,"uncertain");
+    let revoke_count:i64=db.query_row("SELECT COUNT(*) FROM swarm_operation_order
+        WHERE run_id=?1 AND kind='revoke'",[run],|r|r.get(0)).unwrap();
+    assert_eq!(revoke_count,1);
+}
+
+#[test]
+fn identity_revocation_stop_result_and_review_have_one_durable_order() {
+    for steps in [
+        ["result","accept","revoke","stop"],
+        ["result","revoke","accept","stop"],
+        ["revoke","stop","result","accept"],
+    ] {
+        let d=Daemon::start(&[]);
+        let created=d.call("swarm.create",json!({"category":format!("Identity race {steps:?}"),
+            "objective":"Audit account-scoped route","allowed_targets":["route-a"]}));
+        let run=created["id"].as_str().unwrap();
+        d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+            {"id":"audit","title":"Audit route","acceptance":"status and row evidence","deps":[]},
+            {"id":"sibling","title":"Independent route","acceptance":"separate evidence","deps":[]}
+        ]}));
+        commit_beneficial_batch(&d,run,&["audit".into(),"sibling".into()]);
+        let at=now();
+        let snap=|time:i64,revoked:bool|json!({"version":1,"observed_ms":time,
+            "expires_ms":time+60000,"targets":[{"id":"route-a",
+                "account_id":"account-a","pool_ids":["pool-a"],
+                "capabilities":["code"],"health":"up",
+                "auth":if revoked {"revoked"} else {"ok"}}],
+            "pools":[{"id":"pool-a","windows":[{"id":"week","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":time+60000}]}]});
+        let healthy=snap(at-1000,false);
+        d.call("swarm.availability.observe",json!({"run_id":run,"snapshot":healthy,
+            "now_ms":at,"required_capabilities":["code"],
+            "estimate_milli":{"points":100},"purpose":"worker"}));
+        let admitted=d.call("swarm.admit",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":"audit","target_id":"route-a",
+            "request_id":"audit-first","snapshot":healthy,"now_ms":at,
+            "required_capabilities":["code"],"estimate_milli":{"points":100},
+            "purpose":"worker"}));
+        assert_eq!(admitted["status"],"admitted");
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"audit",
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "artifact_id":"route-proof","source_revision":1,"kind":"reproduction",
+            "content":"fixture response and database row"}));
+        let report=json!({"run_id":run,"job_id":"audit",
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "message_id":"route-result","type":"result","revision":1,
+            "payload":{"audit_outcome":"confirmed_defect","artifact_ids":["route-proof"]}});
+        let decide=json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":"audit","decision":"accept","evidence":["route-proof"]});
+        let revoked=snap(at+1000,true);
+        let mut accepted=false;
+        for step in steps {
+            match step {
+                "result"=>{d.call("swarm.report",report.clone());},
+                "accept"=>{accepted=d.try_call("swarm.decide",decide.clone()).is_ok();},
+                "revoke"=>{let response=d.call("swarm.availability.observe",json!({
+                    "run_id":run,"snapshot":revoked,"now_ms":at+1500,
+                    "required_capabilities":["code"],"estimate_milli":{"points":100},
+                    "purpose":"worker"}));
+                    assert_eq!(response["revoked_jobs"],json!(["audit"]));},
+                "stop"=>{d.call("swarm.stop",json!({"run_id":run}));},
+                _=>unreachable!(),
+            }
+        }
+        assert_eq!(accepted,steps==["result","accept","revoke","stop"]);
+        let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let mut stmt=db.prepare("SELECT kind FROM swarm_operation_order
+            WHERE run_id=?1 ORDER BY seq").unwrap();
+        let order:Vec<String>=stmt.query_map([run],|r|r.get(0)).unwrap()
+            .collect::<rusqlite::Result<_>>().unwrap();
+        let expected:Vec<String>=steps.iter().filter(|step| **step!="accept" || accepted)
+            .map(|step|step.to_string()).collect();
+        assert_eq!(order,expected,"{steps:?}");
+        assert_eq!(d.call("swarm.report",report.clone())["duplicate"],true);
+        assert_eq!(d.call("swarm.stop",json!({"run_id":run}))["duplicate"],true);
+        let inbox=d.call("swarm.messages",json!({"run_id":run,"recipient":"director"}));
+        assert!(inbox["messages"].as_array().unwrap().iter()
+            .any(|message|message["message_id"]=="route-result"));
+        assert!(inbox["messages"].as_array().unwrap().iter()
+            .any(|message|message["type"]=="availability"
+                && message["job_id"].is_null() && message["attempt_id"].is_null()));
+        assert!(d.try_call("swarm.decide",decide).is_err() || accepted);
+        assert!(d.try_call("swarm.complete",json!({"run_id":run,
+            "generation":1,"revision":1,"summary":"done",
+            "verification":"fixture","checks":[]})).is_err());
+        let temp=tmp();
+        let checkout=repo(&temp.path().join("identity-race"));
+        assert!(d.try_call("swarm.worker.launch",json!({"run_id":run,
+            "job_id":"audit","attempt_id":admitted["attempt_id"],
+            "token":admitted["token"],"repo":checkout,
+            "program":"/bin/true","args":[],"prompt":"Inspect route",
+            "title":"Late worker"})).is_err());
+        let replay_order:i64=db.query_row("SELECT COUNT(*) FROM swarm_operation_order
+            WHERE run_id=?1",[run],|r|r.get(0)).unwrap();
+        assert_eq!(replay_order,expected.len() as i64);
+    }
 }
 
 #[test]

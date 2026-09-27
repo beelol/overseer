@@ -631,7 +631,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. A joined Atlas replay blocks J4 after an injected external allowance reduction while preserving J2 backend evidence; a separate cross-category regression fences an older generous admission snapshot. An injected selected-account revocation now cancels and interrupts only its active worker, preserves another account's evidence, and leaves usage uncertain. Live Auto Mode updates, account identity feeds, numeric allowance display, normal status UI, user-triggered target changes and live director behavior remain unverified."
+      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. A joined Atlas replay blocks J4 after an injected external allowance reduction while preserving J2 backend evidence; a separate cross-category regression fences an older generous admission snapshot. An injected selected-account revocation now cancels and interrupts only its active worker, records one durable revoke operation across replay, preserves another account's evidence, and leaves usage uncertain. Director-wide availability messages remain readable with null job and attempt IDs. Live Auto Mode updates, account identity feeds, numeric allowance display, normal status UI, user-triggered target changes and live director behavior remain unverified."
     },
     "SWARM-60": {
       "status": "partial",
@@ -654,11 +654,12 @@
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/swarm_plan.rs",
         "daemon/tests/swarm_context.rs",
+        "daemon/tests/swarm_availability.rs",
         "daemon/src/swarm/schema.rs",
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Scripted local and Atlas-backed final-result/Stop orderings persist one operation sequence, preserve the artifact and result, reject acceptance/completion, and deduplicate replay. Simultaneous native races, native descendants, qualified live paths, and explicit user resume remain unverified."
+      "blocker": "Scripted local and Atlas-backed final-result/Stop orderings persist one operation sequence, preserve the artifact and result, reject acceptance/completion, and deduplicate replay. Local selected-account revocation/result/review/Stop orderings now record revocation in the same cancellation transaction and retain a readable director inbox; no worker launches after Stop. Simultaneous native races, native descendants, qualified live paths, and explicit user resume remain unverified."
     },
     "SWARM-62": {
       "status": "partial",

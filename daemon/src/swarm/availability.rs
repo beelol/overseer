@@ -198,6 +198,7 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
     revoked_jobs.sort();
     revoked_jobs.dedup();
     if !revoked_jobs.is_empty() {
+        super::record_operation(&tx, run, "revoke")?;
         tx.execute(
             "INSERT INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
              VALUES(?1,?2,NULL,NULL,'control','director','availability',?3,?4,'queued',?5,?5)",

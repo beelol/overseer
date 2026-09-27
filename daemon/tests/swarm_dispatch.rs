@@ -268,12 +268,12 @@ fn startup_does_not_launch_an_admitted_worker_from_an_expired_snapshot() {
     let at = now();
     let request = json!({"request_id":"expiring-dispatch","target_id":"fixture",
         "repo":checkout,"program":"/bin/sleep","args":["30"],"now_ms":at,
-        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+150,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+1500,
             "targets":[{"id":"fixture","account_id":"fixture","pool_ids":["pool"],
                 "capabilities":["code"],"health":"up","auth":"ok"}],
             "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
                 "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
-                "confidence":"exact","expires_ms":at+150}]}]},
+                "confidence":"exact","expires_ms":at+1500}]}]},
         "required_capabilities":["code"],"estimate_milli":{"points":100},
         "purpose":"worker","inject_failure_after_admit_once":true});
     assert!(d.try_call("swarm.dispatch.next", request.clone()).is_err());
@@ -283,17 +283,15 @@ fn startup_does_not_launch_an_admitted_worker_from_an_expired_snapshot() {
         [run_id],
     )
     .unwrap();
-    assert!(d
-        .try_call("swarm.dispatch.next", request.clone())
-        .unwrap_err()
-        .contains("permission revoked"));
+    let permission_error=d.try_call("swarm.dispatch.next", request.clone()).unwrap_err();
+    assert!(permission_error.contains("permission revoked"),"{permission_error}");
     db.execute(
         "UPDATE swarm_runs SET allowed_targets='[\"fixture\"]' WHERE id=?1",
         [run_id],
     )
     .unwrap();
     drop(db);
-    std::thread::sleep(std::time::Duration::from_millis(200));
+    std::thread::sleep(std::time::Duration::from_millis(1600));
     d.kill9();
     d.spawn();
     assert!(d.runs().is_empty());
