@@ -140,3 +140,26 @@ worktree for explicit reconciliation. A conflict after the Git commit but
 before durable acknowledgement also needs a recovery/cleanup fixture and
 safe path. This iteration therefore does not qualify automatic integration
 recovery under every conflict timing; SWARM-47 remains partial.
+
+Invalidated-integration recovery at `884f81a` (2026-09-27): the daemon now
+reconciles pending integration intents for jobs invalidated by a late evidence
+conflict. One fixture pauses after staging an accepted dependent patch; conflict
+registration prevents its commit, and the reconciler removes the exact staged
+effect and intent. A second fixture interrupts after Git commit but before
+durable acknowledgement, opens the conflict, restarts the daemon, and observes
+the private branch return to its recorded parent without acknowledging the
+artifact. Both fixtures assert that the user's source checkout is unchanged.
+The reconciler checks the private workspace path, recorded parent, expected
+tree, clean state and exact integration commit message before resetting it.
+A tamper fixture changes the private worktree before restart; recovery leaves
+that edit and intent untouched, while plan revision refuses to clear the
+conflict until reconciliation. The post-commit fixture failed first because
+the intent remained after restart; it passed after the reconciler was added.
+`cargo test -p overseerd --test swarm_integration --test swarm_conflict
+--test swarm_plan --test swarm_state --offline -- --test-threads=1` passed
+22 + 8 + 11 + 19 tests; `git diff --check` passed.
+
+Already acknowledged integrated patches still need a joined contradiction
+policy and fixture. Autonomous semantic judgment, unresolved partial reporting,
+and a qualified live director path also remain unverified. SWARM-47 stays
+partial and its RFC box remains unchecked.
