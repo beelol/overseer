@@ -1,6 +1,8 @@
 // The phone's scenarios, in the order they run. Each drives the app with a flow (e2e/flows) and
 // then asks the daemon what happened, as the Mac sees it: a scenario passes only when both agree.
 
+import net from 'node:net';
+
 const ALLOWED_FIELDS = ['aps.alert.title', 'aps.alert.body', 'aps.category', 'aps.thread-id', 'aps.sound', 'aps.interruption-level', 'overseer.v', 'overseer.kind', 'overseer.run_id', 'overseer.task_id', 'overseer.request_id', 'overseer.device', 'Simulator Target Bundle'];
 const ACTIVE = ['queued', 'starting', 'running', 'waiting_for_user'];
 /** How long a flow takes to start watching the screen. */
@@ -9,6 +11,16 @@ const WATCH_FIRST_MS = 12_000;
 const me = (c) => c.lab.call('gateway.devices').devices.find((d) => d.id === c.deviceId);
 const run = (c, id) => c.lab.call('state').runs.find((r) => r.id === id);
 const events = (c, runId) => c.lab.call('events.list', { run_id: runId, after: 0, limit: 5000 }).events;
+/** A port nothing on this Mac listens on now: another lab or daemon may hold any fixed one. */
+const freePort = () =>
+  new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, '0.0.0.0', () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
+    });
+  });
 const expect = (ok, what) => {
   if (!ok) throw new Error(what);
 };
@@ -314,9 +326,15 @@ export const scenarios = [
     says: 'the Mac answers somewhere else: an address typed by the owner connects, with no pairing again',
     async run(c) {
       const paired = me(c).paired_ms;
-      const moved = c.port + 10;
+      const moved = await freePort();
       c.lab.call('gateway.disable');
-      c.lab.call('gateway.enable', { port: moved });
+      try {
+        c.lab.call('gateway.enable', { port: moved });
+      } catch (error) {
+        // The scenarios after this one need phone access on.
+        c.lab.call('gateway.enable', { port: c.port });
+        throw error;
+      }
       c.port = moved;
       await c.sleep(1500);
       expect(me(c).connected === false, 'the phone is connected although the Mac moved');

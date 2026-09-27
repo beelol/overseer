@@ -140,6 +140,14 @@ async function start(args) {
     if (stopping) return;
     stopping = true;
     child.kill('SIGTERM');
+    // A daemon started again by `up` is not this process's child, and its command line does not
+    // name the lab's folder (the folder is in its environment): it is stopped by its pid.
+    try {
+      const now = readState(stateFile).pid;
+      if (now && now !== child.pid) process.kill(now, 'SIGTERM');
+    } catch {
+      /* gone already */
+    }
     try {
       execFileSync('pkill', ['-9', '-f', home], { stdio: 'ignore' });
     } catch {
