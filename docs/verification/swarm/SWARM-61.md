@@ -25,3 +25,18 @@ At `b70433b`, the opt-in Atlas J2 PostgreSQL probe supplies real backend evidenc
 Selected-account revocation follow-up (this revision): `identity_revocation_stop_result_and_review_have_one_durable_order` exercises result→accept→revoke→Stop, result→revoke→rejected accept→Stop, and revoke→Stop→late result→rejected accept against one fixture-admitted attempt. The injected identity revocation records `revoke` in the same transaction as targeted cancellation. The test verifies each successful operation appears once and in order in `swarm_operation_order`; a duplicate result and Stop add no entries, the late result remains in the director inbox, and no worker launch or completion is allowed after Stop. A director-wide availability message has nullable job and attempt IDs; the inbox reader now returns those as null instead of failing to read the whole inbox. The full serialized offline workspace suite passed (`cargo test --workspace --offline -q -- --test-threads=1`), and the final explicit null-field assertion passed its focused rerun. This is a scripted local ordering, not a simultaneous native race or live account feed. SWARM-61 remains partial.
 
 Main-branch Gate N alignment: device-scoped request-ID replay after reconnect and a stale queued phone control racing a newer VS Code/CLI control have no joined Swarm gateway fixture yet. The local ordering tests do not establish either behavior.
+
+Start replay follow-up (this revision): `swarm.create` now accepts a bounded
+`request_id` with an optional `request_scope` (default `local`). The daemon commits
+the category run and its request fingerprint in one SQLite transaction. A retry
+returns the same run, even after the daemon restarts; changing the objective or
+another request field under the same scoped ID is rejected. Equal request IDs in
+different scopes can create different categories. The focused black-box tests in
+`daemon/tests/swarm_create.rs` failed before the change because a replay hit the
+active-category guard, then passed after it. The full
+`cargo test --workspace --offline -- --test-threads=1` suite exited successfully;
+declared opt-in backend tests remained ignored. This makes the daemon Start effect
+replay-safe; it does not launch the director. A future phone gateway must supply
+the authenticated device as `request_scope` rather than trusting a device-provided
+scope. Phone authorization, confirmation, other control IDs, and stale queued
+phone commands still need joined tests. SWARM-61 remains partial.

@@ -62,6 +62,7 @@ use anyhow::{anyhow, bail, Result};
 use plan::JobSpec;
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 fn required<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
@@ -240,22 +241,67 @@ pub fn create(store: &mut Store, p: &Value) -> Result<Value> {
     if !["none", "isolated"].contains(&source_change_permission) {
         bail!("invalid source change permission");
     }
+    let request_id = p.get("request_id").map(|v| v.as_str()
+        .ok_or_else(|| anyhow!("invalid create request id"))).transpose()?;
+    let request_scope = p.get("request_scope").map(|v| v.as_str()
+        .ok_or_else(|| anyhow!("invalid create request scope"))).transpose()?;
+    if request_scope.is_some() && request_id.is_none() {
+        bail!("create request scope requires request id");
+    }
+    let request_scope = request_scope.unwrap_or("local");
+    if request_id.is_some_and(|id| id.is_empty() || id.len() > 128)
+        || request_scope.is_empty() || request_scope.len() > 128
+        || crate::redact::redact(request_scope) != request_scope
+        || request_id.is_some_and(|id| crate::redact::redact(id) != id) {
+        bail!("invalid create request identity");
+    }
+    // The scope and ID identify the request; fingerprint only the requested
+    // effect. An omitted scope and explicit `local` scope are equivalent.
+    let mut effect = p.clone();
+    if let Value::Object(fields) = &mut effect {
+        fields.remove("request_id");
+        fields.remove("request_scope");
+    }
+    let request_sha256 = format!("{:x}", Sha256::digest(effect.to_string().as_bytes()));
+    if let Some(request_id) = request_id {
+        let prior: Option<(String,String)> = store.conn.query_row(
+            "SELECT request_sha256,run_id FROM swarm_create_requests
+             WHERE request_scope=?1 AND request_id=?2",
+            params![request_scope,request_id], |row| Ok((row.get(0)?,row.get(1)?)),
+        ).optional()?;
+        if let Some((prior_sha256,run_id)) = prior {
+            if prior_sha256 != request_sha256 {
+                bail!("create request id reused with different input");
+            }
+            let mut result = get(store,&run_id)?;
+            result["duplicate"] = json!(true);
+            return Ok(result);
+        }
+    }
     let key = category.to_lowercase();
-    let occupied: bool = store.conn.query_row(
+    let (policy,targets) = settings::resolve(store,category,p.get("policy"),p.get("allowed_targets"))?;
+    let tx = store.conn.transaction()?;
+    let occupied: bool = tx.query_row(
         "SELECT 1 FROM swarm_runs WHERE category_key=?1 AND status IN ('planning','running','paused','stalled','draining','stopping') LIMIT 1",
         params![key], |_| Ok(()),
     ).optional()?.is_some();
     if occupied {
         bail!("category already has an active swarm run");
     }
-    let (policy,targets) = settings::resolve(store,category,p.get("policy"),p.get("allowed_targets"))?;
     let id = format!("sw-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
     let now = crate::daemon::now();
-    store.conn.execute(
+    tx.execute(
         "INSERT INTO swarm_runs(id,category,category_key,objective,source_change_permission,status,generation,revision,allowed_targets,policy,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,'planning',1,0,?6,?7,?8,?8)",
         params![id,category,key,objective,source_change_permission,targets.to_string(),policy.to_string(),now],
     )?;
-    get(store, &id)
+    if let Some(request_id) = request_id {
+        tx.execute("INSERT INTO swarm_create_requests(request_scope,request_id,request_sha256,run_id,created_ms)
+            VALUES(?1,?2,?3,?4,?5)",params![request_scope,request_id,request_sha256,id,now])?;
+    }
+    tx.commit()?;
+    let mut result = get(store, &id)?;
+    if request_id.is_some() { result["duplicate"] = json!(false); }
+    Ok(result)
 }
 
 pub fn get(store: &Store, id: &str) -> Result<Value> {

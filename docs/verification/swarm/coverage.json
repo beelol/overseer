@@ -705,9 +705,10 @@
         "daemon/tests/swarm_availability.rs",
         "daemon/src/swarm/schema.rs",
         "daemon/tests/swarm_atlas.rs",
+        "daemon/tests/swarm_create.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Scripted local and Atlas-backed final-result/Stop orderings persist one operation sequence, preserve the artifact and result, reject acceptance/completion, and deduplicate replay. Local selected-account revocation/result/review/Stop orderings now record revocation in the same cancellation transaction and retain a readable director inbox; no worker launches after Stop. Simultaneous native races, native descendants, qualified live paths, and explicit user resume remain unverified."
+      "blocker": "Scripted local and Atlas-backed final-result/Stop orderings persist one operation sequence, preserve the artifact and result, reject acceptance/completion, and deduplicate replay. Local selected-account revocation/result/review/Stop orderings record revocation in the same cancellation transaction. Start request IDs now replay one durable run across daemon restart using a caller-provided scope, but no phone gateway binds that scope to an authenticated device. Other phone controls, stale queued phone commands, simultaneous native races, native descendants, qualified live paths, and explicit user resume remain unverified."
     },
     "SWARM-62": {
       "status": "partial",
