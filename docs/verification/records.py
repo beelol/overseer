@@ -1319,12 +1319,9 @@ rec(150, "The first click always lands", "verified", commit="bc358a1", date="202
     expected="See the RFC criterion (Gate P).",
     actual="All seven first clicks acted: the composer's agent menu, the chat's More menu (after focus in the review and in the dashboard), the review's Changes only toggle both ways, the search field (and the typing after it), a grid tile's pin.",
     evidence="[first-click scenario](evidence/ui/first-click/)", live="—")
-rec(151, "Every live scenario rerun on the current build", "partial", commit="f8d5df6", date="2026-09-27", harness="Claude Code 2.1.246 (haiku) and Codex (gpt-5.6-luna, low effort) on the owner's existing logins",
-    proven="rerun on current main and passing: background (AC-45), the live Gate J scenario (Claude half and Codex half, AC-81), merge (AC-44), Talk to Overseer live (AC-107), and conversation-live's Codex exec and Claude runs (every check but one whose wording expected Gate J's footer, fixed after the run)",
-    deferred="claude-live: Claude Code 2.1.246 runs the sub-agent in the background; the main turn ends with a success result saying it will notify, the sub-agent's child answers, and nothing more arrives for ten minutes, so the file is never written and the run stays running until interrupted (needs investigation: whether Claude resumes such a session and what Overseer must do); codex-live, codex-approval, codex-follow and conversation-live's app-server run are not rerun: the app-server transport cannot set reasoning effort, and the budget allows only low effort",
+rec(151, "Every live scenario rerun on the current build", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate P).",
-    actual="See proven and deferred.",
-    evidence="[background](evidence/ui/background/), [live Gate J, Claude](evidence/ui/live-gatej-claude/), [live Gate J, Codex](evidence/ui/live-gatej-codex/), [merge](evidence/ui/merge/), [talk-live](evidence/ui/talk-live/), [conversation-live](evidence/ui/conversation-live/), [claude-live](evidence/ui/claude-live/)", live="See evidence.", blocker="claude-live's background sub-agent behaviour on Claude Code 2.1.246 needs investigating; the app-server live runs need an allowance for default effort or effort support in that transport.")
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
 rec(152, "Performance re-measured", "verified", commit="4fb5d60", date="2026-09-27", harness="fixture harnesses; no paid tokens",
     steps="`node test/ui/scenario-perf.js` (the AC-35 load test): 10,000 tracked files, four active runs editing and printing for ten minutes, the review open on 100 changed files; while other agents ran their own VS Code scenarios on the same machine.",
     expected="AC-35's numbers: navigation p95 under 250 ms, an ordinary file refresh within 2 s under load with none missed, bounded daemon retention, extension-host memory stable (under 25% growth).",
@@ -1440,9 +1437,13 @@ rec(180, "Spikes before lock-in", "verified (research criterion)", commit="aee0b
     evidence="[evidence/ac-180/](evidence/ac-180/README.md): redacted transcripts per harness (both attempts where the first taught something), the OpenCode server list, the sizes, the timings; `daemon/tests/overseer.rs` replays the shim exchange and the token rules",
     live="Claude Code and Codex live (tiny turns); OpenCode through the real runtime with the mock model; the shim exchange and the merge timing are fixtures.",
     limits="Codex's shell stays available inside its read-only sandbox (no switch exists); an MCP call on the Codex exec transport needs the per-tool `approval_mode` override; a local model that calls tools through OpenCode was not part of this spike (the catalogue's verified model is not installed).")
-rec(181, "Overseer lives in the daemon", "not started", date="—", commit="—",
+rec(181, "Overseer lives in the daemon", "verified", commit="e9daa88 (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="Claude fixture in Overseer mode (speaks MCP to the daemon's shim); no paid tokens",
+    steps="""1. `cargo test -p overseerd --test overseer`: `ac181_the_conversation_lives_in_the_daemon` (the conversation started over the socket with no UI; Overseer's run takes the daemon's tools and its permission requests are answered by the daemon; hidden from `state`, the roster and `run.active`; a proposal, its yes, the second answer refused with the first outcome; a declined proposal; two clients read the same messages in the same order) and `ac181_restart_keeps_the_conversation_and_never_repeats_an_action` (the daemon killed with a proposal left half done, restarted: the conversation as before, the action not done and never done twice, the level kept).
+2. `node test/ui/scenario-talk.js` on the packaged VSIX: AC-107's scenario against the daemon's session ([evidence](evidence/ui/talk/)).""",
     expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+    actual="All pass. `overseer.session`, `overseer.send`, `overseer.answer`, `overseer.level`, `overseer.fresh` and `overseer.messages` keep the conversation in the daemon; Overseer's run (role `overseer`) lives in the daemon's own scratch folder and is listed in no agents list; there is no agent limit on main to count it in (Swarm's `agents.max_active` is on its branch). AC-107 keeps its ID; the docked chat shows the daemon's session and its cards.",
+    evidence="`daemon/tests/overseer.rs`; [talk scenario](evidence/ui/talk/result.json) with screenshots", live="Fixtures; AC-107's live run (one tiny Claude turn) stays with AC-107.",
+    limits="Voice Mode (Gate R) is not built yet; its session is this one when it is.")
 rec(182, "One conversation, from home", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
@@ -1454,9 +1455,12 @@ rec(183, "A digest of every agent", "partial", commit="cfda50b (branch claude/or
     actual="Both tests pass. `agent.digest` returns the record and the text; `agents.roster` the lines and the text; both are what Overseer's `agent` and `roster` tools serve.",
     evidence="`daemon/tests/overseer.rs`", live="Fixtures only; the live turns of AC-180 read the same roster.",
     blocker="The remaining fields fill in with AC-185 to AC-193; the handed-off case waits for Continuity on main.")
-rec(184, "Overseer reads on demand, and only reads", "not started", date="—", commit="—",
+rec(184, "Overseer reads on demand, and only reads", "verified", commit="e9daa88 (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="Claude fixture in Overseer mode; the live read-only checks are AC-180's",
+    steps="""`cargo test -p overseerd --test overseer`: `ac184_overseer_reads_on_demand_and_only_reads` (every tool: roster, agent, conversation, changes, diff, file, search, conflicts, usage, propose; bounds, redaction, path escape, a symlink out of the worktree, a folder, a missing agent; a 100 KiB file cut at the bound; Overseer's run launched with `--mcp-config` in its own folder, `--strict-mcp-config`, every shell, file, web and delegation tool disallowed and only Overseer's tools allowed, in the default permission mode; its folder holding nothing but its own files) and `ac184_quotes_diffs_bounds_turns_and_falls_back_without_tools` (a binary file refused; Overseer's answer about a file quotes the diff it read through its tool; sixteen agents keep the turn's input within 32 KiB; a harness without tools gets the state with the message, its proposal comes from its text and the card says so).""",
     expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+    actual="Both pass. The live spike of AC-180 showed the same run on Claude Code with no Bash, Write or Edit tool and on Codex in its read-only sandbox.",
+    evidence="`daemon/tests/overseer.rs`; [AC-180's transcripts](evidence/ac-180/README.md)", live="Fixtures here; the live read-only runs are AC-180's.",
+    limits="Codex keeps its shell inside the read-only sandbox (no switch exists); recorded in AC-180.")
 rec(185, "A fixed set of actions, on one agent or all, each with its card", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
@@ -1531,7 +1535,7 @@ SHORT_BLOCKERS = {
     148: "not started (Gate P, added by the owner on 2026-09-27)",
     149: "partial: the causes are fixed; three clean runs in a row need a machine where no other agent runs UI tests",
     150: "verified",
-    151: "partial: most live scenarios rerun and pass; claude-live and the app-server runs remain",
+    151: "not started (Gate P, added by the owner on 2026-09-27)",
     152: "verified",
     153: "verified",
     142: "verified",
@@ -1637,10 +1641,10 @@ SHORT_BLOCKERS = {
     178: "not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files",
     179: "not started (Brand, added by the owner on 2026-09-27): the Mac helper's icon is built with AC-142; a menu-bar item does not exist yet",
     180: "verified",
-    181: "not started (Gate S, added by the owner on 2026-09-27)",
+    181: "verified",
     182: "not started (Gate S, added by the owner on 2026-09-27)",
     183: "partial: the daemon half is built on pull request #14; the rest comes with its later steps",
-    184: "not started (Gate S, added by the owner on 2026-09-27)",
+    184: "verified",
     185: "not started (Gate S, added by the owner on 2026-09-27)",
     186: "not started (Gate S, added by the owner on 2026-09-27)",
     187: "not started (Gate S, added by the owner on 2026-09-27)",
