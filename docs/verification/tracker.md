@@ -17,7 +17,7 @@ Owners: **goal** = the agent running the everything goal. **owner** = only the o
 | AC-108 | Gate M design review | owner + goal | review page (Gate M), to publish | owner's marks |
 | AC-109 to AC-113 | Gate K follow-ups | goal | PR #8 (`claude/gate-k-followups`) | merge once the owner OKs round 3; record in the ledger |
 | AC-114 | Gate K in the owner's VS Code | owner | none | owner tries the build |
-| AC-115 to AC-141 | Phone remote (Gate N) | agent: Claude phone app | Gate N branch (its own pull request when ready) | watch; merge when finished; AC-133 needs the owner |
+| AC-115 to AC-137, AC-141 | Phone remote (Gate N) | agent: Claude phone app | PR #10 (`claude/phone-remote-vscode-control-b48a34`), a draft that says work continues | watch; merge when it is marked ready (the simulator milestone); AC-128 waits for AC-107; AC-133 and the iPhone parts need the owner |
 | AC-142 | One Overseer mark everywhere | goal + owner | none | owner adds the logo files to `docs/design/brand/`; then the goal wires them in everywhere |
 | AC-143 to AC-145, T-23, T-24 | Audio Mode (Gate O) | agent: Audio Mode | PR #5 (`codex/reactor-audio-mode`), PR #6 (`codex/audio-tui-controls`, stacked) | watch; merge #5 then #6 when finished; AC-145 needs the owner |
 | Swarm criteria | Category-directed Swarm mode | agent: Codex Swarm | PR #3 (`codex/swarm-mode`); criteria in `docs/rfcs/swarm-mode.md` on that branch | watch; merge when finished; its criteria join the ledger |

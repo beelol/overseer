@@ -28,6 +28,6 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 ## Where the designs are
 - Orchestrator UI (Gates J, K, M): `docs/rfcs/orchestrator-ui.md`
 - Continuity, offline mode (Gate L): `docs/rfcs/offline-mode.md`
-- Phone remote (Gate N): `docs/rfcs/` (see Gate N in the RFC)
+- Phone remote (Gate N): `docs/rfcs/phone-remote.md`, its wire format `docs/rfcs/phone-remote-protocol.md` and its goal `docs/rfcs/phone-remote-goal.md`; the work is in pull request #10
 - Audio Mode (Gate O), TUI (`docs/rfcs/tui.md`), Auto and Swarm: their RFCs under `docs/rfcs/`
 - Follow-through and agent oversight (Gates P and Q): `docs/overseer-rfc.md`; the goal is `docs/goals/everything.md` and what it tracks is `docs/verification/tracker.md`

@@ -1,6 +1,6 @@
 # Prepared goal: implement the phone remote on the same network
 
-Status: not activated. This file holds the goal for the first pull request and the full instruction behind it.
+Status: activated by the owner on 2026-09-26 (session budget: eight hours). The work is in pull request #10, a draft that says work continues. This file holds the goal for the first pull request and the full instruction behind it.
 Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 and AC-141 (Gate N) in the
 [main RFC](../overseer-rfc.md#gate-n--phone-remote-on-the-same-network-added-by-the-owner-2026-09-26).
 
