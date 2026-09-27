@@ -4740,6 +4740,24 @@ fn auto_recent_429_excludes_only_its_route_without_inventing_quota_exhaustion() 
 }
 
 #[test]
+fn auto_native_structured_retry_after_reaches_scoped_health_without_exhausting_quota() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models")]);
+    let failing = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-sol","effort":"medium",
+        "prompt":"simulate direct 429 with Retry-After","approval_policy":"never"})));
+    assert_eq!(d.wait_done(&failing, 15)["status"], "failed");
+    let event = d.events(&failing).into_iter().find(|event|
+        event["kind"] == "error" && event["payload"]["class"] == "rate_limit").unwrap();
+    assert_eq!(event["payload"]["retry_after_ms"], 300_000);
+    assert_ne!(d.call("auto.quota.state", json!({"profile_id":"system-codex",
+        "harness":"codex-app","model":"gpt-6-sol"}))["state"], "exhausted");
+}
+
+#[test]
 fn auto_recent_503_blocks_the_failed_endpoint_before_an_independent_child() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

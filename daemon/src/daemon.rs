@@ -2129,6 +2129,11 @@ impl Daemon {
                 state.last_error = Some((class.clone(), message.clone()));
                 ev("error", "harness", "exact", json!({"class": class, "message": message}), None)?
             }
+            Norm::ErrorRetryAfter { class, message, retry_after_ms } => {
+                state.last_error = Some((class.clone(), message.clone()));
+                ev("error", "harness", "exact", json!({"class": class, "message": message,
+                    "retry_after_ms": retry_after_ms}), None)?
+            }
             Norm::BackgroundTasks(n) => state.background = n,
             Norm::BackgroundLaunched(id) => {
                 state.backgrounded.insert(id);

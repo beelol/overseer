@@ -253,10 +253,13 @@ rl.on('line', line => {
         pendingTurnTimer = setTimeout(() => {}, 60_000);
         return;
       }
-      if (prompt === 'simulate direct 429' || prompt === 'simulate direct 503' || prompt === 'edit then 503') {
+      if (prompt === 'simulate direct 429' || prompt === 'simulate direct 429 with Retry-After'
+          || prompt === 'simulate direct 503' || prompt === 'edit then 503') {
+        const is429 = prompt === 'simulate direct 429' || prompt === 'simulate direct 429 with Retry-After';
         out({ method: 'turn/completed', params: { threadId: thread,
-          turn: { id: turn, status: 'failed', error: { message: prompt === 'simulate direct 429'
-            ? 'HTTP 429 Too Many Requests' : 'HTTP 503 Service Unavailable' } } } });
+          turn: { id: turn, status: 'failed', error: { message: is429
+            ? 'HTTP 429 Too Many Requests' : 'HTTP 503 Service Unavailable',
+            ...(prompt === 'simulate direct 429 with Retry-After' ? { retryAfterMs: 300000 } : {}) } } } });
         return;
       }
       let text;

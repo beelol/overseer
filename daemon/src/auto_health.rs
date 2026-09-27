@@ -77,6 +77,16 @@ pub fn parse_public_status(value: &Value, provider: &str, observed_ms: i64) -> R
 pub fn evaluate(route: &Route, observations: &[Observation], now_ms: i64) -> Health {
     let mut direct: Option<(i64, u8, Health)> = None;
     let mut provider_status: Option<(i64, Signal)> = None;
+    // A successful turn clears earlier direct failures for this route even
+    // after its short Healthy signal expires. Otherwise a long Retry-After
+    // would falsely reappear after a proven recovery.
+    let recovered_at = observations.iter()
+        .filter(|observation| matches!(&observation.scope, Scope::Route(id) if id == &route.id)
+            && observation.signal == Signal::RouteSuccess
+            && observation.expires_ms > observation.observed_ms
+            && observation.observed_ms <= now_ms)
+        .map(|observation| observation.observed_ms)
+        .max();
     for observation in observations {
         if observation.expires_ms <= observation.observed_ms
             || observation.observed_ms > now_ms
@@ -139,6 +149,9 @@ pub fn evaluate(route: &Route, observations: &[Observation], now_ms: i64) -> Hea
             _ => None,
         };
         if let Some((priority, health)) = matching {
+            if priority == 1 && recovered_at.is_some_and(|at| observation.observed_ms <= at) {
+                continue;
+            }
             let candidate = (observation.observed_ms, priority, health);
             if direct
                 .as_ref()
@@ -165,7 +178,10 @@ pub fn recent_local_observations(
     now_ms: i64,
 ) -> Result<Vec<Observation>> {
     const RECENT_MS: i64 = 60_000;
-    let since = now_ms.saturating_sub(RECENT_MS);
+    // A provider may ask us to wait longer than the transient default. Only
+    // bounded, structured retry timing can extend the local health window.
+    const MAX_RETRY_AFTER_MS: i64 = 24 * 60 * 60 * 1000;
+    let since = now_ms.saturating_sub(MAX_RETRY_AFTER_MS);
     let mut observations = Vec::new();
     let mut errors = store.conn.prepare(
         "SELECT e.ts,e.payload,r.profile_id,r.harness,r.model,r.launch FROM events e JOIN runs r ON r.id=e.run_id \
@@ -217,9 +233,15 @@ pub fn recent_local_observations(
             scope,
             signal,
             observed_ms: at,
-            expires_ms: at.saturating_add(RECENT_MS),
+            expires_ms: at.saturating_add(
+                value.get("retry_after_ms").and_then(Value::as_i64)
+                    .filter(|ms| (1..=MAX_RETRY_AFTER_MS).contains(ms))
+                    .filter(|_| matches!(signal, Signal::Throttled | Signal::EndpointFailure))
+                    .unwrap_or(RECENT_MS)),
         });
     }
+    // Keep completed turns for the maximum failure window so an expired
+    // Healthy signal can still cancel an earlier active cooldown.
     let mut successes = store.conn.prepare(
         "SELECT ended_ms,profile_id,model,effort FROM runs WHERE status='completed' \
          AND ended_ms>=?1 AND ended_ms<=?2 ORDER BY ended_ms DESC LIMIT 100",
@@ -333,6 +355,46 @@ mod tests {
         assert_eq!(observations.len(), 2);
         assert_eq!(evaluate(&scoped, &observations, 1100), Health::Unavailable);
         assert_eq!(evaluate(&independent, &observations, 1100), Health::Unknown);
+    }
+
+    #[test]
+    fn structured_retry_after_outlives_the_default_cooldown_without_becoming_quota() {
+        let store = crate::store::Store::open(std::path::Path::new(":memory:")).unwrap();
+        store.conn.execute_batch("INSERT INTO workspaces(id,path,repo_root,common_dir,kind,initial_dirty,created_ms) VALUES('w','/tmp','/tmp','/tmp','current','{}',0);
+            INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms) VALUES('t','t','p','/tmp','w',0);
+            INSERT INTO runs(id,task_id,harness,profile_id,model,effort,workspace_id,status,created_ms,title,capabilities)
+                VALUES('r','t','codex-app','acct-a','general','medium','w','failed',1000,'r','{}');").unwrap();
+        store.conn.execute("INSERT INTO events(ts,task_id,run_id,kind,source,confidence,payload)
+            VALUES(1000,'t','r','error','harness','exact',?1)",
+            [serde_json::json!({"class":"rate_limit","message":"429",
+                "retry_after_ms":300_000}).to_string()]).unwrap();
+        let route = route("acct-a/general/medium", "codex-app", "openai", "codex", "acct-a");
+        let later = recent_local_observations(&store, 1000 + 120_000).unwrap();
+        assert_eq!(evaluate(&route, &later, 1000 + 120_000), Health::Unavailable);
+        assert_eq!(route.quota, Allowance::ObservedNonExhausted,
+            "a transient Retry-After is not proof of subscription exhaustion");
+        store.conn.execute_batch("INSERT INTO runs(id,task_id,harness,profile_id,model,effort,workspace_id,status,created_ms,ended_ms,title,capabilities)
+            VALUES('recovered','t','codex-app','acct-a','general','medium','w','completed',2000,31000,'recovered','{}');").unwrap();
+        let after_success_freshness = recent_local_observations(&store, 1000 + 120_000).unwrap();
+        assert_eq!(evaluate(&route, &after_success_freshness, 1000 + 120_000), Health::Unknown,
+            "an older retry delay must not reblock a route after a successful turn");
+        let recovered = recent_local_observations(&store, 1000 + 300_000).unwrap();
+        assert_eq!(evaluate(&route, &recovered, 1000 + 300_000), Health::Unknown);
+    }
+
+    #[test]
+    fn later_route_success_clears_a_long_cooldown_without_claiming_fresh_health_forever() {
+        let route = route("codex", "codex-app", "openai", "codex", "acct-a");
+        let failure = obs(Scope::AccountEndpoint { profile_id: "acct-a".into(),
+            provider: "openai".into(), endpoint: "codex".into() },
+            Signal::Throttled, 1_000, 301_000);
+        let success = obs(Scope::Route(route.id.clone()), Signal::RouteSuccess, 31_000, 91_000);
+        assert_eq!(evaluate(&route, &[failure.clone(), success.clone()], 40_000), Health::Healthy);
+        assert_eq!(evaluate(&route, &[failure.clone(), success.clone()], 120_000), Health::Unknown);
+        let newer_failure = obs(Scope::AccountEndpoint { profile_id: "acct-a".into(),
+            provider: "openai".into(), endpoint: "codex".into() },
+            Signal::Throttled, 130_000, 430_000);
+        assert_eq!(evaluate(&route, &[failure, success, newer_failure], 140_000), Health::Unavailable);
     }
 
     #[test]

@@ -27,6 +27,9 @@ pub enum Norm {
     Quota(Value),
     Permission { request_id: String, tool: String, input: Value },
     Error { class: String, message: String },
+    /// Only an explicit, bounded numeric native field can extend the
+    /// transient health cooldown; prose is never parsed as Retry-After.
+    ErrorRetryAfter { class: String, message: String, retry_after_ms: i64 },
     TurnDone { ok: bool, summary: Option<String> },
     /// JSON-RPC response to one of Overseer's requests (app-server transport).
     RpcResult { id: String, result: Value, error: Option<Value> },
@@ -471,6 +474,22 @@ pub fn classify_error(message: &str) -> &'static str {
     }
 }
 
+fn structured_error(message: &str, source: &Value) -> Norm {
+    structured_error_class(classify_error(message), message, source)
+}
+
+fn structured_error_class(class: &str, message: &str, source: &Value) -> Norm {
+    let retry_after_ms = source.get("retryAfterMs").or_else(|| source.get("retry_after_ms"))
+        .and_then(Value::as_i64)
+        .filter(|ms| (1..=86_400_000).contains(ms));
+    match (class, retry_after_ms) {
+        ("rate_limit" | "service_unavailable", Some(retry_after_ms)) => Norm::ErrorRetryAfter {
+            class: class.into(), message: truncate(message, 2000), retry_after_ms,
+        },
+        _ => Norm::Error { class: class.into(), message: truncate(message, 2000) },
+    }
+}
+
 /// Connection failures and provider outages (Continuity, AC-83): the request never reached the
 /// provider, or the provider answered with a failure of its own. `m` is lower-case.
 fn is_network_error(m: &str) -> bool {
@@ -535,11 +554,11 @@ pub fn parse_codex(v: &Value) -> Vec<Norm> {
         "turn.completed" => vec![Norm::Usage(v["usage"].clone()), Norm::TurnDone { ok: true, summary: None }],
         "turn.failed" => {
             let msg = s(&v["error"]["message"]);
-            vec![Norm::Error { class: classify_error(&msg).into(), message: truncate(&msg, 2000) }, Norm::TurnDone { ok: false, summary: Some(truncate(&msg, 300)) }]
+            vec![structured_error(&msg, &v["error"]), Norm::TurnDone { ok: false, summary: Some(truncate(&msg, 300)) }]
         }
         "error" => {
             let msg = s(&v["message"]);
-            vec![Norm::Error { class: classify_error(&msg).into(), message: truncate(&msg, 2000) }]
+            vec![structured_error(&msg, v)]
         }
         "item.started" | "item.updated" | "item.completed" => {
             let item = &v["item"];
@@ -572,7 +591,7 @@ pub fn parse_codex(v: &Value) -> Vec<Norm> {
                 "todo_list" if done => vec![Norm::Text { role: "plan".into(), text: truncate(&item["items"].to_string(), 4000) }],
                 "error" => {
                     let msg = s(&item["message"]);
-                    vec![Norm::Error { class: classify_error(&msg).into(), message: truncate(&msg, 2000) }]
+                    vec![structured_error(&msg, item)]
                 }
                 "collab_tool_call" => parse_codex_collab(item, done),
                 _ if done => vec![Norm::Unparsed(truncate(&v.to_string(), 4000))],
@@ -667,7 +686,7 @@ pub fn parse_codex_app(v: &Value) -> Vec<Norm> {
             let status = s(&turn["status"]);
             let mut out = Vec::new();
             if let Some(msg) = turn["error"]["message"].as_str() {
-                out.push(Norm::Error { class: classify_error(msg).into(), message: truncate(msg, 2000) });
+                out.push(structured_error(msg, &turn["error"]));
             }
             out.push(Norm::TurnDone { ok: status == "completed", summary: Some(status) });
             out
@@ -676,7 +695,8 @@ pub fn parse_codex_app(v: &Value) -> Vec<Norm> {
         "account/rateLimits/updated" => vec![Norm::Usage(json!({"rate_limits": params["rateLimits"]}))],
         "error" => {
             let msg = s(&params["error"]["message"]);
-            vec![Norm::Error { class: classify_error(&msg).into(), message: truncate(&format!("{msg}{}", if params["willRetry"] == true { " (will retry)" } else { "" }), 2000) }]
+            let display = format!("{msg}{}", if params["willRetry"] == true { " (will retry)" } else { "" });
+            vec![structured_error(&display, &params["error"])]
         }
         "item/started" | "item/completed" => {
             let item = &params["item"];
@@ -778,7 +798,7 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
                     "billing_error" => "quota".to_string(),
                     _ => classify_error(&text).to_string(),
                 };
-                out.push(Norm::Error { class, message: truncate(&text, 2000) });
+                out.push(structured_error_class(&class, &text, v));
                 return out;
             }
             let content = &v["message"]["content"];
@@ -843,7 +863,7 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
             let result = s(&v["result"]);
             let mut out = vec![Norm::Usage(json!({"usage": v["usage"], "total_cost_usd": v["total_cost_usd"], "num_turns": v["num_turns"]}))];
             if is_error {
-                out.push(Norm::Error { class: classify_error(&result).into(), message: truncate(&result, 2000) });
+                out.push(structured_error(&result, v));
             }
             if let Some(denials) = v["permission_denials"].as_array().filter(|d| !d.is_empty()) {
                 let tools: Vec<String> = denials.iter().map(|d| s(&d["tool_name"])).collect();
@@ -947,7 +967,7 @@ pub fn parse_opencode(v: &Value) -> Vec<Norm> {
         }
         "error" => {
             let msg = v["error"]["data"]["message"].as_str().or(v["error"]["message"].as_str()).map(str::to_string).unwrap_or_else(|| v["error"].to_string());
-            out.push(Norm::Error { class: classify_error(&msg).into(), message: truncate(&msg, 2000) });
+            out.push(structured_error(&msg, &v["error"]["data"]));
             out.push(Norm::TurnDone { ok: false, summary: Some(truncate(&msg, 300)) });
         }
         _ => out.push(Norm::Unparsed(truncate(&v.to_string(), 4000))),
@@ -1003,6 +1023,26 @@ pub fn opencode_store_children(db: &Path, root_session: &str) -> Result<Vec<Norm
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn structured_retry_after_is_bounded_and_never_read_from_error_prose() {
+        let native = json!({"method":"error","params":{"error":{
+            "message":"HTTP 429 Too Many Requests","retryAfterMs":300_000}}});
+        assert_eq!(parse_codex_app(&native), vec![Norm::ErrorRetryAfter {
+            class:"rate_limit".into(), message:"HTTP 429 Too Many Requests".into(),
+            retry_after_ms:300_000,
+        }]);
+        let mut injected = native;
+        injected["params"]["error"]["retryAfterMs"] = json!("300000");
+        injected["params"]["error"]["message"] = json!("HTTP 429 Too Many Requests; retryAfterMs: 300000");
+        assert!(matches!(&parse_codex_app(&injected)[0], Norm::Error { class, .. } if class == "rate_limit"));
+        injected["params"]["error"]["retryAfterMs"] = json!(100_000_000);
+        assert!(matches!(&parse_codex_app(&injected)[0], Norm::Error { class, .. } if class == "rate_limit"));
+        injected["params"]["error"]["message"] = json!("usage limit reached");
+        injected["params"]["error"]["retryAfterMs"] = json!(300_000);
+        assert!(matches!(&parse_codex_app(&injected)[0], Norm::Error { class, .. } if class == "quota"),
+            "Retry-After cannot recast a quota rejection as transient health");
+    }
 
     #[test]
     fn classify_errors() {
