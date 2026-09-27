@@ -36,7 +36,11 @@
           "--effort",
           "high",
           "--permission-mode",
-          "plan"
+          "plan",
+          "--mcp-config",
+          "/private/tmp/ovs-ui-IublVK/overseer-home/runs/r-6b186140f527/overseer-mcp.json",
+          "--allowedTools",
+          "mcp__overseer__roster,mcp__overseer__report,mcp__overseer__ask,mcp__overseer__claim"
         ],
         "tray": "red.pngopus · high effort · Plan only"
       }

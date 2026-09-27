@@ -1,19 +1,14 @@
-[2026-09-27T17:30:35.044Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+== scenario home, briefings/channel on, check-ins every:3
 [2026-09-27T17:30:41.182Z] PASS home shows the conversation with Overseer above the composer, whose target is New agent {"target":"agent"}
 [2026-09-27T17:30:42.180Z] PASS Enter at home starts an agent exactly as before, with no Overseer turn in the event log {"started":"r-84cd8bb5d0e9","overseerTurns":0}
-[2026-09-27T17:30:42.364Z] screenshot docs/verification/evidence/ui/home/01-home-started.png
 [2026-09-27T17:30:42.364Z] PASS the start appears in the conversation as a card
 [2026-09-27T17:30:44.579Z] PASS typing @overseer first switches the target chip to Overseer {"chip":"overseer"}
 [2026-09-27T17:30:45.260Z] PASS the same text sent to Overseer starts no agent and is answered in the conversation {"runs":1,"answer":"OverseerHere is what everyone is doing:\n\n- **tidy the docs**: completed"}
-[2026-09-27T17:30:45.410Z] screenshot docs/verification/evidence/ui/home/02-home-overseer.png
 [2026-09-27T17:30:46.255Z] PASS `@` offers the agents by name, narrowed as you type ["tidy the docscompleted"]
 [2026-09-27T17:30:46.523Z] PASS Enter inserts the named agent {"inserted":"@overseer Tell @tidy the docs "}
 [2026-09-27T17:30:46.881Z] PASS a named agent reaches Overseer as that agent's id {"sent":"Tell @tidy the docs (r-84cd8bb5d0e9) to add a changelog"}
 [2026-09-27T17:31:27.797Z] PASS *Start as an agent* starts one from a message sent to Overseer {"corrected":"r-57c9d50d979b"}
 [2026-09-27T17:31:32.859Z] PASS *Ask Overseer instead* stops the agent just started, removes its untouched worktree, and puts the words back for Overseer {"gone":true,"back":"what is the plan for the docs?","chip2":"overseer"}
 [2026-09-27T17:31:36.407Z] PASS the docked chat and home show the same conversation {"docked":"What is everyone doing?\nShared the state of 1 agent\nUsed\nmcp__overseer__check_in\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nDone\n0s\n2 tokens\nTell @tidy the docs (r-84cd8bb5d0e9) to add a changelog\nShared the state of 1 agent\n\nI could not find an agent called @tidy the docs (r-84cd8bb","home":"Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nStart as an agent\nOverseer\nHere is what everyone is doing:\n\n- **tidy the docs**: completed\nYou\nTell @tidy the docs (r-84cd8bb5d0e9) to add a changelog\nStart as an agent\nOverseer\nI could not fin"}
-[2026-09-27T17:31:36.617Z] screenshot docs/verification/evidence/ui/home/03-docked-same.png
 [2026-09-27T17:31:38.608Z] PASS *Start fresh* begins a new conversation and leaves a hold in place {"holds":[{"by":"owner","card":null,"reason":"kept through a fresh start","release_on":{"kind":"release"},"run_id":"r-84cd8bb5d0e9","set_ms":1790530296629,"title":"tidy the docs"}]}
-[2026-09-27T17:31:38.842Z] screenshot docs/verification/evidence/ui/home/04-home-fresh.png
-[2026-09-27T17:31:43.050Z] screenshot docs/verification/evidence/ui/home/05-home-overseer-dark.png
-[2026-09-27T17:31:47.277Z] screenshot docs/verification/evidence/ui/home/06-home-overseer-light.png
+SCENARIO PASSED /private/tmp/ovs-ui-SnlPOg

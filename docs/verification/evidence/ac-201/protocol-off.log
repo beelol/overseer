@@ -1,0 +1,61 @@
+== protocol, briefings/channel off, check-ins off
+test ac08_connections_from_a_foreign_uid_are_rejected_and_logged ... ok
+test ac13_isolated_profiles_have_separate_homes_and_no_keys ... ok
+test ac08_socket_is_owner_only_and_requests_are_not_shell ... ok
+test ac10_redaction_of_secrets_in_output ... ok
+test ac06_structured_harness_silence_is_not_completion ... ok
+test ac14_fixture_claude_background_notice_read_within_the_turn_does_not_hold_the_run_open ... ok
+test ac14_fixture_claude_subagents_own_background_child_does_not_hold_the_run_open ... ok
+test ac07_lost_session_is_reported_not_running ... ok
+test ac19_fixture_codex_app_child_threads_nest_and_do_not_end_the_parent ... ok
+test ac18_fixture_recursive_tree_duplicates_and_delayed_parent ... ok
+test ac10_replay_cursor_burst_and_retention ... ok
+test ac14_fixture_claude_background_task_finishing_before_the_interim_result_still_keeps_the_session_open ... ok
+test ac14_fixture_claude_background_subagent_keeps_session_open_for_permissions ... ok
+test ac19_fixture_codex_live_transcript_children ... ok
+test ac09_follow_up_reaches_only_the_selected_run ... ok
+test ac26_unknown_fork_is_reported_unavailable ... ok
+test ac20_prose_is_not_a_child_and_unknown_events_are_visible ... ok
+test ac16_fixture_error_classes_stay_distinct ... ok
+test ac34_merge_conflicts_do_not_break_snapshots_or_diffs ... ok
+test ac28_opposing_layers_remain_inspectable ... ok
+test ac22_current_checkout_preserves_preexisting_work ... ok
+test ac05_ac07_state_survives_daemon_crash_and_reattaches ... ok
+Successfully logged in (fixture account work).
+Login successful (fixture account claudia).
+Successfully logged in (fixture account desk1).
+test ac21_parallel_worktrees_are_independent_and_collisions_are_safe ... ok
+Successfully logged in (fixture account desk2).
+test ac16_fixture_codex_app_server_approvals_interrupt_and_unsupported_requests ... ok
+Successfully logged in (fixture account work2).
+test ac43_fixture_tool_calls_carry_inputs_and_results_for_the_conversation_view ... ok
+test ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_removal ... ok
+test ac16_fixture_permission_allow_deny_and_interrupt_waiting_run ... ok
+test ac23_unrelated_writer_rejected_on_current_checkout ... ok
+test ac27_complete_change_and_dirty_views ... ok
+test ac45_no_notice_when_nothing_is_running ... ok
+test ac52_notifications_use_the_overseer_helper_and_fall_back_when_denied_or_missing ... ok
+test ac06_lifecycle_states_follow_real_signals ... ok
+test ac60_repo_files_lists_mentionable_files_best_first ... ok
+test ac44_clean_merge_back_commits_the_worktree_and_merges_only_on_request ... ok
+test ac52_the_daemon_finds_the_notifier_app_next_to_its_own_binary ... ok
+test ac15_generic_harness_paths_with_spaces_failures_and_unknown_capabilities ... ok
+test ac44_conflicts_are_resolved_in_the_worktree_before_the_target_changes ... ok
+test ac52_background_notice_is_delivered_by_the_helper ... ok
+test ac50_pr_plan_targets_the_branch_name_in_a_fresh_clone ... ok
+test ac26_snapshots_and_selectable_bases ... ok
+test ac24_cleanup_reports_and_preserves_until_confirmed ... ok
+test ac62_account_usage_is_what_the_harness_reports ... ok
+test ac45_last_vscode_window_closing_with_active_runs_posts_a_notice_but_a_reload_does_not ... ok
+test ac60_an_interrupted_claude_turn_is_interrupted_not_failed ... ok
+test ac60_turn_options_reach_claude_and_unsupported_ones_are_refused ... ok
+test ac63_search_finds_tasks_by_title_output_and_status_and_archive_hides_without_deleting ... ok
+test ac50_pr_plan_explains_refusals_and_prepares_a_github_branch_without_merging ... ok
+test ac44_refuses_dirty_target_active_runs_and_current_checkout_tasks ... ok
+test ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside ... ok
+test t11_an_attached_tui_counts_as_a_watching_ui ... ok
+test ac45_one_notice_per_quit_a_brief_reconnect_does_not_repeat_it ... ok
+test ac45_stop_all_interrupts_runs_forces_stragglers_and_exits_the_daemon ... ok
+
+test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.69s
+
