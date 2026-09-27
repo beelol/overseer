@@ -1150,6 +1150,12 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 }
                 let now_ms = estimator["now_ms"].as_i64()
                     .ok_or_else(|| anyhow!("automatic estimator observation time is missing"))?;
+                let raw_inputs = estimator["inputs"].as_array()
+                    .ok_or_else(|| anyhow!("automatic estimator inputs are missing"))?;
+                if raw_inputs.len() != routes.len() || raw_inputs.len() > 128
+                    || serde_json::to_vec(raw_inputs)?.len() > 128 * 1024 {
+                    return Err(anyhow!("automatic estimator replay inputs are incomplete or oversized"));
+                }
                 let inputs: Vec<crate::auto_fit::FitEvidenceInput> =
                     serde_json::from_value(estimator["inputs"].clone())?;
                 let saved_results = estimator["routes"].as_array()

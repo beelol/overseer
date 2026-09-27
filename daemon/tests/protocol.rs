@@ -3141,6 +3141,13 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
         rusqlite::params![missing_inputs.to_string(), seq]).unwrap();
     assert!(d.try_call("auto.decision.replay", json!({"event_seq":seq})).is_err(),
         "v7 replay must not trust saved fit when estimator inputs are missing");
+    let mut oversized_inputs = original_trace.clone();
+    oversized_inputs["estimator"]["inputs"][0]["ignored_padding"] =
+        json!("x".repeat(129 * 1024));
+    db.execute("UPDATE events SET payload=?1 WHERE seq=?2",
+        rusqlite::params![oversized_inputs.to_string(), seq]).unwrap();
+    assert!(d.try_call("auto.decision.replay", json!({"event_seq":seq})).is_err(),
+        "v7 replay must reject oversized raw inputs even when deserialization ignores a field");
     let mut legacy = original_trace.clone();
     legacy["selector_version"] = json!("multi-harness-preflight-v6");
     db.execute("UPDATE events SET payload=?1 WHERE seq=?2",
