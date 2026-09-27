@@ -42,6 +42,7 @@ class Comparison {
     this.subscriptions = [this.emitter, this.progressEmitter, repo.state.onDidChange(() => {
       if (!this.refreshingStatus) this.invalidate(true);
     })];
+    this.watchGitDir();
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(repo.rootUri, '**/*'));
     this.subscriptions.push(watcher, watcher.onDidChange(uri => this.invalidate(true, uri)),
       watcher.onDidCreate(uri => this.invalidate(true, uri)), watcher.onDidDelete(uri => this.invalidate(true, uri)),
@@ -68,6 +69,20 @@ class Comparison {
     const before = this.browsed.length;
     this.browsed = this.browsed.filter(p => p !== relPath);
     if (this.browsed.length !== before) this.invalidate(false);
+  }
+
+  /** Staging and commits change the Git index or HEAD, which the file watcher does not see (they
+   *  live in the Git directory). Watch them directly instead of waiting for the Git extension to
+   *  notice (Overseer: staged-scope refresh within 2 s, AC-31). */
+  async watchGitDir() {
+    try {
+      const dir = await new Promise((resolve, reject) => require('child_process').execFile('git', ['rev-parse', '--absolute-git-dir'],
+        { cwd: this.repo.rootUri.fsPath }, (error, out) => (error ? reject(error) : resolve(out.trim()))));
+      if (this.disposed || !dir) return;
+      const watcher = require('fs').watch(dir, (event, name) => { if (/^(index|HEAD)(\.lock)?$/.test(String(name || ''))) this.invalidate(true); });
+      watcher.on('error', () => {});
+      this.subscriptions.push({ dispose: () => watcher.close() });
+    } catch { /* the Git extension's own events still refresh the review */ }
   }
 
   configure(mode, target) {
