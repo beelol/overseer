@@ -147,7 +147,8 @@ class AgentsProvider {
       (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
       (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [],
       this.model.swarms.map(s => [s.id, s.status, s.revision, s.active_worker_processes,
-        s.job_counts, s.unconfirmed_exit_count, s.benefit?.decision, s.benefit?.reason, s.capacity]),
+        s.job_counts, s.unconfirmed_exit_count, s.benefit?.decision, s.benefit?.reason,
+        s.availability?.observed_ms, s.availability?.state, s.availability?.reason, s.capacity]),
       (this.continuity?.data?.handoffs || []).length]);
   }
   getTreeItem(node) { return node.item; }
@@ -372,6 +373,32 @@ class AgentsProvider {
       item.tooltip = `Recorded ${new Date(observation.observed_ms).toLocaleString()}. ` +
         (expired ? 'This observation has expired; refresh eligibility before admitting work.' :
           'This was the last eligibility observation; admission revalidates it.');
+      rows.push({ item, parent });
+    }
+    for (const window of run.availability?.allowance_windows || []) {
+      const expired = !Number.isSafeInteger(run.availability.expires_ms) ||
+        run.availability.expires_ms <= Date.now();
+      const item = new vscode.TreeItem(`${window.pool_id} · ${window.window_id}${expired ? ' (expired)' : ''}`);
+      item.iconPath = new vscode.ThemeIcon(expired || window.remaining_milli == null ? 'question' : 'graph');
+      const amount = Number.isSafeInteger(window.remaining_milli) ?
+        nativeAmount(window.remaining_milli, window.unit) : 'unknown';
+      const change = Number.isSafeInteger(window.change_milli) ?
+        window.change_milli < 0 ? `down ${nativeAmount(-window.change_milli, window.unit)}` :
+          window.change_milli > 0 ? `up ${nativeAmount(window.change_milli, window.unit)}` : 'unchanged' : null;
+      item.description = [amount, change].filter(Boolean).join(' · ');
+      const usable = Number.isSafeInteger(window.observed_usable_milli) ?
+        nativeAmount(window.observed_usable_milli, window.unit) : 'unknown';
+      item.tooltip = `${window.pool_id} / ${window.window_id} · ${window.confidence || 'unknown'} observation\n` +
+        `Remaining ${amount}; unreserved and unprotected ${usable}. ` +
+        `Recorded ${new Date(run.availability.observed_ms).toLocaleString()}. ` +
+        (expired ? 'Expired; refresh before admitting work.' :
+          'Last observation, not live usage; admission revalidates it.');
+      item.accessibilityInformation = { label: `Last observed allowance for ${window.pool_id}, ${window.window_id}: ${item.description}${expired ? ', expired' : ''}` };
+      rows.push({ item, parent });
+    }
+    if (run.availability?.allowance_windows_truncated) {
+      const item = new vscode.TreeItem('More allowance windows');
+      item.description = `showing 100 of ${run.availability.allowance_window_count}`;
       rows.push({ item, parent });
     }
     const last = run.capacity?.last_admission;

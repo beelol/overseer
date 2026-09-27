@@ -26,7 +26,11 @@ Module._load = originalLoad;
     job_counts: { total: 100, by_status: { running: 32, ready: 56, submitted: 8, blocked: 4 } },
     active_worker_processes: 32, registered_attempts: 32, director: { owner_status: 'active' },
     availability: { state: 'blocked', reason: 'no_allowed_target',
-      observed_ms: Date.now() - 1000, expires_ms: Date.now() + 60000 },
+      observed_ms: Date.now() - 1000, expires_ms: Date.now() + 60000,
+      allowance_windows: [{ pool_id: 'fixture-pool', window_id: 'week', unit: 'points',
+        remaining_milli: 500, previous_remaining_milli: 100000, change_milli: -99500,
+        observed_usable_milli: 500, confidence: 'exact' }],
+      allowance_window_count: 1, allowance_windows_truncated: false },
     benefit: { decision: 'serial', reason: 'finishing_unaffordable', max_parallel_workers: 1 },
     capacity: { provider_usage_state: 'unknown', source: 'fixture_admission',
       last_admission: { job_id: 'j032', target_id: 'fixture-a', status: 'blocked',
@@ -86,6 +90,10 @@ Module._load = originalLoad;
   assert(capacity.some(row => /eligibility.*blocked/i.test(row.item.label) &&
     /no allowed target/i.test(row.item.description)),
     'show the recorded blocked eligibility reason');
+  assert(capacity.some(row => /fixture-pool.*week/i.test(row.item.label) &&
+    /0\.5 points.*down 99\.5 points/i.test(row.item.description) &&
+    /exact/.test(row.item.tooltip) && /Last observed allowance/.test(row.item.accessibilityInformation.label)),
+    'show the observed native-unit allowance drop without implying live usage');
   assert(capacity.some(row => /usage unknown/i.test(row.item.label)),
     'fixture estimates must not be presented as measured provider usage');
   assert(capacity.some(row => /last admission held/i.test(row.item.label) &&
@@ -98,6 +106,19 @@ Module._load = originalLoad;
   assert(staleCapacity.some(row => /eligibility.*expired/i.test(row.item.label) &&
     /no allowed target/i.test(row.item.description)),
     'an expired eligibility observation must not be presented as current');
+  assert(staleCapacity.some(row => /week.*expired/i.test(row.item.label)),
+    'an expired allowance observation must be marked expired');
+  run.availability.allowance_windows[0].remaining_milli = null;
+  run.availability.allowance_windows[0].change_milli = null;
+  run.availability.allowance_windows[0].confidence = 'unknown';
+  const unknownCapacity = provider.getChildren(firstPage[1]);
+  assert(unknownCapacity.some(row => /fixture-pool.*week/i.test(row.item.label) &&
+    /unknown/.test(row.item.description) && !/0 points/.test(row.item.description)),
+    'unknown allowance must not be displayed as zero');
+  const beforeObservation = provider.signature();
+  run.availability.observed_ms += 1000;
+  assert.notEqual(provider.signature(), beforeObservation,
+    'a newer availability observation must redraw the Agents tree even without a job change');
   run.benefit = { decision: 'parallel', reason: 'beneficial', max_parallel_workers: 3 };
   run.policy = { effective: { max_workers: 8 } };
   const scaledCapacity = provider.getChildren(firstPage[1]);
