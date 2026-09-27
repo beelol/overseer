@@ -585,8 +585,11 @@ impl Daemon {
         let started = self.start_turn_internal(&run.id, &prompt, false, &opts, swarm_identity.as_ref());
         if let Err(e) = started {
             let current = self.run(&run.id)?;
-            let launch_uncertain = crate::swarm::mark_uncertain_director_spawn(
-                &self.store.lock().unwrap(), &run.id)?;
+            let launch_uncertain = {
+                let store = self.store.lock().unwrap();
+                crate::swarm::mark_uncertain_director_spawn(&store, &run.id)?
+                    || store.mark_worker_spawn_uncertain(&run.id)?
+            };
             // If no supervisor was recorded, a rejected initial turn must not
             // consume an active slot forever. A process with a recorded run
             // directory is left to normal exit/recovery reconciliation.
@@ -785,6 +788,7 @@ impl Daemon {
             });
         }
         self.store.lock().unwrap().mark_director_spawn_requested(&run.id)?;
+        self.store.lock().unwrap().mark_worker_spawn_requested(&run.id)?;
         let mut child = cmd.spawn().context("starting run supervisor")?;
         std::thread::spawn(move || {
             let _ = child.wait();
@@ -1462,19 +1466,85 @@ impl Daemon {
         Ok(true)
     }
 
+    fn reattach_unrecorded_worker(&self, run: &Run) -> Result<bool> {
+        let identity: Option<(String,String,String,i64,String)> = self.store.lock().unwrap().conn.query_row(
+            "SELECT l.run_id,l.job_id,l.attempt_id,a.revision,a.token_sha256
+             FROM swarm_worker_launches l JOIN swarm_attempts a ON a.id=l.attempt_id
+             WHERE l.overseer_run_id=?1
+             AND (l.launch_phase='spawn_requested' OR l.launch_phase IS NULL)
+             AND a.status='registered' AND a.run_id=l.run_id AND a.job_id=l.job_id",
+            [&run.id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+        ).optional()?;
+        let Some((swarm_run,job,attempt,revision,digest)) = identity else { return Ok(false) };
+        let dir = paths::runs_dir().join(&run.id).join(format!("p{}",run.process_generation+1));
+        if !std::fs::symlink_metadata(&dir).is_ok_and(|m| m.file_type().is_dir()) {
+            return Ok(false);
+        }
+        let launch_path = dir.join("launch.json");
+        use std::os::unix::fs::PermissionsExt;
+        let Ok(metadata) = std::fs::symlink_metadata(&launch_path) else { return Ok(false) };
+        if !metadata.file_type().is_file() || metadata.len() > 1_000_000
+            || metadata.permissions().mode() & 0o077 != 0 {
+            return Ok(false);
+        }
+        let Ok(raw) = std::fs::read(&launch_path) else { return Ok(false) };
+        let Ok(launch) = serde_json::from_slice::<LaunchFile>(&raw) else { return Ok(false) };
+        let Some(token) = launch.env.get("OVERSEER_SWARM_TOKEN") else { return Ok(false) };
+        let revision_text = revision.to_string();
+        use sha2::{Digest, Sha256};
+        if format!("{:x}",Sha256::digest(token.as_bytes())) != digest
+            || launch.env.get("OVERSEER_SWARM_RUN_ID").map(String::as_str) != Some(swarm_run.as_str())
+            || launch.env.get("OVERSEER_SWARM_JOB_ID").map(String::as_str) != Some(job.as_str())
+            || launch.env.get("OVERSEER_SWARM_ATTEMPT_ID").map(String::as_str) != Some(attempt.as_str())
+            || launch.env.get("OVERSEER_SWARM_REVISION").map(String::as_str) != Some(revision_text.as_str())
+            || launch.cwd != self.workspace(&run.workspace_id)?.path {
+            return Ok(false);
+        }
+        let exited = std::fs::read(dir.join("exit.json")).ok()
+            .and_then(|raw| serde_json::from_slice::<ExitInfo>(&raw).ok()).is_some();
+        let live = std::fs::read(dir.join("shim.json")).ok()
+            .and_then(|raw| serde_json::from_slice::<ShimInfo>(&raw).ok())
+            .is_some_and(|info| pid_alive(info.shim_pid));
+        if !exited && !live { return Ok(false) }
+        let store = self.store.lock().unwrap();
+        let prior: Option<String> = store.conn.query_row(
+            "SELECT launch FROM runs WHERE id=?1", [&run.id], |r| r.get(0))?;
+        let generic: Value = prior.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null);
+        let meta = json!({"generic":generic,"program":launch.program,
+            "args":launch.args.iter().map(|arg|redact(arg)).collect::<Vec<_>>(),
+            "env_keys":launch.env.keys().collect::<Vec<_>>(),"orphan_reconciled":true});
+        if let Err(error) = store.set_run_process(
+            &run.id,&dir.display().to_string(),run.process_generation+1,&meta) {
+            crate::log(&format!("worker orphan reattachment deferred: {}",redact(&error.to_string())));
+            return Ok(false);
+        }
+        store.set_run_attention(&run.id,None)?;
+        if live && !exited { store.update_run_status(&run.id,"running",None,None)?; }
+        Ok(true)
+    }
+
     pub fn reconcile(self: &Arc<Self>) -> Result<Value> {
         let runs = self.store.lock().unwrap().runs()?;
         let mut report = Vec::new();
         for run in runs.iter().filter(|r| r.parent_run_id.is_none() && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {
             let mut process = self.store.lock().unwrap().run_process(&run.id)?;
-            if process.is_none() && self.reattach_unrecorded_director(run)? {
-                process = self.store.lock().unwrap().run_process(&run.id)?;
+            if process.is_none() {
+                if self.reattach_unrecorded_director(run)? || self.reattach_unrecorded_worker(run)? {
+                    process = self.store.lock().unwrap().run_process(&run.id)?;
+                }
             }
             let Some((dir, _, _)) = process else {
                 if ACTIVE.contains(&run.status.as_str()) {
-                    if crate::swarm::mark_uncertain_director_spawn(
-                        &self.store.lock().unwrap(), &run.id)? {
-                        report.push(json!({"run": run.id, "result": "director spawn uncertain"}));
+                    let uncertain = {
+                        let store = self.store.lock().unwrap();
+                        if crate::swarm::mark_uncertain_director_spawn(&store, &run.id)? {
+                            Some("director spawn uncertain")
+                        } else if store.mark_worker_spawn_uncertain(&run.id)? {
+                            Some("worker spawn uncertain")
+                        } else { None }
+                    };
+                    if let Some(reason) = uncertain {
+                        report.push(json!({"run": run.id, "result": reason}));
                     } else {
                         self.mark_ended(run, "failed", "daemon stopped before the run was launched")?;
                         report.push(json!({"run": run.id, "result": "never launched"}));

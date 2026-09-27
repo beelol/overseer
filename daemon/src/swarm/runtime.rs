@@ -195,18 +195,25 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
         let store = d.store.lock().unwrap();
         attempt_revision = broker::check_attempt(&store, run, job, attempt, token)?;
         let current = get(&store, run)?;
-        let prior: Option<(String,Option<String>)> = store.conn.query_row(
-            "SELECT request_sha256,overseer_run_id FROM swarm_worker_launches WHERE attempt_id=?1 AND run_id=?2 AND job_id=?3",
-            params![attempt,run,job], |row| Ok((row.get(0)?,row.get(1)?)),
+        let prior: Option<(String,Option<String>,Option<String>)> = store.conn.query_row(
+            "SELECT l.request_sha256,l.overseer_run_id,
+              CASE WHEN r.status='failed' THEN 'launch_failed'
+                   WHEN r.run_dir IS NULL AND
+                     (l.launch_phase='spawn_requested' OR l.launch_phase IS NULL) THEN 'launch_uncertain'
+                   ELSE 'linked' END
+             FROM swarm_worker_launches l LEFT JOIN runs r ON r.id=l.overseer_run_id
+             WHERE l.attempt_id=?1 AND l.run_id=?2 AND l.job_id=?3",
+            params![attempt,run,job], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
         ).optional()?;
         let new_intent = prior.is_none();
-        if let Some((old_digest, linked)) = prior {
+        if let Some((old_digest, linked, status)) = prior {
             if old_digest != digest {
                 bail!("worker launch replay changes request");
             }
             if let Some(overseer_run_id) = linked {
                 return Ok(
-                    json!({"status":"linked","overseer_run_id":overseer_run_id,"duplicate":true}),
+                    json!({"status":status.unwrap_or_else(||"linked".into()),
+                        "overseer_run_id":overseer_run_id,"duplicate":true}),
                 );
             }
         }
@@ -230,8 +237,8 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
         }
         if new_intent {
             store.conn.execute(
-                "INSERT INTO swarm_worker_launches(attempt_id,run_id,job_id,request_sha256,created_ms)
-                 VALUES(?1,?2,?3,?4,?5)",
+                "INSERT INTO swarm_worker_launches(attempt_id,run_id,job_id,request_sha256,created_ms,launch_phase)
+                 VALUES(?1,?2,?3,?4,?5,'reserved')",
                 params![attempt,run,job,digest,crate::daemon::now()],
             )?;
         }
@@ -253,8 +260,10 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
         .as_str()
         .ok_or_else(|| anyhow!("worker run was not recorded"))?;
     if !task["launch_error"].is_null() {
+        let status = if task["launch_uncertain"] == true { "launch_uncertain" }
+            else { "launch_failed" };
         return Ok(
-            json!({"status":"launch_failed","overseer_run_id":overseer_run_id,
+            json!({"status":status,"overseer_run_id":overseer_run_id,
             "error":task["launch_error"],"duplicate":false}),
         );
     }

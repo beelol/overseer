@@ -338,7 +338,8 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           job_id TEXT NOT NULL,
           request_sha256 TEXT NOT NULL,
           overseer_run_id TEXT UNIQUE REFERENCES runs(id),
-          created_ms INTEGER NOT NULL
+          created_ms INTEGER NOT NULL,
+          launch_phase TEXT CHECK(launch_phase IN ('reserved','linked','spawn_requested'))
         );
         CREATE TABLE IF NOT EXISTS swarm_stop_signals(
           run_id TEXT NOT NULL REFERENCES swarm_runs(id),
@@ -396,6 +397,15 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         .exists([])?;
     if !has_launch_phase {
         conn.execute_batch("ALTER TABLE swarm_director_owners ADD COLUMN launch_phase TEXT CHECK(launch_phase IN ('reserved','linked','spawn_requested'));")?;
+    }
+    let has_worker_launch_phase = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_worker_launches') WHERE name='launch_phase'")?
+        .exists([])?;
+    if !has_worker_launch_phase {
+        // An unlinked intent could not have spawned: task/run/intent linkage
+        // commits before launch. Historical linked rows lack that proof.
+        conn.execute_batch("ALTER TABLE swarm_worker_launches ADD COLUMN launch_phase TEXT CHECK(launch_phase IN ('reserved','linked','spawn_requested'));
+            UPDATE swarm_worker_launches SET launch_phase='reserved' WHERE overseer_run_id IS NULL;")?;
     }
     let has_source_change_permission = conn
         .prepare(
@@ -509,6 +519,26 @@ pub fn migrate(conn: &Connection) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_worker_intent_migrates_only_unlinked_rows_to_proven_no_spawn() {
+        let conn=Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE swarm_worker_launches(
+            attempt_id TEXT PRIMARY KEY,run_id TEXT NOT NULL,job_id TEXT NOT NULL,
+            request_sha256 TEXT NOT NULL,overseer_run_id TEXT UNIQUE,created_ms INTEGER NOT NULL);
+            INSERT INTO swarm_worker_launches VALUES('pending','run','job','digest',NULL,1);
+            INSERT INTO swarm_worker_launches VALUES('linked','run','job','digest','overseer-run',1);").unwrap();
+        migrate(&conn).unwrap();
+        let pending: Option<String>=conn.query_row(
+            "SELECT launch_phase FROM swarm_worker_launches WHERE attempt_id='pending'",
+            [],|r|r.get(0)).unwrap();
+        let linked: Option<String>=conn.query_row(
+            "SELECT launch_phase FROM swarm_worker_launches WHERE attempt_id='linked'",
+            [],|r|r.get(0)).unwrap();
+        assert_eq!(pending.as_deref(),Some("reserved"));
+        assert_eq!(linked,None);
+        migrate(&conn).unwrap();
+    }
 
     #[test]
     fn old_director_owner_keeps_its_reservation_when_process_link_is_added() {

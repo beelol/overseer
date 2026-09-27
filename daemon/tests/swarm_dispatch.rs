@@ -2,13 +2,145 @@ mod common;
 
 use common::*;
 use serde_json::json;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis() as i64
+}
+
+#[test]
+fn worker_spawn_record_failure_keeps_one_attempt_and_reattaches_after_restart() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("orphan-worker-source"));
+    let swarm = d.call("swarm.create", json!({"category":"Worker spawn window",
+        "objective":"Inspect backend","allowed_targets":["fixture"]}));
+    let id = swarm["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Orphan worker","acceptance":"Evidence","deps":[]}
+    ]}));
+    let at = now();
+    let request = json!({"request_id":"orphan-worker","target_id":"fixture",
+        "repo":checkout,"program":"/bin/sleep","args":["30"],"now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture","account_id":"fixture","pool_ids":["pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"});
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER abort_worker_process_record BEFORE UPDATE OF run_dir ON runs
+        WHEN NEW.title='Orphan worker' BEGIN
+        SELECT RAISE(ABORT, 'fixture orphaned worker supervisor'); END;").unwrap();
+    let result = d.call("swarm.dispatch.next", request.clone());
+    assert_eq!(result["status"],"launch_uncertain","{result}");
+    let worker = result["overseer_run_id"].as_str().unwrap();
+    assert_eq!(d.run(worker)["status"],"queued");
+    let uncertain_replay=d.call("swarm.dispatch.next",request.clone());
+    assert_eq!(uncertain_replay["status"],"launch_uncertain");
+    assert_eq!(uncertain_replay["overseer_run_id"],worker);
+    assert_eq!(uncertain_replay["duplicate"],true);
+    let (phase, linked): (String,String) = db.query_row(
+        "SELECT l.launch_phase,l.overseer_run_id FROM swarm_worker_launches l WHERE l.attempt_id=?1",
+        [result["attempt_id"].as_str().unwrap()], |r| Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!(phase,"spawn_requested");
+    assert_eq!(linked,worker);
+    let run_dir=d.home.path().join("runs").join(worker).join("p1");
+    let deadline=Instant::now()+Duration::from_secs(3);
+    while !run_dir.join("shim.json").exists() {
+        assert!(Instant::now()<deadline,"orphan worker did not start");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.run(worker)["status"],"queued",
+        "continued storage failure must retain the uncertain run");
+    let unrecorded: Option<String>=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[worker],|r|r.get(0)).unwrap();
+    assert!(unrecorded.is_none());
+    db.execute_batch("DROP TRIGGER abort_worker_process_record;").unwrap();
+    db.execute("UPDATE swarm_worker_launches SET launch_phase=NULL WHERE overseer_run_id=?1",
+        [worker]).unwrap(); // A historical linked row has no recorded spawn phase.
+    let launch_file=run_dir.join("launch.json");
+    let original=std::fs::read(&launch_file).unwrap();
+    let mut altered: serde_json::Value=serde_json::from_slice(&original).unwrap();
+    altered["env"]["OVERSEER_SWARM_TOKEN"]=json!("wrong-private-credential");
+    std::fs::write(&launch_file,serde_json::to_vec(&altered).unwrap()).unwrap();
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.run(worker)["status"],"queued");
+    let untrusted: Option<String>=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[worker],|r|r.get(0)).unwrap();
+    assert!(untrusted.is_none(),"mismatched launch identity must stay reserved");
+    d.kill9();
+    std::fs::write(&launch_file,original).unwrap();
+    d.spawn();
+    let recovered=d.run(worker);
+    assert!(matches!(recovered["status"].as_str(),Some("running"|"starting")),"{recovered}");
+    let dir: String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[worker],|r|r.get(0)).unwrap();
+    assert_eq!(dir,run_dir.to_string_lossy());
+    let replay=d.call("swarm.dispatch.next",request);
+    assert_eq!(replay["overseer_run_id"],worker);
+    assert_eq!(replay["duplicate"],true);
+    let count: i64=db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1",[id],|r|r.get(0)).unwrap();
+    assert_eq!(count,1);
+    d.call("run.interrupt",json!({"run_id":worker}));
+    d.wait_done(worker,8);
+}
+
+#[test]
+fn exited_orphan_worker_replays_completion_once() {
+    let mut d=Daemon::start(&[]);
+    let temp=tmp();
+    let checkout=repo(&temp.path().join("exited-orphan-worker-source"));
+    let swarm=d.call("swarm.create",json!({"category":"Exited worker window",
+        "objective":"Inspect backend","allowed_targets":["fixture"]}));
+    let id=swarm["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Exited orphan worker","acceptance":"Evidence","deps":[]}
+    ]}));
+    let at=now();
+    let request=json!({"request_id":"exited-orphan-worker","target_id":"fixture",
+        "repo":checkout,"program":"/usr/bin/true","args":[],"now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture","account_id":"fixture","pool_ids":["pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"});
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER abort_exited_worker_record BEFORE UPDATE OF run_dir ON runs
+        WHEN NEW.title='Exited orphan worker' BEGIN
+        SELECT RAISE(ABORT, 'fixture exited orphan worker'); END;").unwrap();
+    let result=d.call("swarm.dispatch.next",request.clone());
+    assert_eq!(result["status"],"launch_uncertain","{result}");
+    let worker=result["overseer_run_id"].as_str().unwrap();
+    let exit=d.home.path().join("runs").join(worker).join("p1").join("exit.json");
+    let deadline=Instant::now()+Duration::from_secs(3);
+    while !exit.exists() {
+        assert!(Instant::now()<deadline,"orphan worker did not exit");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    db.execute_batch("DROP TRIGGER abort_exited_worker_record;").unwrap();
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.wait_done(worker,5)["status"],"completed");
+    let first: i64=db.query_row("SELECT COUNT(*) FROM events WHERE run_id=?1 AND kind='status'
+        AND json_extract(payload,'$.status')='completed'",[worker],|r|r.get(0)).unwrap();
+    assert_eq!(first,1);
+    d.kill9();
+    d.spawn();
+    let again: i64=db.query_row("SELECT COUNT(*) FROM events WHERE run_id=?1 AND kind='status'
+        AND json_extract(payload,'$.status')='completed'",[worker],|r|r.get(0)).unwrap();
+    assert_eq!(again,1);
+    let replay=d.call("swarm.dispatch.next",request);
+    assert_eq!(replay["overseer_run_id"],worker);
+    assert_eq!(replay["duplicate"],true);
 }
 
 #[test]

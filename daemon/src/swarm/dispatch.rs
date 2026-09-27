@@ -71,13 +71,20 @@ pub fn next(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let attempt = scheduled["attempt_id"]
         .as_str()
         .ok_or_else(|| anyhow!("scheduler omitted attempt"))?;
-    let linked: Option<String> = {
+    let linked: Option<(String,String)> = {
         let store = d.store.lock().unwrap();
-        store.conn.query_row("SELECT overseer_run_id FROM swarm_worker_launches WHERE attempt_id=?1 AND overseer_run_id IS NOT NULL",
-            params![attempt],|r|r.get(0)).optional()?
+        store.conn.query_row(
+            "SELECT l.overseer_run_id,
+              CASE WHEN r.status='failed' THEN 'launch_failed'
+                   WHEN r.run_dir IS NULL AND
+                     (l.launch_phase='spawn_requested' OR l.launch_phase IS NULL) THEN 'launch_uncertain'
+                   ELSE 'linked' END
+             FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+             WHERE l.attempt_id=?1",
+            params![attempt],|r|Ok((r.get(0)?,r.get(1)?))).optional()?
     };
-    if let Some(worker) = linked {
-        return Ok(json!({"status":"linked","run_id":run,"job_id":job,
+    if let Some((worker,status)) = linked {
+        return Ok(json!({"status":status,"run_id":run,"job_id":job,
             "attempt_id":attempt,"overseer_run_id":worker,"duplicate":true}));
     }
     verify_pending_launch(d, p, run)?;

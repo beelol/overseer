@@ -402,7 +402,8 @@ impl Store {
         Self::insert_run_row(&tx, r)?;
         if let Some(attempt_id) = attempt_id {
             let linked = tx.execute(
-                "UPDATE swarm_worker_launches SET overseer_run_id=?2 WHERE attempt_id=?1 AND overseer_run_id IS NULL",
+                "UPDATE swarm_worker_launches SET overseer_run_id=?2,launch_phase='linked'
+                 WHERE attempt_id=?1 AND overseer_run_id IS NULL AND launch_phase='reserved'",
                 params![attempt_id, r.id],
             )?;
             if linked != 1 {
@@ -446,6 +447,42 @@ impl Store {
             bail!("director process cannot start without active linked ownership");
         }
         Ok(())
+    }
+
+    /// A worker's launch identity is durable before its supervisor can exist.
+    /// A legacy null phase is deliberately not upgraded into spawn proof.
+    pub fn mark_worker_spawn_requested(&self, overseer_run_id: &str) -> Result<()> {
+        let worker_exists = self.conn.prepare(
+            "SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1"
+        )?.exists([overseer_run_id])?;
+        if !worker_exists {
+            return Ok(());
+        }
+        let updated = self.conn.execute(
+            "UPDATE swarm_worker_launches SET launch_phase='spawn_requested'
+             WHERE overseer_run_id=?1 AND launch_phase='linked'
+             AND EXISTS(SELECT 1 FROM swarm_attempts a
+                        WHERE a.id=swarm_worker_launches.attempt_id AND a.status='registered')",
+            [overseer_run_id],
+        )?;
+        if updated != 1 {
+            bail!("worker process cannot start without an active linked attempt");
+        }
+        Ok(())
+    }
+
+    pub fn mark_worker_spawn_uncertain(&self, overseer_run_id: &str) -> Result<bool> {
+        let uncertain = self.conn.prepare(
+            "SELECT 1 FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+             JOIN swarm_attempts a ON a.id=l.attempt_id
+             WHERE r.id=?1 AND r.run_dir IS NULL AND a.status='registered'
+             AND (l.launch_phase='spawn_requested' OR l.launch_phase IS NULL)"
+        )?.exists([overseer_run_id])?;
+        if uncertain {
+            self.set_run_attention(overseer_run_id,
+                Some(&serde_json::json!({"reason":"worker_spawn_uncertain"})))?;
+        }
+        Ok(uncertain)
     }
 
     fn map_run(row: &Row) -> rusqlite::Result<Run> {
