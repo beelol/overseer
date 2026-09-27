@@ -234,7 +234,10 @@ CLI. A director or worker message cannot impersonate that action. A proposed voi
 that was not sent must not be replayed after reconnection. Test the same Stop, redirect,
 permission revocation and stale-revision ordering from each supported surface under
 SWARM-20/21/43/61; keep unsupported surfaces explicitly unverified until their own gates
-land. Gate P's PR monitor must treat this draft PR as in flight and cannot merge it merely
+land. Gate R now uses Gate S's daemon-owned Overseer session, so spoken Swarm controls
+arrive through that session rather than a separate voice scheduler; the owner's chosen
+mark animation (AC-177) does not affect Swarm admission or director authority. Gate P's
+PR monitor must treat this draft PR as in flight and cannot merge it merely
 because a fixture passes; SWARM evidence stays in its own ledger until its criteria pass.
 
 Gate N's phone protocol gives a paired *Full control* device the same Swarm actions as a
