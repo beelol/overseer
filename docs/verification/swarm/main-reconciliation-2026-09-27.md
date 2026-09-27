@@ -92,3 +92,24 @@ budget, or qualified a live Swarm account route. SWARM-17/25/52 remain open.
 Keep one director, the current capability floor and the fail-closed live launch
 boundary; consume Gate S's harness findings in the future per-harness
 qualification rather than treating them as a new Swarm permission grant.
+
+## Subsequent published main: `f8d5df6`
+
+The branch merged main through `f8d5df6` after the owner's new push. Main now
+records Gate S AC-183 (bounded agent digests/roster) and AC-192 (cross-agent
+working-tree conflict detection) as **partial**, with their implementation and
+fixture evidence on separate pull request #14. Those records do not put that
+implementation on main or verify Gate S/Swarm AC-195. Swarm's current
+`swarm.conflicts` records submitted-result conflicts within a run; they neither
+replace the cross-agent detector nor prove its joined behavior. When Gate S's
+daemon records land, Swarm should expose director and worker identity, claims
+and conflict outcomes through that shared authority, and route a detected
+cross-run overlap to the category director. Keep the existing one-director
+boundary and SWARM-24/30/36/60 joined checks open. No new Swarm acceptance
+criterion or worker-count default is needed.
+
+The other main commit ports the live Codex/Claude conversation scenario to the
+current Gate K chat and adds live Codex UI evidence. Future Swarm launch/readout
+qualification should use that current surface, not legacy panel selectors.
+It does not exercise a Swarm launch or change daemon scheduling. SWARM-01/25/39/63
+remain unverified; no fixture result is promoted to live evidence by this merge.
