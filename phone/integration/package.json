@@ -1,0 +1,17 @@
+{
+  "name": "@overseer/phone-integration",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The phone's own code against a real overseerd: pairing, sessions, resume and exactly-once through the real gateway.",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run typecheck && vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.2"
+  }
+}

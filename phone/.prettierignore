@@ -1,0 +1,11 @@
+node_modules
+ios
+android
+.expo
+coverage
+package-lock.json
+src/theme/tokens.generated.ts
+# Other packages format themselves.
+core
+model
+protocol

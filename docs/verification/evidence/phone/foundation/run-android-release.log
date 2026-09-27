@@ -1,0 +1,10 @@
+start 20:04:23
+20:04:23 > overseer-phone@0.1.0 android:release
+20:04:23 > node scripts/run-android.mjs --release
+20:04:23 Emulator: Overseer_API_35 (emulator-5554, arm64-v8a)
+20:05:43 Build output: android/build/gradle-release.log
+20:05:43 gradle :app:assembleRelease: 79.8 s
+20:05:44 Performing Streamed Install
+20:05:44 Success
+20:05:44 com.beelol.overseer.phone (release) is open on Overseer_API_35
+end 20:05:44
