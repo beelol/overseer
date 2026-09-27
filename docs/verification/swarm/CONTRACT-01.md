@@ -13,3 +13,26 @@ Evidence paths: `daemon/tests/swarm_admission.rs`, `docs/rfcs/swarm-auto-contrac
 Live vs fixture coverage: fixture precursor; no integrated or live coverage.
 Known limitations and remaining platform/account combinations: Auto producer and atomic cross-mode allowance commitment are absent on this branch.
 Blocker, attempted alternatives and next action: keep unchecked; integrate one reservation authority with Auto and run the concurrent multi-window test.
+
+## Read-only integration check — 2026-09-27
+
+Inputs: Swarm `2927b431` and the locally active Auto branch `68dea8f4`;
+published `origin/main` remains `b84f9984` and is already in Swarm. Commands:
+`git merge-base HEAD codex/automode-rfc`, `git merge-tree <base> HEAD codex/automode-rfc`,
+and a count of conflict markers by merged file. The dry merge has 25 conflict
+hunks in seven files: `adapters.rs` (2), `daemon.rs` (9), `git.rs` (3),
+`server.rs` (3), `store.rs` (6), the daemon test helper (1), and the
+extension entry point (1). The branches also overlap without a textual
+conflict in six more files. This is a compatibility forecast, not an
+integrated build or a merge into either active branch.
+
+The normal Swarm path still cannot satisfy this contract: `swarm.create` is
+public, but native director launch, planning, admission and dispatch remain
+fixture-gated, and the scripted director launch does not make a shared account
+allowance commitment. Auto's in-flight collector and route code must be
+consumed at the shared transaction; copying its collector or simply removing
+the fixture gate would give a false S0 launch. Resolve the overlapping daemon
+entry points when Auto's integration surface is stable, then make the first
+joined test race an ordinary start, Auto child and Swarm worker against one
+binding short and long window and one writer. No CONTRACT-01 or SWARM-01 box
+is checked by this audit.
