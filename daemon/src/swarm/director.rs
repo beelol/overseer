@@ -297,8 +297,11 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
     // A claimed batch is only delivery. A terminal report remains reviewable until
-    // a durable decision covers that particular report sequence. Otherwise a
-    // completed model turn could silently consume the only result notification.
+    // a durable decision covers that particular report sequence. A contaminated
+    // attempt is already quarantined and cannot receive a review decision, so
+    // retaining its result in the inbox would block an isolated retry forever.
+    // Otherwise a completed model turn could silently consume the only result
+    // notification.
     let pending_review = if current["status"] == "stopping" || current["status"] == "stopped" || current["status"] == "invalidated" {
         0
     } else {
@@ -306,6 +309,8 @@ pub fn complete_batch(store: &mut Store, p: &Value) -> Result<Value> {
             "UPDATE swarm_messages AS m SET phase='queued',updated_ms=?2
              WHERE m.seq IN (SELECT seq FROM swarm_director_turn_messages WHERE turn_id=?1)
              AND m.phase='delivered' AND m.kind IN ('result','submit')
+             AND NOT EXISTS (SELECT 1 FROM swarm_resource_contamination c
+                 WHERE c.run_id=m.run_id AND c.job_id=m.job_id AND c.attempt_id=m.attempt_id)
              AND NOT EXISTS (SELECT 1 FROM swarm_decisions d WHERE d.run_id=m.run_id
                  AND d.job_id=m.job_id AND d.attempt_id=m.attempt_id
                  AND d.reviewed_message_seq>=m.seq)",

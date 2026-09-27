@@ -809,3 +809,138 @@ fn atlas_s5_invalid_dependency_subgraph_does_not_block_valid_audit() {
         "checks":[{"job_id":"j2","outcome":"passed","evidence":[artifact]}]}));
     assert_eq!(completed["status"],"completed","{completed}");
 }
+
+// S5: two admitted jobs really mutate one Atlas PostgreSQL schema despite
+// distinct planned claims. Late observation quarantines both evidence chains.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_shared_database_contamination_quarantines_and_retries() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Atlas shared DB fault",
+        "objective":"Independently audit foreign task mutation","allowed_targets":["fixture"],
+        "policy":{"max_workers":2}}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Tasks","acceptance":"foreign patch and before-after rows",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j2","mode":"write"}]},
+        {"id":"j7","title":"Independent task reproduction",
+            "acceptance":"fresh foreign patch before-after rows","deps":[],
+            "resource_claims":[{"resource":"atlas-db-j7","mode":"write"}]}
+    ]}));
+    let at=now();
+    let snapshot=json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"fixture","account_id":"account","pool_ids":["pool"],
+            "capabilities":["audit"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+120000}]}]});
+    commit_wave(&d,run,1,&["j2","j7"]);
+    let a2=admit(&d,run,1,"j2","fixture",&snapshot,at);
+    let a7=admit(&d,run,1,"j7","fixture",&snapshot,at);
+    assert_eq!(a2["status"],"admitted","{a2}");
+    assert_eq!(a7["status"],"admitted","{a7}");
+    let output=Command::new("node").arg("probe-shared.mjs")
+        .current_dir(repo_root().join("fixtures/swarm/atlas-v1")).output().unwrap();
+    assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
+    let shared:Value=serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(shared["fixtureVersion"],1);
+    assert_eq!(shared["fault"],"shared-schema");
+    assert_eq!(shared["j2"]["taskBefore"],"Bob task");
+    assert_eq!(shared["j2"]["foreignPatchStatus"],200);
+    assert_eq!(shared["j7"]["taskInitially"],"Bob task");
+    assert_eq!(shared["j7"]["taskBefore"],"changed-by-alice");
+    assert_eq!(shared["j7"]["foreignPatchStatus"],200);
+    assert_eq!(shared["j7"]["taskAfter"],"changed-by-j7");
+    assert_eq!(shared["j2"]["taskAtEnd"],"changed-by-j7");
+    assert_eq!(shared["j2"]["namespace"],shared["j7"]["namespace"]);
+    for (job,attempt) in [("j2",&a2),("j7",&a7)] {
+        let artifact=format!("atlas-shared-{job}");
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+            "artifact_id":artifact,"source_revision":1,"kind":"reproduction",
+            "content":shared[job].to_string()}));
+        d.call("swarm.report",json!({"run_id":run,"job_id":job,
+            "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+            "message_id":format!("atlas-shared-{job}-result"),"type":"result",
+            "revision":1,"payload":{"artifact_ids":[artifact]}}));
+    }
+    let observe=|job:&str,attempt:&Value|json!({"run_id":run,"job_id":job,
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "generation":1,"revision":1,"resource":shared["resource"],
+        "mode":"write","after_use":true});
+    d.call("swarm.claim",observe("j2",&a2));
+    let conflict=d.call("swarm.claim",observe("j7",&a7));
+    assert_eq!(conflict["status"],"contaminated","{conflict}");
+    for (job,attempt) in [("j2",&a2),("j7",&a7)] {
+        let row=d.call("swarm.jobs",json!({"id":run}))["jobs"]
+            .as_array().unwrap().iter().find(|row|row["id"]==job).unwrap().clone();
+        assert_eq!(row["status"],"cancel_requested");
+        let coverage=d.call("swarm.coverage",json!({"run_id":run}));
+        assert!(coverage["rows"].as_array().unwrap().iter()
+            .any(|row|row["job_id"]==job && row["coverage_state"]=="contaminated"));
+        assert!(d.try_call("swarm.decide",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":job,"decision":"accept",
+            "evidence":[format!("atlas-shared-{job}")]})).is_err());
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":job,"attempt_id":attempt["attempt_id"]}));
+    }
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let retained:i64=db.query_row("SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1",
+        [run],|r|r.get(0)).unwrap();
+    assert_eq!(retained,2);
+    let mut retry_namespaces=Vec::new();
+    for job in ["j2","j7"] {
+        let retry=d.call("swarm.admit",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":job,"target_id":"fixture",
+            "request_id":format!("atlas-shared-{job}-retry"),
+            "snapshot":snapshot,"now_ms":now(),"required_capabilities":["audit"],
+            "estimate_milli":{"points":100},"purpose":"worker"}));
+        assert_eq!(retry["status"],"admitted","{retry}");
+        let clean=atlas_probe(job);
+        assert_eq!(clean["taskBefore"],"Bob task");
+        assert_eq!(clean["foreignPatchStatus"],200);
+        assert_ne!(clean["namespace"],shared["namespace"]);
+        retry_namespaces.push(clean["namespace"].as_str().unwrap().to_owned());
+        let claim=d.call("swarm.claim",json!({"run_id":run,"job_id":job,
+            "attempt_id":retry["attempt_id"],"token":retry["token"],
+            "generation":1,"revision":1,
+            "resource":format!("atlas-db:{}",clean["namespace"].as_str().unwrap()),
+            "mode":"write","after_use":true}));
+        assert_ne!(claim["status"],"contaminated","{claim}");
+        let artifact=format!("atlas-{job}-retry-evidence");
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":job,
+            "attempt_id":retry["attempt_id"],"token":retry["token"],
+            "artifact_id":artifact,"source_revision":1,"kind":"reproduction",
+            "content":clean.to_string()}));
+        d.call("swarm.report",json!({"run_id":run,"job_id":job,
+            "attempt_id":retry["attempt_id"],"token":retry["token"],
+            "message_id":format!("atlas-{job}-retry-result"),"type":"result",
+            "revision":1,"payload":{"artifact_ids":[artifact]}}));
+        accept_and_exit(&d,run,1,job,&retry,&artifact);
+    }
+    assert_ne!(retry_namespaces[0],retry_namespaces[1]);
+    let admissions:i64=db.query_row("SELECT COUNT(*) FROM swarm_admissions WHERE run_id=?1",
+        [run],|r|r.get(0)).unwrap();
+    assert_eq!(admissions,4);
+    for _ in 0..8 {
+        let pending:i64=db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1
+            AND recipient='director' AND phase!='applied'",[run],|r|r.get(0)).unwrap();
+        if pending==0 { break; }
+        let batch=d.call("swarm.director.claim_batch",json!({"run_id":run,
+            "generation":1,"revision":1,"now_ms":now()+12000}));
+        assert_eq!(batch["status"],"claimed","{batch}; pending={pending}");
+        d.call("swarm.director.complete_batch",json!({"run_id":run,"generation":1,
+            "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"progress"}));
+    }
+    let pending:i64=db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1
+        AND recipient='director' AND phase!='applied'",[run],|r|r.get(0)).unwrap();
+    assert_eq!(pending,0);
+    let completed=d.call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"atlas-s5-shared-db-complete",
+        "summary":"Foreign task mutation reproduced in isolated retry namespaces",
+        "verification":"Shared namespace evidence quarantined; two fresh Atlas probes",
+        "checks":[{"job_id":"j2","outcome":"passed","evidence":["atlas-j2-retry-evidence"]},
+            {"job_id":"j7","outcome":"passed","evidence":["atlas-j7-retry-evidence"]}]}));
+    assert_eq!(completed["status"],"completed","{completed}");
+}

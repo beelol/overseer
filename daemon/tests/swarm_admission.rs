@@ -459,6 +459,15 @@ fn late_shared_database_use_quarantines_evidence_and_bounds_retries() {
         let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
         let retained:i64=db.query_row("SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1",[run],|r|r.get(0)).unwrap();
         assert_eq!(retained,1);
+        let batch=d.call("swarm.director.claim_batch",json!({"run_id":run,
+            "generation":1,"revision":1,"now_ms":now()+6000}));
+        assert_eq!(batch["status"],"claimed","{batch}");
+        d.call("swarm.director.complete_batch",json!({"run_id":run,
+            "generation":1,"turn_id":batch["turn_id"],"token":batch["token"],
+            "outcome":"progress"}));
+        let pending:i64=db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1
+            AND recipient='director' AND phase!='applied'",[run],|r|r.get(0)).unwrap();
+        assert_eq!(pending,0,"quarantined result must not block an isolated retry");
         d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,"revision":1,
             "job_id":"j0","attempt_id":attempt["attempt_id"]}));
         assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"][0]["status"],"ready");
