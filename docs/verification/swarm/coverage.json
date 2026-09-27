@@ -420,7 +420,7 @@
         "docs/verification/swarm/SWARM-43.md",
         "fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs"
       ],
-      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect. Daemon fixtures enforce the 30-second applied-ack timeout, and a joined Atlas S5 replay now polls the broker while J4's PostgreSQL attachment probe is held: receipt remains delivered, dependent review is held, a checkpoint is queued and the linked worker is interrupted without accepting a result. The complete J4 revision-2 assignment and stale-output trace, qualified live provider delivery/acknowledgement, and exclusion of unsupported harness paths remain unverified."
+      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect. Daemon fixtures enforce the 30-second applied-ack timeout, and a joined Atlas S5 replay now sends a revision-2 plan redirect while J4's PostgreSQL attachment probe is held: receipt remains delivered, dependent review is held, a checkpoint is queued and the linked worker is interrupted without accepting a result. The complete six-job S1 revision-2 and stale-output trace, qualified live provider delivery/acknowledgement, and exclusion of unsupported harness paths remain unverified."
     },
     "SWARM-44": {
       "status": "partial",
