@@ -216,3 +216,6 @@ button.open-native, button.close-file { height: 24px; min-width: 24px; padding: 
 .spinner { border-color: var(--ov-accent); border-right-color: transparent; }
 .large-diff { padding: var(--ov-space-4) var(--ov-space-5); }
 .large-diff .load-diff { background: var(--ov-raised); border-color: var(--ov-border); }
+/* A review narrower than about 440 px (beside the chat on a small window): Where am I (also ⌥⌘M)
+   and Refresh (the review refreshes itself) give their room to the agent's name (AC-76). */
+@media (max-width: 440px) { #where, #refresh { display: none; } #toolbar { gap: 4px; padding: 0 var(--ov-space-2); } }
