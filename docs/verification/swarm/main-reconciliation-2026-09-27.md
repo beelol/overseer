@@ -288,3 +288,32 @@ and prompt-injection boundary agree with Swarm's rule that worker/source text
 cannot issue director commands or grant scope. None of the Gate S partial
 records verifies joined SWARM-24/27/60 or the shared account authority.
 The Swarm RFC and its acceptance boxes therefore remain unchanged.
+
+## Refresh against published main: `639dfcb`
+
+`git fetch origin main` and `git ls-remote origin refs/heads/main` both resolve to
+`639dfcb`; that commit is already an ancestor of this draft branch. The owner's
+local `main` is older than the published branch, so this check uses the remote
+tip. No merge or rebase is needed.
+
+The new main commit records Gate S's live Claude/Codex probes, partial AC-195
+and AC-201 evidence, and decisions made while building Gate S. It does **not**
+merge Gate S's daemon implementation into main. The live probes qualify its
+own hold, redirect, check-in and report paths; they do not qualify a Swarm
+director, worker or shared admission transaction. AC-195 specifically defers
+the joint tests for worker-target refusal, director advisories and plan
+revisions, shared exclusive claims, watcher findings, and owner-confirmed
+Swarm start/limit changes. AC-201 still defers a clean-clone run at merge.
+
+Those decisions match the Swarm RFC's current boundary: Gate S sees one
+director; workers use the Swarm broker; the owner decides permissions; Gate S
+briefings wait until the owner has spoken to Overseer and another agent is
+working in the repository. Swarm coordination must still work before that
+briefing appears. The eventual integration must join Gate S's durable
+`areas`, `conflicts` and `agent_messages` authority to Swarm's claims and
+broker, preserving sender identity and redaction rather than adding a second
+worker-command channel. This is a **remaining integration requirement**, not
+proof that the present tables are already shared. The partial AC-195 record
+and SWARM-24/27/30/36/60 remain open until a joined fixture exercises both
+implementations. No worker-count default, allocation policy, RFC criterion or
+verified box changes from this latest main commit.
