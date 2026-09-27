@@ -526,9 +526,13 @@
         "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/milestone-2.md",
         "docs/verification/swarm/milestone-13.md",
-        "docs/verification/swarm/SWARM-53.md"
+        "docs/verification/swarm/SWARM-53.md",
+        "daemon/tests/swarm_atlas.rs",
+        "fixtures/swarm/atlas-v1/probe-shared.mjs",
+        "daemon/src/swarm/director.rs",
+        "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Fixture late observations survive worker exit and daemon restart, quarantine conflicting active or historically accepted attempts, invalidate coverage and even a prior completed-run verdict, interrupt affected supervised workers, retry within attempt/budget bounds on a fresh resource identity, and allow shared read-only access. An unobserved planned owner now holds both jobs safely without claiming proven overlap. Live tool/resource discovery, alias canonicalization, external contamination proof, and full Atlas replay remain unavailable."
+      "blocker": "Planned write claims constrain admission; a joined Atlas replay now proves two scripted Express/PostgreSQL clients sharing one mutable schema contaminate each other, quarantine both submitted artifacts, and recover through one isolated retry per job. Quarantined result notifications no longer requeue indefinitely in the director inbox, with a non-ignored regression. Other fixtures preserve observations through exit/restart, invalidate a prior completed verdict, interrupt affected supervised workers, enforce retry bounds, and permit shared read-only access. Live resource discovery, alias canonicalization, external mutation detection, and independent live harness qualification remain unavailable."
     },
     "SWARM-54": {
       "status": "partial",
@@ -672,7 +676,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins five named faults to Atlas v1: lost result receipt, director death after dispatch, held J4 redirect timeout, repeated evidence-free J4 progress through its absolute job deadline, and malformed dependencies with valid J2 continuation. Other named faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins six named Atlas v1 faults: lost result receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, malformed dependencies with valid J2 continuation, and real shared-schema contamination with isolated retries. Other named faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
     }
   },
   "scenarios": {
@@ -734,9 +738,10 @@
         "daemon/tests/swarm_faults.rs",
         "daemon/tests/swarm_admission.rs",
         "daemon/tests/swarm_runtime.rs",
-        "docs/verification/swarm/S5.md"
+        "docs/verification/swarm/S5.md",
+        "fixtures/swarm/atlas-v1/probe-shared.mjs"
       ],
-      "blocker": "Atlas v1 joins five named faults: J2 lost-result-receipt, director death after dispatch admission, J4 delivery without application during a held PostgreSQL attachment probe, repeated evidence-free J4 progress through its unchanged job deadline, and invalid J8/J9/J99 dependencies rejected while valid J2 completes. Separate daemon fixtures cover SQLite-full replay and late shared-database contamination. Other named S5 faults, Atlas-backed contamination/full storage and a full S1-sized ordered replay remain unverified. Live provider harness communication is absent."
+      "blocker": "Atlas v1 joins six named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, and two scripted clients sharing one mutable PostgreSQL schema before isolated retries. Separate daemon fixtures cover SQLite-full replay and completed-run contamination. Other named S5 faults, Atlas-backed full storage and a full S1-sized ordered replay remain unverified. Live provider harness communication and automatic resource alias discovery are absent."
     }
   }
 }
