@@ -44,7 +44,8 @@ Added the same day, about what is on screen:
 | Quick answer | It quickly answers that it is working on the request. |
 | Evidence | It shows what it is saying to every new agent and every in-flight agent it references for that request. |
 | Audio | Audio is collected on the Rust side (owner, 2026-09-27, added while this RFC was written). No Swift or webview code captures the microphone. |
-| The mark | The animated Overseer logo is in the middle while the conversation is happening. The waveform has an effect on it, so the owner knows Overseer is getting what is said. How to animate it is left open. |
+| The mark | The animated Overseer logo is in the middle while the conversation is happening. The waveform has an effect on it, so the owner knows Overseer is getting what is said. |
+| The animation | Orbit (owner, 2026-09-27, from the preview page): the swooshes turn around the core. Ideally each swoosh on its own; when they cannot be separated, a gradient pulse through them is the owner's alternative. |
 
 ## Proposed defaults, distinguished from the decisions above
 
@@ -501,12 +502,20 @@ the [preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr).
 | Star | The star grows and the glow behind the mark breathes with the voice. | The layers |
 | Together | Orbit, the gradient on the swooshes, and the star, at once. | The layers |
 
+**The owner's pick (2026-09-27): Orbit, with a gradient pulse.** The swooshes turn as one ring
+around the core, faster with the owner's voice, and a gradient pulses through them with it; the
+star lights up when Overseer speaks. That is the *Together* candidate on the preview page. If
+the swooshes are ever separated, each gets its own motion.
+
 **The layers.** The owner's logo is one transparent image. At the owner's suggestion a copy was
 cut into three layers by a script: the core as a whole disc, the swooshes as one ring, and the
 star. They are in [`docs/design/brand/layers/`](../design/brand/layers/), with the script. The
 owner's file is untouched. The [brand notes](../design/brand.md#the-mark-in-layers-docsdesignbrandlayers)
-give the numbers and the limits: the three swooshes are not separated from each other, and the
-inner edge has small flaws. A layered file from whoever drew the mark would replace them.
+give the numbers and the limits. Separating the three swooshes from each other by machine was
+tried and does not work: their colours run in one gradient around the ring (hue tells the top
+and the right swoosh apart nowhere), and the shape does not repeat every 120° (overlap 0.38), so
+neither colour nor symmetry finds the parts hidden where they cross. A layered source file from
+whoever drew the mark (Figma, Illustrator, an SVG) would give clean, separate swooshes at once.
 
 Effects on the mark are allowed. The brand notes once forbade them; the owner corrected that on
 2026-09-27. What stays fixed is the mark's shape and proportions.
@@ -545,7 +554,7 @@ Effects on the mark are allowed. The brand notes once forbade them; the owner co
 
 | Gate | Relation |
 | --- | --- |
-| Gate M, Talk to Overseer (AC-107) | The orchestrator session moves from the extension into the daemon so voice works with VS Code closed. The typed chat becomes a client of it and keeps its rule (propose, then yes). This touches Gate M's area and is said so in the pull request. |
+| Gate S, Overseer itself (AC-180 to AC-202) | Gate S builds the Overseer session in the daemon (AC-181); Voice Mode is its spoken side. Its classes are Voice Mode's (AC-185), its settle window is AC-170's, and its level (AC-186) leaves what the owner says by voice to this gate. The two are built in parallel, and whichever comes first builds the session. |
 | Gate O, Audio Mode | One arbiter; Audio Mode is unchanged. |
 | Gate L, Continuity | The orchestrator follows its failover and its memory budget. A speech model counts against the same budget. |
 | Gate N, phone | No voice on the phone. Cards appear there when the chat with Overseer does (AC-128). |
@@ -584,7 +593,7 @@ Effects on the mark are allowed. The brand notes once forbade them; the owner co
 | 6. Should Overseer speak up by itself when an agent needs you? | No. Audio Mode's cue does that. Overseer speaks only in answer. |
 | 7. Should the typed chat follow the same tiers? | No change to AC-107 in this gate. |
 | 8. Audio is collected on the Rust side: inside `overseerd` itself, or in a Rust process of its own? | Its own process, started by the daemon, so a fault in audio code cannot stop the agents. |
-| 9. Which animation for the mark? | The owner picks on the [preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr), one or a mix. The large mark in the voice view and the small one in the strip are fine for now (owner, 2026-09-27); the owner judges again on the build. |
+| 9. Which animation for the mark? | Answered on 2026-09-27: Orbit, with a gradient pulse through the swooshes ([preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr)). The large mark in the voice view and the small one in the strip are fine for now; the owner judges again on the build. |
 
 ## Order of work
 
