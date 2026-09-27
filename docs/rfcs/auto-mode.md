@@ -2,7 +2,7 @@
 
 Status: **draft; local implementation and verification in progress under the owner’s later goal**.
 Requested by the owner on 2026-09-25. Baseline: `2c2c7cf`. Revised after owner feedback: continuously assign the right model/effort to each work unit; no user-maintained routing policy; prefer evaluating XCB reuse or a pinned fork.
-Acceptance criteria: **11 / 40 core criteria verified**; AUTO-AC-30 remains conditionally deferred, tracked independently below as `AUTO-AC-NN`.
+Acceptance criteria: **14 / 40 core criteria verified**; AUTO-AC-30 remains conditionally deferred, tracked independently below as `AUTO-AC-NN`.
 
 Local revision: based on the complete fetched draft at `c76938360352909c6157aae359bf811fa8b7405e`. Preserve all original sections and AUTO-AC-01 through AUTO-AC-36. This revision adds local-only telemetry and AUTO-AC-37 through AUTO-AC-41; condensed chat drafts do not replace the full RFC. The owner has requested a draft PR once implementation and verification are complete. Until then, drafting and implementation stay local.
 
@@ -23,6 +23,8 @@ The selector needs three different facts: what this work requires, what each rou
 This document defines the Auto Mode contract independently of the daemon, extension, account credentials, packaging, original RFC, and release acceptance ledger. The owner later authorized an implementation goal against its acceptance criteria. The existing draft PR holds the prior version; the current implementation remains local while it is incomplete and is coordinated with the VS Code production-readiness work. Open a new draft PR for the completed, verified work.
 
 The design builds on [account governance](account-governance.md), [credential isolation](claude-credentials.md), the [existing RFC](../overseer-rfc.md), and [adapter capabilities](../compatibility.md). Preserve account/subscription login only and no API-key fallback. Auto Mode is disabled by default. Existing manual tasks retain their selected route and behavior.
+
+This RFC's Auto Mode is **route picking**: it chooses who does each work unit. Overseer's separate Ask first / Steer / Auto level controls whether Overseer may act without asking, and an agent's Auto permission mode controls its own approvals. The three controls must remain independent in storage, API, and UI. Route picking never turns up either permission level; an Overseer message alone is not a work unit.
 
 Current account governance restricts OpenCode to local providers. The routing model must accommodate multiple providers, but cloud OpenCode routes stay ineligible until their account integration is separately supported and verified. Auto Mode does not implement that login work or assume that a ChatGPT/Claude subscription authorizes another harness to use it. A verified local endpoint is a valid route without a subscription quota; this is explicitly `not_applicable`, not an invented unlimited balance.
 
