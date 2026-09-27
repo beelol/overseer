@@ -1443,9 +1443,14 @@ rec(181, "Overseer lives in the daemon", "not started", date="—", commit="—"
 rec(182, "One conversation, from home", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
-rec(183, "A digest of every agent", "not started", date="—", commit="—",
+rec(183, "A digest of every agent", "partial", commit="cfda50b (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="fixture harnesses (Claude fixture, generic programs); no paid tokens",
+    proven="the digest is read from the daemon's records and events with no model and no git in the path: what was asked and by whom, status and since when, harness, account, model, effort and permission mode, repository, branch, worktree and base, changed files from the harness's own events, the last three messages, children (native child and grandchild), usage as reported or `not reported`, area and open conflicts; at most 4 KiB, redacted (a credential in a generic run's title and output never reaches it); a 2,000-line burst leaves it within its size and it is read in well under 2 s; nine fixture agents and a nested child give a roster equal to `state`, one line each within 16 KiB; building digests starts no turn and no run",
+    deferred="the fields that later steps fill (last report and check-in, holds, guardrails, watches) and the roles those steps add (watcher, director, worker); a handed-off run carried on by its successor (Continuity, pull request #9)",
+    steps="""`cargo test -p overseerd --test overseer`: `ac183_digest_says_what_an_agent_was_asked_did_and_changed` (Claude fixture in showcase mode; each digest field against the run, the events and `git status --porcelain` of the worktree) and `ac183_roster_equals_state_and_digests_stay_bounded_and_clean` (a nested fixture run, seven echo runs, a generic run printing a credential-shaped token, a generic run printing 2,000 lines).""",
     expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+    actual="Both tests pass. `agent.digest` returns the record and the text; `agents.roster` the lines and the text; both are what Overseer's `agent` and `roster` tools serve.",
+    evidence="`daemon/tests/overseer.rs`", live="Fixtures only; the live turns of AC-180 read the same roster.",
+    blocker="The remaining fields fill in with AC-185 to AC-193; the handed-off case waits for Continuity on main.")
 rec(184, "Overseer reads on demand, and only reads", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
@@ -1470,9 +1475,14 @@ rec(190, "Agents that know about each other", "not started", date="—", commit=
 rec(191, "Context passed between agents", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
-rec(192, "Conflicts between agents in flight", "not started", date="—", commit="—",
+rec(192, "Conflicts between agents in flight", "partial", commit="cfda50b (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="generic programs in real Git worktrees; no paid tokens",
+    proven="same lines, same file and target moved are found by trial merges of the agents' captured working trees (`git merge-tree` on trees from a private index) with no model; with three agents editing at once the same-lines and same-file conflicts appear within the bound with the right files, both worktrees, the source checkout's index and every branch are byte-identical before and after, both agents get the event, the roster and the digest count them; a reverted overlap closes the conflict as gone; the owner dismisses one; a commit on main that touches an agent's line gives target moved; sixteen agents in a 10,000-file repository: one scan compares all fifteen others in well under 10 s (seven same-lines conflicts on the shared file) and `state` answers during it; detection starts no turn and no run",
+    deferred="area crossed with a real area (areas arrive with AC-190); the card's assign and sequence (they need guardrails and holds, AC-185) and Overseer settling a conflict at Auto (AC-186); the Needs-you and badge parts of the surfaces (AC-199)",
+    steps="""`cargo test -p overseerd --test overseer`: `ac192_conflicts_between_agents_in_flight` and `ac192_sixteen_agents_in_a_large_repository`.""",
     expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+    actual="Both tests pass. Scans run after an agent's events settle (2 s) and on an 8-second sweep for harnesses that report no file activity; `overseer.scan` runs one now.",
+    evidence="`daemon/tests/overseer.rs`", live="Fixtures only.",
+    blocker="assign, sequence and Auto follow with AC-185 and AC-186; area crossed with AC-190.")
 rec(193, "One agent watches another", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
@@ -1626,7 +1636,7 @@ SHORT_BLOCKERS = {
     180: "verified",
     181: "not started (Gate S, added by the owner on 2026-09-27)",
     182: "not started (Gate S, added by the owner on 2026-09-27)",
-    183: "not started (Gate S, added by the owner on 2026-09-27)",
+    183: "partial: the daemon half is built on pull request #14; the rest comes with its later steps",
     184: "not started (Gate S, added by the owner on 2026-09-27)",
     185: "not started (Gate S, added by the owner on 2026-09-27)",
     186: "not started (Gate S, added by the owner on 2026-09-27)",
@@ -1635,7 +1645,7 @@ SHORT_BLOCKERS = {
     189: "not started (Gate S, added by the owner on 2026-09-27)",
     190: "not started (Gate S, added by the owner on 2026-09-27)",
     191: "not started (Gate S, added by the owner on 2026-09-27)",
-    192: "not started (Gate S, added by the owner on 2026-09-27)",
+    192: "partial: the daemon half is built on pull request #14; the rest comes with its later steps",
     193: "not started (Gate S, added by the owner on 2026-09-27)",
     194: "not started (Gate S, added by the owner on 2026-09-27)",
     195: "not started (Gate S, added by the owner on 2026-09-27)",
