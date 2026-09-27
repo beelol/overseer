@@ -387,6 +387,24 @@ fn explicit_ceiling_runs_thirty_two_supervised_workers() {
         assert!(std::time::Instant::now() < until, "only {running}/32 workers running");
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
+    let page = d.call("swarm.jobs", json!({"id":id,"limit":40}));
+    let rows = page["jobs"].as_array().unwrap();
+    for (n, worker) in workers.iter().enumerate() {
+        let linked = &rows.iter().find(|row| row["id"] == format!("j{n}"))
+            .unwrap()["worker_runs"];
+        assert_eq!(linked.as_array().unwrap().len(), 1, "job {n} should show its worker");
+        assert_eq!(linked[0]["overseer_run_id"], *worker);
+        assert_eq!(linked[0]["status"], "running");
+        assert!(linked[0].get("token").is_none(), "worker detail must not expose broker credentials");
+    }
+    assert_eq!(rows.iter().find(|row| row["id"] == "j32").unwrap()["worker_runs"]
+        .as_array().unwrap().len(), 0);
+    let state = d.call("state", json!({}));
+    let worker_state = state["runs"].as_array().unwrap().iter()
+        .find(|row| row["id"] == workers[0]).unwrap();
+    assert_eq!(worker_state["swarm_membership"]["role"], "worker");
+    assert_eq!(worker_state["swarm_membership"]["run_id"], id);
+    assert_eq!(worker_state["swarm_membership"]["job_id"], "j0");
     let db_probe = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     for worker in &workers {
         let run_dir: String = db_probe.query_row("SELECT run_dir FROM runs WHERE id=?1",

@@ -27,9 +27,12 @@ Module._load = originalLoad;
     active_worker_processes: 32, registered_attempts: 32, director: { owner_status: 'active' },
     availability: null, benefit: null, unconfirmed_exit_count: 0 };
   const jobs = Array.from({ length: 50 }, (_, n) => ({ id: `j${String(n).padStart(3, '0')}`,
-    title: `Check route ${n}`, status: n < 32 ? 'running' : 'ready', attempt_count: n < 32 ? 1 : 0,
+    title: `Check route ${n}`, status: n < 32 ? 'reserved' : 'ready', attempt_count: n < 32 ? 1 : 0,
     plan_revision: 1, acceptance: 'Evidence', deps: [], resource_claims: [], run_id: run.id,
-    deadline_at_ms: null, stop_reason: null }));
+    deadline_at_ms: null, stop_reason: null,
+    worker_runs: n === 0 ? [{ attempt_id: 'a0', overseer_run_id: 'worker-0',
+      status: 'running', harness: 'generic', profile_id: null, model: null,
+      workspace_id: 'ws-0', ended_ms: null }] : [] }));
   let swarmRuns = [run];
   const client = { request: async (method, params) => {
     calls.push([method, params]);
@@ -63,6 +66,12 @@ Module._load = originalLoad;
   assert.equal(firstPage.length, 52, 'director, 50 job rows and one next-page control');
   assert.equal(firstPage[0].item.label, 'Director');
   assert.equal(firstPage[1].item.iconPath.id, 'sync~spin');
+  assert.equal(firstPage[1].item.description, 'working', 'a live worker must not be shown as merely reserved');
+  assert.equal(firstPage[1].item.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
+  const workerRows = provider.getChildren(firstPage[1]);
+  assert.equal(workerRows.length, 1);
+  assert.equal(workerRows[0].item.command.command, 'overseer.selectRun');
+  assert.deepEqual(workerRows[0].item.command.arguments, ['worker-0']);
   assert.equal(firstPage[33].item.iconPath.id, 'clock');
   assert.equal(calls.filter(([method]) => method === 'swarm.jobs').length, 1);
   assert.equal(calls.find(([method]) => method === 'swarm.jobs')[1].limit, 50);
@@ -79,5 +88,26 @@ Module._load = originalLoad;
   await model.refresh(true);
   assert(!provider.getChildren().some(node => node.section === 'swarms'),
     'explicit refresh should remove a run that no longer appears in the daemon list');
+
+  const stateWithWorker = { tasks: [
+    { id: 'swarm-task', title: 'Fixture worker', repo_root: '/repo', created_ms: 1 },
+    { id: 'ordinary-task', title: 'Ordinary agent', repo_root: '/repo', created_ms: 2 },
+  ], runs: [
+    { id: 'worker-0', task_id: 'swarm-task', status: 'running', created_ms: 1,
+      workspace_id: 'worker-ws', swarm_membership: { role: 'worker', run_id: 'sw-large', job_id: 'j000' } },
+    { id: 'ordinary-0', task_id: 'ordinary-task', status: 'running', created_ms: 2,
+      workspace_id: 'ordinary-ws' },
+  ], workspaces: [
+    { id: 'worker-ws', repo_root: '/repo', path: '/repo/workers/0' },
+    { id: 'ordinary-ws', repo_root: '/repo', path: '/repo/ordinary' },
+  ], profiles: [], turns: {} };
+  const isolated = new Model({ request: async method => method === 'state' ? stateWithWorker : { runs: [] } });
+  await isolated.refresh(true);
+  const ordinary = new AgentsProvider(isolated, { get: () => [], update: () => {} });
+  assert.deepEqual(ordinary.visibleTasks().map(task => task.id), ['ordinary-task'],
+    'Swarm workers should appear under their category, not as duplicate ordinary agents');
+  assert.equal(isolated.run('worker-0').id, 'worker-0', 'drilldown still needs the worker run');
+  assert.equal(isolated.workspace('worker-ws').path, '/repo/workers/0',
+    'drilldown still needs the worker workspace');
   console.log('Swarm summaries stay compact; jobs load only when a run expands');
 })().catch(error => { console.error(error); process.exit(1); });

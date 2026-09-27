@@ -1742,11 +1742,30 @@ impl Daemon {
     pub fn state(&self) -> Result<Value> {
         let store = self.store.lock().unwrap();
         let runs = store.runs()?;
+        let mut memberships = BTreeMap::new();
+        let mut links = store.conn.prepare(
+            "SELECT overseer_run_id,run_id,'worker',job_id FROM swarm_worker_launches
+             WHERE overseer_run_id IS NOT NULL
+             UNION ALL
+             SELECT overseer_run_id,run_id,'director',NULL FROM swarm_director_owners
+             WHERE overseer_run_id IS NOT NULL",
+        )?;
+        for row in links.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?,
+            r.get::<_, String>(2)?, r.get::<_, Option<String>>(3)?)))? {
+            let (process, run, role, job) = row?;
+            memberships.insert(process, json!({"role":role,"run_id":run,"job_id":job}));
+        }
+        let mut run_values = serde_json::to_value(&runs)?;
+        for run in run_values.as_array_mut().expect("runs serialize as an array") {
+            if let Some(link) = run["id"].as_str().and_then(|id| memberships.get(id)) {
+                run["swarm_membership"] = link.clone();
+            }
+        }
         let mut turns = serde_json::Map::new();
         for r in runs.iter().filter(|r| r.parent_run_id.is_none()) {
             turns.insert(r.id.clone(), serde_json::to_value(store.turns(&r.id)?)?);
         }
-        Ok(json!({"cursor": store.max_seq()?, "tasks": store.tasks()?, "runs": runs, "workspaces": store.workspaces()?, "profiles": store.profiles()?, "turns": turns,
+        Ok(json!({"cursor": store.max_seq()?, "tasks": store.tasks()?, "runs": run_values, "workspaces": store.workspaces()?, "profiles": store.profiles()?, "turns": turns,
             "daemon": {"pid": std::process::id(), "started_ms": self.started_ms, "version": env!("CARGO_PKG_VERSION"), "parser_version": adapters::PARSER_VERSION,
                 "swarm_storage": if self.swarm_storage_blocked.load(std::sync::atomic::Ordering::SeqCst) { "blocked" } else { "ready" }}}))
     }

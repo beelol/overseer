@@ -60,10 +60,13 @@ class Model {
   scheduleRefresh() { if (!this.timer) this.timer = setTimeout(() => { this.timer = undefined; this.refresh(); }, 120); }
   hide(taskId) { if (taskId && !this.hidden.has(taskId)) { this.hidden.add(taskId); this.state = this.visible(this.all); this.emitter.fire(); } }
   visible(all) {
-    if (!this.hidden.size) return all;
-    const runs = (all.runs || []).filter(r => !this.hidden.has(r.task_id));
+    const swarmTasks = new Set((all.runs || []).filter(r => r.swarm_membership && !r.parent_run_id)
+      .map(r => r.task_id));
+    if (!this.hidden.size && !swarmTasks.size) return all;
+    const excluded = new Set([...this.hidden, ...swarmTasks]);
+    const runs = (all.runs || []).filter(r => !excluded.has(r.task_id));
     const used = new Set(runs.map(r => r.workspace_id));
-    return { ...all, tasks: (all.tasks || []).filter(t => !this.hidden.has(t.id)), runs, workspaces: (all.workspaces || []).filter(w => used.has(w.id) || !(all.runs || []).some(r => r.workspace_id === w.id)) };
+    return { ...all, tasks: (all.tasks || []).filter(t => !excluded.has(t.id)), runs, workspaces: (all.workspaces || []).filter(w => used.has(w.id) || !(all.runs || []).some(r => r.workspace_id === w.id)) };
   }
   // Lookups see every run, hidden ones included (the Overseer chat shows its own run).
   run(id) { return this.all.runs.find(r => r.id === id); }
@@ -225,6 +228,7 @@ class AgentsProvider {
     if (node.section === 'swarms') return m.swarms.map(run => this.swarmNode(run, node));
     if (node.swarm) return this.swarmPage(node.swarm, undefined, node, true);
     if (node.swarmPage) return this.swarmPage(node.swarmPage.run, node.swarmPage.cursor, node, false);
+    if (node.job) return (node.job.worker_runs || []).map(worker => this.swarmWorkerNode(worker, node));
     if (node.repo) return this.visibleTasks().filter(t => t.repo_root === node.repo).map(t => this.agentNode(t, node));
     if (node.run) return this.kidsOf(node.run.id).map(run => this.childNode(run, node));
     return [];
@@ -263,11 +267,16 @@ class AgentsProvider {
       rows.push({ item, parent });
     }
     for (const job of page.jobs || []) {
-      const item = new vscode.TreeItem(job.title);
+      const workerRuns = job.worker_runs || [];
+      const active = workerRuns.find(worker => !worker.ended_ms &&
+        ['queued', 'starting', 'running', 'waiting_for_user'].includes(worker.status));
+      const item = new vscode.TreeItem(job.title, workerRuns.length
+        ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
       item.id = `swarm-job:${run.id}:${job.id}`;
-      item.iconPath = statusIcon(job.status);
-      item.description = job.status;
-      item.tooltip = `${job.acceptance}\n${job.status} · ${job.attempt_count} attempts`;
+      item.iconPath = statusIcon(active?.status || job.status);
+      item.description = active?.status === 'running' ? 'working' : active?.status || job.status;
+      item.tooltip = `${job.acceptance}\n${item.description} · ${job.attempt_count} attempts`;
+      item.accessibilityInformation = { label: `${job.title}, ${item.description}, ${job.attempt_count} attempts` };
       item.contextValue = 'swarm-job';
       rows.push({ item, job, parent });
     }
@@ -278,6 +287,18 @@ class AgentsProvider {
       rows.push({ item, swarmPage: { run, cursor: page.next_cursor }, parent });
     }
     return rows;
+  }
+  swarmWorkerNode(worker, parent) {
+    const item = new vscode.TreeItem('Worker');
+    item.id = `swarm-worker:${worker.overseer_run_id}`;
+    item.iconPath = this.logo(worker.harness);
+    item.description = worker.status === 'running' ? 'working' : worker.status;
+    const profile = worker.profile_id ? this.model.profile(worker.profile_id) : undefined;
+    item.tooltip = [worker.harness, profile?.name, worker.model, worker.status].filter(Boolean).join(' · ');
+    item.accessibilityInformation = { label: `Worker, ${item.tooltip}` };
+    item.contextValue = 'swarm-worker';
+    item.command = { command: 'overseer.selectRun', title: 'Open worker', arguments: [worker.overseer_run_id] };
+    return { item, worker, parent };
   }
   needsSection(list) {
     const item = new vscode.TreeItem('Needs you', this.expansion('section:needs'));

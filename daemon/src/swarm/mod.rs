@@ -486,7 +486,31 @@ pub fn jobs(store: &Store, p: &Value) -> Result<Value> {
         }))
     })?.collect::<rusqlite::Result<Vec<_>>>()?;
     let has_more = rows.len() as i64 > limit;
-    let page: Vec<Value> = rows.into_iter().take(limit as usize).collect();
+    let mut page: Vec<Value> = rows.into_iter().take(limit as usize).collect();
+    // A reservation is not a running process. Keep the job's durable status
+    // separate, and expose linked supervised runs so clients can show who is
+    // working and open that worker without loading every transcript.
+    let mut workers_stmt = store.conn.prepare(
+        "SELECT l.attempt_id,l.overseer_run_id,l.launch_phase,r.status,r.harness,
+                r.profile_id,r.model,r.workspace_id,r.ended_ms
+         FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+         WHERE l.run_id=?1 AND l.job_id=?2
+         ORDER BY l.created_ms DESC,l.attempt_id DESC LIMIT 3",
+    )?;
+    for job in &mut page {
+        let linked = workers_stmt.query_map(params![id,job["id"].as_str()], |r| Ok(json!({
+            "attempt_id":r.get::<_,String>(0)?,
+            "overseer_run_id":r.get::<_,String>(1)?,
+            "launch_phase":r.get::<_,Option<String>>(2)?,
+            "status":r.get::<_,String>(3)?,
+            "harness":r.get::<_,String>(4)?,
+            "profile_id":r.get::<_,Option<String>>(5)?,
+            "model":r.get::<_,Option<String>>(6)?,
+            "workspace_id":r.get::<_,String>(7)?,
+            "ended_ms":r.get::<_,Option<i64>>(8)?,
+        })))?.collect::<rusqlite::Result<Vec<_>>>()?;
+        job["worker_runs"] = json!(linked);
+    }
     let next_cursor = if has_more {
         page.last().and_then(|j| j["id"].as_str())
     } else {
