@@ -1661,7 +1661,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let id = thread_recorded?;
                 Some(json!({"id":id,"run_id":run.id,"profile_id":profile_id,"read_account_generation":generation,"attribution":attribution,"subscription_window_relation":"unverified","source":"codex-app/account-usage-read","estimate":estimate}))
             } else { None };
-            match store.refresh_auto_work_observation(&run.id) {
+            match store.refresh_auto_work_observation(&run.id, &allowance_delta) {
                 Ok(true) => d.learning_work_paused.store(false, std::sync::atomic::Ordering::Relaxed),
                 Err(_) => d.learning_work_paused.store(true, std::sync::atomic::Ordering::Relaxed),
                 Ok(false) => {}

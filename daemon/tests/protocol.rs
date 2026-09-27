@@ -2373,6 +2373,12 @@ fn auto_work_history_links_actual_usage_outcome_and_quota_without_content() {
     assert_eq!(work["quota_before"]["source"], "codex-app/managed-pre-turn");
     assert_eq!(work["quota_after"]["source"], "codex-app/metadata-read");
     assert_eq!(work["subscription_window_draw"], "unverified");
+    assert_eq!(work["subscription_window_assessment"]["state"], "unverified");
+    assert!(work["subscription_window_assessment"]["windows"].as_array().unwrap().is_empty());
+    let reasons = work["subscription_window_assessment"]["reasons"].as_array().unwrap();
+    for reason in ["external_usage_unexcluded", "reporting_not_settled", "meter_precision_unknown"] {
+        assert!(reasons.iter().any(|item| item == reason), "{work}");
+    }
     assert!(work["execution_ms"].as_i64().unwrap() >= 0);
     assert!(work["launch_overhead_ms"].as_i64().unwrap() >= 0);
     let serialized = history.to_string();
@@ -2384,6 +2390,7 @@ fn auto_work_history_links_actual_usage_outcome_and_quota_without_content() {
     let exported = std::fs::read_to_string(&export_path).unwrap();
     assert!(exported.contains("\"work_units\""));
     assert!(exported.contains("measured-browser-unit"));
+    assert!(exported.contains("external_usage_unexcluded"));
     assert!(!exported.contains("private-browser-sentinel"));
     assert!(!exported.contains("private-parent-sentinel"));
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
@@ -2424,6 +2431,8 @@ fn auto_work_history_preserves_missing_usage_as_unknown() {
     assert_eq!(rows["work_units"][0]["usage_observations"], 0);
     assert!(rows["work_units"][0]["usage"].is_null());
     assert_eq!(rows["work_units"][0]["subscription_window_draw"], "unverified");
+    assert!(rows["work_units"][0]["subscription_window_assessment"].is_null(),
+        "a work unit with no later account read has no delta assessment");
 }
 
 #[test]
