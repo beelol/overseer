@@ -120,13 +120,21 @@ class TaskLauncher {
     await this.context.globalState.update('overseer.autoPendingStart', { hash, workUnitId });
     await this.client.request('auto.mode.set', { enabled: true });
     const created = await this.client.request('auto.start', { ...request, work_unit_id: workUnitId });
-    if (!created.run?.id) throw new Error('Auto routing paused: no eligible route. Refresh account usage or choose a manual agent.');
+    if (!created.run?.id) throw new Error(autoPauseMessage(created));
     await this.context.globalState.update('overseer.autoPendingStart', undefined);
     await this.saveDefaults({ repo, routing: 'auto', preferredHarness: preferred,
       mode: f.mode === 'current' ? 'current' : 'worktree' });
     await this.model.refresh();
     return created.run.id;
   }
+}
+
+function autoPauseMessage(created) {
+  const reasons = (created.decision?.exclusions || []).map(x => x.reason);
+  if (reasons.length && reasons.every(x => x === 'quota_exhausted')) return 'Auto routing paused: available account allowance is exhausted. Choose a manual agent or wait for a reset.';
+  if (reasons.length && reasons.every(x => x === 'pool_in_flight_unknown_draw')) return 'Auto routing paused: an agent is already using the available account. Try again when it finishes.';
+  if (created.discovery_failures?.length && !reasons.length) return 'Auto routing paused: account or model availability could not be checked. Refresh and try again, or choose a manual agent.';
+  return 'Auto routing paused: no eligible route. Refresh account usage or choose a manual agent.';
 }
 
 /** A short title from the first line of the prompt (the full prompt stays on the task). */

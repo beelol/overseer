@@ -42,11 +42,12 @@ function fixture(reply) {
   assert.match(request.work_unit_id, /^[A-Za-z0-9_-]+$/);
   assert.equal(x.saved.get('overseer.autoPendingStart'), undefined);
 
-  const y = fixture({ state: 'paused', decision: { selected: null } });
-  await assert.rejects(y.launcher.start(f), /no eligible route|paused/i);
+  const y = fixture({ state: 'paused', decision: { selected: null, reason: 'no_eligible_route',
+    exclusions: [{ route_id: 'codex/sol', reason: 'quota_exhausted' }] } });
+  await assert.rejects(y.launcher.start(f), /allowance is exhausted/i);
   const pending = y.saved.get('overseer.autoPendingStart');
   assert.equal(pending.workUnitId, y.calls[1][1].work_unit_id);
-  await assert.rejects(y.launcher.start(f), /no eligible route|paused/i);
+  await assert.rejects(y.launcher.start(f), /allowance is exhausted/i);
   assert.equal(y.calls[3][1].work_unit_id, pending.workUnitId, 'retry must reuse its admitted work-unit identity');
 
   const z = fixture();
