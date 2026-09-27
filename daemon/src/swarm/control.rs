@@ -1,7 +1,7 @@
 use super::{get, required};
 use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 
 fn checked(store: &Store, p: &Value) -> Result<(String, String)> {
@@ -77,6 +77,65 @@ pub fn off(store: &mut Store, p: &Value) -> Result<Value> {
     let status = super::finalize_control_if_idle(&tx,&id,now)?;
     tx.commit()?;
     Ok(json!({"id":id,"status":status,"duplicate":false}))
+}
+
+/// An owner-initiated time extension changes the run deadline only. The run's
+/// frozen account allocations and any admitted job deadlines are untouched.
+pub fn extend_deadline(store: &mut Store, p: &Value) -> Result<Value> {
+    let run = required(p, "run_id")?;
+    let request_id = required(p, "request_id")?;
+    if request_id.is_empty() || request_id.len() > 128 || request_id.chars().any(char::is_control) {
+        bail!("invalid deadline extension request id");
+    }
+    let expected = p["expected_deadline_at_ms"].as_i64()
+        .ok_or_else(|| anyhow!("missing expected deadline"))?;
+    let additional = p["additional_ms"].as_i64()
+        .ok_or_else(|| anyhow!("missing extension duration"))?;
+    if !(1..=86_400_000).contains(&additional) {
+        bail!("extension duration must be between 1 millisecond and 24 hours");
+    }
+    let tx = store.conn.transaction()?;
+    let replay: Option<(i64,i64,i64)> = tx.query_row(
+        "SELECT expected_deadline_at_ms,additional_ms,new_deadline_at_ms
+         FROM swarm_deadline_extensions WHERE run_id=?1 AND request_id=?2",
+        params![run,request_id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+    ).optional()?;
+    if let Some((old_expected,old_additional,new_deadline)) = replay {
+        if old_expected != expected || old_additional != additional {
+            bail!("deadline extension request id reused with different input");
+        }
+        return Ok(json!({"run_id":run,"deadline_at_ms":new_deadline,"duplicate":true}));
+    }
+    let (status,created,raw_policy): (String,i64,String) = tx.query_row(
+        "SELECT status,created_ms,policy FROM swarm_runs WHERE id=?1",[run],
+        |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+    ).optional()?.ok_or_else(||anyhow!("unknown swarm run"))?;
+    if !["planning","running","paused","stalled","draining"].contains(&status.as_str()) {
+        bail!("swarm run cannot extend its deadline in this state");
+    }
+    let mut policy: Value = serde_json::from_str(&raw_policy)?;
+    let duration = policy["effective"]["deadline_ms"].as_i64()
+        .ok_or_else(||anyhow!("run is missing its deadline"))?;
+    let old_deadline = created.checked_add(duration)
+        .ok_or_else(||anyhow!("invalid current deadline"))?;
+    if expected != old_deadline { bail!("stale deadline"); }
+    let now = crate::daemon::now();
+    if now >= old_deadline { bail!("run deadline already expired"); }
+    let new_duration = duration.checked_add(additional)
+        .ok_or_else(||anyhow!("deadline extension overflow"))?;
+    let new_deadline = created.checked_add(new_duration)
+        .ok_or_else(||anyhow!("deadline extension overflow"))?;
+    policy["effective"]["deadline_ms"] = json!(new_duration);
+    policy["sources"]["deadline_ms"] = json!("run_extension");
+    tx.execute("UPDATE swarm_runs SET policy=?2,updated_ms=?3 WHERE id=?1",
+        params![run,policy.to_string(),now])?;
+    tx.execute("INSERT INTO swarm_deadline_extensions(run_id,request_id,
+        expected_deadline_at_ms,additional_ms,old_deadline_at_ms,new_deadline_at_ms,created_ms)
+        VALUES(?1,?2,?3,?4,?5,?6,?7)",
+        params![run,request_id,expected,additional,old_deadline,new_deadline,now])?;
+    tx.commit()?;
+    Ok(json!({"run_id":run,"previous_deadline_at_ms":old_deadline,
+        "deadline_at_ms":new_deadline,"duplicate":false}))
 }
 
 /// Expire runs independently of admission requests, including runs waiting for an account.

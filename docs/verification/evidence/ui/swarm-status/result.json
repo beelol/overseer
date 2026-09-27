@@ -95,10 +95,18 @@
       ]
     },
     {
+      "name": "deadline extension from the Swarm row records 30 more minutes",
+      "ok": true,
+      "detail": {
+        "before_ms": 3600000,
+        "after_ms": 5400000
+      }
+    },
+    {
       "name": "Pause from the Swarm row changes durable daemon state within 2 seconds",
       "ok": true,
       "detail": {
-        "pause_ms": 588
+        "pause_ms": 593
       }
     },
     {
@@ -126,7 +134,7 @@
       "name": "confirmed Stop cancels queued work within 2 seconds",
       "ok": true,
       "detail": {
-        "stop_ms": 67
+        "stop_ms": 69
       }
     }
   ]

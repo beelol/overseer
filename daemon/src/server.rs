@@ -491,6 +491,11 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let _serial = d.swarm_launch_lock.lock().unwrap();
             crate::swarm::set_run_limit(&mut d.store.lock().unwrap(), p)?
         }
+        "swarm.deadline.extend" => {
+            let _serial = d.swarm_launch_lock.lock().unwrap();
+            require_swarm_storage(d)?;
+            crate::swarm::extend_deadline(&mut d.store.lock().unwrap(), p)?
+        }
         "swarm.admit" => {
             fixture_only()?;
             let _serial = d.swarm_launch_lock.lock().unwrap();

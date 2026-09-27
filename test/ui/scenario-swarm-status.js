@@ -68,6 +68,21 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
       }
       return false;
     };
+    const priorDeadlineMs = s.ctl('swarm.get', { id: made.id }).policy.effective.deadline_ms;
+    await chooseControl('Extend Swarm Deadline…');
+    await cdp.waitFor(`document.querySelector('.quick-input-widget')?.textContent.includes('30 minutes')`,
+      10000, 'deadline extension choices');
+    await cdp.key('Enter');
+    let extended;
+    for (let n = 0; n < 40; n++) {
+      extended = s.ctl('swarm.get', { id: made.id });
+      if (extended.policy.effective.deadline_ms === priorDeadlineMs + 30 * 60 * 1000) break;
+      await delay(100);
+    }
+    check('deadline extension from the Swarm row records 30 more minutes',
+      extended.policy.effective.deadline_ms === priorDeadlineMs + 30 * 60 * 1000 &&
+      extended.policy.sources.deadline_ms === 'run_extension',
+      { before_ms: priorDeadlineMs, after_ms: extended.policy.effective.deadline_ms });
     let controlStarted = Date.now();
     await chooseControl('Pause Swarm');
     const paused = await waitStatus('paused');

@@ -48,5 +48,25 @@ const { SwarmControls } = require(path.resolve(__dirname, '../../extension/src/s
   await assert.rejects(controls.pause(run.id), /stale plan revision/);
   assert.equal(run.status, 'running');
   assert.equal(refreshed, 5, 'a stale control reloads current state before the user retries');
+
+  let extensionRefreshed = 0;
+  const extensionCalls = [];
+  const extensionClient = { request: async (method, params) => {
+    extensionCalls.push([method, params]);
+    if (method === 'swarm.get') return { id: 'sw-2', created_ms: 1000,
+      policy: { effective: { deadline_ms: 3600000 } } };
+    if (method === 'swarm.deadline.extend') return { deadline_at_ms: 1000 + 5400000 };
+    throw new Error(`unexpected ${method}`);
+  } };
+  const extensionControls = new SwarmControls(extensionClient,
+    () => { extensionRefreshed++; }, () => false);
+  const extended = await extensionControls.extendDeadline('sw-2', 1800000);
+  assert.equal(extended.deadline_at_ms, 5401000);
+  const sent = extensionCalls.find(([method]) => method === 'swarm.deadline.extend')[1];
+  assert.equal(sent.run_id, 'sw-2');
+  assert.equal(sent.expected_deadline_at_ms, 3601000);
+  assert.equal(sent.additional_ms, 1800000);
+  assert.match(sent.request_id, /^[0-9a-f-]{36}$/);
+  assert.equal(extensionRefreshed, 1);
   console.log('Swarm controls use fresh versions and confirm Stop once');
 })().catch(error => { console.error(error); process.exit(1); });

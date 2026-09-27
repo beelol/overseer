@@ -648,6 +648,18 @@ async function activate(context) {
       requireTrust(); const id = await swarmId(arg, ['planning', 'running', 'paused', 'stalled']);
       if (id) await swarmControls.off(id);
     })),
+    vscode.commands.registerCommand('overseer.extendSwarmDeadline', guard(async arg => {
+      requireTrust(); const id = await swarmId(arg, ['planning', 'running', 'paused', 'stalled', 'draining']);
+      if (!id) return;
+      const choice = await vscode.window.showQuickPick([
+        { label: '30 minutes', additionalMs: 30 * 60 * 1000 },
+        { label: '1 hour', additionalMs: 60 * 60 * 1000 },
+        { label: '2 hours', additionalMs: 2 * 60 * 60 * 1000 }
+      ], { title: 'Extend Swarm deadline', placeHolder: 'Choose how much time to add' });
+      if (!choice) return;
+      const result = await swarmControls.extendDeadline(id, choice.additionalMs);
+      vscode.window.showInformationMessage(`Swarm deadline extended until ${new Date(result.deadline_at_ms).toLocaleString()}. Account allocation is unchanged.`);
+    })),
     vscode.commands.registerCommand('overseer.selectRun', guard(runId => selectRun(runId))),
     vscode.commands.registerCommand('overseer.openReview', guard(async arg => { const id = runArg(arg); if (!id) return; selectedRun = id; await arrangement.openReview(id); await center.select(id); })),
     vscode.commands.registerCommand('overseer.openEdit', guard(async (runId, rel) => {

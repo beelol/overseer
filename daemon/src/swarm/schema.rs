@@ -44,6 +44,16 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           PRIMARY KEY(run_id,request_id),
           UNIQUE(run_id,limit_revision)
         );
+        CREATE TABLE IF NOT EXISTS swarm_deadline_extensions(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          request_id TEXT NOT NULL,
+          expected_deadline_at_ms INTEGER NOT NULL,
+          additional_ms INTEGER NOT NULL,
+          old_deadline_at_ms INTEGER NOT NULL,
+          new_deadline_at_ms INTEGER NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,request_id)
+        );
         CREATE TABLE IF NOT EXISTS swarm_availability(
           run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
           state TEXT NOT NULL CHECK(state IN ('eligible','blocked')),

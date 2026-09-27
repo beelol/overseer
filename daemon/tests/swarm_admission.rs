@@ -895,6 +895,64 @@ fn run_percentage_overrides_change_frozen_allocation_and_finishing_reserve() {
 }
 
 #[test]
+fn explicit_run_deadline_extension_survives_restart_without_new_account_allocation() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create",json!({"category":"Extended audit","objective":"Audit",
+        "allowed_targets":["codex-a"],"policy":{"deadline_ms":60000}}));
+    let id = run["id"].as_str().unwrap();
+    let created = run["created_ms"].as_i64().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"first","title":"First","acceptance":"evidence","deps":[]},
+        {"id":"second","title":"Second","acceptance":"evidence","deps":[]},
+        {"id":"third","title":"Third","acceptance":"evidence","deps":[]}
+    ]}));
+    assert_eq!(admit(&d,id,"first","codex-a","before-extension",now(),60000,100)
+        .unwrap()["status"],"admitted");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let before: (i64,i64) = db.query_row(
+        "SELECT allocation_milli,reserve_milli FROM swarm_allocations WHERE run_id=?1",
+        [id],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    let request = json!({"run_id":id,"request_id":"owner-extension-1",
+        "expected_deadline_at_ms":created+60000,"additional_ms":60000});
+    let extended = d.call("swarm.deadline.extend",request.clone());
+    assert_eq!(extended["deadline_at_ms"],created+120000);
+    assert_eq!(extended["duplicate"],false);
+    assert_eq!(d.call("swarm.deadline.extend",request.clone())["duplicate"],true);
+    let mut changed = request.clone();
+    changed["additional_ms"] = json!(30000);
+    assert!(d.try_call("swarm.deadline.extend",changed).unwrap_err()
+        .contains("request id reused"));
+    assert!(d.try_call("swarm.deadline.extend",json!({"run_id":id,
+        "request_id":"stale-extension","expected_deadline_at_ms":created+60000,
+        "additional_ms":1000})).unwrap_err().contains("stale deadline"));
+    d.kill9();
+    d.spawn();
+    let persisted = d.call("swarm.get",json!({"id":id}));
+    assert_eq!(persisted["policy"]["effective"]["deadline_ms"],120000);
+    let event: (i64,i64) = db.query_row(
+        "SELECT old_deadline_at_ms,new_deadline_at_ms FROM swarm_deadline_extensions WHERE run_id=?1",
+        [id],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!(event,(created+60000,created+120000));
+    let after_old = admit(&d,id,"second","codex-a","after-old-deadline",
+        created+60001,60000,100).unwrap();
+    assert_ne!(after_old["reason"],"run_deadline","{after_old}");
+    assert_ne!(d.call("swarm.get",json!({"id":id}))["stop_reason"],"deadline");
+    let after: (i64,i64) = db.query_row(
+        "SELECT allocation_milli,reserve_milli FROM swarm_allocations WHERE run_id=?1",
+        [id],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!(after,before,"time extension must not mint quota allocation");
+    let expired = admit(&d,id,"third","codex-a","after-new-deadline",
+        created+120000,60000,100).unwrap();
+    assert_eq!(expired["reason"],"run_deadline");
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["stop_reason"],"deadline");
+    assert!(d.try_call("swarm.deadline.extend",json!({"run_id":id,
+        "request_id":"too-late","expected_deadline_at_ms":created+120000,
+        "additional_ms":60000})).unwrap_err().contains("cannot extend"));
+    assert_eq!(d.call("swarm.deadline.extend",request)["duplicate"],true,
+        "replaying the earlier request must not add more time after Stop");
+}
+
+#[test]
 fn default_worker_ceiling_and_four_per_wave_are_admission_bounds() {
     let d = Daemon::start(&[]);
     let id = setup(&d, "Scale admission", 9);
