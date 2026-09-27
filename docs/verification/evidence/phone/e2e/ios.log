@@ -1,0 +1,101 @@
+19:17:23 The phone's scenarios on ios. Commit 6eda771.
+lab: {"state":"/Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/docs/verification/evidence/phone/e2e/lab-ios.json","home":"/tmp/ovs-e2eKFhybE","socket":"/tmp/ovs-e2eKFhybE/run/overseerd.sock","port":47821,"repo":"/tmp/ovs-e2eKFhybE/shop","pid":90352,"code":"OVSR1-AFB3KPX7SYNDRW22UYDDD3TF7B5W6RIJXJR76TU6FJYCO3YDHZWQKE6OXG33F5I4KZCYG56WEM4NAYV2ZUBA4MJZGIXDCNRYFY2TALRRHA
+19:17:28 scenario pair (AC-117, AC-118, AC-141): a code typed on the phone, confirmed on the Mac, and the agents list
+19:17:28 flow pair
+lab: {"paired":"Lab ios"}
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow pair
+Launch app "${APP}"... COMPLETED
+Assert that id: pair.code is visible... COMPLETED
+Tap on id: pair.name... COMPLETED
+Erase 40 characters... COMPLETED
+Input text ${NAME}... COMPLETED
+Tap on id: pair.code... COMPLETED
+Input text ${CODE}... COMPLETED
+Tap on id: pair.submit... COMPLETED
+Assert that id: pair.notifications.reason|agents.screen is visible... COMPLETED
+Run flow when id: pair.notifications.reason is visible...
+  Take screenshot notifications-the-reason-first... COMPLETED
+  Tap on id: ${NOTIFICATIONS}... COMPLETED
+  Assert that "Allow" is visible... COMPLETED
+  Take screenshot the-system-asks-about-notifications... COMPLETED
+  Tap on "Allow"... COMPLETED
+Run flow when id: pair.notifications.reason is visible... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+19:18:04 ok   pair
+19:18:04 scenario agents (AC-124): every agent, those that need the owner first
+19:18:04 flow agents
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow agents
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Assert that id: agents.row.${SHOWCASE} is visible... COMPLETED
+Assert that id: agents.needs.${PERMISSION} is visible... COMPLETED
+Assert that id: agents.row.${PERMISSION} is visible... COMPLETED
+Tap on id: agents.filter.needs... COMPLETED
+Assert that id: agents.needs.${PERMISSION} is visible... COMPLETED
+Assert that id: agents.row.${SHOWCASE} is not visible... COMPLETED
+Tap on id: agents.filter.all... COMPLETED
+Assert that id: agents.row.${SHOWCASE} is visible... COMPLETED
+19:18:39 ok   agents
+19:18:39 scenario conversation (AC-124): an agent's conversation opens with its composer
+19:18:39 flow conversation
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow conversation
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Tap on id: agents.row.${SHOWCASE}... COMPLETED
+Assert that id: agent.list is visible... COMPLETED
+Assert that id: agent.composer.text is visible... COMPLETED
+Assert that id: agent.changes is visible... COMPLETED
+Assert that id: agent.error is not visible... COMPLETED
+19:19:00 ok   conversation
+19:19:00 scenario permission (AC-125): a permission request allowed from the phone unblocks the agent
+19:19:00 flow permission
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow permission
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Scrolling DOWN until id: agents.needs.${PERMISSION} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Tap on id: agents.needs.${PERMISSION}... COMPLETED
+Assert that id: agent.permission.allow is visible... COMPLETED
+Tap on id: agent.permission.allow... COMPLETED
+Assert that id: agent.permission.allow is not visible... COMPLETED
+19:19:22 ok   permission
+19:19:22 scenario send (AC-122, AC-125): a message typed on the phone reaches the agent exactly once
+19:19:22 flow send
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow send
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Scrolling DOWN until id: agents.row.${SHOWCASE} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Tap on id: agents.row.${SHOWCASE}... COMPLETED
+Assert that id: agent.composer.text is visible... COMPLETED
+Tap on id: agent.composer.text... COMPLETED
+Input text ${MESSAGE}... COMPLETED
+Tap on id: agent.composer.send... COMPLETED
+Assert that ".*${MESSAGE}.*" is visible... COMPLETED
+19:19:48 ok   send
+19:19:48 scenario review (AC-126): an agent's changed files, a file's hunks, and a hunk marked reviewed
+19:19:48 flow review
+Running on iPhone 17 Pro - iOS 26.5 - E6105FAE-0651-4D7B-801A-40FF49980468
+ > Flow review
+Launch app "${APP}"... COMPLETED
+Assert that id: agents.screen is visible... COMPLETED
+Scrolling DOWN until id: agents.row.${RUN} is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Tap on id: agents.row.${RUN}... COMPLETED
+Assert that id: agent.changes is visible... COMPLETED
+Tap on id: agent.changes... COMPLETED
+Assert that id: changes.comparison is visible... COMPLETED
+Tap on id: changes.comparison... COMPLETED
+Tap on id: changes.comparison.menu.task_start... COMPLETED
+Assert that id: changes.row.${FILE} is visible... COMPLETED
+Tap on id: changes.row.${FILE}... COMPLETED
+Assert that id: file.hunk.accept is visible... COMPLETED
+Tap on id: file.hunk.accept, Index: 0... COMPLETED
+Tap on id: file.back... COMPLETED
+Tap on id: changes.back... COMPLETED
+19:20:15 ok   review
+19:20:15 scenario reject (AC-126, AC-130): a hunk rejected from the phone is asked about once and then gone from the worktree
+19:20:16 flow reject

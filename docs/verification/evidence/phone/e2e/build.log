@@ -1,0 +1,40 @@
+19:17:23 $ cargo build -p overseerd
+
+warning: function `tree_has` is never used
+   --> daemon/src/git.rs:274:8
+    |
+274 | pub fn tree_has(workspace: &Path, tree_ish: &str, path: &str) -> bool {
+    |        ^^^^^^^^
+
+warning: function `show_blob` is never used
+   --> daemon/src/git.rs:278:8
+    |
+278 | pub fn show_blob(workspace: &Path, tree_ish: &str, path: &str) -> Result<Vec<u8>> {
+    |        ^^^^^^^^^
+
+warning: function `is_ancestor` is never used
+   --> daemon/src/git.rs:282:8
+    |
+282 | pub fn is_ancestor(workspace: &Path, a: &str, b: &str) -> bool {
+    |        ^^^^^^^^^^^
+
+warning: function `worktree_list` is never used
+   --> daemon/src/git.rs:286:8
+    |
+286 | pub fn worktree_list(repo: &Path) -> Vec<PathBuf> {
+    |        ^^^^^^^^^^^^^
+
+warning: methods `set_task_start_snapshot` and `child_by_native` are never used
+   --> daemon/src/store.rs:295:12
+    |
+123 | impl Store {
+    | ---------- methods in this implementation
+...
+295 |     pub fn set_task_start_snapshot(&self, id: &str, snap: &str) -> Result<()> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+...
+348 |     pub fn child_by_native(&self, parent: &str, native: &str) -> Result<Option<Run>> {
+    |            ^^^^^^^^^^^^^^^
+
+warning: `overseerd` (bin "overseerd") generated 11 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s

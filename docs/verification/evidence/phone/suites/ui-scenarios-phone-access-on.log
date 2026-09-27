@@ -1,0 +1,187 @@
+=== accounts (phone access on) 23:34:07
+PASS accounts
+SCENARIO PASSED /private/tmp/ovs-ui-Pfdw74
+=== arrangement (phone access on) 23:35:23
+FAIL arrangement
+(node:61466) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+[2026-09-27T06:36:02.274Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T06:36:05.603Z] phone access is on for this scenario {"port":49395}
+[2026-09-27T06:36:08.089Z] PASS no agent selected: one editor group with the new-agent composer and no review [{"share":1,"active":"Overseer","tabs":["Overseer"]}]
+[2026-09-27T06:36:08.158Z] screenshot docs/verification/evidence/ui/arrangement/01-composer-alone.png
+[2026-09-27T06:36:12.515Z] PASS an agent with no changes: one editor group with its chat and no review [{"share":1,"active":"Overseer","tabs":["Overseer"]}]
+[2026-09-27T06:36:12.599Z] screenshot docs/verification/evidence/ui/arrangement/02-chat-alone.png
+[2026-09-27T06:36:15.802Z] FAIL the first file edit brings the review forward within 500 ms: review on the left (about two thirds) on the changed file, chat on the right {"lag":1063,"waitedMs":701,"layout":[{"share":0.66,"active":"Review: Write perm.txt (1), Editor Group 1","tabs":["Review: Write perm.txt (1), Editor Group 1"]},{"share":0.34,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}],"reviewFiles":["perm.txt","A"]}
+[2026-09-27T06:36:15.880Z] screenshot docs/verification/evidence/ui/arrangement/03-review-and-chat.png
+[2026-09-27T06:36:18.939Z] PASS the chat is a normal tab after moving (not a preview another file would replace) {"cls":"tab tab-actions-right sizing-fit has-icon active selected tab-border-bottom tab-border-top connected-tab-left-edge","italic":"normal"}
+[2026-09-27T06:36:18.939Z] PASS closing the review returns the chat to the middle (one group) [{"share":1,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
+[2026-09-27T06:36:22.350Z] PASS selecting another agent (with changes) keeps the chosen arrangement: chat alone [{"share":1,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
+[2026-09-27T06:36:25.314Z] PASS Open Review brings the review back beside the chat [{"share":0.66,"active":"Review: Refresh sessions once (2), Editor Group 1","tabs":["Review: Refresh sessions once (2), Editor Group 1"]},{"share":0.34,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
+[2026-09-27T06:36:38.791Z] PASS the arrangement survives a window reload (review left, chat right) [{"share":0.66,"active":"Review: Refresh sessions once (2), Editor Group 1","tabs":["Review: Refresh sessions once (2), Editor Group 1"]},{"share":0.34,"active":"Overseer, Editor Group 2","tabs":["Overseer, Editor Group 2"]}]
+[2026-09-27T06:36:38.921Z] screenshot docs/verification/evidence/ui/arrangement/04-after-reload.png
+[2026-09-27T06:36:38.921Z] PASS no settings changed (apart from VS Code's own migration)
+SCENARIO FAILED /private/tmp/ovs-ui-YKu1GM
+SCENARIO FAILED /private/tmp/ovs-ui-YKu1GM
+=== audit (phone access on) 23:36:40
+PASS audit
+SCENARIO PASSED /private/tmp/ovs-ui-JXm5RE
+skip background (it starts paid agents or uses the owner's daemon)
+=== center (phone access on) 23:38:13
+PASS center
+SCENARIO PASSED /private/tmp/ovs-ui-GBOPpR
+=== chat (phone access on) 23:39:11
+PASS chat
+SCENARIO PASSED /private/tmp/ovs-ui-5Kkdkc
+skip claude-live (it starts paid agents or uses the owner's daemon)
+skip codex-approval (it starts paid agents or uses the owner's daemon)
+skip codex-follow (it starts paid agents or uses the owner's daemon)
+skip codex-live (it starts paid agents or uses the owner's daemon)
+=== composer (phone access on) 23:39:50
+PASS composer
+SCENARIO PASSED /private/tmp/ovs-ui-eiLWk4
+skip conversation-live (it starts paid agents or uses the owner's daemon)
+=== conversation (phone access on) 23:40:43
+PASS conversation
+SCENARIO PASSED /private/tmp/ovs-ui-Q09Fi3
+=== dashboard (phone access on) 23:41:22
+PASS dashboard
+SCENARIO PASSED /private/tmp/ovs-ui-nnJNPg
+=== dragout (phone access on) 23:42:05
+PASS dragout
+SCENARIO PASSED /private/tmp/ovs-ui-NdGccD
+=== endings (phone access on) 23:42:28
+PASS endings
+SCENARIO PASSED /private/tmp/ovs-ui-n30hJo
+=== files (phone access on) 23:43:12
+FAIL files
+(node:8618) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+[2026-09-27T06:44:26.616Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T06:44:31.492Z] phone access is on for this scenario {"port":55663}
+[2026-09-27T06:44:44.205Z] PASS Files pane lists the selected run's worktree (repository not open in the window) with changes marked ["sub (1)","a.txt M","b.txt","README.md","c.txt D"]
+[2026-09-27T06:44:45.278Z] PASS folders expand lazily and show their changed files {"path":"sub/new.txt","level":2,"status":"A","inside":"","deleted":false,"dir":false}
+[2026-09-27T06:44:46.293Z] PASS clicking a file opens it in the editor from the X worktree (in the review's group, no third column) {"label":"a.txt, Editor Group 1","path":"private/tmp/ovs-ui-l5tTGr/overseer-home/worktrees/repo-x-91164351/x-files/a.txt","groups":2}
+[2026-09-27T06:44:46.462Z] screenshot docs/verification/evidence/ui/files/01-files-x.png
+[2026-09-27T06:44:50.358Z] PASS switching runs switches the Files pane; files open from the Y worktree too {"ey":["a.txt ","b.txt M","c.txt ","README.md "],"tabY":{"label":"b.txt, Editor Group 1","path":"private/tmp/ovs-ui-l5tTGr/overseer-home/worktrees/repo-y-63fbfb6b/y-files/b.txt","groups":2}}
+[2026-09-27T06:44:50.589Z] screenshot docs/verification/evidence/ui/files/02-files-y.png
+[2026-09-27T06:44:57.172Z] PASS large repository: the deep change is visible from the root (folder counts) ["big ","pkg 1","a.txt ","b.txt ","c.txt ","README.md "]
+[2026-09-27T06:45:02.328Z] FAIL a 6,000-entry folder opens within 2 s, is capped with a visible note, and scrolling stays responsive (p95 lag < 250 ms) {"openMs":2311,"truncated":"+1000 more (1000 more entries not shown)","lag":{"n":80,"p95":3,"max":17}}
+[2026-09-27T06:45:08.110Z] PASS nested change found and opened in the large repository {"deep":{"path":"pkg/m39/x99.txt","level":3,"status":"M","inside":"","deleted":false,"dir":false},"tabZ":{"label":"x99.txt, Editor Group 1","path":"private/tmp/ovs-ui-l5tTGr/overseer-home/worktrees/repo-z-182c47cb/z-large/pkg/m39/x99.txt","groups":2}}
+[2026-09-27T06:45:08.236Z] screenshot docs/verification/evidence/ui/files/03-files-large.png
+[2026-09-27T06:45:08.253Z] PASS Files pane is a keyboard tree with labelled items ["pkg, folder, 1 changed inside","m0, folder"]
+SCENARIO FAILED /private/tmp/ovs-ui-l5tTGr
+SCENARIO FAILED /private/tmp/ovs-ui-l5tTGr
+=== follow (phone access on) 23:45:10
+PASS follow
+SCENARIO PASSED /private/tmp/ovs-ui-9s33qA
+=== grid (phone access on) 23:46:06
+PASS grid (second attempt)
+SCENARIO PASSED /private/tmp/ovs-ui-CPmrpH
+=== history (phone access on) 23:48:00
+PASS history
+SCENARIO PASSED /private/tmp/ovs-ui-ZuEroe
+=== hunks (phone access on) 23:58:00
+PASS hunks
+SCENARIO PASSED /private/tmp/ovs-ui-olzFxb
+=== keyboard (phone access on) 23:59:17
+FAIL keyboard
+(node:41442) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+[2026-09-27T07:00:14.653Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T07:00:18.532Z] phone access is on for this scenario {"port":61042}
+[2026-09-27T07:00:33.784Z] screenshot docs/verification/evidence/ui/keyboard/01-needs-you.png
+[2026-09-27T07:00:33.794Z] PASS Needs you gathers permission requests, the failure and the finished run with changes, counted on the view and in the status bar {"list":[{"title":"Write file A","why":"Approve"},{"title":"Write file B","why":"Approve"},{"title":"Broken build","why":"Failed"},{"title":"Small edit","why":"Review"}],"badge":"4","status":"eye  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."}
+[2026-09-27T07:00:38.063Z] PASS ⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request {"first":"r-a2685de9c2b9","second":"r-81533459eb1e","firstDone":"completed","secondDone":"completed","denied":true}
+[2026-09-27T07:00:42.861Z] FAIL ⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each {"visited":["r-d3b58c0d712f","r-a2685de9c2b9","r-a2685de9c2b9"],"left":[]}
+[2026-09-27T07:00:46.685Z] PASS ⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent {"switched":"r-b1b5b6809b88","stopped":"interrupted"}
+[2026-09-27T07:00:50.572Z] PASS ⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent {"created":"r-2aea703f734b","nowSelected":"r-2aea703f734b"}
+[2026-09-27T07:00:51.610Z] prompt before Enter {"value":"And add a test","focused":"prompt"}
+[2026-09-27T07:00:54.254Z] PASS Enter in the chat composer sends a follow-up {"turns":2}
+[2026-09-27T07:00:54.728Z] screenshot docs/verification/evidence/ui/keyboard/02-keyboard-done.png
+[2026-09-27T07:01:00.122Z] FAIL the shortcuts also work from the side bar (⌥⌘A opens the agent switcher, ⌥⌘N the composer) {"inList":false,"switcher":true,"composer":true}
+[2026-09-27T07:01:00.135Z] PASS every control in the dashboard has a screen-reader label {"checked":36,"bad":[]}
+SCENARIO FAILED /private/tmp/ovs-ui-eb48NU
+SCENARIO FAILED /private/tmp/ovs-ui-eb48NU
+skip live-gatej (it starts paid agents or uses the owner's daemon)
+=== look (phone access on) 00:01:02
+PASS look
+SCENARIO PASSED /private/tmp/ovs-ui-M1bfIH
+=== main (phone access on) 00:02:50
+PASS main
+SCENARIO PASSED /private/tmp/ovs-ui-JCFtDC
+skip merge (it starts paid agents or uses the owner's daemon)
+=== modes (phone access on) 00:04:38
+PASS modes
+SCENARIO PASSED /private/tmp/ovs-ui-DgCAyG
+=== narrow-chat (phone access on) 00:05:45
+PASS narrow-chat
+SCENARIO PASSED /private/tmp/ovs-ui-FbCWoJ
+=== notify (phone access on) 00:06:40
+PASS notify
+SCENARIO PASSED /private/tmp/ovs-ui-Zmm6qE
+=== parity (phone access on) 00:07:17
+PASS parity
+SCENARIO PASSED /private/tmp/ovs-ui-TPF3oL
+=== perf (phone access on) 00:08:06
+FAIL perf
+[2026-09-27T07:11:28.639Z] fixture {"tracked":10000}
+(node:27222) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+[2026-09-27T07:11:32.266Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T07:11:36.884Z] phone access is on for this scenario {"port":65026}
+[2026-09-27T07:11:52.578Z] processes ["280096 /Applications/Visual Studio Code.app/Contents/MacOS/Code --remote-debugging-port=0 --disable-renderer-backgrounding --disable-backgro","98432 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=gpu-process --user-data-dir","53840 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type=","601392 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app/Contents/MacOS/Code Helper (Renderer) --type=rend","200208 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type","92336 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper.app/Contents/MacOS/Code Helper --type=utility --utility-sub-type=","176592 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin) --type=utility "]
+[2026-09-27T07:13:37.980Z] ERROR Error: Webview not found for probe document.getElementById('workspace-note')?.textContent.includes("/private/tmp/ovs-ui-01t4Xj/overseer-home/worktrees/big-7f20f71d/load-run-0")
+    at Cdp.webview (/Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/test/ui/cdp.js:223:11)
+    at async /Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/test/ui/scenario-perf.js:47:20
+[2026-09-27T07:13:38.104Z] screenshot docs/verification/evidence/ui/perf/01-error.png
+SCENARIO FAILED /private/tmp/ovs-ui-01t4Xj
+SCENARIO FAILED /private/tmp/ovs-ui-01t4Xj
+skip phone-access (it turns phone access on itself; it ran with the setting off)
+=== place (phone access on) 00:13:39
+PASS place
+SCENARIO PASSED /private/tmp/ovs-ui-wpRdL5
+=== pr (phone access on) 00:14:18
+PASS pr
+SCENARIO PASSED /private/tmp/ovs-ui-I7ie3k
+=== restore (phone access on) 00:15:19
+FAIL restore
+(node:99234) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+[2026-09-27T07:15:48.238Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T07:15:51.244Z] phone access is on for this scenario {"port":51284}
+[2026-09-27T07:15:53.085Z] runs {"r1":"r-0d103d26fea4","r2":"r-b198ae19d173","r3":"r-34eec7e1a319","ws1":"/private/tmp/ovs-ui-5l3UUY/overseer-home/worktrees/repoA-4081fb39/r1-long-review","ws2":"/private/tmp/ovs-ui-5l3UUY/overseer-home/worktrees/repoB-853f33e3/r2-other-repo","ws3":"/private/tmp/ovs-ui-5l3UUY/overseer-home/worktrees/repoA-4081fb39/r3-removed-later"}
+[2026-09-27T07:16:14.176Z] ERROR Error: Timed out waiting for run row R3 removed later (last: null)
+    at Cdp.waitFor (/Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/test/ui/cdp.js:148:11)
+    at async selectRun (/Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/test/ui/scenario-restore.js:39:18)
+    at async /Users/bilal/projects/overseer/.claude/worktrees/phone-remote-vscode-control-b48a34/test/ui/scenario-restore.js:53:5
+[2026-09-27T07:16:14.245Z] screenshot docs/verification/evidence/ui/restore/01-error.png
+SCENARIO FAILED /private/tmp/ovs-ui-5l3UUY
+SCENARIO FAILED /private/tmp/ovs-ui-5l3UUY
+=== review-width (phone access on) 00:16:16
+PASS review-width
+SCENARIO PASSED /private/tmp/ovs-ui-hTEU1t
+=== review (phone access on) 00:16:43
+PASS review
+SCENARIO PASSED /private/tmp/ovs-ui-169wnA
+=== scopes (phone access on) 00:18:02
+PASS scopes
+SCENARIO PASSED /private/tmp/ovs-ui-9fI4ZN
+=== sidebar-search (phone access on) 00:18:46
+PASS sidebar-search
+SCENARIO PASSED /private/tmp/ovs-ui-HozZzG
+=== sidebar (phone access on) 00:23:37
+PASS sidebar
+SCENARIO PASSED /private/tmp/ovs-ui-lCEWlI
+=== signin (phone access on) 00:24:12
+PASS signin
+SCENARIO PASSED /private/tmp/ovs-ui-c2FBT2
+=== theme (phone access on) 00:24:43
+PASS theme
+SCENARIO PASSED /private/tmp/ovs-ui-QDYrxx
+=== trust (phone access on) 00:25:47
+PASS trust
+SCENARIO PASSED /private/tmp/ovs-ui-oMM8bq
+=== usage (phone access on) 00:26:01
+PASS usage
+SCENARIO PASSED /private/tmp/ovs-ui-7mPkHd
+phone access on: 30 passed, 5 failed. arrangement files keyboard perf restore
