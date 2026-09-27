@@ -27,6 +27,8 @@ Module._load = originalLoad;
     active_worker_processes: 32, registered_attempts: 32, director: { owner_status: 'active' },
     availability: null, benefit: { decision: 'serial', reason: 'finishing_unaffordable' },
     capacity: { provider_usage_state: 'unknown', source: 'fixture_admission',
+      last_admission: { job_id: 'j032', target_id: 'fixture-a', status: 'blocked',
+        reason: 'growth_wave_full', observed_ms: 123 },
       selected_targets: [{ id: 'fixture-a', harness: 'generic', profile_id: 'profile-a', attempts: 1 }],
       windows: [{ pool_id: 'fixture-pool', window_id: 'week', unit: 'points',
         allocation_milli: 6000, finishing_reserve_milli: 1200,
@@ -81,8 +83,11 @@ Module._load = originalLoad;
     'show the recorded planning decision and reason');
   assert(capacity.some(row => /usage unknown/i.test(row.item.label)),
     'fixture estimates must not be presented as measured provider usage');
-  assert(capacity.some(row => /current limit unknown/i.test(row.item.label)),
-    'a past planning decision cannot be mislabeled as the current admission constraint');
+  assert(capacity.some(row => /last admission held/i.test(row.item.label) &&
+    /growth wave full/i.test(row.item.description) && /j032/.test(row.item.tooltip)),
+    'show the durable held admission as a past observation with its job and reason');
+  assert(!capacity.some(row => /current limit/i.test(row.item.label)),
+    'a past admission result cannot be mislabeled as the current constraint');
   assert.equal(firstPage[2].item.iconPath.id, 'sync~spin');
   assert.equal(firstPage[2].item.description, 'working', 'a live worker must not be shown as merely reserved');
   assert.equal(firstPage[2].item.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);

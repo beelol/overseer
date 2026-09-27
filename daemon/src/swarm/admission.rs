@@ -16,6 +16,23 @@ fn blocked(reason: &str) -> Value {
     json!({"status":"blocked","reason":reason})
 }
 
+fn record_observation(store: &Store, p: &Value, result: &Value) {
+    let Some(status @ ("blocked" | "admitted")) = result["status"].as_str() else { return };
+    let (Some(run),Some(job),Some(target)) =
+        (p["run_id"].as_str(),p["job_id"].as_str(),p["target_id"].as_str()) else { return };
+    if let Err(error)=store.conn.execute(
+        "INSERT INTO swarm_admission_observations(run_id,job_id,target_id,status,reason,observed_ms)
+         VALUES(?1,?2,?3,?4,?5,?6)
+         ON CONFLICT(run_id) DO UPDATE SET job_id=excluded.job_id,target_id=excluded.target_id,
+             status=excluded.status,reason=excluded.reason,observed_ms=excluded.observed_ms",
+        params![run,job,target,status,result["reason"].as_str(),crate::daemon::now()],
+    ) {
+        // Admission may already be committed. An optional status readout must
+        // never turn a successful reservation into an apparent launch failure.
+        crate::log(&format!("swarm admission readout could not be recorded: {error}"));
+    }
+}
+
 pub(super) struct ScheduledCommit<'a> {
     pub request_id: &'a str,
     pub request_sha256: &'a str,
@@ -25,7 +42,9 @@ pub(super) struct ScheduledCommit<'a> {
 pub fn admit(store: &mut Store, p: &Value, pending_slots: i64) -> Result<Value> {
     let run = required(p,"run_id")?;
     super::owner::require(store,run,p)?;
-    admit_inner(store, p, None, pending_slots)
+    let result=admit_inner(store, p, None, pending_slots)?;
+    record_observation(store,p,&result);
+    Ok(result)
 }
 
 pub(super) fn admit_scheduled(
@@ -34,7 +53,9 @@ pub(super) fn admit_scheduled(
     commit: ScheduledCommit<'_>,
     pending_slots: i64,
 ) -> Result<Value> {
-    admit_inner(store, p, Some(commit), pending_slots)
+    let result=admit_inner(store, p, Some(commit), pending_slots)?;
+    record_observation(store,p,&result);
+    Ok(result)
 }
 
 fn admit_inner(

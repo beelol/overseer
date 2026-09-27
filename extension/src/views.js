@@ -357,10 +357,20 @@ class AgentsProvider {
       item.tooltip = `Latest recorded planning decision. Current admission limit may differ. ${item.description}`;
       rows.push({ item, parent });
     }
-    const limit = new vscode.TreeItem('Current limit unknown');
-    limit.iconPath = new vscode.ThemeIcon('question');
-    limit.description = 'last rejected admission is not recorded';
-    rows.push({ item: limit, parent });
+    const last = run.capacity?.last_admission;
+    if (last) {
+      const held = last.status === 'blocked';
+      const item = new vscode.TreeItem(held ? 'Last admission held' : 'Last admission: admitted');
+      item.iconPath = new vscode.ThemeIcon(held ? 'warning' : 'check');
+      item.description = held ? String(last.reason || 'reason unknown').replaceAll('_', ' ') : `${last.job_id} → ${last.target_id}`;
+      item.tooltip = `Job ${last.job_id} · target ${last.target_id}\n${item.description}\nRecorded ${new Date(last.observed_ms).toLocaleString()}. Current eligibility may have changed.`;
+      rows.push({ item, parent });
+    } else {
+      const item = new vscode.TreeItem('No admission recorded');
+      item.iconPath = new vscode.ThemeIcon('question');
+      item.description = 'current limit unknown';
+      rows.push({ item, parent });
+    }
     const usage = new vscode.TreeItem(`Provider usage ${run.capacity?.provider_usage_state || 'unknown'}`);
     usage.iconPath = new vscode.ThemeIcon('question');
     usage.description = 'current allowance not reported';

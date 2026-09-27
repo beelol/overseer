@@ -35,6 +35,33 @@ fn setup(d: &Daemon, category: &str, count: usize) -> String {
     id
 }
 
+#[test]
+fn last_admission_hold_survives_restart_and_success_replaces_it() {
+    let mut d=Daemon::start(&[]);
+    let id=setup(&d,"Last admission readout",2);
+    let at=now();
+    let held=admit(&d,&id,"j0","missing-target","held-request",at,100000,1000).unwrap();
+    assert_eq!(held["reason"],"unknown_target");
+    let first=&d.call("swarm.get",json!({"id":id}))["capacity"]["last_admission"];
+    assert_eq!((first["job_id"].as_str(),first["target_id"].as_str(),
+        first["status"].as_str(),first["reason"].as_str()),
+        (Some("j0"),Some("missing-target"),Some("blocked"),Some("unknown_target")));
+    assert!(first["observed_ms"].as_i64().is_some());
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["capacity"]["last_admission"]["reason"],
+        "unknown_target");
+    let admitted=admit(&d,&id,"j0","codex-a","success-request",at,100000,1000).unwrap();
+    assert_eq!(admitted["status"],"admitted","{admitted}");
+    let latest=d.call("swarm.get",json!({"id":id}))["capacity"]["last_admission"].clone();
+    assert_eq!((latest["job_id"].as_str(),latest["target_id"].as_str(),
+        latest["status"].as_str(),latest["reason"].as_str()),
+        (Some("j0"),Some("codex-a"),Some("admitted"),None));
+    let replay=admit(&d,&id,"j0","codex-a","success-request",at,100000,1000).unwrap();
+    assert_eq!(replay["status"],"already_admitted");
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["capacity"]["last_admission"],latest);
+}
+
 fn admit(
     d: &Daemon,
     run: &str,

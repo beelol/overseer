@@ -135,6 +135,13 @@ print(json.loads((pathlib.Path(run_dir) / 'launch.json').read_text())['env']['OV
       program: '/bin/sleep', args: ['180'], prompt: 'Direct the backend audit', title: 'Fixture director' });
     if (director.status !== 'launched') throw new Error(`director not launched: ${JSON.stringify(director)}`);
     directorRunId = director.overseer_run_id;
+    const held = s.ctl('swarm.admit', { run_id: runId, generation: 1, revision: 1,
+      owner_token: fixtureDirectorToken(s.home, directorRunId),
+      job_id: 'j036', target_id: 'fixture-local', request_id: 'ui-scale-at-ceiling',
+      now_ms: at + 40000, snapshot, required_capabilities: ['code'],
+      estimate_milli: { points: 100 }, purpose: 'worker' });
+    check('an extra worker is held at the configured ceiling without an attempt',
+      held.status === 'blocked' && held.reason === 'worker_limit', held);
     let run;
     for (let n = 0; n < 100; n++) {
       run = s.ctl('swarm.get', { id: runId });
@@ -157,7 +164,9 @@ print(json.loads((pathlib.Path(run_dir) / 'launch.json').read_text())['env']['OV
       run.capacity?.selected_targets?.[0]?.attempts === 32 &&
       run.capacity?.windows?.[0]?.allocation_milli === 100000 &&
       run.capacity?.windows?.[0]?.finishing_reserve_milli === 20000 &&
-      run.capacity?.windows?.[0]?.outstanding_estimate_milli === 3200,
+      run.capacity?.windows?.[0]?.outstanding_estimate_milli === 3200 &&
+      run.capacity?.last_admission?.job_id === 'j036' &&
+      run.capacity?.last_admission?.reason === 'worker_limit',
       run.capacity);
 
     await cdp.command('Overseer: Refresh');
@@ -207,12 +216,12 @@ print(json.loads((pathlib.Path(run_dir) / 'launch.json').read_text())['env']['OV
       10000, 'all Swarm jobs restored');
     await s.clickAgentRow('Capacity', { twisty: true });
     const capacityRows = await s.agentRows();
-    check('expanded capacity names target, reserve and planning decision without claiming live usage',
+    check('expanded capacity names target, reserve, latest hold and planning decision without claiming live usage',
       capacityRows.some(row => row.label === 'Target: fixture-local') &&
       capacityRows.some(row => row.label === 'Allocation: fixture-pool / run' &&
         /finishing reserve 20 points/.test(row.description)) &&
       capacityRows.some(row => row.label === 'Planning: parallel') &&
-      capacityRows.some(row => row.label === 'Current limit unknown') &&
+      capacityRows.some(row => row.label === 'Last admission held' && /worker limit/.test(row.description)) &&
       capacityRows.some(row => row.label === 'Provider usage unknown'),
       capacityRows.filter(row => row.level === 4).slice(0, 8));
     await s.screenshot('capacity-expanded');

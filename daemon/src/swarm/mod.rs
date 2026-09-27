@@ -477,9 +477,19 @@ fn capacity_readout(store: &Store, id: &str) -> Result<Value> {
     })))?.collect::<rusqlite::Result<Vec<_>>>()?;
     let windows_truncated = windows.len() > 32;
     windows.truncate(32);
+    let last_admission: Option<Value> = store.conn.query_row(
+        "SELECT job_id,target_id,status,reason,observed_ms
+         FROM swarm_admission_observations WHERE run_id=?1",
+        [id], |row| Ok(json!({
+            "job_id":row.get::<_,String>(0)?,"target_id":row.get::<_,String>(1)?,
+            "status":row.get::<_,String>(2)?,"reason":row.get::<_,Option<String>>(3)?,
+            "observed_ms":row.get::<_,i64>(4)?
+        })),
+    ).optional()?;
     Ok(json!({"selected_targets":targets,"selected_targets_truncated":targets_truncated,
         "windows":windows,"windows_truncated":windows_truncated,
-        "provider_usage_state":"unknown","source":"fixture_admission"}))
+        "provider_usage_state":"unknown","source":"fixture_admission",
+        "last_admission":last_admission}))
 }
 
 /// Bounded category summaries for control surfaces. Job rows and transcripts are fetched

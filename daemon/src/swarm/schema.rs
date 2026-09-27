@@ -403,6 +403,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           PRIMARY KEY(run_id,request_id)
         );
+        CREATE TABLE IF NOT EXISTS swarm_admission_observations(
+          run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          job_id TEXT NOT NULL,
+          target_id TEXT NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('blocked','admitted')),
+          reason TEXT,
+          observed_ms INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS swarm_reservations(
           attempt_id TEXT NOT NULL REFERENCES swarm_attempts(id),
           run_id TEXT NOT NULL REFERENCES swarm_runs(id),

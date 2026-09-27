@@ -54,7 +54,7 @@
         "reason": "beneficial",
         "replay": false,
         "revision": 1,
-        "run_id": "sw-52784e2d601d",
+        "run_id": "sw-5f16b950f4a8",
         "serial": {
           "affordable": true,
           "elapsed_ms": 3240,
@@ -66,6 +66,14 @@
           }
         },
         "wave": 1
+      }
+    },
+    {
+      "name": "an extra worker is held at the configured ceiling without an attempt",
+      "ok": true,
+      "detail": {
+        "reason": "worker_limit",
+        "status": "blocked"
       }
     },
     {
@@ -93,7 +101,7 @@
       "name": "supervised category director is running alongside 32 workers",
       "ok": true,
       "detail": {
-        "overseer_run_id": "r-491bb0708fe7",
+        "overseer_run_id": "r-40486fdc8e53",
         "owner_status": "active",
         "process_status": "running"
       }
@@ -102,6 +110,13 @@
       "name": "daemon exposes only fixture commitments, with provider usage unknown",
       "ok": true,
       "detail": {
+        "last_admission": {
+          "job_id": "j036",
+          "observed_ms": 1790527199313,
+          "reason": "worker_limit",
+          "status": "blocked",
+          "target_id": "fixture-local"
+        },
         "provider_usage_state": "unknown",
         "selected_targets": [
           {
@@ -254,7 +269,7 @@
       ]
     },
     {
-      "name": "expanded capacity names target, reserve and planning decision without claiming live usage",
+      "name": "expanded capacity names target, reserve, latest hold and planning decision without claiming live usage",
       "ok": true,
       "detail": [
         {
@@ -285,13 +300,13 @@
           "aria": "Latest recorded planning decision. Current admission limit may differ. beneficial"
         },
         {
-          "label": "Current limit unknown",
-          "description": "last rejected admission is not recorded",
+          "label": "Last admission held",
+          "description": "worker limit",
           "level": 4,
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Current limit unknown last rejected admission is not recorded"
+          "aria": "Job j036 · target fixture-local\nworker limit\nRecorded 9/27/2026, 9:39:59 AM. Current eligibility may have changed."
         },
         {
           "label": "Provider usage unknown",
@@ -329,7 +344,7 @@
       "detail": {
         "status": "paused",
         "active_worker_processes": 32,
-        "pause_ms": 91
+        "pause_ms": 94
       }
     },
     {
@@ -373,16 +388,23 @@
       "ok": true,
       "detail": {
         "status": "stopping",
-        "unconfirmed_exit_count": 2,
-        "stop_ms": 82
+        "unconfirmed_exit_count": 6,
+        "stop_ms": 76
       }
     },
     {
       "name": "the SIGINT-resistant fixture worker remains unconfirmed with its estimate reserved",
       "ok": true,
       "detail": {
-        "unconfirmed_exit_count": 2,
+        "unconfirmed_exit_count": 6,
         "capacity": {
+          "last_admission": {
+            "job_id": "j036",
+            "observed_ms": 1790527208844,
+            "reason": "run_not_admitting",
+            "status": "blocked",
+            "target_id": "fixture-local"
+          },
           "provider_usage_state": "unknown",
           "selected_targets": [
             {
@@ -424,7 +446,7 @@
         },
         {
           "label": "Director",
-          "description": "running"
+          "description": "interrupted"
         },
         {
           "label": "Capacity",
@@ -443,8 +465,8 @@
           "description": "beneficial"
         },
         {
-          "label": "Current limit unknown",
-          "description": "last rejected admission is not recorded"
+          "label": "Last admission held",
+          "description": "run not admitting"
         },
         {
           "label": "Provider usage unknown",
@@ -465,7 +487,7 @@
       "ok": true,
       "detail": {
         "status": "interrupted",
-        "ended_ms": 1790509322683
+        "ended_ms": 1790527209469
       }
     },
     {
