@@ -169,3 +169,61 @@ pub fn expire_jobs_due(store: &mut Store, now: i64) -> Result<Vec<String>> {
     }
     Ok(workers)
 }
+
+/// A received redirect is not an applied assignment. After 30 seconds, hold
+/// its job and ask the worker to checkpoint before interrupting a linked run.
+/// The message phase remains delivered so a late applied receipt is observable.
+pub fn expire_redirects_due(store: &mut Store, now: i64) -> Result<Value> {
+    let mut stmt = store.conn.prepare(
+        "SELECT m.seq,m.run_id,m.job_id,m.attempt_id,m.revision,j.stop_reason,
+                CASE WHEN r.status IN ('queued','starting','running','waiting_for_user','disconnected')
+                     THEN l.overseer_run_id ELSE NULL END
+         FROM swarm_messages m
+         JOIN swarm_attempts a ON a.id=m.attempt_id AND a.run_id=m.run_id
+         JOIN swarm_jobs j ON j.run_id=m.run_id AND j.id=m.job_id
+         JOIN swarm_runs s ON s.id=m.run_id
+         LEFT JOIN swarm_worker_launches l ON l.attempt_id=a.id
+         LEFT JOIN runs r ON r.id=l.overseer_run_id
+         WHERE m.kind='redirect' AND m.sender='director' AND m.phase='delivered'
+           AND m.updated_ms<=?1 AND a.status='registered'
+           AND s.status IN ('planning','running','paused','stalled','draining')
+           AND j.status IN ('ready','reserved','launching','running','submitted','cancel_requested')
+           AND (j.stop_reason IS NULL OR j.stop_reason='redirect_ack_timeout')
+         ORDER BY m.updated_ms,m.seq LIMIT 100",
+    )?;
+    let due = stmt.query_map([now.saturating_sub(30_000)], |row| Ok((
+        row.get::<_,i64>(0)?, row.get::<_,String>(1)?, row.get::<_,String>(2)?,
+        row.get::<_,String>(3)?, row.get::<_,i64>(4)?,
+        row.get::<_,Option<String>>(5)?, row.get::<_,Option<String>>(6)?,
+    )))?.collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    let mut timed_out = 0;
+    let mut workers = std::collections::BTreeSet::new();
+    for (seq, run, job, attempt, revision, reason, worker) in due {
+        if reason.as_deref() != Some("redirect_ack_timeout") {
+            let tx = store.conn.transaction()?;
+            let changed = tx.execute(
+                "UPDATE swarm_jobs SET status='cancel_requested',stop_reason='redirect_ack_timeout',updated_ms=?3
+                 WHERE run_id=?1 AND id=?2 AND status IN
+                   ('ready','reserved','launching','running','submitted','cancel_requested')
+                   AND stop_reason IS NULL",
+                params![run,job,now],
+            )?;
+            if changed != 0 {
+                tx.execute(
+                    "INSERT OR IGNORE INTO swarm_messages
+                     (run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+                     VALUES(?1,?2,?3,?4,'control',?4,'checkpoint',?5,?6,'queued',?7,?7)",
+                    params![run,format!("redirect-timeout-{seq}"),job,attempt,revision,
+                        json!({"reason":"redirect_ack_timeout","redirect_seq":seq}).to_string(),now],
+                )?;
+                timed_out += 1;
+            }
+            tx.commit()?;
+        }
+        if let Some(worker) = worker {
+            workers.insert(worker);
+        }
+    }
+    Ok(json!({"timed_out":timed_out,"interrupt_pending":workers}))
+}

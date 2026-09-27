@@ -363,12 +363,64 @@ fn directive_delivery_and_application_are_distinct() {
     assert_eq!(delivered["phase"], "delivered");
     let applied=d.call("swarm.ack",json!({"run_id":run_id,"message_id":"redirect-2","recipient":attempt_id,"token":token,"phase":"applied","revision":1}));
     assert_eq!(applied["phase"], "applied");
+    assert_eq!(d.call("swarm.redirect.persist_due",json!({"now_ms":i64::MAX-1}))["timed_out"],0);
     let replay=d.call("swarm.direct",json!({"run_id":run_id,"job_id":"routes","attempt_id":attempt_id,
         "message_id":"redirect-2","generation":1,"revision":1,"type":"redirect","payload":{"focus":"pagination"}}));
     assert_eq!(replay["phase"], "applied");
     assert_eq!(replay["duplicate"], true);
     assert!(d.try_call("swarm.ack",json!({"run_id":run_id,"message_id":"redirect-2","recipient":attempt_id,"token":token,"phase":"applied","revision":0})).is_err());
     assert!(d.try_call("swarm.direct",json!({"run_id":run_id,"job_id":"routes","attempt_id":attempt_id,"message_id":"stale","generation":0,"revision":1,"type":"redirect","payload":{}})).is_err());
+}
+
+#[test]
+fn unapplied_redirect_times_out_and_holds_dependent_work() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Redirect timeout",
+        "objective":"Audit Atlas","allowed_targets":["system-codex"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j4","title":"Attachments","acceptance":"signed URL evidence","deps":[]},
+        {"id":"dependent","title":"Review","acceptance":"review evidence","deps":["j4"]}
+    ]}));
+    let attempt = d.call("swarm.attempt.register", json!({"run_id":id,"job_id":"j4",
+        "generation":1,"revision":1}));
+    let message = json!({"run_id":id,"job_id":"j4","attempt_id":attempt["id"],
+        "message_id":"j4-redirect","generation":1,"revision":1,"type":"redirect",
+        "payload":{"focus":"signed URL boundary"}});
+    d.call("swarm.direct", message.clone());
+    assert!(d.try_call("swarm.ack", json!({"run_id":id,"message_id":"j4-redirect",
+        "recipient":attempt["id"],"token":attempt["token"],"phase":"applied",
+        "revision":1})).is_err());
+    d.call("swarm.ack", json!({"run_id":id,"message_id":"j4-redirect",
+        "recipient":attempt["id"],"token":attempt["token"],"phase":"delivered",
+        "revision":1}));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let delivered_at: i64 = db.query_row("SELECT updated_ms FROM swarm_messages
+        WHERE run_id=?1 AND message_id='j4-redirect'",[id],|row|row.get(0)).unwrap();
+    d.call("swarm.ack", json!({"run_id":id,"message_id":"j4-redirect",
+        "recipient":attempt["id"],"token":attempt["token"],"phase":"delivered",
+        "revision":1}));
+    let replay_at: i64 = db.query_row("SELECT updated_ms FROM swarm_messages
+        WHERE run_id=?1 AND message_id='j4-redirect'",[id],|row|row.get(0)).unwrap();
+    assert_eq!(replay_at,delivered_at);
+    let before = d.call("swarm.redirect.persist_due", json!({"now_ms":delivered_at+29_999}));
+    assert_eq!(before["timed_out"],0);
+    assert_eq!(d.call("swarm.jobs",json!({"id":id}))["jobs"].as_array().unwrap()
+        .iter().find(|j|j["id"]=="j4").unwrap()["status"],"reserved");
+    d.kill9();
+    d.spawn();
+    let timed_out = d.call("swarm.redirect.persist_due", json!({"now_ms":delivered_at+30_000}));
+    assert_eq!(timed_out["timed_out"],1);
+    let jobs = d.call("swarm.jobs",json!({"id":id}));
+    let j4 = jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="j4").unwrap();
+    assert_eq!(j4["status"],"cancel_requested");
+    assert_eq!(j4["stop_reason"],"redirect_ack_timeout");
+    let dependent = jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="dependent").unwrap();
+    assert_eq!(dependent["status"],"planned");
+    let inbox = d.call("swarm.messages",json!({"run_id":id,"recipient":attempt["id"]}));
+    assert!(inbox["messages"].as_array().unwrap().iter()
+        .any(|m|m["type"]=="checkpoint" && m["payload"]["reason"]=="redirect_ack_timeout"));
+    assert_eq!(d.call("swarm.redirect.persist_due",json!({"now_ms":delivered_at+30_001}))["timed_out"],0);
 }
 
 #[test]

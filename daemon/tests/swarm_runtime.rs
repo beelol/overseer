@@ -13,6 +13,61 @@ fn now() -> i64 {
 }
 
 #[test]
+fn delivered_redirect_interrupts_a_long_running_worker_after_restart() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("redirect-source"));
+    let run = d.call("swarm.create", json!({"category":"Atlas redirect",
+        "objective":"Audit attachments","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"j4","title":"Attachments","acceptance":"signed URL evidence","deps":[]}
+    ]}));
+    let at=now();
+    let attempt=d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"j4","target_id":"fixture-local","request_id":"redirect-worker",
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(attempt["status"],"admitted", "{attempt}");
+    let launched=d.call("swarm.worker.launch",json!({"run_id":id,"job_id":"j4",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "repo":checkout,"program":"/bin/sleep","args":["30"],
+        "prompt":"Inspect attachments","title":"J4"}));
+    let worker=launched["overseer_run_id"].as_str().unwrap();
+    d.call("swarm.direct",json!({"run_id":id,"job_id":"j4",
+        "attempt_id":attempt["attempt_id"],"message_id":"redirect-j4",
+        "generation":1,"revision":1,"type":"redirect",
+        "payload":{"focus":"signed URL boundary"}}));
+    d.call("swarm.ack",json!({"run_id":id,"message_id":"redirect-j4",
+        "recipient":attempt["attempt_id"],"token":attempt["token"],
+        "phase":"delivered","revision":1}));
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let run_dir:String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[worker],|r|r.get(0)).unwrap();
+    let marker=std::path::Path::new(&run_dir).join("interrupt.requested");
+    assert!(!marker.exists());
+    d.kill9();
+    db.execute("UPDATE swarm_messages SET updated_ms=?3 WHERE run_id=?1 AND message_id=?2",
+        rusqlite::params![id,"redirect-j4",now()-30_001]).unwrap();
+    d.spawn();
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(4);
+    while !marker.exists() {
+        assert!(std::time::Instant::now()<until,"redirect timeout did not interrupt linked worker");
+        std::thread::sleep(std::time::Duration::from_millis(30));
+    }
+    let job=&d.call("swarm.jobs",json!({"id":id}))["jobs"][0];
+    assert_eq!(job["status"],"cancel_requested");
+    assert_eq!(job["stop_reason"],"redirect_ack_timeout");
+    let inbox=d.call("swarm.messages",json!({"run_id":id,"recipient":attempt["attempt_id"]}));
+    assert_eq!(inbox["messages"].as_array().unwrap().iter()
+        .filter(|m|m["type"]=="checkpoint" && m["payload"]["reason"]=="redirect_ack_timeout").count(),1);
+}
+
+#[test]
 fn late_resource_conflict_interrupts_only_affected_supervised_workers() {
     let d = Daemon::start(&[]);
     let temp = tmp();

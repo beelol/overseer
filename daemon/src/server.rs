@@ -44,12 +44,13 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
             match tokio::task::spawn_blocking(move || {
                 crate::swarm::reconcile_control_verifications(&mut daemon.store.lock().unwrap())?;
                 crate::swarm::expire_director_owners(&mut daemon.store.lock().unwrap())?;
-                let (expired, timed_out_workers) = {
+                let (expired, timed_out_workers, redirect_timeouts) = {
                     let _serial = daemon.swarm_launch_lock.lock().unwrap();
                     let mut store = daemon.store.lock().unwrap();
                     let now = crate::daemon::now();
                     (crate::swarm::expire_due(&mut store, now)?,
-                     crate::swarm::expire_jobs_due(&mut store, now)?)
+                     crate::swarm::expire_jobs_due(&mut store, now)?,
+                     crate::swarm::expire_redirects_due(&mut store, now)?)
                 };
                 // State is committed before control sockets are contacted. A slow
                 // or unreachable worker must not hold the launch lock while the
@@ -60,6 +61,15 @@ pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
                 for worker in timed_out_workers {
                     if let Err(error) = daemon.interrupt(&worker) {
                         crate::log(&format!("swarm job deadline interrupt {worker} failed: {error}"));
+                    }
+                }
+                if let Some(workers) = redirect_timeouts["interrupt_pending"].as_array() {
+                    for worker in workers {
+                        if let Some(worker) = worker.as_str() {
+                            if let Err(error) = daemon.interrupt(worker) {
+                                crate::log(&format!("swarm redirect interrupt {worker} failed: {error}"));
+                            }
+                        }
                     }
                 }
                 crate::swarm::retry_revoked_interrupts(&daemon)?;
@@ -538,6 +548,15 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             // interrupt unsent, as if the daemon died between these two steps.
             let pending = crate::swarm::expire_jobs_due(&mut d.store.lock().unwrap(), now_ms)?;
             json!({"interrupt_pending": pending})
+        }
+        "swarm.redirect.persist_due" => {
+            fixture_only()?;
+            let now_ms = p["now_ms"].as_i64()
+                .ok_or_else(|| anyhow!("missing deadline time"))?;
+            if now_ms < 0 { return Err(anyhow!("invalid deadline time")); }
+            // Fault seam: persist timeout/checkpoint but leave the external
+            // interrupt unsent, as if the daemon died before signaling it.
+            crate::swarm::expire_redirects_due(&mut d.store.lock().unwrap(), now_ms)?
         }
         "swarm.director.claim_batch" => {
             fixture_only()?;

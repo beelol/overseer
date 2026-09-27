@@ -390,6 +390,12 @@ pub fn ack(store: &mut Store, p: &Value) -> Result<Value> {
     if old_phase == "applied" && phase == "delivered" {
         bail!("acknowledgement phase cannot move backward");
     }
+    if recipient != "director" && phase == "applied" && old_phase == "queued" {
+        bail!("directive must be acknowledged as delivered before it is applied");
+    }
+    if old_phase == phase {
+        return Ok(json!({"message_id":id,"phase":phase}));
+    }
     let target = if old_phase == "applied" {
         "applied"
     } else {

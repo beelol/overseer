@@ -28,7 +28,7 @@ pub use benefit::commit as commit_benefit;
 pub use broker::{ack, direct, messages, register, report};
 pub use completion::complete;
 pub use coverage::report as coverage_report;
-pub use control::{expire_due, expire_jobs_due, off, pause, resume};
+pub use control::{expire_due, expire_jobs_due, expire_redirects_due, off, pause, resume};
 pub use context::{artifact_chunk, director_summary, worker_brief};
 pub use context::{grant_artifact, retry_revoked_interrupts, revoke_artifact};
 pub use director::{claim_batch, complete_batch, recover};
