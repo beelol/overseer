@@ -38,8 +38,18 @@ impl Daemon {
                 env.push((key.to_string(), "/nonexistent/harness-disabled-in-tests".to_string()));
             }
         }
+        // OVERSEER_TEST_PHONE_ACCESS=on runs a whole suite with phone access turned on (AC-116):
+        // what passed with it off must pass with it on.
+        let phone_access = std::env::var("OVERSEER_TEST_PHONE_ACCESS").as_deref() == Ok("on");
+        if phone_access && !env.iter().any(|(k, _)| k == "OVERSEER_GATEWAY_MDNS") {
+            env.push(("OVERSEER_GATEWAY_MDNS".to_string(), "off".to_string()));
+        }
         let mut d = Daemon { home, child: None, env };
         d.spawn();
+        if phone_access {
+            let status = d.call("gateway.enable", json!({"port": 0}));
+            assert_eq!(status["enabled"], true);
+        }
         d
     }
 

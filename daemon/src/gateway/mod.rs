@@ -396,6 +396,14 @@ async fn next_binary(ws: &mut WebSocketStream<TcpStream>) -> Option<Vec<u8>> {
     }
 }
 
+/// The kind and the handshake message of a first frame, or `None` when it is not one.
+pub fn first_frame(frame: &[u8]) -> Option<(noise::Kind, &[u8])> {
+    if frame.len() <= 2 || frame.len() > 4096 || frame[0] != noise::FRAME_VERSION {
+        return None;
+    }
+    Some((noise::Kind::from_byte(frame[1])?, &frame[2..]))
+}
+
 fn clean(text: &str, max: usize) -> String {
     text.chars().filter(|c| !c.is_control()).take(max).collect::<String>().trim().to_string()
 }
@@ -414,12 +422,9 @@ async fn connection(d: Arc<Daemon>, stream: TcpStream, addr: SocketAddr) -> Resu
         d.gateway.failed(addr, "no handshake");
         return Ok(());
     };
-    let kind = match (first.first(), first.get(1).and_then(|b| noise::Kind::from_byte(*b))) {
-        (Some(&noise::FRAME_VERSION), Some(kind)) if first.len() > 2 && first.len() <= 4096 => kind,
-        _ => {
-            d.gateway.failed(addr, "malformed handshake");
-            return Ok(());
-        }
+    let Some((kind, _)) = first_frame(&first) else {
+        d.gateway.failed(addr, "malformed handshake");
+        return Ok(());
     };
     let identity = d.gateway.identity()?;
     let mut payload = vec![0u8; first.len()];
@@ -654,4 +659,187 @@ pub fn once(d: &Arc<Daemon>, device: &str, request_id: &str, method: &str, run: 
     entry.finish(reply.clone());
     d.gateway.inflight.lock().unwrap().remove(&key);
     reply
+}
+
+#[cfg(test)]
+mod fuzz {
+    //! A fuzz test of the handshake and the frame parser (AC-130): random, mutated, truncated and
+    //! oversized input. Nothing may crash, nothing may be accepted, and nothing may be answered.
+    //! Seeded; a failure names its round.
+    use super::*;
+
+    struct Rng(u64);
+
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+
+        fn below(&mut self, n: usize) -> usize {
+            (self.next() % n.max(1) as u64) as usize
+        }
+
+        fn bytes(&mut self, len: usize) -> Vec<u8> {
+            (0..len).map(|_| self.next() as u8).collect()
+        }
+    }
+
+    fn mutate(rng: &mut Rng, good: &[u8]) -> Vec<u8> {
+        let mut out = good.to_vec();
+        match rng.below(6) {
+            0 => {
+                let at = rng.below(out.len());
+                out[at] ^= 1 << rng.below(8);
+            }
+            1 => out.truncate(rng.below(out.len())),
+            2 => {
+                let n = 1 + rng.below(64);
+                out.extend(rng.bytes(n));
+            }
+            3 => {
+                let at = rng.below(out.len());
+                out.insert(at, rng.next() as u8);
+            }
+            4 => {
+                let (a, b) = (rng.below(out.len()), rng.below(out.len()));
+                out.swap(a, b);
+            }
+            _ => {
+                let at = rng.below(out.len());
+                let n = rng.below(out.len() - at).max(1);
+                let noise = rng.bytes(n);
+                out[at..at + n].copy_from_slice(&noise);
+            }
+        }
+        out
+    }
+
+    /// The evidence file is written only when asked, so an ordinary test run leaves it alone.
+    fn write_log(name: &str, text: &str) {
+        if std::env::var_os("OVERSEER_WRITE_EVIDENCE").is_none() {
+            return;
+        }
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/verification/evidence/phone/daemon");
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::write(dir.join(name), text);
+    }
+
+    #[test]
+    fn the_handshake_and_the_frame_parser_survive_fuzzing() {
+        let started = Instant::now();
+        // The full run is the optimized build's; an ordinary debug run does a fortieth of it.
+        let scale: u64 = if cfg!(debug_assertions) { 40 } else { 1 };
+        let seed = 0x0_5EED_2026_0926u64;
+        let mut rng = Rng(seed);
+        // Keys from the seed, so every run sees the same inputs.
+        let pair = |rng: &mut Rng| {
+            let private = rng.bytes(32);
+            noise::Keypair { public: public_of(&private), private }
+        };
+        let gateway = pair(&mut rng);
+        let phone = pair(&mut rng);
+        let secret = [9u8; 16];
+        let psk = noise::psk_from_secret(&secret);
+        let payload = br#"{"device":"d","name":"Fuzz","platform":"ios","app":"0","counter":1}"#;
+        let (mut accepted_handshakes, mut rejected_handshakes, mut first_frames_rejected, mut first_frames_parsed) = (0u64, 0u64, 0u64, 0u64);
+
+        // 1. First frames: random bytes of every length, and mutations of good ones.
+        let mut good = Vec::new();
+        for kind in [noise::Kind::Session, noise::Kind::Pairing] {
+            let mut hs = noise::initiator(kind, &phone.private, &gateway.public, if kind == noise::Kind::Pairing { Some(&psk) } else { None }).unwrap();
+            let mut m1 = vec![0u8; 1024];
+            let n = hs.write_message(payload, &mut m1).unwrap();
+            let mut frame = vec![noise::FRAME_VERSION, if kind == noise::Kind::Session { noise::KIND_SESSION } else { noise::KIND_PAIRING }];
+            frame.extend_from_slice(&m1[..n]);
+            good.push((kind, frame));
+        }
+        for round in 0..200_000 / scale {
+            let (kind, base) = &good[rng.below(2)];
+            let frame = if round % 3 == 0 { let n = rng.below(5000); rng.bytes(n) } else { mutate(&mut rng, base) };
+            let Some((seen_kind, message)) = first_frame(&frame) else {
+                first_frames_rejected += 1;
+                continue;
+            };
+            first_frames_parsed += 1;
+            let mut hs = noise::responder(seen_kind, &gateway.private, if seen_kind == noise::Kind::Pairing { Some(&psk) } else { None }).unwrap();
+            let mut out = vec![0u8; frame.len() + 64];
+            match hs.read_message(message, &mut out) {
+                Ok(n) => {
+                    // Only the untouched message may be accepted: anything else that decrypts is a break.
+                    assert!(frame == *base && seen_kind == *kind, "seed {seed:#x} round {round}: a changed handshake was accepted");
+                    assert_eq!(&out[..n], payload);
+                    accepted_handshakes += 1;
+                }
+                Err(_) => rejected_handshakes += 1,
+            }
+        }
+
+        // 2. Transport frames after a good handshake: random and mutated frames never open.
+        let mut i = noise::initiator(noise::Kind::Session, &phone.private, &gateway.public, None).unwrap();
+        let mut r = noise::responder(noise::Kind::Session, &gateway.private, None).unwrap();
+        let (mut a, mut b) = (vec![0u8; 1024], vec![0u8; 1024]);
+        let n = i.write_message(payload, &mut a).unwrap();
+        r.read_message(&a[..n], &mut b).unwrap();
+        let n = r.write_message(b"{}", &mut a).unwrap();
+        i.read_message(&a[..n], &mut b).unwrap();
+        let (mut phone_side, mut gateway_side) = (i.into_transport_mode().unwrap(), r.into_transport_mode().unwrap());
+        let (mut frames_rejected, mut frames_opened) = (0u64, 0u64);
+        for round in 0..100_000 / scale {
+            let n = rng.below(300);
+            let message = rng.bytes(n);
+            let frames = noise::seal(&mut phone_side, &message).unwrap();
+            let mut opener = noise::Opener::new(1 << 20);
+            let bad = if round % 4 == 0 { let n = rng.below(70_000); rng.bytes(n) } else { mutate(&mut rng, &frames[0]) };
+            if bad != frames[0] {
+                assert!(opener.open(&mut gateway_side, &bad).is_err(), "seed {seed:#x} round {round}: a changed frame opened");
+                frames_rejected += 1;
+            }
+            // The real frame still opens afterwards: a bad frame does not move the counters.
+            let mut opener = noise::Opener::new(1 << 20);
+            let mut joined = None;
+            for f in &frames {
+                joined = opener.open(&mut gateway_side, f).unwrap();
+            }
+            assert_eq!(joined.unwrap(), message, "seed {seed:#x} round {round}");
+            frames_opened += 1;
+        }
+
+        // 3. The pairing code and the address rules with random text.
+        for _ in 0..50_000 / scale {
+            let n = rng.below(40);
+            let text = String::from_utf8_lossy(&rng.bytes(n)).to_string();
+            let _ = net::Cidr::parse(&text);
+            let _ = base32::decode(&text);
+            let _ = classes::class_of(&text);
+            let _ = clean(&text, 60);
+        }
+        let log = [
+            "fuzz of the gateway's handshake and frame parser (AC-130)".to_string(),
+            format!("seed {seed:#x} for the static keys and the mutations; each handshake's own one-time keys are fresh, so counts differ a little between runs"),
+            String::new(),
+            format!("first frames: {} inputs (random bytes of 0 to 5000, and mutated good handshakes)", 200_000 / scale),
+            format!("  refused by the frame parser: {first_frames_rejected}"),
+            format!("  parsed and given to the handshake: {first_frames_parsed}"),
+            format!("  handshakes refused: {rejected_handshakes}"),
+            format!("  handshakes accepted: {accepted_handshakes} (each one byte for byte the untouched message)"),
+            String::new(),
+            format!("transport frames: {} rounds (random bytes of 0 to 70000, and mutated good frames)", 100_000 / scale),
+            format!("  changed frames refused: {frames_rejected}"),
+            format!("  untouched frames opened afterwards: {frames_opened}"),
+            String::new(),
+            format!("other parsers: {} random texts through the range, base32, method class and name cleaning", 50_000 / scale),
+            String::new(),
+            "crashes: 0".to_string(),
+            "changed input accepted: 0".to_string(),
+            format!("time: {:.1} s", started.elapsed().as_secs_f64()),
+            String::new(),
+        ]
+        .join("\n");
+        write_log("fuzz.log", &log);
+        println!("{log}");
+        assert_eq!(first_frames_rejected + first_frames_parsed, 200_000 / scale);
+    }
 }
