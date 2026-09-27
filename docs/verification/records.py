@@ -1230,7 +1230,41 @@ rec(153, "A ledger that stays true", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate P).",
     actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
 
+# Gate Q, cover everything and oversee the agents (added by the owner on 2026-09-27). Not started.
+rec(154, "Composer choices fill the row", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(155, "One-line search with a filter menu", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(156, "Every agent works from the same rules", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(157, "Oversee the other agents", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(158, "Gate M's theme and immersive look are back in scope", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(159, "The toolchain works without Xcode's license", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(160, "Owner actions in one place", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(161, "Everything merged into one main", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+
 SHORT_BLOCKERS = {
+    154: "not started (Gate Q, added by the owner on 2026-09-27)",
+    155: "not started (Gate Q, added by the owner on 2026-09-27)",
+    156: "not started (Gate Q, added by the owner on 2026-09-27)",
+    157: "not started (Gate Q, added by the owner on 2026-09-27)",
+    158: "not started (Gate Q, added by the owner on 2026-09-27)",
+    159: "not started (Gate Q, added by the owner on 2026-09-27)",
+    160: "not started (Gate Q, added by the owner on 2026-09-27)",
+    161: "not started (Gate Q, added by the owner on 2026-09-27)",
     146: "not started (Gate P, added by the owner on 2026-09-27)",
     147: "not started (Gate P, added by the owner on 2026-09-27)",
     148: "not started (Gate P, added by the owner on 2026-09-27)",
