@@ -1455,6 +1455,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             }
         }
         "auto.usage.thread.refresh" => {
+            let deadline = metadata_deadline(p)?;
             let run = d.run(s(p, "run_id")?)?;
             if run.harness != "codex-app" || run.status != "completed" {
                 return Err(anyhow!("thread usage is available only after a completed Codex app-server run"));
@@ -1462,7 +1463,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let profile_id = run.profile_id.as_deref().ok_or_else(|| anyhow!("run account profile is unavailable"))?;
             let thread_id = run.native_id.as_deref().ok_or_else(|| anyhow!("run thread identity is unavailable"))?;
             let gate = d.profile_gate(profile_id);
-            let _profile_guard = gate.lock().unwrap();
+            let _profile_guard = lock_gate_until(&gate, deadline)?;
             if d.run(&run.id)?.status != "completed" {
                 return Err(anyhow!("run changed while reading usage"));
             }
@@ -1475,7 +1476,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let program = crate::adapters::resolve_program("codex-app").ok_or_else(|| anyhow!("Codex is not installed"))?;
                 let mut env = crate::adapters::base_env(&program.display().to_string());
                 env.extend(Daemon::profile_env(&profile));
-                let raw = crate::auto_collect::codex_thread_usage(&program, &env, &crate::adapters::neutral_dir(), thread_id, std::time::Duration::from_secs(5))?;
+                let raw = crate::auto_collect::codex_thread_usage(&program, &env, &crate::adapters::neutral_dir(), thread_id,
+                    Duration::from_millis(remaining_metadata_ms(deadline)?))?;
                 let observed_ms = crate::daemon::now();
                 let fingerprint = crate::auto_quota::account_fingerprint(&raw.rate_limits)?;
                 let snapshot = crate::auto_quota::parse_codex_rate_limits(&raw.rate_limits, profile_id, raw.rate_limits_observed_ms)?;

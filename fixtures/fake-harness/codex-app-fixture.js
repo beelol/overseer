@@ -50,7 +50,9 @@ rl.on('line', line => {
           primary: quotaMode === 'unknown' ? null : { usedPercent: quotaUsed, windowDurationMins: 300, resetsAt: 1800003600 }, secondary: null,
           credits: { balance: 'secret-credit-sentinel' } } } } });
     };
-    if (process.env.FIXTURE_MODE === 'metadata-delay') setTimeout(reply, 700); else reply();
+    if (process.env.FIXTURE_QUOTA_DELAY_MS) setTimeout(reply, Number(process.env.FIXTURE_QUOTA_DELAY_MS));
+    else if (process.env.FIXTURE_MODE === 'metadata-delay') setTimeout(reply, 700);
+    else reply();
   } else if (m.method === 'account/usage/read' && (process.env.FIXTURE_MODE?.startsWith('metadata-usage') || process.env.FIXTURE_MODE?.startsWith('managed'))) {
     mark('thread_usage_read');
     const usage = process.env.FIXTURE_MODE === 'metadata-usage-null' ? null : {
