@@ -345,52 +345,91 @@ can reorder with `continuity.preferredModels`.
 
 | Harness | How | Status |
 | --- | --- | --- |
-| **OpenCode** | The `local` account's `opencode.json` (in its `XDG_CONFIG_HOME`) gets an `ollama` provider (`@ai-sdk/openai-compatible`, `baseURL http://127.0.0.1:11434/v1`) listing the derived tags with `tool_call: true`; `model` and `small_model` point at the pick; `autoupdate: false`, `share: disabled`, `agent.general.permission.task: allow` as in the mock fixture. Model per turn with `-m ollama/<tag>` (already supported). | verified path; the config writer is new |
+| **OpenCode** | Through `opencode serve` (harness id `opencode-serve`, chosen by the spike below). The `local` account's `opencode.json` (in its own `XDG_CONFIG_HOME`) gets an `ollama` provider (`@ai-sdk/openai-compatible`, `baseURL http://127.0.0.1:11434/v1`) listing the derived tags with `tool_call: true`; `enabled_providers: ["ollama"]`; `model` and `small_model` point at the pick; `autoupdate: false`, `share: disabled`. The model and agent are chosen per prompt. | transport verified by the spike; the bridge and the config writer are new |
 | **Codex** | `codex exec --oss --local-provider ollama -m <tag>` (flags present in the installed 0.155 binary). Keeps Codex's file-change and child telemetry with a local model. | to verify (AC-87); second choice until then |
 | **Claude Code** | Would need `ANTHROPIC_BASE_URL` and a placeholder token in the harness environment. Overseer never forwards `ANTHROPIC_*` or token variables (AC-16), so this is **not in scope**; see [Open questions](#open-questions). | out of scope |
 
 ### The spike comes first (AC-139)
 
-Before any adapter work, the goal finds out how OpenCode's session transports behave in the
-installed version, with a local model inside the budget:
+Done on 2026-09-26 with OpenCode 1.15.13, Ollama 0.34.2 and `qwen3-coder:30b-64k` (23.7 GiB
+loaded, inside a budget of 42.7 GiB at the time), in an isolated OpenCode profile and two
+disposable repositories. Drivers: [`test/spike/opencode-serve.js`](../../test/spike/opencode-serve.js)
+and [`test/spike/opencode-acp.js`](../../test/spike/opencode-acp.js). Evidence:
+[`docs/verification/evidence/ac-139/`](../verification/evidence/ac-139/).
 
-- how a session starts with a chosen model and agent, and how a prompt is sent;
-- the message a permission request arrives as, and how Allow and Deny are answered;
-- interrupt, and resuming an existing session after the daemon restarts;
-- child sessions, file activity and usage, compared with what `opencode run` reports today;
-- what a long-lived session process means for the supervisor (as with `codex-app` and Claude Code).
+**Decision: local runs use `opencode serve`.** It answers every question below. `opencode acp` is
+not used: it cannot interrupt a running turn, and a turn that delegated to a child never finished.
 
-The result is a written decision in this section (which transport, or why neither and what the
-fallback is), redacted transcripts, and a fixture recorded from the chosen transport for the adapter
-tests. It is a research criterion, like AC-01 to AC-03: an investigated blocker completes it, but
-does not pass AC-138.
+| Question | `opencode serve` (HTTP and an event stream on loopback) | `opencode acp` (JSON-RPC on stdin and stdout) |
+| --- | --- | --- |
+| Start a session with a model and an agent | `POST /session` with `agent`, `model` and `permission` rules; the model and agent can also change per prompt | `session/new`, then `session/set_config_option` for `model` and `mode` |
+| Send a prompt | `POST /session/{id}/prompt_async` (answers 204 at once; the turn reports through events) | `session/prompt` (answers when the turn ends) |
+| A permission request | event `permission.asked`: id, session, `permission` (`edit`, `bash`), patterns, and for edits the file path and a diff; also listed by `GET /permission` | request `session/request_permission` with the tool call, its diff and three options |
+| Allow and Deny | `POST /permission/{id}/reply` with `once` or `reject`; nothing is written before the answer; Deny blocks the write | answer with the option `once` or `reject`; same results |
+| Rules per session | yes, in `POST /session`; no file is written | no, only from the profile's configuration |
+| Interrupt | `POST /session/{id}/abort`: a 45 s command ended 56 ms later, the message carries `MessageAbortedError`, and the session took the next prompt | **none**: `session/cancel` answers "Method not found" as a notification and as a request, and the 45 s command ran to its end |
+| Resume after a restart | a restarted server still has the session and continues it with its history | `session/load` in a new process works |
+| Child sessions | event `session.created` with `parentID`, their events on the same stream, `GET /session/{id}/children` | only an id inside the task tool call; a turn that delegated in plan mode never finished (300 s) and no request reached the client |
+| File activity and usage | tool parts with the file path, `file.edited`, `session.diff`; tokens and cost on the assistant message | tool call updates; token counts on the prompt result |
+| Several worktrees | one server serves any directory (`?directory=`); events and pending requests are scoped to it, `/global/event` carries all | one process per directory |
+
+What the adapter must do, learned the hard way:
+
+- **Rules travel with the session**, so Overseer writes no rules into any file. The profile's
+  configuration only names the local provider.
+- **Only `once` and `reject` are sent.** A `once` answer is not remembered: the next command in
+  the same turn asks again, which is what Ask first means. `always` is never sent.
+- **The `question` tool is denied** by a session rule. Without it a model may ask the user a
+  multiple-choice question and the session waits for an answer Overseer has no card for.
+- **Providers are pinned.** A fresh profile still offers eight online OpenCode Zen models.
+  Overseer's profile sets `enabled_providers: ["ollama"]` and points `model` and `small_model` at
+  the local pick, so a local run can never go online, not even to name a session.
+- **A tool call written as text is a failure to detect.** Once in the 49 prompts of the spike
+  the verified model wrote `<function=bash>…` as plain text and the turn ended without running
+  anything. The adapter
+  reports it as `tool_call_as_text` and repeats the turn once; the catalogue check (AC-87) runs
+  each model three times.
+- **Interrupting is a request, not a signal.** The run's process stays up between turns and after
+  an interrupt, as with `codex-app` and Claude Code.
+
+**How it fits the daemon.** A new harness id, `opencode-serve`, beside the unchanged one-shot
+`opencode`. The run's supervisor starts a small bridge, a subcommand of `overseerd`
+(`overseerd opencode-bridge`), which starts `opencode serve` on a loopback port of its own, prints
+every server event as one JSON line on its standard output, and turns lines on its standard input
+(prompt, permission answer, interrupt) into requests. The daemon's existing tail, parser and
+control path stay as they are; the bridge needs only a plain HTTP client for loopback. One bridge
+and one server per run, so a run's process tree is stopped as a unit and a crash affects one run.
+
+Fixtures recorded from the chosen transport, for the adapter tests:
+`fixtures/transcripts/opencode-1.15.13-serve-{allow,deny,interrupt,children}-local.jsonl`.
 
 ### Permission modes carry over (AC-138)
 
 A handoff keeps the run's permission mode and never loosens it. Local models have nothing to do
 with this: OpenCode has its own permission system (allow, ask and deny rules per tool), a built-in
 `plan` agent that denies edits, and two session transports a client can answer requests over
-(`opencode serve` and `opencode acp`). The gap is in Overseer's adapter, which uses the one-shot
+(`opencode serve` and `opencode acp`; the spike chose the first). The gap is in Overseer's adapter, which uses the one-shot
 `opencode run` transport: it passes no agent and no rules, and it has no channel for a permission
 request to come back, so asks are rejected. The same was true of Codex before the app-server
 transport ([compatibility](../compatibility.md)).
 
 | The run's mode | Claude Code | Codex | OpenCode (local), after this gate |
 | --- | --- | --- | --- |
-| Plan only | `--permission-mode plan` | sandbox read-only | `--agent plan` |
-| Ask first | `--permission-mode manual` with the permission prompt tool | `codex-app` approval requests | rules `edit: ask`, `bash: ask` over a session transport; requests appear as Allow and Deny cards in the chat |
-| Accept edits | `--permission-mode acceptEdits` | sandbox workspace-write | rules `edit: allow`, `bash: ask` over a session transport |
-| Auto | `--permission-mode auto` | sandbox workspace-write | the `build` agent as shipped |
+| Plan only | `--permission-mode plan` | sandbox read-only | the `plan` agent (edits denied) |
+| Ask first | `--permission-mode manual` with the permission prompt tool | `codex-app` approval requests | session rules `edit: ask`, `bash: ask`; requests appear as Allow and Deny cards in the chat |
+| Accept edits | `--permission-mode acceptEdits` | sandbox workspace-write | session rules `edit: allow`, `bash: ask` |
+| Auto | `--permission-mode auto` | sandbox workspace-write | the `build` agent as shipped (it still asks before leaving the worktree) |
 
-- **Rules are written by Overseer** into the local account's `opencode.json` per turn; the user's own
-  OpenCode configuration is never edited.
+- **Rules travel with the session** (`POST /session`), and every mode also denies the `question`
+  tool. Overseer writes no rules into any file, and the user's own OpenCode configuration is never
+  edited or read.
 - **Never looser.** If the target cannot honour the run's mode, Overseer does not transition on its
   own: the run waits (as with Continuity off) and the chat offers the move with the difference
   stated, for example *The local agent cannot ask before running commands yet. Continue locally in
   Accept edits?*
-- **Spike first (AC-139).** How permission requests appear over `opencode serve` and `opencode acp`
-  in OpenCode 1.15 is not yet verified. Until it is, Plan only and Auto carry over and Ask first and
-  Accept edits use the fallback above.
+- **Settled by the spike (AC-139).** All four modes carry over through `opencode serve`. The
+  fallback above remains for a machine whose OpenCode is too old to have the server, or where the
+  server does not start.
 
 The local account is the existing `local` provider ("OpenCode (local models)", `daemon/src/accounts.rs`),
 renamed **Local (Ollama)**, created automatically when Ollama is found, with no sign-in. Its status
@@ -653,7 +692,7 @@ Left to the implementation, with the owner's agreement:
 
 | Question | Approach |
 | --- | --- |
-| How permission requests appear over OpenCode's session transports | The spike (AC-139): `opencode acp` first (a documented client protocol), then `opencode serve`; pick the one whose requests map cleanly onto Overseer's Allow and Deny cards. |
+| How permission requests appear over OpenCode's session transports | Settled by the spike (AC-139): `opencode serve`; see [the decision](#the-spike-comes-first-ac-139). |
 | Codex `--oss` as the local harness | Tested during catalogue verification (AC-87); OpenCode stays the default and Codex is offered as `localHarness: codex` if it passes. |
 | Derived tags versus per-request `num_ctx` | Derived tags: the OpenAI-compatible route OpenCode uses cannot carry `num_ctx`. |
 | Change notifications versus polling for the system check | Polling every 5 seconds first; the SystemConfiguration and NetworkManager subscriptions if the delay is noticeable in AC-83. |

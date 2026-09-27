@@ -1,0 +1,73 @@
+## serve.out
+== allow
+PASS  serve: a permission request arrives as a permission.asked event  — permission=edit patterns=["allowed.txt"] tool.callID=call_b84bsf2w
+PASS  serve: GET /permission lists the pending request
+PASS  serve: nothing is written before the answer
+PASS  serve: reply once is accepted  — status 200
+PASS  serve: later requests in the same turn ask again (reply once is not remembered)  — 1 further request(s): bash ["ls -la"]
+PASS  serve: Allow lets the write through  — "hello from spike"
+== deny
+PASS  serve: reply reject is accepted  — status 200
+PASS  serve: Deny blocks the write
+== plan
+FAIL  serve: scenario plan completed  — timeout waiting for idle ses_f1f7b2fd4ffegMsTFlOdtq8Jr2
+== interrupt
+PASS  serve: abort is accepted while a tool is running  — status 200
+PASS  serve: abort ends the turn long before the 45 s command would  — idle 56 ms after the abort request
+PASS  serve: the interrupted message says it was aborted  — {"name":"MessageAbortedError","data":{"message":"Aborted"}}
+PASS  serve: the same session takes a new prompt after an interrupt
+== children
+PASS  serve: a child session is announced by session.created with parentID  — child ses_f1f777defffepMsbA14AH6iujB
+PASS  serve: GET /session/{id}/children lists the child  — 1 child session(s)
+== directory
+PASS  serve: a session can be created for another directory on the same server  — session.directory=/WORKSPACE2
+PASS  serve: events and pending requests are scoped to the directory
+PASS  serve: the write lands in the second directory, not the first
+== usage
+PASS  serve: the assistant message reports tokens and cost  — tokens={"total":10631,"input":11,"output":3,"reasoning":0,"cache":{"read":10617,"write":0}} cost=0 model=ollama/qwen3-coder:30b-64k agent=build
+18 passed, 1 failed
+
+## serve-resume.out
+== resume-after
+PASS  serve: a session created before the restart is still there
+PASS  serve: the restarted server continues the session with its history  — 5 messages in the session
+== plan
+PASS  serve: with the question tool denied, the session never waits on a question  — 0 question(s) asked
+PASS  serve: the plan agent changes no file  — no permission request was raised
+4 passed, 0 failed
+
+## acp.out
+PASS  acp: initialize answers with the agent capabilities  — protocolVersion=1 capabilities={"loadSession":true,"mcpCapabilities":{"http":true,"sse":true},"promptCapabilities":{"embeddedContext":true,"image":true},"sessionCapabilities":{"close":{},"fork":{},"list":{},"resume":{}}}
+== allow
+PASS  acp: session/new returns a session id, its modes and its models  — modes=[] current=undefined model=undefined of undefined
+PASS  acp: a permission request arrives as a session/request_permission request  — toolCall=call_a1j4iq9f kind=edit options=["allow_once","allow_always","reject_once"]
+PASS  acp: Allow (allow_once) lets the write through  — stopReason=end_turn; 2 request(s)
+PASS  acp: the prompt result reports usage  — {"inputTokens":338,"outputTokens":2,"totalTokens":10669,"cachedReadTokens":10329}
+== deny
+PASS  acp: Deny (reject_once) blocks the write  — stopReason=end_turn
+== plan
+PASS  acp: the plan agent is offered as a mode and can be selected  — mode is now plan
+FAIL  acp: scenario plan completed  — timeout: session/prompt ""
+== config
+PASS  acp: session/new reports config options instead of modes and models  — model (model) = ollama/qwen3-coder:30b-64k of 1; mode (mode) = build of 2
+PASS  acp: the model is chosen with session/set_config_option  — {"configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"ollama/qwen3-coder:30b-64k","options":[{"value":"ollama/qwen3-
+PASS  acp: only local models are offered in the isolated profile  — 0 online model(s) offered:
+PASS  acp: the agent (plan) is chosen with a config option  — mode option: mode ["build","plan"] -> {"configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"ollama/qwen3-coder:30b
+== interrupt
+FAIL  acp: session/cancel (notification, then request) ends the turn long before the 45 s command would  — stopReason=end_turn 45565 ms after the cancel; as a request: {"error":"\"Method not found\": session/cancel"}
+PASS  acp: the same session takes a new prompt afterwards
+== kill
+PASS  acp: SIGINT ends the agent process  — {"code":null,"signal":"SIGINT"} after 15 ms
+PASS  acp: a new process loads the session and continues it  — resumed after kill
+== children
+
+## acp-2.out
+PASS  acp: initialize answers with the agent capabilities  — protocolVersion=1 capabilities={"loadSession":true,"mcpCapabilities":{"http":true,"sse":true},"promptCapabilities":{"embeddedContext":true,"image":true},"sessionCapabilities":{"close":{},"fork":{},"list":{},"resume":{}}}
+== children
+PASS  acp: the task tool call is reported  — 4 tool_call update(s)
+PASS  acp: the child session id is visible to the client  — ids in the tool call: ["ses_f1f6c7f12ffe9JYVPsNzDV4Upe"]; updates from other sessions: []
+== load
+PASS  acp: a session from an earlier process can be loaded (session/load)  — loadSession capability=true; {"configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"ollama/qwen3-coder:30b-64k","options":[{"value":"ollama/qwen3-coder:30b-64k","name":"Ollama (local)/Qw
+PASS  acp: the loaded session continues with its history  — acp-allowed.txt
+5 passed, 0 failed
+
