@@ -261,6 +261,49 @@ fn quota_window_reset_does_not_grant_a_second_run_allocation() {
 }
 
 #[test]
+fn short_window_and_unlike_unit_each_bind_admission_without_conversion() {
+    let d=Daemon::start(&[]);
+    let run=setup(&d,"Binding windows",3);
+    commit_beneficial_batch(&d,&run,&["j0".into(),"j1".into(),"j2".into()]);
+    let at=now();
+    let mut snap=snapshot(at,100000);
+    let windows=snap["pools"][0]["windows"].as_array_mut().unwrap();
+    windows.push(json!({"id":"day","unit":"points","remaining_milli":5000,
+        "protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+60000}));
+    windows.push(json!({"id":"requests","unit":"requests","remaining_milli":20000,
+        "protected_milli":0,"reserved_milli":0,"confidence":"exact","expires_ms":at+60000}));
+    let admit=|job:&str,key:&str,points:i64,requests:Option<i64>| {
+        let mut estimate=json!({"points":points});
+        if let Some(requests)=requests { estimate["requests"]=json!(requests); }
+        d.call("swarm.admit",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":job,"target_id":"codex-a","request_id":key,
+            "snapshot":snap,"now_ms":at,"required_capabilities":["code"],
+            "estimate_milli":estimate,"purpose":"worker"}))
+    };
+    let first=admit("j0","all-windows-first",300,Some(100));
+    assert_eq!(first["status"],"admitted","{first}");
+    assert_eq!(first["reservation_windows"],3);
+    let day_limited=admit("j1","day-binds",150,Some(100));
+    assert_eq!(day_limited["reason"],"finishing_reserve","{day_limited}");
+    let no_conversion=admit("j1","missing-native-unit",50,None);
+    assert_eq!(no_conversion["reason"],"missing_estimate","{no_conversion}");
+    let requests_limited=admit("j1","requests-bind",50,Some(1700));
+    assert_eq!(requests_limited["reason"],"finishing_reserve","{requests_limited}");
+    let second=admit("j1","both-units-fit",50,Some(100));
+    assert_eq!(second["status"],"admitted","{second}");
+    assert_eq!(second["reservation_windows"],3);
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let mut stmt=db.prepare("SELECT window_id,unit,allocation_milli FROM swarm_allocations
+        WHERE run_id=?1 ORDER BY window_id").unwrap();
+    let saved=stmt.query_map([&run],|row|Ok((row.get::<_,String>(0)?,
+        row.get::<_,String>(1)?,row.get::<_,i64>(2)?))).unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>().unwrap();
+    assert_eq!(saved,vec![("day".into(),"points".into(),500),
+        ("requests".into(),"requests".into(),2000),
+        ("week".into(),"points".into(),10000)]);
+}
+
+#[test]
 fn newly_selected_account_cannot_create_allocation_after_first_admission() {
     let d=Daemon::start(&[]);
     let run=setup(&d,"New account after work starts",2);
