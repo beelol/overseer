@@ -262,9 +262,11 @@
         "test/unit/swarm-view.js",
         "test/ui/scenario-swarm-status.js",
         "test/ui/scenario-swarm-scale.js",
-        "docs/verification/evidence/ui/swarm-scale/result.json"
+        "docs/verification/evidence/ui/swarm-scale/result.json",
+        "daemon/tests/swarm_admission.rs",
+        "docs/verification/evidence/ui/swarm-scale/04-capacity-expanded.png"
       ],
-      "blocker": "Background notifications group category work. A packaged VS Code fixture now displays one 100-job category with 32 live supervised local workers, 68 ready jobs, and a nested worker drilldown without duplicate ordinary agent rows. Account usage, limiting constraint, finishing reserve and decision explanation are not yet shown."
+      "blocker": "A packaged 100-job/32-worker category now shows aggregate work, nested workers, selected fixture target, frozen allocation and finishing reserve, recorded parallel decision, and the last held admission reason (`worker_limit`) without claiming current live usage. That hold is a past observation, not a current limiting constraint. Live Auto account usage and account names, current constraint reconciliation, serial/scaled-down/blocked explanation variants, and joined credential-redaction evidence remain unverified."
     },
     "SWARM-24": {
       "status": "partial",

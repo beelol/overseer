@@ -235,3 +235,10 @@ this branch so the main evidence is not overwritten by a local replay.
 Main next updated AC-179's icon-helper evidence and tracker only. It changes
 no Swarm runtime, route, permission or UI behavior, so the preceding Swarm
 fixture results remain applicable and the SWARM-01–64 statuses are unchanged.
+
+## Subsequent published main: `ca6bcab`
+
+Main restored Gate L and AC-151 ledger records lost in an earlier generated
+ledger update. It changed documentation only. The Swarm/Continuity handoff
+fence and the SWARM-23 admission readout remain unchanged; no Swarm criterion
+or supported target is newly qualified by the ledger restoration.
