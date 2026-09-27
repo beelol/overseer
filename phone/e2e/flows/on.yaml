@@ -9,5 +9,8 @@ appId: ${APP}
     id: "connection.unreachable"
 - assertNotVisible:
     id: "pair.code"
-- assertVisible:
-    id: "agents.row.${SHOWCASE}"
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000

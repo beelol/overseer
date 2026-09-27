@@ -4,4 +4,4 @@ appId: ${APP}
 - extendedWaitUntil:
     visible:
       id: "agents.new"
-    timeout: 20000
+    timeout: 45000

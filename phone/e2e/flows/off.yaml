@@ -5,5 +5,8 @@ appId: ${APP}
     visible:
       id: "connection.off"
     timeout: 30000
-- assertVisible:
-    id: "agents.row.${SHOWCASE}"
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${SHOWCASE}"
+    direction: DOWN
+    timeout: 20000

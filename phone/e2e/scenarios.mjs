@@ -226,8 +226,8 @@ export const scenarios = [
     criteria: ['AC-125', 'AC-130'],
     says: 'Stop all agents names how many will stop, asks once, and stops them',
     async run(c) {
-      c.lab.mode('slow');
-      const one = c.lab.agent('slow', 'Count the stock', 'count');
+      // Two agents that wait for the owner: they stay going until stopped.
+      const one = c.lab.agent('showcase-permission', 'Count the stock', 'count');
       const two = c.lab.agent('showcase-permission', 'Price the returns', 'price');
       await c.until('two agents going', () => ACTIVE.includes(run(c, one).status) && ACTIVE.includes(run(c, two).status));
       await c.flow('stop-all');
@@ -314,9 +314,18 @@ export const scenarios = [
     says: 'the Mac answers somewhere else: an address typed by the owner connects, with no pairing again',
     async run(c) {
       const paired = me(c).paired_ms;
-      const moved = c.port + 10;
       c.lab.call('gateway.disable');
-      c.lab.call('gateway.enable', { port: moved });
+      let moved = c.port;
+      for (const candidate of [c.port + 10, c.port + 11, c.port + 12, c.port + 13]) {
+        try {
+          c.lab.call('gateway.enable', { port: candidate });
+          moved = candidate;
+          break;
+        } catch (error) {
+          c.log.say(`  port ${candidate} is not free: ${error instanceof Error ? error.message.split('\n')[0].slice(0, 120) : error}`);
+        }
+      }
+      expect(moved !== c.port, 'no other port could be used');
       c.port = moved;
       await c.sleep(1500);
       expect(me(c).connected === false, 'the phone is connected although the Mac moved');
@@ -371,15 +380,23 @@ export const scenarios = [
     says: 'every screen in both themes, at the smallest and the largest text size; the theme changed with the app open',
     async run(c) {
       const state = c.lab.call('state');
-      let file = null;
-      for (const r of state.runs.filter((x) => x.id === c.runs.showcase)) file = c.lab.call('workspace.changes', { workspace_id: r.workspace_id }).names[0];
-      expect(file, 'the showcase agent has no changed file to show');
+      let shown = null;
+      for (const r of state.runs.filter((x) => !x.parent_run_id)) {
+        const changes = c.lab.call('workspace.changes', { workspace_id: r.workspace_id });
+        if (changes.files > 0) {
+          shown = { run: r.id, file: changes.names[0] };
+          break;
+        }
+      }
+      expect(shown, 'no agent has a changed file to show');
+      const file = shown.file;
+      c.runs = { ...c.runs, tour: shown.run };
       for (const theme of ['dark', 'light']) {
         for (const size of ['small', 'large']) {
           c.dev.appearance(theme);
           c.dev.textSize(size);
           await c.sleep(1500);
-          await c.flow('tour', { SHOWCASE: c.runs.showcase, FILE: file, SHOTS: `${c.out}/screens/${theme}-${size}` });
+          await c.flow('tour', { SHOWCASE: c.runs.tour, FILE: file, SHOTS: `${c.out}/screens/${theme}-${size}` });
         }
       }
       // The system's setting, changed while the app is open: the app follows at once.

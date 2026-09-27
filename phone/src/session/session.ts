@@ -329,6 +329,8 @@ export class Session {
     const device = hello && typeof hello['device'] === 'object' && hello['device'] !== null ? (hello['device'] as Record<string, unknown>) : null;
     const scope = device?.['scope'] === 'watch' ? 'watch' : device?.['scope'] === 'full' ? 'full' : (c.gateway?.scope as Scope | undefined) ?? null;
     if (hello && hello['notifications'] !== undefined) this.setSwitches(switchesOf(hello['notifications']));
+    // Unpaired, however it went (revoked on the Mac, or forgotten here): nothing of the Mac is kept.
+    if (c.gateway === null && this.snapshot.paired) this.onForgotten();
     this.update({
       notifications: this.switches,
       connection: c.state,
@@ -348,6 +350,10 @@ export class Session {
   }
 
   private onForgotten(): void {
+    if (this.cacheTimer !== null) {
+      clearTimeout(this.cacheTimer);
+      this.cacheTimer = null;
+    }
     this.pending = [];
     this.open.clear();
     this.deps.cache.delete('state');

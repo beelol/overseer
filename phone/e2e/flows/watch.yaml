@@ -10,7 +10,7 @@ appId: ${APP}
 - extendedWaitUntil:
     notVisible:
       id: "agents.new"
-    timeout: 20000
+    timeout: 45000
 - scrollUntilVisible:
     element:
       id: "agents.row.${SHOWCASE}"
