@@ -13,6 +13,35 @@ fn now() -> i64 {
 }
 
 #[test]
+fn uncontrolled_native_delegation_blocks_admission_before_reserving_or_launching() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Uncontrolled delegation",
+        "objective":"Inspect backend","allowed_targets":["fixture-codex"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let at = now();
+    let result = d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"inspect","target_id":"fixture-codex","request_id":"uncontrolled",
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-codex","harness":"codex",
+                "profile_id":"system-codex","model":"gpt-5.6-luna","account_id":"fixture",
+                "pool_ids":["pool"],"capabilities":["code","native_child_control"],
+                "health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(result["status"],"blocked", "{result}");
+    assert_eq!(result["reason"],"uncontrolled_native_delegation");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let attempts: i64 = db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1",
+        [id],|r|r.get(0)).unwrap();
+    assert_eq!(attempts,0);
+}
+
+#[test]
 fn admitted_target_harness_cannot_be_changed_at_worker_launch() {
     let d = Daemon::start(&[]);
     let temp = tmp();
@@ -1088,6 +1117,8 @@ fn synthetic_claude_background_child_does_not_finish_swarm_attempt_at_launch_stu
     assert!(launch_file.contains("--model") && launch_file.contains("sonnet")
         && launch_file.contains("--effort") && launch_file.contains("medium"),
         "admitted route options did not reach the harness: {launch_file}");
+    assert!(launch_file.contains("--disallowedTools") && launch_file.contains("Agent,Task"),
+        "Swarm worker launch did not disable native Claude delegation: {launch_file}");
     assert!(!launch_file.contains(admitted["token"].as_str().unwrap()),
         "synthetic harness must not receive the worker broker credential");
     let until = std::time::Instant::now() + std::time::Duration::from_secs(15);

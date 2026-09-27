@@ -608,7 +608,8 @@ impl Daemon {
                 )?;
             }
         }
-        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "extra_args": p["extra_args"].clone()});
+        let generic = json!({"program": program, "args": p["args"].clone(), "approval": p["approval_policy"].as_str().unwrap_or("on-request"), "extra_args": p["extra_args"].clone(),
+            "swarm_worker": matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_)))});
         let opts = TurnOpts { model: None, ..TurnOpts::from_params(p)? };
         {
             let store = self.store.lock().unwrap();
@@ -754,6 +755,7 @@ impl Daemon {
                 effort: effort.as_deref(),
                 permission_mode: mode.as_deref(),
                 images: &images,
+                swarm_worker: generic_meta["swarm_worker"] == true,
             },
         )?;
         if let Some(identity) = swarm_identity {

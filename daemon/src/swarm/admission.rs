@@ -209,6 +209,11 @@ fn admit_inner(
             candidate["reason"].as_str().unwrap_or("ineligible_target"),
         ));
     }
+    if !director_self && !crate::adapters::swarm_worker_launch_supported(
+        candidate["harness"].as_str().unwrap_or(""),
+    ) {
+        return Ok(blocked("uncontrolled_native_delegation"));
+    }
     if super::context::revoked_dependency(&tx, run, job, target)? {
         return Ok(blocked("artifact_permission_revoked"));
     }
