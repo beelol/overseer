@@ -71,17 +71,38 @@ fn expected_tree(workspace: &Path, patch: &str) -> Result<String> {
         .map(|bytes| String::from_utf8_lossy(&bytes).trim().to_string())
 }
 
-fn disputed_integrated_patch(conn: &rusqlite::Connection, run: &str) -> Result<bool> {
-    conn.prepare("SELECT 1 FROM swarm_integrated_artifacts i
+fn disputed_integrated_patch(
+    conn: &rusqlite::Connection, run: &str, repair_job: Option<&str>,
+) -> Result<bool> {
+    let unresolved=conn.prepare("WITH RECURSIVE upstream(job_id) AS (
+            SELECT DISTINCT job_id FROM swarm_integrated_artifacts WHERE run_id=?1
+            UNION
+            SELECT dep.value FROM upstream u
+            JOIN swarm_jobs j ON j.run_id=?1 AND j.id=u.job_id
+            JOIN json_each(j.deps) dep
+        )
+        SELECT 1 FROM upstream u JOIN swarm_conflicts c ON c.run_id=?1
+        WHERE c.status!='resolved' AND (c.left_job_id=u.job_id OR c.right_job_id=u.job_id)")?
+        .exists([run])?;
+    if unresolved { return Ok(true); }
+    let mut stmt=conn.prepare("SELECT DISTINCT i.job_id FROM swarm_integrated_artifacts i
         JOIN swarm_jobs j ON j.run_id=i.run_id AND j.id=i.job_id
-        WHERE i.run_id=?1 AND j.status='blocked' AND j.stop_reason='evidence_conflict'")?
-        .exists([run]).map_err(Into::into)
+        WHERE i.run_id=?1 AND (j.status!='accepted' OR NOT EXISTS (
+            SELECT 1 FROM swarm_integrated_artifacts fresh
+            JOIN swarm_artifacts a ON a.run_id=fresh.run_id
+                AND a.job_id=fresh.job_id AND a.id=fresh.artifact_id
+            WHERE fresh.run_id=i.run_id AND fresh.job_id=i.job_id
+                AND a.source_revision=j.plan_revision))")?;
+    let stale=stmt.query_map([run],|r|r.get::<_,String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(!stale.is_empty() && !(stale.len()==1
+        && repair_job.is_some_and(|job|job==stale[0])))
 }
 
 pub(super) fn ensure_no_disputed_integrated_patch(
-    conn: &rusqlite::Connection, run: &str,
+    conn: &rusqlite::Connection, run: &str, repair_job: Option<&str>,
 ) -> Result<()> {
-    if disputed_integrated_patch(conn,run)? {
+    if disputed_integrated_patch(conn,run,repair_job)? {
         bail!("disputed integrated patch holds this integration branch");
     }
     Ok(())
@@ -112,7 +133,7 @@ fn acknowledge(
     if !accepted {
         bail!("job is not accepted after its evidence or control state changed");
     }
-    ensure_no_disputed_integrated_patch(&tx,run)?;
+    ensure_no_disputed_integrated_patch(&tx,run,Some(job))?;
     let changed = tx.execute(
         "UPDATE swarm_integrations SET current_commit=?2,updated_ms=?3 WHERE run_id=?1 AND current_commit=?4",
         params![run,commit,now,prior],
@@ -147,7 +168,7 @@ fn ensure_current(store: &Store, run: &str, job: &str, generation: i64, revision
     if !accepted {
         bail!("job is not accepted after its evidence or control state changed");
     }
-    ensure_no_disputed_integrated_patch(&store.conn,run)?;
+    ensure_no_disputed_integrated_patch(&store.conn,run,Some(job))?;
     Ok(())
 }
 
@@ -258,7 +279,7 @@ pub fn integrate(store: &mut Store, p: &Value) -> Result<Value> {
     if current["source_change_permission"] != "isolated" {
         bail!("source changes are not permitted for this run");
     }
-    ensure_no_disputed_integrated_patch(&store.conn,run)?;
+    ensure_no_disputed_integrated_patch(&store.conn,run,Some(job))?;
     let root = git::toplevel(repo)?;
     if root != std::fs::canonicalize(repo)? {
         bail!("integration repo must be its root");

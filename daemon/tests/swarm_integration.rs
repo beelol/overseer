@@ -149,6 +149,75 @@ fn acknowledged_dependent_patch_holds_later_integration_after_conflict() {
     assert!(held.contains("disputed integrated patch"),"{held}");
     assert_eq!(git(std::path::Path::new(branch),&["rev-parse","HEAD"]),first_commit);
     assert_eq!(fingerprint(&checkout),source_before);
+
+    d.call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Recheck the integrated patch after route disagreement",
+        "jobs":[
+            {"id":"left","title":"Left route","acceptance":"route evidence"},
+            {"id":"right","title":"Right route","acceptance":"route evidence"},
+            {"id":"dependent","title":"Change a.txt",
+                "acceptance":"fresh patch","deps":["right"]},
+            {"id":"unrelated","title":"Change b.txt","acceptance":"patch"},
+            {"id":"repro","title":"Reproduce route behavior","acceptance":"fresh route proof"}
+        ]}));
+    let premature=d.try_call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"unrelated",
+        "artifact_id":"unrelated-patch","repo":checkout,"base_revision":base}))
+        .unwrap_err();
+    assert!(premature.contains("disputed integrated patch"),"{premature}");
+    let repro=d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"repro"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"repro",
+        "attempt_id":repro["id"],"token":repro["token"],
+        "artifact_id":"repro-proof","source_revision":2,"kind":"reproduction",
+        "content":"fresh guarded route returns 403"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"repro",
+        "attempt_id":repro["id"],"token":repro["token"],
+        "message_id":"repro-result","type":"result","revision":2,
+        "payload":{"artifact_ids":["repro-proof"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":"repro","decision":"accept","evidence":["repro-proof"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"repro","attempt_id":repro["id"]}));
+    d.call("swarm.conflict.resolve",json!({"run_id":run,
+        "generation":1,"revision":2,"conflict_id":"late-route",
+        "outcome":"supports_right","reproduction_job_id":"repro",
+        "reproduction_artifact_id":"repro-proof"}));
+    let before_repair=d.try_call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"unrelated",
+        "artifact_id":"unrelated-patch","repo":checkout,"base_revision":base}))
+        .unwrap_err();
+    assert!(before_repair.contains("disputed integrated patch"),"{before_repair}");
+    assert_eq!(d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|j|j["id"]=="dependent").unwrap()["status"],"ready");
+    assert_eq!(std::fs::read_to_string(std::path::Path::new(branch).join("a.txt")).unwrap(),
+        "changed\n");
+    let repair_patch="diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-changed\n+repaired\n";
+    let repair=d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"dependent"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"dependent",
+        "attempt_id":repair["id"],"token":repair["token"],
+        "artifact_id":"repair-patch","source_revision":2,"kind":"patch",
+        "content":repair_patch}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"dependent",
+        "attempt_id":repair["id"],"token":repair["token"],
+        "message_id":"repair-result","type":"result","revision":2,
+        "payload":{"artifact_ids":["repair-patch"]}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":"dependent","decision":"accept","evidence":["repair-patch"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"dependent","attempt_id":repair["id"]}));
+    let repaired=d.call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"dependent",
+        "artifact_id":"repair-patch","repo":checkout,"base_revision":base}));
+    assert_eq!(repaired["status"],"integrated");
+    assert_eq!(git(std::path::Path::new(branch),&["rev-list","--parents","-n","1","HEAD"]),
+        format!("{} {}",repaired["commit"].as_str().unwrap(),first_commit));
+    let later=d.call("swarm.integrate",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"unrelated",
+        "artifact_id":"unrelated-patch","repo":checkout,"base_revision":base}));
+    assert_eq!(later["status"],"integrated");
+    assert_eq!(fingerprint(&checkout),source_before);
 }
 
 #[test]
