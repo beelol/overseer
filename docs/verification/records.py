@@ -1407,10 +1407,10 @@ rec(118, 'Encrypted and mutually authenticated', 'verified',
 2. `cargo test -p overseerd noise` writes `protocol/vectors/noise.json`; `cd phone/core && npm test` and `node test/unit/ref-phone.js` read them.
 3. The fuzz run ([fuzz.log](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/daemon/fuzz.log)).""",
     expected='See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).',
-    actual="""- **Door and app, as the app recorded them by hand on the iOS simulator (debug build, one launch each):** door shown at 1,337 ms after the process started, first screen interactive at 1,355 ms, the opening 629 ms with 36 frames and 0 dropped, longest frame 16.7 ms. The 20-launch measurement of release builds (the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed) is the takeover branch's next step ([measure.mjs]({BR}phone/e2e/measure.mjs)).
+    actual="""- **Door and app, as the app recorded them by hand on the iOS simulator (debug build, one launch each):** door shown at 1,337 ms after the process started, first screen interactive at 1,355 ms, the opening 629 ms with 36 frames and 0 dropped, longest frame 16.7 ms. The 20-launch measurement of release builds (the measurement of 20 cold starts did not run in this session: it runs after every scenario passes, and scenarios failed) is the takeover branch's next step ([measure.mjs](https://github.com/beelol/overseer/blob/97a5bfbf/phone/e2e/measure.mjs)).
 - **Encrypted session, resumed:** the daemon-side tests of AC-118 and AC-121; `phone/integration` (10 tests against a real overseerd); on the iOS simulator five minutes away with the daemon restarted half way (2,583 events, no gap, no duplicate).
 - **Vectors:** `protocol/vectors/noise.json` passes in `snow` (daemon), in `@noble` (phone/core, 217 tests) and in the extension's reference phone (19 of 19).
-- **Notification payload on the simulator:** the daemon's own send (route `simulator`, outcome `sent`) showed *Claude · shop — Needs your permission* with the app's icon ([screenshot]({ev('e2e/ios/notification-shown.png')})); the tap and Allow on it were not exercised (Maestro cannot see the system's banner).
+- **Notification payload on the simulator:** the daemon's own send (route `simulator`, outcome `sent`) showed *Claude · shop — Needs your permission* with the app's icon ([screenshot](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/e2e/ios/notification-shown.png)); the tap and Allow on it were not exercised (Maestro cannot see the system's banner).
 - **Happy:** nothing adopted as code; every message of Happy passes through its server and its accounts, which this gate rules out. Same stack confirmed for long conversations.
 - **Rust on the phone:** not needed; no measurement asked for it (one event on a 5,000-row conversation costs about 7 microseconds in the view models).""",
     evidence='[daemon tests](https://github.com/beelol/overseer/blob/97a5bfbf/daemon/tests/gateway.rs), [daemon evidence](https://github.com/beelol/overseer/blob/97a5bfbf/docs/verification/evidence/phone/daemon), [phone/core](https://github.com/beelol/overseer/blob/97a5bfbf/phone/core), [protocol/vectors](https://github.com/beelol/overseer/blob/97a5bfbf/protocol/vectors)',
@@ -2373,7 +2373,9 @@ def sync(out):
     follow += [f"- [ ] {x}" for x in EXTRA_FOLLOWUPS]
     readme = root / "README.md"
     rt = readme.read_text()
-    rt = re.sub(r"(<!-- ac-list:start -->\n)(.*?)(<!-- ac-list:end -->)", lambda m: m.group(1) + "\n".join(items) + "\n" + m.group(3), rt, flags=re.S)
+    # A record's text links relative to docs/verification/; in the README, relative to the root.
+    rebased = [re.sub(r"\]\((?!https?:|#|docs/)(\.\./)?", lambda m: "](docs/" if m.group(1) else "](docs/verification/", i) for i in items]
+    rt = re.sub(r"(<!-- ac-list:start -->\n)(.*?)(<!-- ac-list:end -->)", lambda m: m.group(1) + "\n".join(rebased) + "\n" + m.group(3), rt, flags=re.S)
     rt = re.sub(r"Verified acceptance\ncriteria: \*\*[^*]+\*\*( · \*\*\d+\*\* partial)?", f"Verified acceptance\ncriteria: **{len(verified)} / {TOTAL}** · **{len(partials)}** partial", rt)
     rt = rt.replace("__VERIFIED__ / 41", f"{len(verified)} / {TOTAL}")
     rt = rt.replace("__UNVERIFIED__", ", ".join(f"AC-{n:02d}" for n in unverified))
