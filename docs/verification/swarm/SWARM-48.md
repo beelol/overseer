@@ -82,3 +82,17 @@ and director suites passed 4 + 11 + 19 + 11 tests with
 `git diff --check` passed. This proves local durable replay for this
 semantic rejection. Invalid revisions without a request ID and other repair
 error paths do not yet have this replay guarantee; SWARM-48 remains partial.
+
+Plan-validation replay follow-up at `aa2c6cd` (2026-09-27):
+`invalid_dependency_repair_request_replays_without_consuming_a_second_turn`
+submits a repair with an unknown dependency, loses its rejection reply, and
+replays the same request ID after restart. Before the change, that replay
+raised `failed_planning_turns` from 1 to 2. The validation-failure path now
+records a redacted, 256-character-bounded error with the request ID and
+failure count atomically. The identical replay leaves the count at 1; a
+distinct request ID raises it to 2 and stalls the run. The focused test
+failed then passed; the affected revision, plan, state, and director suites
+passed 5 + 11 + 19 + 11 tests. `git diff --check` passed.
+
+The no-ID path still treats repeated invalid submissions as distinct turns;
+other semantic repair errors and live director behavior remain unverified.
