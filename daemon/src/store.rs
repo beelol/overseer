@@ -1200,11 +1200,15 @@ impl Store {
         // in both that path and standalone metadata refreshes.
         self.conn.execute_batch("SAVEPOINT auto_identity")?;
         let result = (|| -> Result<bool> {
-            let previous: Option<(String, i64)> = self.conn.query_row(
-                "SELECT fingerprint,generation FROM auto_account_identity WHERE profile_id=?1",
-                params![profile_id], |row| Ok((row.get(0)?, row.get(1)?)),
+            let previous: Option<(String, i64, i64)> = self.conn.query_row(
+                "SELECT fingerprint,generation,observed_ms FROM auto_account_identity WHERE profile_id=?1",
+                params![profile_id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             ).optional()?;
-            let changed = previous.as_ref().is_some_and(|(old, _)| old != fingerprint);
+            let observed_ms = crate::daemon::now();
+            if previous.as_ref().is_some_and(|(_, _, prior_ms)| observed_ms < *prior_ms) {
+                return Err(anyhow!("Auto account observation is older than its recorded identity"));
+            }
+            let changed = previous.as_ref().is_some_and(|(old, _, _)| old != fingerprint);
             if changed {
                 // If the learning file is unavailable, retain a durable reset
                 // marker. Recovery clears stale account data before exposing it.
@@ -1230,7 +1234,7 @@ impl Store {
             }
             self.conn.execute(
                 "INSERT INTO auto_account_identity(profile_id,fingerprint,generation,observed_ms) VALUES(?1,?2,?3,?4) ON CONFLICT(profile_id) DO UPDATE SET fingerprint=excluded.fingerprint,generation=excluded.generation,observed_ms=excluded.observed_ms",
-                params![profile_id, fingerprint, previous.map(|(_, generation)| generation + i64::from(changed)).unwrap_or(1), crate::daemon::now()],
+                params![profile_id, fingerprint, previous.map(|(_, generation, _)| generation + i64::from(changed)).unwrap_or(1), observed_ms],
             )?;
             Ok(changed)
         })();
@@ -1400,7 +1404,9 @@ impl Store {
     // ---- allowlisted, account-scoped model discovery
     pub fn put_auto_model_catalog(&self, profile_id: &str, catalog: &crate::auto_route::ModelCatalog) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO auto_model_catalogs(profile_id,observed_ms,catalog) VALUES(?1,?2,?3) ON CONFLICT(profile_id) DO UPDATE SET observed_ms=excluded.observed_ms,catalog=excluded.catalog",
+            "INSERT INTO auto_model_catalogs(profile_id,observed_ms,catalog) VALUES(?1,?2,?3)
+             ON CONFLICT(profile_id) DO UPDATE SET observed_ms=excluded.observed_ms,catalog=excluded.catalog
+             WHERE excluded.observed_ms > auto_model_catalogs.observed_ms",
             params![profile_id, catalog.observed_ms, serde_json::to_string(catalog)?],
         )?;
         Ok(())
@@ -2852,6 +2858,40 @@ mod auto_measurement_tests {
         assert!(store.auto_daily_aggregates(10).unwrap().is_empty());
         assert!(store.auto_quotas(10).unwrap().is_empty());
         assert_eq!(store.events_after(0, Some("r-1"), 10).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn backward_clock_cannot_restore_an_older_account_identity() {
+        let store = Store::open(Path::new(":memory:")).unwrap();
+        let older = "a".repeat(64);
+        let current = "b".repeat(64);
+        assert!(!store.record_auto_account_identity("profile", &older).unwrap());
+        assert!(store.record_auto_account_identity("profile", &current).unwrap());
+        let current_pool = store.auto_account_pool_id("profile").unwrap();
+        // A later authenticated read completed before the wall clock moved
+        // backward. The next stale read must not restore the old account.
+        store.conn.execute("UPDATE auto_account_identity SET observed_ms=?1 WHERE profile_id='profile'",
+            [crate::daemon::now() + 60_000]).unwrap();
+        assert!(store.record_auto_account_identity("profile", &older).is_err());
+        assert_eq!(store.auto_account_generation("profile").unwrap(), Some(2));
+        assert_eq!(store.auto_account_pool_id("profile").unwrap(), current_pool);
+    }
+
+    #[test]
+    fn delayed_model_catalog_cannot_replace_newer_capabilities() {
+        let store = Store::open(Path::new(":memory:")).unwrap();
+        let catalog = |model: &str, at| crate::auto_route::parse_codex_catalog(
+            &json!({"data":[{"model":model,"isDefault":true,"hidden":false,
+                "defaultReasoningEffort":"medium",
+                "supportedReasoningEfforts":[{"reasoningEffort":"medium"}],
+                "inputModalities":["text"]}],"nextCursor":null}), at).unwrap();
+        let newer = catalog("gpt-6-sol", 2_000);
+        let older = catalog("gpt-5.5", 1_000);
+        store.put_auto_model_catalog("profile", &newer).unwrap();
+        store.put_auto_model_catalog("profile", &older).unwrap();
+        let saved = store.auto_model_catalog("profile").unwrap().unwrap();
+        assert_eq!(saved.observed_ms, 2_000);
+        assert_eq!(saved.models[0].model, "gpt-6-sol");
     }
 
     #[test]
