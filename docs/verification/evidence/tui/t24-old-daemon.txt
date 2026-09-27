@@ -1,0 +1,11 @@
+$ git rev-parse --short HEAD   # the TUI of pull request #6; code as at 47312f3
+356ad04
+$ python3 docs/verification/evidence/tui/t24-old-daemon.py <overseerd built from main at c3fe3b8, which has no Audio Mode> target/debug/overseer-tui
+ok    the daemon has no audio.get: 'unknown method audio.get'
+ok    an agent starts waiting while the TUI is attached
+ok    the window title says 1 needs you · 2 active
+ok    the notice names the agent
+ok    one bell beyond the title's terminators (5 bells, 4 titles)
+
+PASS
+exit=0
