@@ -54,6 +54,40 @@ fn admit(
 }
 
 #[test]
+fn audit_only_run_holds_native_worker_without_source_write_enforcement() {
+    let d = Daemon::start(&[]);
+    let at = now();
+    let snapshot = json!({"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+        "targets":[{"id":"claude-a","harness":"claude","profile_id":"approved-a",
+            "model":"test-model","account_id":"account-a","pool_ids":["pool-a"],
+            "capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool-a","windows":[{"id":"week","unit":"points",
+            "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+60000}]}]});
+    let create = |category: &str, permission: &str| d.call("swarm.create", json!({
+        "category":category,"objective":"Audit a local backend",
+        "allowed_targets":["claude-a"],"source_change_permission":permission}));
+    let audit = create("Audit scope", "none");
+    let write = create("Granted source change", "isolated");
+    for run in [&audit, &write] {
+        d.call("swarm.plan", json!({"id":run["id"],"generation":1,"revision":0,
+            "jobs":[{"id":"j1","title":"Inspect backend","acceptance":"Evidence",
+                "deps":[]}]}));
+    }
+    let request = |run: &Value, request_id: &str| json!({
+        "run_id":run["id"],"generation":1,"revision":1,"job_id":"j1",
+        "target_id":"claude-a","request_id":request_id,"snapshot":snapshot,
+        "now_ms":at,"required_capabilities":["code"],
+        "estimate_milli":{"points":1000},"purpose":"worker"});
+    let denied = d.call("swarm.admit", request(&audit,"audit-native"));
+    assert_eq!(denied["status"], "blocked", "{denied}");
+    assert_eq!(denied["reason"], "audit_source_boundary_unqualified");
+    assert_eq!(d.call("swarm.jobs",json!({"id":audit["id"]}))["jobs"][0]["status"], "ready");
+    let granted = d.call("swarm.admit", request(&write,"write-native"));
+    assert_eq!(granted["status"], "admitted", "{granted}");
+}
+
+#[test]
 fn one_run_freezes_allocation_and_dedupes_replayed_admission() {
     let d = Daemon::start(&[]);
     let id = setup(&d, "Backend admission", 3);

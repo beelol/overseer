@@ -214,6 +214,13 @@ fn admit_inner(
     ) {
         return Ok(blocked("uncontrolled_native_delegation"));
     }
+    // Fixture processes are isolated test inputs. No native Swarm execution
+    // path has yet proved an audit-only source-write boundary, even when it can
+    // disable native subagents. Do not reserve quota for one in an audit run.
+    if current["source_change_permission"] == "none" && candidate["harness"] != "generic"
+    {
+        return Ok(blocked("audit_source_boundary_unqualified"));
+    }
     if super::context::revoked_dependency(&tx, run, job, target)? {
         return Ok(blocked("artifact_permission_revoked"));
     }

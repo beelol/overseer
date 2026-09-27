@@ -293,6 +293,11 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
         if current["status"] != "running" && current["status"] != "planning" {
             bail!("swarm run is not launching workers");
         }
+        // Recheck the stored authority at process creation. An attempt admitted
+        // before this gate existed may still be pending after daemon restart.
+        if current["source_change_permission"] == "none" && harness != "generic" {
+            bail!("audit source boundary is unqualified for native worker {harness}");
+        }
         let admitted_route: Option<(Option<String>,Option<String>,Option<String>,Option<String>)> = store.conn.query_row(
             "SELECT target_harness,target_profile_id,target_model,target_effort FROM swarm_admissions
              WHERE attempt_id=?1 AND run_id=?2 AND job_id=?3",

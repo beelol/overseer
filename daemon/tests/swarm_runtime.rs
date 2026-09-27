@@ -126,7 +126,8 @@ fn admitted_target_harness_cannot_be_changed_at_worker_launch() {
     let temp = tmp();
     let checkout = repo(&temp.path().join("route-binding-source"));
     let run = d.call("swarm.create", json!({"category":"Route binding",
-        "objective":"Inspect backend","allowed_targets":["fixture-claude"]}));
+        "objective":"Inspect backend","allowed_targets":["fixture-claude"],
+        "source_change_permission":"isolated"}));
     let id = run["id"].as_str().unwrap();
     d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
         {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
@@ -157,6 +158,42 @@ fn admitted_target_harness_cannot_be_changed_at_worker_launch() {
 }
 
 #[test]
+fn previously_admitted_native_worker_cannot_launch_after_audit_scope_is_restored() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("legacy-audit-source"));
+    let run = d.call("swarm.create", json!({"category":"Legacy audit admission",
+        "objective":"Inspect backend","allowed_targets":["fixture-claude"],
+        "source_change_permission":"isolated"}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let at = now();
+    let admitted = d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"inspect","target_id":"fixture-claude","request_id":"old-admission",
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-claude","harness":"claude",
+                "profile_id":"system-claude","model":"sonnet","account_id":"fixture",
+                "pool_ids":["pool"],"capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(admitted["status"],"admitted","{admitted}");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute("UPDATE swarm_runs SET source_change_permission='none' WHERE id=?1",[id]).unwrap();
+    let error = d.try_call("swarm.worker.launch",json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "repo":checkout,"harness":"claude","args":[],
+        "prompt":"Inspect","title":"Unsafe old reservation"})).unwrap_err();
+    assert!(error.contains("audit source boundary"),"{error}");
+    let count: i64 = db.query_row("SELECT COUNT(*) FROM swarm_worker_launches WHERE attempt_id=?1",
+        [admitted["attempt_id"].as_str().unwrap()],|r|r.get(0)).unwrap();
+    assert_eq!(count,0,"unsafe launch must not write an intent");
+}
+
+#[test]
 fn admitted_profile_model_and_effort_cannot_be_changed_at_worker_launch() {
     let fixture_path = repo_root().join("fixtures/fake-harness/claude-fixture.js")
         .display().to_string();
@@ -164,7 +201,8 @@ fn admitted_profile_model_and_effort_cannot_be_changed_at_worker_launch() {
     let temp = tmp();
     let checkout = repo(&temp.path().join("route-options-source"));
     let run = d.call("swarm.create", json!({"category":"Route options",
-        "objective":"Inspect backend","allowed_targets":["claude-sonnet"]}));
+        "objective":"Inspect backend","allowed_targets":["claude-sonnet"],
+        "source_change_permission":"isolated"}));
     let id = run["id"].as_str().unwrap();
     d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
         {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
@@ -1164,7 +1202,8 @@ fn synthetic_claude_background_child_does_not_finish_swarm_attempt_at_launch_stu
     let temp = tmp();
     let checkout = repo(&temp.path().join("claude-background-source"));
     let run = d.call("swarm.create",json!({"category":"Synthetic child ordering",
-        "objective":"Inspect backend","allowed_targets":["fixture-claude"]}));
+        "objective":"Inspect backend","allowed_targets":["fixture-claude"],
+        "source_change_permission":"isolated"}));
     let id = run["id"].as_str().unwrap();
     d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
         {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
