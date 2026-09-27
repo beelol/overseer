@@ -13,6 +13,41 @@ fn now() -> i64 {
 }
 
 #[test]
+fn admitted_target_harness_cannot_be_changed_at_worker_launch() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("route-binding-source"));
+    let run = d.call("swarm.create", json!({"category":"Route binding",
+        "objective":"Inspect backend","allowed_targets":["fixture-claude"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
+    ]}));
+    let at = now();
+    let admitted = d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"inspect","target_id":"fixture-claude","request_id":"route-binding",
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-claude","harness":"claude","account_id":"fixture",
+                "pool_ids":["pool"],"capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(admitted["status"],"admitted", "{admitted}");
+    let wrong = json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "repo":checkout,"harness":"generic","program":"/bin/sleep","args":["30"],
+        "prompt":"Inspect","title":"Wrong harness"});
+    let error = d.try_call("swarm.worker.launch",wrong).unwrap_err();
+    assert!(error.contains("admitted target harness"), "{error}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let launch_count: i64 = db.query_row("SELECT COUNT(*) FROM swarm_worker_launches
+        WHERE attempt_id=?1",[admitted["attempt_id"].as_str().unwrap()],|row|row.get(0)).unwrap();
+    assert_eq!(launch_count,0,"wrong harness must not create a launch intent");
+    assert_eq!(d.call("swarm.jobs",json!({"id":id}))["jobs"][0]["status"],"reserved");
+}
+
+#[test]
 fn delivered_redirect_interrupts_a_long_running_worker_after_restart() {
     let mut d = Daemon::start(&[]);
     let temp = tmp();
@@ -962,7 +997,7 @@ fn synthetic_claude_background_child_does_not_finish_swarm_attempt_at_launch_stu
     let admitted = d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
         "job_id":"inspect","target_id":"fixture-claude","request_id":"recorded-claude-child",
         "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
-            "targets":[{"id":"fixture-claude","account_id":"fixture","pool_ids":["pool"],
+            "targets":[{"id":"fixture-claude","harness":"claude","account_id":"fixture","pool_ids":["pool"],
                 "capabilities":["code"],"health":"up","auth":"ok"}],
             "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
                 "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,

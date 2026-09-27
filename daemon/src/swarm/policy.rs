@@ -18,6 +18,8 @@ struct Snapshot {
 #[derive(Deserialize)]
 struct Target {
     id: String,
+    #[serde(default = "default_fixture_harness")]
+    harness: String,
     account_id: String,
     pool_ids: Vec<String>,
     capabilities: Vec<String>,
@@ -61,6 +63,7 @@ struct Request {
 
 fn default_allocation_percent() -> i64 { 10 }
 fn default_finishing_reserve_percent() -> i64 { 20 }
+fn default_fixture_harness() -> String { "generic".to_string() }
 
 pub fn preview(p: &Value) -> Result<Value> {
     let snapshot: Snapshot = serde_json::from_value(p["snapshot"].clone())
@@ -113,6 +116,11 @@ pub fn preview(p: &Value) -> Result<Value> {
             || !target_ids.insert(target.id.as_str())
         {
             bail!("duplicate or missing target identity");
+        }
+        if !["generic", "codex", "codex-app", "claude", "opencode"]
+            .contains(&target.harness.as_str())
+        {
+            bail!("invalid target harness");
         }
         if target.auth == "revoked" {
             revoked_accounts.insert(target.account_id.as_str());
@@ -235,7 +243,8 @@ pub fn preview(p: &Value) -> Result<Value> {
         }
         results.insert(
             target.id.clone(),
-            json!({"eligible":reason.is_none(),"reason":reason,"account_id":target.account_id,"windows":windows}),
+            json!({"eligible":reason.is_none(),"reason":reason,"account_id":target.account_id,
+                "harness":target.harness,"windows":windows}),
         );
     }
     let mut target_json = Map::new();

@@ -356,6 +356,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           job_id TEXT NOT NULL,
           attempt_id TEXT NOT NULL REFERENCES swarm_attempts(id),
           target_id TEXT NOT NULL,
+          target_harness TEXT,
           created_ms INTEGER NOT NULL,
           PRIMARY KEY(run_id,request_id)
         );
@@ -589,6 +590,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
             "ALTER TABLE swarm_jobs ADD COLUMN resource_claims TEXT NOT NULL DEFAULT '[]';",
         )?;
     }
+    let has_admitted_harness = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_admissions') WHERE name='target_harness'")?
+        .exists([])?;
+    if !has_admitted_harness {
+        // Historical rows lack a trustworthy route-to-harness binding. They
+        // cannot authorize a new worker process until reconciled.
+        conn.execute_batch("ALTER TABLE swarm_admissions ADD COLUMN target_harness TEXT;")?;
+    }
     let has_turn_applied_count = conn
         .prepare("SELECT 1 FROM pragma_table_info('swarm_director_turns') WHERE name='applied_count'")?
         .exists([])?;
@@ -614,6 +623,24 @@ pub fn migrate(conn: &Connection) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_admission_has_no_launchable_harness_binding_after_migration() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE swarm_admissions(
+            run_id TEXT NOT NULL,request_id TEXT NOT NULL,request_sha256 TEXT NOT NULL,
+            job_id TEXT NOT NULL,attempt_id TEXT NOT NULL,target_id TEXT NOT NULL,
+            created_ms INTEGER NOT NULL,PRIMARY KEY(run_id,request_id));
+            INSERT INTO swarm_admissions VALUES('run','request','hash','job','attempt','target',1);")
+            .unwrap();
+        migrate(&conn).unwrap();
+        let binding: Option<String> = conn.query_row(
+            "SELECT target_harness FROM swarm_admissions WHERE request_id='request'",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(binding,None);
+        migrate(&conn).unwrap();
+    }
 
     #[test]
     fn old_worker_intent_migrates_only_unlinked_rows_to_proven_no_spawn() {

@@ -282,6 +282,14 @@ pub(super) fn launch_worker_locked(d: &Arc<Daemon>, p: &Value) -> Result<Value> 
         if current["status"] != "running" && current["status"] != "planning" {
             bail!("swarm run is not launching workers");
         }
+        let admitted_harness: Option<String> = store.conn.query_row(
+            "SELECT target_harness FROM swarm_admissions
+             WHERE attempt_id=?1 AND run_id=?2 AND job_id=?3",
+            params![attempt,run,job], |row| row.get(0),
+        ).optional()?.flatten();
+        if admitted_harness.as_deref() != Some(harness) {
+            bail!("worker harness does not match admitted target harness");
+        }
         let eligible: bool = store.conn.prepare(
             "SELECT 1 FROM swarm_admissions a JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
              JOIN swarm_attempts t ON t.id=a.attempt_id AND t.status='registered'

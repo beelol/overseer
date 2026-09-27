@@ -501,8 +501,11 @@ fn admit_inner(
         tx.execute("INSERT INTO swarm_reservations(attempt_id,run_id,pool_id,window_id,unit,amount_milli,status,created_ms) VALUES(?1,?2,?3,?4,?5,?6,'active',?7)",
             params![attempt_id,run,pool,window_id,unit,estimate,now])?;
     }
-    tx.execute("INSERT INTO swarm_admissions(run_id,request_id,request_sha256,job_id,attempt_id,target_id,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7)",
-        params![run,request_id,request_hash,job,attempt_id,target,now])?;
+    let target_harness = candidate["harness"]
+        .as_str()
+        .ok_or_else(|| anyhow!("qualified target has no harness"))?;
+    tx.execute("INSERT INTO swarm_admissions(run_id,request_id,request_sha256,job_id,attempt_id,target_id,target_harness,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+        params![run,request_id,request_hash,job,attempt_id,target,target_harness,now])?;
     if let Some(commit) = scheduled {
         tx.execute("INSERT INTO swarm_scheduler_admissions(request_id,request_sha256,run_id,job_id,attempt_id,target_id,created_ms)
             VALUES(?1,?2,?3,?4,?5,?6,?7)",

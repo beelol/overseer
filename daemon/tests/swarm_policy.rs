@@ -30,6 +30,22 @@ fn preview(d: &Daemon, snapshot: Value, allowed: &[&str], estimate: i64, finishi
 }
 
 #[test]
+fn preview_preserves_admitted_harness_identity_and_rejects_unknown_harness() {
+    let d = Daemon::start(&[]);
+    let mut target_snapshot = snapshot(Some(60000), true);
+    target_snapshot["targets"][1]["harness"] = json!("claude");
+    let result = preview(&d, target_snapshot.clone(), &["qualified"], 1000, 0);
+    assert_eq!(result["targets"]["qualified"]["harness"], "claude");
+    assert_eq!(result["targets"]["cheap"]["harness"], "generic");
+    target_snapshot["targets"][1]["harness"] = json!("unknown");
+    let error = d.try_call("swarm.policy.preview",json!({"snapshot":target_snapshot,
+        "request":{"now_ms":1200,"allowed_targets":["qualified"],
+            "required_capabilities":["write"],"purpose":"worker",
+            "estimate_milli":{"points":1000}}})).unwrap_err();
+    assert!(error.contains("invalid target harness"), "{error}");
+}
+
+#[test]
 fn policy_uses_capability_allowed_pool_and_finishing_headroom() {
     let d = Daemon::start(&[]);
     let result = preview(
