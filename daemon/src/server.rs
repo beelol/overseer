@@ -1365,6 +1365,13 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 || store.auto_learning_is_paused()?;
             json!({"measurements": rows, "learning_paused": paused})
         }
+        "auto.usage.work.list" => {
+            let store = d.store.lock().unwrap();
+            let rows = store.auto_work_observations(p["limit"].as_i64().unwrap_or(100).clamp(1, 5000))?;
+            let paused = d.learning_paused.load(std::sync::atomic::Ordering::Relaxed)
+                || store.auto_learning_is_paused()?;
+            json!({"work_units":rows,"learning_paused":paused})
+        }
         "auto.usage.thread.refresh" => {
             let run = d.run(s(p, "run_id")?)?;
             if run.harness != "codex-app" || run.status != "completed" {
@@ -1425,6 +1432,9 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let id = store.insert_auto_thread_usage(&run.id, profile_id, generation, "codex-app/account-usage-read", &estimate)?;
                 Some(json!({"id":id,"run_id":run.id,"profile_id":profile_id,"read_account_generation":generation,"attribution":attribution,"subscription_window_relation":"unverified","source":"codex-app/account-usage-read","estimate":estimate}))
             } else { None };
+            if store.refresh_auto_work_observation(&run.id).is_err() {
+                d.learning_paused.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
             json!({"state":if observation.is_some() {"estimated"} else {"unavailable"},
                 "observation":observation,"allowance_delta":allowance_delta})
         }
@@ -1447,12 +1457,14 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let rows = store.auto_measurements(50_000)?;
             let aggregates = store.auto_daily_aggregates(10_000)?;
             let thread_usage_observations = store.auto_thread_usage_observations(5000)?;
+            let work_units = store.auto_work_observations(5000)?;
             drop(store);
             let mut file = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(path)?;
             let result = serde_json::to_writer_pretty(&mut file, &json!({
-                "schema_version": 2, "generated_ms": crate::daemon::now(),
+                "schema_version": 3, "generated_ms": crate::daemon::now(),
                 "measurements": rows, "aggregates": aggregates,
                 "thread_usage_observations": thread_usage_observations,
+                "work_units": work_units,
                 "note": "Local usage observations and daily summaries; missing fields are unknown, not zero."
             })).and_then(|_| file.write_all(b"\n").map_err(serde_json::Error::io));
             if let Err(error) = result {

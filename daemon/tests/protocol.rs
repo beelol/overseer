@@ -1775,16 +1775,17 @@ fn auto_dispatch_continues_during_local_learning_write_pressure_and_recovers() {
     let repo = repo(&r.path().join("repo"));
     let trace = r.path().join("auto-learning-pressure-trace.txt");
     let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
-        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_EMIT_USAGE"),
-        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap()),
-        ("FIXTURE_EMIT_USAGE", "1")]);
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
     let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
         "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
-    assert_eq!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().len(), 1);
+    assert!(d.call("auto.usage.list", json!({}))["measurements"].as_array().unwrap().is_empty());
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite.learning")).unwrap();
     db.execute_batch("CREATE TRIGGER learning_capacity_full BEFORE INSERT ON auto_measurements
-        BEGIN SELECT RAISE(FAIL, 'simulated local learning capacity full'); END;").unwrap();
+        BEGIN SELECT RAISE(FAIL, 'simulated local learning capacity full'); END;
+        CREATE TRIGGER work_capacity_full BEFORE INSERT ON auto_work_observations
+        BEGIN SELECT RAISE(FAIL, 'simulated work learning capacity full'); END;").unwrap();
     let first = d.call("auto.dispatch", json!({"work_unit_id":"learning-pressure-1",
         "parent_run_id":parent,"min_tier":"general","required_tools":[],"prompt":"browser check"}));
     assert_eq!(first["state"], "dispatched", "{first}");
@@ -1793,9 +1794,11 @@ fn auto_dispatch_continues_during_local_learning_write_pressure_and_recovers() {
     assert_eq!(d.call("run.result", json!({"run_id":first_child}))["state"], "ready");
     let paused = d.call("auto.usage.list", json!({}));
     assert_eq!(paused["learning_paused"], true);
-    assert_eq!(paused["measurements"].as_array().unwrap().len(), 1,
+    assert_eq!(paused["measurements"].as_array().unwrap().len(), 0,
         "failed learning write must not leave a partial sample");
-    db.execute_batch("DROP TRIGGER learning_capacity_full;").unwrap();
+    assert!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().is_empty(),
+        "failed work learning must not leave a partial row");
+    db.execute_batch("DROP TRIGGER learning_capacity_full; DROP TRIGGER work_capacity_full;").unwrap();
     let second = d.call("auto.dispatch", json!({"work_unit_id":"learning-pressure-2",
         "parent_run_id":parent,"min_tier":"general","required_tools":[],"prompt":"another bounded child"}));
     assert_eq!(second["state"], "dispatched", "{second}");
@@ -1803,7 +1806,11 @@ fn auto_dispatch_continues_during_local_learning_write_pressure_and_recovers() {
     assert_eq!(d.wait_done(&second_child, 15)["status"], "completed");
     let recovered = d.call("auto.usage.list", json!({}));
     assert_eq!(recovered["learning_paused"], false);
-    assert_eq!(recovered["measurements"].as_array().unwrap().len(), 2);
+    assert_eq!(recovered["measurements"].as_array().unwrap().len(), 0,
+        "recovery must be observed from the work write alone");
+    let work = d.call("auto.usage.work.list", json!({}));
+    assert_eq!(work["work_units"].as_array().unwrap().len(), 1);
+    assert_eq!(work["work_units"][0]["work_unit_id"], "learning-pressure-2");
     assert_eq!(d.runs().len(), 3);
     assert_eq!(d.events(&parent).into_iter().filter(|event| event["kind"] == "auto_decision").count(), 2);
     assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 2,
@@ -1922,6 +1929,113 @@ fn auto_managed_codex_quota_reads_are_linked_to_the_child_without_raw_response()
 }
 
 #[test]
+fn auto_work_history_links_actual_usage_outcome_and_quota_without_content() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_EMIT_USAGE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_EMIT_USAGE", "1")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"private-parent-sentinel"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let selected = d.call("auto.dispatch", json!({"work_unit_id":"measured-browser-unit",
+        "parent_run_id":parent,"min_tier":"general","required_tools":["browser/navigate"],
+        "prompt":"private-browser-sentinel"}));
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    let child = run_id(&selected);
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    let _ = d.call("auto.usage.thread.refresh", json!({"run_id":child}));
+    let history = d.call("auto.usage.work.list", json!({"limit":10}));
+    let rows = history["work_units"].as_array().unwrap();
+    assert_eq!(rows.len(), 1, "{history}");
+    let work = &rows[0];
+    assert_eq!(work["work_unit_id"], "measured-browser-unit");
+    assert_eq!(work["run_id"], child);
+    assert_eq!(work["model"], "gpt-6-sol");
+    assert_eq!(work["effort"], "medium");
+    assert_eq!(work["status"], "completed");
+    assert_eq!(work["usage"]["input_tokens"], 42);
+    assert_eq!(work["usage"]["output_tokens"], 7);
+    assert_eq!(work["quota_before"]["source"], "codex-app/managed-pre-turn");
+    assert_eq!(work["quota_after"]["source"], "codex-app/metadata-read");
+    assert_eq!(work["subscription_window_draw"], "unverified");
+    assert!(work["execution_ms"].as_i64().unwrap() >= 0);
+    assert!(work["launch_overhead_ms"].as_i64().unwrap() >= 0);
+    let serialized = history.to_string();
+    assert!(!serialized.contains("private-parent-sentinel"));
+    assert!(!serialized.contains("private-browser-sentinel"));
+    assert!(!serialized.contains("secret-credit-sentinel"));
+    let export_path = r.path().join("work-observations.json");
+    d.call("auto.usage.export", json!({"path":export_path}));
+    let exported = std::fs::read_to_string(&export_path).unwrap();
+    assert!(exported.contains("\"work_units\""));
+    assert!(exported.contains("measured-browser-unit"));
+    assert!(!exported.contains("private-browser-sentinel"));
+    assert!(!exported.contains("private-parent-sentinel"));
+    d.call("auto.usage.clear", json!({}));
+    assert!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().is_empty());
+    d.kill9();
+    d.spawn();
+    assert!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().is_empty(),
+        "cleared work learning must not regenerate from retained execution history");
+    assert_eq!(d.run(&child)["status"], "completed");
+}
+
+#[test]
+fn auto_work_history_preserves_missing_usage_as_unknown() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let child = run_id(&d.call("auto.dispatch", json!({"work_unit_id":"no-usage-unit",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "prompt":"bounded work"})));
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    let rows = d.call("auto.usage.work.list", json!({}));
+    assert_eq!(rows["work_units"].as_array().unwrap().len(), 1, "{rows}");
+    assert_eq!(rows["work_units"][0]["usage_observations"], 0);
+    assert!(rows["work_units"][0]["usage"].is_null());
+    assert_eq!(rows["work_units"][0]["subscription_window_draw"], "unverified");
+}
+
+#[test]
+fn auto_work_history_does_not_reappear_after_account_changes_during_child() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let account_file = r.path().join("account-id.txt");
+    std::fs::write(&account_file, "account-A").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_ACCOUNT_ID_FILE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_ACCOUNT_ID_FILE", account_file.to_str().unwrap()),
+        ("FIXTURE_TURN_DELAY_MS", "6000")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let selected = d.call("auto.dispatch", json!({"work_unit_id":"account-changes-mid-child",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],"prompt":"browser check"}));
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    let child = run_id(&selected);
+    d.wait_status(&child, |status| status == "running", 10);
+    let profile_id = selected["run"]["profile_id"].as_str().unwrap();
+    let workspace_id = selected["workspace"]["id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let generation = || -> i64 { db.query_row(
+        "SELECT generation FROM auto_account_identity WHERE profile_id=?1",
+        [profile_id], |row| row.get(0)).unwrap() };
+    let prior_generation = generation();
+    std::fs::write(&account_file, "account-B").unwrap();
+    d.call("auto.tools.inspect", json!({"profile_id":profile_id,"workspace_id":workspace_id}));
+    assert!(generation() > prior_generation, "metadata read must observe the new login while the child is active");
+    assert_eq!(d.wait_done(&child, 15)["status"], "completed");
+    assert!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().is_empty(),
+        "a settled child must not recreate prior-account learning");
+}
+
+#[test]
 fn auto_managed_child_has_an_isolated_parent_snapshot_and_returnable_result() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
@@ -1983,9 +2097,12 @@ fn auto_managed_child_has_an_isolated_parent_snapshot_and_returnable_result() {
     assert!(approvals.len() >= 2 && approvals.iter().all(|approval| *approval == "thread_approval:never"),
         "the managed child must inherit the parent's approval ceiling: {approvals:?}");
     assert_eq!(d.runs().len(), 2);
+    assert_eq!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().len(), 1);
     std::fs::write(&account_file, "account-B").unwrap();
     let switched = d.call("auto.usage.thread.refresh", json!({"run_id":child}));
     assert_eq!(switched["observation"]["attribution"], "unverified_run_account");
+    assert!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().is_empty(),
+        "a changed login must invalidate prior account-scoped work learning");
     assert_eq!(d.call("auto.usage.thread.list", json!({}))["observations"].as_array().unwrap().len(), 1,
         "an account switch must remove the old account's estimate");
     d.call("auto.usage.clear", json!({}));
@@ -2747,6 +2864,12 @@ fn auto_ordinary_child_failure_stays_failed_until_the_user_requests_new_work() {
     assert_eq!(dispatched["run"]["harness"], "claude");
     let child = run_id(&dispatched);
     assert_eq!(d.wait_done(&child, 15)["status"], "failed");
+    let observations = d.call("auto.usage.work.list", json!({}));
+    let failed = observations["work_units"].as_array().unwrap().iter()
+        .find(|row| row["run_id"] == child).unwrap();
+    assert_eq!(failed["status"], "failed", "failed work must remain in local outcome learning");
+    assert_eq!(failed["subscription_window_draw"], "unverified",
+        "failed work's token activity is not a subscription charge");
     assert_eq!(d.call("run.result", json!({"run_id":child}))["state"], "not_completed");
     assert!(d.events(&child).iter().any(|event|
         event["kind"] == "error" && event["payload"]["class"] == "other"));

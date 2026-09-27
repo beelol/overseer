@@ -186,7 +186,7 @@ impl Store {
         };
         let mut store = Self { conn, learning_conn, learning_persistent };
         store.migrate_main()?;
-        if store.migrate_learning().is_err() {
+        if store.migrate_learning().and_then(|_| store.prune_auto_work_observations(crate::daemon::now(), 5000).map(|_| ())).is_err() {
             store.learning_conn = Connection::open_in_memory()?;
             store.learning_persistent = false;
             store.migrate_learning()?;
@@ -386,6 +386,13 @@ impl Store {
               attribution TEXT NOT NULL, observed_ms INTEGER NOT NULL,
               source TEXT NOT NULL, estimate TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS auto_thread_usage_observed ON auto_thread_usage_observations(observed_ms);
+            CREATE TABLE IF NOT EXISTS auto_work_observations(
+              work_unit_id TEXT PRIMARY KEY, run_id TEXT NOT NULL,
+              profile_id TEXT, observed_ms INTEGER NOT NULL, record TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS auto_work_observations_recent
+              ON auto_work_observations(observed_ms,work_unit_id);
+            CREATE INDEX IF NOT EXISTS auto_measurements_run_observed
+              ON auto_measurements(run_id,observed_ms);
         "#)?;
         if !self.learning_persistent { return Ok(()); }
         if self.learning_reset_pending()? {
@@ -393,6 +400,7 @@ impl Store {
             tx.execute("DELETE FROM auto_measurements", [])?;
             tx.execute("DELETE FROM auto_daily_aggregates", [])?;
             tx.execute("DELETE FROM auto_thread_usage_observations", [])?;
+            tx.execute("DELETE FROM auto_work_observations", [])?;
             tx.execute("DELETE FROM meta WHERE key='auto_learning_samples_inserted'", [])?;
             tx.commit()?;
             let tx = self.conn.unchecked_transaction()?;
@@ -981,6 +989,7 @@ impl Store {
                         tx.execute("DELETE FROM auto_measurements WHERE profile_id=?1", params![profile_id])?;
                         tx.execute("DELETE FROM auto_daily_aggregates WHERE profile_id=?1", params![profile_id])?;
                         tx.execute("DELETE FROM auto_thread_usage_observations WHERE profile_id=?1", params![profile_id])?;
+                        tx.execute("DELETE FROM auto_work_observations WHERE profile_id=?1", params![profile_id])?;
                         tx.commit()?;
                         Ok(())
                     })();
@@ -1313,6 +1322,168 @@ impl Store {
         Ok(rows)
     }
 
+    /// Build a content-free record from execution and normalized meter rows.
+    /// A later metadata read may update an existing record, but may not
+    /// recreate history after the user has cleared learning.
+    fn auto_work_observation(&self, run_id: &str) -> Result<Option<(String, Option<String>, i64, Value)>> {
+        let Some(run) = self.run(run_id)? else { return Ok(None); };
+        let work: Option<(String, Option<i64>, Option<i64>, Option<String>)> = self.conn.query_row(
+            "SELECT m.work_unit_id,i.created_ms,i.account_generation,c.pool_id
+             FROM managed_work_units m
+             LEFT JOIN auto_launch_intents i ON i.work_unit_id=m.work_unit_id
+             LEFT JOIN auto_pool_claims c ON c.work_unit_id=m.work_unit_id
+             WHERE m.child_run_id=?1", [run_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        ).optional()?;
+        let Some((work_unit_id, intent_ms, account_generation, pool_id)) = work else {
+            return Ok(None);
+        };
+        // An account switch invalidates the old account's learning. An Auto
+        // child can still finish after that switch, so its launch generation
+        // must match the account currently attached to the selected profile.
+        if let Some(expected) = account_generation {
+            let Some(profile_id) = run.profile_id.as_deref() else { return Ok(None); };
+            if self.auto_account_generation(profile_id)? != Some(expected) {
+                return Ok(None);
+            }
+        }
+        let Some(ended_ms) = run.ended_ms else { return Ok(None); };
+        let started_ms: Option<i64> = self.conn.query_row(
+            "SELECT MIN(started_ms) FROM turns WHERE run_id=?1", [run_id], |row| row.get(0))?;
+        let quota_ref = |source: &str| -> Result<Option<Value>> {
+            let row: Option<(i64, i64, String)> = self.conn.query_row(
+                "SELECT q.event_seq,q.observed_ms,q.snapshot FROM auto_quota_observations q
+                 JOIN events e ON e.seq=q.event_seq
+                 WHERE e.run_id=?1 AND q.source=?2
+                 ORDER BY q.observed_ms DESC,q.event_seq DESC LIMIT 1",
+                params![run_id, source], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            ).optional()?;
+            row.map(|(event_seq, observed_ms, encoded)| -> Result<Value> {
+                let snapshot: QuotaSnapshot = serde_json::from_str(&encoded)?;
+                Ok(serde_json::json!({"event_seq":event_seq,"source":source,
+                    "observed_ms":observed_ms,"expires_ms":snapshot.expires_ms,
+                    "plan_type":snapshot.reported_plan_type(),
+                    "windows":snapshot.windows.iter().map(|window| serde_json::json!({
+                        "bucket_id":window.bucket_id,"window":window.window,
+                        "model":window.model,"model_family":window.model_family,
+                        "reset_ms":window.reset_ms})).collect::<Vec<_>>() }))
+            }).transpose()
+        };
+        let quota_before = quota_ref("codex-app/managed-pre-turn")?;
+        let quota_after = quota_ref("codex-app/metadata-read")?;
+        let usage_count: i64 = self.learning_conn.query_row(
+            "SELECT COUNT(*) FROM auto_measurements WHERE run_id=?1", [run_id], |row| row.get(0))?;
+        let usage: Option<Value> = if usage_count == 1 {
+            self.learning_conn.query_row(
+                "SELECT observed_ms,input_tokens,output_tokens,cached_input_tokens,
+                        reasoning_output_tokens,cost_usd FROM auto_measurements WHERE run_id=?1",
+                [run_id], |row| Ok(serde_json::json!({"observed_ms":row.get::<_,i64>(0)?,
+                    "input_tokens":row.get::<_,Option<i64>>(1)?,
+                    "output_tokens":row.get::<_,Option<i64>>(2)?,
+                    "cached_input_tokens":row.get::<_,Option<i64>>(3)?,
+                    "reasoning_output_tokens":row.get::<_,Option<i64>>(4)?,
+                    "cost_usd":row.get::<_,Option<f64>>(5)?})),
+            ).optional()?
+        } else { None };
+        let record = serde_json::json!({
+            "work_unit_id":work_unit_id,"run_id":run.id,"harness":run.harness,
+            "harness_version":run.harness_version,"profile_id":run.profile_id,
+            "pool_id":pool_id,"account_generation":account_generation,
+            "model":run.model,"effort":run.effort,"status":run.status,
+            "started_ms":started_ms,"ended_ms":ended_ms,
+            "launch_overhead_ms":intent_ms.zip(started_ms).and_then(|(intent, start)|
+                start.checked_sub(intent).filter(|value| *value >= 0)),
+            "execution_ms":started_ms.and_then(|start|
+                ended_ms.checked_sub(start).filter(|value| *value >= 0)),
+            "quota_before":quota_before,"quota_after":quota_after,
+            "usage_observations":usage_count,"usage":usage,
+            "usage_semantics":"single_harness_observation_only",
+            "subscription_window_draw":"unverified"
+        });
+        Ok(Some((work_unit_id, run.profile_id, ended_ms, record)))
+    }
+
+    pub fn record_auto_work_observation(&self, run_id: &str) -> Result<bool> {
+        if !self.learning_persistent || self.learning_reset_pending()? {
+            return Err(anyhow!("Auto learning storage unavailable"));
+        }
+        let Some((work_unit_id, profile_id, observed_ms, record)) = self.auto_work_observation(run_id)? else {
+            return Ok(false);
+        };
+        self.learning_conn.execute_batch("SAVEPOINT auto_work_measurement_write")?;
+        let write = (|| -> Result<bool> {
+        let inserted = self.learning_conn.execute(
+            "INSERT OR IGNORE INTO auto_work_observations(work_unit_id,run_id,profile_id,observed_ms,record)
+             VALUES(?1,?2,?3,?4,?5)",
+            params![work_unit_id,run_id,profile_id,observed_ms,record.to_string()])?;
+        if inserted == 1 {
+            self.prune_auto_work_observations(crate::daemon::now(), 5000)?;
+        }
+        Ok(inserted == 1)
+        })();
+        match write {
+            Ok(inserted) => {
+                self.learning_conn.execute_batch("RELEASE auto_work_measurement_write")?;
+                Ok(inserted)
+            }
+            Err(error) => {
+                let _ = self.learning_conn.execute_batch(
+                    "ROLLBACK TO auto_work_measurement_write; RELEASE auto_work_measurement_write");
+                Err(error)
+            }
+        }
+    }
+
+    pub fn refresh_auto_work_observation(&self, run_id: &str) -> Result<()> {
+        if !self.learning_persistent || self.learning_reset_pending()? {
+            return Err(anyhow!("Auto learning storage unavailable"));
+        }
+        let existing: bool = self.learning_conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM auto_work_observations WHERE run_id=?1)",
+            [run_id], |row| row.get(0))?;
+        if !existing { return Ok(()); }
+        if let Some((work_unit_id, _, _, record)) = self.auto_work_observation(run_id)? {
+            self.learning_conn.execute("UPDATE auto_work_observations SET record=?2 WHERE work_unit_id=?1",
+                params![work_unit_id,record.to_string()])?;
+        }
+        Ok(())
+    }
+
+    pub fn auto_work_observations(&self, limit: i64) -> Result<Vec<Value>> {
+        if self.learning_reset_pending()? { return Ok(Vec::new()); }
+        self.prune_auto_work_observations(crate::daemon::now(), 5000)?;
+        let mut stmt = self.learning_conn.prepare(
+            "SELECT record FROM auto_work_observations ORDER BY observed_ms DESC,work_unit_id DESC LIMIT ?1")?;
+        let rows = stmt.query_map([limit.clamp(1, 5000)], |row| {
+            let encoded: String = row.get(0)?;
+            serde_json::from_str::<Value>(&encoded).map_err(|error|
+                rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(error)))
+        })?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    /// Work-level learning has the same 30-day detail horizon and an exact
+    /// 5,000-row cap. Indexed cutoff deletion keeps maintenance bounded.
+    pub fn prune_auto_work_observations(&self, now_ms: i64, cap: i64) -> Result<usize> {
+        const THIRTY_DAYS_MS: i64 = 30 * 86_400_000;
+        let expired = self.learning_conn.execute(
+            "DELETE FROM auto_work_observations WHERE observed_ms < ?1",
+            [now_ms.saturating_sub(THIRTY_DAYS_MS)])?;
+        let cutoff: Option<(i64, String)> = self.learning_conn.query_row(
+            "SELECT observed_ms,work_unit_id FROM auto_work_observations
+             ORDER BY observed_ms DESC,work_unit_id DESC LIMIT 1 OFFSET ?1",
+            [cap.clamp(1, 5000)], |row| Ok((row.get(0)?, row.get(1)?)),
+        ).optional()?;
+        let over_cap = match cutoff {
+            Some((observed_ms, work_unit_id)) => self.learning_conn.execute(
+                "DELETE FROM auto_work_observations WHERE observed_ms < ?1
+                 OR (observed_ms=?1 AND work_unit_id<=?2)",
+                params![observed_ms,work_unit_id])?,
+            None => 0,
+        };
+        Ok(expired + over_cap)
+    }
+
     /// Keep detailed observations for 30 days and at most 50,000 rows. A caller
     /// may pass a lower cap for bounded fixture verification.
     pub fn prune_auto_measurements(&self, now_ms: i64, cap: i64) -> Result<usize> {
@@ -1392,6 +1563,7 @@ impl Store {
         let deleted = tx.execute("DELETE FROM auto_measurements", [])?;
         tx.execute("DELETE FROM auto_daily_aggregates", [])?;
         tx.execute("DELETE FROM auto_thread_usage_observations", [])?;
+        tx.execute("DELETE FROM auto_work_observations", [])?;
         tx.execute("DELETE FROM meta WHERE key='auto_learning_samples_inserted'", [])?;
         tx.commit()?;
         self.conn.execute("DELETE FROM auto_run_account_evidence", [])?;
@@ -1473,6 +1645,56 @@ impl Store {
 #[cfg(test)]
 mod schema_migration_tests {
     use super::*;
+
+    #[test]
+    fn work_learning_uses_fake_clock_expiry_and_exact_row_cap() {
+        let store = Store::open(Path::new(":memory:")).unwrap();
+        let now = 1_800_000_000_000_i64;
+        for (id, observed) in [
+            ("expired", now - 31 * 86_400_000),
+            ("older", now - 5_000),
+            ("middle", now - 3_000),
+            ("newest", now - 1_000),
+        ] {
+            store.learning_conn.execute(
+                "INSERT INTO auto_work_observations(work_unit_id,run_id,profile_id,observed_ms,record)
+                 VALUES(?1,?2,'profile',?3,?4)",
+                params![id,id,observed,serde_json::json!({"work_unit_id":id}).to_string()],
+            ).unwrap();
+        }
+        assert_eq!(store.prune_auto_work_observations(now, 2).unwrap(), 2);
+        let rows = store.auto_work_observations(10).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0]["work_unit_id"], "newest");
+        assert_eq!(rows[1]["work_unit_id"], "middle");
+    }
+
+    #[test]
+    fn work_history_read_expires_rows_without_a_new_work_unit_and_reopen_prunes_disk() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let store = Store::open(&path).unwrap();
+        let expired = crate::daemon::now() - 31 * 86_400_000;
+        store.learning_conn.execute(
+            "INSERT INTO auto_work_observations(work_unit_id,run_id,profile_id,observed_ms,record)
+             VALUES('old','old','profile',?1,'{\"work_unit_id\":\"old\"}')",
+            [expired],
+        ).unwrap();
+        assert!(store.auto_work_observations(10).unwrap().is_empty());
+        let remaining: i64 = store.learning_conn.query_row(
+            "SELECT COUNT(*) FROM auto_work_observations", [], |row| row.get(0)).unwrap();
+        assert_eq!(remaining, 0, "a read must remove expired rows from disk");
+        store.learning_conn.execute(
+            "INSERT INTO auto_work_observations(work_unit_id,run_id,profile_id,observed_ms,record)
+             VALUES('old','old','profile',?1,'{\"work_unit_id\":\"old\"}')",
+            [expired],
+        ).unwrap();
+        drop(store);
+        let reopened = Store::open(&path).unwrap();
+        let remaining: i64 = reopened.learning_conn.query_row(
+            "SELECT COUNT(*) FROM auto_work_observations", [], |row| row.get(0)).unwrap();
+        assert_eq!(remaining, 0, "startup must enforce retention even without a read");
+    }
 
     #[test]
     fn oversized_existing_learning_database_pauses_learning_without_stopping_execution() {

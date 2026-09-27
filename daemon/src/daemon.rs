@@ -2025,6 +2025,15 @@ impl Daemon {
         for e in emitted {
             let _ = self.events.send(e);
         }
+        if run.relation_source.as_deref() == Some("managed-delegation")
+            && matches!(status, "completed" | "failed" | "interrupted") {
+            let recorded = self.store.lock().unwrap().record_auto_work_observation(&run.id);
+            match recorded {
+                Ok(true) => self.learning_paused.store(false, std::sync::atomic::Ordering::Relaxed),
+                Err(_) => self.learning_paused.store(true, std::sync::atomic::Ordering::Relaxed),
+                Ok(false) => {}
+            }
+        }
         Ok(())
     }
 
