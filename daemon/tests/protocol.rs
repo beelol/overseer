@@ -2345,6 +2345,7 @@ fn auto_work_history_links_actual_usage_outcome_and_quota_without_content() {
     assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
     let selected = d.call("auto.dispatch", json!({"work_unit_id":"measured-browser-unit",
         "parent_run_id":parent,"min_tier":"general","required_tools":["browser/navigate"],
+        "task_class":"browser_check","execution_budget_ms":12000,
         "prompt":"private-browser-sentinel"}));
     assert_eq!(selected["state"], "dispatched", "{selected}");
     let child = run_id(&selected);
@@ -2364,6 +2365,8 @@ fn auto_work_history_links_actual_usage_outcome_and_quota_without_content() {
     assert_eq!(work["task_requirements"]["context_needed"], 0);
     assert_eq!(work["task_requirements"]["requires_approvals"], false);
     assert_eq!(work["task_requirements"]["sandbox"], "workspace_write");
+    assert_eq!(work["task_requirements"]["task_class"], "browser_check");
+    assert_eq!(work["task_requirements"]["execution_budget_ms"], 12000);
     assert_eq!(work["task_requirements"]["source"], "auto_decision");
     assert_eq!(work["usage"]["input_tokens"], 42);
     assert_eq!(work["usage"]["output_tokens"], 7);
@@ -3254,6 +3257,7 @@ fn auto_dispatch_selects_managed_children_for_different_healthy_work_units_and_p
         ("unsupported-profile", json!({"profile_id":"another-account"})),
         ("unsupported-pool", json!({"allowed_profiles":["another-account"]})),
         ("unsupported-model", json!({"model":"gpt-6-astra"})),
+        ("private-task-label", json!({"task_class":"private-user-secret-sentinel"})),
     ] {
         let mut invalid = json!({"work_unit_id":unit,"parent_run_id":parent,
             "min_tier":"general","required_tools":[],"prompt":"browser check"});

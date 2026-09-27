@@ -1409,6 +1409,8 @@ impl Store {
                 "required_tools":work.required_tools, "context_needed":work.context_needed,
                 "requires_approvals":work.requires_approvals,
                 "sandbox":work.min_sandbox,
+                "task_class":work.task_class,
+                "execution_budget_ms":work.execution_budget_ms,
             }));
         let started_ms: Option<i64> = self.conn.query_row(
             "SELECT MIN(started_ms) FROM turns WHERE run_id=?1", [run_id], |row| row.get(0))?;

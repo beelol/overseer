@@ -678,7 +678,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 if !matches!(field.as_str(), "work_unit_id" | "parent_run_id" | "prompt" | "title"
                     | "min_tier" | "required_tools" | "context_needed" | "requires_approvals"
                     | "pinned_route" | "preferred_harness" | "allowed_profiles" | "sandbox"
-                    | "execution_budget_ms") {
+                    | "execution_budget_ms" | "task_class") {
                     return Err(anyhow!("unsupported automatic work constraint: {field}"));
                 }
             }
@@ -725,6 +725,15 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 None => crate::daemon::DEFAULT_AUTO_EXECUTION_BUDGET_MS,
                 Some(value) => value.as_u64().filter(|ms| (1_000..=1_800_000).contains(ms))
                     .ok_or_else(|| anyhow!("execution_budget_ms must be 1000-1800000"))?,
+            };
+            // A broad product category can scope learning, but free-text
+            // labels must not copy task content into the usage store.
+            let task_class = match p.get("task_class") {
+                None => None,
+                Some(Value::String(value)) if matches!(value.as_str(),
+                    "browser_check" | "routine_edit" | "difficult_diagnosis" | "general") =>
+                    Some(value.clone()),
+                _ => return Err(anyhow!("task_class must be a supported broad work category")),
             };
             let sandbox = match p.get("sandbox") {
                 None => Sandbox::WorkspaceWrite,
@@ -776,6 +785,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             if p.get("execution_budget_ms").is_some() {
                 requirements["execution_budget_ms"] = json!(execution_budget_ms);
             }
+            if let Some(class) = &task_class { requirements["task_class"] = json!(class); }
             let requirements_hash = Sha256::digest(serde_json::to_vec(&requirements)?)
                 .iter().map(|byte| format!("{byte:02x}")).collect::<String>();
             let saved_work_unit = {
@@ -929,7 +939,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     context_needed, requires_approvals, min_sandbox:sandbox,
                     max_sandbox:sandbox,
                     allowed_profiles:allowed_profiles.clone(),
-                    pinned_route, preferred_harness, task_class:None,
+                    pinned_route, preferred_harness, task_class:task_class.clone(),
                     execution_budget_ms:Some(execution_budget_ms) };
                 let fit_now_ms = crate::daemon::now();
                 let (fit_inputs, fit_evidence) = if d.learning_is_paused() {
@@ -1025,6 +1035,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                         "deadline_exhausted":deadline_exhausted},
                     "requirements":{"min_tier":min_tier,"required_tools":required_tools,
                         "context_needed":context_needed,"requires_approvals":requires_approvals,
+                        "task_class":task_class,
                         "execution_budget_ms":execution_budget_ms},
                     "evidence":evidence,"discovery_failures":discovery_failures,
                     "pre_effect_failures":pre_effect_failures,
