@@ -564,6 +564,16 @@ function rejectHunk(row, change, key) {
   replaceText(row.modified, next);
   editing.save(row);
 }
+// Theme variables arrive as hex or rgb()/rgba(); Monaco themes take hex. Without this an rgba value
+// was dropped and Monaco's own olive inserted-text color showed through (Overseer, AC-101).
+function hexColor(value) {
+  if (/^#[\da-f]{6}([\da-f]{2})?$/i.test(value)) return value;
+  const m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/i.exec(value);
+  if (!m) return undefined;
+  const alpha = m[4] === undefined ? 1 : m[4].endsWith('%') ? parseFloat(m[4]) / 100 : parseFloat(m[4]);
+  const hex = n => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return '#' + hex(+m[1]) + hex(+m[2]) + hex(+m[3]) + (alpha < 1 ? hex(alpha * 255) : '');
+}
 function theme() {
   if (!monaco) return;
   const high = document.body.classList.contains('vscode-high-contrast') || document.body.classList.contains('vscode-high-contrast-light');
@@ -571,8 +581,8 @@ function theme() {
   const css = getComputedStyle(document.body); const colors = {};
   for (const key of ['editor.background', 'editor.foreground', 'editorLineNumber.foreground', 'editor.selectionBackground',
     'diffEditor.insertedTextBackground', 'diffEditor.removedTextBackground', 'diffEditor.insertedLineBackground', 'diffEditor.removedLineBackground']) {
-    const value = css.getPropertyValue('--vscode-' + key.replaceAll('.', '-')).trim();
-    if (/^#[\da-f]{6}([\da-f]{2})?$/i.test(value)) colors[key] = value;
+    const value = hexColor(css.getPropertyValue('--vscode-' + key.replaceAll('.', '-')).trim());
+    if (value) colors[key] = value;
   }
   monaco.editor.defineTheme('branch-diff', { base: high ? (light ? 'hc-light' : 'hc-black') : (light ? 'vs' : 'vs-dark'), inherit: true, rules: [], colors });
   monaco.editor.setTheme('branch-diff');

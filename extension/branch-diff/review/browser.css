@@ -139,3 +139,80 @@ button.open-native { min-width: 26px; }
 .close-file { display: flex; align-items: center; justify-content: center; padding: 3px; }
 .close-file[hidden] { display: none; }
 .diff-file.browsed .stats { display: none; }
+
+/* ---------------------------------------------------------------------------------------------
+   Overseer's own reviewer (AC-101). Everything below restyles the review with Overseer's design
+   (media/tokens.css: surfaces, type scale, radii, motion) instead of VS Code's diff styling. It only
+   changes appearance: every control, id and behavior above stays as it was.
+   --------------------------------------------------------------------------------------------- */
+body { font-family: var(--ov-font); font-size: var(--ov-font-md); color: var(--ov-text); -webkit-font-smoothing: antialiased; }
+button, select { border: 1px solid transparent; background: transparent; border-radius: var(--ov-radius-control); padding: 4px 8px; color: var(--ov-text);
+  transition: background-color var(--ov-motion-fast) var(--ov-ease), border-color var(--ov-motion-fast) var(--ov-ease), color var(--ov-motion-fast) var(--ov-ease); }
+button:hover:not(:disabled) { background: var(--ov-hover); }
+button:focus-visible, a:focus-visible, summary:focus-visible, select:focus-visible, #resize:focus-visible { outline: 1px solid var(--ov-focus); outline-offset: -1px; }
+@media (prefers-reduced-motion: reduce) { button, select, .file, .folder summary { transition: none; } }
+
+/* Header: the agent's name leads, controls are quiet icons. */
+#toolbar { min-height: 48px; padding: 0 var(--ov-space-3); gap: var(--ov-space-2); border-bottom: 1px solid var(--ov-border); background: transparent; }
+#comparison { font-size: var(--ov-font-lg); font-weight: var(--ov-weight-semibold); color: var(--ov-text); }
+#total, #loading-stage, #base-label { color: var(--ov-muted); font-size: var(--ov-font-sm); }
+button.icon { width: 28px; height: 28px; border-radius: var(--ov-radius-control); color: var(--ov-icon); }
+button.icon:hover { background: var(--ov-hover); }
+button.base { height: 28px; padding: 0 var(--ov-space-2); color: var(--ov-text); background: var(--ov-raised); border-color: var(--ov-border); }
+#scope, #layout { height: 28px; background: var(--ov-raised); color: var(--ov-text); border: 1px solid var(--ov-border); border-radius: var(--ov-radius-control); padding: 0 var(--ov-space-2); }
+#follow[aria-pressed="true"] { background: var(--ov-accent-soft); color: var(--ov-accent); outline: 0; border-color: transparent; }
+#follow[data-state="paused"] { color: var(--ov-waiting); }
+#notice { padding: var(--ov-space-2) var(--ov-space-3); background: var(--ov-raised); color: var(--ov-text); border-bottom: 1px solid var(--ov-border); box-shadow: inset 3px 0 0 var(--ov-waiting); font-size: var(--ov-font-sm); }
+
+/* File navigator: Overseer's side-bar list. */
+#navigator { background: var(--ov-chrome); padding: var(--ov-space-3) var(--ov-space-2); }
+#resize { border-right: 1px solid var(--ov-border); }
+#resize:hover, #resize:focus { background: var(--ov-accent-soft); }
+#filter { height: 28px; padding: 0 var(--ov-space-2); background: var(--ov-input-bg); color: var(--ov-input-fg); border: 1px solid var(--ov-border); border-radius: var(--ov-radius-control); font-size: var(--ov-font-sm); }
+#filter:focus { outline: 0; border-color: var(--ov-focus); }
+#changes-only { width: 28px; height: 28px; border-radius: var(--ov-radius-control); color: var(--ov-icon); }
+#changes-only[aria-pressed="true"] { background: var(--ov-accent-soft); color: var(--ov-accent); border-color: transparent; }
+.folder summary, .file { min-height: 26px; padding: 3px var(--ov-space-2); border-radius: var(--ov-radius-control); font-size: var(--ov-font-md); color: var(--ov-text); transition: background-color var(--ov-motion-fast) var(--ov-ease); }
+.folder summary:hover, .file:hover { background: var(--ov-hover); }
+.file.active { background: var(--ov-selected-strong); color: var(--ov-selected-fg); }
+.folder-children { border-left-color: var(--ov-border); }
+.file .codicon { color: var(--ov-icon); }
+.status { font-size: var(--ov-font-xs); font-weight: var(--ov-weight-semibold); letter-spacing: .02em; }
+.status-A, .status-U, .additions { color: var(--ov-added); }
+.status-D, .deletions { color: var(--ov-removed); }
+.status-M, .status-R { color: var(--ov-modified); }
+.folder summary.has-changes::after { background: var(--ov-modified); }
+.tree-note { color: var(--ov-muted); font-size: var(--ov-font-sm); }
+
+/* Each file is a card; its header stays pinned while its lines scroll by. */
+#diffs { padding: var(--ov-space-3) var(--ov-space-3) var(--ov-space-8); }
+.diff-file { margin-bottom: var(--ov-space-3); border: 1px solid var(--ov-border); border-radius: var(--ov-radius-card); background: var(--ov-bg); overflow: clip; }
+.file-header { top: calc(-1 * var(--ov-space-3)); min-height: 40px; padding: 0 var(--ov-space-2) 0 var(--ov-space-1); gap: var(--ov-space-2); background: var(--ov-raised); border-bottom: 1px solid var(--ov-border); }
+.diff-file.collapsed .file-header { border-bottom-color: transparent; }
+.file-path { font-family: var(--ov-mono); font-size: var(--ov-font-sm); color: var(--ov-text); }
+.file-path[href]:hover, .file-path[href]:focus-visible { color: var(--ov-accent); text-decoration: none; }
+.fold { width: 24px; height: 24px; color: var(--ov-muted); }
+.stats { font-size: var(--ov-font-xs); font-variant-numeric: tabular-nums; gap: var(--ov-space-1); }
+.unsaved, .edit-status, .file-loading { color: var(--ov-muted); font-size: var(--ov-font-xs); }
+.unsaved:not(:empty) { padding: 1px var(--ov-space-2); border-radius: var(--ov-radius-pill); background: var(--ov-accent-soft); color: var(--ov-text); }
+button.save-file { height: 24px; padding: 0 var(--ov-space-3); border-radius: var(--ov-radius-pill); background: var(--ov-accent-gradient); color: var(--ov-accent-fg); font-weight: var(--ov-weight-medium); font-size: var(--ov-font-sm); }
+button.save-file:hover:not(:disabled) { background: var(--ov-accent-bg-hover); }
+button.open-native, button.close-file { height: 24px; min-width: 24px; padding: 0 var(--ov-space-1); color: var(--ov-icon); }
+.diff-body { background: var(--ov-bg); }
+
+/* Hunk actions: a small pill on the strip above each hunk. */
+.hunk-actions { height: 20px; padding: 0 3px; gap: 2px; border-radius: var(--ov-radius-pill); background: var(--ov-raised); border: 1px solid var(--ov-border); box-shadow: 0 2px 8px var(--ov-shadow); }
+.hunk-actions button { min-width: 22px; height: 16px; padding: 0 4px; border-radius: var(--ov-radius-pill); background: transparent; color: var(--ov-icon); }
+.hunk-actions button:hover:not(:disabled) { background: var(--ov-hover); }
+.hunk-actions .hunk-accept { color: var(--ov-done); }
+.hunk-actions .hunk-reject:hover:not(:disabled) { color: var(--ov-removed); }
+.hunk-badge { color: var(--ov-done); }
+.follow-line { background: var(--ov-accent-soft); }
+
+/* Empty, loading and problem states. */
+.empty, .file-problem, .large-diff, .loading { color: var(--ov-muted); font-size: var(--ov-font-sm); line-height: var(--ov-line-body); }
+.empty { margin: var(--ov-space-10) auto; max-width: 420px; text-align: center; }
+.loading { justify-content: center; padding: var(--ov-space-6); }
+.spinner { border-color: var(--ov-accent); border-right-color: transparent; }
+.large-diff { padding: var(--ov-space-4) var(--ov-space-5); }
+.large-diff .load-diff { background: var(--ov-raised); border-color: var(--ov-border); }

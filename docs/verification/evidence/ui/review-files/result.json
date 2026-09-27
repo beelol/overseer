@@ -82,12 +82,12 @@
       "name": "on a 10,000-file worktree the navigator's first level shows in under 500 ms",
       "ok": true,
       "detail": {
-        "ms": 5,
+        "ms": 4,
         "folders": 100
       }
     }
   ],
   "timings": {
-    "firstLevel10k": 5
+    "firstLevel10k": 4
   }
 }
