@@ -245,6 +245,12 @@ impl Daemon {
             return Ok(());
         }
         let session = self.overseer_session()?;
+        // A turn Overseer starts by itself never creates its run: until the owner has spoken to
+        // Overseer there is no model to spend, and the free checks keep recording on their own.
+        if session["run_id"].is_null() {
+            self.store.lock().unwrap().conn.execute("DELETE FROM check_in_queue", [])?;
+            return Ok(());
+        }
         let busy = session["run_id"].as_str().and_then(|r| self.run(r).ok()).map(|r| ACTIVE.contains(&r.status.as_str())).unwrap_or(false);
         if busy {
             return Ok(());

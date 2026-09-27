@@ -153,11 +153,19 @@ impl Daemon {
     /// Scan one agent against every agent it can collide with, and record what is found.
     pub fn scan_conflicts(self: &Arc<Self>, run_id: &str) -> Result<Value> {
         let root = self.root_of(run_id)?;
-        {
+        // A scan of the same agent already under way (the sweep's) is waited out, so a caller
+        // always gets a scan of what is there now, never a silent skip.
+        let started = Instant::now();
+        loop {
             let mut scanning = self.coord.scanning.lock().unwrap();
-            if !scanning.insert(root.id.clone()) {
+            if scanning.insert(root.id.clone()) {
+                break;
+            }
+            drop(scanning);
+            if started.elapsed() > Duration::from_secs(20) {
                 return Ok(json!({"run_id": root.id, "skipped": "already scanning"}));
             }
+            std::thread::sleep(Duration::from_millis(50));
         }
         let result = self.scan_conflicts_inner(&root);
         self.coord.scanning.lock().unwrap().remove(&root.id);

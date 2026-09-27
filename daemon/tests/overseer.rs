@@ -296,10 +296,10 @@ fn ac192_conflicts_between_agents_in_flight() {
     assert_eq!(digest["conflicts"][0]["other_title"], "Agent A");
     // B reverts its a.txt change: the same-lines conflict goes away by itself.
     write_lines(&ws_b.join("a.txt"), &twenty);
-    d.call("overseer.scan", json!({"run_id": b}));
+    let scan = d.call("overseer.scan", json!({"run_id": b}));
     let list = d.call("conflicts.list", json!({"run_id": a, "include_closed": true}));
     let gone = list["conflicts"].as_array().unwrap().iter().find(|c| c["kind"] == "same_lines").unwrap();
-    assert_eq!(gone["state"], "gone");
+    assert_eq!(gone["state"], "gone", "scan {scan}; list {list}; b's events {:?}", d.events(&b).iter().map(|e| e["kind"].clone()).collect::<Vec<_>>());
     assert!(d.events(&a).iter().any(|e| e["kind"] == "conflict_closed" && e["payload"]["state"] == "gone"));
     // The owner dismisses the same-file one.
     let id = same_file["id"].as_str().unwrap();
@@ -1334,9 +1334,13 @@ fn ac190_briefing_and_channel() {
     d.wait_done(&lone, 30);
     assert_eq!(turns(&d, &lone)[0]["prompt"], "tidy the docs");
     let echo = d.events(&lone).iter().find(|e| e["kind"] == "output" && e["payload"]["text"].as_str().unwrap_or("").starts_with("ECHO")).expect("echo")["payload"]["text"].as_str().unwrap().to_string();
-    assert!(!echo.contains("--mcp-config"), "a lone agent has no channel: {echo}");
-    assert!(!d.events(&lone).iter().any(|e| e["kind"] == "briefing"));
-    assert_eq!(d.call("agent.channel", json!({"run_id": lone}))["channel"], false);
+    // With the suite's setting forcing the channel on for every agent (AC-201), a lone agent has one too.
+    let forced_on = std::env::var("OVERSEER_CHANNEL_DEFAULT").as_deref() == Ok("on");
+    if !forced_on {
+        assert!(!echo.contains("--mcp-config"), "a lone agent has no channel: {echo}");
+        assert!(!d.events(&lone).iter().any(|e| e["kind"] == "briefing"));
+        assert_eq!(d.call("agent.channel", json!({"run_id": lone}))["channel"], false);
+    }
     // A second agent while the first works: both get a briefing, the first as a queued message.
     let first = claude_task(&d, &repo, &mode_file, "slow", "Login API", "build the login API");
     d.wait_status(&first, |s| s == "running", 20);
