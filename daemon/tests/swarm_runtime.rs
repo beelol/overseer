@@ -13,6 +13,79 @@ fn now() -> i64 {
 }
 
 #[test]
+fn independent_jobs_execute_together_while_conflicting_writer_waits() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("parallel-source"));
+    let run = d.call("swarm.create", json!({"category":"Parallel backend replay",
+        "objective":"Check contract, API, queue and storage independently",
+        "allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"root","title":"Contract","acceptance":"contract evidence","deps":[]},
+        {"id":"ind-a","title":"API","acceptance":"API evidence","deps":[]},
+        {"id":"ind-b","title":"Queue","acceptance":"queue evidence","deps":[]},
+        {"id":"ind-c","title":"Storage","acceptance":"storage evidence","deps":[]},
+        {"id":"writer-a","title":"Database writer A","acceptance":"DB evidence","deps":[],
+            "resource_claims":[{"resource":"db:shared","mode":"write"}]},
+        {"id":"writer-b","title":"Database writer B","acceptance":"DB evidence","deps":[],
+            "resource_claims":[{"resource":"db:shared","mode":"write"}]}
+    ]}));
+    commit_beneficial_batch(&d,id,&["root".into(),"ind-a".into(),"ind-b".into(),
+        "ind-c".into(),"writer-a".into()]);
+    let at=now();
+    let snapshot=json!({"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+        "targets":[{"id":"fixture-local","account_id":"fixture",
+            "pool_ids":["pool"],"capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+            "remaining_milli":200000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+60000}]}]});
+    let mut workers=Vec::new();
+    for job in ["root","ind-a","ind-b","ind-c","writer-a"] {
+        if job=="writer-a" {
+            let early=d.call("swarm.admit",json!({"run_id":id,"generation":1,
+                "revision":1,"job_id":job,"target_id":"fixture-local",
+                "request_id":"parallel-writer-early","snapshot":snapshot,"now_ms":at,
+                "required_capabilities":["code"],"estimate_milli":{"points":1000},
+                "purpose":"worker"}));
+            assert_eq!(early["reason"],"growth_wave_full","{early}");
+        }
+        let wave_at=if job=="writer-a" { at+5000 } else { at };
+        let admitted=d.call("swarm.admit",json!({"run_id":id,"generation":1,
+            "revision":1,"job_id":job,"target_id":"fixture-local",
+            "request_id":format!("parallel-{job}"),"snapshot":snapshot,"now_ms":wave_at,
+            "required_capabilities":["code"],"estimate_milli":{"points":1000},
+            "purpose":"worker"}));
+        assert_eq!(admitted["status"],"admitted","{job}: {admitted}");
+        let launched=d.call("swarm.worker.launch",json!({"run_id":id,"job_id":job,
+            "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+            "repo":checkout,"program":"/bin/sleep","args":["30"],
+            "prompt":format!("Check {job}"),"title":format!("Worker {job}")}));
+        assert_eq!(launched["status"],"launched","{job}: {launched}");
+        workers.push(launched["overseer_run_id"].as_str().unwrap().to_owned());
+    }
+    for worker in &workers {
+        assert_eq!(d.wait_status(worker,|s|s=="running",5)["status"],"running");
+    }
+    assert!(workers.iter().all(|worker|d.run(worker)["status"]=="running"),
+        "all five supervised workers must overlap in real process time");
+    let held=d.call("swarm.admit",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"writer-b","target_id":"fixture-local",
+        "request_id":"parallel-writer-b","snapshot":snapshot,"now_ms":at+5000,
+        "required_capabilities":["code"],"estimate_milli":{"points":1000},
+        "purpose":"worker"}));
+    assert_eq!(held["reason"],"resource_conflict","{held}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let attempts:i64=db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1",
+        [id],|row|row.get(0)).unwrap();
+    assert_eq!(attempts,5,"held writer must not reserve a sixth attempt");
+    d.call("swarm.stop",json!({"run_id":id}));
+    for worker in &workers {
+        assert_eq!(d.wait_done(worker,8)["status"],"interrupted");
+    }
+}
+
+#[test]
 fn repository_scope_blocks_director_and_worker_launch_outside_approved_repo() {
     let d = Daemon::start(&[]);
     let temp = tmp();
