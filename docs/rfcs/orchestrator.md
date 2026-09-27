@@ -46,6 +46,7 @@ The owner's request (2026-09-27), in the owner's words where it matters:
 | Caps | Overseer starts at most 100 turns a day by itself, check-ins included, and a watch wakes at most 12 times an hour. A turn that answers the owner is never counted and never refused. |
 | Which model runs Overseer | The default account's harness, as AC-107 does. It can be changed, and route picking chooses when it is on. |
 | Building | Nothing is started now; the criteria are on main. This gate and Voice Mode can be built in parallel. |
+| Permission requests | Overseer never answers one by itself, at any level ("keep never"). The owner can answer one from the conversation. An agent that asks is an agent the owner told to ask; to let an agent work without asking, the owner runs that agent on Auto. |
 | What Auto means | The Auto an agent has when it is left to work on its own (the permission mode). Overseer has that kind of Auto too. It is Overseer's own switch. |
 | Choosing who does the work | A different layer from Overseer's Auto, and it should perhaps have another name. It is the feature of pull request #2, called Auto mode there. This document calls it *route picking*. The owner's remark is passed on in a comment on that pull request; the name is theirs to settle. |
 | Who acts on what a watcher finds | Overseer. It acts for the watcher and tells the agent what to do. |
@@ -62,13 +63,6 @@ is a recorded revision.
   ([Agents that know about each other](#agents-that-know-about-each-other)). The owner is not
   sure yet (2026-09-27). The other choice is every agent, always: simpler to explain, and a lone
   agent then carries a paragraph and three commands it has no use for.
-- **Permission requests.** Overseer never answers one by itself, at any level. The owner can answer
-  one from the conversation. The owner is not sure yet (2026-09-27) and wondered whether Auto
-  should answer them. The reason for never: an agent that asks is an agent the owner told to ask.
-  To let an agent work without asking, the owner runs that agent on Auto, and then it sends no
-  request for Overseer to answer. If Overseer answered for it, it would loosen the agent's
-  permission mode behind the owner's back, which AC-16 and AC-138 rule out. Changing this is a
-  recorded revision of AC-185 and of AC-16.
 - **Hold on stop.** A watch can be set to hold its subject the instant the watcher raises a *stop*.
 - **The name.** *Route picking* is this document's word for choosing who does the work. Candidates
   for the product's name: *Routing*, *Match*. Nothing in this gate depends on it.
