@@ -1578,15 +1578,22 @@ impl Store {
     /// recreate history after the user has cleared learning.
     fn auto_work_observation(&self, run_id: &str) -> Result<Option<(String, Option<String>, i64, Value)>> {
         let Some(run) = self.run(run_id)? else { return Ok(None); };
-        let work: Option<(String, Option<i64>, Option<i64>, Option<String>)> = self.conn.query_row(
-            "SELECT m.work_unit_id,i.created_ms,i.account_generation,c.pool_id
+        let child: Option<(String, Option<i64>, Option<i64>, Option<String>, Option<i64>)> = self.conn.query_row(
+            "SELECT m.work_unit_id,i.created_ms,i.account_generation,c.pool_id,i.decision_event_seq
              FROM managed_work_units m
              LEFT JOIN auto_launch_intents i ON i.work_unit_id=m.work_unit_id
              LEFT JOIN auto_pool_claims c ON c.work_unit_id=m.work_unit_id
              WHERE m.child_run_id=?1", [run_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
         ).optional()?;
-        let Some((work_unit_id, intent_ms, account_generation, pool_id)) = work else {
+        let root = if child.is_none() { self.conn.query_row(
+            "SELECT i.work_unit_id,i.created_ms,i.account_generation,c.pool_id,i.decision_event_seq
+             FROM auto_root_intents i
+             LEFT JOIN auto_pool_claims c ON c.work_unit_id=i.work_unit_id
+             WHERE i.run_id=?1", [run_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+        ).optional()? } else { None };
+        let Some((work_unit_id, intent_ms, account_generation, pool_id, decision_event_seq)) = child.or(root) else {
             return Ok(None);
         };
         // An account switch invalidates the old account's learning. An Auto
@@ -1599,11 +1606,10 @@ impl Store {
             }
         }
         let Some(ended_ms) = run.ended_ms else { return Ok(None); };
-        let decision_payload: Option<String> = self.conn.query_row(
-            "SELECT e.payload FROM auto_launch_intents i JOIN events e ON e.seq=i.decision_event_seq
-             WHERE i.work_unit_id=?1 AND e.kind='auto_decision'",
-            [&work_unit_id], |row| row.get(0),
-        ).optional()?;
+        let decision_payload: Option<String> = if let Some(seq) = decision_event_seq {
+            self.conn.query_row("SELECT payload FROM events WHERE seq=?1 AND kind='auto_decision'",
+                [seq], |row| row.get(0)).optional()?
+        } else { None };
         let task_requirements = decision_payload
             .as_deref()
             .and_then(|encoded| serde_json::from_str::<Value>(encoded).ok())
@@ -1675,12 +1681,12 @@ impl Store {
     }
 
     pub fn record_auto_work_observation(&self, run_id: &str) -> Result<bool> {
-        if !self.learning_persistent || self.learning_reset_pending()? {
-            return Err(anyhow!("Auto learning storage unavailable"));
-        }
         let Some((work_unit_id, profile_id, observed_ms, record)) = self.auto_work_observation(run_id)? else {
             return Ok(false);
         };
+        if !self.learning_persistent || self.learning_reset_pending()? {
+            return Err(anyhow!("Auto learning storage unavailable"));
+        }
         self.learning_conn.execute_batch("SAVEPOINT auto_work_measurement_write")?;
         let write = (|| -> Result<bool> {
         let inserted = self.learning_conn.execute(

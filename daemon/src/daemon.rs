@@ -2446,7 +2446,8 @@ impl Daemon {
         for e in emitted {
             let _ = self.events.send(e);
         }
-        if run.relation_source.as_deref() == Some("managed-delegation")
+        if (run.relation_source.as_deref() == Some("managed-delegation")
+            || run.parent_run_id.is_none())
             && matches!(status, "completed" | "failed" | "interrupted") {
             let recorded = self.store.lock().unwrap().record_auto_work_observation(&run.id);
             match recorded {

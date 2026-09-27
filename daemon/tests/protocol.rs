@@ -6023,6 +6023,38 @@ fn auto_start_selects_and_launches_one_root_before_a_model_turn_then_replays_it(
 }
 
 #[test]
+fn auto_completed_root_records_one_content_free_work_observation() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_EMIT_USAGE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_EMIT_USAGE", "1")]);
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let request = json!({"work_unit_id":"measured-auto-root", "repo":repo,
+        "workspace_mode":"worktree", "prompt":"private-root-prompt-sentinel",
+        "title":"private-root-title-sentinel", "allowed_profiles":["system-codex"],
+        "min_tier":"general", "required_tools":[], "sandbox":"read_only"});
+    let started = d.call("auto.start", request.clone());
+    let run = run_id(&started);
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    let history = d.call("auto.usage.work.list", json!({"limit":10}));
+    let rows = history["work_units"].as_array().unwrap();
+    assert_eq!(rows.len(), 1, "completed Auto roots must enter local work history: {history}");
+    assert_eq!(rows[0]["work_unit_id"], "measured-auto-root");
+    assert_eq!(rows[0]["run_id"], run);
+    assert_eq!(rows[0]["model"], "gpt-6-sol");
+    assert_eq!(rows[0]["effort"], "medium");
+    assert_eq!(rows[0]["status"], "completed");
+    assert_eq!(rows[0]["usage"]["input_tokens"], 42);
+    assert_eq!(rows[0]["subscription_window_draw"], "unverified");
+    assert_eq!(rows[0]["task_requirements"]["source"], "auto_decision");
+    assert!(!history.to_string().contains("private-root-prompt-sentinel"));
+    assert!(!history.to_string().contains("private-root-title-sentinel"));
+    assert_eq!(d.call("auto.start", request)["run"]["id"], run);
+    assert_eq!(d.call("auto.usage.work.list", json!({}))["work_units"].as_array().unwrap().len(), 1);
+}
+
+#[test]
 fn auto_root_disabled_during_discovery_cannot_commit_a_launch() {
     use std::time::Instant;
     let r = tmp();
