@@ -178,7 +178,7 @@
         "daemon/tests/swarm_director_process.rs",
         "docs/verification/swarm/main-reconciliation-2026-09-27.md"
       ],
-      "blocker": "A worker-authored checkpoint survives failure and daemon restart, is granted to another selected account and is revoked during replacement. Automatic recovery of accepted artifacts, a live account failure/harness handoff and joined side-effect reconciliation remain unverified. Gate L generic successor recovery is barred for linked Swarm runs until checkpoint and reservation continuity can be proved."
+      "blocker": "A worker-authored checkpoint and separately granted durable trace now reach a selected same-job replacement; unselected destinations fail, and trace revocation interrupts after daemon restart. The trace is not accepted dependent evidence. Automatic checkpoint creation after abrupt failure, live account/harness handoff and joined accepted-artifact/uncertain-effect reconciliation remain unverified. Gate L generic successor recovery stays barred until same-job reservation continuity is proved."
     },
     "SWARM-17": {
       "status": "partial",
