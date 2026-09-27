@@ -201,12 +201,12 @@ const G = 2 ** 30;
     check('one Needs-you item counts the waiting agents, and the status bar counts them too', !!needs && needs.label === '1 agent waiting for a connection' && /1 waiting/.test(bar.text), { needs, bar });
     await s.screenshot('waiting-dark');
     // The grid shows the waiting agent as a tile, not as a failure.
-    await cdp.command('Overseer: Toggle Grid'); await delay(1500);
+    await cdp.command('Overseer: Toggle Agent Grid'); await delay(1500);
     dash = await s.editorView(`document.body.dataset.mode === 'grid'`);
     const tile = await dash.waitFor(`(() => { const t = [...document.querySelectorAll('.tile')].find(t => t.querySelector('.tile-title')?.textContent === 'Update the docs'); return t ? { status: t.querySelector('.status')?.getAttribute('aria-label'), card: !!t.querySelector('[data-continuity-card="waiting"]'), needs: t.classList.contains('needs') } : null; })()`, 15000);
     check('the grid keeps the waiting agent as a tile with a cloud, its card compact, and no failure', tile && tile.status === 'Waiting for a connection' && tile.card && !tile.needs, tile);
     await s.screenshot('grid-waiting-dark');
-    await cdp.command('Overseer: Toggle Grid'); await delay(1000);
+    await cdp.command('Overseer: Toggle Agent Grid'); await delay(1000);
     await s.selectAgent('Update the docs');
     dash = await s.editorView(`document.getElementById('title')?.textContent === 'Update the docs' && !!document.querySelector('#conv [data-continuity-card="waiting"]')`);
     { const at = await s.webviewPoint(dash, '[data-continuity="handoff:local"]'); await cdp.click(at.x, at.y); }
