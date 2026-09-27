@@ -5998,6 +5998,102 @@ fn auto_root_disabled_during_discovery_cannot_commit_a_launch() {
 }
 
 #[test]
+fn auto_root_executor_never_spawns_without_a_durable_supervisor_identity() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mut d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE"),
+        ("CLAUDE_FIXTURE_MODE", "prose")]);
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER reject_auto_root_process_identity
+        BEFORE UPDATE OF run_dir ON runs
+        WHEN NEW.run_dir IS NOT NULL AND EXISTS(
+            SELECT 1 FROM auto_root_intents i WHERE i.run_id=NEW.id)
+        BEGIN SELECT RAISE(FAIL, 'injected root identity failure'); END;").unwrap();
+    let request = json!({"work_unit_id":"root-identity-before-spawn", "repo":repo,
+        "workspace_mode":"worktree", "prompt":"bounded root summary", "title":"root summary",
+        "allowed_profiles":["system-claude"], "min_tier":"general", "required_tools":[]});
+    let first = d.call("auto.start", request.clone());
+    assert_eq!(first["decision"]["selected"], "system-claude/sonnet/medium", "{first}");
+    let run = run_id(&first);
+    assert_eq!(d.wait_done(&run, 15)["status"], "unknown");
+    std::thread::sleep(Duration::from_millis(700));
+    assert!(!d.home.path().join("runs").join(&run).join("p1/shim.json").exists(),
+        "a selected root executor cannot spawn before its supervisor identity is durable");
+    assert!(db.query_row("SELECT run_dir FROM runs WHERE id=?1", [&run],
+        |row| row.get::<_, Option<String>>(0)).unwrap().is_none());
+    let claim: String = db.query_row(
+        "SELECT state FROM auto_pool_claims WHERE work_unit_id='root-identity-before-spawn'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(claim, "released", "a confirmed pre-process failure cannot hold model allowance");
+    d.kill9();
+    d.spawn();
+    let replay = d.call("auto.start", request);
+    assert_eq!(replay["run"]["id"], run);
+    assert_eq!(replay["state"], "paused");
+    assert_eq!(d.runs().len(), 1);
+}
+
+#[test]
+fn auto_root_crash_after_git_effect_reports_planned_resource_without_retry() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::Instant;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let bin = r.path().join("bin");
+    std::fs::create_dir(&bin).unwrap();
+    let marker = r.path().join("root-git-effect");
+    let attempts = r.path().join("root-git-attempts");
+    let wrapper = bin.join("git");
+    std::fs::write(&wrapper, format!("#!/bin/sh\nif [ \"$1\" = worktree ] && [ \"$2\" = add ] && [ \"$3\" = -b ]; then\n  case \"$4\" in overseer/root-summary*)\n    printf 'x\\n' >> '{}'\n    /usr/bin/git \"$@\" || exit $?\n    printf '%s\\n%s\\n%s\\n' \"$$\" \"$4\" \"$5\" > '{}'\n    exec /bin/sleep 30;;\n  esac\nfi\nexec /usr/bin/git \"$@\"\n", attempts.display(), marker.display())).unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap());
+    let mut d = Daemon::start(&[("PATH", &path),
+        ("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models")]);
+    d.call("auto.mode.set", json!({"enabled":true}));
+    let request = json!({"work_unit_id":"root-git-effect-crash", "repo":repo,
+        "workspace_mode":"worktree", "prompt":"bounded root summary", "title":"root summary",
+        "allowed_profiles":["system-codex"], "min_tier":"general", "required_tools":[]});
+    let first = d.call("auto.start", request.clone());
+    assert_eq!(first["state"], "launch_pending", "{first}");
+    let run = run_id(&first);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !marker.exists() {
+        assert!(Instant::now() < deadline, "root Git worktree creation did not reach crash window");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let effect = std::fs::read_to_string(&marker).unwrap();
+    let mut parts = effect.lines();
+    let wrapper_pid: i64 = parts.next().unwrap().parse().unwrap();
+    let branch = parts.next().unwrap().to_string();
+    let worktree = parts.next().unwrap().to_string();
+    assert!(Path::new(&worktree).exists());
+    d.kill9();
+    signal(wrapper_pid, 9);
+    d.spawn();
+    let replay = d.call("auto.start", request);
+    assert_eq!(replay["state"], "paused", "{replay}");
+    assert_eq!(replay["run"]["id"], run);
+    assert_eq!(replay["pause_reason"], "launch_effects_uncertain");
+    assert_eq!(replay["launch_resources"]["branch"], branch);
+    assert_eq!(replay["launch_resources"]["path"], worktree);
+    assert_eq!(std::fs::read_to_string(&attempts).unwrap().lines().count(), 1,
+        "root replay must not attempt another Git mutation");
+    assert_eq!(d.runs().len(), 1);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let decisions: i64 = db.query_row("SELECT COUNT(*) FROM events WHERE kind='auto_decision'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(decisions, 1);
+    let claim: String = db.query_row(
+        "SELECT state FROM auto_pool_claims WHERE work_unit_id='root-git-effect-crash'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(claim, "released", "the root had no process and could not spend model allowance");
+}
+
+#[test]
 fn auto_failed_account_read_does_not_leave_fresh_model_or_allowance_evidence() {
     let r = tmp();
     let auth_file = r.path().join("auth-state.txt");

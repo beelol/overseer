@@ -1067,9 +1067,12 @@ fn auto_root_response(d: &Arc<Daemon>, work_unit_id: &str, request_hash: &str,
         } else if run.process_generation > 0 { "running" }
         else if auto_launch_active(work_unit_id) { "launch_pending" }
         else { "paused" };
+    let launch_resources = json!({"branch":workspace.branch,"path":workspace.path,
+        "snapshot_id":task.start_snapshot,"start_commit":task.fork_commit,
+        "effect_state":if state == "paused" { "unknown" } else { "planned_or_active" }});
     Ok(json!({"state":state,"work_unit_id":work_unit_id,"replayed":replayed,
         "task":task,"run":run,"workspace":workspace,"decision":decision,
-        "launch_phase":intent.phase,
+        "launch_phase":intent.phase,"launch_resources":launch_resources,
         "pause_reason":if state == "paused" { Some("launch_effects_uncertain") } else { None },
         "actions":if state == "paused" { vec!["inspect_launch","choose_manual_route"] }
             else { vec!["refresh"] }}))
@@ -1375,6 +1378,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                             exit_reason=?2 WHERE id=?1 AND process_generation=0",
                             rusqlite::params![intent.run_id, format!("automatic root launch paused: {error}")]);
                     }
+                    let _ = store.release_unstarted_auto_root_pool_claim(&id);
                 }
             });
             if spawn.is_err() {

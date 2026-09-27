@@ -1446,9 +1446,8 @@ impl Daemon {
         recorded_meta["program"] = json!(launch.program);
         recorded_meta["args"] = json!(launch.args.iter().map(|a| redact(a)).collect::<Vec<_>>());
         recorded_meta["env_keys"] = json!(launch.env.keys().collect::<Vec<_>>());
-        let auto_child = recorded_meta["generic"]["auto_selected"] == true
-            && run.relation_source.as_deref() == Some("managed-delegation");
-        let record_before_spawn = auto_child || recorded_meta["generic"]["auto_routing"] == true;
+        let record_before_spawn = recorded_meta["generic"]["auto_selected"] == true
+            || recorded_meta["generic"]["auto_routing"] == true;
         if record_before_spawn {
             // A crash or write failure after cmd.spawn must not leave a live
             // Auto supervisor with no durable identity to reconcile.
