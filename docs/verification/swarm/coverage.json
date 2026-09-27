@@ -208,9 +208,12 @@
         "daemon/tests/swarm_integration.rs",
         "docs/verification/swarm/milestone-1.md",
         "docs/verification/swarm/milestone-3.md",
-        "docs/verification/swarm/SWARM-21.md"
+        "docs/verification/swarm/SWARM-21.md",
+        "daemon/tests/swarm_effects.rs",
+        "daemon/tests/swarm_scenarios.rs",
+        "docs/verification/swarm/S3.md"
       ],
-      "blocker": "Revision CAS, affected-job invalidation and stale result rejection pass. An unchanged accepted patch integrates across an unrelated revision while a changed job's old patch cannot. User-message intake, live delivery, and safe job removal remain unimplemented."
+      "blocker": "Revision CAS, affected-job invalidation and stale-result rejection pass. Scripted scope narrowing now supersedes queued jobs, stops active excluded attempts, preserves provenance, and makes completion cover only retained jobs. An integrated patch or uncertain external effect cannot be hidden by omission. User-message intake, qualified live delivery and an explicit reversal path for already integrated excluded work remain unimplemented."
     },
     "SWARM-22": {
       "status": "partial",
@@ -719,7 +722,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins fourteen named Atlas v1 faults, including durable J2/J7 contradictory evidence resolved after one bounded independent J8 reproduction and targeted interruption after an injected selected-account revocation. Some complete traces remain open. Autonomous director/routing, real account outage and usage feed, live communication and S0 remain unverified."
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S3 now includes a 24-to-12 plan/ledger scope variant, but not an integrated 12-module branch. S5 joins fourteen named Atlas v1 faults. Autonomous director/routing, real account outage and usage feed, live communication, complete scenario traces and S0 remain unverified."
     }
   },
   "scenarios": {
@@ -761,7 +764,7 @@
         "daemon/tests/swarm_scenarios.rs",
         "docs/verification/swarm/S3.md"
       ],
-      "blocker": "One scripted run of the versioned 24-module fixture joins contract repair, stale-result rejection, four-to-eight admission, review backpressure, 26 isolated integration commits and evidence-gated completion. Autonomous director adaptation, a live run, conflict repair, scope narrowing and qualified harness paths remain unverified."
+      "blocker": "One scripted run of the versioned 24-module fixture joins contract repair, stale-result rejection, four-to-eight admission, review backpressure, 26 isolated integration commits and evidence-gated completion. A separate 24-to-12 plan/ledger variant supersedes excluded work but does not integrate the narrowed branch. Autonomous director adaptation, live user intake, conflict repair and qualified harness paths remain unverified."
     },
     "S4": {
       "status": "partial",

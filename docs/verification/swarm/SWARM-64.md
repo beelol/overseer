@@ -8,7 +8,7 @@ Actual: the first versioned backend is Catalog v1 for S3. Its 24 TypeScript rout
 
 Follow-up revisions `d97695e`, `3bdf972`, `b72f962`, `5fb537b` and `9696f0b`: Atlas v1 supplies an Express/TypeScript + PostgreSQL service for S1, with an isolated schema per job and two deliberately vulnerable endpoints. Eleven backend tests cover J1–J7 observations, per-job probes, a guarded contradictory J7 variant and a missing J5 export queue. `./run-swarm.sh` joins those real backend probes to a scripted Swarm run: four initial admissions, D1 dedupe and bounded director claim, targeted advisory/redirect acknowledgements, J5 slot refill during active work, independent J7 after a revision, seven acceptance decisions, and evidence-gated completion. Three separate fault replays reject missing artifact and stale J4 evidence, hold contradictory J7 output with retractions to J2/J4, and keep an unavailable export queue as blocked coverage. [S1](S1.md) records the traces and limits. Director inputs and choices are synthetic; this is partial S1 evidence, not a full scenario pass.
 
-Earlier remaining gaps: S3's director-driven adaptive choice, scope narrowing, conflict/fault variants, final user-facing artifact view and live communication path have not been replayed. S1 lacks autonomous route/coordination choices, the specified main-run revision-2 assignment, full report detail, source-text injection, contradiction resolution and live communication. S0/S4/S5 lack complete versioned backends and scenario traces. No RFC checkbox is checked.
+Earlier remaining gaps at that revision: S3's director-driven adaptive choice, scope narrowing, conflict/fault variants, final user-facing artifact view and live communication path had not been replayed. S1 lacked autonomous route/coordination choices, the specified main-run revision-2 assignment, full report detail, source-text injection, contradiction resolution and live communication. S0/S4/S5 lacked complete versioned backends and scenario traces. No RFC checkbox was checked.
 
 Follow-up revision `2fecb59`: [S2](S2.md) added a versioned FastAPI/PostgreSQL/Redis backend and a joined scripted run. Seven local checks prove signed ingress, a two-delivery 0→2 race, protected 0→1 behavior, stale-event rejection, a lost-ack unknown outcome and missing-Redis recovery. Two joined opt-in Rust tests prove K1–K3 initial admission, K4 wait/refill, K2→director→K3 communication with acknowledgement, evidence-gated four-job completion, and missing-Redis blocked coverage. S0/S4/S5 have no complete versioned replay.
 
@@ -47,3 +47,10 @@ inbox loop. It is fixed and the joined run again reaches evidence-gated completi
 the director acknowledges the revision-1 report. The full non-ignored serial Rust suite,
 17 Atlas tests, three LedgerPay tests and two Dispatch tests pass on this revision.
 S0 and the remaining autonomous/live paths are still unverified; SWARM-64 stays partial.
+
+At `ce34a52`, S3 adds a non-ignored 24-to-12 scope variant against the version-1 Catalog
+manifest. Twelve excluded jobs remain visible, one active excluded attempt receives Stop,
+and the unchanged contract plus 12 retained modules remain the only required plan work.
+The separate 24-module backend replay still passes; the full serial offline Rust suite
+and 17 Atlas backend tests pass. This does not integrate or verify a 12-module branch,
+exercise live user-message intake, or qualify a model director. SWARM-64 stays partial.

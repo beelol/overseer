@@ -20,4 +20,26 @@ an unchanged job's unreviewed result remains queued. The Catalog S3 replay now r
 completion after its old result is delivered and acknowledged. Exact commands and the
 broader regression results are in [S3](S3.md). Status remains partial.
 
-Remaining: user requirement intake and live director delivery are not connected; job removal still needs a safe cancellation transition. This evidence verifies the local unchanged/affected patch boundary, not the whole criterion. The RFC box remains unchecked.
+At `ce34a52`, a scripted scope change omits jobs from a plan while retaining their rows,
+attempts, messages and artifacts. The first focused test failed with `revision must retain
+existing job ids`. The revised transition marks queued jobs `superseded`, sends a durable
+Stop to active excluded attempts, waits for confirmed exit before making them superseded,
+and prevents their revision-1 evidence from being accepted as revision 2. An unchanged
+retained job keeps its original assignment revision. The coverage readout labels excluded
+jobs `excluded_by_scope`; completion requires checks only for retained jobs and refuses
+extra checks for excluded jobs. A real isolated-worktree integration test refuses to hide
+an already applied patch, and an effect test refuses to erase an uncertain external action.
+The 24-module Catalog manifest replay narrows to 12 and leaves precisely 12 excluded jobs.
+
+Replay: `cargo test -p overseerd --test swarm_state`,
+`cargo test -p overseerd --test swarm_integration narrowing_scope_refuses_to_hide_an_already_integrated_patch`,
+`cargo test -p overseerd --test swarm_effects narrowing_scope_cannot_erase_an_uncertain_external_effect`,
+and `cargo test -p overseerd --test swarm_scenarios catalog_s3_narrowing_to_twelve_modules_supersedes_the_other_twelve`.
+The complete serial offline Rust suite, the opt-in Catalog backend replay and 17 Atlas
+backend tests passed; `git diff --check` passed. No provider account or production service
+was used.
+
+Remaining: user-message intake and qualified live director/worker delivery are not
+connected. Reversing an already integrated excluded patch needs an explicit new
+integration plan; the daemon refuses silent exclusion. This local plan/revision boundary
+is partial evidence for SWARM-21, whose RFC box remains unchecked.
