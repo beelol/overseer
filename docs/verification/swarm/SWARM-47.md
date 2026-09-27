@@ -163,3 +163,29 @@ Already acknowledged integrated patches still need a joined contradiction
 policy and fixture. Autonomous semantic judgment, unresolved partial reporting,
 and a qualified live director path also remain unverified. SWARM-47 stays
 partial and its RFC box remains unchecked.
+
+Acknowledged-patch branch hold at `6790bde` (2026-09-27): a fixture first
+integrates a dependent patch into the private branch, then accepts an unrelated
+patch while a late result disputes the dependency. Before the change, the
+unrelated patch could commit on top of the disputed branch. The fixture now
+starts that second integration, waits for its durable intent, and opens the
+conflict during its pre-commit delay. The integration refuses to commit or
+acknowledge; background reconciliation removes its exact staged effect and
+intent while preserving the already acknowledged first commit. A fresh
+integration request and combined verification are held while the integrated
+dependent job remains blocked. The user's source checkout is unchanged.
+
+The same fixture found that a plan revision could clear the blocked job before
+the unrelated intent was reconciled; revision now waits for that intent. The
+plan-revision assertion failed first with an accepted revision and passed after
+the guard. The verification assertion failed first because it reached the
+unconfigured fixture verifier and passed after the branch guard. The affected
+integration (23), conflict (8), plan (11), and state (19) suites passed with
+`--offline -- --test-threads=1`; `git diff --check` passed.
+
+The acknowledged commit is deliberately preserved as historical work; no
+automatic rollback of an acknowledged patch is claimed. A durable repair or
+explicit disposition path for an integrated patch after conflict resolution,
+including a branch with later acknowledged commits, still needs design and
+fixtures. The real director's semantic choice, unresolved partial reporting,
+and qualified live review remain unverified. SWARM-47 remains partial.
