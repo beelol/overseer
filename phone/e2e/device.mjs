@@ -56,6 +56,8 @@ function ios() {
     install: (app) => void simctl('install', udid, app),
     uninstall: () => void quiet('xcrun', ['simctl', 'uninstall', udid, BUNDLE]),
     launch: () => void simctl('launch', udid, BUNDLE),
+    /** How far the device's clock is ahead of the Mac's, in milliseconds: the simulator uses the Mac's own. */
+    clockOffset: () => 0,
     /** Shuts the simulator down and boots it again; returns once it has booted. */
     reboot: () => {
       quiet('xcrun', ['simctl', 'shutdown', udid]);
@@ -102,6 +104,15 @@ function android() {
     installed: () => shell(`pm list packages ${BUNDLE}`).includes(BUNDLE),
     install: (apk) => void adb('-s', serial, 'install', '-r', apk),
     uninstall: () => void quiet(ADB, ['-s', serial, 'uninstall', BUNDLE]),
+    /** How far the emulator's clock is ahead of the Mac's, in milliseconds: the median of three readings. */
+    clockOffset: () => {
+      const readings = [0, 1, 2].map(() => {
+        const before = Date.now();
+        const device = Number(shell('date +%s%3N'));
+        return device - (before + Date.now()) / 2;
+      });
+      return Math.round(readings.sort((a, b) => a - b)[1]);
+    },
     // `monkey` reports failure (exit 251) on this emulator image and starts nothing; the activity is started by name.
     launch: () => void shell(`am start -n ${BUNDLE}/.MainActivity >/dev/null 2>&1`),
     /** Reboots the emulator and waits until Android says it has booted; storage is read as root again afterwards. */

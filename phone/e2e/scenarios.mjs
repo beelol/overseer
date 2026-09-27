@@ -4,6 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 
 /**
@@ -96,15 +97,23 @@ export const scenarios = [
     async run(c) {
       await c.flow('agents', { SHOWCASE: c.runs.showcase, PERMISSION: c.runs.permission });
       c.shot('agents');
+      // Nine agents or more, a nested child among them: the lab starts with fewer, so echo fixtures are added.
+      const { agents: model, store } = await import('../model/src/index.ts');
+      const listed = () => model.agentRows(store.load(c.lab.call('state')), { now: Date.now() }).filter((r) => r.runId && r.kind !== 'needs');
+      const titles = ['Label the shelves', 'Check the invoices', 'Tag the photos', 'Merge the carts', 'Trim the logs', 'Name the branches'];
+      for (let i = 0; new Set(listed().map((r) => r.runId)).size < 9 && i < titles.length; i += 1) c.lab.agent('echo', titles[i], 'hello');
+      await c.until('the Mac with nine agents or more, their first turns over', () => {
+        const state = c.lab.call('state');
+        return new Set(listed().map((r) => r.runId)).size >= 9 && !state.runs.some((r) => ['queued', 'starting'].includes(r.status));
+      }, 60_000);
       // The rows the phone must show: its own view model (parity-tested against VS Code's side
       // bar) over the daemon's state. Each is looked for on the screen, above or below.
-      const { agents: model, store } = await import('../model/src/index.ts');
-      const rows = model.agentRows(store.load(c.lab.call('state')), { now: Date.now() }).filter((r) => r.runId && r.kind !== 'needs');
+      const rows = listed();
       const ids = [...new Set(rows.map((r) => r.runId))];
       expect(ids.length >= 9, `the Mac has only ${ids.length} agents; the check needs nine or more`);
       const steps = ids.flatMap((id) => [
-        `- scrollUntilVisible:\n    element:\n      id: "agents.row.${id}"\n    direction: DOWN\n    timeout: 8000\n    optional: true`,
-        `- scrollUntilVisible:\n    element:\n      id: "agents.row.${id}"\n    direction: UP\n    timeout: 8000`,
+        `- scrollUntilVisible:\n    element:\n      id: ${JSON.stringify(exactly(`agents.row.${id}`))}\n    direction: DOWN\n    timeout: 8000\n    optional: true`,
+        `- scrollUntilVisible:\n    element:\n      id: ${JSON.stringify(exactly(`agents.row.${id}`))}\n    direction: UP\n    timeout: 8000`,
       ]);
       const file = path.join(path.dirname(c.out), 'maestro', c.platform, 'generated', 'agents-every-row.yaml');
       fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -132,10 +141,12 @@ export const scenarios = [
         const summary = raw ? JSON.parse(JSON.parse(raw)) : null;
         return summary && summary.count >= 50 ? summary : null;
       }, 30_000);
-      c.lab.call('run.interrupt', { run_id: id });
       const round = (n) => Math.round(n * 10) / 10;
-      c.log.say(`  from the Mac's event to the frame that shows it: ${delay.count} lines, p50 ${round(delay.p50)} ms, p95 ${round(delay.p95)} ms, longest ${round(delay.max)} ms (AC-58 holds a VS Code tile to 250 ms)`);
-      return { delay: { count: delay.count, p50: round(delay.p50), p95: round(delay.p95), max: round(delay.max) } };
+      const clock = c.dev.clockOffset();
+      const load = os.loadavg()[0].toFixed(1);
+      c.log.say(`  from the Mac's event to the frame that shows it: ${delay.count} lines, p50 ${round(delay.p50)} ms, p95 ${round(delay.p95)} ms, longest ${round(delay.max)} ms (AC-58 holds a VS Code tile to 250 ms); the device's clock ${clock} ms from the Mac's; load average ${load}`);
+      if (ACTIVE.includes(run(c, id).status)) c.lab.call('run.interrupt', { run_id: id });
+      return { delay: { count: delay.count, p50: round(delay.p50), p95: round(delay.p95), max: round(delay.max), clockOffsetMs: clock, load: Number(load) } };
     },
   },
   {
@@ -227,19 +238,20 @@ export const scenarios = [
       const second = hunks[1];
       if (second) c.lab.call('review.accept', { run_id: runId, ...review.acceptParams(file, second) });
       else c.lab.call('review.unaccept', { run_id: runId, key: hunks[0].key });
+      // The hunk's button says what it would do: take the mark away from a reviewed hunk, or accept it.
       const expectations = second
-        ? [[hunks[0].key, 'Reviewed'], [second.key, 'Reviewed']]
-        : [[hunks[0].key, 'Accept']];
+        ? [[hunks[0].key, 'Unmark reviewed hunk 1'], [second.key, 'Unmark reviewed hunk 2']]
+        : [[hunks[0].key, 'Accept hunk 1']];
       // Every line on the screen, as the phone says it: its number and its text.
       const shown = (line) => line.replace(/\t/g, '  ').slice(0, 2000);
       const steps = rows.flatMap((row) => {
         const label = row.kind === 'removed' ? `Removed, line ${row.baseLine ?? ''}: ${shown(row.text)}` : `Added, line ${row.modifiedLine ?? ''}: ${shown(row.text)}`;
         return [
-          `- scrollUntilVisible:\n    element:\n      id: "file.line.${row.key}"\n    direction: DOWN\n    timeout: 15000`,
-          `- assertVisible:\n    id: "file.line.${row.key}"\n    text: ${JSON.stringify(exactly(label))}`,
+          `- scrollUntilVisible:\n    element:\n      id: ${JSON.stringify(exactly(`file.line.${row.key}`))}\n    direction: DOWN\n    timeout: 15000`,
+          `- assertVisible:\n    id: ${JSON.stringify(exactly(`file.line.${row.key}`))}\n    text: ${JSON.stringify(exactly(label))}`,
         ];
       });
-      const marks = expectations.map(([key, words]) => `- scrollUntilVisible:\n    element:\n      text: "${words}"\n      childOf:\n        id: "file.hunk.${key}"\n    direction: UP\n    timeout: 15000`);
+      const marks = expectations.map(([key, words]) => `- scrollUntilVisible:\n    element:\n      id: "file\\\\.hunk\\\\.accept"\n      text: "${words}"\n      childOf:\n        id: ${JSON.stringify(exactly(`file.hunk.${key}`))}\n    direction: UP\n    timeout: 15000`);
       const open = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), 'flows', 'open-file.yaml'), 'utf8');
       const file_ = path.join(path.dirname(c.out), 'maestro', c.platform, 'generated', 'diff-lines.yaml');
       fs.mkdirSync(path.dirname(file_), { recursive: true });
