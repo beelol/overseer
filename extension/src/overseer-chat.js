@@ -36,6 +36,8 @@ class OverseerChat {
   }
 
   get harness() { return vscode.workspace.getConfiguration('overseer').get('chat.harness', 'claude'); }
+  /** The model for Overseer's own turns (empty: the harness's default). */
+  get model() { return vscode.workspace.getConfiguration('overseer').get('chat.model', '') || undefined; }
 
   /** The WebviewView in the panel ("Talk to Overseer"). */
   resolveWebviewView(view) {
@@ -72,7 +74,7 @@ window.addEventListener('message', e => { if (e.data.type === 'notice') { docume
   async start(text) {
     if (!text) return;
     await this.model.refresh();
-    const created = await this.client.request('task.create', { repo: this.scratch(), harness: this.harness, prompt: this.wrap(text), title: 'Talk to Overseer', workspace_mode: 'current' });
+    const created = await this.client.request('task.create', { repo: this.scratch(), harness: this.harness, prompt: this.wrap(text), title: 'Talk to Overseer', workspace_mode: 'current', ...(this.model ? { model: this.model } : {}) });
     this.taskId = created.task?.id || created.run.task_id; this.runId = created.run.id;
     this.model.hide(this.taskId);
     await this.context.globalState.update('overseer.chat', { taskId: this.taskId, runId: this.runId });

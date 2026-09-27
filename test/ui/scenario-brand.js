@@ -18,6 +18,7 @@ function repoSearch() {
   const tracked = cp.execFileSync('git', ['ls-files'], { cwd: repoRoot, encoding: 'utf8' }).split('\n').filter(f => f && !f.startsWith('docs/verification/') && !/\.(png|icns|woff|ttf|vsix)$/.test(f) && !f.includes('/vendor/'));
   const hits = [];
   for (const f of tracked) {
+    if (f === 'test/ui/scenario-brand.js') continue; // this file names the glyph it looks for
     let text; try { text = fs.readFileSync(path.join(repoRoot, f), 'utf8'); } catch { continue; }
     text.split('\n').forEach((line, i) => {
       if (OLD_EYE.some(p => line.includes(p))) hits.push(`${f}:${i + 1}: old eye glyph`);
