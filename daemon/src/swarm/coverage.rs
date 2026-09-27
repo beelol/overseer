@@ -9,7 +9,8 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
     get(store, run)?;
     let mut stmt = store
         .conn
-        .prepare("SELECT id,plan_revision,status,stop_reason FROM swarm_jobs WHERE run_id=?1 ORDER BY id")?;
+        .prepare("SELECT id,plan_revision,status,stop_reason,attempt_count
+            FROM swarm_jobs WHERE run_id=?1 ORDER BY id")?;
     let jobs = stmt
         .query_map(params![run], |r| {
             Ok((
@@ -17,12 +18,13 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
                 r.get::<_, i64>(1)?,
                 r.get::<_, String>(2)?,
                 r.get::<_, Option<String>>(3)?,
+                r.get::<_, i64>(4)?,
             ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
     let mut rows = Vec::with_capacity(jobs.len());
-    for (job, revision, status, stop_reason) in jobs {
+    for (job, revision, status, stop_reason, attempt_count) in jobs {
         let mut results_stmt = store.conn.prepare(
             "SELECT attempt_id,message_id,payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND revision=?3 AND sender=attempt_id AND kind='result' ORDER BY seq DESC",
         )?;
@@ -90,6 +92,7 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
         let state = if contaminated { "contaminated" }
         else if conflict_unresolved { "conflict_unresolved" }
         else if stop_reason.as_deref()==Some("evidence_conflict") { "dependency_conflict" }
+        else if status=="failed" && attempt_count>=2 { "attempts_exhausted" }
         else if status == "superseded" { "excluded_by_scope" }
         else { match outcome {
             Some("environment_failure") => "environment_blocked",
@@ -103,6 +106,7 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
         }};
         rows.push(json!({
             "job_id":job,"plan_revision":revision,"job_status":status,
+            "attempt_count":attempt_count,"stop_reason":stop_reason,
             "attempt_id":attempt,"message_id":message,
             "audit_outcome":outcome,"coverage_state":state,
             "unavailable_resource":payload["unavailable_resource"],

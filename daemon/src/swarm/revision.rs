@@ -298,7 +298,8 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         };
         tx.execute("UPDATE swarm_jobs SET plan_revision=?3,title=?4,acceptance=?5,deps=?6,resource_claims=?7,required_capabilities=?8,status=?9,
             deadline_at_ms=CASE WHEN ?11=1 THEN NULL ELSE deadline_at_ms END,
-            stop_reason=CASE WHEN ?11=1 THEN NULL ELSE stop_reason END,updated_ms=?10
+            stop_reason=CASE WHEN ?11=1 AND ?9='failed' THEN 'attempts_exhausted'
+                WHEN ?11=1 THEN NULL ELSE stop_reason END,updated_ms=?10
             WHERE run_id=?1 AND id=?2",
             params![id,job.id,revision,job.title,job.acceptance,serde_json::to_string(&job.deps)?,serde_json::to_string(&job.resource_claims)?,serde_json::to_string(&job.required_capabilities)?,state,now,i64::from(live.is_empty())])?;
         if live.is_empty() && unsafe_effects == 0 {
