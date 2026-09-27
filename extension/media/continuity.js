@@ -242,6 +242,8 @@
     if (!c) return undefined;
     ensureNotice(c);
     const choices = T.localChoices(c);
+    // Back online: what was chosen before the connection dropped is chosen again, whenever the composer looks.
+    if (form.beforeOffline && !T.harnessBlocked(form.beforeOffline.harness, c)) { Object.assign(form, form.beforeOffline); form.beforeOffline = undefined; if (save) setTimeout(save, 0); return undefined; }
     if (isLocal(form)) {
       form.account = LOCAL_ACCOUNT;
       if (d && !d.trusted) return undefined;
@@ -260,8 +262,6 @@
     if (why) {
       return { text: `${why}. ${ui.HARNESS[form.harness] || form.harness} cannot be reached.`, fix: choices.pick ? `Use a local model (${choices.pick.tag})` : undefined, action: () => { form.beforeOffline = { harness: form.harness, account: form.account, model: form.model }; useLocal(form, ''); save(); } };
     }
-    // Back online: what was chosen before the connection dropped is chosen again.
-    if (form.beforeOffline) { Object.assign(form, form.beforeOffline); form.beforeOffline = undefined; }
     return undefined;
   }
 

@@ -42,7 +42,7 @@
           "allow_ollama_install": false,
           "enabled": true,
           "show": false,
-          "shown_ms": 1790516793576
+          "shown_ms": 1790517502737
         }
       }
     },
@@ -155,7 +155,7 @@
       "detail": [
         "Local model qwen3-coder:30b at a 64k context · 23.7 GiB, already loaded.",
         "This agent continues the work of another.Open the first agent",
-        "Continued from \"Rename the helpers\" after the connection was lost at 06:46."
+        "Continued from \"Rename the helpers\" after the connection was lost at 06:58."
       ]
     },
     {
@@ -193,7 +193,7 @@
       "detail": {
         "title": "Waiting for a connection",
         "line": "The connection to OpenAI failed: stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses): client error (Connect): dns error: failed to lookup address information. Your message is kept.",
-        "foot": "Next check in 7 s · waiting 4 s · gives up after 36 hours",
+        "foot": "Next check in 8 s · waiting 5 s · gives up after 36 hours",
         "actions": [
           "Use a local model now",
           "Retry now",
@@ -237,12 +237,12 @@
       "ok": true,
       "detail": {
         "taken": {
-          "at_ms": 1790516821257,
+          "at_ms": 1790517531173,
           "offered_ms": null,
-          "predecessor": "r-b2db2feb6a9f",
+          "predecessor": "r-0fbc7a92e779",
           "reason": "user",
           "stay": false,
-          "successor": "r-b4893c3ebf6f"
+          "successor": "r-062750cb8a4a"
         },
         "takenDone": "completed",
         "shownNext": true
@@ -272,12 +272,55 @@
       "ok": true,
       "detail": {
         "backDone": "completed",
-        "session": "fixture-thread-3120",
+        "session": "fixture-thread-36109",
         "args": [
           "exec",
           "resume",
-          "fixture-thread-3120"
+          "fixture-thread-36109"
         ]
+      }
+    },
+    {
+      "name": "back online, a new agent defaults to the online agent again, not the local one",
+      "ok": true,
+      "detail": "Agent: Codex · Your login"
+    },
+    {
+      "name": "offline, no view overflows sideways, no unbroken run over 80 characters outside code, every icon-only control has a name",
+      "ok": true,
+      "detail": {
+        "chat": {
+          "chars": 740,
+          "longRuns": [],
+          "overflow": 0,
+          "unnamed": 0
+        },
+        "agents": {
+          "chars": 425,
+          "overflow": 0,
+          "offlineLine": 58,
+          "waitingRow": 32,
+          "rows": 11
+        }
+      }
+    },
+    {
+      "name": "the text budget: the chat with a waiting card stays under Gate J's chat budget (1050 characters); what Continuity adds to the side bar is one line under 80 characters and one row under 40",
+      "ok": true,
+      "detail": {
+        "chat": {
+          "chars": 740,
+          "longRuns": [],
+          "overflow": 0,
+          "unnamed": 0
+        },
+        "agents": {
+          "chars": 425,
+          "overflow": 0,
+          "offlineLine": 58,
+          "waitingRow": 32,
+          "rows": 11
+        }
       }
     },
     {
@@ -287,5 +330,20 @@
         "again": false
       }
     }
-  ]
+  ],
+  "textBudget": {
+    "chat": {
+      "chars": 740,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": 0
+    },
+    "agents": {
+      "chars": 425,
+      "overflow": 0,
+      "offlineLine": 58,
+      "waitingRow": 32,
+      "rows": 11
+    }
+  }
 }
