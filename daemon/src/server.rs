@@ -1381,12 +1381,13 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "limitation":"discovery only; effective child tool permission requires launch-time verification"})
         }
         "auto.quota.refresh" => {
+            let deadline = metadata_deadline(p)?;
             let profile = d.profile(s(p, "profile_id")?)?;
             if profile.harness != "codex" {
                 return Err(anyhow!("structured quota refresh is not supported for this profile"));
             }
             let gate = d.profile_gate(&profile.id);
-            let _profile_guard = gate.lock().unwrap();
+            let _profile_guard = lock_gate_until(&gate, deadline)?;
             let active = d.store.lock().unwrap().runs()?.iter().any(|run| run.profile_id.as_deref() == Some(profile.id.as_str()) && crate::daemon::ACTIVE.contains(&run.status.as_str()));
             if active {
                 return Err(anyhow!("account profile has an active run; use its native updates"));
@@ -1395,7 +1396,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 let program = crate::adapters::resolve_program("codex-app").ok_or_else(|| anyhow!("Codex is not installed"))?;
                 let mut env = crate::adapters::base_env(&program.display().to_string());
                 env.extend(Daemon::profile_env(&profile));
-                let raw = crate::auto_collect::codex_rate_limits(&program, &env, &crate::adapters::neutral_dir(), std::time::Duration::from_secs(5))?;
+                let raw = crate::auto_collect::codex_rate_limits(&program, &env, &crate::adapters::neutral_dir(),
+                    Duration::from_millis(remaining_metadata_ms(deadline)?))?;
                 let observed_ms = crate::daemon::now();
                 let snapshot = crate::auto_quota::parse_codex_rate_limits(&raw, &profile.id, observed_ms)?;
                 let fingerprint = crate::auto_quota::account_fingerprint(&raw)?;

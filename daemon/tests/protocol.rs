@@ -4976,6 +4976,30 @@ fn auto_codex_quota_freshness_starts_when_its_metadata_arrives() {
 }
 
 #[test]
+fn auto_quota_refresh_deadline_includes_waiting_for_profile_metadata() {
+    let r = tmp();
+    let trace = r.path().join("quota-gate-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_MODEL_DELAY_MS,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "metadata-models"), ("FIXTURE_MODEL_DELAY_MS", "1200"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    std::thread::scope(|scope| {
+        let pending = scope.spawn(|| d.call("auto.models.refresh", json!({"profile_id":"system-codex"})));
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        while !std::fs::read_to_string(&trace).unwrap_or_default().contains("model_read") {
+            assert!(std::time::Instant::now() < deadline, "model metadata did not enter its gated read");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let started = std::time::Instant::now();
+        assert!(d.try_call("auto.quota.refresh", json!({"profile_id":"system-codex",
+            "timeout_ms":100})).is_err(), "quota refresh must respect its deadline while a profile read owns the gate");
+        assert!(started.elapsed() < Duration::from_millis(600),
+            "quota refresh waited beyond its 100 ms metadata budget");
+        assert!(pending.join().unwrap()["catalog"].is_object());
+    });
+}
+
+#[test]
 fn auto_codex_tool_inventory_is_project_scoped_bounded_and_content_free() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
