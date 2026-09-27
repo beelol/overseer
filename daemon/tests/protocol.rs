@@ -1616,6 +1616,8 @@ fn unattended_learning_expiry_does_not_delay_execution_dispatch() {
         params![now - 31 * DAY]).unwrap();
     learning.execute("INSERT INTO auto_work_observations(work_unit_id,run_id,profile_id,observed_ms,record) VALUES('unit','run',NULL,?1,'{}')",
         params![now - 31 * DAY]).unwrap();
+    learning.execute("INSERT INTO auto_allowance_estimates(profile_id,account_generation,scope_key,observed_ms,estimate) VALUES('profile',1,'fixture',?1,'{}')",
+        params![now - 31 * DAY]).unwrap();
     learning.execute("INSERT INTO auto_daily_aggregates(day_ms,harness,profile_id,model,effort,last_observed_ms,samples,input_observations,input_tokens,output_observations,output_tokens,cached_input_observations,cached_input_tokens,reasoning_output_observations,reasoning_output_tokens,cost_observations,cost_usd) VALUES(1,'codex','','','',?1,1,0,0,0,0,0,0,0,0,0,0)",
         params![now - 91 * DAY]).unwrap();
 
@@ -1630,7 +1632,7 @@ fn unattended_learning_expiry_does_not_delay_execution_dispatch() {
 
     let deadline = std::time::Instant::now() + Duration::from_secs(3);
     loop {
-        let remaining: i64 = ["auto_measurements", "auto_daily_aggregates", "auto_thread_usage_observations", "auto_work_observations"]
+        let remaining: i64 = ["auto_measurements", "auto_daily_aggregates", "auto_thread_usage_observations", "auto_work_observations", "auto_allowance_estimates"]
             .iter().map(|table| learning.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get::<_, i64>(0)).unwrap()).sum();
         if remaining == 0 { break; }
         assert!(std::time::Instant::now() < deadline,

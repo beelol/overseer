@@ -41,14 +41,14 @@
 
 ### Task 2: Capped, invalidatable local evidence
 
-**Files:** Modify `daemon/src/store.rs` and `daemon/src/auto_consumption.rs`; test in store and consumption unit modules.
+**Files:** Modify `daemon/src/store.rs`, `daemon/src/auto_consumption.rs`, `daemon/src/auto_maintenance.rs`, and the production delta context in `daemon/src/server.rs`; test in store/consumption unit modules and the unattended protocol fixture.
 
 **Interfaces:** A store method accepts a validated `AllowanceEstimate` with account generation and actual-work provenance, returns at most one current scoped estimate, and refuses mismatched generation. The trusted delta assessor is the only actual-window producer; all real currently unverified Codex readings still produce none.
 
-- [ ] Write failing tests for bounded sample insertion/read, account change, clear, expiry, and no promotion from unverified thread credits or deltas.
-- [ ] Run targeted tests and observe failure.
-- [ ] Add the learning table and methods, with a finite row/age cap and migration behavior.
-- [ ] Run targeted tests, ledger checks, and commit.
+- [x] Write failing tests for bounded sample insertion/read, account change, clear, expiry, and no promotion from unverified thread credits or deltas.
+- [x] Run targeted tests and observe failure.
+- [x] Add the learning table and methods, with a finite row/age cap and migration behavior.
+- [x] Run targeted tests, ledger checks, and commit.
 
 ### Task 3: Dispatch and replay integration
 

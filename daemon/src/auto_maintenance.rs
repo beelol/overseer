@@ -48,8 +48,14 @@ fn prune_one_batch(path: &Path, now_ms: i64) -> Result<bool> {
            ORDER BY observed_ms LIMIT ?2)",
         params![now_ms.saturating_sub(30 * DAY_MS), BATCH],
     )?;
+    let estimates = tx.execute(
+        "DELETE FROM auto_allowance_estimates WHERE rowid IN (
+           SELECT rowid FROM auto_allowance_estimates WHERE observed_ms < ?1
+           ORDER BY observed_ms LIMIT ?2)",
+        params![now_ms.saturating_sub(30 * DAY_MS), BATCH],
+    )?;
     tx.commit()?;
-    Ok([detail, summary, thread, work]
+    Ok([detail, summary, thread, work, estimates]
         .iter()
         .any(|count| *count as i64 == BATCH))
 }

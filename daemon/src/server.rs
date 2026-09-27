@@ -1433,6 +1433,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let allowance_delta = crate::auto_consumption::assess_window_delta(prior.as_ref(),
                 &snapshot, &crate::auto_consumption::DeltaContext {
                     model:run.model.as_deref(), effort:run.effort.as_deref(),
+                    resolved_model_version:None, task_signature:None,
                     same_account_generation:store.auto_run_account_matches(&run.id, profile_id, generation)?,
                     model_version_stable:false, local_overlap_excluded:false,
                     external_usage_excluded:false, reporting_settled:false,

@@ -5,6 +5,32 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// Comparable subscription-window estimate identity. This deliberately
+/// excludes account-profile display names and never derives from tokens.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct EstimateKey {
+    pub pool_id: String,
+    pub model: String,
+    pub effort: String,
+    pub model_version: String,
+    pub task_signature: crate::auto_select::TaskSignature,
+    pub plan_type: String,
+}
+
+impl EstimateKey {
+    pub fn from_estimate(estimate: &crate::auto_select::AllowanceEstimate) -> Option<Self> {
+        let model_version = estimate.model_version.as_deref().filter(|value| !value.is_empty())?;
+        let task_signature = estimate.task_signature.as_ref()?.clone();
+        let plan_type = estimate.plan_type.as_deref().filter(|value| !value.is_empty())?;
+        if estimate.pool_id.is_empty() || estimate.model.is_empty() || estimate.effort.is_empty() {
+            return None;
+        }
+        Some(Self { pool_id:estimate.pool_id.clone(), model:estimate.model.clone(),
+            effort:estimate.effort.clone(), model_version:model_version.into(),
+            task_signature, plan_type:plan_type.into() })
+    }
+}
+
 const MAX_CREDITS_MICROS: u64 = 1_000_000_000_000_000;
 const MAX_TOKENS: u64 = 1_000_000_000_000;
 
@@ -140,6 +166,8 @@ pub fn parse_codex_thread_usage(
 pub struct DeltaContext<'a> {
     pub model: Option<&'a str>,
     pub effort: Option<&'a str>,
+    pub resolved_model_version: Option<&'a str>,
+    pub task_signature: Option<&'a crate::auto_select::TaskSignature>,
     pub same_account_generation: bool,
     pub model_version_stable: bool,
     pub local_overlap_excluded: bool,
@@ -272,6 +300,9 @@ pub fn estimate_from_actual_window_delta(
     }
     let model = context.model.filter(|value| !value.is_empty())?;
     let effort = context.effort.filter(|value| !value.is_empty())?;
+    let model_version = context.resolved_model_version
+        .filter(|value| !value.is_empty())?;
+    let task_signature = context.task_signature?.clone();
     let plan_type = after.reported_plan_type()?.to_string();
     let pool_id = assessment.windows.first()?.pool_id.clone();
     if pool_id.is_empty() { return None; }
@@ -288,7 +319,7 @@ pub fn estimate_from_actual_window_delta(
             window:window.window, upper_percent:window.upper_percent });
     }
     Some(AllowanceEstimate { pool_id, model:model.into(), effort:effort.into(),
-        model_version:None, task_signature:None,
+        model_version:Some(model_version.into()), task_signature:Some(task_signature),
         plan_type:Some(plan_type), source:DrawSource::AttributedActualWork,
         observed_ms:after.observed_ms, windows })
 }
@@ -334,6 +365,7 @@ mod tests {
         let before = reading(40.0, 1_800_003_600, "pro", at);
         let after = reading(42.0, 1_800_003_600, "pro", at + 20_000);
         let trusted = DeltaContext { model:Some("gpt-6-sol"), effort:Some("medium"),
+            resolved_model_version:None, task_signature:None,
             same_account_generation:true, model_version_stable:true,
             local_overlap_excluded:true, external_usage_excluded:true,
             reporting_settled:true, meter_error_percent:Some(0.1) };
@@ -363,19 +395,20 @@ mod tests {
             "pool-1", observed).unwrap();
         let before = reading(40.0, at);
         let after = reading(42.0, at + 20_000);
-        let trusted = DeltaContext { model:Some("gpt-6-sol"), effort:Some("medium"),
-            same_account_generation:true, model_version_stable:true,
-            local_overlap_excluded:true, external_usage_excluded:true,
-            reporting_settled:true, meter_error_percent:Some(0.1) };
-        let mut estimate = estimate_from_actual_window_delta(Some(&before), &after, &trusted)
-            .expect("credible actual work should yield a scoped estimate");
-        estimate.model_version = Some("gpt-6-sol-resolved-v1".into());
         let work = WorkUnit { id:"actual-unit".into(), min_tier:CapabilityTier::General,
             required_tools:BTreeSet::new(), context_needed:0, requires_approvals:false,
             min_sandbox:Sandbox::WorkspaceWrite, max_sandbox:Sandbox::WorkspaceWrite,
             allowed_profiles:["profile".into()].into(), pinned_route:None,
             preferred_harness:None };
-        estimate.task_signature = Some(TaskSignature::from(&work));
+        let task_signature = TaskSignature::from(&work);
+        let trusted = DeltaContext { model:Some("gpt-6-sol"), effort:Some("medium"),
+            resolved_model_version:Some("gpt-6-sol-resolved-v1"),
+            task_signature:Some(&task_signature),
+            same_account_generation:true, model_version_stable:true,
+            local_overlap_excluded:true, external_usage_excluded:true,
+            reporting_settled:true, meter_error_percent:Some(0.1) };
+        let estimate = estimate_from_actual_window_delta(Some(&before), &after, &trusted)
+            .expect("credible actual work should yield a scoped estimate");
         assert_eq!(estimate.pool_id, "pool-1");
         assert_eq!(estimate.model, "gpt-6-sol");
         assert_eq!(estimate.effort, "medium");
@@ -400,6 +433,23 @@ mod tests {
     }
 
     #[test]
+    fn bounded_delta_without_resolved_model_and_task_scope_is_not_a_route_estimate() {
+        use crate::auto_quota::parse_codex_rate_limits;
+        let at = 1_800_000_000_000_i64;
+        let reading = |used: f64, observed| parse_codex_rate_limits(
+            &json!({"rateLimits":{"limitId":"codex","planType":"pro",
+                "primary":{"usedPercent":used,"resetsAt":1_800_003_600}}}),
+            "pool-1", observed).unwrap();
+        let context = DeltaContext { model:Some("gpt-6-sol"), effort:Some("medium"),
+            resolved_model_version:None, task_signature:None,
+            same_account_generation:true, model_version_stable:true,
+            local_overlap_excluded:true, external_usage_excluded:true,
+            reporting_settled:true, meter_error_percent:Some(0.1) };
+        assert!(estimate_from_actual_window_delta(Some(&reading(40.0, at)),
+            &reading(42.0, at + 20_000), &context).is_none());
+    }
+
+    #[test]
     fn actual_window_estimate_rejects_ambiguous_or_zero_draw() {
         use crate::auto_quota::parse_codex_rate_limits;
         let at = 1_800_000_000_000_i64;
@@ -410,6 +460,7 @@ mod tests {
         let before = reading(40.0, at);
         let after = reading(42.0, at + 20_000);
         let mut context = DeltaContext { model:Some("gpt-6-sol"), effort:Some("medium"),
+            resolved_model_version:None, task_signature:None,
             same_account_generation:true, model_version_stable:true,
             local_overlap_excluded:true, external_usage_excluded:true,
             reporting_settled:true, meter_error_percent:Some(0.1) };
@@ -438,6 +489,7 @@ mod tests {
         let before = reading(40.0, 1_800_003_600, "pro", at);
         let after = reading(42.0, 1_800_003_600, "pro", at + 20_000);
         let mut context = DeltaContext { model:Some("gpt-6-sol"), effort:Some("medium"),
+            resolved_model_version:None, task_signature:None,
             same_account_generation:true, model_version_stable:true,
             local_overlap_excluded:true, external_usage_excluded:true,
             reporting_settled:true, meter_error_percent:Some(0.1) };

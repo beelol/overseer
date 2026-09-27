@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-pub const SCHEMA_VERSION: i64 = 16;
+pub const SCHEMA_VERSION: i64 = 17;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -396,6 +396,12 @@ impl Store {
               profile_id TEXT, observed_ms INTEGER NOT NULL, record TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS auto_work_observations_recent
               ON auto_work_observations(observed_ms,work_unit_id);
+            CREATE TABLE IF NOT EXISTS auto_allowance_estimates(
+              profile_id TEXT NOT NULL, account_generation INTEGER NOT NULL,
+              scope_key TEXT NOT NULL, observed_ms INTEGER NOT NULL, estimate TEXT NOT NULL,
+              PRIMARY KEY(profile_id,account_generation,scope_key));
+            CREATE INDEX IF NOT EXISTS auto_allowance_estimates_recent
+              ON auto_allowance_estimates(observed_ms,profile_id);
             CREATE INDEX IF NOT EXISTS auto_measurements_run_observed
               ON auto_measurements(run_id,observed_ms);
         "#)?;
@@ -406,6 +412,7 @@ impl Store {
             tx.execute("DELETE FROM auto_daily_aggregates", [])?;
             tx.execute("DELETE FROM auto_thread_usage_observations", [])?;
             tx.execute("DELETE FROM auto_work_observations", [])?;
+            tx.execute("DELETE FROM auto_allowance_estimates", [])?;
             tx.execute("DELETE FROM meta WHERE key='auto_learning_samples_inserted'", [])?;
             tx.commit()?;
             let tx = self.conn.unchecked_transaction()?;
@@ -997,6 +1004,7 @@ impl Store {
                         tx.execute("DELETE FROM auto_daily_aggregates WHERE profile_id=?1", params![profile_id])?;
                         tx.execute("DELETE FROM auto_thread_usage_observations WHERE profile_id=?1", params![profile_id])?;
                         tx.execute("DELETE FROM auto_work_observations WHERE profile_id=?1", params![profile_id])?;
+                        tx.execute("DELETE FROM auto_allowance_estimates WHERE profile_id=?1", params![profile_id])?;
                         tx.commit()?;
                         Ok(())
                     })();
@@ -1488,6 +1496,112 @@ impl Store {
         Ok(rows)
     }
 
+    /// Store only a bounded, fully scoped estimate for the account generation
+    /// that produced it. This is local learning, not execution authority; a
+    /// caller must first establish actual-work attribution or a direct
+    /// provider-reported subscription charge.
+    pub fn put_auto_allowance_estimate(&self, profile_id: &str, generation: i64,
+        estimate: &crate::auto_select::AllowanceEstimate, now_ms: i64) -> Result<bool> {
+        use crate::auto_consumption::EstimateKey;
+        if !self.learning_persistent || self.learning_reset_pending()? {
+            return Err(anyhow!("Auto learning storage unavailable"));
+        }
+        let key = EstimateKey::from_estimate(estimate)
+            .ok_or_else(|| anyhow!("allowance estimate scope is incomplete"))?;
+        const AGE_MS: i64 = 30 * 86_400_000;
+        if generation <= 0 || self.auto_account_generation(profile_id)? != Some(generation)
+            || self.auto_account_pool_id(profile_id)?.as_deref() != Some(key.pool_id.as_str())
+            || estimate.observed_ms > now_ms
+            || now_ms.saturating_sub(estimate.observed_ms) >= AGE_MS
+            || estimate.windows.is_empty() || estimate.windows.len() > 16 {
+            return Err(anyhow!("allowance estimate account, age, or windows invalid"));
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        for draw in &estimate.windows {
+            if draw.bucket_id.is_empty() || draw.window.is_empty()
+                || !draw.upper_percent.is_finite()
+                || !(0.0..=100.0).contains(&draw.upper_percent)
+                || draw.upper_percent == 0.0
+                || !seen.insert((&draw.bucket_id, &draw.window)) {
+                return Err(anyhow!("allowance estimate window is invalid"));
+            }
+        }
+        let scope_key = serde_json::to_string(&key)?;
+        let encoded = serde_json::to_string(estimate)?;
+        if profile_id.is_empty() || profile_id.len() > 120
+            || scope_key.len() > 4096 || encoded.len() > 8192 {
+            return Err(anyhow!("allowance estimate exceeds storage bound"));
+        }
+        self.learning_conn.execute_batch("SAVEPOINT auto_allowance_estimate_write")?;
+        let write = (|| -> Result<bool> {
+            let changed = self.learning_conn.execute(
+                "INSERT INTO auto_allowance_estimates(profile_id,account_generation,scope_key,observed_ms,estimate)
+                 VALUES(?1,?2,?3,?4,?5)
+                 ON CONFLICT(profile_id,account_generation,scope_key) DO UPDATE
+                 SET observed_ms=excluded.observed_ms,estimate=excluded.estimate
+                 WHERE excluded.observed_ms>=auto_allowance_estimates.observed_ms",
+                params![profile_id,generation,scope_key,estimate.observed_ms,encoded],
+            )?;
+            self.prune_auto_allowance_estimates(now_ms, 5000)?;
+            Ok(changed != 0)
+        })();
+        match write {
+            Ok(changed) => {
+                self.learning_conn.execute_batch("RELEASE auto_allowance_estimate_write")?;
+                Ok(changed)
+            }
+            Err(error) => {
+                let _ = self.learning_conn.execute_batch(
+                    "ROLLBACK TO auto_allowance_estimate_write; RELEASE auto_allowance_estimate_write");
+                Err(error)
+            }
+        }
+    }
+
+    pub fn auto_allowance_estimate(&self, profile_id: &str, generation: i64,
+        key: &crate::auto_consumption::EstimateKey, now_ms: i64)
+        -> Result<Option<crate::auto_select::AllowanceEstimate>> {
+        if !self.learning_persistent || self.learning_reset_pending()?
+            || self.auto_account_generation(profile_id)? != Some(generation)
+            || self.auto_account_pool_id(profile_id)?.as_deref() != Some(key.pool_id.as_str()) {
+            return Ok(None);
+        }
+        let scope_key = serde_json::to_string(key)?;
+        let encoded: Option<String> = self.learning_conn.query_row(
+            "SELECT estimate FROM auto_allowance_estimates
+             WHERE profile_id=?1 AND account_generation=?2 AND scope_key=?3
+               AND observed_ms<=?4 AND observed_ms>?5",
+            params![profile_id,generation,scope_key,now_ms,
+                now_ms.saturating_sub(30 * 86_400_000_i64)], |row| row.get(0),
+        ).optional()?;
+        let Some(encoded) = encoded else { return Ok(None); };
+        let estimate: crate::auto_select::AllowanceEstimate = serde_json::from_str(&encoded)?;
+        if crate::auto_consumption::EstimateKey::from_estimate(&estimate).as_ref() != Some(key) {
+            return Err(anyhow!("stored allowance estimate scope changed"));
+        }
+        Ok(Some(estimate))
+    }
+
+    pub fn prune_auto_allowance_estimates(&self, now_ms: i64, cap: i64) -> Result<usize> {
+        let expired = self.learning_conn.execute(
+            "DELETE FROM auto_allowance_estimates WHERE observed_ms < ?1",
+            [now_ms.saturating_sub(30 * 86_400_000_i64)],
+        )?;
+        let cutoff: Option<(i64, i64)> = self.learning_conn.query_row(
+            "SELECT observed_ms,rowid FROM auto_allowance_estimates
+             ORDER BY observed_ms DESC,rowid DESC LIMIT 1 OFFSET ?1",
+            [cap.clamp(1, 5000)], |row| Ok((row.get(0)?, row.get(1)?)),
+        ).optional()?;
+        let over_cap = match cutoff {
+            Some((observed_ms, rowid)) => self.learning_conn.execute(
+                "DELETE FROM auto_allowance_estimates WHERE observed_ms < ?1
+                 OR (observed_ms=?1 AND rowid<=?2)", params![observed_ms,rowid],
+            )?,
+            None => 0,
+        };
+        Ok(expired + over_cap)
+    }
+
     /// Work-level learning has the same 30-day detail horizon and an exact
     /// 5,000-row cap. Indexed cutoff deletion keeps maintenance bounded.
     pub fn prune_auto_work_observations(&self, now_ms: i64, cap: i64) -> Result<usize> {
@@ -1520,6 +1634,7 @@ impl Store {
             params![now_ms.saturating_sub(30 * 86_400_000_i64)],
         )?;
         self.prune_auto_work_observations(now_ms, 5000)?;
+        self.prune_auto_allowance_estimates(now_ms, 5000)?;
         Ok(())
     }
 
@@ -1603,6 +1718,7 @@ impl Store {
         tx.execute("DELETE FROM auto_daily_aggregates", [])?;
         tx.execute("DELETE FROM auto_thread_usage_observations", [])?;
         tx.execute("DELETE FROM auto_work_observations", [])?;
+        tx.execute("DELETE FROM auto_allowance_estimates", [])?;
         tx.execute("DELETE FROM meta WHERE key='auto_learning_samples_inserted'", [])?;
         tx.commit()?;
         self.conn.execute("DELETE FROM auto_run_account_evidence", [])?;
@@ -1684,6 +1800,66 @@ impl Store {
 #[cfg(test)]
 mod schema_migration_tests {
     use super::*;
+
+    fn scoped_estimate(pool_id: &str, model_version: &str, observed_ms: i64)
+        -> crate::auto_select::AllowanceEstimate {
+        serde_json::from_value(serde_json::json!({
+            "pool_id":pool_id,"model":"sol","effort":"medium",
+            "model_version":model_version,"plan_type":"pro",
+            "task_signature":{"min_tier":"general","required_tools":["browser"],
+                "context_needed":1000,"requires_approvals":false,
+                "min_sandbox":"read_only","max_sandbox":"workspace_write"},
+            "source":"attributed_actual_work","observed_ms":observed_ms,
+            "windows":[{"bucket_id":"codex","window":"primary","upper_percent":2.2}]
+        })).unwrap()
+    }
+
+    #[test]
+    fn learned_allowance_estimate_is_bound_to_account_generation_and_clear() {
+        use crate::auto_consumption::EstimateKey;
+        let store = Store::open(Path::new(":memory:")).unwrap();
+        let now = crate::daemon::now();
+        store.record_auto_account_identity("profile", &"a".repeat(64)).unwrap();
+        let pool = store.auto_account_pool_id("profile").unwrap().unwrap();
+        let estimate = scoped_estimate(&pool, "sol-v1", now);
+        let key = EstimateKey::from_estimate(&estimate).unwrap();
+        assert!(store.put_auto_allowance_estimate("profile", 1, &estimate, now).unwrap());
+        let stored = store.auto_allowance_estimate("profile", 1, &key, now).unwrap().unwrap();
+        assert_eq!(stored.windows[0].upper_percent, 2.2);
+        assert!(store.auto_allowance_estimate("profile", 2, &key, now).unwrap().is_none());
+        store.record_auto_account_identity("profile", &"b".repeat(64)).unwrap();
+        assert!(store.auto_allowance_estimate("profile", 1, &key, now).unwrap().is_none());
+        assert!(store.put_auto_allowance_estimate("profile", 2, &estimate, now).is_err(),
+            "the old account pool cannot seed the new login");
+        let new_pool = store.auto_account_pool_id("profile").unwrap().unwrap();
+        let next = scoped_estimate(&new_pool, "sol-v1", now);
+        let next_key = EstimateKey::from_estimate(&next).unwrap();
+        assert!(store.put_auto_allowance_estimate("profile", 2, &next, now).unwrap());
+        store.clear_auto_learning().unwrap();
+        assert!(store.auto_allowance_estimate("profile", 2, &next_key, now).unwrap().is_none());
+    }
+
+    #[test]
+    fn learned_allowance_estimates_obey_age_and_row_caps() {
+        use crate::auto_consumption::EstimateKey;
+        let store = Store::open(Path::new(":memory:")).unwrap();
+        let now = crate::daemon::now();
+        store.record_auto_account_identity("profile", &"a".repeat(64)).unwrap();
+        let pool = store.auto_account_pool_id("profile").unwrap().unwrap();
+        let mut keys = Vec::new();
+        for index in 0..4 {
+            let estimate = scoped_estimate(&pool, &format!("sol-v{index}"), now - 4 + index);
+            keys.push(EstimateKey::from_estimate(&estimate).unwrap());
+            store.put_auto_allowance_estimate("profile", 1, &estimate, now).unwrap();
+        }
+        assert_eq!(store.prune_auto_allowance_estimates(now, 2).unwrap(), 2);
+        assert!(store.auto_allowance_estimate("profile", 1, &keys[0], now).unwrap().is_none());
+        assert!(store.auto_allowance_estimate("profile", 1, &keys[3], now).unwrap().is_some());
+        store.learning_conn.execute("UPDATE auto_allowance_estimates SET observed_ms=?1",
+            [now - 31 * 86_400_000]).unwrap();
+        assert!(store.auto_allowance_estimate("profile", 1, &keys[3], now).unwrap().is_none());
+        assert_eq!(store.prune_auto_allowance_estimates(now, 2).unwrap(), 2);
+    }
 
     #[test]
     fn work_learning_uses_fake_clock_expiry_and_exact_row_cap() {
