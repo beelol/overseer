@@ -45,7 +45,8 @@ class OutputPanels {
     const feed = new RunFeed(this.client, this.model, m => panel.webview.postMessage(m));
     const entry = { panel, feed };
     this.panels.set(runId, entry);
-    panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer.svg');
+    // A panel view (Talk to Overseer) has no tab icon.
+    if (!('onDidChangeVisibility' in panel)) panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer.svg');
     panel.onDidDispose(() => { feed.dispose(); if (this.panels.get(runId) === entry) this.panels.delete(runId); });
     panel.webview.onDidReceiveMessage(message => this.receive(runId, message).catch(error => panel.webview.postMessage({ type: 'notice', message: error.message })));
     panel.webview.options = { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri) };
@@ -54,6 +55,9 @@ class OutputPanels {
   }
 
   async receive(runId, message) {
+    // Hooks for Talk to Overseer (AC-107): a proposal answered in its chat, and its messages wrapped with the agents' state.
+    if (this.onMessage && await this.onMessage(runId, message)) return;
+    if (this.transform) message = this.transform(runId, message);
     if (message?.type === 'ready') {
       const entry = this.panels.get(runId); if (!entry) return;
       this.pushRun(runId, entry);

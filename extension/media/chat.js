@@ -27,7 +27,10 @@
       this.reviewBtn = ui.iconButton('diff-multiple', 'Review changes', { action: 'review' }); this.reviewBtn.id = 'review';
       this.stopBtn = ui.iconButton('debug-stop', 'Stop', { action: 'interrupt', shortcut: '⌘.' }); this.stopBtn.id = 'interrupt';
       this.moreBtn = ui.iconButton('ellipsis', 'More actions', { action: 'more' }); this.moreBtn.id = 'more'; this.moreBtn.setAttribute('aria-haspopup', 'menu');
-      actions.append(this.stopBtn, this.reviewBtn, this.moreBtn);
+      // AC-106: every Overseer view open in this window, and a jump to each.
+      this.whereBtn = ui.iconButton('location', 'Where am I', { action: 'where', shortcut: '⌥⌘M' }); this.whereBtn.id = 'where';
+      if (this.opts.mode !== 'dashboard') this.whereBtn.hidden = true;
+      actions.append(this.stopBtn, this.reviewBtn, this.whereBtn, this.moreBtn);
       head.append(this.statusEl, titles, actions);
 
       this.scroll = el('div', 'chat-scroll'); this.scroll.id = 'scroll';
@@ -62,6 +65,7 @@
       this.stopBtn.addEventListener('click', () => this.post({ type: 'interrupt' }));
       this.reviewBtn.addEventListener('click', () => this.post({ type: 'openReview' }));
       this.moreBtn.addEventListener('click', () => this.menu());
+      this.whereBtn.addEventListener('click', () => this.post({ type: 'command', command: 'overseer.whereAmI' }));
       this.sendBtn.addEventListener('click', e => this.send(e.altKey ? 'interrupt' : 'queue'));
       this.jump.addEventListener('click', () => { this.stick = true; this.toBottom(); });
       this.prompt.addEventListener('keydown', e => {

@@ -16,6 +16,7 @@ const { TaskLauncher } = require('./task-launcher');
 const { Steering } = require('./run-actions');
 const { Dashboard } = require('./dashboard-mode');
 const { Immersive } = require('./immersive');
+const { OverseerChat } = require('./overseer-chat');
 
 let client;
 let centerRef;
@@ -148,6 +149,42 @@ async function activate(context) {
     }, 0);
     return true;
   };
+  // AC-106: "Where am I": every Overseer view open in this window (the Overseer view as chat, grid
+  // or composer, the review, chats taken out into editor groups, New Task, run output), in editor
+  // group order, and a jump to the one picked.
+  const whereAmI = async () => {
+    const title = id => (id && model.run(id)?.title) || '';
+    const panels = [center.panel, ...review.manager.panels.values(), ...[...outputs.panels.values()].map(e => e.panel), newTaskPanel.panel].filter(Boolean);
+    const describe = (vt, tab) => {
+      if (/overseer\.center$/.test(vt)) {
+        if (center.mode === 'grid') return { icon: 'layout', kind: 'Grid', what: arrangement.tracked ? `tracking ${title(arrangement.tracked)}` : 'agents side by side' };
+        if (center.mode === 'composer') return { icon: 'add', kind: 'New agent', what: 'the composer' };
+        return { icon: 'comment-discussion', kind: 'Chat', what: title(selectedRun) || 'no agent selected' };
+      }
+      if (/overseer\.review$/.test(vt)) return { icon: 'diff-multiple', kind: 'Review', what: tab.label.replace(/^Review: /, '') };
+      if (/overseer\.chatEditor$/.test(vt)) return { icon: 'comment', kind: 'Chat, taken out', what: tab.label.replace(/\.overseer-chat$/, '') };
+      if (/overseer\.newTask$/.test(vt)) return { icon: 'new-file', kind: 'New task', what: 'the full form' };
+      if (/overseer\.output$/.test(vt)) return { icon: 'output', kind: 'Output', what: tab.label };
+      return undefined;
+    };
+    const items = [];
+    for (const group of vscode.window.tabGroups.all) for (const tab of group.tabs) {
+      const vt = tab.input?.viewType || '';
+      const d = describe(vt, tab);
+      if (!d) continue;
+      const here = group.isActive && tab.isActive;
+      items.push({ label: `$(${d.icon}) ${d.kind}`, description: d.what, detail: `Editor group ${group.viewColumn}${here ? ' · you are here' : ''}`, tab, group,
+        panel: panels.find(p => p.viewColumn === group.viewColumn && p.title === tab.label) });
+    }
+    if (!items.length) { vscode.window.showInformationMessage('No Overseer view is open in this window.'); return; }
+    const pick = await vscode.window.showQuickPick(items, { title: 'Where am I', placeHolder: 'Overseer views open in this window: pick one to go there', matchOnDescription: true });
+    if (!pick) return;
+    if (pick.panel) pick.panel.reveal(pick.group.viewColumn, false);
+    else if (pick.tab.input instanceof vscode.TabInputCustom) await vscode.commands.executeCommand('vscode.openWith', pick.tab.input.uri, pick.tab.input.viewType, { viewColumn: pick.group.viewColumn, preserveFocus: false });
+  };
+  // AC-107: Talk to Overseer, docked in the panel under the editor area.
+  const overseerChat = new OverseerChat({ context, client, model, outputs, setPinned: (id, on) => { setPinned(id, on); agents.refresh(); center.push(); }, log: say });
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider('overseer.talk', overseerChat, { webviewOptions: { retainContextWhenHidden: true } }));
   const pullRequests = new PullRequests(client, model, say);
   const newTaskPanel = new NewTaskPanel(context, client, model, { selectRun: (...a) => selectRun(...a), launcher, column: () => vscode.ViewColumn.Beside });
   // An agent dragged from the side bar into the editor opens its chat there (AC-71): a read-only
@@ -662,6 +699,8 @@ async function activate(context) {
     vscode.commands.registerCommand('overseer.toggleDashboard', guard(async () => { if (dashboard.inDashboard) await dashboard.exit(); else { await model.refresh(); await dashboard.enter(); } })),
     vscode.commands.registerCommand('overseer.openDashboardWindow', guard(() => dashboard.openWindow())),
     vscode.commands.registerCommand('overseer.newAgent', guard(async () => { requireTrust(); await arrangement.chatOnly(); center.setMode('composer'); center.focus('composer'); })),
+    vscode.commands.registerCommand('overseer.whereAmI', guard(() => whereAmI())),
+    vscode.commands.registerCommand('overseer.talk', guard(() => vscode.commands.executeCommand('overseer.talk.focus'))),
     vscode.commands.registerCommand('overseer.resetGridLayout', guard(() => center.panel?.webview.postMessage({ type: 'gridReset' }))),
     vscode.commands.registerCommand('overseer.toggleGrid', guard(async () => {
       if (center.mode === 'grid') { center.setMode(selectedRun ? 'chat' : 'composer'); return; }

@@ -25,9 +25,13 @@ body { overflow: hidden; background: var(--ov-bg); background-image: var(--ov-ba
 .composer-note .fix { margin-left: 4px; }
 
 /* ---- Grid ---- */
-.view-grid { position: relative; display: flex; min-height: 0; }
+.view-grid { position: relative; display: flex; flex-direction: column; height: 100vh; min-height: 0; }
+.grid-head { flex: none; display: flex; align-items: center; gap: var(--ov-space-2); height: 36px; padding: 0 var(--ov-space-2) 0 var(--ov-space-4); border-bottom: 1px solid var(--ov-border); }
+.grid-head-title { font-weight: var(--ov-weight-semibold); }
+.grid-head-count { color: var(--ov-muted); font-size: var(--ov-font-sm); font-variant-numeric: tabular-nums; }
+.grid-head .spacer { flex: 1; }
 /* AC-104: the grid is a tree of splits; every split halves its space between two parts. */
-.grid { flex: 1; display: flex; gap: var(--ov-space-2); padding: var(--ov-space-2); height: 100vh; min-width: 0; min-height: 0; }
+.grid { flex: 1; display: flex; gap: var(--ov-space-2); padding: var(--ov-space-2); min-width: 0; min-height: 0; }
 .grid > .split, .grid > .cell { flex: 1 1 0; }
 .split { display: flex; flex: 1 1 0; gap: var(--ov-space-2); min-width: 0; min-height: 0; }
 .split-row { flex-direction: row; }

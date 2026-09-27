@@ -203,3 +203,16 @@ pre.code.error { color: var(--ov-failed); }
 .queued { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 12px; border-radius: var(--ov-radius-card); border: 1px dashed var(--ov-border-strong); font-size: var(--ov-font-sm); }
 .queued-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composer-note.warn { color: var(--ov-waiting); }
+
+/* Talk to Overseer (AC-107): a proposal card; a message Overseer sent to an agent; the shared state. */
+.proposal { margin: var(--ov-space-2) 0; padding: var(--ov-space-3); border: 1px solid var(--ov-border-strong); border-radius: var(--ov-radius-card); background: var(--ov-raised); }
+.proposal-head { display: flex; align-items: center; gap: var(--ov-space-2); font-weight: var(--ov-weight-semibold); color: var(--ov-text); }
+.proposal-head .codicon { color: var(--ov-accent); }
+.proposal-list { margin: var(--ov-space-2) 0; padding-left: var(--ov-space-5); line-height: var(--ov-line-body); }
+.proposal-actions { display: flex; gap: var(--ov-space-2); }
+.proposal-status { margin-top: var(--ov-space-2); color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.proposal-status:empty { display: none; }
+.proposal.answered { border-color: var(--ov-border); }
+.msg-from { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; font-size: var(--ov-font-xs); font-weight: var(--ov-weight-semibold); color: var(--ov-accent); }
+.msg.user.from-overseer { border: 1px solid var(--ov-accent-soft); }
+.msg-context { margin-top: 4px; font-size: var(--ov-font-xs); color: var(--ov-muted); }

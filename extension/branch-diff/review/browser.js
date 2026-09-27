@@ -820,6 +820,7 @@ window.addEventListener('message', event => {
 });
 layout.addEventListener('change', () => { updateSettings(settings); persist(); });
 document.getElementById('refresh').addEventListener('click', () => vscode.postMessage({ type: 'refresh' }));
+document.getElementById('where').addEventListener('click', () => vscode.postMessage({ type: 'whereAmI' }));
 const themeObserver = new MutationObserver(theme);
 themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-vscode-theme-id'] });
 const sizeObserver = new ResizeObserver(() => {
