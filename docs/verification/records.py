@@ -1409,6 +1409,75 @@ rec(176, "Voice Mode by voice (owner-confirmed)", "not started", date="—", com
 rec(177, "The mark shows it is hearing you", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate R).",
     actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(180, "Spikes before lock-in", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27; the goal's first step).")
+rec(181, "Overseer lives in the daemon", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(182, "One conversation, from home", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(183, "A digest of every agent", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(184, "Overseer reads on demand, and only reads", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(185, "A fixed set of actions, on one agent or all, each with its card", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(186, "Ask first, Steer, Auto", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(187, "Rein in: hold, release and guardrails", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(188, "Change direction", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(189, "Overseer keeps agents on task", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(190, "Agents that know about each other", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(191, "Context passed between agents", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(192, "Conflicts between agents in flight", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(193, "One agent watches another", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(194, "A watch that checks", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(195, "With Swarm: one decision-maker per swarm", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(196, "With route picking: routes, admission and metering", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(197, "Handoffs and offline", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(198, "Quiet and bounded", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(199, "Every surface", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(200, "What agents say is data", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(201, "Regression coverage", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(202, "Orchestration session (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate S).",
+    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
 
 SHORT_BLOCKERS = {
     154: "verified",
@@ -1529,6 +1598,29 @@ SHORT_BLOCKERS = {
     177: "not started (Gate R, added by the owner on 2026-09-27)",
     178: "not started (Brand, added by the owner on 2026-09-27): the phone app's agent uses the owner's files",
     179: "not started (Brand, added by the owner on 2026-09-27): the Mac helper's icon is built with AC-142; a menu-bar item does not exist yet",
+    180: "not started (Gate S, added by the owner on 2026-09-27; the goal's first step)",
+    181: "not started (Gate S, added by the owner on 2026-09-27)",
+    182: "not started (Gate S, added by the owner on 2026-09-27)",
+    183: "not started (Gate S, added by the owner on 2026-09-27)",
+    184: "not started (Gate S, added by the owner on 2026-09-27)",
+    185: "not started (Gate S, added by the owner on 2026-09-27)",
+    186: "not started (Gate S, added by the owner on 2026-09-27)",
+    187: "not started (Gate S, added by the owner on 2026-09-27)",
+    188: "not started (Gate S, added by the owner on 2026-09-27)",
+    189: "not started (Gate S, added by the owner on 2026-09-27)",
+    190: "not started (Gate S, added by the owner on 2026-09-27)",
+    191: "not started (Gate S, added by the owner on 2026-09-27)",
+    192: "not started (Gate S, added by the owner on 2026-09-27)",
+    193: "not started (Gate S, added by the owner on 2026-09-27)",
+    194: "not started (Gate S, added by the owner on 2026-09-27)",
+    195: "not started (Gate S, added by the owner on 2026-09-27)",
+    196: "not started (Gate S, added by the owner on 2026-09-27)",
+    197: "not started (Gate S, added by the owner on 2026-09-27)",
+    198: "not started (Gate S, added by the owner on 2026-09-27)",
+    199: "not started (Gate S, added by the owner on 2026-09-27)",
+    200: "not started (Gate S, added by the owner on 2026-09-27)",
+    201: "not started (Gate S, added by the owner on 2026-09-27)",
+    202: "not started (Gate S, added by the owner on 2026-09-27)",
 }
 TOTAL = 53
 
