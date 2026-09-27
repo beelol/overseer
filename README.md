@@ -130,7 +130,7 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-94** Local models as a first-class choice — [evidence](docs/verification/AC-94.md)
 - [x] **AC-95** Honest offline UI — [evidence](docs/verification/AC-95.md)
 - [x] **AC-96** Several local agents — [evidence](docs/verification/AC-96.md)
-- [ ] **AC-97** Offline session (owner-confirmed) — ◐ partial: with the network simulated at the owner's direction and everything else real (the packaged extension, the real Codex cut mid-turn through the simulated link, the real OpenCode on a real local model picked by the daemon's guard), the run transitions to local and the local model finishes the task in the same worktree / deferred: the full session with Switch back and its screenshots (the rerun waits for memory), and the owner's dated confirmation — [evidence](docs/verification/AC-97.md)
+- [ ] **AC-97** Offline session (owner-confirmed) — ◐ partial: the whole session with the network simulated at the owner's direction and everything else real: a real Codex run loses its connection mid-turn, transitions to a real local model that finishes the task in the same worktree, and when the connection returns Switch back continues in Codex's own session; both announcements, the run tree and the review are screenshotted at each step / deferred: the owner's dated confirmation of the session (the criterion is owner-confirmed) — [evidence](docs/verification/AC-97.md)
 - [x] **AC-98** On by default, explained once — [evidence](docs/verification/AC-98.md)
 - [x] **AC-99** The review is where files live — [evidence](docs/verification/AC-99.md)
 - [x] **AC-100** Nothing shown twice — [evidence](docs/verification/AC-100.md)
@@ -398,7 +398,7 @@ the owner action or decision each one needs.
 - [ ] [AC-64](docs/verification/AC-64.md) (Default-to-Overseer session (owner-confirmed)): Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.
 - [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.
 - [ ] [AC-83](docs/verification/AC-83.md) (Offline is not an outage): Owner: switch Wi-Fi off for about 15 seconds, then on again, any time before 2026-09-28 10:30 PDT; `node test/local/wifi-live.js watch` (started 2026-09-27, a real daemon in its own home reading Wi-Fi power once a second, stopping by itself afterwards) records it into `evidence/ac-83/`. Nothing else is needed.
-- [ ] [AC-97](docs/verification/AC-97.md) (Offline session (owner-confirmed)): Next: the rerun (automatic once memory allows), then the owner looks at the screenshots in `evidence/ui/offline-session/` and confirms with the date.
+- [ ] [AC-97](docs/verification/AC-97.md) (Offline session (owner-confirmed)): Owner: look at the eight screenshots in `evidence/ui/offline-session/` and confirm with the date (or say what is wrong).
 - [ ] [AC-114](docs/verification/AC-114.md) (Gate K in the owner's VS Code (owner-confirmed)): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
 - [ ] [AC-115](docs/verification/AC-115.md) (Feasibility and reuse before lock-in): not blocked
 - [ ] [AC-117](docs/verification/AC-117.md) (Pairing needs the Mac): not blocked
