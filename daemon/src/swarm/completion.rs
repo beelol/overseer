@@ -33,6 +33,22 @@ pub fn get(store: &Store, run: &str) -> Result<Value> {
     }
 }
 
+pub fn partial_get(store: &Store, run: &str) -> Result<Value> {
+    let saved: Option<(i64,i64,String,String,String,i64,String)> = store.conn.query_row(
+        "SELECT p.generation,p.revision,p.reason,p.summary,p.limitations,p.created_ms,r.status
+         FROM swarm_partial_reports p JOIN swarm_runs r ON r.id=p.run_id WHERE p.run_id=?1",
+        [run],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?)),
+    ).optional()?;
+    Ok(match saved {
+        Some((generation,revision,reason,summary,limitations,created_ms,status))=>json!({
+            "generation":generation,"revision":revision,"reason":reason,
+            "summary":summary,"limitations":limitations,"created_ms":created_ms,
+            "outcome":"incomplete","finalized":status=="stopped"
+        }),
+        None=>Value::Null,
+    })
+}
+
 pub fn complete(store: &mut Store, p: &Value) -> Result<Value> {
     let run = required(p, "run_id")?;
     super::owner::require(store,run,p)?;

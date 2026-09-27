@@ -366,6 +366,7 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
         .optional()?
         .ok_or_else(|| anyhow!("unknown swarm run {id}"))?;
     run["completion"] = completion::get(store, id)?;
+    run["partial_report"] = completion::partial_get(store, id)?;
     run["availability"] = availability::get(store, id)?;
     run["benefit"] = benefit::get_state(store, id, run["revision"].as_i64().unwrap_or(0))?;
     run["capacity"] = capacity_readout(store, id)?;
@@ -725,21 +726,31 @@ pub fn stop(store: &mut Store, p: &Value) -> Result<Value> {
     stop_with_reason(store, p, "requested", false)
 }
 
+pub fn partial(store: &mut Store, p: &Value) -> Result<Value> {
+    stop_with_reason(store, p, "incomplete", true)
+}
+
 pub(super) fn stop_for_deadline(store: &mut Store, p: &Value) -> Result<Value> {
     stop_with_reason(store, p, "deadline", true)
 }
 
 fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version: bool) -> Result<Value> {
     let id = required(p, "run_id")?;
-    let request_id = if reason == "requested" { p.get("request_id")
+    let request_id = if reason != "deadline" { p.get("request_id")
         .map(|v| v.as_str().ok_or_else(|| anyhow!("invalid stop request id"))).transpose()? }
         else { None };
+    if reason == "incomplete" && request_id.is_none() {
+        bail!("partial close requires a request id");
+    }
     let request_scope = p.get("request_scope").map(|v| v.as_str()
         .ok_or_else(|| anyhow!("invalid stop request scope"))).transpose()?;
     if request_scope.is_some() && request_id.is_none() {
         bail!("stop request scope requires request id");
     }
-    let request_scope = request_scope.unwrap_or("local");
+    let request_scope = request_scope.unwrap_or(if reason == "incomplete" { "director" } else { "local" });
+    if reason == "incomplete" && request_scope != "director" {
+        bail!("partial close requires director request scope");
+    }
     if request_id.is_some_and(|key| key.is_empty() || key.len() > 128
         || key.chars().any(char::is_control) || crate::redact::redact(key) != key)
         || request_scope.is_empty() || request_scope.len() > 128
@@ -782,6 +793,21 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
             return Ok(result);
         }
     }
+    let partial = if reason == "incomplete" {
+        owner::require(store,id,p)?;
+        let incomplete_reason=required(p,"incomplete_reason")?;
+        if !["unresolved_conflict","attempts_exhausted"].contains(&incomplete_reason) {
+            bail!("unsupported incomplete reason");
+        }
+        let summary=required(p,"summary")?.trim();
+        let limitations=required(p,"limitations")?.trim();
+        if summary.is_empty() || summary.len()>32*1024
+            || limitations.is_empty() || limitations.len()>8*1024 {
+            bail!("partial report requires bounded summary and limitations");
+        }
+        Some((incomplete_reason.to_string(),crate::redact::redact(summary),
+            crate::redact::redact(limitations)))
+    } else { None };
     let current = get(store, id)?;
     // Stop is a user safety control. A stale view must not prevent it; only
     // internal deadline transitions carry a director-version precondition.
@@ -802,6 +828,10 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
     if let Some((plan,control))=expected {
         if current["revision"]!=plan { bail!("stale stop plan revision"); }
         if current["control_revision"]!=control { bail!("stale stop control revision"); }
+    }
+    if partial.is_some() && !["planning","running","paused","stalled"]
+        .contains(&current["status"].as_str().unwrap_or("")) {
+        bail!("run cannot accept a new partial report in this state");
     }
     if current["status"] == "stopping" {
         let result=json!({"id":id,"status":"stopping","duplicate":true,
@@ -828,10 +858,48 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
     }
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
+    if let Some((incomplete_reason,_,_))=&partial {
+        let supported = match incomplete_reason.as_str() {
+            "unresolved_conflict" => tx.prepare(
+                "SELECT 1 FROM swarm_conflicts WHERE run_id=?1 AND status!='resolved'"
+            )?.exists([id])?,
+            "attempts_exhausted" => tx.prepare(
+                "SELECT 1 FROM swarm_jobs WHERE run_id=?1 AND status='failed'
+                 AND stop_reason='attempts_exhausted'"
+            )?.exists([id])?,
+            _ => false,
+        };
+        if !supported { bail!("incomplete reason lacks recorded evidence"); }
+        let active: i64=tx.query_row(
+            "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND status='registered'",
+            [id],|r|r.get(0))?;
+        let linked: i64=tx.query_row(
+            "SELECT COUNT(*) FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id
+             WHERE l.run_id=?1 AND (r.ended_ms IS NULL OR r.status='disconnected')",
+            [id],|r|r.get(0))?;
+        let unread: i64=tx.query_row(
+            "SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND recipient='director'
+             AND phase!='applied'",[id],|r|r.get(0))?;
+        let checking: i64=tx.query_row(
+            "SELECT COUNT(*) FROM swarm_verifications WHERE run_id=?1 AND status='running'",
+            [id],|r|r.get(0))?;
+        if active!=0 || linked!=0 || unread!=0 || checking!=0 {
+            bail!("partial close requires confirmed worker exits and reviewed director evidence");
+        }
+    }
+    let stop_reason=partial.as_ref().map(|(reason,_,_)|reason.as_str()).unwrap_or(reason);
     tx.execute(
         "UPDATE swarm_runs SET status='stopping',stop_reason=?3,control_revision=control_revision+1,updated_ms=?2 WHERE id=?1",
-        params![id, now, reason],
+        params![id, now, stop_reason],
     )?;
+    if let Some((incomplete_reason,summary,limitations))=&partial {
+        tx.execute(
+            "INSERT INTO swarm_partial_reports(run_id,request_sha256,generation,revision,
+             reason,summary,limitations,created_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+            params![id,request_sha256.as_deref().unwrap(),p["generation"].as_i64().unwrap(),
+                p["revision"].as_i64().unwrap(),incomplete_reason,summary,limitations,now],
+        )?;
+    }
     tx.execute("UPDATE swarm_jobs SET status='cancelled',updated_ms=?2 WHERE run_id=?1 AND status IN ('planned','ready')", params![id,now])?;
     tx.execute("UPDATE swarm_jobs SET status='cancel_requested',updated_ms=?2 WHERE run_id=?1 AND status IN ('reserved','launching','running')", params![id,now])?;
     if reason == "deadline" {
@@ -852,7 +920,7 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
     )?;
     record_operation(&tx, id, "stop")?;
     let status = finalize_control_if_idle(&tx,id,now)?;
-    let result=json!({"id":id,"status":status,"stop_reason":reason,"duplicate":false,
+    let result=json!({"id":id,"status":status,"stop_reason":stop_reason,"duplicate":false,
         "control_revision":current["control_revision"].as_i64().unwrap_or(0)+1});
     if let (Some(key),Some(hash))=(request_id,request_sha256.as_deref()) {
         tx.execute("INSERT INTO swarm_stop_requests(request_scope,request_id,

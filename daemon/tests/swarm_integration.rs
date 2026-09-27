@@ -342,7 +342,7 @@ fn two_acknowledged_dependents_repair_in_dependency_order_after_conflict() {
 
 #[test]
 fn exhausted_integrated_patch_stays_incomplete_after_late_conflict() {
-    let d=Daemon::start(&[]);
+    let mut d=Daemon::start(&[]);
     let t=tmp();
     let checkout=repo(&t.path().join("exhausted-integrated-patch"));
     let base=git(&checkout,&["rev-parse","HEAD"]);
@@ -449,6 +449,39 @@ fn exhausted_integrated_patch_stays_incomplete_after_late_conflict() {
     assert!(verification.contains("disputed integrated patch"),"{verification}");
     let current=d.call("swarm.coverage",json!({"run_id":run}));
     assert_eq!(current["rows"].as_array().unwrap().iter()
+        .find(|j|j["job_id"]=="patch").unwrap()["coverage_state"],"attempts_exhausted");
+    assert_eq!(git(std::path::Path::new(branch),&["rev-parse","HEAD"]),commit);
+    assert_eq!(fingerprint(&checkout),source_before);
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let left_attempt:String=db.query_row(
+        "SELECT id FROM swarm_attempts WHERE run_id=?1 AND job_id='left' ORDER BY created_ms LIMIT 1",
+        [run],|r|r.get(0)).unwrap();
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":2,"job_id":"left","attempt_id":left_attempt}));
+    let inbox=d.call("swarm.messages",json!({"run_id":run,"recipient":"director",
+        "limit":100}));
+    for message in inbox["messages"].as_array().unwrap() {
+        d.call("swarm.ack",json!({"run_id":run,"message_id":message["message_id"],
+            "recipient":"director","generation":1,"revision":message["revision"],
+            "phase":"applied"}));
+    }
+    let before=d.call("swarm.get",json!({"id":run}));
+    let report=json!({"run_id":run,"generation":1,"revision":2,
+        "expected_revision":2,"expected_control_revision":before["control_revision"],
+        "request_id":"close-exhausted-patch","incomplete_reason":"attempts_exhausted",
+        "summary":"The route was reproduced, but the accepted patch cannot be repaired",
+        "limitations":"Two patch attempts were spent; the private branch still contains the invalidated commit"});
+    let closed=d.call("swarm.partial",report.clone());
+    assert_eq!(closed["status"],"stopped","{closed}");
+    assert_eq!(closed["stop_reason"],"attempts_exhausted");
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.partial",report)["duplicate"],true);
+    let terminal=d.call("swarm.coverage",json!({"run_id":run}));
+    assert_eq!(terminal["outcome"],"incomplete","{terminal}");
+    assert_eq!(terminal["partial_report"]["reason"],"attempts_exhausted");
+    assert_eq!(terminal["partial_report"]["finalized"],true);
+    assert_eq!(terminal["rows"].as_array().unwrap().iter()
         .find(|j|j["job_id"]=="patch").unwrap()["coverage_state"],"attempts_exhausted");
     assert_eq!(git(std::path::Path::new(branch),&["rev-parse","HEAD"]),commit);
     assert_eq!(fingerprint(&checkout),source_before);

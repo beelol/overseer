@@ -333,6 +333,16 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           checks TEXT NOT NULL,
           created_ms INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS swarm_partial_reports(
+          run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          request_sha256 TEXT NOT NULL,
+          generation INTEGER NOT NULL,
+          revision INTEGER NOT NULL,
+          reason TEXT NOT NULL CHECK(reason IN ('unresolved_conflict','attempts_exhausted')),
+          summary TEXT NOT NULL,
+          limitations TEXT NOT NULL,
+          created_ms INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS swarm_completion_invalidations(
           run_id TEXT PRIMARY KEY REFERENCES swarm_completions(run_id),
           reason TEXT NOT NULL,

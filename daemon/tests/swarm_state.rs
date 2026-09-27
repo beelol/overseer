@@ -205,6 +205,30 @@ fn user_stop_needs_only_the_run_id_even_after_a_plan_revision() {
 }
 
 #[test]
+fn partial_close_cannot_invent_exhaustion_or_override_user_stop() {
+    let d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Partial order",
+        "objective":"Inspect a path","allowed_targets":["fixture"]}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"proof"}
+    ]}));
+    let report=json!({"run_id":run,"generation":1,"revision":1,
+        "expected_revision":1,"expected_control_revision":0,"request_id":"false-exhaustion",
+        "incomplete_reason":"attempts_exhausted","summary":"Could not finish",
+        "limitations":"No more attempts"});
+    assert!(d.try_call("swarm.partial",report.clone()).unwrap_err()
+        .contains("lacks recorded evidence"));
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["status"],"planning");
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["partial_report"],serde_json::Value::Null);
+    assert_eq!(d.call("swarm.stop",json!({"run_id":run}))["status"],"stopped");
+    assert!(d.try_call("swarm.partial",report).is_err());
+    let after=d.call("swarm.get",json!({"id":run}));
+    assert_eq!(after["stop_reason"],"requested");
+    assert_eq!(after["partial_report"],serde_json::Value::Null);
+}
+
+#[test]
 fn narrowing_scope_supersedes_queued_work_and_stops_an_active_excluded_attempt() {
     let d = Daemon::start(&[]);
     let made = d.call("swarm.create",json!({"category":"Catalog scope",

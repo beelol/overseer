@@ -214,6 +214,67 @@ fn stopped_disagreement_reports_incomplete_coverage_after_restart() {
 }
 
 #[test]
+fn director_can_close_an_unresolved_run_with_a_durable_partial_report() {
+    let mut d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Director partial close",
+        "objective":"Audit a disputed response","allowed_targets":["fixture"]}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"First probe","acceptance":"response evidence"},
+        {"id":"right","title":"Second probe","acceptance":"response evidence"}
+    ]}));
+    let left=submit(&d,run,"left","finding","foreign request returned 200");
+    let right=submit(&d,run,"right","finding","foreign request returned 403");
+    d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"response-disagreement","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"The responses disagree"}));
+    d.call("swarm.conflict.resolve",json!({"run_id":run,"generation":1,
+        "revision":1,"conflict_id":"response-disagreement","outcome":"unresolved"}));
+    let mut request=json!({"run_id":run,"generation":1,"revision":1,
+        "expected_revision":1,"expected_control_revision":0,
+        "request_id":"close-unresolved","incomplete_reason":"unresolved_conflict",
+        "summary":"Two fixture responses disagree; no confirmed verdict",
+        "limitations":"Independent reproduction was unavailable within the run allocation"});
+    assert!(d.try_call("swarm.partial",request.clone()).unwrap_err()
+        .contains("confirmed worker exits"));
+    for (job,attempt) in [("left",left),("right",right)] {
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":job,"attempt_id":attempt["id"]}));
+        d.call("swarm.ack",json!({"run_id":run,"message_id":format!("{job}-result"),
+            "recipient":"director","generation":1,"revision":1,"phase":"applied"}));
+    }
+    let owner=d.call("swarm.director.owner.begin",json!({"run_id":run,"generation":1}));
+    assert!(d.try_call("swarm.partial",request.clone()).is_err());
+    request["owner_token"]=owner["owner_token"].clone();
+    let closed=d.call("swarm.partial",request.clone());
+    assert_eq!(closed["status"],"stopped","{closed}");
+    assert_eq!(closed["stop_reason"],"unresolved_conflict");
+    let get=d.call("swarm.get",json!({"id":run}));
+    assert_eq!(get["completion"],Value::Null);
+    assert_eq!(get["partial_report"]["reason"],"unresolved_conflict");
+    assert_eq!(get["partial_report"]["summary"],request["summary"]);
+    assert_eq!(get["partial_report"]["finalized"],true);
+    let coverage=d.call("swarm.coverage",json!({"run_id":run}));
+    assert_eq!(coverage["outcome"],"incomplete");
+    assert_eq!(coverage["partial_report"],get["partial_report"]);
+    assert_eq!(coverage["unresolved_conflict_count"],1);
+    d.kill9();
+    d.spawn();
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap()
+        .execute("UPDATE swarm_director_owners SET lease_expires_ms=1 WHERE run_id=?1",
+            [run]).unwrap();
+    assert_eq!(d.call("swarm.partial",request.clone())["duplicate"],true);
+    let mut changed=request;
+    changed["summary"]=json!("A different verdict");
+    assert!(d.try_call("swarm.partial",changed).unwrap_err().contains("different input"));
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["partial_report"]["finalized"],true);
+    assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"false-success","summary":"Done",
+        "verification":"No repro","checks":[]})).is_err());
+}
+
+#[test]
 fn late_conflict_holds_accepted_jobs_until_contradicted_review_is_revised() {
     let mut d = Daemon::start(&[]);
     let made = d.call("swarm.create",json!({"category":"Late contradiction",

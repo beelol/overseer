@@ -132,6 +132,7 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
     let conflicts_truncated=unresolved_conflict_count>conflicts.len() as i64;
     Ok(json!({"run_id":run,"run_status":status,"outcome":outcome,
         "stop_reason":current["stop_reason"],"completion":current["completion"],
+        "partial_report":current["partial_report"],
         "unresolved_conflict_count":unresolved_conflict_count,
         "conflicts_truncated":conflicts_truncated,"conflicts":conflicts,"rows":rows}))
 }

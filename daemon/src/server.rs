@@ -414,6 +414,16 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 d, s(p,"run_id")?, fault_interrupt_once)?;
             stopped
         }
+        "swarm.partial" => {
+            fixture_only()?;
+            require_swarm_storage(d)?;
+            let mut closed = {
+                let _serial = d.swarm_launch_lock.lock().unwrap();
+                crate::swarm::partial(&mut d.store.lock().unwrap(), p)?
+            };
+            closed["workers"] = crate::swarm::interrupt_workers(d, s(p,"run_id")?)?;
+            closed
+        }
         "swarm.pause" => crate::swarm::pause(&mut d.store.lock().unwrap(), p)?,
         "swarm.resume" => crate::swarm::resume(&mut d.store.lock().unwrap(), p)?,
         "swarm.off" => crate::swarm::off(&mut d.store.lock().unwrap(), p)?,
