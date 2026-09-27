@@ -92,7 +92,12 @@ impl Daemon {
             store.conn.last_insert_rowid()
         };
         let msg = json!({"seq": seq, "id": id, "ts": now, "source": source, "surface": surface, "text": text, "card": card});
-        self.emit(None, None, "overseer_message", "daemon", "exact", json!({"session": session, "message": msg}))?;
+        // On Overseer's own run, so the surfaces that follow its feed (the docked chat) get it.
+        let run_id: Option<String> = {
+            use rusqlite::OptionalExtension;
+            self.store.lock().unwrap().conn.query_row("SELECT run_id FROM overseer_sessions WHERE id=?1", [session], |r| r.get::<_, Option<String>>(0)).optional()?.flatten()
+        };
+        self.emit(None, run_id.as_deref(), "overseer_message", "daemon", "exact", json!({"session": session, "message": msg}))?;
         Ok(msg)
     }
 
@@ -406,6 +411,26 @@ impl Daemon {
             "watch" => format!("Watch {} ({}): “{}”{}", who(a["agent"].as_str().or(a["subject"].as_str()).unwrap_or("?")), a["mode"].as_str().unwrap_or("watch"), a["brief"].as_str().or(a["text"].as_str()).unwrap_or(""), if a["hold_on_stop"] == true { ", hold on stop" } else { "" }),
             other => format!("{other} (not an action Overseer has)"),
         }
+    }
+
+    /// An agent started by hand appears in the conversation as a card (a start from Overseer has
+    /// its proposal's card already).
+    fn started_card(&self, run_id: &str, payload: &Value) -> Result<()> {
+        let session = self.overseer_session()?;
+        let sid = session["id"].as_str().unwrap_or_default().to_string();
+        let run = self.run(run_id)?;
+        let from_overseer = {
+            use rusqlite::OptionalExtension;
+            let store = self.store.lock().unwrap();
+            store.turns(run_id)?.first().and_then(|t| store.conn.query_row("SELECT source FROM turn_sources WHERE turn_id=?1", [&t.id], |r| r.get::<_, String>(0)).optional().ok().flatten()).as_deref() == Some("overseer")
+        };
+        if from_overseer {
+            return Ok(());
+        }
+        let task = payload["task"].clone();
+        let card = json!({"kind": "started", "agent": run_id, "title": run.title, "harness": run.harness, "repo": task["repo_root"], "prompt": crate::redact::redact(task["prompt"].as_str().unwrap_or("")).chars().take(400).collect::<String>(), "by": "owner"});
+        self.append_session_message(&sid, "card", None, &format!("Started {} ({}) in {}", run.title, run.harness, task["repo_root"].as_str().map(|r| r.rsplit('/').next().unwrap_or(r).to_string()).unwrap_or_default()), Some(&card))?;
+        Ok(())
     }
 
     /// A denied permission of the last day whose command or path these words would repeat.
@@ -957,7 +982,10 @@ pub fn start(daemon: Arc<Daemon>) {
                             d.subject_turn_started(&run)?;
                         }
                         // A second agent in a repository: the ones already working there get their briefing.
-                        ("task_created", "agent") => d.brief_companions(&run)?,
+                        ("task_created", "agent") => {
+                            d.brief_companions(&run)?;
+                            d.started_card(&run, &payload)?;
+                        }
                         ("turn_done", _) => {
                             d.dispatch_advance(&run, "answered", None)?;
                             d.deliver_queued(&run)?;

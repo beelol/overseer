@@ -1450,7 +1450,54 @@ impl Daemon {
         for r in runs.iter().filter(|r| r.parent_run_id.is_none()) {
             turns.insert(r.id.clone(), serde_json::to_value(store.turns(&r.id)?)?);
         }
-        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": runs, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns,
+        // Oversight per top-level run (held, watched, watching, open conflicts, area) and Overseer's
+        // own summary (the level, what waits for the owner), so every surface shows the same thing
+        // from one state (AC-199).
+        let mut oversight = serde_json::Map::new();
+        {
+            let mut holds = store.conn.prepare("SELECT run_id, reason FROM holds")?;
+            let held: std::collections::HashMap<String, String> = holds.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?.flatten().collect();
+            let mut watches = store.conn.prepare("SELECT subject, watcher, mode FROM watches WHERE ended_ms IS NULL")?;
+            let watching: Vec<(String, String, String)> = watches.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)))?.flatten().collect();
+            let mut conflicts = store.conn.prepare("SELECT run_a, run_b, kind FROM conflicts WHERE state='open'")?;
+            let open: Vec<(String, Option<String>, String)> = conflicts.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?, r.get::<_, String>(2)?)))?.flatten().collect();
+            let mut areas = store.conn.prepare("SELECT run_id, path FROM areas ORDER BY path")?;
+            let mut area_of: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+            for (run, path) in areas.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?.flatten() {
+                area_of.entry(run).or_default().push(path);
+            }
+            let mut roles = store.conn.prepare("SELECT run_id, role FROM run_roles")?;
+            let role_of: std::collections::HashMap<String, String> = roles.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?.flatten().collect();
+            for r in runs.iter().filter(|r| r.parent_run_id.is_none()) {
+                let mine: Vec<&(String, Option<String>, String)> = open.iter().filter(|c| c.0 == r.id || c.1.as_deref() == Some(r.id.as_str())).collect();
+                let watched_by: Vec<&str> = watching.iter().filter(|w| w.0 == r.id).map(|w| w.1.as_str()).collect();
+                let watching_whom: Vec<&str> = watching.iter().filter(|w| w.1 == r.id).map(|w| w.0.as_str()).collect();
+                let held_reason = held.get(&r.id);
+                if held_reason.is_none() && watched_by.is_empty() && watching_whom.is_empty() && mine.is_empty() && !area_of.contains_key(&r.id) && !role_of.contains_key(&r.id) {
+                    continue;
+                }
+                oversight.insert(r.id.clone(), json!({
+                    "held": held_reason.is_some(), "hold_reason": held_reason,
+                    "watched": !watched_by.is_empty(), "watchers": watched_by, "watching": watching_whom,
+                    "conflicts": mine.len(), "needs_decision": mine.iter().any(|c| c.2 == "same_lines" || c.2 == "area_crossed"),
+                    "area": area_of.get(&r.id).cloned().unwrap_or_default(), "role": role_of.get(&r.id).cloned().unwrap_or_else(|| "agent".into()),
+                }));
+            }
+        }
+        let overseer = {
+            use rusqlite::OptionalExtension;
+            let session: Option<(String, String, Option<String>)> = store.conn.query_row("SELECT id, level, run_id FROM overseer_sessions WHERE archived_ms IS NULL ORDER BY started_ms DESC LIMIT 1", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional()?;
+            match session {
+                Some((id, level, run_id)) => {
+                    let open: i64 = store.conn.query_row("SELECT COUNT(*) FROM overseer_proposals WHERE session_id=?1 AND state='open'", [&id], |r| r.get(0))?;
+                    let decisions: i64 = store.conn.query_row("SELECT COUNT(*) FROM conflicts WHERE state='open' AND kind IN ('same_lines', 'area_crossed')", [], |r| r.get(0))?;
+                    let last: Option<i64> = store.conn.query_row("SELECT MAX(ts) FROM overseer_messages WHERE session_id=?1", [&id], |r| r.get::<_, Option<i64>>(0)).ok().flatten();
+                    json!({"session": id, "level": level, "run_id": run_id, "open_proposals": open, "conflicts_needing_decision": decisions, "last_message_ms": last})
+                }
+                None => json!({"session": Value::Null, "level": "ask_first", "open_proposals": 0, "conflicts_needing_decision": 0}),
+            }
+        };
+        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": runs, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns, "oversight": oversight, "overseer": overseer,
             "daemon": {"pid": std::process::id(), "started_ms": self.started_ms, "version": env!("CARGO_PKG_VERSION"), "parser_version": adapters::PARSER_VERSION}}))
     }
 
