@@ -1173,9 +1173,24 @@ rec(137, "Motion throughout", "not started", date="—", commit="—",
 rec(138, "Permission modes carry over", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#permission-modes-carry-over-ac-138).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
-rec(139, "OpenCode session transport spike", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
-    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(139, "OpenCode session transport spike", "partial", commit="b5776a2", date="2026-09-26",
+    proven="both session transports of the installed OpenCode were driven with a local model inside the memory budget and their transcripts are recorded; the decision is written in the RFC (local runs use `opencode serve`; `opencode acp` cannot interrupt a turn); four fixtures were recorded from the chosen transport",
+    deferred="the adapter tests that replay the recorded fixtures, which arrive with the OpenCode adapter work (AC-138)",
+    harness="OpenCode 1.15.13 with Ollama 0.34.2 and `qwen3-coder:30b-64k` (local model; no account, no paid tokens)",
+    fixture="An isolated OpenCode profile (its own XDG folders, `enabled_providers: [\"ollama\"]`, rules `edit: ask`, `bash: ask`) and two disposable Git repositories under the session scratchpad; the user's own OpenCode configuration was neither read nor written",
+    steps="""1. Memory before loading: 55.5 GiB available, budget 42.7 GiB; the model measures 23.7 GiB at a 65,536-token context ([memory.jsonl](evidence/ac-139/memory.jsonl)).
+2. `opencode serve --port 47931 --hostname 127.0.0.1` in the disposable repository, then `node test/spike/opencode-serve.js allow deny plan interrupt children directory usage`; the server was stopped and started again, then `node test/spike/opencode-serve.js resume-after plan`.
+3. `node test/spike/opencode-acp.js allow deny plan config interrupt kill children load` (it starts `opencode acp` itself).
+4. The model was unloaded (`keep_alive: 0`) and memory recorded again: 52.4 GiB available, nothing loaded.""",
+    expected="Redacted transcripts of both transports with versions; the written decision; a fixture recorded from the chosen transport that the adapter tests replay.",
+    actual="""- **`opencode serve`: 22 of 23 checks pass** ([results.txt](evidence/ac-139/results.txt)). A permission request arrives as a `permission.asked` event with the file path and a diff; nothing is written before the answer; `once` lets the write through and `reject` blocks it; a later command in the same turn asks again. `POST /session/{id}/abort` ended a 45 s command in 56 ms with `MessageAbortedError`, and the session took the next prompt. A restarted server continued the earlier session with its history. A child session is announced by `session.created` with its parent and listed by `/session/{id}/children`. One server served a second directory, with events and pending requests scoped to it. The assistant message reports tokens and cost. The one failure is the first plan attempt, which waited on OpenCode's `question` tool; with that tool denied by a session rule the plan agent finished and changed no file.
+- **`opencode acp`: 19 of 21 checks pass.** Permission requests, Allow, Deny, model and mode through config options, and `session/load` in a new process all work. **Interrupt does not:** `session/cancel` answers "Method not found" as a notification and as a request, and the 45 s command ran to its end (45,565 ms). A plan turn that delegated to a child never finished (300 s) and no request reached the client.
+- **Decision:** local runs use `opencode serve` through a bridge subcommand of `overseerd` and a new harness id `opencode-serve`; written in [the RFC](../rfcs/offline-mode.md#the-spike-comes-first-ac-139).
+- **Also learned:** a fresh profile offers eight online OpenCode Zen models unless `enabled_providers` names only the local provider; once in the 49 prompts of the spike the verified model wrote its tool call as text and nothing ran ([transcript](evidence/ac-139/serve-tool-call-as-text.jsonl)).""",
+    evidence="[evidence/ac-139/](evidence/ac-139/) (transcripts, results, memory), `fixtures/transcripts/opencode-1.15.13-serve-{allow,deny,interrupt,children}-local.jsonl`, drivers `test/spike/opencode-serve.js` and `test/spike/opencode-acp.js`",
+    live="Real OpenCode runtime and a real local model through Ollama; no account and no paid tokens.",
+    limits="macOS only; one OpenCode version (1.15.13) and one model. A research criterion: it does not pass AC-138.",
+    blocker="Next: build the bridge and the `opencode-serve` adapter (AC-138); its tests replay the recorded fixtures, which completes this criterion.")
 rec(140, "Memory safety guard", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
     actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
@@ -1271,7 +1286,6 @@ SHORT_BLOCKERS = {
     136: "not started (Gate N, added by the owner on 2026-09-26)",
     137: "not started (Gate N, added by the owner on 2026-09-26)",
     138: "not started (Gate L, added by the owner on 2026-09-26)",
-    139: "not started (Gate L, added by the owner on 2026-09-26; the goal's first step)",
     140: "not started (Gate L, added by the owner on 2026-09-26)",
     141: "not started (Gate N, added by the owner on 2026-09-26)",
 }
