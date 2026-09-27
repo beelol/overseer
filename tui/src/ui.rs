@@ -47,6 +47,9 @@ pub fn status_mark(status: &str) -> (&'static str, Color) {
         "failed" => ("✗", Color::Red),
         "interrupted" => ("■", Color::Yellow),
         "disconnected" => ("⚡", Color::Red),
+        // Continuity (Gate L): waiting is not a failure; a handed-off agent points at its successor.
+        "waiting_for_connection" | "waiting_for_memory" => ("☁", waiting()),
+        "handed_off" => ("→", MUTED),
         _ => ("?", Color::Magenta),
     }
 }
@@ -54,6 +57,9 @@ pub fn status_mark(status: &str) -> (&'static str, Color) {
 fn status_word(status: &str) -> &str {
     match status {
         "waiting_for_user" => "needs you",
+        "waiting_for_connection" => "waiting for a connection",
+        "waiting_for_memory" => "waiting for memory",
+        "handed_off" => "handed off",
         "starting" => "starting",
         s => s,
     }

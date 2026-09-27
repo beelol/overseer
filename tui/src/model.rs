@@ -3,7 +3,8 @@
 use serde::Deserialize;
 use serde_json::Value;
 
-pub const ACTIVE: [&str; 4] = ["queued", "starting", "running", "waiting_for_user"];
+// Continuity (Gate L): an agent that waits for its connection or for memory still holds its work.
+pub const ACTIVE: [&str; 6] = ["queued", "starting", "running", "waiting_for_user", "waiting_for_connection", "waiting_for_memory"];
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Run {

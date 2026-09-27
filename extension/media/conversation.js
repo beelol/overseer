@@ -75,6 +75,7 @@
       this.active = ['queued', 'starting', 'running'].includes(msg.run.status);
       this.attention = msg.run.attention && msg.run.attention.kind === 'permission' ? msg.run.attention.request_id : undefined;
       for (const c of msg.children || []) this.childInfo.set(c.id, c);
+      if (window.OverseerContinuity) window.OverseerContinuity.run(this, msg);
       for (const [id, card] of this.perms) this.renderPermission(id, card);
       for (const [id, block] of this.children) this.renderChildHeader(id, block);
       this.updateWorking();
@@ -275,6 +276,8 @@
       this.seen.add(ev.seq);
       const p = ev.payload || {};
       const child = ev.run_id && ev.run_id !== this.rootId;
+      // Continuity (Gate L) draws its own events: transitions, waiting, the way back.
+      if (window.OverseerContinuity && window.OverseerContinuity.event(this, ev)) return;
       switch (ev.kind) {
         case 'turn_started': if (!child) { this.stopping = false; this.newTurn(p.turn || { n: this.turns.length + 1, prompt: '' }, false, ev); this.active = true; this.updateWorking('Working…'); } break;
         case 'interrupt_requested': if (!child) this.stopping = true; break;

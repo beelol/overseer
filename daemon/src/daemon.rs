@@ -348,9 +348,9 @@ impl Daemon {
         let repo = git::toplevel(Path::new(repo_in)).context("repository not found")?;
         let common = git::common_dir(&repo)?;
         let profile = match p["profile_id"].as_str() {
+            // Local runs use Overseer's own OpenCode profile, never the user's own configuration; it is made on first use.
+            Some(crate::opencode_bridge::LOCAL_PROFILE) | None if harness == "opencode-serve" => Some(crate::opencode_bridge::local_profile(self)?),
             Some(id) => Some(self.profile(id)?),
-            // Local runs use Overseer's own OpenCode profile, never the user's own configuration.
-            None if harness == "opencode-serve" => Some(crate::opencode_bridge::local_profile(self)?),
             None if harness != "generic" => Some(self.profile(&format!("system-{}", profile_harness(harness)))?),
             None => None,
         };
@@ -499,7 +499,7 @@ impl Daemon {
         let continuity = opts.retry_of.is_some() || opts.handoff;
         if follow_up && !continuity {
             // With `returnOnline: auto` a message to a run that went local returns to its first agent.
-            if let Some(turn) = crate::handoff::before_follow_up(self, &run, prompt)? {
+            if let Some(turn) = crate::handoff::before_follow_up(self, &run, prompt, opts)? {
                 return Ok(turn);
             }
         }

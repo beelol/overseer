@@ -369,6 +369,12 @@ fn ac91_transition_to_local_when_offline() {
     // The model passed the guard and was loaded under the watchdog.
     assert_eq!(l.kinds(&next, "local_model")[0]["auto"], true);
     assert_eq!(l.o.asked("/api/generate").len(), 1);
+    // A message to the agent that handed off goes to the agent that has the work now.
+    let turn = l.d.call("run.follow_up", json!({"run_id": first, "prompt": "write again.txt more; say done"}));
+    assert_eq!(turn["run_id"], next.as_str(), "{turn}");
+    l.until(&next, "done with the message", |r| r["status"] == "completed" && l.turns(&next).len() == 2);
+    assert_eq!(std::fs::read_to_string(l.workspace(&c).join("again.txt")).unwrap(), "more\n");
+    assert_eq!(l.turns(&first).len(), 1, "the handed-off agent got no turn of its own");
 
     // A read-only Codex run becomes Plan only, and changes nothing.
     let c = l.start("codex", "write never.txt nope; say blocked", Some("read-only"));

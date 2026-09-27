@@ -8,7 +8,7 @@
 // tiles can be pinned; arrow keys move between tiles. The layout is kept per window.
 (function () {
   const ui = window.OverseerUI, el = ui.el;
-  const ACTIVE = new Set(['queued', 'starting', 'running', 'waiting_for_user']);
+  const ACTIVE = new Set(['queued', 'starting', 'running', 'waiting_for_user', 'waiting_for_connection', 'waiting_for_memory']);
   const MAX = 16;
 
   // ---- Layout tree: { run } | { dir: 'row' | 'col', parts: [two or more nodes] } ----
@@ -184,7 +184,7 @@
       }
       const busy = ACTIVE.has(run.status) && run.harness !== 'generic';
       tile.input.disabled = busy || String(run.capabilities?.follow_up || '').startsWith('unsupported');
-      tile.input.placeholder = busy ? 'Working…' : 'Reply';
+      tile.input.placeholder = busy ? (window.OverseerContinuityText && window.OverseerContinuityText.isWaiting(run.status) ? 'Message for when it continues' : 'Working…') : 'Reply';
     }
 
     let ready = false; // no layout (and no pruning of a restored one) before the first state arrives

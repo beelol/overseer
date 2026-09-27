@@ -716,6 +716,37 @@ Follows the Gate J principles (less text, quiet until it needs you) and the Gate
   limit; transitions are not attention items.
 - **Grid:** waiting tiles show the retry countdown quietly; local tiles carry the Local mark.
 
+As built (2026-09-26), in `extension/src/continuity.js` (the host), `extension/media/continuity.js`
+(the webviews) and `extension/media/continuity-text.js` (the words, shared with the unit tests):
+
+- **Status bar:** its own item, `$(cloud)` alone while online; `$(cloud) OpenAI unreachable` while
+  degraded; `$(cloud) Offline · 2 waiting` on the warning background while offline. Its tooltip is
+  the sentence, what the system said, each provider's health and what Continuity does now. It opens
+  a pick with the connection, the Continuity switch, the waiting agents, Check now, Local models,
+  the two Allow switches and the settings.
+- **Side bar:** the Agents view's message says *Overseer is offline: no network (system). 1 agent
+  waiting.* while not online, and nothing while online. Waiting agents keep their provider's mark
+  with a `☁` badge; a handed-off agent folds under the agent that took over as *Earlier: Codex ·
+  handed off · the connection was lost*. One Needs-you row, *2 agents waiting for a connection*,
+  stands for every waiting agent. The Continuity switch is in the status bar's pick and in the
+  settings, not in Accounts.
+- **Composer and New Task:** the Agent menu ends with **Local models · Ollama**: *Best fit ·
+  qwen3-coder:30b*, then each installed model with its badge (*fits at 64k*, *fits at 32k · failed
+  its check*, *too big · 77.2 GiB of 51.2 GiB*), and the models the catalogue knows but that are
+  not installed behind one entry. The badge is the guard's own answer (`local.models`). Offline, the
+  online agents are disabled with the reason, a line above the field says so, and one click moves
+  to the best local model; back online, the last online agent is the default again. A local agent
+  needs no account. The first-use notice sits above the field, once per machine, with the two Allow
+  switches and *Turn Continuity off*.
+- **Chat and tiles:** the announcements are one quiet line each. A waiting agent shows one card:
+  the title, *Your message is kept*, *Next check in 40 s · waiting 2 min · gives up after 36 hours*,
+  and **Use a local model now** (or *Continue with Claude Code*), **Retry now**, **Stop**; a move
+  that would ask less often is offered with the difference and made after a confirmation. Back
+  online, a local or failed-over agent shows **Switch back to Codex** and **Stay here**. The turn
+  of a waiting agent never reads *Failed*. Tiles show the same, compact. The settings are 19
+  `overseer.continuity.*` entries with the daemon's ranges; VS Code pushes what the user sets and
+  mirrors what the daemon has.
+
 ## Security and privacy
 
 - Probes send no credentials and no payload beyond a TLS handshake or an empty `HEAD`; the system

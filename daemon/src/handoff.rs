@@ -707,7 +707,8 @@ pub fn new_agents(d: &Daemon, status: &Status) -> Value {
     harnesses.push(json!({"harness": opencode_bridge::HARNESS, "provider": "local", "usable": local_installed, "why": if local_installed { Value::Null } else { json!("OpenCode is not installed") }}));
     // The user's own last choice: a run they started, not one Overseer moved the work to.
     let own = |r: &&Run| r.parent_run_id.is_none() && !r.relation_source.as_deref().is_some_and(|s| s.starts_with("handoff from "));
-    let last = runs.iter().rev().filter(own).find(|r| usable.contains(&r.harness.as_str()));
+    // Back online, the online harness the user last chose comes first; a local run made offline does not become the default.
+    let last = runs.iter().rev().filter(own).find(|r| usable.contains(&r.harness.as_str()) && r.harness != opencode_bridge::HARNESS);
     let order = provider_order(&continuity::settings().provider_order, "");
     let first = order.iter().filter_map(|p| match p.as_str() {
         "openai" => Some("codex"),
@@ -736,7 +737,17 @@ fn back_target(d: &Daemon, run: &Run) -> Result<Target> {
 
 /// With `returnOnline: auto`, a message sent to a run that went local goes back to the first
 /// agent once the connection has returned. Returns the turn it started there.
-pub fn before_follow_up(d: &Arc<Daemon>, run: &Run, prompt: &str) -> Result<Option<Turn>> {
+pub fn before_follow_up(d: &Arc<Daemon>, run: &Run, prompt: &str, opts: &TurnOpts) -> Result<Option<Turn>> {
+    // A message to an agent that handed its work off goes to the agent that has the work now.
+    if run.status == HANDED_OFF {
+        let mut id = run.id.clone();
+        while let Some(next) = successor_of(d, &id) {
+            id = next;
+        }
+        if id != run.id {
+            return Ok(Some(d.start_turn(&id, prompt, true, opts)?));
+        }
+    }
     if continuity::settings().return_online != "auto" || ACTIVE.contains(&run.status.as_str()) {
         return Ok(None);
     }
