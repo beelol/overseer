@@ -1,7 +1,7 @@
 # Side RFC: Continuity — offline mode and local models
 
 Status: proposed by the owner on 2026-09-26; decisions taken the same day (below). Acceptance
-criteria: AC-83 to AC-98 (Gate L) in the
+criteria: AC-83 to AC-98 and AC-138 (Gate L) in the
 [main RFC](../overseer-rfc.md#gate-l--continuity-offline-mode-and-local-models-added-by-the-owner-2026-09-26).
 Implementation: **its own worktree and pull request** (owner, 2026-09-26). Builds on the verified OpenCode + Ollama
 path ([AC-14](../verification/AC-14.md), the [Ollama log](../verification/evidence/ac-14/opencode-ollama.log)),
@@ -43,6 +43,7 @@ under `overseer.continuity.*`. The chat still uses the owner's verb for the mome
 | Failover order | OpenAI, then Anthropic, then whatever other providers have accounts, then local. |
 | Prefetch | Kept as a feature, **off until asked**: Overseer offers it once when downloads are first allowed, and only then keeps a fitting local model downloaded. |
 | Downloads and Ollama install | Opt-in settings, off by default, offered in the first-use notice. |
+| Permission modes | Carried over on every handoff, never loosened. The OpenCode adapter gains Plan only, Accept edits, Auto and Ask first; until Ask first is verified, such a run waits and offers the move instead. |
 | Where it is built | In its own worktree, landing through a pull request. |
 | Other proposals in this RFC | Accepted as written (budget, handoff, catalogue verification, out-of-scope items). |
 
@@ -314,6 +315,33 @@ can reorder with `continuity.preferredModels`.
 | **Codex** | `codex exec --oss --local-provider ollama -m <tag>` (flags present in the installed 0.155 binary). Keeps Codex's file-change and child telemetry with a local model. | to verify (AC-87); second choice until then |
 | **Claude Code** | Would need `ANTHROPIC_BASE_URL` and a placeholder token in the harness environment. Overseer never forwards `ANTHROPIC_*` or token variables (AC-16), so this is **not in scope**; see [Open questions](#open-questions). | out of scope |
 
+### Permission modes carry over (AC-138)
+
+A handoff keeps the run's permission mode and never loosens it. Local models have nothing to do
+with this: OpenCode has its own permission system (allow, ask and deny rules per tool), a built-in
+`plan` agent that denies edits, and two session transports a client can answer requests over
+(`opencode serve` and `opencode acp`). The gap is in Overseer's adapter, which uses the one-shot
+`opencode run` transport: it passes no agent and no rules, and it has no channel for a permission
+request to come back, so asks are rejected. The same was true of Codex before the app-server
+transport ([compatibility](../compatibility.md)).
+
+| The run's mode | Claude Code | Codex | OpenCode (local), after this gate |
+| --- | --- | --- | --- |
+| Plan only | `--permission-mode plan` | sandbox read-only | `--agent plan` |
+| Ask first | `--permission-mode manual` with the permission prompt tool | `codex-app` approval requests | rules `edit: ask`, `bash: ask` over a session transport; requests appear as Allow and Deny cards in the chat |
+| Accept edits | `--permission-mode acceptEdits` | sandbox workspace-write | rules `edit: allow`, `bash: ask` over a session transport |
+| Auto | `--permission-mode auto` | sandbox workspace-write | the `build` agent as shipped |
+
+- **Rules are written by Overseer** into the local account's `opencode.json` per turn; the user's own
+  OpenCode configuration is never edited.
+- **Never looser.** If the target cannot honour the run's mode, Overseer does not transition on its
+  own: the run waits (as with Continuity off) and the chat offers the move with the difference
+  stated, for example *The local agent cannot ask before running commands yet. Continue locally in
+  Accept edits?*
+- **Spike first.** How permission requests appear over `opencode serve` and `opencode acp` in
+  OpenCode 1.15 is not yet verified. Until it is, Plan only and Auto carry over and Ask first and
+  Accept edits use the fallback above.
+
 The local account is the existing `local` provider ("OpenCode (local models)", `daemon/src/accounts.rs`),
 renamed **Local (Ollama)**, created automatically when Ollama is found, with no sign-in. Its status
 row shows the Ollama version, the number of installed models and the current budget.
@@ -375,7 +403,8 @@ workspace. It is the one mechanism behind failover, going local, and switching b
    ```
 
 5. **Start the successor** with the run's remembered turn options where the target supports them
-   (model per turn, permission mode), `predecessor_run_id` set and `handoff_reason` recorded
+   (model per turn) and its permission mode mapped as in
+   [Permission modes carry over](#permission-modes-carry-over-ac-138), never loosened, `predecessor_run_id` set and `handoff_reason` recorded
    (`offline`, `provider_unreachable:openai`, `back_online`, `user`).
 6. **Mark the predecessor** `handed_off` (a terminal state distinct from `failed`, with the successor's
    id in `exit_reason`), release its workspace ownership to the successor (one writer at a time), and
@@ -568,6 +597,7 @@ prefetch and the catalogue's starting family. Still open:
 | Fail over on quota or rate limit too? | Not in Gate L. Add a separate criterion under quota-aware routing; the handoff mechanism will be reusable. |
 | Codex `--oss` as the local harness | Verify under AC-87; if it passes, offer it as `localHarness: codex` because it keeps Codex's telemetry. |
 | Derived tags versus per-request `num_ctx` | Derived tags: the OpenAI-compatible route OpenCode uses cannot carry `num_ctx`. Revisit if OpenCode gains native Ollama options. |
+| How permission requests appear over OpenCode's session transports | Spike `opencode acp` first (a documented client protocol), then `opencode serve`; pick the one whose requests map cleanly onto Overseer's Allow and Deny cards. |
 | Change notifications versus polling for the system check | Start with polling every 5 seconds (cheap, portable); add the SystemConfiguration and NetworkManager subscriptions if the polling delay is noticeable in AC-83. |
 
 ## Phases (goal candidates)
@@ -578,13 +608,13 @@ built in its own worktree and lands through a pull request.
 | Phase | Criteria | Outcome |
 | --- | --- | --- |
 | 1. See | AC-83, AC-85, AC-86, AC-87, AC-88, AC-98 | Connection state from the system, probes and agents; memory read from the machine; budget and fit; verified Qwen coder catalogue; settings owned by the daemon; Continuity on by default with its one-time notice. Nothing changes routing yet. |
-| 2. Choose local | AC-89, AC-90, AC-94 | Local models are a first-class choice online, with downloads, prefetch and the Ollama install behind settings. |
+| 2. Choose local | AC-89, AC-90, AC-94, AC-138 | Local models are a first-class choice online, with downloads, prefetch and the Ollama install behind settings, and the OpenCode adapter honours permission modes. |
 | 3. Keep working | AC-84, AC-91, AC-92, AC-93, AC-96 | Failover, transition to local, wait and retry for up to 36 hours, back online, several local agents. |
 | 4. Confirm | AC-95, AC-97 | Honest UI at every state; the owner turns the network off during a real run and sees the transition. |
 
 ## Acceptance
 
-AC-83 to AC-98 in the main RFC are the acceptance criteria. Their Verify clauses cover, in short:
+AC-83 to AC-98 and AC-138 in the main RFC are the acceptance criteria. Their Verify clauses cover, in short:
 
 - the three connection states from the system's answer, fixture-controlled probes and harness errors,
   including Wi-Fi turned off on a real machine, a captive portal, a DNS failure, and a 429 that is
@@ -605,4 +635,6 @@ AC-83 to AC-98 in the main RFC are the acceptance criteria. Their Verify clauses
 - back online: new agents default to online, Switch back and Stay local both work;
 - local models offered in the composer with fit badges; several local agents sharing one model;
 - Continuity on by default with the one-time notice, and off with one switch;
+- permission modes carried over on handoff and never loosened, with Plan only, Ask first, Accept
+  edits and Auto working through OpenCode;
 - the owner's dated confirmation after disconnecting during a real run.

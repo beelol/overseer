@@ -1169,6 +1169,11 @@ rec(137, "Motion throughout", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
 
+# Gate L addition (Continuity): permission modes on handoff.
+rec(138, "Permission modes carry over", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#permission-modes-carry-over-ac-138).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+
 SHORT_BLOCKERS = {
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
@@ -1249,6 +1254,7 @@ SHORT_BLOCKERS = {
     135: "not started (Gate N, added by the owner on 2026-09-26)",
     136: "not started (Gate N, added by the owner on 2026-09-26)",
     137: "not started (Gate N, added by the owner on 2026-09-26)",
+    138: "not started (Gate L, added by the owner on 2026-09-26)",
 }
 TOTAL = 53
 
