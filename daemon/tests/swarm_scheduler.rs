@@ -199,3 +199,57 @@ fn distinct_allowed_targets_admit_only_the_jobs_they_can_perform() {
     assert_eq!(browser["job_id"], "j000");
     assert_eq!(browser["target_id"], "browser-profile");
 }
+
+#[test]
+fn identical_persisted_state_replays_scheduler_decisions_and_provider_labels_do_not_route() {
+    let mut first = Daemon::start(&[]);
+    let run = make_run(&first, "Deterministic audit", 3);
+    commit_beneficial_batch(&first, &run, &["j000".into(), "j001".into(), "j002".into()]);
+    first.kill9();
+    let source = first.home.path().join("overseer.sqlite");
+    rusqlite::Connection::open(&source).unwrap()
+        .execute_batch("PRAGMA wal_checkpoint(TRUNCATE)").unwrap();
+    let second_home = tempfile::Builder::new().prefix("ovs-scheduler-replay")
+        .tempdir_in("/tmp").unwrap();
+    std::fs::copy(&source, second_home.path().join("overseer.sqlite")).unwrap();
+    let mut second = Daemon { home: second_home, child: None, env: first.env.clone() };
+    first.spawn();
+    second.spawn();
+
+    let at = now();
+    let mut left_snapshot = snapshot(at);
+    left_snapshot["targets"][0]["provider"] = json!("provider-one");
+    let mut right_snapshot = left_snapshot.clone();
+    let schedule = |d: &Daemon, snapshot: Value, id: &str| d.call(
+        "swarm.schedule.next", json!({"request_id":id,"target_id":"fixture",
+            "now_ms":at,"snapshot":snapshot,"required_capabilities":["code"],
+            "estimate_milli":{"points":100},"purpose":"worker"}),
+    );
+    let left = schedule(&first, left_snapshot.clone(), "same-first");
+    let right = schedule(&second, right_snapshot.clone(), "same-first");
+    for key in ["status", "run_id", "job_id", "target_id"] {
+        assert_eq!(left[key], right[key], "decision differs at {key}: {left} / {right}");
+    }
+    assert_eq!(left["status"], "admitted", "{left}");
+    assert_eq!(left["job_id"], "j000");
+
+    right_snapshot["targets"][0]["provider"] = json!("renamed-provider");
+    let left_renamed = schedule(&first, left_snapshot.clone(), "same-second");
+    let right_renamed = schedule(&second, right_snapshot.clone(), "same-second");
+    for key in ["status", "run_id", "job_id", "target_id"] {
+        assert_eq!(left_renamed[key], right_renamed[key],
+            "provider label changed {key}: {left_renamed} / {right_renamed}");
+    }
+    assert_eq!(left_renamed["status"], "admitted", "{left_renamed}");
+    assert_eq!(left_renamed["job_id"], "j001");
+
+    left_snapshot["targets"][0]["health"] = json!("down");
+    right_snapshot["targets"][0]["health"] = json!("down");
+    let left_blocked = schedule(&first, left_snapshot, "same-blocked");
+    let right_blocked = schedule(&second, right_snapshot, "same-blocked");
+    assert_eq!(left_blocked, right_blocked,
+        "the provider label cannot change the blocked reason");
+    assert_eq!(left_blocked["status"], "blocked");
+    assert_eq!(left_blocked["reason"], "all_categories_blocked");
+    assert_eq!(left_blocked["candidates"][0]["reason"], "target_unhealthy");
+}
