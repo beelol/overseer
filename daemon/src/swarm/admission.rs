@@ -270,24 +270,24 @@ fn admit_inner(
     if now >= job_deadline {
         return Ok(blocked("job_deadline"));
     }
-    if job_status != "ready" {
-        if job_status == "planned" {
-            let raw: String = tx.query_row(
-                "SELECT deps FROM swarm_jobs WHERE run_id=?1 AND id=?2",
-                params![run,job], |row| row.get(0),
-            )?;
-            let deps: Vec<String> = serde_json::from_str(&raw)?;
-            let mut waiting_on = Vec::new();
-            for dep in deps {
-                if !super::artifacts::dep_satisfied(&tx,run,&dep)? {
-                    waiting_on.push(dep);
-                }
-            }
-            if !waiting_on.is_empty() {
-                return Ok(json!({"status":"blocked","reason":"dependency_pending",
-                    "waiting_on":waiting_on}));
+    if job_status == "ready" || job_status == "planned" {
+        let raw: String = tx.query_row(
+            "SELECT deps FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            params![run,job], |row| row.get(0),
+        )?;
+        let deps: Vec<String> = serde_json::from_str(&raw)?;
+        let mut waiting_on = Vec::new();
+        for dep in deps {
+            if !super::artifacts::dep_satisfied(&tx,run,&dep)? {
+                waiting_on.push(dep);
             }
         }
+        if !waiting_on.is_empty() {
+            return Ok(json!({"status":"blocked","reason":"dependency_pending",
+                "waiting_on":waiting_on}));
+        }
+    }
+    if job_status != "ready" {
         return Ok(blocked("job_not_ready"));
     }
     let planned_claims: String = tx.query_row(

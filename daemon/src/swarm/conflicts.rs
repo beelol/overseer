@@ -83,13 +83,27 @@ pub fn open(store: &mut Store, p: &Value) -> Result<Value> {
         bail!("conflict requires separate submitted or accepted attempts");
     }
     let now=crate::daemon::now();
-    store.conn.execute(
+    let tx=store.conn.transaction()?;
+    tx.execute(
         "INSERT INTO swarm_conflicts(run_id,conflict_id,generation,revision,left_job_id,
           left_artifact_id,right_job_id,right_artifact_id,reason,status,created_ms,updated_ms)
          VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,'open',?10,?10)",
         params![run,id,p["generation"].as_i64(),p["revision"].as_i64(),
             left_job,left_artifact,right_job,right_artifact,reason,now],
     )?;
+    let mut stmt=tx.prepare("SELECT id,deps FROM swarm_jobs WHERE run_id=?1 AND status='ready'")?;
+    let ready=stmt.query_map([&run],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?)))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    for (job,raw_deps) in ready {
+        let deps: Vec<String>=serde_json::from_str(&raw_deps)?;
+        if deps.iter().try_fold(false,|blocked,dep|
+            Ok::<bool,anyhow::Error>(blocked || !super::artifacts::dep_satisfied(&tx,&run,dep)?))? {
+            tx.execute("UPDATE swarm_jobs SET status='planned',updated_ms=?3
+                WHERE run_id=?1 AND id=?2 AND status='ready'",params![run,job,now])?;
+        }
+    }
+    tx.commit()?;
     Ok(json!({"conflict_id":id,"status":"open","duplicate":false}))
 }
 
@@ -159,11 +173,17 @@ pub fn resolve(store: &mut Store, p: &Value) -> Result<Value> {
         }
     }
     let new_status=if outcome=="unresolved" {"unresolved"} else {"resolved"};
-    store.conn.execute(
+    let now=crate::daemon::now();
+    let tx=store.conn.transaction()?;
+    tx.execute(
         "UPDATE swarm_conflicts SET status=?3,outcome=?4,reproduction_job_id=?5,
          reproduction_artifact_id=?6,updated_ms=?7 WHERE run_id=?1 AND conflict_id=?2 AND status='open'",
-        params![run,id,new_status,outcome,repro_job,repro_artifact,crate::daemon::now()],
+        params![run,id,new_status,outcome,repro_job,repro_artifact,now],
     )?;
+    if new_status=="resolved" {
+        super::materialize_ready(&tx,&run,now)?;
+    }
+    tx.commit()?;
     Ok(json!({"conflict_id":id,"status":new_status,"outcome":outcome,"duplicate":false}))
 }
 

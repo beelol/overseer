@@ -226,3 +226,66 @@ fn late_conflict_holds_accepted_jobs_until_contradicted_review_is_revised() {
             {"job_id":"repro","outcome":"passed","evidence":["repro-evidence"]}
         ]})).unwrap_err().contains("accepted and checked"));
 }
+
+#[test]
+fn late_conflict_holds_a_ready_transitive_dependent_before_admission() {
+    let d = Daemon::start(&[]);
+    let made = d.call("swarm.create",json!({"category":"Conflict dependent",
+        "objective":"Audit route and consumer","allowed_targets":["fixture"]}));
+    let run = made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"Left probe","acceptance":"response proof"},
+        {"id":"right","title":"Right probe","acceptance":"response proof"},
+        {"id":"middle","title":"Use right result","acceptance":"consumer proof","deps":["right"]},
+        {"id":"leaf","title":"Use middle result","acceptance":"final proof","deps":["middle"]},
+        {"id":"repro","title":"Independent probe","acceptance":"fresh proof"}
+    ]}));
+    for (job,content) in [
+        ("right","foreign request returned 403"),
+        ("middle","consumer relies on the denied response")
+    ] {
+        let attempt = submit(&d,run,job,"finding",content);
+        d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":job,"decision":"accept","evidence":[format!("{job}-evidence")]}));
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":job,"attempt_id":attempt["id"]}));
+    }
+    submit(&d,run,"left","finding","foreign request returned 200");
+    let leaf_before = d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|job|job["id"]=="leaf").unwrap().clone();
+    assert_eq!(leaf_before["status"],"ready");
+    d.call("swarm.conflict.open",json!({"run_id":run,"generation":1,
+        "revision":1,"conflict_id":"ancestor-disagreement","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"Different route responses"}));
+    let leaf_after = d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|job|job["id"]=="leaf").unwrap().clone();
+    assert_eq!(leaf_after["status"],"planned");
+    let at = now();
+    let admission = d.call("swarm.admit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"leaf","target_id":"fixture",
+        "request_id":"leaf-after-conflict","now_ms":at,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture","account_id":"fixture-a","pool_ids":["pool-a"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool-a","windows":[{"id":"week","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":1000},
+        "purpose":"worker"}));
+    assert_eq!(admission["status"],"blocked","{admission}");
+    assert_eq!(admission["reason"],"dependency_pending","{admission}");
+    assert_eq!(admission["waiting_on"],json!(["middle"]));
+    let repro = submit(&d,run,"repro","reproduction","fresh probe supports right");
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"repro","decision":"accept","evidence":["repro-evidence"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"repro","attempt_id":repro["id"]}));
+    assert_eq!(d.call("swarm.conflict.resolve",json!({"run_id":run,"generation":1,
+        "revision":1,"conflict_id":"ancestor-disagreement","outcome":"supports_right",
+        "reproduction_job_id":"repro","reproduction_artifact_id":"repro-evidence"}))["status"],
+        "resolved");
+    let leaf_restored = d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|job|job["id"]=="leaf").unwrap().clone();
+    assert_eq!(leaf_restored["status"],"ready");
+}

@@ -268,7 +268,24 @@ pub(super) fn dep_satisfied(conn: &rusqlite::Connection, run: &str, job: &str) -
         |r| Ok((r.get(0)?, r.get(1)?)),
     ).optional()?;
     let Some((status, active)) = state else { return Ok(false); };
-    Ok(status == "accepted" && active == 0 && !pending_patch_integration(conn, run, job)?)
+    if status != "accepted" || active != 0 || pending_patch_integration(conn, run, job)? {
+        return Ok(false);
+    }
+    // An accepted result can become disputed after its dependents were made
+    // ready. Follow the dependency chain so a later conflict also holds
+    // grandchildren until the disputed review is resolved and revalidated.
+    let disputed = conn.prepare(
+        "WITH RECURSIVE upstream(job_id) AS (
+            SELECT ?2
+            UNION
+            SELECT dep.value FROM upstream u
+            JOIN swarm_jobs j ON j.run_id=?1 AND j.id=u.job_id
+            JOIN json_each(j.deps) dep
+         )
+         SELECT 1 FROM upstream u JOIN swarm_conflicts c ON c.run_id=?1
+         WHERE c.status!='resolved' AND (c.left_job_id=u.job_id OR c.right_job_id=u.job_id)",
+    )?.exists(params![run,job])?;
+    Ok(!disputed)
 }
 
 pub(super) fn release_and_unlock(tx: &Transaction<'_>, run: &str, job: &str, now: i64) -> Result<()> {
