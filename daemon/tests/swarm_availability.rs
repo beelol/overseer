@@ -78,6 +78,71 @@ fn director_can_close_a_fresh_target_block_without_claiming_success() {
 }
 
 #[test]
+fn availability_readout_preserves_the_observed_allowance_drop() {
+    let mut d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Allowance change readout",
+        "objective":"Audit backend","allowed_targets":["route-a"]}));
+    let run=made["id"].as_str().unwrap();
+    let at=now();
+    let observe=|d:&Daemon,when:i64,remaining:i64| {
+        let mut snap=snapshot(when,true,remaining);
+        snap["pools"].as_array_mut().unwrap().push(json!({"id":"unrelated-pool",
+            "windows":[{"id":"week","unit":"points","remaining_milli":999999,
+                "protected_milli":0,"reserved_milli":0,"confidence":"exact",
+                "expires_ms":when+60000}]}));
+        d.call("swarm.availability.observe",json!({"run_id":run,
+            "snapshot":snap,"now_ms":when,"required_capabilities":["code"],
+            "estimate_milli":{"points":100},"purpose":"worker"}))
+    };
+    assert_eq!(observe(&d,at,100000)["state"],"eligible");
+    let dropped=observe(&d,at+1000,500);
+    assert_eq!(dropped["reason"],"finishing_reserve");
+    let read=d.call("swarm.get",json!({"id":run}));
+    let windows=read["availability"]["allowance_windows"].as_array().unwrap();
+    assert_eq!(windows.len(),1);
+    let week=&windows[0];
+    assert_eq!(week["pool_id"],"pool-a");
+    assert_eq!(week["unit"],"points");
+    assert_eq!(week["remaining_milli"],500);
+    assert_eq!(week["previous_remaining_milli"],100000);
+    assert_eq!(week["change_milli"],-99500);
+    assert_eq!(week["confidence"],"exact");
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["availability"]["allowance_windows"],
+        read["availability"]["allowance_windows"]);
+    assert_eq!(observe(&d,at+1000,500)["changed"],false);
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["availability"]["allowance_windows"],
+        read["availability"]["allowance_windows"]);
+    let mut unknown=snapshot(at+2000,true,0);
+    unknown["pools"][0]["windows"][0]["remaining_milli"]=Value::Null;
+    unknown["pools"][0]["windows"][0]["confidence"]=json!("unknown");
+    let no_balance=d.call("swarm.availability.observe",json!({"run_id":run,
+        "snapshot":unknown,"now_ms":at+2000,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(no_balance["reason"],"unknown_quota");
+    let unknown_read=d.call("swarm.get",json!({"id":run}));
+    let current=&unknown_read["availability"]["allowance_windows"][0];
+    assert_eq!(current["remaining_milli"],Value::Null);
+    assert_eq!(current["previous_remaining_milli"],500);
+    assert_eq!(current["change_milli"],Value::Null);
+    assert_eq!(current["confidence"],"unknown");
+    let mut many=snapshot(at+3000,true,100000);
+    many["pools"][0]["windows"]=json!((0..101).map(|i|json!({
+        "id":format!("window-{i:03}"),"unit":"points",
+        "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+        "confidence":"exact","expires_ms":at+63000
+    })).collect::<Vec<_>>());
+    assert_eq!(d.call("swarm.availability.observe",json!({"run_id":run,
+        "snapshot":many,"now_ms":at+3000,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"}))["state"],"eligible");
+    let bounded=d.call("swarm.get",json!({"id":run}));
+    assert_eq!(bounded["availability"]["allowance_window_count"],101);
+    assert_eq!(bounded["availability"]["allowance_windows_truncated"],true);
+    assert_eq!(bounded["availability"]["allowance_windows"].as_array().unwrap().len(),100);
+}
+
+#[test]
 fn revoked_selected_identity_cancels_only_its_active_attempt_and_keeps_usage_uncertain() {
     let mut d=Daemon::start(&[]);
     let created=d.call("swarm.create",json!({"category":"Revoked identity",

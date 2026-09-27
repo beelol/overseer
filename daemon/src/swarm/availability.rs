@@ -7,13 +7,16 @@ use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
+
+const WINDOW_PREVIEW_LIMIT: usize = 100;
 
 pub fn get(store: &Store, run: &str) -> Result<Value> {
-    let row: Option<(String, Option<String>, String, String, i64, i64, i64)> = store
+    let row: Option<(String, Option<String>, String, String, String, i64, i64, i64, i64)> = store
         .conn
         .query_row(
-            "SELECT state,reason,eligible_targets,purpose,observed_ms,expires_ms,wake_count
+            "SELECT state,reason,eligible_targets,purpose,allowance_windows,
+                    allowance_window_count,observed_ms,expires_ms,wake_count
          FROM swarm_availability WHERE run_id=?1",
             params![run],
             |r| {
@@ -25,14 +28,19 @@ pub fn get(store: &Store, run: &str) -> Result<Value> {
                     r.get(4)?,
                     r.get(5)?,
                     r.get(6)?,
+                    r.get(7)?,
+                    r.get(8)?,
                 ))
             },
         )
         .optional()?;
     Ok(match row {
-        Some((state, reason, targets, purpose, observed, expires, wakes)) => json!({
+        Some((state, reason, targets, purpose, windows, window_count, observed, expires, wakes)) => json!({
             "state":state,"reason":reason,
             "eligible_targets":serde_json::from_str::<Value>(&targets)?,
+            "allowance_windows":serde_json::from_str::<Value>(&windows)?,
+            "allowance_window_count":window_count,
+            "allowance_windows_truncated":window_count>WINDOW_PREVIEW_LIMIT as i64,
             "purpose":purpose,"observed_ms":observed,"expires_ms":expires,
             "wake_count":wakes}),
         None => Value::Null,
@@ -171,16 +179,23 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
     }
     let woken = !old.is_null() && old["state"] == "blocked" && state == "eligible";
     let wakes = old["wake_count"].as_i64().unwrap_or(0) + i64::from(woken);
+    let (allowance_windows,allowance_window_count)=if !changed && !old.is_null() {
+        (old["allowance_windows"].clone(),old["allowance_window_count"].as_i64().unwrap_or(0))
+    } else {
+        selected_allowance_windows(&p["snapshot"],allowed,&old)
+    };
     let tx = store.conn.transaction()?;
     tx.execute(
-        "INSERT INTO swarm_availability(run_id,state,reason,eligible_targets,purpose,request_sha256,snapshot_sha256,observed_ms,expires_ms,wake_count,updated_ms)
-         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)
+        "INSERT INTO swarm_availability(run_id,state,reason,eligible_targets,purpose,request_sha256,snapshot_sha256,allowance_windows,allowance_window_count,observed_ms,expires_ms,wake_count,updated_ms)
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)
          ON CONFLICT(run_id) DO UPDATE SET state=excluded.state,reason=excluded.reason,
          eligible_targets=excluded.eligible_targets,purpose=excluded.purpose,
-         snapshot_sha256=excluded.snapshot_sha256,
+         snapshot_sha256=excluded.snapshot_sha256,allowance_windows=excluded.allowance_windows,
+         allowance_window_count=excluded.allowance_window_count,
          observed_ms=excluded.observed_ms,expires_ms=excluded.expires_ms,
          wake_count=excluded.wake_count,updated_ms=excluded.updated_ms",
-        params![run,state,reason,json!(eligible).to_string(),purpose,request_sha256,snapshot_sha256,observed,expires,wakes,now],
+        params![run,state,reason,json!(eligible).to_string(),purpose,request_sha256,snapshot_sha256,
+            allowance_windows.to_string(),allowance_window_count,observed,expires,wakes,now],
     )?;
     let mut revoked_jobs=Vec::new();
     for target in &revoked_targets {
@@ -227,6 +242,50 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
     Ok(
         json!({"state":state,"reason":reason,"eligible_targets":eligible,
         "changed":changed,"woken":woken,"wake_count":wakes,
+        "allowance_windows":allowance_windows,
+        "allowance_window_count":allowance_window_count,
+        "allowance_windows_truncated":allowance_window_count>WINDOW_PREVIEW_LIMIT as i64,
         "revoked_jobs":revoked_jobs}),
     )
+}
+
+fn selected_allowance_windows(snapshot: &Value, allowed: &[Value], old: &Value) -> (Value,i64) {
+    let allowed_ids: HashSet<&str>=allowed.iter().filter_map(Value::as_str).collect();
+    let mut pool_ids=BTreeSet::new();
+    for target in snapshot["targets"].as_array().into_iter().flatten() {
+        if target["id"].as_str().is_some_and(|id|allowed_ids.contains(id)) {
+            for pool in target["pool_ids"].as_array().into_iter().flatten() {
+                if let Some(id)=pool.as_str() { pool_ids.insert(id); }
+            }
+        }
+    }
+    let mut windows=Vec::new();
+    let mut count=0_i64;
+    for pool_id in pool_ids {
+        let Some(pool)=snapshot["pools"].as_array().into_iter().flatten()
+            .find(|pool|pool["id"]==pool_id) else {continue};
+        let mut current:Vec<&Value>=pool["windows"].as_array().into_iter().flatten().collect();
+        current.sort_by_key(|window|window["id"].as_str().unwrap_or("").to_owned());
+        for window in current {
+            count+=1;
+            if windows.len()>=WINDOW_PREVIEW_LIMIT {continue;}
+            let window_id=window["id"].as_str().unwrap_or("");
+            let unit=window["unit"].as_str().unwrap_or("");
+            let previous=old["allowance_windows"].as_array().into_iter().flatten()
+                .find(|prior| prior["pool_id"]==pool_id && prior["window_id"]==window_id
+                    && prior["unit"]==unit)
+                .and_then(|prior|prior["remaining_milli"].as_i64());
+            let remaining=window["remaining_milli"].as_i64();
+            let protected=window["protected_milli"].as_i64().unwrap_or(0);
+            let reserved=window["reserved_milli"].as_i64().unwrap_or(0);
+            let usable=remaining.map(|v|v.saturating_sub(protected).saturating_sub(reserved).max(0));
+            let change=remaining.zip(previous).map(|(now,before)|now.saturating_sub(before));
+            windows.push(json!({"pool_id":pool_id,"window_id":window_id,"unit":unit,
+                "remaining_milli":remaining,"protected_milli":protected,"reserved_milli":reserved,
+                "observed_usable_milli":usable,"confidence":window["confidence"],
+                "window_expires_ms":window["expires_ms"],
+                "previous_remaining_milli":previous,"change_milli":change}));
+        }
+    }
+    (json!(windows),count)
 }

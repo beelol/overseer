@@ -89,6 +89,8 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           purpose TEXT NOT NULL,
           request_sha256 TEXT NOT NULL,
           snapshot_sha256 TEXT NOT NULL,
+          allowance_windows TEXT NOT NULL DEFAULT '[]',
+          allowance_window_count INTEGER NOT NULL DEFAULT 0,
           observed_ms INTEGER NOT NULL,
           expires_ms INTEGER NOT NULL,
           wake_count INTEGER NOT NULL DEFAULT 0,
@@ -658,6 +660,18 @@ pub fn migrate(conn: &Connection) -> Result<()> {
              WHERE state='eligible';",
         )?;
     }
+    let has_allowance_windows=conn.prepare(
+        "SELECT 1 FROM pragma_table_info('swarm_availability') WHERE name='allowance_windows'")?
+        .exists([])?;
+    if !has_allowance_windows {
+        conn.execute_batch("ALTER TABLE swarm_availability ADD COLUMN allowance_windows TEXT NOT NULL DEFAULT '[]';")?;
+    }
+    let has_allowance_window_count=conn.prepare(
+        "SELECT 1 FROM pragma_table_info('swarm_availability') WHERE name='allowance_window_count'")?
+        .exists([])?;
+    if !has_allowance_window_count {
+        conn.execute_batch("ALTER TABLE swarm_availability ADD COLUMN allowance_window_count INTEGER NOT NULL DEFAULT 0;")?;
+    }
     let has_failed_planning_turns = conn
         .prepare(
             "SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='failed_planning_turns'",
@@ -956,6 +970,11 @@ mod tests {
                 "".into()
             )
         );
+        let historical:(String,i64)=conn.query_row(
+            "SELECT allowance_windows,allowance_window_count FROM swarm_availability
+             WHERE run_id='old-run'",[],|r|Ok((r.get(0)?,r.get(1)?)),
+        ).unwrap();
+        assert_eq!(historical,("[]".into(),0));
         migrate(&conn).unwrap();
     }
 
