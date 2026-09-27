@@ -536,8 +536,14 @@ fn play_reactor(key: &str) -> Result<()> {
     }
     let dir = paths::data_dir().join("audio/reactor-v1");
     paths::ensure_private_dir(&dir)?;
+    play_file(&cached_cue(&dir, key)?)
+}
+
+fn cached_cue(dir: &Path, key: &str) -> Result<PathBuf> {
     let path = dir.join(format!("{key}.mp3"));
-    if std::fs::metadata(&path).map(|meta| meta.len()).unwrap_or(0) != bytes(key).len() as u64 {
+    // Compare the content, not the length: a cue from an earlier pack can have
+    // the same size as the bundled one.
+    if std::fs::read(&path).ok().as_deref() != Some(bytes(key)) {
         use std::io::Write;
         use std::os::unix::fs::OpenOptionsExt;
         let tmp = dir.join(format!("{key}.tmp"));
@@ -550,7 +556,7 @@ fn play_reactor(key: &str) -> Result<()> {
         file.write_all(bytes(key))?;
         std::fs::rename(tmp, &path)?;
     }
-    play_file(&path)
+    Ok(path)
 }
 
 #[cfg(test)]
@@ -695,5 +701,44 @@ mod tests {
             assert!(bytes(key).len() < 4_000);
             assert!(cue["provenance"].as_str().unwrap().contains("original"));
         }
+    }
+    #[test]
+    fn a_cached_cue_from_another_pack_is_replaced() {
+        let dir = tempfile::tempdir().unwrap();
+        let bundled = bytes("agent_started");
+        let stale = dir.path().join("agent_started.mp3");
+        std::fs::write(&stale, vec![0u8; bundled.len()]).unwrap();
+        let path = cached_cue(dir.path(), "agent_started").unwrap();
+        assert_eq!(path, stale);
+        assert_eq!(std::fs::read(&path).unwrap(), bundled);
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+    #[test]
+    fn manifest_describes_the_bundled_bytes() {
+        use sha2::{Digest, Sha256};
+        let manifest: Value = serde_json::from_str(MANIFEST).unwrap();
+        let cues = manifest.as_array().unwrap();
+        let listed: Vec<&str> = cues.iter().map(|cue| cue["key"].as_str().unwrap()).collect();
+        assert_eq!(listed, KEYS, "one entry per key, in the daemon's order");
+        let mut total = 0;
+        for cue in cues {
+            let key = cue["key"].as_str().unwrap();
+            let bundled = bytes(key);
+            total += bundled.len();
+            assert_eq!(cue["mp3"], format!("{key}.mp3"));
+            assert_eq!(cue["mp3_bytes"], bundled.len(), "{key}");
+            assert_eq!(
+                cue["sha256"].as_str().unwrap(),
+                format!("{:x}", Sha256::digest(bundled)),
+                "{key}"
+            );
+            assert_eq!(
+                cue["default_auto"],
+                DEFAULT_KEYS.contains(&key),
+                "{key}: only the three core cues play by themselves"
+            );
+            assert!(cue.get("wav").is_none(), "{key}: no WAV is part of the pack");
+        }
+        assert_eq!(total, 31_488, "the owner-approved pack");
     }
 }
