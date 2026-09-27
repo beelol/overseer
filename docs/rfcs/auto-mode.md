@@ -258,6 +258,8 @@ Published main at `639dfcb` records Gate S's decisions and tiny live Claude/Code
 
 Published main through `dfe0ebcc` adds verification records and wording, with no executable-code change since `639dfcb`. Continuity now records verified provider failover, local inventory/fit, local handoff, and concurrent local-agent behavior; Auto should reuse that already present daemon path and memory guard when a local route becomes an eligible candidate, rather than claim its current project-configured OpenCode endpoint is the same as Continuity's `opencode-serve` route. The existing Auto requirements for verified model/tool capability, memory admission, one handoff authority, and the AUTO-AC-11/16/17/19/21/24/25 integration tests remain open. Main also publishes mixed verified/partial Gate N phone records, and its tracker records that phone work has resumed; the tested phone app and gateway still live on their separate branch, so a record marked verified there does not make a phone API available on this branch. When that branch lands, its cross-device request identity and scope checks must precede Auto admission, and reconnect must replay one daemon decision. Gate R's owner-picked mark animation changes no routing input or model economics. The release ledger's strengthened record validation does not replace Auto's separate criterion ledger or add new Auto acceptance IDs.
 
+The later main commit `b84f9984` only repairs two AC-118 evidence links in the release ledger. It is merged into this branch and does not change Auto's route inputs, admission contract, implementation, or acceptance criteria.
+
 The in-flight Swarm design makes that shared boundary more concrete without changing Auto's routing policy:
 
 | Boundary | Contract |
