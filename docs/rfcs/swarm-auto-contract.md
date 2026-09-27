@@ -37,6 +37,11 @@ director may request a job only through the category plan, approved pool and sha
 admission transaction. A Swarm worker's attempt to invoke managed delegation must
 be refused unless its descendants are explicitly accounted and controlled under
 SWARM-17; the v1 one-worker-level policy leaves recursive launches disabled.
+Gate S treats a Swarm as one director agent for its repository-based briefing and
+channel rule. Workers use the Swarm broker to report, ask and claim through that
+director; a second direct Overseer channel must not create another assignment
+authority. Neither Overseer nor a director may autonomously answer a worker's
+permission request or widen its permission mode; the owner decides it.
 
 Continuity (Gate L) owns daemon-wide connectivity and local-model memory eligibility. Auto
 may rank its qualified route, but neither Auto nor Swarm may reinterpret a single provider

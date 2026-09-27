@@ -24,3 +24,17 @@ limits, frozen allocation and SWARM-01–64 scope. No worker-count default, budg
 scenario or acceptance box was weakened. The only new criterion wording is the Gate S
 cap/admission boundary in SWARM-24. The separate Auto Mode branch still owns route and
 usage observation; shared account-window admission remains an integration gap.
+
+## Subsequent published main: `91c7fc8`
+
+The Swarm branch merged `91c7fc8` after its seven new commits were fetched. They
+changed Gate S owner decisions and review/keyboard UI code, with no Rust daemon
+change and no merge conflict. Gate S now explicitly says Overseer never answers a
+permission request on its own and gives its briefing/channel only when multiple
+agents share a repository. The Swarm RFC and Auto contract now state how those
+decisions apply: Gate S treats a category as one director agent; workers keep
+their director brief and broker, and a permission request goes to the owner.
+This preserves one decision-maker and the existing approved account/permission
+scope. SWARM-24/60 and AC-190/195 need joined tests once Gate S lands; this
+read-only design reconciliation verifies none of them. The review/keyboard changes
+do not alter Swarm scheduling defaults or acceptance criteria.

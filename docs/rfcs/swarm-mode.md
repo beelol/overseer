@@ -165,6 +165,16 @@ controls still work without an Overseer model turn.
 The AC-107 Talk to Overseer harness setting selects that conversation's harness; it does not
 choose the Swarm director or add an account to the approved Swarm pool.
 
+Gate S's confirmed briefing/channel rule applies to its view of a Swarm as **one**
+agent, the director. Swarm workers keep the director-issued brief and the Swarm
+broker for reports, questions and claims; sharing a repository with other agents
+does not inject a second, Overseer-directed worker channel or authorize a direct
+worker instruction. A director may receive Gate S's briefing/channel when an
+ordinary agent also works in that repository, but cross-agent information still
+enters the category plan through the director. Neither Overseer nor the director
+answers or grants a worker's permission request autonomously. The owner must make
+that decision; a director assignment cannot loosen the worker's permission mode.
+
 Gate S makes starting a swarm or raising its active limit a Confirm action at every
 Overseer level, including its Auto permission level. The launch surface should show the
 effective account pool, allocation and ceiling in one compact read-back, then record the
