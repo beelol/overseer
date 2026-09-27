@@ -397,7 +397,9 @@ async fn ac119_devices_scopes_and_revoking() {
     // From a phone, agents start only in repositories Overseer knows, and never as a program.
     let other = common::repo(&r.path().join("unknown"));
     assert_eq!(Phone::code(&full.act("task.create", json!({"repo": other, "harness": "claude", "prompt": "x"})).await), "mac_only");
-    assert_eq!(Phone::code(&full.act("task.create", json!({"repo": repo, "harness": "generic", "program": "/bin/sh", "args": ["-c", "touch /tmp/ovs-should-not-exist"], "prompt": ""})).await), "mac_only");
+    assert_eq!(Phone::code(&full.act("task.create", json!({"repo": repo, "harness": "generic", "program": "/bin/sh", "args": ["-c", "touch /tmp/ovs-should-not-exist"], "prompt": ""})).await), "invalid_params");
+    assert_eq!(Phone::code(&full.act("task.create", json!({"repo": repo, "harness": "generic", "prompt": "a program"})).await), "mac_only");
+    assert!(!std::path::Path::new("/tmp/ovs-should-not-exist").exists());
     assert_eq!(Phone::code(&full.ask("repo.inspect", json!({"path": other}), None).await.unwrap()), "mac_only");
     assert_eq!(full.call("repo.known", json!({})).await["repos"][0]["root"], json!(repo));
 
@@ -432,9 +434,17 @@ async fn ac119_devices_scopes_and_revoking() {
     assert!(watch.ends_within(Duration::from_secs(1)).await, "ended in {:?}", started.elapsed());
     assert!(started.elapsed() < Duration::from_secs(1));
     assert_eq!(watch.notices(), vec!["revoked"]);
+    // The revoked phone comes back later (it may have been away when it was removed): it is
+    // told, inside a handshake only its key can complete, and nothing else is answered.
     let mut gone = watch_paired.clone();
-    assert!(Phone::connect(&mut gone).await.is_err(), "a revoked key is refused");
-    assert!(log(&d).contains("unknown or revoked device"));
+    let mut told = Phone::connect(&mut gone).await.expect("the handshake is completed so the phone can be told");
+    assert_eq!(told.hello["scope"], "revoked");
+    let _ = told.send(&json!({"id": 1, "method": "state", "params": {}})).await;
+    assert!(told.ends_within(Duration::from_secs(2)).await);
+    assert_eq!(told.notices(), vec!["revoked"]);
+    assert!(told.inbox.iter().all(|m| m["method"] == "gateway"), "nothing is answered: {:?}", told.inbox);
+    assert!(log(&d).contains("was removed on the Mac and was told so"));
+    assert_eq!(d.call("gateway.status", json!({}))["sessions"], 1, "a revoked phone has no session");
     assert!(d.try_call("gateway.device_scope", json!({"id": watch_paired.device, "scope": "full"})).is_err(), "a revoked device cannot be given a scope");
     // The other phone is untouched.
     assert_eq!(full.call("ping", json!({})).await["now_ms"].as_i64().is_some(), true);
@@ -791,7 +801,9 @@ async fn ac141_a_phone_pairs_once() {
 
     // It ends only when the owner revokes the device; then the phone is offered pairing, and pairing works.
     d.call("gateway.device_revoke", json!({"id": paired.device}));
-    assert!(Phone::connect(&mut paired).await.is_err());
+    let mut told = Phone::connect(&mut paired).await.expect("a revoked phone is told");
+    assert!(told.ends_within(Duration::from_secs(2)).await);
+    assert_eq!(told.notices(), vec!["revoked"]);
     // The revoked key cannot pair again either; the app makes a new key when it pairs.
     let started = d.call("gateway.pair_start", json!({}));
     assert!(Phone::pair_on(port, &parse_code(started["code"].as_str().unwrap()), &paired.keys, "Old key", Duration::from_secs(2)).await.is_err());
@@ -922,4 +934,92 @@ async fn ac120_the_gateway_is_advertised_only_while_phone_access_is_on() {
     assert!(advertised().contains(&record), "advertised again after the restart");
     d.call("gateway.disable", json!({}));
     wait_until("the withdrawal", 10, || !advertised().contains(&record));
+}
+
+// ---------------------------------------------------------------- AC-130: the security review's findings
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac130_a_phone_sends_only_what_the_protocol_describes() {
+    let d = daemon("echo", &[]);
+    phone::enable(&d);
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let seeded = run_id(&d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "seed", "title": "seed"})));
+    d.wait_done(&seeded, 15);
+    let (mut p, _) = pair(&d, "Curious Phone").await;
+    let marker = r.path().join("ran-on-the-mac");
+    let shell = format!("touch {}", marker.display());
+    let tasks = d.call("state", json!({}))["tasks"].as_array().unwrap().len();
+    // What would change how a harness is started, or start a program, in every spelling the
+    // daemon's own methods read.
+    let attempts = [
+        json!({"extra_args": ["--mcp-config", format!("{{\"mcpServers\":{{\"x\":{{\"command\":\"/bin/sh\",\"args\":[\"-c\",\"{shell}\"]}}}}}}")]}),
+        json!({"extra_args": ["--dangerously-skip-permissions"]}),
+        json!({"extra_args": ["--permission-mode", "bypassPermissions"]}),
+        json!({"args": ["-c", shell]}),
+        json!({"program": "/bin/sh"}),
+        json!({"approval_policy": "never"}),
+        json!({"unsaved": [{"path": "a.txt", "text": "x"}]}),
+        json!({"env": {"PATH": "/tmp"}}),
+    ];
+    for extra in &attempts {
+        let mut params = json!({"repo": repo, "harness": "claude", "prompt": "as a phone", "title": "from a phone"});
+        let key = extra.as_object().unwrap().keys().next().unwrap().clone();
+        params[&key] = extra[&key].clone();
+        let reply = p.act("task.create", params).await;
+        assert_eq!(Phone::code(&reply), if key == "program" { "invalid_params" } else { "invalid_params" }, "{key}: {reply}");
+        assert_eq!(reply["error"]["data"]["parameters"], json!([key]));
+    }
+    let follow = p.act("run.follow_up", json!({"run_id": seeded, "prompt": "x", "extra_args": ["--dangerously-skip-permissions"]})).await;
+    assert_eq!(Phone::code(&follow), "invalid_params", "{follow}");
+    let read = p.ask("state", json!({"anything": true}), None).await.unwrap();
+    assert_eq!(Phone::code(&read), "invalid_params", "{read}");
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert_eq!(d.call("state", json!({}))["tasks"].as_array().unwrap().len(), tasks, "nothing was started");
+    assert_eq!(d.call("run.turns", json!({"run_id": seeded})).as_array().unwrap().len(), 1);
+    assert!(!marker.exists(), "nothing ran on the Mac");
+    assert!(log(&d).contains("parameters a phone may not send (extra_args)"));
+    // What the protocol describes still works, and its launch is the same as from the Mac.
+    let ok = p.act("task.create", json!({"repo": repo, "harness": "claude", "prompt": "allowed", "title": "allowed", "model": "opus", "effort": "low"})).await;
+    assert!(ok.get("error").is_none(), "{ok}");
+    let from_phone = run_id(&ok["result"]);
+    d.wait_done(&from_phone, 15);
+    let from_mac = run_id(&d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "allowed", "title": "allowed", "model": "opus", "effort": "low"})));
+    d.wait_done(&from_mac, 15);
+    let argv = |run: &str| -> Value {
+        let text: Vec<String> = d.events(run).iter().filter(|e| e["kind"] == "output").filter_map(|e| e["payload"]["text"].as_str().map(str::to_string)).collect();
+        let echo = text.iter().find(|t| t.starts_with("ECHO ")).expect("the fixture echoes its arguments");
+        serde_json::from_str::<Value>(&echo[5..]).unwrap()["argv"].clone()
+    };
+    assert_eq!(argv(&from_phone), argv(&from_mac), "the same launch from the phone as from the Mac");
+    assert!(argv(&from_phone).to_string().contains("opus"));
+    // The Mac itself may still pass extra arguments: the local socket is unchanged.
+    let mac = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "mac", "title": "mac", "extra_args": ["--verbose"]}));
+    d.wait_done(&run_id(&mac), 15);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac130_a_desktop_login_and_a_pairing_are_not_a_phones_to_replace() {
+    let d = daemon("echo", &[("OVERSEER_TEST_CONFIRM_WAIT_MS", "1500")]);
+    let port = phone::enable(&d);
+    let (mut p, _) = pair(&d, "Signing Phone").await;
+    let system = p.act("profile.device_login", json!({"id": "system-codex"})).await;
+    assert_eq!(Phone::code(&system), "mac_only", "{system}");
+    assert!(system["error"]["message"].as_str().unwrap().contains("follows the desktop app's login"));
+    // A pairing request that ends does not close a pairing that was opened after it.
+    let first = d.call("gateway.pair_start", json!({}));
+    let first_code = parse_code(first["code"].as_str().unwrap());
+    let waiting = tokio::spawn(async move { Phone::pair_on(port, &first_code, &Keys::new(), "First", Duration::from_secs(4)).await });
+    phone::waiting_request(&d, Duration::from_secs(5)).await.unwrap();
+    let second = d.call("gateway.pair_start", json!({}));
+    assert!(waiting.await.unwrap().is_err(), "the first request was dropped with its pairing");
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let status = d.call("gateway.status", json!({}));
+    assert_eq!(status["pairing"]["open"], true, "the newer pairing is still open: {status}");
+    let code = parse_code(second["code"].as_str().unwrap());
+    let keys = Keys::new();
+    let task = tokio::spawn(async move { Phone::pair_on(port, &code, &keys, "Second", Duration::from_secs(10)).await });
+    let request = phone::waiting_request(&d, Duration::from_secs(5)).await.unwrap();
+    d.call("gateway.pair_confirm", json!({"request": request["request"], "accept": true}));
+    assert!(task.await.unwrap().is_ok());
 }

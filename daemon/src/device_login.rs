@@ -44,6 +44,10 @@ pub fn find_code(lines: &[String]) -> (Option<String>, Option<String>) {
 impl Daemon {
     pub fn device_login(self: &Arc<Self>, id: &str) -> Result<Value> {
         let profile = self.profile(id)?;
+        if profile.is_system {
+            // The same rule as sign-out and removal: Overseer never changes the desktop app's login.
+            return Err(ProtoError::new("mac_only", format!("Sign in on the Mac: {} follows the desktop app's login, which Overseer does not change.", profile.name)).into());
+        }
         let args: Vec<&str> = match profile.harness.as_str() {
             "codex" => vec!["login", "--device-auth"],
             other => {

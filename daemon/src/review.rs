@@ -58,6 +58,15 @@ pub fn lines_of(text: &str) -> Vec<String> {
     out
 }
 
+/// True for a name that a file system can take for `.git`: any case (APFS and HFS+ ignore case
+/// by default), with trailing dots or spaces, with characters HFS+ ignores, or its short name.
+pub fn is_git_name(name: &std::ffi::OsStr) -> bool {
+    let text = name.to_string_lossy();
+    let ignorable = |c: char| matches!(c, '\u{200c}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{206a}'..='\u{206f}' | '\u{feff}');
+    let plain: String = text.chars().filter(|c| !ignorable(*c)).collect::<String>().trim_end_matches(['.', ' ']).to_lowercase();
+    plain == ".git" || plain == "git~1"
+}
+
 fn refuse(message: impl Into<String>) -> anyhow::Error {
     ProtoError::new("outside_workspace", message).into()
 }
@@ -68,7 +77,7 @@ fn clean_rel(rel: &str) -> Result<PathBuf> {
     if rel.is_empty() || rel.contains('\0') || p.is_absolute() || p.components().any(|c| !matches!(c, Component::Normal(_))) {
         return Err(refuse("the path must be inside the workspace"));
     }
-    if p.components().any(|c| c.as_os_str() == ".git") {
+    if p.components().any(|c| is_git_name(c.as_os_str())) {
         return Err(refuse("files under .git are not shown"));
     }
     Ok(p.to_path_buf())
@@ -131,9 +140,7 @@ impl Daemon {
         // Every directory on the way must really be inside the workspace (a linked directory is not).
         if let Some(parent) = target.parent() {
             if let Ok(real) = std::fs::canonicalize(parent) {
-                if !real.starts_with(root) {
-                    return Err(refuse("the path leaves the workspace through a link"));
-                }
+                inside(root, &real)?;
             }
         }
         let meta = match std::fs::symlink_metadata(&target) {
@@ -309,8 +316,7 @@ impl Daemon {
     }
 
     /// Rejects a hunk: puts the comparison's lines back in the worktree. Refused when the file is
-    /// not what the hunk was shown against, when it is not a regular text file, or when an agent
-    /// is writing in this workspace right now.
+    /// not what the hunk was shown against, or when it is not a regular text file.
     pub fn review_reject(self: &Arc<Self>, workspace_id: &str, p: &Value) -> Result<Value> {
         let path = p["path"].as_str().ok_or_else(|| anyhow!("missing string parameter path"))?;
         let base = clean_base(p["base"].as_str().ok_or_else(|| anyhow!("missing string parameter base"))?)?;
@@ -345,18 +351,7 @@ impl Daemon {
             // The file did not exist at the comparison and nothing of it is left.
             std::fs::remove_file(&target)?;
         } else {
-            if let Some(parent) = target.parent() {
-                std::fs::create_dir_all(parent)?;
-                if !std::fs::canonicalize(parent)?.starts_with(&root) {
-                    return Err(refuse("the path leaves the workspace through a link"));
-                }
-            }
-            let tmp = target.with_extension(format!("overseer-{}.tmp", std::process::id()));
-            std::fs::write(&tmp, restored.as_bytes())?;
-            if let Ok(meta) = std::fs::metadata(&target) {
-                let _ = std::fs::set_permissions(&tmp, meta.permissions());
-            }
-            std::fs::rename(&tmp, &target)?;
+            write_inside(&root, &target, restored.as_bytes())?;
         }
         let (task_id, run_id) = {
             let store = self.store.lock().unwrap();
@@ -369,6 +364,58 @@ impl Daemon {
         self.emit(task_id.as_deref(), run_id.as_deref(), "review_reject", "user", "exact", json!({"path": rel_text, "key": key, "base": base, "lines_restored": hunk.base_lines.len(), "lines_removed": hunk.modified_lines.len(), "file_removed": deleted}))?;
         Ok(json!({"path": rel_text, "rejected": true, "file_removed": deleted}))
     }
+}
+
+/// `real` (a resolved path) must be inside `root` and nowhere under `.git`.
+fn inside(root: &Path, real: &Path) -> Result<()> {
+    let Ok(rest) = real.strip_prefix(root) else { return Err(refuse("the path leaves the workspace through a link")) };
+    if rest.components().any(|c| is_git_name(c.as_os_str())) {
+        return Err(refuse("files under .git are not shown"));
+    }
+    Ok(())
+}
+
+/// Writes `bytes` to `target`, which must end up inside `root`. The folder is checked before
+/// anything is created in it. The new content is written to a file that did not exist, under a
+/// name nobody can know beforehand and never through a link, and then takes the target's place.
+fn write_inside(root: &Path, target: &Path, bytes: &[u8]) -> Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let parent = target.parent().ok_or_else(|| refuse("the path must be inside the workspace"))?;
+    // The nearest folder that exists decides, before any folder is made.
+    let mut existing = parent;
+    while !existing.exists() {
+        existing = existing.parent().ok_or_else(|| refuse("the path must be inside the workspace"))?;
+    }
+    inside(root, &std::fs::canonicalize(existing)?)?;
+    std::fs::create_dir_all(parent)?;
+    let parent = std::fs::canonicalize(parent)?;
+    inside(root, &parent)?;
+    let name = target.file_name().ok_or_else(|| refuse("the path must be inside the workspace"))?;
+    let target = parent.join(name);
+    if std::fs::symlink_metadata(&target).is_ok_and(|m| !m.is_file()) {
+        return Err(ProtoError::new("not_editable", "this is not a regular file").into());
+    }
+    let tmp = parent.join(format!(".overseer-{}.tmp", uuid::Uuid::new_v4().simple()));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true).custom_flags(libc::O_NOFOLLOW).mode(0o600);
+    let written = (|| -> Result<()> {
+        let mut file = options.open(&tmp)?;
+        file.write_all(bytes)?;
+        if let Ok(meta) = std::fs::metadata(&target) {
+            file.set_permissions(meta.permissions())?;
+        } else {
+            use std::os::unix::fs::PermissionsExt;
+            file.set_permissions(std::fs::Permissions::from_mode(0o644))?;
+        }
+        file.sync_all()?;
+        std::fs::rename(&tmp, &target)?;
+        Ok(())
+    })();
+    if written.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    written
 }
 
 pub struct Hunk {
@@ -463,7 +510,10 @@ mod tests {
         for bad in ["", "/etc/passwd", "../x", "a/../../x", ".git/config", "a/.git/HEAD", "a\0b"] {
             assert!(clean_rel(bad).is_err(), "{bad:?}");
         }
-        for ok in ["a.txt", "src/a b.ts", "./x", ".github/x", ".gitignore"] {
+        for bad in [".GIT/config", ".Git/HEAD", "a/.GiT/x", ".git./config", ".git /config", ".g\u{200c}it/config", "GIT~1/config", "git~1/x"] {
+            assert!(clean_rel(bad).is_err(), "{bad:?} can be .git to a file system");
+        }
+        for ok in ["a.txt", "src/a b.ts", "./x", ".github/x", ".gitignore", ".gitattributes", "git/x", "x.git/y", ".gitmodules"] {
             assert!(clean_rel(ok).is_ok(), "{ok:?}");
         }
         for bad in ["", "-x", "--output=/tmp/x", "a..b", "a b", "a;b", "$(x)", "a:b"] {

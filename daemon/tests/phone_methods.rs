@@ -570,3 +570,87 @@ async fn ac129_needs_you_notifications_you_can_switch() {
         assert!(got.iter().all(|f| allowed.contains(&f.as_str())), "{got:?}");
     }
 }
+
+// ---------------------------------------------------------------- AC-130: the security review's findings
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac130_the_git_folder_is_closed_in_every_spelling() {
+    let d = daemon("echo", &[]);
+    phone::enable(&d);
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    git(&repo, &["remote", "add", "origin", "https://someone:ghp_000000000000000000000000000000000000@github.com/o/r.git"]);
+    // A run in the current checkout, where .git is a folder with the repository's configuration.
+    let created = d.generic(&repo, "current", "/bin/sh", &["-c", "echo changed >> a.txt"]);
+    d.wait_done(&run_id(&created), 15);
+    let wsid = created["workspace"]["id"].as_str().unwrap().to_string();
+    let (mut p, _) = pair(&d, "Spelling Phone").await;
+    let config = std::fs::read_to_string(repo.join(".git/config")).unwrap();
+    assert!(config.contains("ghp_0000"), "the fixture's configuration holds a token");
+    let case_insensitive = repo.join(".GIT/config").exists();
+    for path in [".git/config", ".GIT/config", ".Git/config", ".git./config", ".git /config", ".g\u{200c}it/config", "GIT~1/config", ".GIT/HEAD", "sub/../.GIT/config"] {
+        for method in ["workspace.file", "workspace.hunks"] {
+            let reply = p.ask(method, json!({"workspace_id": wsid, "path": path, "base": "HEAD"}), None).await.unwrap();
+            assert!(reply.get("error").is_some(), "{method} {path:?}: {reply}");
+            assert!(!reply.to_string().contains("ghp_") && !reply.to_string().contains("someone"), "{path:?} leaked the configuration");
+        }
+        let rejected = p.act("review.reject", json!({"workspace_id": wsid, "path": path, "base": "HEAD", "key": "0123456789abcdef"})).await;
+        assert!(rejected.get("error").is_some(), "review.reject {path:?}: {rejected}");
+    }
+    for dir in [".git", ".GIT", ".Git", ".git.", "GIT~1", ".GIT/hooks", ".git/refs"] {
+        let reply = p.ask("workspace.tree", json!({"workspace_id": wsid, "dir": dir}), None).await.unwrap();
+        assert!(reply.get("error").is_some(), "workspace.tree {dir:?}: {reply}");
+    }
+    let listed = p.call("workspace.tree", json!({"workspace_id": wsid, "dir": ""})).await;
+    assert!(listed["entries"].as_array().unwrap().iter().all(|e| !e["name"].as_str().unwrap_or_default().eq_ignore_ascii_case(".git")), "{listed}");
+    assert_eq!(std::fs::read_to_string(repo.join(".git/config")).unwrap(), config, "the configuration is untouched");
+    assert!(repo.join(".git/HEAD").exists());
+    // The plan of a pull request names the remote without what is written into its address.
+    let plan = p.call("workspace.pr_plan", json!({"workspace_id": wsid})).await;
+    assert!(!plan.to_string().contains("ghp_") && !plan.to_string().contains("someone"), "{plan}");
+    println!("this volume ignores case: {case_insensitive}");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac130_rejecting_a_hunk_never_writes_through_a_link() {
+    let d = daemon("echo", &[]);
+    phone::enable(&d);
+    let pid = d.call("hello", json!({}))["pid"].as_u64().unwrap();
+    let r = tmp();
+    let outside = r.path().join("outside");
+    std::fs::create_dir_all(&outside).unwrap();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::create_dir_all(repo.join("docs")).unwrap();
+    std::fs::write(repo.join("docs/setup.sh"), "echo one\necho two\n").unwrap();
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-q", "-m", "setup"]);
+    let (created, ws, base) = edited(&d, &repo, "printf 'echo one\\necho CHANGED\\n' > docs/setup.sh");
+    let wsid = created["workspace"]["id"].as_str().unwrap().to_string();
+    // Links where a temporary file with a name that can be known beforehand would be written.
+    let target = outside.join("written-by-the-daemon");
+    for name in [format!("docs/setup.overseer-{pid}.tmp"), format!("docs/setup.sh.overseer-{pid}.tmp"), "docs/.overseer.tmp".to_string()] {
+        std::os::unix::fs::symlink(&target, ws.join(&name)).unwrap();
+    }
+    let (mut p, _) = pair(&d, "Rejecting Phone").await;
+    let hunk = p.call("workspace.hunks", json!({"workspace_id": wsid, "path": "docs/setup.sh", "base": base})).await["hunks"][0].clone();
+    let rejected = p.act("review.reject", json!({"workspace_id": wsid, "path": "docs/setup.sh", "base": base, "key": hunk["key"]})).await;
+    assert!(rejected.get("error").is_none(), "{rejected}");
+    assert_eq!(std::fs::read_to_string(ws.join("docs/setup.sh")).unwrap(), "echo one\necho two\n");
+    assert!(!target.exists(), "nothing was written outside the workspace");
+    assert!(std::fs::read_dir(&outside).unwrap().next().is_none());
+    assert!(std::fs::symlink_metadata(ws.join("docs/setup.sh")).unwrap().file_type().is_file(), "the file is a file, not a link");
+    let left: Vec<String> = std::fs::read_dir(ws.join("docs")).unwrap().flatten().map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.starts_with(".overseer-")).collect();
+    assert!(left.is_empty(), "no temporary file is left behind: {left:?}");
+    // The file itself replaced by a link, and a folder on the way replaced by a link: refused.
+    std::fs::write(ws.join("docs/setup.sh"), "echo one\necho AGAIN\n").unwrap();
+    let again = p.call("workspace.hunks", json!({"workspace_id": wsid, "path": "docs/setup.sh", "base": base})).await["hunks"][0].clone();
+    std::fs::remove_file(ws.join("docs/setup.sh")).unwrap();
+    std::os::unix::fs::symlink(&target, ws.join("docs/setup.sh")).unwrap();
+    assert!(p.act("review.reject", json!({"workspace_id": wsid, "path": "docs/setup.sh", "base": base, "key": again["key"]})).await.get("error").is_some());
+    std::fs::remove_file(ws.join("docs/setup.sh")).unwrap();
+    std::fs::remove_dir_all(ws.join("docs")).unwrap();
+    std::os::unix::fs::symlink(&outside, ws.join("docs")).unwrap();
+    let through = p.act("review.reject", json!({"workspace_id": wsid, "path": "docs/setup.sh", "base": base, "key": again["key"]})).await;
+    assert!(through.get("error").is_some(), "{through}");
+    assert!(std::fs::read_dir(&outside).unwrap().next().is_none(), "nothing was written or created outside");
+}

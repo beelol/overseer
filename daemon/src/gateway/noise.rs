@@ -178,7 +178,8 @@ mod tests {
             let mut i = ib.build_initiator().unwrap();
             let mut r = rb.build_responder().unwrap();
             let payload1 = br#"{"device":"d-1","name":"Test Phone","platform":"ios","app":"0.1.0","counter":1790000000000}"#;
-            let payload2 = br#"{"protocol":1,"device":"d-1","scope":"full","gateway":"Test Mac","fingerprint":"0000000000000000"}"#;
+            let payload2 = format!(r#"{{"protocol":1,"device":"d-1","scope":"full","gateway":"Test Mac","fingerprint":"{}"}}"#, fingerprint(&rs_pub));
+            let payload2 = payload2.as_bytes();
             let mut m1 = vec![0u8; 1024];
             let n = i.write_message(payload1, &mut m1).unwrap();
             m1.truncate(n);

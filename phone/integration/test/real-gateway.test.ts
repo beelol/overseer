@@ -138,6 +138,24 @@ describe("pairing and sessions with the real gateway", () => {
     await online(p);
   });
 
+  it("a phone removed on the Mac while it was away learns it when it comes back", async () => {
+    const d = await daemon("echo");
+    const p = phone();
+    const gateway = await pair(d, p, "Away Phone");
+    await online(p);
+    await p.client.stop();
+    await d.mac("gateway.device_revoke", { id: gateway.deviceId as string });
+    const back = phone({ store: p.store, secrets: p.secrets });
+    await back.client.start();
+    await until("the phone learning it was removed", () => back.client.state === "unpaired" && back.states.includes("revoked"));
+    expect(await back.secrets.get("overseer.keys")).toBeNull();
+    expect(((await d.mac("gateway.status")).sessions as number)).toBe(0);
+    // A stranger with another key learns nothing: no reply at all.
+    const stranger = phone({ store: p.store, secrets: p.secrets, timing: { pairingTimeoutMs: 2_000 } });
+    await stranger.client.start();
+    expect(stranger.client.state).toBe("unpaired");
+  });
+
   it("finds its Mac by key: an impostor is refused and the real Mac answers", async () => {
     const real = await daemon("echo");
     const impostor = await daemon("echo");

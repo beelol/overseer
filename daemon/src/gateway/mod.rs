@@ -438,10 +438,17 @@ async fn connection(d: Arc<Daemon>, stream: TcpStream, addr: SocketAddr) -> Resu
             let hello: Value = serde_json::from_slice(&payload[..n]).unwrap_or(Value::Null);
             let key = noise::hex(hs.get_remote_static().unwrap_or_default());
             let device = d.store.lock().unwrap().device_by_key(&key)?;
-            let Some(device) = device.filter(|dev| dev.revoked_ms.is_none()) else {
-                d.gateway.failed(addr, "unknown or revoked device");
+            let Some(device) = device else {
+                d.gateway.failed(addr, "unknown device");
                 return Ok(());
             };
+            if device.revoked_ms.is_some() {
+                // A phone that was removed while it was away must learn it, or it would try
+                // forever. Only the holder of the paired key can read this: the handshake is
+                // completed, the notice is sent, and nothing else is ever answered.
+                crate::log(&format!("gateway: {addr}: \"{}\" was removed on the Mac and was told so", device.name));
+                return tell_revoked(hs, ws, &device, &identity).await;
+            }
             let counter = hello["counter"].as_i64().unwrap_or(0);
             let app = hello["app"].as_str().map(|a| clean(a, 40));
             if !d.store.lock().unwrap().device_accept_counter(&device.id, counter, now_ms(), &addr.ip().to_string(), app.as_deref())? {
@@ -492,6 +499,7 @@ async fn connection(d: Arc<Daemon>, stream: TcpStream, addr: SocketAddr) -> Resu
             }
             let request = uuid::Uuid::new_v4().to_string();
             let (decide, decided) = oneshot::channel();
+            let opened_with = psk;
             {
                 let mut guard = d.gateway.pairing.lock().unwrap();
                 let Some(p) = guard.as_mut().filter(|p| p.accepts_attempts()) else {
@@ -504,7 +512,13 @@ async fn connection(d: Arc<Daemon>, stream: TcpStream, addr: SocketAddr) -> Resu
             }
             d.emit(None, None, "pairing_request", "gateway", "exact", json!({"request": request, "name": name, "platform": platform, "address": addr.ip().to_string(), "fingerprint": noise::fingerprint(&key), "wait_ms": pairing::confirm_wait().as_millis() as u64}))?;
             let accepted = matches!(tokio::time::timeout(pairing::confirm_wait(), decided).await, Ok(Ok(true)));
-            *d.gateway.pairing.lock().unwrap() = None;
+            {
+                // This request's pairing is over. One that was opened since is left alone.
+                let mut guard = d.gateway.pairing.lock().unwrap();
+                if guard.as_ref().is_some_and(|p| p.psk == opened_with) {
+                    *guard = None;
+                }
+            }
             if !accepted {
                 d.emit(None, None, "pairing_closed", "gateway", "exact", json!({"reason": "declined or not confirmed", "request": request, "name": name}))?;
                 crate::log(&format!("gateway: {addr}: pairing of \"{name}\" was not confirmed"));
@@ -536,6 +550,21 @@ async fn connection(d: Arc<Daemon>, stream: TcpStream, addr: SocketAddr) -> Resu
     ws.send(Message::Binary(message.into())).await?;
     let transport = handshake.into_transport_mode()?;
     session(d, device, transport, ws, addr).await
+}
+
+/// Completes the handshake of a revoked device, tells it, and closes.
+async fn tell_revoked(mut handshake: snow::HandshakeState, mut ws: WebSocketStream<TcpStream>, device: &Device, identity: &Identity) -> Result<()> {
+    let reply = json!({"protocol": crate::server::PROTOCOL_VERSION, "device": device.id, "scope": "revoked", "gateway": net::host_name(), "fingerprint": identity.fingerprint()}).to_string();
+    let mut message = vec![0u8; reply.len() + 128];
+    let n = handshake.write_message(reply.as_bytes(), &mut message)?;
+    message.truncate(n);
+    ws.send(Message::Binary(message.into())).await?;
+    let mut transport = handshake.into_transport_mode()?;
+    for frame in noise::seal(&mut transport, json!({"method": "gateway", "params": {"state": "revoked"}}).to_string().as_bytes())? {
+        ws.send(Message::Binary(frame.into())).await?;
+    }
+    let _ = ws.close(None).await;
+    Ok(())
 }
 
 async fn session(d: Arc<Daemon>, device: Device, transport: snow::TransportState, ws: WebSocketStream<TcpStream>, addr: SocketAddr) -> Result<()> {

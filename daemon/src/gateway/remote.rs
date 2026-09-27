@@ -105,7 +105,9 @@ fn guard(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<()> {
     };
     match method {
         "task.create" => {
-            if p["harness"].as_str() == Some("generic") || p.get("program").is_some_and(|v| !v.is_null()) {
+            // Parameters the protocol does not describe were refused before this; this is the
+            // second check for the one that matters most.
+            if p["harness"].as_str() == Some("generic") || ["program", "args", "extra_args", "approval_policy"].iter().any(|k| p.get(*k).is_some()) {
                 return Err(ProtoError::new("mac_only", "starting a program is available on the Mac only").into());
             }
             known(p["repo"].as_str().unwrap_or_default())
@@ -153,6 +155,11 @@ pub async fn handle(d: &Arc<Daemon>, ctx: &Ctx, bytes: Vec<u8>, tx: &mpsc::Sende
             return reply(tx, &id, json!({"error": {"code": code, "message": refusal(code)}})).await;
         }
     };
+    let extra = classes::undeclared_params(&method, &params);
+    if !extra.is_empty() {
+        crate::log(&format!("gateway: \"{}\" was refused {method}: parameters a phone may not send ({})", ctx.device_name, extra.join(", ")));
+        return reply(tx, &id, json!({"error": {"code": "invalid_params", "message": format!("{method} from a phone does not take: {}", extra.join(", ")), "data": {"parameters": extra}}})).await;
+    }
     if method == "events.subscribe" {
         return server::subscribe(d.clone(), id, params, tx.clone());
     }

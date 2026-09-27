@@ -22,6 +22,18 @@ pub fn github_repo(url: &str) -> Option<(String, String)> {
     (!owner.is_empty() && !repo.is_empty() && !repo.contains('/')).then_some((owner, repo))
 }
 
+/// A remote's address without a user name or token written into it.
+pub fn without_userinfo(url: &str) -> String {
+    match url.split_once("://") {
+        Some((scheme, rest)) => {
+            let (authority, path) = rest.split_once('/').map(|(a, p)| (a, format!("/{p}"))).unwrap_or((rest, String::new()));
+            let host = authority.rsplit_once('@').map(|(_, h)| h).unwrap_or(authority);
+            format!("{scheme}://{host}{path}")
+        }
+        None => url.to_string(),
+    }
+}
+
 impl Daemon {
     pub fn pr_plan(&self, workspace_id: &str) -> Result<Value> {
         let ws = self.workspace(workspace_id)?;
@@ -50,7 +62,7 @@ impl Daemon {
         // The configured URL (not `get-url`, which applies insteadOf rewrites).
         let url = git::git(path, &["config", "--get", &format!("remote.{remote}.url")])?;
         let Some((owner, repo)) = github_repo(&url) else {
-            return refuse(format!("The remote {remote} ({url}) is not on GitHub; Open PR only supports github.com remotes."));
+            return refuse(format!("The remote {remote} ({}) is not on GitHub; Open PR only supports github.com remotes.", without_userinfo(&url)));
         };
         let target = task.target_ref.clone().filter(|t| !t.is_empty() && !t.contains("..")).and_then(|t| {
             let local = git::git(Path::new(&task.repo_root), &["show-ref", "--verify", "--quiet", &format!("refs/heads/{t}")]).is_ok();
@@ -74,7 +86,7 @@ impl Daemon {
         Ok(json!({
             "ok": true, "workspace": ws, "run_id": root.map(|r| r.id.clone()), "title": root.map(|r| r.title.clone()).unwrap_or_else(|| task.title.clone()),
             "prompt": task.prompt, "harness": root.map(|r| r.harness.clone()), "model": root.and_then(|r| r.model.clone()),
-            "remote": remote, "remote_url": url, "owner": owner, "repo": repo, "branch": branch, "target": target, "base_ref": base_ref,
+            "remote": remote, "remote_url": without_userinfo(&url), "owner": owner, "repo": repo, "branch": branch, "target": target, "base_ref": base_ref,
             "uncommitted": uncommitted, "commits": commits,
         }))
     }
@@ -204,5 +216,11 @@ mod tests {
         assert_eq!(ok("https://gitlab.com/a/b.git"), None);
         assert_eq!(ok("/tmp/bare.git"), None);
         assert_eq!(ok("https://github.com/only-owner"), None);
+        use super::without_userinfo;
+        assert_eq!(without_userinfo("https://user:ghp_secret@github.com/o/r.git"), "https://github.com/o/r.git");
+        assert_eq!(without_userinfo("https://github.com/o/r.git"), "https://github.com/o/r.git");
+        assert_eq!(without_userinfo("ssh://git@github.com/o/r.git"), "ssh://github.com/o/r.git");
+        assert_eq!(without_userinfo("git@github.com:o/r.git"), "git@github.com:o/r.git");
+        assert_eq!(without_userinfo("https://tok@example.com"), "https://example.com");
     }
 }

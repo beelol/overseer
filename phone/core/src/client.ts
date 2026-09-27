@@ -512,7 +512,17 @@ export class PhoneClient {
       // Only now did connecting succeed in full, and the waits between passes start over. A
       // gateway that greets and then refuses the subscription is retried ever more slowly.
       this.backoff.reset();
-      if (isJsonObject(result) && result["history_truncated"] === true) this.emitter.emit("truncated", { cursor: after });
+      if (isJsonObject(result) && result["history_truncated"] === true) {
+        // The daemon's log may have started again below the cursor (another data folder, a
+        // restored backup). It then goes on from the end of its log and says where that is:
+        // the cursor follows, or every event up to the old cursor would be dropped as seen.
+        const from = numberField(result, "after");
+        if (from !== null && from < this.cursorValue) {
+          this.cursorValue = from;
+          this.savedCursor.set(String(from));
+        }
+        this.emitter.emit("truncated", { cursor: this.cursorValue });
+      }
     } catch (error) {
       if (session.closed) return;
       this.options.log?.(`subscribing failed (${error instanceof RequestError ? error.code : "no reply"}); connecting again`);

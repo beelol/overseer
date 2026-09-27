@@ -230,11 +230,19 @@ pub(crate) fn subscribe(daemon: Arc<Daemon>, id: Value, params: Value, tx: mpsc:
         let run_filter = params["run_id"].as_str().map(str::to_string);
         // History is gone when the log no longer reaches back to the cursor, or when a run's older
         // events after the cursor were pruned (each pruning leaves a retention marker).
-        let gap = cursor > 0 && {
+        let newest = daemon.store.lock().unwrap().max_seq().unwrap_or(0);
+        let beyond = cursor > newest;
+        let gap = beyond || cursor > 0 && {
             let store = daemon.store.lock().unwrap();
             let oldest = store.conn.query_row("SELECT MIN(seq) FROM events", [], |r| r.get::<_, Option<i64>>(0)).ok().flatten();
             matches!(oldest, Some(o) if o > cursor + 1) || store.pruned_after(cursor, run_filter.as_deref()).unwrap_or(false)
         };
+        if beyond {
+            // The client's cursor is past the end of the log: the log started again (another
+            // data folder, a restored backup). Without this nothing would reach the client until
+            // the new log grew past its old cursor. It reloads state; events go on from here.
+            cursor = newest;
+        }
         if tx.send(json!({"id": id, "result": {"subscribed": true, "after": cursor, "history_truncated": gap}})).await.is_err() {
             return;
         }

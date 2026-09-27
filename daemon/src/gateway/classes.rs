@@ -39,6 +39,28 @@ impl Scope {
 
 const SOURCE: &str = include_str!("../../../protocol/protocol.json");
 
+/// The parameters each method takes, by the protocol description. `None` for a method whose
+/// parameters are not described field by field.
+fn params_table() -> &'static HashMap<String, Option<Vec<String>>> {
+    static T: OnceLock<HashMap<String, Option<Vec<String>>>> = OnceLock::new();
+    T.get_or_init(|| {
+        let doc: Value = serde_json::from_str(SOURCE).expect("protocol/protocol.json is valid JSON");
+        doc["methods"].as_object().expect("methods").iter().map(|(name, m)| (name.clone(), m["params"].as_object().map(|fields| fields.keys().cloned().collect()))).collect()
+    })
+}
+
+/// What a device sent that the method does not take. A device may send only what the protocol
+/// describes: the daemon's methods read more than that for the Mac's own surfaces (a program to
+/// start, extra arguments for a harness), and none of it is for a phone.
+pub fn undeclared_params(method: &str, params: &Value) -> Vec<String> {
+    let sent: Vec<String> = params.as_object().map(|o| o.keys().cloned().collect()).unwrap_or_default();
+    match params_table().get(method) {
+        Some(Some(declared)) => sent.into_iter().filter(|k| !declared.contains(k)).collect(),
+        // Not described field by field: nothing may be sent.
+        _ => sent,
+    }
+}
+
 fn table() -> &'static HashMap<String, Class> {
     static T: OnceLock<HashMap<String, Class>> = OnceLock::new();
     T.get_or_init(|| {
@@ -147,6 +169,23 @@ mod tests {
         for (method, _) in methods() {
             assert!(readme.contains(&format!("| `{method}` |")), "{method} is missing from the README's table");
         }
+    }
+
+    #[test]
+    fn every_method_a_phone_may_call_describes_its_parameters() {
+        let doc: Value = serde_json::from_str(SOURCE).unwrap();
+        for (name, m) in doc["methods"].as_object().unwrap() {
+            if m["class"] != "mac_only" && m["planned"].as_bool() != Some(true) {
+                assert!(m["params"].is_object(), "{name} must describe its parameters field by field, so a phone can send nothing else");
+            }
+        }
+        // What starts a program, or changes how a harness is started, is never a phone's to send.
+        for key in ["program", "args", "extra_args", "approval_policy", "unsaved", "env"] {
+            assert_eq!(undeclared_params("task.create", &serde_json::json!({key: "x"})), vec![key.to_string()], "{key}");
+            assert_eq!(undeclared_params("run.follow_up", &serde_json::json!({key: "x"})), vec![key.to_string()], "{key}");
+        }
+        assert!(undeclared_params("task.create", &serde_json::json!({"repo": "/r", "harness": "claude", "prompt": "p", "model": "m"})).is_empty());
+        assert_eq!(undeclared_params("no.such_method", &serde_json::json!({"a": 1})), vec!["a".to_string()]);
     }
 
     #[test]
