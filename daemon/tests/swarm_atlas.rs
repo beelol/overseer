@@ -614,14 +614,22 @@ fn atlas_s5_redirect_during_long_probe_interrupts_and_holds_review() {
     assert_eq!(marker["job"],"j4");
     assert_eq!(marker["attachmentStatus"],200);
     assert!(["queued","starting","running"].contains(&d.run(worker)["status"].as_str().unwrap()));
-    d.call("swarm.direct",json!({"run_id":run,"generation":1,"revision":1,
-        "job_id":"j4","attempt_id":attempt["attempt_id"],"message_id":"j4-s5-redirect",
-        "type":"redirect","payload":{"focus":"signed URL boundary","owner":"j2"}}));
+    let revised=d.call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"J2 owns the shared helper; J4 checks the signed URL boundary",
+        "jobs":[
+            {"id":"j4","title":"Attachments","acceptance":"signed URL boundary only",
+                "deps":[],"resource_claims":[{"resource":"atlas-db-j4","mode":"write"}]},
+            {"id":"review","title":"Review attachment finding","acceptance":"validated J4 evidence",
+                "deps":["j4"]}
+        ]}));
+    assert_eq!(revised["revision"],2);
+    assert_eq!(revised["redirected"],1);
+    let redirect_id=format!("revision-2-{}",attempt["attempt_id"].as_str().unwrap());
     let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
     let delivered_by=std::time::Instant::now()+std::time::Duration::from_secs(4);
     loop {
         let phase:String=db.query_row("SELECT phase FROM swarm_messages
-            WHERE run_id=?1 AND message_id='j4-s5-redirect'",[run],|r|r.get(0)).unwrap();
+            WHERE run_id=?1 AND message_id=?2",[run,redirect_id.as_str()],|r|r.get(0)).unwrap();
         if phase=="delivered" { break; }
         assert!(std::time::Instant::now()<delivered_by,"J4 did not acknowledge delivery: {phase}");
         std::thread::sleep(std::time::Duration::from_millis(50));
@@ -631,14 +639,14 @@ fn atlas_s5_redirect_during_long_probe_interrupts_and_holds_review() {
     let interrupt=std::path::Path::new(&run_dir).join("interrupt.requested");
     assert!(!interrupt.exists());
     db.execute("UPDATE swarm_messages SET updated_ms=?3 WHERE run_id=?1 AND message_id=?2",
-        rusqlite::params![run,"j4-s5-redirect",now()-30_001]).unwrap();
+        rusqlite::params![run,redirect_id,now()-30_001]).unwrap();
     let stopped_by=std::time::Instant::now()+std::time::Duration::from_secs(4);
     while !interrupt.exists() {
         assert!(std::time::Instant::now()<stopped_by,"J4 was not interrupted after redirect timeout");
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
     let phase:String=db.query_row("SELECT phase FROM swarm_messages
-        WHERE run_id=?1 AND message_id='j4-s5-redirect'",[run],|r|r.get(0)).unwrap();
+        WHERE run_id=?1 AND message_id=?2",[run,redirect_id.as_str()],|r|r.get(0)).unwrap();
     assert_eq!(phase,"delivered");
     let results:i64=db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1
         AND job_id='j4' AND kind='result'",[run],|r|r.get(0)).unwrap();
@@ -652,7 +660,7 @@ fn atlas_s5_redirect_during_long_probe_interrupts_and_holds_review() {
     let review=jobs["jobs"].as_array().unwrap().iter().find(|job|job["id"]=="review").unwrap();
     assert_eq!(review["status"],"planned");
     assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
-        "revision":1,"request_id":"s5-redirect-complete","summary":"Attachment audit passed",
+        "revision":2,"request_id":"s5-redirect-complete","summary":"Attachment audit passed",
         "verification":"J4 probe","checks":[]})).is_err());
     let messages=d.call("swarm.messages",json!({"run_id":run,"recipient":attempt["attempt_id"]}));
     assert!(messages["messages"].as_array().unwrap().iter().any(|message|
