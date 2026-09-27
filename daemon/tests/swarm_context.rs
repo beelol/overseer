@@ -202,6 +202,54 @@ fn hundred_job_summary_and_scoped_large_artifact_context() {
 }
 
 #[test]
+fn worker_artifact_references_page_without_losing_retrievable_evidence() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Paged evidence",
+        "objective":"Inspect recorded evidence","allowed_targets":["account-a"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"audit","title":"Inspect evidence","acceptance":"Record each artifact","deps":[]}
+    ]}));
+    let attempt = admit(&d, id, "audit", "account-a");
+    for n in 0..64 {
+        d.call("swarm.artifact.put", json!({"run_id":id,"job_id":"audit",
+            "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+            "artifact_id":format!("proof-{n:03}"),"source_revision":1,
+            "kind":"trace","content":format!("evidence {n}")}));
+    }
+
+    let mut cursor = Value::Null;
+    let mut seen = Vec::new();
+    let mut pages = 0;
+    loop {
+        let page = d.call("swarm.worker.brief", json!({"run_id":id,"job_id":"audit",
+            "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+            "max_inline_bytes":2048,"artifact_cursor":cursor}));
+        assert!(page.to_string().len() <= 2048, "{page}");
+        assert_eq!(page["job"]["acceptance"], "Record each artifact");
+        let refs = page["artifacts"].as_array().unwrap();
+        assert!(!refs.is_empty());
+        for reference in refs {
+            seen.push(reference["id"].as_str().unwrap().to_owned());
+        }
+        pages += 1;
+        cursor = page["next_artifact_cursor"].clone();
+        if cursor.is_null() { break; }
+        assert_eq!(cursor, refs.last().unwrap()["id"]);
+        assert!(pages < 64);
+        if pages == 1 { d.kill9(); d.spawn(); }
+    }
+    assert!(pages > 1);
+    assert_eq!(seen, (0..64).map(|n| format!("proof-{n:03}")).collect::<Vec<_>>());
+    assert_eq!(d.call("swarm.context.get", json!({"run_id":id,"job_id":"audit",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "artifact_id":"proof-063"}))["content"], "evidence 63");
+    assert!(d.try_call("swarm.worker.brief", json!({"run_id":id,"job_id":"audit",
+        "attempt_id":attempt["attempt_id"],"token":"wrong",
+        "max_inline_bytes":2048,"artifact_cursor":"proof-031"})).is_err());
+}
+
+#[test]
 fn revoked_artifact_stops_dependent_delivery_and_worker_but_not_unrelated_work() {
     let d = Daemon::start(&[]);
     let temp = tmp();

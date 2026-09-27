@@ -404,6 +404,11 @@ fn visible_artifact(
 
 pub fn worker_brief(store: &Store, p: &Value) -> Result<Value> {
     let limit = inline_limit(p)?;
+    let cursor = match &p["artifact_cursor"] {
+        Value::Null => "",
+        Value::String(value) if value.len() <= 128 => value.as_str(),
+        _ => bail!("invalid artifact cursor"),
+    };
     let run = required(p, "run_id")?;
     let job = required(p, "job_id")?;
     let (target, attempt_revision) = attempt_target(store, p)?;
@@ -439,7 +444,8 @@ pub fn worker_brief(store: &Store, p: &Value) -> Result<Value> {
         "plan_revision":job_revision,"target_id":target,
         "target_constraints":{"assigned_target":target,"allowed_targets":current["allowed_targets"]},
         "job":{"id":job,"title":title,"acceptance":acceptance,"deps":deps,
-            "resource_claims":claims},"budget":budget,"artifacts":[]});
+            "resource_claims":claims},"budget":budget,"artifacts":[],
+        "next_artifact_cursor":Value::Null});
     if result.to_string().len() > limit {
         bail!("required worker brief exceeds inline context limit");
     }
@@ -447,7 +453,7 @@ pub fn worker_brief(store: &Store, p: &Value) -> Result<Value> {
         "SELECT a.id FROM swarm_artifacts a
          JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
          JOIN swarm_admissions s ON s.run_id=a.run_id AND s.attempt_id=a.attempt_id
-         WHERE a.run_id=?1
+         WHERE a.run_id=?1 AND a.id>?4
          AND (s.target_id=?2 OR EXISTS
               (SELECT 1 FROM swarm_artifact_grants g WHERE g.run_id=a.run_id
                AND g.artifact_id=a.id AND g.target_id=?2))
@@ -469,18 +475,26 @@ pub fn worker_brief(store: &Store, p: &Value) -> Result<Value> {
                            AND dep.value=a.job_id))) ORDER BY a.id",
     )?;
     let ids = stmt
-        .query_map(params![run, target, job], |r| r.get::<_, String>(0))?
+        .query_map(params![run, target, job, cursor], |r| r.get::<_, String>(0))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     for id in ids {
         let (source, kind, content, sha, revision, _) =
             visible_artifact(store, run, job, &target, &id)?;
         let reference = json!({"id":id,"job_id":source,"kind":kind,"sha256":sha,
             "source_revision":revision,"size_bytes":content.len()});
+        let previous_cursor = result["next_artifact_cursor"].clone();
         result["artifacts"].as_array_mut().unwrap().push(reference);
+        result["next_artifact_cursor"] = json!(id);
         if result.to_string().len() > limit {
-            bail!("worker artifact references exceed inline context limit");
+            result["artifacts"].as_array_mut().unwrap().pop();
+            result["next_artifact_cursor"] = previous_cursor;
+            if result["artifacts"].as_array().unwrap().is_empty() {
+                bail!("one worker artifact reference exceeds inline context limit");
+            }
+            return Ok(result);
         }
     }
+    result["next_artifact_cursor"] = Value::Null;
     Ok(result)
 }
 
