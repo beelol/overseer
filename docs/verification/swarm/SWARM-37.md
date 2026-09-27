@@ -1,6 +1,6 @@
 # SWARM-37 — large-run status and controls
 
-Status: partial. Latest evidence revision: `a9232f2`.
+Status: partial. Latest evidence revision: `9142d2d`.
 
 Input: a local daemon fixture plans 100 independent jobs, then sets 32 job records to `running`, 8 to `submitted`, 4 to `blocked`, and leaves 56 `ready`. It creates a director owner without a linked process, pages filtered jobs, and restarts the daemon. The fixture deliberately does not launch 32 workers.
 
@@ -33,3 +33,7 @@ Packaged 32-worker follow-up (`0561034`, final teardown evidence `a9232f2`): `no
 Validation: the focused 32-worker Rust test first failed for missing `worker_runs`, then passed after the read API change; a state-membership assertion likewise failed before the daemon annotation and passed after it. `test/unit/swarm-view.js` failed before the grouping/rendering change and passed after. The affected `protocol` (51), `swarm_runtime` (18) and `swarm_state` (18) Rust suites passed serially; `node test/unit/run.js`, extension syntax check, VSIX packaging, the existing packaged sidebar and 100-queued-job control scenarios, and the new packaged 32-worker scenario passed.
 
 Remaining: the fixture has no running director or blocked job, and uses synthetic quota. Account usage, the limiting constraint, unconfirmed exits, packaged blocked-state filtering and Pause/Stop timing under 32 active workers remain unverified. SWARM-37 stays partial.
+
+Capacity follow-up (`9142d2d`): the same packaged 100-job/32-live-worker scenario expands a Capacity row with the selected target, frozen allocation, finishing reserve, recorded planning decision, and explicit unknown provider usage/current limit. The daemon's bounded capacity summary survives a restart in `swarm_status_reports_durable_capacity_without_inventing_provider_usage`; a separate sidebar unit fixture checks the tree rows. The first packaged run failed only because the old assertion counted every level-four row as a worker after Capacity added legitimate rows at that level. It was narrowed to rows labeled Worker and the rerun passed. `cargo test --workspace --offline -q`, `node test/unit/run.js`, extension check/package, packaged scale, queued-control and ordinary-sidebar scenarios passed. Current screenshots/results are under `docs/verification/evidence/ui/swarm-scale/` and `docs/verification/evidence/ui/swarm-status/`; all 32 local child PIDs exited during cleanup.
+
+Remaining: a running director, blocked-state filter in the packaged 32-worker session, unconfirmed exits, actual account usage and current limiting reason, and Pause/Stop latency with 32 active workers. This is fixture-only; SWARM-37 remains unchecked.
