@@ -8,6 +8,7 @@
 //        outage    the turn fails because the provider answers 503
 //        stall     the turn starts and then says nothing, until it is interrupted
 //        early     the turn fails on the network before any session is reported
+//        reconnect the turn never fails: it keeps saying it is reconnecting, as Codex does, until interrupted
 //   $CONTINUITY_LOG       every start is appended here as one JSON line (who, arguments, prompt)
 //
 //   codex:  --version | login status | exec [resume <id>] --json ... -- <prompt>
@@ -56,6 +57,7 @@ if (who === 'codex') {
   out({ type: 'thread.started', thread_id: thread });
   out({ type: 'turn.started' });
   if (behaviour === 'stall') return stall();
+  if (behaviour === 'reconnect') { setInterval(() => out({ type: 'error', message: 'Reconnecting... waiting for network (Connection failed: error sending request)' }), 400); return stall(); }
   if (behaviour === 'network' || behaviour === 'outage') {
     const message = (behaviour === 'network' ? NETWORK : OUTAGE).codex;
     out({ type: 'error', message });

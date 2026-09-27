@@ -831,3 +831,27 @@ fn ac138_without_the_server_a_local_agent_cannot_ask_so_the_move_is_offered() {
     assert_eq!(l.status(&next, "completed")["harness"], "opencode");
     assert!(l.workspace(&c).join("free.txt").exists());
 }
+
+#[test]
+fn ac84_an_agent_that_only_keeps_reconnecting_is_moved() {
+    // The real Codex never fails its turn while its hosts are unreachable: it says "Reconnecting..."
+    // for ever. With its provider unreachable and no progress, Overseer interrupts and moves the work.
+    let l = lab_in(vec![ollama::qwen3_coder_30b(), ollama::qwen3_coder_30b_64k()], &[("OVERSEER_TEST_RECONNECT_MS", "800")]);
+    l.behave("reconnect", "ok");
+    let c = l.start("codex", "write reconnect.txt hello; say done", None);
+    let run = run_id(&c);
+    l.status(&run, "running");
+    std::thread::sleep(Duration::from_millis(1500));
+    assert_eq!(l.d.run(&run)["status"], "running", "reconnecting while the provider answers the probe is left alone");
+    l.degraded(OPENAI_DOWN, "OpenAI unreachable");
+    let next = l.successor(&run);
+    let stall = &l.kinds(&run, "stall")[0];
+    assert_eq!((stall["reason"].as_str(), stall["limit_ms"].as_i64()), (Some("no progress while OpenAI could not be reached; the turn was interrupted by Overseer"), Some(800)));
+    assert!(stall["reconnecting_ms"].as_i64().unwrap() >= 800);
+    let parked = l.kinds(&run, "status").into_iter().find(|s| s["status"] == "waiting_for_connection").unwrap();
+    assert_eq!(parked["reason"], "no progress while OpenAI could not be reached; the turn was interrupted by Overseer");
+    let done = l.status(&next, "completed");
+    assert_eq!(done["harness"], "claude", "the work moved to the provider that can be reached");
+    assert!(l.workspace(&c).join("reconnect.txt").exists());
+    assert_eq!(l.d.run(&run)["status"], "handed_off");
+}

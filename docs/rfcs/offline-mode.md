@@ -46,7 +46,7 @@ under `overseer.continuity.*`. The chat still uses the owner's verb for the mome
 | Permission modes | Carried over on every handoff, never loosened. The OpenCode adapter gains Plan only, Accept edits, Auto and Ask first; until Ask first is verified, such a run waits and offers the move instead. |
 | Failover target | Among several accounts, the one with the most quota left, then the most recently used. The model is the one last picked for that harness, otherwise its default. |
 | Back online | Local runs offer Switch back; new agents go online automatically. |
-| Stall | Overseer interrupts a turn after 90 seconds of silence while offline. |
+| Stall | Overseer interrupts a turn after 90 seconds of silence while offline, and a turn that only keeps reconnecting after 30 seconds with its provider unreachable. |
 | After 36 hours | The run fails with the reason, keeps its message and offers Retry now. |
 | No verified model fits | Wait and say why; a setting can allow unverified models. |
 | Quota and rate limits | Not part of this gate; they come with quota-aware routing. |
@@ -594,6 +594,15 @@ As built (2026-09-26):
   running turn has produced no event for `continuity.stallSeconds` (default 90), Overseer interrupts
   it (recorded as Overseer's action, not the harness's) and applies the policy as if the turn had
   failed.
+- **Reconnecting in vain** (as built, from the live check). The real Codex never fails such a turn:
+  with its hosts unreachable it prints *Reconnecting... waiting for network* every few seconds for as
+  long as it is left, so neither the failed-turn rule nor the silence rule ever fires. When a run's
+  provider is unreachable (the state is offline, or degraded with that provider's probe failing) and
+  the run has produced nothing but network-class errors since its last progress for 30 seconds
+  (`OVERSEER_TEST_RECONNECT_MS` in tests; never longer than `stallSeconds`), Overseer interrupts the
+  turn the same way. The `stall` event carries the reason, and the parked run reads *no progress
+  while OpenAI could not be reached; the turn was interrupted by Overseer*. A turn that reconnects
+  while its provider still answers the probe is left alone.
 - **Shown as** one quiet system card, updated in place: *Offline. Retrying the connection every 2
   minutes (attempt 4). Nothing is lost; your message is sent when the connection returns.* with
   **Use a local model now** and **Stop**. Runs in this state are not dimmed and are not per-run items
@@ -669,7 +678,7 @@ state, the budget and the current pick.
 | `returnOnline` | `"offer"` | `offer`, `auto` or `stay`. |
 | `retryCapSeconds` | `120` | Longest wait between retries. |
 | `retryForHours` | `36` | Give up waiting after this long (the run then fails with the reason and offers Retry now). |
-| `stallSeconds` | `90` | Silence while offline before Overseer interrupts a turn. |
+| `stallSeconds` | `90` | Silence while offline before Overseer interrupts a turn. A turn that only reconnects with its provider unreachable is interrupted after 30 seconds, or after `stallSeconds` when that is shorter. |
 | `probes` | `true` | Credential-free reachability probes. Off: the system and the agents drive the state. |
 | `ollamaIdleMinutes` | `30` | Stop an Overseer-started Ollama after this idle time. |
 | `registry` | `""` | Mirror for model downloads (empty: Ollama's registry). |

@@ -199,7 +199,8 @@ async function failover() {
   fs.writeFileSync(wrapper, `#!/bin/sh\n# Codex with its hosts blocked, for this process only.\nexport HTTPS_PROXY=http://127.0.0.1:${port} HTTP_PROXY=http://127.0.0.1:${port} ALL_PROXY=http://127.0.0.1:${port} https_proxy=http://127.0.0.1:${port} http_proxy=http://127.0.0.1:${port} all_proxy=http://127.0.0.1:${port}\nexec "${codex.program}" "$@"\n`, { mode: 0o755 });
   const netFile = path.join(home, 'net-failover.json');
   write(netFile, { system: 'connected', baseline: { by_name: true, by_ip: true }, providers: { openai: true, anthropic: true } });
-  const s = session('failover', { OVERSEER_TEST_NET: netFile, OVERSEER_CODEX_PATH: wrapper });
+  // The probes read the fixture often, so a change is seen within seconds rather than at the idle interval.
+  const s = session('failover', { OVERSEER_TEST_NET: netFile, OVERSEER_CODEX_PATH: wrapper, OVERSEER_TEST_PROBE_MS: '500', OVERSEER_TEST_PROBE_IDLE_MS: '500', OVERSEER_TEST_CONTINUITY_TICK_MS: '400' });
   const { say, check, ctl } = s;
   await s.start();
   try {
@@ -216,7 +217,7 @@ async function failover() {
 
     say('\n== Codex cannot reach its provider');
     write(netFile, { system: 'connected', baseline: { by_name: true, by_ip: true }, providers: { openai: 'connect', anthropic: true } });
-    await s.until('degraded', () => ctl('connection.status').status.state === 'degraded', 10000);
+    await s.until('degraded', () => ctl('connection.status').status.state === 'degraded', 30000);
     say(`connection: ${ctl('connection.status').status.state} (${ctl('connection.status').status.reason})`);
     const prompt = 'Create a file named failover.txt in the current directory containing exactly: hello from the other provider. Then reply with the single word done.';
     const c = ctl('task.create', { repo: dir, harness: 'codex', model: 'gpt-5.6-luna', effort: 'low', title: 'live failover', prompt });
@@ -232,7 +233,8 @@ async function failover() {
     const before = s.run(first);
     const ws = s.state().workspaces.find(w => w.id === c.workspace.id);
     const file = path.join(ws.path, 'failover.txt');
-    check('Codex failed on the connection and never reached its provider', /^the connection to OpenAI failed: /.test(parked.payload.reason) && !s.events(first).some(e => e.kind === 'usage'), 'no usage was reported for the Codex turn');
+    // The real Codex never fails such a turn: it keeps saying "Reconnecting... waiting for network", so Overseer interrupts it once its provider has been unreachable with no progress for 30 s.
+    check('Codex never reached its provider: its turn failed on the connection or was interrupted while it only reconnected', (/^the connection to OpenAI failed: /.test(parked.payload.reason) || /^no progress while OpenAI could not be reached; the turn was interrupted by Overseer$/.test(parked.payload.reason)) && !s.events(first).some(e => e.kind === 'usage'), `${parked.payload.reason.slice(0, 120)}; no usage was reported for the Codex turn`);
     check('the successor is Claude Code on its smallest model, in the same task and worktree', f.run.harness === 'claude' && /haiku/.test(f.run.model || '') && f.run.task_id === before.task_id && f.run.workspace_id === before.workspace_id, `${f.run.harness} ${f.run.harness_version}, model ${f.run.model}, account ${f.run.profile_id}`);
     check('it finishes the task in that worktree', f.run.status === 'completed' && fs.existsSync(file) && /hello from the other provider/.test(fs.readFileSync(file, 'utf8')), `${f.run.status}; failover.txt: ${fs.existsSync(file) ? JSON.stringify(fs.readFileSync(file, 'utf8')) : 'missing'}; asked: ${f.asked.map(a => a.tool).join(', ') || 'nothing'}`);
     check('the predecessor reads handed off, not failed', before.status === 'handed_off' && before.exit_reason === `handed off to ${next} (provider_unreachable:openai)` && !s.events(first).some(e => e.kind === 'status' && e.payload.status === 'failed'), before.exit_reason);

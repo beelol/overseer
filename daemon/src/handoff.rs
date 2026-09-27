@@ -141,7 +141,9 @@ pub fn park(d: &Daemon, run: &Run, status: &str, last_error: Option<&(String, St
     } else if !KNOWN_PROVIDERS.contains(&provider) {
         return Ok(false);
     } else if stalled {
-        ("connection", "no answer while offline; the turn was interrupted by Overseer".to_string())
+        // The marker carries the reason the turn was interrupted (offline silence, or reconnecting in vain).
+        let why = std::fs::read_to_string(dir.join("stall.requested")).ok().filter(|s| s.contains(' ')).unwrap_or_else(|| "no answer while offline; the turn was interrupted by Overseer".to_string());
+        ("connection", why)
     } else if class == "network" {
         ("connection", format!("the connection to {} failed: {}", provider_name(provider), clip(last_error.map(|(_, m)| m.as_str()).unwrap_or_default(), 200)))
     } else if class == "auth" && offline {
@@ -593,17 +595,28 @@ fn pass(d: &Arc<Daemon>) -> Result<()> {
     Ok(())
 }
 
-/// A turn that produces nothing while the connection is gone is interrupted by Overseer, and
-/// then treated as a turn that failed on the connection.
+/// A turn that produces nothing while the connection is gone, or that only keeps reconnecting
+/// while its provider cannot be reached (Codex prints "Reconnecting... waiting for network" for
+/// ever, live), is interrupted by Overseer and then treated as a turn that failed on the connection.
 fn stalls(d: &Arc<Daemon>, status: &Status, settings: &continuity::Settings) -> Result<()> {
-    if status.state != Conn::Offline {
-        return Ok(());
-    }
+    let offline = status.state == Conn::Offline;
     let limit = ms("OVERSEER_TEST_STALL_MS", settings.stall_seconds as i64 * 1000);
+    // How long an agent may keep reconnecting with no progress before the work moves.
+    let reconnect = ms("OVERSEER_TEST_RECONNECT_MS", limit.min(30_000));
     let runs = d.store.lock().unwrap().runs()?;
     for run in runs.iter().filter(|r| r.parent_run_id.is_none() && ["starting", "running"].contains(&r.status.as_str()) && KNOWN_PROVIDERS.contains(&provider_of(&r.harness))) {
-        let last: i64 = d.store.lock().unwrap().conn.query_row("SELECT COALESCE(MAX(ts), 0) FROM events WHERE run_id=?1", [&run.id], |r| r.get(0)).unwrap_or(0);
-        if now() - last.max(run.created_ms) < limit || now() - status.since_ms < limit {
+        let provider = provider_of(&run.harness);
+        let unreachable = offline || status.providers.get(provider).is_some_and(|h| h.reachable == Some(false));
+        if !unreachable {
+            continue;
+        }
+        let events = d.store.lock().unwrap().events_after(0, Some(&run.id), 5000)?;
+        let last = events.iter().map(|e| e.ts).max().unwrap_or(0).max(run.created_ms);
+        let progress = events.iter().filter(|e| ["turn_started", "output", "tool", "tool_result", "file_activity", "permission", "permission_answered", "child"].contains(&e.kind.as_str())).map(|e| e.ts).max().unwrap_or(run.created_ms);
+        let first_error = events.iter().filter(|e| e.kind == "error" && e.payload["class"] == "network" && e.ts >= progress).map(|e| e.ts).min();
+        let silent = offline && now() - last >= limit && now() - status.since_ms >= limit;
+        let reconnecting = first_error.is_some_and(|t| now() - t >= reconnect);
+        if !silent && !reconnecting {
             continue;
         }
         let Some((dir, _, _)) = d.store.lock().unwrap().run_process(&run.id)? else { continue };
@@ -611,8 +624,9 @@ fn stalls(d: &Arc<Daemon>, status: &Status, settings: &continuity::Settings) -> 
         if marker.exists() {
             continue;
         }
-        std::fs::write(&marker, now().to_string())?;
-        d.emit(Some(&run.task_id), Some(&run.id), "stall", "daemon", "exact", json!({"silent_ms": now() - last, "limit_ms": limit, "action": "interrupted by Overseer", "connection": status.reason}))?;
+        let why = if silent { "no answer while offline; the turn was interrupted by Overseer".to_string() } else { format!("no progress while {} could not be reached; the turn was interrupted by Overseer", provider_name(provider)) };
+        std::fs::write(&marker, &why)?;
+        d.emit(Some(&run.task_id), Some(&run.id), "stall", "daemon", "exact", json!({"silent_ms": now() - last, "limit_ms": if silent { limit } else { reconnect }, "reconnecting_ms": first_error.map(|t| now() - t), "action": "interrupted by Overseer", "reason": why, "connection": status.reason}))?;
         if let Ok(sock) = d.control_socket(run) {
             let _ = crate::shim::control(&sock, &json!({"op": "close_stdin"}));
             let _ = crate::shim::control(&sock, &json!({"op": "signal", "sig": libc::SIGINT}));
