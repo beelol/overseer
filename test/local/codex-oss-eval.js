@@ -112,7 +112,7 @@ function codex(program, tag, dir, prompt, samples) {
         const written = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
         const lines = r.stdout.split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
         const items = lines.filter(l => l.type === 'item.completed').map(l => l.item);
-        const attempt = { n, exit: r.code, seconds: Math.round((Date.now() - started) / 100) / 10, file: written, items: items.map(i => i.type), reply: (items.filter(i => i.type === 'agent_message').pop() || {}).text || null, errors: lines.filter(l => l.type === 'error' || l.type === 'turn.failed').map(l => String(l.message || (l.error || {}).message).slice(0, 200)), stderr: r.stderr.trim().split('\n').slice(-2).join(' | ').slice(0, 300) };
+        const attempt = { n, exit: r.code, seconds: Math.round((Date.now() - started) / 100) / 10, file: written, items: items.map(i => i.type), reply: (items.filter(i => i.type === 'agent_message').pop() || {}).text || null, errors: [...lines.filter(l => l.type === 'error' || l.type === 'turn.failed').map(l => String(l.message || (l.error || {}).message)), ...items.filter(i => i.type === 'error').map(i => String(i.message || i.text || JSON.stringify(i)))].map(e => e.slice(0, 240)), stderr: r.stderr.trim().split('\n').slice(-2).join(' | ').slice(0, 300) };
         attempt.ok = r.code === 0 && written !== null && written.trim() === text;
         result.attempts.push(attempt);
         if (n === 1) result.command = `codex ${r.args.slice(0, -1).join(' ')} <prompt>`;

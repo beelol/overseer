@@ -298,7 +298,8 @@ pub fn start(d: &Daemon) -> Result<Value> {
     continuity::meta_set(d, SERVER_KEY, &record.to_string())?;
     state().used_ms = now();
     let began = Instant::now();
-    while began.elapsed() < Duration::from_secs(20) {
+    // A first start answers late: Ollama looks for the machine's GPUs before it serves (19 s, live).
+    while began.elapsed() < Duration::from_secs(90) {
         if local::get("/api/version", 1).is_ok() {
             emit(d, "ollama_server", json!({"action": "started", "pid": pid, "program": program, "host": host, "after_ms": began.elapsed().as_millis() as u64}));
             crate::log(&format!("continuity: started ollama serve on {host} (pid {pid})"));
@@ -307,7 +308,7 @@ pub fn start(d: &Daemon) -> Result<Value> {
         std::thread::sleep(Duration::from_millis(200));
     }
     let _ = stop(d, "it did not answer");
-    bail!("Ollama was started but did not answer on {host} within 20 s (see {})", own_dir().join("serve.log").display())
+    bail!("Ollama was started but did not answer on {host} within 90 s (see {})", own_dir().join("serve.log").display())
 }
 
 /// Stops the server Overseer started. An Ollama that Overseer did not start is never touched.

@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use world::*;
 
 fn qwen25_coder_7b() -> (Value, Value) {
-    ollama::model("qwen2.5-coder:7b", "", 4_683_087_332, "qwen2", 28, json!(4), 128, 7_615_616_512, 32_768, None, &["completion", "tools", "insert"])
+    ollama::model("qwen2.5-coder:7b", "", 4_683_087_561, "qwen2", 28, json!(4), 128, 7_615_616_512, 32_768, None, &["completion", "tools", "insert"])
 }
 
 fn world(o: &Ollama) -> (World, Daemon) {
@@ -61,20 +61,31 @@ fn ac89_models_are_downloaded_only_when_allowed() {
     assert_eq!(e, "qwen2.5-coder:7b is not installed, and model downloads are off (overseer.continuity.allowModelDownloads)");
     let p = d.call("local.pick", json!({}));
     assert_eq!(p["may_download"], false);
-    assert!(p["pick"]["rejected"].as_array().unwrap().iter().any(|r| r["tag"] == "qwen2.5-coder:32b" && r["reason"].as_str().unwrap().contains("not verified") || r["reason"].as_str().unwrap().contains("not installed")));
+    assert_eq!(p["pick"]["chosen"]["tag"], "qwen3-coder:30b", "what is installed and verified is the pick");
     assert!(o.asked("/api/pull").is_empty());
+    {
+        // A machine where the pick is not installed: it is reported so, and nothing is pulled.
+        let empty = Ollama::start();
+        empty.offer(ollama::qwen3_coder_30b());
+        let (_w, d) = world(&empty);
+        let p = d.call("local.pick", json!({}));
+        assert_eq!((p["pick"]["chosen"].clone(), p["may_download"].clone()), (Value::Null, json!(false)));
+        assert!(p["pick"]["rejected"].as_array().unwrap().iter().any(|r| r["tag"] == "qwen3-coder:30b" && r["reason"] == "not installed, and downloads are off or the registry cannot be reached"), "{p}");
+        assert_eq!(d.call("continuity.status", json!({}))["pick"], Value::Null);
+        assert!(empty.asked("/api/pull").is_empty());
+    }
 
     // Allowed: the first pull ever is confirmed once, with its size.
     d.call("settings.set", json!({"values": {"allowModelDownloads": true}}));
     let first = d.call("local.pull", json!({"tag": "qwen2.5-coder:7b"}));
-    assert_eq!((first["needs_confirmation"].clone(), first["bytes"].as_u64()), (json!(true), Some(4_683_087_332)));
+    assert_eq!((first["needs_confirmation"].clone(), first["bytes"].as_u64()), (json!(true), Some(4_683_087_561)));
     assert!(o.asked("/api/pull").is_empty(), "nothing is pulled before the confirmation");
     let started = d.call("local.pull", json!({"tag": "qwen2.5-coder:7b", "confirm": true}));
     assert_eq!((started["download"]["status"].as_str(), started["download"]["by"].as_str()), (Some("starting"), Some("user")));
     // A second model has to wait its turn.
     assert_eq!(d.try_call("local.pull", json!({"tag": "qwen2.5-coder:14b"})).unwrap_err(), "qwen2.5-coder:7b is being downloaded; one model at a time");
     let done = wait_download(&d, "qwen2.5-coder:7b", "done");
-    assert_eq!((done["percent"].as_u64(), done["completed"].as_u64()), (Some(100), Some(4_683_087_332)));
+    assert_eq!((done["percent"].as_u64(), done["completed"].as_u64()), (Some(100), Some(4_683_087_561)));
     assert!(installed(&d).contains(&"qwen2.5-coder:7b".to_string()));
     assert_eq!(o.asked("/api/pull"), vec![json!({"model": "qwen2.5-coder:7b", "stream": true})]);
     // Progress was streamed as events.
@@ -101,14 +112,14 @@ fn ac89_models_are_downloaded_only_when_allowed() {
     assert!(!installed(&d).contains(&"qwen2.5-coder:14b".to_string()));
     std::thread::sleep(Duration::from_millis(200));
     let reached = o.state.lock().unwrap().pulled["qwen2.5-coder:14b"];
-    assert!(reached > 0 && reached < 8_988_124_069, "the pull stopped partway: {reached}");
+    assert!(reached > 0 && reached < 8_988_124_298, "the pull stopped partway: {reached}");
     assert_eq!(d.try_call("local.pull_cancel", json!({"tag": "qwen2.5-coder:14b"})).unwrap_err(), "qwen2.5-coder:14b is not being downloaded");
     let before = all_events(&d, "local_download").len();
     d.call("local.pull", json!({"tag": "qwen2.5-coder:14b"}));
     wait_download(&d, "qwen2.5-coder:14b", "done");
     let resumed: Vec<u64> = all_events(&d, "local_download")[before..].iter().filter(|e| e["payload"]["download"]["status"] == "downloading").map(|e| e["payload"]["download"]["completed"].as_u64().unwrap()).collect();
     // The fixture continues from the step it had reached, so at most a step or two (a tenth) is repeated.
-    assert!(resumed[0] + 8_988_124_069 / 10 >= reached && resumed[0] > 0, "the second pull continues from about {reached}, not from nothing: {resumed:?}");
+    assert!(resumed[0] + 8_988_124_298 / 10 >= reached && resumed[0] > 0, "the second pull continues from about {reached}, not from nothing: {resumed:?}");
     assert!(installed(&d).contains(&"qwen2.5-coder:14b".to_string()));
 
     // A model the registry does not have fails with Ollama's own words.

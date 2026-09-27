@@ -218,7 +218,7 @@ fn ac86_the_pick_follows_the_machines_memory() {
     let w = World::new();
     let d = w.start(&o.url(), &[]);
     // Checks recorded on this machine are laid over the shipped catalogue.
-    std::fs::write(d.home.path().join("local_catalogue.json"), json!({"models": [{"tag": "qwen2.5-coder:14b", "tier": 2, "disk_bytes": 8_988_124_069u64, "verified": {"opencode": {"status": "passed", "note": "test"}}}]}).to_string()).unwrap();
+    std::fs::write(d.home.path().join("local_catalogue.json"), json!({"models": [{"tag": "qwen2.5-coder:14b", "tier": 2, "disk_bytes": 8_988_124_298u64, "verified": {"opencode": {"status": "passed", "note": "test"}}}]}).to_string()).unwrap();
 
     // 128 GiB with nothing else running: the share decides.
     let p = d.call("local.pick", json!({}));
@@ -226,7 +226,7 @@ fn ac86_the_pick_follows_the_machines_memory() {
     assert_eq!((c["tag"].as_str(), c["context"].as_u64(), c["run_tag"].as_str(), c["run_tag_exists"].clone()), (Some("qwen3-coder:30b"), Some(65536), Some("qwen3-coder:30b-64k"), json!(true)));
     assert_eq!((gib(&c["bytes"]), c["measured"].clone(), gib(&p["pick"]["budget"]["budget"])), (24.3, json!(false), 51.2));
     assert_eq!(p["pick"]["alternatives"][0]["tag"], "qwen2.5-coder:14b");
-    assert!(p["pick"]["rejected"].as_array().unwrap().iter().any(|r| r["tag"] == "qwen2.5-coder:7b" && r["reason"].as_str().unwrap().starts_with("not verified")));
+    assert!(p["pick"]["rejected"].as_array().unwrap().iter().any(|r| r["tag"] == "qwen2.5-coder:7b" && r["reason"] == "failed its check with opencode: said done without calling a tool; nothing was written"));
 
     // 100 GiB in use by other things: what is free now decides, and the pick drops.
     w.memory(128.0, 28.0, "normal");

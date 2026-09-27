@@ -227,7 +227,8 @@ owner's "28 GB" in the request is this 128 GiB machine; nothing in the design de
 ```
 ceiling_share   = total × continuity.ramCeilingPercent / 100     default 40%, hard maximum 50%
 ceiling_now     = available_now − headroom                        headroom = max(4 GiB, 10% of total)
-budget          = min(ceiling_share, ceiling_now)
+ceiling_level   = total × (system_free_level − 45) / 100          where the system gives a level (macOS)
+budget          = min(ceiling_share, ceiling_now, ceiling_level)
 ```
 
 - **Why 40%.** An idle machine already uses 10–20% of its memory; VS Code, the harness, a browser and
@@ -236,6 +237,16 @@ budget          = min(ceiling_share, ceiling_now)
 - **Why two terms.** The share protects the machine from the model; the free-memory term protects the
   model from everything else running right now. Either alone is wrong: 40% of 128 GiB is 51 GiB, but
   with Xcode and Docker holding 90 GiB the honest answer is a much smaller model.
+- **Why a third term (added 2026-09-26, from a live run).** "Available" counts pages the system
+  could give back, and on a busy machine that overstates what a model can take. With another
+  session's 24 GiB model loaded, an emulator and two builds running, this machine read 30.5 GiB
+  available and the two terms allowed 17.7 GiB; a 14.2 GiB load then took the system to its
+  warning level (its own free level fell from 47% to 26%), and the check stopped and unloaded.
+  macOS gives its own account of free memory (`kern.memorystatus_level`), and it reported pressure
+  from about 40% down. The budget now also keeps that level at 45% or more: the same load is
+  refused with the numbers (2.6 GiB would have been left). On an idle 128 GiB machine (75% free by
+  the system's count) this term is 38.4 GiB and it decides, under the 40% share. Where the system
+  gives no level (Linux today), the two terms decide alone.
 - **Reassessment.** The budget is computed for every new run and every new turn (OpenCode starts one
   process per turn, and the model choice is per turn), never in the middle of a turn. A working turn
   is never stopped for a tighter budget (only critical memory pressure pauses local runs, see
@@ -274,8 +285,11 @@ Machine profiles, not one machine. Estimates from the formula; disk sizes from O
 for models not measured here). The order follows the ranking above: a model that fits at 32k comes
 before a larger one that only fits at 16k, because OpenCode's own instructions and tool list
 already take about 10,600 tokens (measured in the spike), which leaves little of a 16k context.
-The rows assume every model has passed its check; with the catalogue as shipped only
-`qwen3-coder:30b` is eligible. (Corrected on 2026-09-26 while building the pick: the first version
+The rows assume every model has passed its check. **They have not:** the verification of
+2026-09-26 passed `qwen3-coder:30b` and failed every `qwen2.5-coder` size (see
+[Model catalogue](#model-catalogue)), so on its own Overseer picks `qwen3-coder:30b` or nothing.
+A machine whose budget is under about 20 GiB (the 16 and 32 GiB rows) has no eligible model
+today: a run there waits and says why, unless the owner turns on `allowUnverifiedModels`. (Corrected on 2026-09-26 while building the pick: the first version
 of this table listed the 16k fits first and gave 128k for the last row, against the rule and the
 64k target.)
 
@@ -319,7 +333,8 @@ The owner's condition: Overseer must never open a model that could crash the com
   `waiting_for_memory`) and unloads the model; they resume when the pressure is back to normal. This
   is the only case in which Overseer stops a working local turn.
 - **One model at a time during verification**, smallest first, each unloaded after its check, with
-  memory recorded before and after.
+  memory recorded before and after. A verification stops at once when the system reports
+  pressure, and starts no model while it does.
 - **Out of reach.** Overseer cannot stop a model the user starts in Ollama themselves. It sees that
   model in `/api/ps` and in available memory, counts it as used, and shrinks its own pick.
 
@@ -331,14 +346,22 @@ for automatic picks only when Ollama reports the `tools` capability *and* the ca
 verified with the local harness; `continuity.allowUnverifiedModels` widens that to any installed
 model with `tools`. Ranking within a tier is by parameter count.
 
-| Tier | Model (Ollama tag) | Disk | Status |
+| Tier | Model (Ollama tag) | Disk | Result on 2026-09-26 (OpenCode 1.15.13 through `opencode serve`, Ollama 0.34.2) |
 | --- | --- | --- | --- |
-| 1 | `qwen3-coder:30b` (MoE, 3B active) | 17.3 GiB | **verified**: completed a write through OpenCode ([log](../verification/evidence/ac-14/opencode-ollama.log)); fast for its size |
-| 1 | `qwen2.5-coder:32b` | ≈20 GB | to verify |
-| 2 | `qwen2.5-coder:14b` | 8.4 GiB | **failed** on 2026-09-25: emitted its tool call as text through OpenCode; excluded until it passes a retest with a derived-tag context |
-| 3 | `qwen2.5-coder:7b` | ≈4.7 GB | to verify |
-| 4 | `qwen2.5-coder:3b` | ≈1.9 GB | to verify; for 16 GiB machines |
-| 4 | `qwen2.5-coder:1.5b` | ≈1 GB | to verify; last resort for 8 GiB machines |
+| 1 | `qwen3-coder:30b` (MoE, 3B active) | 17.3 GiB | **passed**, 3 of 3, at a 64k context (23.7 GiB loaded), 22 to 28 s a turn |
+| 1 | `qwen2.5-coder:32b` | 18.5 GiB | **failed**, 0 of 3, at 32k (26.5 GiB loaded): wrote its tool calls as text |
+| 2 | `qwen2.5-coder:14b` | 8.4 GiB | **failed**, 0 of 3, at 32k: tool calls as text, or "done" with nothing written |
+| 3 | `qwen2.5-coder:7b` | 4.4 GiB | **failed**, 0 of 3, at 32k: said "done" without calling a tool |
+| 4 | `qwen2.5-coder:3b` | 1.8 GiB | **failed**, 0 of 3, at 32k: tool calls as text |
+| 4 | `qwen2.5-coder:1.5b` | 0.9 GiB | **failed**, 0 of 3, at 32k: tool calls as text |
+
+The whole `qwen2.5-coder` family fails the same way through OpenCode: the model writes the call
+(`{"name": "write", "arguments": …}`) into its reply instead of calling the tool, so nothing runs,
+and the smaller sizes sometimes reply "done" with nothing written. Overseer's one nudge does not
+change it. They are excluded from automatic picks and shown as unverified; a user may still name
+one. What this means for small machines is said under
+[Worked examples](#worked-examples-40-ceiling-memory-otherwise-free), and a family that does call
+tools at 8 to 16 GiB is the first thing to look for next ([log](../verification/evidence/ac-87/opencode-serve.txt)).
 
 Later candidates, added only after the Qwen coders are verified: `qwen3.5:35b-a3b` (installed here;
 tools, thinking, vision), `gpt-oss:20b` (Codex's own `--oss` default) and `gpt-oss:120b`,

@@ -83,10 +83,10 @@ pub fn qwen3_coder_30b_64k() -> (Value, Value) {
     model("qwen3-coder:30b-64k", "qwen3-coder:30b", 18_556_700_444, "qwen3moe", 48, json!(4), 128, 30_532_122_624, 262_144, Some(65536), &["completion", "tools"])
 }
 pub fn qwen25_coder_14b() -> (Value, Value) {
-    model("qwen2.5-coder:14b", "", 8_988_124_069, "qwen2", 48, json!(8), 128, 14_770_033_664, 32_768, None, &["completion", "tools", "insert"])
+    model("qwen2.5-coder:14b", "", 8_988_124_298, "qwen2", 48, json!(8), 128, 14_770_033_664, 32_768, None, &["completion", "tools", "insert"])
 }
 pub fn qwen25_coder_32b() -> (Value, Value) {
-    model("qwen2.5-coder:32b", "", 19_851_349_856, "qwen2", 64, json!(8), 128, 32_763_876_352, 32_768, None, &["completion", "tools", "insert"])
+    model("qwen2.5-coder:32b", "", 19_851_349_898, "qwen2", 64, json!(8), 128, 32_763_876_352, 32_768, None, &["completion", "tools", "insert"])
 }
 pub fn qwen35_122b() -> (Value, Value) {
     let mut kv = vec![0u64; 48];

@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "about": "Coding models Overseer may pick on its own (Continuity, AC-87). The owner's direction is to start with the Qwen coders. A model is eligible for automatic picks only when Ollama reports the tools capability and `verified.<harness>.status` is `passed`. `disk_bytes` and the geometry are used for models that are not installed; an installed model's own numbers always win. Approximate sizes are marked.",
-  "check": "A one-turn task through the real local harness that must create a file with the write tool, in a disposable repository, repeated three times.",
+  "about": "Coding models Overseer may pick on its own (Continuity, AC-87). The owner's direction is to start with the Qwen coders. A model is eligible for automatic picks only when Ollama reports the tools capability and `verified.<harness>.status` is `passed`. `disk_bytes` and the geometry are used for models that are not installed; an installed model's own numbers always win. Sizes are the installed models' own (Ollama 0.34.2, Q4_K_M).",
+  "check": "A one-turn task through the real local harness that must create a file with the write tool, in a disposable repository, repeated three times. A model passes with three of three. Run with test/local/catalogue-verify.js: one model at a time, smallest first, through the memory guard, unloaded after its check.",
   "models": [
     {
       "tag": "qwen3-coder:30b",
@@ -11,59 +11,69 @@
       "max_context": 262144,
       "geometry": { "block_count": 48, "head_count_kv": 4, "key_length": 128, "value_length": 128 },
       "verified": {
-        "opencode": { "status": "passed", "on": "2026-09-25", "harness_version": "1.15.13", "ollama": "0.34.2", "evidence": "docs/verification/evidence/ac-14/opencode-ollama.log", "note": "completed a write through opencode run" }
+        "opencode": { "status": "passed", "on": "2026-09-26", "harness_version": "1.15.13", "transport": "opencode serve", "ollama": "0.34.2", "attempts": "3 of 3", "context": 65536, "evidence": "docs/verification/evidence/ac-87/opencode-serve.txt", "note": "created the file with the write tool three times of three" },
+        "codex": { "status": "passed", "on": "2026-09-26", "harness_version": "0.155.0-alpha.16.4", "transport": "codex exec --oss --local-provider ollama", "ollama": "0.34.2", "attempts": "3 of 3", "context": 65536, "evidence": "docs/verification/evidence/ac-87/codex-oss.txt", "note": "created the file with a shell command three times of three" }
       }
     },
     {
       "tag": "qwen2.5-coder:32b",
       "tier": 1,
       "parameters": 32763876352,
-      "disk_bytes": 19851349856,
-      "disk_approximate": true,
+      "disk_bytes": 19851349898,
       "max_context": 32768,
       "geometry": { "block_count": 64, "head_count_kv": 8, "key_length": 128, "value_length": 128 },
-      "verified": {}
+      "verified": {
+        "opencode": { "status": "failed", "on": "2026-09-26", "harness_version": "1.15.13", "transport": "opencode serve", "ollama": "0.34.2", "attempts": "0 of 3", "context": 32768, "evidence": "docs/verification/evidence/ac-87/opencode-serve.txt", "note": "wrote its tool calls as text; nothing ran" },
+        "codex": { "status": "failed", "on": "2026-09-26", "harness_version": "0.155.0-alpha.16.4", "transport": "codex exec --oss --local-provider ollama", "ollama": "0.34.2", "attempts": "0 of 3", "context": 16384, "evidence": "docs/verification/evidence/ac-87/codex-oss.txt", "note": "wrote its tool calls as text; nothing ran" }
+      }
     },
     {
       "tag": "qwen2.5-coder:14b",
       "tier": 2,
       "parameters": 14770033664,
-      "disk_bytes": 8988124069,
+      "disk_bytes": 8988124298,
       "max_context": 32768,
       "geometry": { "block_count": 48, "head_count_kv": 8, "key_length": 128, "value_length": 128 },
       "verified": {
-        "opencode": { "status": "failed", "on": "2026-09-25", "harness_version": "1.15.13", "ollama": "0.34.2", "evidence": "docs/verification/evidence/ac-14/opencode-ollama.log", "note": "emitted its tool call as text" }
+        "opencode": { "status": "failed", "on": "2026-09-26", "harness_version": "1.15.13", "transport": "opencode serve", "ollama": "0.34.2", "attempts": "0 of 3", "context": 32768, "evidence": "docs/verification/evidence/ac-87/opencode-serve.txt", "note": "wrote its tool calls as text, or said done without calling a tool; nothing ran" },
+        "codex": { "status": "failed", "on": "2026-09-26", "harness_version": "0.155.0-alpha.16.4", "transport": "codex exec --oss --local-provider ollama", "ollama": "0.34.2", "attempts": "0 of 3", "context": 32768, "evidence": "docs/verification/evidence/ac-87/codex-oss.txt", "note": "wrote its tool calls as text; nothing ran" }
       }
     },
     {
       "tag": "qwen2.5-coder:7b",
       "tier": 3,
       "parameters": 7615616512,
-      "disk_bytes": 4683087332,
-      "disk_approximate": true,
+      "disk_bytes": 4683087561,
       "max_context": 32768,
       "geometry": { "block_count": 28, "head_count_kv": 4, "key_length": 128, "value_length": 128 },
-      "verified": {}
+      "verified": {
+        "opencode": { "status": "failed", "on": "2026-09-26", "harness_version": "1.15.13", "transport": "opencode serve", "ollama": "0.34.2", "attempts": "0 of 3", "context": 32768, "evidence": "docs/verification/evidence/ac-87/opencode-serve.txt", "note": "said done without calling a tool; nothing was written" },
+        "codex": { "status": "failed", "on": "2026-09-26", "harness_version": "0.155.0-alpha.16.4", "transport": "codex exec --oss --local-provider ollama", "ollama": "0.34.2", "attempts": "0 of 3", "context": 32768, "evidence": "docs/verification/evidence/ac-87/codex-oss-small.txt", "note": "said done without calling a tool; nothing was written" }
+      }
     },
     {
       "tag": "qwen2.5-coder:3b",
       "tier": 4,
       "parameters": 3085938688,
-      "disk_bytes": 1929912432,
-      "disk_approximate": true,
+      "disk_bytes": 1929912626,
       "max_context": 32768,
       "geometry": { "block_count": 36, "head_count_kv": 2, "key_length": 128, "value_length": 128 },
-      "verified": {}
+      "verified": {
+        "opencode": { "status": "failed", "on": "2026-09-26", "harness_version": "1.15.13", "transport": "opencode serve", "ollama": "0.34.2", "attempts": "0 of 3", "context": 32768, "evidence": "docs/verification/evidence/ac-87/opencode-serve.txt", "note": "wrote its tool calls as text, or said done without calling a tool; nothing ran" },
+        "codex": { "status": "failed", "on": "2026-09-26", "harness_version": "0.155.0-alpha.16.4", "transport": "codex exec --oss --local-provider ollama", "ollama": "0.34.2", "attempts": "0 of 3", "context": 32768, "evidence": "docs/verification/evidence/ac-87/codex-oss-small.txt", "note": "said done without calling a tool; nothing was written" }
+      }
     },
     {
       "tag": "qwen2.5-coder:1.5b",
       "tier": 4,
       "parameters": 1543714304,
-      "disk_bytes": 986048576,
-      "disk_approximate": true,
+      "disk_bytes": 986062089,
       "max_context": 32768,
       "geometry": { "block_count": 28, "head_count_kv": 2, "key_length": 128, "value_length": 128 },
-      "verified": {}
+      "verified": {
+        "opencode": { "status": "failed", "on": "2026-09-26", "harness_version": "1.15.13", "transport": "opencode serve", "ollama": "0.34.2", "attempts": "0 of 3", "context": 32768, "evidence": "docs/verification/evidence/ac-87/opencode-serve.txt", "note": "wrote its tool calls as text; nothing ran" },
+        "codex": { "status": "failed", "on": "2026-09-26", "harness_version": "0.155.0-alpha.16.4", "transport": "codex exec --oss --local-provider ollama", "ollama": "0.34.2", "attempts": "0 of 3", "context": 32768, "evidence": "docs/verification/evidence/ac-87/codex-oss-small.txt", "note": "said done without calling a tool; nothing was written" }
+      }
     }
   ],
   "later_candidates": ["qwen3.5:35b-a3b", "gpt-oss:20b", "gpt-oss:120b", "devstral:24b", "qwen3:8b"]

@@ -31,6 +31,7 @@ const freePort = () => new Promise(resolve => { const s = net.createServer(); s.
 // The owner's own Ollama: its processes, its application and its answer.
 const owners = () => sh('/usr/bin/pgrep', ['-f', '/Applications/Ollama.app/Contents']).split('\n').filter(Boolean).filter(pid => !/llama-server|runner/.test(sh('/bin/ps', ['-p', pid, '-o', 'command=']))).sort().join(' ');
 const ownersApp = () => { try { return fs.statSync('/Applications/Ollama.app').mtimeMs; } catch { return null; } };
+const ownersKey = () => { try { const s = fs.statSync(path.join(os.homedir(), '.ollama/id_ed25519')); return `${s.mtimeMs}:${s.size}`; } catch { return 'none'; } };
 const ownersAnswer = () => sh('/usr/bin/curl', ['-s', '-m', '5', 'http://127.0.0.1:11434/api/version']);
 const tree = dir => { try { return fs.readdirSync(dir).sort(); } catch { return null; } };
 
@@ -53,7 +54,7 @@ function machine(name, port, extra) {
 }
 
 (async () => {
-  const before = { pids: owners(), app: ownersApp(), answer: ownersAnswer() };
+  const before = { pids: owners(), app: ownersApp(), answer: ownersAnswer(), key: ownersKey() };
   say(`the owner's own Ollama before: processes ${before.pids || 'none'}; answers ${before.answer || 'nothing'}`);
   const port = await freePort();
   const m = machine('machine', port, {});
@@ -118,12 +119,14 @@ function machine(name, port, extra) {
     check('it is deleted, and nothing is installed or started', JSON.stringify(tree(tampered.own)) === '[]' && tampered.ctl('ollama.status').ollama.installed === null && /needs|off|not installed/i.test(tampered.ctl('ollama.start').error || ''), `${redact(tampered.own)}: ${(tree(tampered.own) || []).join(', ') || 'empty'}`);
 
     say("\n== The owner's own Ollama");
-    const after = { pids: owners(), app: ownersApp(), answer: ownersAnswer() };
+    const after = { pids: owners(), app: ownersApp(), answer: ownersAnswer(), key: ownersKey() };
     check("the owner's running Ollama keeps its process ids", before.pids === after.pids && before.pids !== '', `${before.pids} → ${after.pids}`);
     check("the owner's application and its answer are as they were", before.app === after.app && before.answer === after.answer, after.answer);
-    check("nothing was written to the owner's ~/.ollama by this run's server", fs.existsSync(path.join(m.env.HOME, '.ollama')) || true, `this run's server had its own HOME (${redact(m.env.HOME)})`);
+    const ownKey = path.join(m.env.HOME, '.ollama/id_ed25519');
+    check("this run's server made its key in its own HOME, and the owner's key is as it was", fs.existsSync(ownKey) && before.key === after.key && before.key !== 'none', `${redact(ownKey)} exists; the owner's ~/.ollama/id_ed25519 is unchanged`);
   } catch (e) {
     check('the live check ran to its end', false, e.message);
+    try { say(fs.readFileSync(path.join(m.own, 'serve.log'), 'utf8').split('\n').slice(-15).map(l => '    serve.log: ' + l).join('\n')); } catch { /* no log */ }
   } finally {
     await m.stop();
     if (tampered) await tampered.stop();

@@ -335,18 +335,31 @@ pub struct Budget {
     pub ceiling_share: u64,
     /// available − headroom: protects the model from everything else that is running.
     pub ceiling_now: u64,
+    /// The system's own account of free memory, where it gives one (macOS), less the floor kept
+    /// so that a load does not take the machine to where it reports pressure.
+    pub ceiling_level: Option<u64>,
+    pub level: Option<i64>,
+    pub level_floor: i64,
     pub budget: u64,
     pub pressure: Pressure,
     pub note: Option<String>,
 }
 
+/// The system's own free-memory percentage that a load must leave. On the machine this was
+/// built on (macOS, 128 GiB) the system reported pressure from about 40% down, while "available"
+/// still read 24 GiB: a 14 GiB load that fitted `available − headroom` took it there (AC-87's
+/// evaluation of 2026-09-26). Five points are kept above that.
+pub const LEVEL_FLOOR_PERCENT: i64 = 45;
+
 pub fn headroom(total: u64, configured: Option<u64>) -> u64 {
     configured.unwrap_or_else(|| (4 * GIB).max(total / 10))
 }
 
-/// `min(total × ceiling, available − headroom)`. `reclaimable` is memory the candidate itself
-/// already holds (it is loaded), which loading it again would not take a second time. A warning
-/// from the system lowers the ceiling by ten points; at critical pressure nothing may be loaded.
+/// `min(total × ceiling, available − headroom)`, and where the system gives its own free-memory
+/// level, no more than what keeps that level above the floor. `reclaimable` is memory the
+/// candidate itself already holds (it is loaded), which loading it again would not take a second
+/// time. A warning from the system lowers the ceiling by ten points; at critical pressure nothing
+/// may be loaded.
 pub fn budget(mem: &Memory, opts: &PickOptions, reclaimable: u64) -> Budget {
     let mut percent = opts.ceiling_percent.min(MAX_CEILING_PERCENT);
     let mut note = None;
@@ -357,12 +370,13 @@ pub fn budget(mem: &Memory, opts: &PickOptions, reclaimable: u64) -> Budget {
     let headroom = headroom(mem.total, opts.headroom);
     let ceiling_share = mem.total / 100 * percent;
     let ceiling_now = (mem.available + reclaimable).saturating_sub(headroom);
-    let mut budget = ceiling_share.min(ceiling_now);
+    let ceiling_level = mem.level.map(|l| mem.total / 100 * (l - LEVEL_FLOOR_PERCENT).clamp(0, 100) as u64 + reclaimable);
+    let mut budget = ceiling_share.min(ceiling_now).min(ceiling_level.unwrap_or(u64::MAX));
     if mem.pressure == Pressure::Critical {
         budget = 0;
         note = Some("the system reports critical memory pressure; nothing may be loaded".to_string());
     }
-    Budget { total: mem.total, available: mem.available, headroom, ceiling_percent: percent, ceiling_share, ceiling_now, budget, pressure: mem.pressure, note }
+    Budget { total: mem.total, available: mem.available, headroom, ceiling_percent: percent, ceiling_share, ceiling_now, ceiling_level, level: mem.level, level_floor: LEVEL_FLOOR_PERCENT, budget, pressure: mem.pressure, note }
 }
 
 /// `weights + KV cache(context) + overhead`. `None` when the geometry is unknown: a size that
@@ -647,7 +661,10 @@ pub fn approve_with(mem: &Memory, tag: &str, context: u64, models: &[Model], loa
         bail!("{tag} does not fit beside {}: {} GiB and {} GiB together are over {}% of {} GiB ({} GiB)", beside.iter().map(|l| l.tag.as_str()).collect::<Vec<_>>().join(" and "), gib(bytes), gib(others), b.ceiling_percent, gib(b.total), gib(b.ceiling_share));
     }
     if bytes > b.budget {
-        bail!("{tag} is too big to load: {} GiB at a {}k context is over the budget of {} GiB ({}% of {} GiB is {} GiB; {} GiB available minus {} GiB headroom is {} GiB){}", gib(bytes), context / 1024, gib(b.budget), b.ceiling_percent, gib(b.total), gib(b.ceiling_share), gib(b.available + held), gib(b.headroom), gib(b.ceiling_now), b.note.as_ref().map(|n| format!("; {n}")).unwrap_or_default());
+        bail!("{tag} is too big to load: {} GiB at a {}k context is over the budget of {} GiB ({}% of {} GiB is {} GiB; {} GiB available minus {} GiB headroom is {} GiB{}){}", gib(bytes), context / 1024, gib(b.budget), b.ceiling_percent, gib(b.total), gib(b.ceiling_share), gib(b.available + held), gib(b.headroom), gib(b.ceiling_now), match (b.level, b.ceiling_level) {
+            (Some(level), Some(left)) => format!("; the system counts {level}% of memory as free and {}% is kept free, which leaves {} GiB", b.level_floor, gib(left)),
+            _ => String::new(),
+        }, b.note.as_ref().map(|n| format!("; {n}")).unwrap_or_default());
     }
     Ok(json!({"tag": tag, "base": base, "context": context, "bytes": bytes, "measured": known.is_some(), "already_loaded": held > 0, "budget": b}))
 }
@@ -784,6 +801,30 @@ mod tests {
     }
 
     #[test]
+    fn the_systems_own_free_level_is_a_third_bound() {
+        let o = PickOptions::default();
+        let at = |available: f64, level: i64| Memory { level: Some(level), ..mem(128, available) };
+        // An idle machine (75% free by the system's count): 30 points above the floor are 38.4 GiB.
+        let idle = budget(&at(115.2, 75), &o, 0);
+        assert_eq!((gib(idle.ceiling_share), gib(idle.ceiling_now), idle.ceiling_level.map(gib), gib(idle.budget)), (51.2, 102.4, Some(38.4), 38.4));
+        // The busy machine of 2026-09-26: 30.5 GiB read as available and the level was 47%. The
+        // two older terms allowed 17.7 GiB, and a 14.2 GiB load took the system to its warning.
+        let busy = budget(&at(30.5, 47), &o, 0);
+        assert_eq!((gib(busy.ceiling_now), busy.ceiling_level.map(gib), gib(busy.budget)), (17.7, Some(2.6), 2.6));
+        // At the floor and under it nothing new fits; a copy that is already loaded still does.
+        assert_eq!(budget(&at(30.0, 45), &o, 0).budget, 0);
+        assert_eq!(budget(&at(30.0, 12), &o, 0).budget, 0);
+        assert_eq!(gib(budget(&at(10.0, 40), &o, 24 * GIB).budget), 21.2, "what it already holds is not taken twice");
+        // Where the system gives no level (Linux, fixtures) the two terms decide alone.
+        assert_eq!((budget(&mem(128, 30.5), &o, 0).ceiling_level, gib(budget(&mem(128, 30.5), &o, 0).budget)), (None, 17.7));
+        // The refusal says all three.
+        let cat = shipped();
+        let e14 = cat.iter().find(|e| e.tag == "qwen2.5-coder:14b").unwrap();
+        let err = approve_with(&at(30.5, 47), "qwen2.5-coder:14b", 32768, &[installed("qwen2.5-coder:14b", e14)], &[], &cat, &Measured::new(), &o).unwrap_err().to_string();
+        assert_eq!(err, "qwen2.5-coder:14b is too big to load: 15.4 GiB at a 32k context is over the budget of 2.6 GiB (40% of 128 GiB is 51.2 GiB; 30.5 GiB available minus 12.8 GiB headroom is 17.7 GiB; the system counts 47% of memory as free and 45% is kept free, which leaves 2.6 GiB)");
+    }
+
+    #[test]
     fn the_budget_has_two_terms_and_a_hard_ceiling() {
         let o = PickOptions::default();
         let b = budget(&idle(128), &o, 0);
@@ -860,8 +901,11 @@ mod tests {
         let mut models: Vec<Model> = cat.iter().map(|e| installed(&e.tag, e)).collect();
         let p = pick(&idle(32), &models, &[], &cat, &Measured::new(), &PickOptions::default());
         assert!(p.chosen.is_none(), "on 32 GiB nothing verified fits: {:?}", p.chosen.map(|c| line(&c)));
-        assert!(p.rejected.iter().any(|r| r.tag == "qwen2.5-coder:14b" && r.reason.contains("failed its check") && r.reason.contains("tool call as text")));
-        assert!(p.rejected.iter().any(|r| r.tag == "qwen2.5-coder:7b" && r.reason == "not verified with opencode"));
+        // Every size of qwen2.5-coder failed its check on 2026-09-26 (AC-87), each with its reason.
+        assert!(p.rejected.iter().any(|r| r.tag == "qwen2.5-coder:14b" && r.reason.starts_with("failed its check with opencode: wrote its tool calls as text")));
+        assert!(p.rejected.iter().any(|r| r.tag == "qwen2.5-coder:7b" && r.reason == "failed its check with opencode: said done without calling a tool; nothing was written"));
+        assert_eq!(p.rejected.iter().filter(|r| r.reason.starts_with("failed its check with opencode")).count(), 5);
+        assert_eq!(cat.iter().filter(|e| e.verified_with("opencode")).map(|e| e.tag.as_str()).collect::<Vec<_>>(), ["qwen3-coder:30b"], "the one model that passed");
         assert!(p.rejected.iter().any(|r| r.tag == "qwen3-coder:30b" && r.reason.starts_with("too big")));
         let p = pick(&idle(128), &models, &[], &cat, &Measured::new(), &PickOptions::default());
         assert_eq!(line(&p.chosen.unwrap()), "qwen3-coder:30b at 64k");

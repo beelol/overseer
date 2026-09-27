@@ -1,0 +1,74 @@
+{
+  "on": "2026-09-27",
+  "stopped": "memory pressure became warn during qwen2.5-coder:14b",
+  "results": [
+    {
+      "tag": "qwen2.5-coder:14b",
+      "harness": "codex --oss",
+      "harness_version": "codex-cli 0.155.0-alpha.16.4",
+      "ollama": "0.34.2",
+      "attempts": [
+        {
+          "n": 1,
+          "exit": null,
+          "seconds": 2.4,
+          "file": null,
+          "items": [],
+          "reply": null,
+          "errors": [],
+          "stderr": "Reading additional input from stdin...",
+          "ok": false
+        }
+      ],
+      "memory_before": {
+        "available": 32786644992,
+        "pressure": "normal",
+        "level": 47,
+        "loaded": [
+          {
+            "tag": "qwen3-coder:30b-64k",
+            "gib": 23.7,
+            "context": 65536
+          }
+        ]
+      },
+      "context": 32768,
+      "run_tag": "overseer/qwen2.5-coder-14b:32k",
+      "bytes": 15209406135,
+      "budget": 19042749645,
+      "command": "codex exec --json --oss --local-provider ollama -m overseer/qwen2.5-coder-14b:32k -s workspace-write --skip-git-repo-check -C /ISOLATED/repo-qwen2-5-coder-14b-1 -- <prompt>",
+      "loaded_during": [
+        {
+          "tag": "overseer/qwen2.5-coder-14b:32k",
+          "gib": 14.2,
+          "context": 32768
+        },
+        {
+          "tag": "qwen3-coder:30b-64k",
+          "gib": 23.7,
+          "context": 65536
+        }
+      ],
+      "memory_after": {
+        "available": 25166430208,
+        "pressure": "warn",
+        "level": 37,
+        "loaded": [
+          {
+            "tag": "qwen3-coder:30b-64k",
+            "gib": 23.7,
+            "context": 65536
+          }
+        ]
+      },
+      "lowest_available": 17567055872,
+      "lowest_level": 26,
+      "pressure_seen": [
+        "warn"
+      ],
+      "largest_loaded": 23.7,
+      "status": "failed",
+      "note": "0 of 3 write checks: no file was written"
+    }
+  ]
+}
