@@ -196,12 +196,12 @@ implementation behind it:
 
 | Platform | Total | Available now | Pressure |
 | --- | --- | --- | --- |
-| macOS (Rust asks the kernel directly) | `sysctl hw.memsize` | `host_statistics64(HOST_VM_INFO64)`: free + inactive + purgeable pages × `vm.pagesize`, the numbers `vm_stat` prints | `sysctl kern.memorystatus_level` (the system's own percentage; 77 on this machine while writing) |
+| macOS (Rust asks the kernel directly) | `sysctl hw.memsize` | `host_statistics64(HOST_VM_INFO64)`: free + inactive + purgeable pages × the page size, the numbers `vm_stat` prints | `sysctl kern.memorystatus_vm_pressure_level` (normal, warning, critical), with `kern.memorystatus_level`, the system's own free percentage, reported beside it |
 | Linux | `/proc/meminfo` `MemTotal` | `/proc/meminfo` `MemAvailable` | `/proc/pressure/memory` (PSI) |
 | Windows | later | later | later |
 
-A cross-platform crate (`sysinfo`) is acceptable where its numbers match the kernel's within 5%
-(checked in AC-85); where they do not, the direct calls stay. Available memory is sampled at every
+As built, both platforms read the numbers directly (`daemon/src/sys.rs`), with no extra crate; the
+macOS numbers are tested against `vm_stat` and `sysctl` and sit within 5% of them. Available memory is sampled at every
 pick and smoothed over three samples, so a momentary dip does not flip a decision. Apple silicon has
 unified memory, so RAM is the GPU memory; discrete GPUs on Linux come with AC-41.
 
@@ -258,25 +258,33 @@ fits                 = size(model, ctx) ≤ budget
 - A **measured** size from `/api/ps` at the same tag and context replaces the estimate as soon as it
   exists, and is recorded (`local_models_measured`) so later picks use real numbers. The estimate for
   `qwen3-coder:30b` at 64k is 24.3 GiB against 23.7 GiB measured.
-- **Context is the lever.** If the preferred model does not fit at the target context
-  (`continuity.contextTarget`, default 65,536), Overseer tries 32k, then 16k (`continuity.contextFloor`).
+- **Context is the lever.** A model is tried at the target context (`continuity.contextTarget`,
+  default 65,536, or the model's own maximum when that is smaller), then at half of it, down to the
+  floor (`continuity.contextFloor`, default 16,384): 64k, 32k, 16k.
   Below 16k a coding agent cannot hold the tool schema, the handoff and a few files, so the model is
   skipped instead.
-- **Ranking.** Catalogue tier first, then the largest context that fits. A model that only fits below
-  32k is considered after every model that fits at 32k or more. Within a tier, prefer what is
-  installed over what needs a download.
+- **Ranking.** A model that only fits below 32k is considered after every model that fits at 32k or
+  more. Then the catalogue tier (the owner's `preferredModels` first, in the owner's order); within
+  a tier what is installed before what needs a download, then the longest context that fits, then
+  the larger model.
 
 ### Worked examples (40% ceiling, memory otherwise free)
 
 Machine profiles, not one machine. Estimates from the formula; disk sizes from Ollama (approximate
-for models not measured here).
+for models not measured here). The order follows the ranking above: a model that fits at 32k comes
+before a larger one that only fits at 16k, because OpenCode's own instructions and tool list
+already take about 10,600 tokens (measured in the spike), which leaves little of a 16k context.
+The rows assume every model has passed its check; with the catalogue as shipped only
+`qwen3-coder:30b` is eligible. (Corrected on 2026-09-26 while building the pick: the first version
+of this table listed the 16k fits first and gave 128k for the last row, against the rule and the
+64k target.)
 
 | Total memory | Budget | Picks, in order | Not chosen |
 | --- | --- | --- | --- |
-| 16 GiB | 6.4 GiB | `qwen2.5-coder:7b` at 16k (≈6.3 GiB); `qwen2.5-coder:3b` at 32k (≈3.9 GiB) | `7b` at 32k (≈7.2 GiB) |
-| 32 GiB | 12.8 GiB | `qwen2.5-coder:14b` at 16k (≈12.4 GiB); `qwen2.5-coder:7b` at 32k (≈7.2 GiB) | `14b` at 32k (≈15.4 GiB) |
+| 16 GiB | 6.4 GiB | `qwen2.5-coder:3b` at 32k (≈3.9 GiB); `qwen2.5-coder:1.5b` at 32k; then `qwen2.5-coder:7b` at 16k (≈6.3 GiB) | `7b` at 32k (≈7.2 GiB) |
+| 32 GiB | 12.8 GiB | `qwen2.5-coder:7b` at 32k (≈7.2 GiB); `qwen2.5-coder:3b` at 32k; then `qwen2.5-coder:14b` at 16k (≈12.4 GiB) | `14b` at 32k (≈15.4 GiB) |
 | 64 GiB | 25.6 GiB | `qwen3-coder:30b` at 64k (≈24.3 GiB, measured 23.7) | `qwen2.5-coder:32b` at 32k (≈27.6 GiB) |
-| 128 GiB | 51.2 GiB | `qwen3-coder:30b` at 128k (≈30.3 GiB); `qwen2.5-coder:32b` at 32k | anything over 51 GiB, for example `qwen3.5:122b` (75.8 GiB on disk) |
+| 128 GiB | 51.2 GiB | `qwen3-coder:30b` at 64k (≈24.3 GiB; at 128k, ≈30.3 GiB, when `contextTarget` is raised to 131072); `qwen2.5-coder:32b` at 32k | anything over 51 GiB, for example `qwen3.5:122b` (75.8 GiB on disk) |
 
 With 40 GiB of other work running on a 128 GiB machine, `ceiling_now` is about 75 GiB, so the share
 still decides; with 100 GiB in use it is about 15 GiB and the pick drops to a 14B-class model at 16k,

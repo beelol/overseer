@@ -398,9 +398,25 @@ pub fn classify_error(message: &str) -> &'static str {
         "rate_limit"
     } else if m.contains("authenticat") || m.contains("401") || m.contains("unauthorized") || m.contains("not logged in") || m.contains("log in") || m.contains("login") || m.contains("oauth") || m.contains("token expired") {
         "auth"
+    } else if is_network_error(&m) {
+        "network"
     } else {
         "other"
     }
+}
+
+/// Connection failures and provider outages (Continuity, AC-83): the request never reached the
+/// provider, or the provider answered with a failure of its own. `m` is lower-case.
+fn is_network_error(m: &str) -> bool {
+    const SIGNS: &[&str] = &[
+        "econnrefused", "econnreset", "enotfound", "eai_again", "etimedout", "enetunreach", "ehostunreach", "epipe", "fetch failed", "getaddrinfo", "socket hang up",
+        "network is unreachable", "network is down", "no route to host", "connection refused", "connection reset", "connection closed", "connection error", "unable to connect",
+        "could not resolve host", "failed to lookup address", "dns error", "name or service not known", "nodename nor servname", "tls handshake", "handshake failed", "certificate",
+        "request timed out", "connection timed out", "operation timed out", "stream disconnected", "error sending request", "network error",
+        "502 bad gateway", "503 service unavailable", "504 gateway timeout", "status 502", "status 503", "status 504", "status 529", "status: 502", "status: 503", "status: 504", "status: 529",
+        "api error: 5", "overloaded", "bad gateway", "service unavailable", "gateway timeout", "internal server error",
+    ];
+    SIGNS.iter().any(|s| m.contains(s))
 }
 
 fn truncate(s: &str, max: usize) -> String {
@@ -897,6 +913,28 @@ mod tests {
         assert_eq!(classify_error("exceeded retry limit, last status: 429 Too Many Requests"), "rate_limit");
         // Real Claude Code 2.1.246 message captured live.
         assert_eq!(classify_error("Failed to authenticate: OAuth session expired and could not be refreshed"), "auth");
+    }
+
+    #[test]
+    fn network_errors_are_their_own_class() {
+        for m in [
+            "stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses)",
+            "getaddrinfo ENOTFOUND api.anthropic.com",
+            "connect ECONNREFUSED 127.0.0.1:443",
+            "TypeError: fetch failed",
+            "Connection error.",
+            "error: Network is unreachable (os error 51)",
+            "API Error: 529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}",
+            "unexpected status 503 Service Unavailable",
+            "tls handshake eof",
+        ] {
+            assert_eq!(classify_error(m), "network", "{m}");
+        }
+        // Account states are never network errors, whatever else the text says.
+        assert_eq!(classify_error("exceeded retry limit, last status: 429 Too Many Requests"), "rate_limit");
+        assert_eq!(classify_error("You've hit your usage limit."), "quota");
+        assert_eq!(classify_error("401 Unauthorized"), "auth");
+        assert_eq!(classify_error("the command timed out after 120 s"), "other", "a slow tool is not a connection problem");
     }
 
     #[test]

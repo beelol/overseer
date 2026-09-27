@@ -314,6 +314,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let n = d.ui_clients.load(std::sync::atomic::Ordering::SeqCst);
             json!({"vscode": n, "ui": n})
         }
+        // Continuity (Gate L): connection state, settings, local inventory, pick and guard.
+        m if crate::continuity::handles(m) => crate::continuity::dispatch(d, m, p)?,
         other => return Err(anyhow!("unknown method {other}")),
     })
 }

@@ -1,17 +1,21 @@
 mod accounts;
 mod adapters;
 mod background;
+mod continuity;
 mod daemon;
 mod files;
 mod usage;
 mod git;
+mod local;
 mod merge;
+mod net;
 mod paths;
 mod pr;
 mod redact;
 mod server;
 mod shim;
 mod store;
+mod sys;
 
 use std::io::{BufRead, BufReader, Write};
 
@@ -74,6 +78,9 @@ fn main() {
                 log(&format!("overseerd {} starting, data dir {}", env!("CARGO_PKG_VERSION"), paths::data_dir().display()));
                 let report = d.reconcile()?;
                 log(&format!("reconcile: {report}"));
+                if let Err(e) = continuity::start(d.clone()) {
+                    log(&format!("continuity did not start: {e:#}"));
+                }
                 server::serve(d).await
             });
             if let Err(e) = result {

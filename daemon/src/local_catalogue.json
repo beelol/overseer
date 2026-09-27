@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "about": "Coding models Overseer may pick on its own (Continuity, AC-87). The owner's direction is to start with the Qwen coders. A model is eligible for automatic picks only when Ollama reports the tools capability and `verified.<harness>.status` is `passed`. `disk_bytes` and the geometry are used for models that are not installed; an installed model's own numbers always win. Approximate sizes are marked.",
+  "check": "A one-turn task through the real local harness that must create a file with the write tool, in a disposable repository, repeated three times.",
+  "models": [
+    {
+      "tag": "qwen3-coder:30b",
+      "tier": 1,
+      "parameters": 30532122624,
+      "disk_bytes": 18556700761,
+      "max_context": 262144,
+      "geometry": { "block_count": 48, "head_count_kv": 4, "key_length": 128, "value_length": 128 },
+      "verified": {
+        "opencode": { "status": "passed", "on": "2026-09-25", "harness_version": "1.15.13", "ollama": "0.34.2", "evidence": "docs/verification/evidence/ac-14/opencode-ollama.log", "note": "completed a write through opencode run" }
+      }
+    },
+    {
+      "tag": "qwen2.5-coder:32b",
+      "tier": 1,
+      "parameters": 32763876352,
+      "disk_bytes": 19851349856,
+      "disk_approximate": true,
+      "max_context": 32768,
+      "geometry": { "block_count": 64, "head_count_kv": 8, "key_length": 128, "value_length": 128 },
+      "verified": {}
+    },
+    {
+      "tag": "qwen2.5-coder:14b",
+      "tier": 2,
+      "parameters": 14770033664,
+      "disk_bytes": 8988124069,
+      "max_context": 32768,
+      "geometry": { "block_count": 48, "head_count_kv": 8, "key_length": 128, "value_length": 128 },
+      "verified": {
+        "opencode": { "status": "failed", "on": "2026-09-25", "harness_version": "1.15.13", "ollama": "0.34.2", "evidence": "docs/verification/evidence/ac-14/opencode-ollama.log", "note": "emitted its tool call as text" }
+      }
+    },
+    {
+      "tag": "qwen2.5-coder:7b",
+      "tier": 3,
+      "parameters": 7615616512,
+      "disk_bytes": 4683087332,
+      "disk_approximate": true,
+      "max_context": 32768,
+      "geometry": { "block_count": 28, "head_count_kv": 4, "key_length": 128, "value_length": 128 },
+      "verified": {}
+    },
+    {
+      "tag": "qwen2.5-coder:3b",
+      "tier": 4,
+      "parameters": 3085938688,
+      "disk_bytes": 1929912432,
+      "disk_approximate": true,
+      "max_context": 32768,
+      "geometry": { "block_count": 36, "head_count_kv": 2, "key_length": 128, "value_length": 128 },
+      "verified": {}
+    },
+    {
+      "tag": "qwen2.5-coder:1.5b",
+      "tier": 4,
+      "parameters": 1543714304,
+      "disk_bytes": 986048576,
+      "disk_approximate": true,
+      "max_context": 32768,
+      "geometry": { "block_count": 28, "head_count_kv": 2, "key_length": 128, "value_length": 128 },
+      "verified": {}
+    }
+  ],
+  "later_candidates": ["qwen3.5:35b-a3b", "gpt-oss:20b", "gpt-oss:120b", "devstral:24b", "qwen3:8b"]
+}
