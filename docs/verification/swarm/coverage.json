@@ -380,7 +380,7 @@
         "daemon/src/swarm/limits.rs",
         "docs/verification/swarm/SWARM-39.md"
       ],
-      "blocker": "Built-in defaults, saved precedence, approved-target inheritance, immutable run snapshots, percentage override arithmetic, the 100-job ready window and configured nonterminal backlog cap pass in fixtures. A run-specific worker ceiling can now change through a durable replay-safe limit revision and drain active workers; active-run backlog changes, actual S0 launch, one-time selection UI, immediate revocation and full scheduler enforcement remain unimplemented."
+      "blocker": "Built-in defaults, saved precedence, approved-target inheritance, immutable run snapshots, percentage override arithmetic, the 100-job ready window and configured nonterminal backlog cap pass in fixtures. Durable replay-safe run-limit revisions can lower the worker ceiling and raise the backlog cap without rewriting the initial allowance; lowering backlog below existing nonterminal jobs is rejected. Actual S0 launch, normal UI controls, one-time account selection, immediate revocation and full Auto Mode scheduler enforcement remain unimplemented."
     },
     "SWARM-40": {
       "status": "partial",
