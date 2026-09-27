@@ -171,11 +171,12 @@ confirms every dependency is the version the SDK expects.
 **`react-dom` is overridden to React's version.** The app has no web target, but packages
 under expo-router name `react-dom` as a peer and npm would install a newer one than React.
 
-**The icon and the launch images are drawn from the stand-in mark**
-(`extension/media/overseer.svg`) and the tokens by `npm run assets`, because the owner's mark
-(AC-142) is not in `docs/design/brand/` yet. The mark is read from one place in
-`scripts/gen-assets.mjs`; swapping it is one change. The door (AC-136) replaces the launch
-image.
+**The icons, the launch images and the in-app mark are made from the owner's brand files**
+(`docs/design/brand/`, AC-178) by `npm run assets`: the home-screen icon from
+`overseer-app-icon.png` (no transparency, for iOS), Android's adaptive foreground and the
+in-app mark from `overseer-logo.png`, Android's themed icon and the launch and door marks from
+`overseer-icon-flat.png` in grayscale. `npm run check` fails when a file in `assets/` no longer
+matches them. The door (AC-136) replaces the launch image.
 
 **The notifications library is left out of the Android build** (`expo.autolinking` in
 `package.json`). Push reports unsupported on Android in this gate, and the library would

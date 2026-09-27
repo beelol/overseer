@@ -6,7 +6,7 @@ import { Arrive, Pulse } from '@/motion';
 import { useCapabilities } from '@/platform';
 import { routes } from '@/routes';
 import { useSession } from '@/session';
-import { Button, Icon, makeStyles, Screen, Txt } from '@/ui';
+import { Button, Icon, makeStyles, OverseerLogo, Screen, Txt } from '@/ui';
 
 import { pairingSentence } from './pair/failure';
 import { Field } from './pair/Field';
@@ -256,6 +256,7 @@ export function PairScreen({ onDone }: PairScreenProps = {}) {
       }
     >
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+        <OverseerLogo />
         {eye.state === 'on' || eye.state === 'ask' ? (
           <View style={styles.camera}>
             {eye.state === 'ask' ? (

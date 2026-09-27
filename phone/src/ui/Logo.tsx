@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 
 import { useTheme, type Theme } from '@/theme';
@@ -49,5 +49,24 @@ export function Mark({ size, color }: { readonly size: number; readonly color: s
     <View accessible={false} importantForAccessibility="no-hide-descendants" style={{ width: size, height: size }}>
       <SvgXml xml={MARK} width={size} height={size} color={color} />
     </View>
+  );
+}
+
+const OVERSEER_LOGO = require('../../assets/overseer-logo.png');
+
+/** Overseer's own mark in colour (AC-178): made from docs/design/brand/overseer-logo.png. */
+export function OverseerLogo({ size = 'mark' }: { readonly size?: keyof Theme['phone']['size']['logo'] }) {
+  const theme = useTheme();
+  const points = theme.phone.size.logo[size];
+  return (
+    <Image
+      source={OVERSEER_LOGO}
+      style={{ width: points, height: points, alignSelf: 'center' }}
+      resizeMode="contain"
+      accessible={false}
+      importantForAccessibility="no"
+      accessibilityIgnoresInvertColors
+      testID="overseer-logo"
+    />
   );
 }

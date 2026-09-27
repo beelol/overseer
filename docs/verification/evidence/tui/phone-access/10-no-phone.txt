@@ -15,7 +15,7 @@
                                                                                                                                             
                     ╭ devices ─────────────────────────────────────────────────────────────────────────────────────────╮                    
                     │                                                                                                  │                    
-                    │  phone access on · port 56974 · notifications on                                                 │                    
+                    │  phone access on · port 50142 · notifications on                                                 │                    
                     │                                                                                                  │                    
                     │  No phone is paired. Press p to pair one.                                                        │                    
                     │                                                                                                  │                    

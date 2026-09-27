@@ -328,6 +328,11 @@ export interface EventPayloads {
     text: string;
     parser_version: string;
   };
+  connection: {
+    status: unknown;
+    previous: unknown;
+    first?: boolean | null;
+  };
 }
 
 export type KnownEventKind = keyof EventPayloads;
@@ -799,6 +804,84 @@ export interface Methods {
   "gateway.device_rename": { class: 'mac_only'; params: unknown; result: unknown };
   /** Which agent a window on the Mac is looking at. The Mac only: It describes the Mac's own windows. */
   "ui.focus": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Audio Mode: on or off, the track and the cues. */
+  "audio.get": { class: 'read'; params: Record<string, never>; result: unknown };
+  /** The Mac's installed voices for System voice. */
+  "audio.voices": { class: 'read'; params: Record<string, never>; result: unknown };
+  /** Change Audio Mode. The Mac only: Audio Mode plays on the Mac; it is set there. */
+  "audio.set": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Play a cue on the Mac. The Mac only: Audio Mode plays on the Mac; it is set there. */
+  "audio.preview": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Use a private folder of cues in place. The Mac only: It names a folder on the Mac. */
+  "audio.import_commander": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Online or offline, and whether Continuity is on. */
+  "connection.status": { class: 'read'; params: Record<string, never>; result: unknown };
+  /** Continuity's state: connection, local model, waits and handoffs. */
+  "continuity.status": { class: 'read'; params: Record<string, never>; result: unknown };
+  /** Local models and whether each fits this Mac's memory. */
+  "local.models": { class: 'read'; params: Record<string, never>; result: unknown };
+  /** What is installed locally: Ollama, OpenCode, models. */
+  "local.inventory": { class: 'read'; params: Record<string, never>; result: unknown };
+  /** The local models Continuity may use. */
+  "local.catalogue": { class: 'read'; params: Record<string, never>; result: unknown };
+  /** Local model downloads in progress. */
+  "local.downloads": { class: 'read'; params: Record<string, never>; result: unknown };
+  /** Agents moved to another provider or to local, and back. */
+  "continuity.handoffs": { class: 'read'; params: Record<string, never>; result: unknown };
+  /** Agents waiting for a provider to come back. */
+  "continuity.waits": { class: 'read'; params: Record<string, never>; result: unknown };
+  /** Where an agent can be moved to (local, back, a provider). */
+  "run.targets": { class: 'read'; params: {
+    run_id: string;
+  }; result: unknown };
+  /** Whether Ollama is installed and running. */
+  "ollama.status": { class: 'read'; params: Record<string, never>; result: unknown };
+  /** Check the connection now. */
+  "connection.check": { class: 'control'; params: Record<string, never>; result: unknown };
+  /** Move an agent to local, back, or another provider. */
+  "run.handoff": { class: 'control'; params: {
+    run_id: string;
+    to: string;
+    accept_mode?: string | null;
+  }; result: unknown };
+  /** Retry a waiting agent now. */
+  "run.retry_now": { class: 'control'; params: {
+    run_id: string;
+  }; result: unknown };
+  /** Keep an agent where it is instead of moving it. */
+  "run.stay": { class: 'control'; params: {
+    run_id: string;
+  }; result: unknown };
+  /** Continuity settings. The Mac only: Continuity is set on the Mac. */
+  "settings.get": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Change Continuity settings. The Mac only: Continuity is set on the Mac. */
+  "settings.set": { class: 'mac_only'; params: unknown; result: unknown };
+  /** The first-use notice's state in VS Code. The Mac only: It describes the Mac's own windows. */
+  "continuity.ui": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Dismiss the first-use notice. The Mac only: It describes the Mac's own windows. */
+  "continuity.notice": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Offer to download a local model ahead of time. The Mac only: It changes what runs on the Mac and how much of its memory is used. */
+  "continuity.prefetch_offer": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Choose the local model. The Mac only: It changes what runs on the Mac and how much of its memory is used. */
+  "local.pick": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Approve a local model download. The Mac only: It changes what runs on the Mac and how much of its memory is used. */
+  "local.approve": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Load a local model into memory. The Mac only: It changes what runs on the Mac and how much of its memory is used. */
+  "local.load": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Unload a local model. The Mac only: It changes what runs on the Mac and how much of its memory is used. */
+  "local.unload": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Download a local model. The Mac only: It changes what runs on the Mac and how much of its memory is used. */
+  "local.pull": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Cancel a local model download. The Mac only: It changes what runs on the Mac and how much of its memory is used. */
+  "local.pull_cancel": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Install Ollama. The Mac only: It changes what runs on the Mac and how much of its memory is used. */
+  "ollama.install": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Start Ollama. The Mac only: It changes what runs on the Mac and how much of its memory is used. */
+  "ollama.start": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Stop Ollama. The Mac only: It changes what runs on the Mac and how much of its memory is used. */
+  "ollama.stop": { class: 'mac_only'; params: unknown; result: unknown };
+  /** Age a wait (tests only). The Mac only: A test hook. */
+  "continuity.test_age": { class: 'mac_only'; params: unknown; result: unknown };
 }
 
 export type MethodName = keyof Methods;
@@ -877,6 +960,40 @@ export const METHOD_CLASS = {
   "gateway.device_scope": 'mac_only',
   "gateway.device_rename": 'mac_only',
   "ui.focus": 'mac_only',
+  "audio.get": 'read',
+  "audio.voices": 'read',
+  "audio.set": 'mac_only',
+  "audio.preview": 'mac_only',
+  "audio.import_commander": 'mac_only',
+  "connection.status": 'read',
+  "continuity.status": 'read',
+  "local.models": 'read',
+  "local.inventory": 'read',
+  "local.catalogue": 'read',
+  "local.downloads": 'read',
+  "continuity.handoffs": 'read',
+  "continuity.waits": 'read',
+  "run.targets": 'read',
+  "ollama.status": 'read',
+  "connection.check": 'control',
+  "run.handoff": 'control',
+  "run.retry_now": 'control',
+  "run.stay": 'control',
+  "settings.get": 'mac_only',
+  "settings.set": 'mac_only',
+  "continuity.ui": 'mac_only',
+  "continuity.notice": 'mac_only',
+  "continuity.prefetch_offer": 'mac_only',
+  "local.pick": 'mac_only',
+  "local.approve": 'mac_only',
+  "local.load": 'mac_only',
+  "local.unload": 'mac_only',
+  "local.pull": 'mac_only',
+  "local.pull_cancel": 'mac_only',
+  "ollama.install": 'mac_only',
+  "ollama.start": 'mac_only',
+  "ollama.stop": 'mac_only',
+  "continuity.test_age": 'mac_only',
 } as const satisfies Record<MethodName, MethodClass>;
 
 export type PhoneMethod = { [K in MethodName]: Methods[K]['class'] extends 'mac_only' ? never : K }[MethodName];

@@ -15,7 +15,7 @@
                                                                                                                                             
                     ╭ devices ─────────────────────────────────────────────────────────────────────────────────────────╮                    
                     │                                                                                                  │                    
-                    │  phone access on · port 56974 · notifications on                                                 │                    
+                    │  phone access on · port 50142 · notifications on                                                 │                    
                     │                                                                                                  │                    
                     │  › Pixel 9                         Android   ● connected           Full control  127.0.0.1       │                    
                     │    Bilal's iPhone                  iPhone    ● connected           Full control  127.0.0.1       │                    

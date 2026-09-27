@@ -223,6 +223,7 @@ export const phone = {
     logo: {
       row: 28,
       header: 20,
+      mark: 72,
       door: 160,
     },
     hairline: 1,

@@ -313,6 +313,11 @@
     "raw_unparsed": {
       "text": "string",
       "parser_version": "string"
+    },
+    "connection": {
+      "status": "json",
+      "previous": "json",
+      "first": "boolean?"
     }
   },
   "methods": {
