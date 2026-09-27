@@ -106,7 +106,16 @@ async function record(name, act) {
   const stop = dev.record(file);
   await sleep(LEAD_S * 1000);
   await act();
-  await sleep(4000);
+  // Until the app says its door has opened (or 15 s: back from the background it never does), then a moment of the list.
+  const until = Date.now() + 15_000;
+  await sleep(1500);
+  while (Date.now() < until) {
+    const now = stored(dev, 'perf.last');
+    if (now && now.launch !== before && now.marks?.['door.opened'] !== undefined) break;
+    if (name === 'return-from-background' && Date.now() > until - 11_000) break;
+    await sleep(250);
+  }
+  await sleep(1200);
   await stop();
   sheets(name);
   const fresh = stored(dev, 'perf.last');
