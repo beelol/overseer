@@ -178,6 +178,12 @@
       const m = this.msg; if (!m) return;
       const blocked = m.active ? 'Wait for the agent to finish or stop it first' : !m.trusted ? 'Requires a trusted workspace' : !this.worktree ? 'This task works in the current checkout' : '';
       const items = [];
+      // Narrow (beside a diff): the header's Review and Files buttons are in this menu instead.
+      if (window.innerWidth <= 480) {
+        items.push({ id: 'review-menu', label: 'Review changes', icon: 'diff-multiple', run: () => this.post({ type: 'openReview' }) });
+        if (this.opts.mode === 'dashboard') items.push({ id: 'files-menu', label: 'Files', icon: 'list-tree', run: () => this.opts.onFiles?.() });
+        items.push('sep');
+      }
       if (!this.child) {
         items.push({ id: 'merge', label: 'Merge back…', icon: 'git-merge', disabled: !!blocked, why: blocked, run: () => this.post({ type: 'mergeBack' }) });
         items.push({ id: 'pr', label: 'Open pull request…', logo: window.OverseerLogos && window.OverseerLogos.logo('github', { size: 14 }), disabled: !!blocked, why: blocked, run: () => this.post({ type: 'openPullRequest' }) });

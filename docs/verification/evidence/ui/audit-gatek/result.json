@@ -1,0 +1,745 @@
+{
+  "ui": "gatek",
+  "checks": [
+    {
+      "name": "agents: side-bar title actions show their name in VS Code's hover",
+      "ok": true,
+      "detail": "Search Agents"
+    },
+    {
+      "name": "dashboard: no horizontal overflow at 1280/900 px in every theme",
+      "ok": true,
+      "detail": 0
+    },
+    {
+      "name": "dashboard: no unbroken text run over 80 characters outside code",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "dashboard: every icon-only control has a name and a tooltip",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "agents: no horizontal overflow at 1280/900 px in every theme",
+      "ok": true,
+      "detail": 0
+    },
+    {
+      "name": "agents: no unbroken text run over 80 characters outside code",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "agents: every icon-only control has a name and a tooltip",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "agents: at least 40% less visible text than today's UI (531 → 225)",
+      "ok": true,
+      "detail": {
+        "before": 531,
+        "after": 225,
+        "reduction": "58%"
+      }
+    },
+    {
+      "name": "chat: no horizontal overflow at 1280/900 px in every theme",
+      "ok": true,
+      "detail": 0
+    },
+    {
+      "name": "chat: no unbroken text run over 80 characters outside code",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "chat: every icon-only control has a name and a tooltip",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "chat: at least 40% less visible text than today's UI (2795 → 1063)",
+      "ok": true,
+      "detail": {
+        "before": 2795,
+        "after": 1063,
+        "reduction": "62%"
+      }
+    },
+    {
+      "name": "files: no horizontal overflow at 1280/900 px in every theme",
+      "ok": true,
+      "detail": 0
+    },
+    {
+      "name": "files: no unbroken text run over 80 characters outside code",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "files: every icon-only control has a name and a tooltip",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "files: at least 40% less visible text than today's UI (127 → 59)",
+      "ok": true,
+      "detail": {
+        "before": 127,
+        "after": 59,
+        "reduction": "54%"
+      }
+    },
+    {
+      "name": "review: no horizontal overflow at 1280/900 px in every theme",
+      "ok": true,
+      "detail": 0
+    },
+    {
+      "name": "review: no unbroken text run over 80 characters outside code",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "review: every icon-only control has a name and a tooltip",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "review: at least 40% less visible text than today's UI (350 → 150)",
+      "ok": true,
+      "detail": {
+        "before": 350,
+        "after": 150,
+        "reduction": "57%"
+      }
+    },
+    {
+      "name": "grid: no horizontal overflow at 1280/900 px in every theme",
+      "ok": true,
+      "detail": 0
+    },
+    {
+      "name": "grid: no unbroken text run over 80 characters outside code",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "grid: every icon-only control has a name and a tooltip",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "new-agent: no horizontal overflow at 1280/900 px in every theme",
+      "ok": true,
+      "detail": 0
+    },
+    {
+      "name": "new-agent: no unbroken text run over 80 characters outside code",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "new-agent: every icon-only control has a name and a tooltip",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "new-agent: at least 40% less visible text than today's UI (1037 → 133)",
+      "ok": true,
+      "detail": {
+        "before": 1037,
+        "after": 133,
+        "reduction": "87%"
+      }
+    },
+    {
+      "name": "accounts: no horizontal overflow at 1280/900 px in every theme",
+      "ok": true,
+      "detail": 0
+    },
+    {
+      "name": "accounts: no unbroken text run over 80 characters outside code",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "accounts: every icon-only control has a name and a tooltip",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "accounts: at least 40% less visible text than today's UI (381 → 189)",
+      "ok": true,
+      "detail": {
+        "before": 381,
+        "after": 189,
+        "reduction": "50%"
+      }
+    },
+    {
+      "name": "agents: the side bar stays within the Gate J agents budget (238 characters)",
+      "ok": true,
+      "detail": 225
+    },
+    {
+      "name": "chat: no more visible text than Gate J (1063 → 1063)",
+      "ok": true,
+      "detail": {
+        "view": "chat",
+        "gatej": 1063,
+        "gatek": 1063
+      }
+    },
+    {
+      "name": "files: no more visible text than Gate J (59 → 59)",
+      "ok": true,
+      "detail": {
+        "view": "files",
+        "gatej": 59,
+        "gatek": 59
+      }
+    },
+    {
+      "name": "review: no more visible text than Gate J (175 → 150)",
+      "ok": true,
+      "detail": {
+        "view": "review",
+        "gatej": 175,
+        "gatek": 150
+      }
+    },
+    {
+      "name": "grid: no more visible text than Gate J (993 → 993)",
+      "ok": true,
+      "detail": {
+        "view": "grid",
+        "gatej": 993,
+        "gatek": 993
+      }
+    },
+    {
+      "name": "new-agent: no more visible text than Gate J (133 → 133)",
+      "ok": true,
+      "detail": {
+        "view": "new-agent",
+        "gatej": 133,
+        "gatek": 133
+      }
+    },
+    {
+      "name": "accounts: no more visible text than Gate J (189 → 189)",
+      "ok": true,
+      "detail": {
+        "view": "accounts",
+        "gatej": 189,
+        "gatek": 189
+      }
+    }
+  ],
+  "views": {
+    "dashboard": {
+      "Overseer Dark@1280": {
+        "chars": 1122,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 313
+      },
+      "Overseer Dark@900": {
+        "chars": 1122,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 220
+      },
+      "Overseer Light@1280": {
+        "chars": 1122,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 313
+      },
+      "Overseer Light@900": {
+        "chars": 1122,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 220
+      },
+      "Default Dark Modern@1280": {
+        "chars": 1122,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 313
+      },
+      "Default Dark Modern@900": {
+        "chars": 1122,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 220
+      }
+    },
+    "agents": {
+      "Overseer Dark@1280": {
+        "chars": 225,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Agents | Needs you | 2 | Add a changelog entry | Approve | Migration dry-run | Failed | web-app | 1 | Add a changelog entry | Refresh sessions once | now | api-server | 1 | Watch the build | Migration dry-run | now | Split the payment service | now | child task | now | grandchild task | now",
+        "width": 1280
+      },
+      "Overseer Dark@900": {
+        "chars": 225,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Agents | Needs you | 2 | Add a changelog entry | Approve | Migration dry-run | Failed | web-app | 1 | Add a changelog entry | Refresh sessions once | now | api-server | 1 | Watch the build | Migration dry-run | now | Split the payment service | now | child task | now | grandchild task | now",
+        "width": 900
+      },
+      "Overseer Light@1280": {
+        "chars": 225,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Agents | Needs you | 2 | Add a changelog entry | Approve | Migration dry-run | Failed | web-app | 1 | Add a changelog entry | Refresh sessions once | now | api-server | 1 | Watch the build | Migration dry-run | now | Split the payment service | now | child task | now | grandchild task | now",
+        "width": 1280
+      },
+      "Overseer Light@900": {
+        "chars": 225,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Agents | Needs you | 2 | Add a changelog entry | Approve | Migration dry-run | Failed | web-app | 1 | Add a changelog entry | Refresh sessions once | now | api-server | 1 | Watch the build | Migration dry-run | now | Split the payment service | now | child task | now | grandchild task | now",
+        "width": 900
+      },
+      "Default Dark Modern@1280": {
+        "chars": 225,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Agents | Needs you | 2 | Add a changelog entry | Approve | Migration dry-run | Failed | web-app | 1 | Add a changelog entry | Refresh sessions once | now | api-server | 1 | Watch the build | Migration dry-run | now | Split the payment service | now | child task | now | grandchild task | now",
+        "width": 1280
+      },
+      "Default Dark Modern@900": {
+        "chars": 225,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Agents | Needs you | 2 | Add a changelog entry | Approve | Migration dry-run | Failed | web-app | 1 | Add a changelog entry | Refresh sessions once | now | api-server | 1 | Watch the build | Migration dry-run | now | Split the payment service | now | child task | now | grandchild task | now",
+        "width": 900
+      }
+    },
+    "chat": {
+      "Overseer Dark@1280": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 313
+      },
+      "Overseer Dark@900": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 220
+      },
+      "Overseer Light@1280": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 313
+      },
+      "Overseer Light@900": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 220
+      },
+      "Default Dark Modern@1280": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 313
+      },
+      "Default Dark Modern@900": {
+        "chars": 1063,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | claude (existing login) | · | refresh-sessions-once | Expired sessions trigger a refresh in every tab. Make them refresh once and share the result, and add tests. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | sess",
+        "width": 220
+      }
+    },
+    "files": {
+      "Overseer Dark@1280": {
+        "chars": 59,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
+        "width": 313
+      },
+      "Overseer Dark@900": {
+        "chars": 59,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
+        "width": 220
+      },
+      "Overseer Light@1280": {
+        "chars": 59,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
+        "width": 313
+      },
+      "Overseer Light@900": {
+        "chars": 59,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
+        "width": 220
+      },
+      "Default Dark Modern@1280": {
+        "chars": 59,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
+        "width": 313
+      },
+      "Default Dark Modern@900": {
+        "chars": 59,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "refresh-sessions-once | 2 changed | src | 1 | a.txt | b.txt | c.txt | README.md | M",
+        "width": 220
+      }
+    },
+    "review": {
+      "Overseer Dark@1280": {
+        "chars": 150,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "width": 609
+      },
+      "Overseer Dark@900": {
+        "chars": 129,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "width": 322
+      },
+      "Overseer Light@1280": {
+        "chars": 150,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "width": 609
+      },
+      "Overseer Light@900": {
+        "chars": 129,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "width": 322
+      },
+      "Default Dark Modern@1280": {
+        "chars": 150,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Refresh sessions once | src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "width": 609
+      },
+      "Default Dark Modern@900": {
+        "chars": 129,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "src | auth | session-refresh-coordinator.ts | A | README.md | M | M | README.md | +4 | −0 | Save | ↗ | A | src/auth/session-refresh-coordinator.ts | +8 | −0 | Save | ↗ | Filter files…",
+        "width": 322
+      }
+    },
+    "grid": {
+      "Overseer Dark@1280": {
+        "chars": 993,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 922
+      },
+      "Overseer Dark@900": {
+        "chars": 993,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 542
+      },
+      "Overseer Light@1280": {
+        "chars": 993,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 922
+      },
+      "Overseer Light@900": {
+        "chars": 993,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 542
+      },
+      "Default Dark Modern@1280": {
+        "chars": 993,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 922
+      },
+      "Default Dark Modern@900": {
+        "chars": 993,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Add a changelog entry | Add a changelog entry for the session refresh change. | I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing. | 6 steps | Read · Searched · Found files · Created · Edited · Ran | session-refresh-coordinator.ts | README.md | Done: sessions refresh once | Expired sessions now go through a sing",
+        "width": 542
+      }
+    },
+    "new-agent": {
+      "Overseer Dark@1280": {
+        "chars": 133,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "What should an agent do? | web-app | Codex · codex (existing login) | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "width": 922
+      },
+      "Overseer Dark@900": {
+        "chars": 133,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "What should an agent do? | web-app | Codex · codex (existing login) | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "width": 542
+      },
+      "Overseer Light@1280": {
+        "chars": 133,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "What should an agent do? | web-app | Codex · codex (existing login) | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "width": 922
+      },
+      "Overseer Light@900": {
+        "chars": 133,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "What should an agent do? | web-app | Codex · codex (existing login) | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "width": 542
+      },
+      "Default Dark Modern@1280": {
+        "chars": 133,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "What should an agent do? | web-app | Codex · codex (existing login) | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "width": 922
+      },
+      "Default Dark Modern@900": {
+        "chars": 133,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "What should an agent do? | web-app | Codex · codex (existing login) | Default model | New worktree | ⏎ start · ⇧⏎ new line | Full form | Describe the task",
+        "width": 542
+      }
+    },
+    "accounts": {
+      "Overseer Dark@1280": {
+        "chars": 189,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Accounts | ChatGPT | codex (existing login) | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | claude (existing login) | max · cc6d9661 · desktop | OpenCode | opencode (existing login) | signed out · desktop",
+        "width": 1280
+      },
+      "Overseer Dark@900": {
+        "chars": 189,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Accounts | ChatGPT | codex (existing login) | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | claude (existing login) | max · cc6d9661 · desktop | OpenCode | opencode (existing login) | signed out · desktop",
+        "width": 900
+      },
+      "Overseer Light@1280": {
+        "chars": 189,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Accounts | ChatGPT | codex (existing login) | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | claude (existing login) | max · cc6d9661 · desktop | OpenCode | opencode (existing login) | signed out · desktop",
+        "width": 1280
+      },
+      "Overseer Light@900": {
+        "chars": 189,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Accounts | ChatGPT | codex (existing login) | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | claude (existing login) | max · cc6d9661 · desktop | OpenCode | opencode (existing login) | signed out · desktop",
+        "width": 900
+      },
+      "Default Dark Modern@1280": {
+        "chars": 189,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Accounts | ChatGPT | codex (existing login) | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | claude (existing login) | max · cc6d9661 · desktop | OpenCode | opencode (existing login) | signed out · desktop",
+        "width": 1280
+      },
+      "Default Dark Modern@900": {
+        "chars": 189,
+        "longRuns": [],
+        "overflow": [],
+        "unnamed": [],
+        "sample": "Accounts | ChatGPT | codex (existing login) | pro · 55b9da0f · desktop | ChatGPT Work | signed out | Claude | claude (existing login) | max · cc6d9661 · desktop | OpenCode | opencode (existing login) | signed out · desktop",
+        "width": 900
+      }
+    }
+  },
+  "summary": {
+    "dashboard": {
+      "chars": 1122,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "agents": {
+      "chars": 225,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "chat": {
+      "chars": 1063,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "files": {
+      "chars": 59,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "review": {
+      "chars": 150,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "grid": {
+      "chars": 993,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "new-agent": {
+      "chars": 133,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "accounts": {
+      "chars": 189,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    }
+  },
+  "gatej": {
+    "dashboard": {
+      "chars": 1360,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "agents": {
+      "chars": 238,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "chat": {
+      "chars": 1063,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "files": {
+      "chars": 59,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "review": {
+      "chars": 175,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "grid": {
+      "chars": 993,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "new-agent": {
+      "chars": 133,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    },
+    "accounts": {
+      "chars": 189,
+      "longRuns": [],
+      "overflow": 0,
+      "unnamed": []
+    }
+  }
+}

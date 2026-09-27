@@ -6,19 +6,19 @@
       "detail": {
         "list": [
           {
-            "run": "r-e95938dd4ac4",
+            "title": "Write file A",
             "why": "Approve"
           },
           {
-            "run": "r-0477aca0e478",
+            "title": "Write file B",
             "why": "Approve"
           },
           {
-            "run": "r-c34b6bd33ecb",
+            "title": "Broken build",
             "why": "Failed"
           },
           {
-            "run": "r-071e0c9edcfe",
+            "title": "Small edit",
             "why": "Review"
           }
         ],
@@ -30,8 +30,8 @@
       "name": "⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request",
       "ok": true,
       "detail": {
-        "first": "r-e95938dd4ac4",
-        "second": "r-0477aca0e478",
+        "first": "r-20f3ceba2981",
+        "second": "r-204653c438ae",
         "firstDone": "completed",
         "secondDone": "completed",
         "denied": true
@@ -42,9 +42,9 @@
       "ok": true,
       "detail": {
         "visited": [
-          "r-c34b6bd33ecb",
-          "r-e95938dd4ac4",
-          "r-071e0c9edcfe"
+          "r-eccda3e28762",
+          "r-20f3ceba2981",
+          "r-2e11bd52ec2d"
         ],
         "left": []
       }
@@ -53,7 +53,7 @@
       "name": "⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent",
       "ok": true,
       "detail": {
-        "switched": "r-6418f2bf31a4",
+        "switched": "r-e141115ebe16",
         "stopped": "interrupted"
       }
     },
@@ -61,8 +61,8 @@
       "name": "⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent",
       "ok": true,
       "detail": {
-        "created": "r-b1f8cdbbd47d",
-        "nowSelected": "r-b1f8cdbbd47d"
+        "created": "r-aa237e3d3003",
+        "nowSelected": "r-aa237e3d3003"
       }
     },
     {
@@ -73,10 +73,19 @@
       }
     },
     {
+      "name": "the shortcuts also work from the side bar (⌥⌘A opens the agent switcher, ⌥⌘N the composer)",
+      "ok": true,
+      "detail": {
+        "inList": true,
+        "switcher": true,
+        "composer": true
+      }
+    },
+    {
       "name": "every control in the dashboard has a screen-reader label",
       "ok": true,
       "detail": {
-        "checked": 57,
+        "checked": 36,
         "bad": []
       }
     }

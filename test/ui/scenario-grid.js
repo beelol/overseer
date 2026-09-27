@@ -30,9 +30,9 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     for (let i = 0; i < 60 && state().runs.find(r => r.id === perm.run.id).status !== 'waiting_for_user'; i++) await delay(300);
 
     await cdp.command('Overseer: Open Overseer View');
-    const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list .row')`, 30000);
+    const dash = await s.editorView();
     // Pin the finished run from its tile later; first open the grid.
-    await dash.eval(`document.querySelector('[data-action="grid"]').click()`);
+    await cdp.command('Overseer: Toggle Agent Grid');
     await dash.waitFor(`document.querySelectorAll('.grid .tile').length >= 1`, 20000);
     // Pin the finished run through the dashboard message (as the tile's pin button does).
     await dash.eval(`window.overseerApi.postMessage({ type: 'pin', runId: ${JSON.stringify(done.run.id)}, on: true })`);
@@ -50,8 +50,12 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await dash.waitFor(`document.querySelectorAll('.grid .tile').length === 9`, 5000);
     // Measure: when a "tick <ms>" line appears in a tile, how late is it; and event-loop lag.
     await dash.eval(`(() => {
-      window.__lat = []; window.__lag = [];
-      const seen = new Set();
+      window.__lat = []; window.__lag = []; window.__stages = [];
+      // Where the time goes: printed → daemon event timestamp → message reaches the webview.
+      window.addEventListener('message', e => { const d = e.data; if (d?.type !== 'events' || d.channel !== 'grid') return; const now = Date.now();
+        for (const it of d.items) for (const m of String(it.event?.payload?.text || '').matchAll(/tick (\\d+)/g)) window.__stages.push([Number(m[1]), it.event.ts, now]); });
+      // Lines already on the tiles are not new: only lines that appear from now on are timed.
+      const seen = new Set(document.querySelectorAll('.grid .tile .msg .text'));
       const mo = new MutationObserver(() => { const now = Date.now(); for (const t of document.querySelectorAll('.grid .tile .msg .text')) { const m = /^tick (\\d+)$/.exec(t.textContent.trim()); if (m && !seen.has(t)) { seen.add(t); window.__lat.push(now - Number(m[1])); } } });
       mo.observe(document.querySelector('.grid'), { childList: true, subtree: true, characterData: true });
       (function tick() { const t0 = performance.now(); if (window.__lag.length < 400) setTimeout(() => { window.__lag.push(performance.now() - t0 - 25); tick(); }, 25); })();
@@ -60,6 +64,11 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const layout = await dash.eval(`(() => { const g = document.querySelector('.grid'); return { tiles: document.querySelectorAll('.grid .tile').length, cols: g.style.getPropertyValue('--cols'), rows: g.style.getPropertyValue('--rows') }; })()`);
     await s.screenshot('grid-9-dark');
     const perf = await dash.eval(`(() => { const p = (a, q) => { const x = a.slice().sort((m, n) => m - n); return Math.round(x[Math.floor(x.length * q)] || 0); }; return { lines: window.__lat.length, latP95: p(window.__lat, .95), latMax: Math.max(...window.__lat), lagN: window.__lag.length, lagP95: p(window.__lag, .95), lagMax: Math.round(Math.max(...window.__lag)) }; })()`);
+    const stages = await dash.eval(`(() => { const p = (a, q) => { const x = a.slice().sort((m, n) => m - n); return Math.round(x[Math.floor(x.length * q)] || 0); };
+      const st = window.__stages; const toDaemon = st.map(([t, d]) => d - t), toWebview = st.map(([, d, w]) => w - d), total = st.map(([t, , w]) => w - t);
+      return { n: st.length, toDaemonP50: p(toDaemon, .5), toDaemonP95: p(toDaemon, .95), daemonToWebviewP50: p(toWebview, .5), daemonToWebviewP95: p(toWebview, .95), arriveP95: p(total, .95) }; })()`);
+    s.note('grid latency by stage (ms)', stages);
+    perf.stages = stages;
     check('nine agents tile as 3×3', layout.tiles === 9 && layout.cols === '3' && layout.rows === '3', layout);
     check('nine concurrent streams: each tile shows a line within 250 ms (p95) and event-loop lag p95 stays under 50 ms', perf.lines > 100 && perf.latP95 < 250 && perf.lagP95 < 50, perf);
     await setSetting('workbench.colorTheme', 'Overseer Light');
@@ -91,13 +100,15 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
     // Keyboard: arrows move between tiles; Enter opens the agent's chat.
     // Put keyboard focus inside the webview (the search field), then on the first tile.
-    { const at = await s.webviewPoint(dash, '.rail-search input, input[type="search"], #search'); await cdp.click(at.x, at.y); await delay(200); }
+    // Put keyboard focus inside the webview with a click on an empty corner of the grid (not a tile).
+    await dash.eval(`(() => { const g = document.querySelector('.grid'); const c = document.createElement('div'); c.id = 'grid-corner'; c.style.cssText = 'position:fixed;left:1px;top:1px;width:3px;height:3px;z-index:9'; document.body.append(c); return true; })()`);
+    { const at = await s.webviewPoint(dash, '#grid-corner'); await cdp.click(at.x, at.y); await delay(200); }
     await dash.eval(`document.querySelector('.grid .tile').focus()`);
     const first = await dash.eval(`document.activeElement.dataset.run`);
     await cdp.key('ArrowRight'); await delay(200);
     const second = await dash.eval(`document.activeElement.dataset.run`);
     await cdp.key('Enter'); await delay(1500);
-    const opened = await dash.eval(`({ mode: document.body.dataset.mode, title: document.getElementById('title')?.textContent, selected: document.querySelector('.rail-list .row[aria-selected="true"]')?.dataset.run })`);
+    const opened = await dash.eval(`({ mode: document.body.dataset.mode, title: document.getElementById('title')?.textContent, selected: window.__overseer.selected() })`);
     check('arrow keys move between tiles and Enter opens the agent in the chat', first && second && first !== second && opened.mode === 'chat' && opened.selected === second, { first, second, opened });
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;

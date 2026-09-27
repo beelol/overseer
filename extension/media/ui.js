@@ -70,8 +70,9 @@
 
   /** Popup menu anchored to an element. items: {label, icon?, logo?, hint?, checked?, danger?, disabled?, run()} | 'sep' | {head}. */
   let openMenu;
-  ui.closeMenu = () => { if (openMenu) { openMenu.el.remove(); openMenu.anchor?.setAttribute('aria-expanded', 'false'); const a = openMenu.anchor; openMenu = undefined; a?.focus?.(); } };
-  ui.menu = (anchor, items, { align = 'start', label = 'Menu' } = {}) => {
+  ui.closeMenu = () => { if (openMenu) { openMenu.el.remove(); openMenu.anchor?.setAttribute('aria-expanded', 'false'); const a = openMenu.returnFocus || openMenu.anchor; openMenu = undefined; a?.focus?.(); } };
+  // returnFocus: where keyboard focus goes after the menu closes (default: its button).
+  ui.menu = (anchor, items, { align = 'start', label = 'Menu', returnFocus } = {}) => {
     const wasSame = openMenu && openMenu.anchor === anchor;
     ui.closeMenu();
     if (wasSame) return;
@@ -100,7 +101,7 @@
     if (top + mr.height > innerHeight - 8) top = Math.max(8, r.top - mr.height - 4);
     m.style.left = left + 'px'; m.style.top = top + 'px';
     anchor.setAttribute('aria-expanded', 'true');
-    openMenu = { el: m, anchor };
+    openMenu = { el: m, anchor, returnFocus };
     const enabled = buttons.filter(b => !b.disabled);
     (enabled.find(b => b.getAttribute('aria-checked') === 'true') || enabled[0])?.focus();
     m.addEventListener('keydown', e => {

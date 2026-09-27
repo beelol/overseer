@@ -1,40 +1,7 @@
-/* Overseer dashboard (AC-48, AC-54, AC-57..AC-59): rail | main (chat, composer or grid) | files. */
+/* Overseer editor view (Gate K): main (chat, composer or grid) | files. The agents list is the side bar. */
 html, body { height: 100%; }
 body { overflow: hidden; background: var(--ov-bg); }
 .dash { display: flex; height: 100vh; min-width: 0; }
-
-/* ---- Rail ---- */
-.rail { flex: none; width: 272px; display: flex; flex-direction: column; min-height: 0; background: var(--ov-chrome); border-right: 1px solid var(--ov-border); }
-@media (max-width: 820px) { .rail { width: 220px; } }
-.rail-head { display: flex; align-items: center; gap: 2px; height: 48px; padding: 0 var(--ov-space-2) 0 var(--ov-space-3); }
-.rail-head .search { flex: 1; min-width: 0; margin-right: 4px; }
-.rail-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 var(--ov-space-2) var(--ov-space-3); }
-.rail .row { padding-left: calc(var(--ov-space-2) + var(--level) * 12px); }
-.rail .row.section { min-height: 28px; margin-top: var(--ov-space-3); color: var(--ov-muted); font-size: var(--ov-font-sm); font-weight: var(--ov-weight-medium); }
-.rail .row.section:first-child { margin-top: 0; }
-.rail .row.section .title { color: var(--ov-muted); }
-.rail .row.section.needs .title { color: var(--ov-text); }
-.rail .row.section:hover { background: transparent; color: var(--ov-text); }
-.rail .row.section .repo-add { opacity: 0; transition: opacity var(--ov-motion-fast); }
-.rail .row.section:hover .repo-add, .rail .row.section:focus-within .repo-add, .rail .row.section:focus .repo-add { opacity: 1; }
-.rail .row.section .count { min-width: 16px; text-align: center; font-size: var(--ov-font-xs); color: var(--ov-muted); }
-.rail .row.run .title { color: var(--ov-text); }
-.rail .row.run.child { min-height: 26px; }
-.rail .row.run.child .title { color: var(--ov-muted); font-size: var(--ov-font-sm); }
-.rail .row .meta-mark { display: inline-flex; color: var(--ov-muted); opacity: .8; }
-.rail .row .meta-time { min-width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
-.rail .row .row-archive { display: none; }
-.rail .row:hover .row-archive, .rail .row:focus .row-archive, .rail .row:focus-within .row-archive { display: inline-flex; }
-.rail .row:hover .meta-time, .rail .row:focus .meta-time { display: none; }
-.rail .row[aria-selected="true"] .meta { color: var(--ov-text); }
-.rail .why-chip { font-size: var(--ov-font-xs); padding: 1px 6px; border-radius: var(--ov-radius-pill); background: var(--ov-raised-2); color: var(--ov-text); }
-.rail .row.needs-row .status { color: var(--ov-waiting); }
-.rail-empty { display: flex; flex-direction: column; align-items: center; gap: var(--ov-space-2); padding: var(--ov-space-8) var(--ov-space-4); color: var(--ov-muted); text-align: center; }
-.rail-empty .codicon { font-size: 22px; }
-.rail-foot { flex: none; padding: var(--ov-space-2); border-top: 1px solid var(--ov-border); }
-.rail-accounts { display: flex; align-items: center; gap: var(--ov-space-2); width: 100%; height: 30px; padding: 0 var(--ov-space-2); border-radius: var(--ov-radius-control); color: var(--ov-muted); font-size: var(--ov-font-sm); }
-.rail-accounts:hover { background: var(--ov-hover); color: var(--ov-text); }
-.rail-accounts .ellipsis { flex: 1; text-align: left; }
 
 /* ---- Main ---- */
 .main { flex: 1; min-width: 0; min-height: 0; position: relative; display: flex; }

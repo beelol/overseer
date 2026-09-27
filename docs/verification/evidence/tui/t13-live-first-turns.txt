@@ -1,0 +1,44 @@
+ ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                       ● connected 
+┏ 1 ● Live Codex hello ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ codex · gpt-5.6-luna · 1s ┓╭ 2 ✗ Live Claude hello ────────────────────────────────── claude · haiku · 1s ╮
+┃ › Reply with exactly: hi from codex                                          ┃│ › Reply with exactly: hi from claude                                         │
+┃                                                                              ┃│ ✖ auth: Failed to authenticate: OAuth session expired and could not be       │
+┃                                                                              ┃│   refreshed                                                                  │
+┃                                                                              ┃│ ✖ auth: Failed to authenticate: OAuth session expired and could not be       │
+┃                                                                              ┃│   refreshed                                                                  │
+┃                                                                              ┃│ ■ failed: Failed to authenticate: OAuth session expired and could not be     │
+┃                                                                              ┃│   refreshed · 0 in / 0 out / $0.00                                           │
+┃                                                                              ┃│ · failed: exit code 1; last error [auth]: Failed to authenticate: OAuth      │
+┃                                                                              ┃│   session expired and could not be refreshed                                 │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┃                                                                              ┃│                                                                              │
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛╰ failed · exit code 1; last error [auth]: Failed … ───────────────────────────╯
+ ←↑↓→ move   i message   z zoom   v changes   a/d allow/deny   w next waiting   ]/[ page   n new   f filter   ? help   q quit                                   

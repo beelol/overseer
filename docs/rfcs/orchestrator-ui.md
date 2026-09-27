@@ -1,6 +1,6 @@
 # Side RFC: daily-driver orchestrator UI
 
-Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-54 to AC-66 (Gate J) and AC-67 to AC-82 (Gate K) in the
+Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-54 to AC-66 (Gate J), AC-67 to AC-82 (Gate K) and AC-99 to AC-108 (Gate M) in the
 [main RFC](../overseer-rfc.md)).
 
 ## Why
@@ -198,3 +198,23 @@ shows what matters for the selected agent.
 
 - VS Code does not let an extension remove the title bar or activity bar outright. The dashboard hides what the workbench commands allow and leaves the rest.
 - Themes cannot restyle native widgets beyond the color tokens VS Code exposes.
+
+## Gate M: Overseer as the whole surface
+
+Owner review of Gate K (2026-09-26), in the owner's words where it matters:
+
+- Approved: the side bar hierarchy ("looks amazing"; no changes), the layout after a restart, the review inside the grid, and the overall direction ("really good progress").
+- The review: "I should be able to go into the folders and still see the same changes, and I must be able to edit it", and clicking files should "open in the same thing", not the standard VS Code view. The reviewer should be Overseer's own.
+- Duplication: the changed-files strip under the chat repeats the review; the Explorer should not be repeated inside Overseer ("just use the Overseer one that goes on the side instead of the Explorer"); the dirty checkout stays inside the review.
+- The look: "I want the middle to look less like it's just VS Code… a full VS Code overhaul", and a third theme named **Overseer**: "darkish, but mostly focused on gradients… like it's a future app."
+- The grid: drag agents onto the top, bottom or sides of a tile to grow it, up to a hard cap of 16 ("you just can't drag more in"); click one agent to track it with its review and follow mode; "I just want to make sure you can't easily get lost", meaning losing track of windows.
+- A chat with Overseer itself at the bottom, on the default account, to nudge agents in a different direction (a separate criterion).
+
+Design direction:
+
+1. **Files live in the review.** The navigator becomes the worktree tree with changes marked and a *Changes only* filter; the right pane shows one file at a time in Overseer's editor (Monaco, already in the fork): a diff when the file changed, plain editable text when it did not. The chat keeps its per-turn edit chips (they jump to the hunk) and loses the Files pane and the changed-files strip.
+2. **One frame.** Overseer's views share one header style (agent, what the view is, the few controls it needs) so VS Code's tab strip and breadcrumbs can be hidden while Overseer holds the editor area; the settings involved are applied in Overseer's mode only and restored exactly, as dashboard mode already does for the panel and side bars.
+3. **The Overseer theme.** VS Code's workbench colors are flat, so the gradients (a slow aurora on the editor backdrop, lit edges on active tiles and the tracked agent, glass-like chat and review surfaces) are drawn by Overseer's webviews; the workbench colors of the theme are picked to sit under them. Overseer Dark and Light stay as they are.
+4. **Grid by drag.** The grid becomes a split layout (like editor groups): dropping on a tile's edge splits that tile; the tree of splits is kept per window; 16 is the cap. Clicking a tile tracks it: the review for that agent opens beside the grid, following.
+5. **Where am I.** One of each view per window, every header names its agent, and a small map lists what is open and jumps to it.
+6. **Talk to Overseer.** A docked chat that runs an orchestrator turn on the default account with read access to the daemon's state and a small set of actions it may propose; every action waits for the owner's yes.
