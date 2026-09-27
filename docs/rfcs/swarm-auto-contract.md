@@ -1,10 +1,12 @@
 # Swarm ↔ Auto Mode integration contract (implementation boundary)
 
-Status: proposed boundary in `codex/swarm-mode`, checked against the separate
-`codex/automode-rfc` branch at `11b4cf9` on 2026-09-26. That implementation is not
-merged here. Auto's selector, structured quota collection, and durable selected
-launch intent exist on that branch; atomic allowance commitment and complete
-crash reconciliation remain open. This contract defines their shared boundary,
+Status: proposed boundary in `codex/swarm-mode`, checked read-only against the separate
+local `codex/automode-rfc` branch at `d2e9d34` on 2026-09-27 (its published branch was
+still at `c769383`). That implementation is not merged here. Auto's route type now
+exposes harness, provider, endpoint, profile, pool, model and effort; its selector,
+structured quota collection, and durable selected launch intent exist on that branch.
+Atomic measured-window allowance commitment across ordinary, Auto and Swarm work and
+complete crash reconciliation remain open. This contract defines their shared boundary,
 not an assertion that either side already implements it end to end.
 
 ## Responsibilities
