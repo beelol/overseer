@@ -1,0 +1,9 @@
+# The Mac removed this phone: pairing is the only way on.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    visible:
+      id: "pair.code"
+    timeout: 60000
+- assertNotVisible:
+    id: "agents.list"

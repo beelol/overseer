@@ -250,6 +250,19 @@ describe('the session', () => {
     expect(session.getSnapshot().notifications).toEqual({ enabled: false, show_text: false, kinds: { permission: true, question: true, failure: false, finished: true } });
   });
 
+  test('what the Mac lets this phone do changes at once, and only for this phone', async () => {
+    const { session, connection } = make();
+    connection.gateway = GATEWAY;
+    await session.start();
+    connection.go('online');
+    await settle();
+    expect(session.getSnapshot().scope).toBe('full');
+    connection.emit('event', event(11, 'device_scope', { device: 'another', scope: 'watch' }), { live: true });
+    expect(session.getSnapshot().scope).toBe('full');
+    connection.emit('event', event(12, 'device_scope', { device: 'd1', scope: 'watch' }), { live: true });
+    expect(session.getSnapshot().scope).toBe('watch');
+  });
+
   test('coming to the front tries the Mac at once', async () => {
     const { session, connection } = make();
     await session.start();

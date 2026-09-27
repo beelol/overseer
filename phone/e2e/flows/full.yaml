@@ -1,0 +1,7 @@
+# Full control again: the controls are back by themselves.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    visible:
+      id: "agents.new"
+    timeout: 20000

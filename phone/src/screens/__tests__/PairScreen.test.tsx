@@ -134,7 +134,9 @@ describe('pair with your Mac', () => {
     await fireEvent.press(screen.getByTestId('pair.notifications.allow'));
     await app.settle();
     expect(app.platform.fakes.push.prompts()).toBe(1);
+    // The owner said yes: notifications are on for this phone, and the Mac knows where to send.
     expect(app.connection.calls('device.notifications')).toEqual([
+      { enabled: true },
       { token: 'booted', environment: 'simulator' },
     ]);
     expect(router.replaced).toEqual([routes.agents]);

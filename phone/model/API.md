@@ -28,7 +28,7 @@ again: `Task`, `Run`, `RunStatus`, `Turn`, `Workspace`, `Profile`, `Event`, `Sta
 | `ACTIVE_STATUSES: ReadonlyArray<string>` | `queued`, `starting`, `running`, `waiting_for_user`. |
 | `isActive(status: string \| null \| undefined): boolean` | True while a run is still going. |
 | `isRun(v: unknown): v is Run`, `isTurn`, `isAttention`, `isMark` | Narrow a value of unknown shape. |
-| `record(v: unknown): Readonly<Record<string, unknown>>`, `text(v): string \| undefined`, `number(v): number \| undefined` | Read a payload without assuming its shape. |
+| `record(v: unknown): Readonly<Record<string, unknown>>`, `textOf(v): string \| undefined`, `numberOf(v): number \| undefined` | Read a payload without assuming its shape. (`src/types.ts` also exports them as `text` and `number`; from the package, `text` is the namespace of the words.) |
 
 ## `store`: the phone's copy of the daemon's state
 
@@ -73,7 +73,7 @@ again: `Task`, `Run`, `RunStatus`, `Turn`, `Workspace`, `Profile`, `Event`, `Sta
 
 | Export | Meaning |
 | --- | --- |
-| `interface Conversation { rootId: string; home: string; rows: PVec<Row>; working: { shown: boolean; label: string }; banner: string \| null; status: string \| undefined; attention: unknown; … }` | A conversation. The other fields are the builder's own. |
+| `interface Conversation { rootId: string; home: string; rows: PVec<Row>; working: { shown: boolean; label: string }; banner: string \| null; status: string \| undefined; attention: unknown; landed: PMap<number>; … }` | A conversation. `working`: what to say under the rows while the agent works. `banner`: what to say above them when older history is gone. `landed`: requests sent from a phone that became a turn. The other fields are the builder's own. |
 | `type Row = UserRow \| MessageRow \| ThinkingRow \| StepsRow \| ToolRow \| EditRow \| PermissionRow \| ErrorRow \| ChildRow \| NoteRow \| FooterRow` | One row of the list. Every row has `key`, `kind`, `depth`, `turn`, `turnNumber`, `run`, `parent`, `seq`. |
 | `interface UserRow { kind: 'user'; label: string; text: string; sent: 'sent' \| 'queued' \| 'sending' \| 'failed'; requestId: string \| null }` | Your prompt. |
 | `interface MessageRow { kind: 'message'; role: string; label: string; text: string; markdown: boolean }` | The agent's reply (Markdown) or a program's output (plain). |
@@ -132,6 +132,7 @@ again: `Task`, `Run`, `RunStatus`, `Turn`, `Workspace`, `Profile`, `Event`, `Sta
 | `parse(source: string, options?: MarkdownOptions): ReadonlyArray<Block>` | The tree. Raw HTML never becomes a view: tags are dropped, their text is kept; what a script or style element holds is dropped with it. |
 | `plainText(blocks: ReadonlyArray<Block>): string` | The words of a tree, a line for each block. |
 | `safeHref(href: string): string \| null` | The address when VS Code's sanitizer keeps it, else `null`. |
+| `knownEntities(): ReadonlyMap<string, string>` | The named entities this reads (`&copy;`, `&mdash;`: the ones of HTML 4 and some more), each with its character. |
 | `opensExternally(href: string \| null): boolean` | True for `http` and `https`. |
 
 ## `review`: changed files, comparisons, hunks
@@ -140,13 +141,13 @@ again: `Task`, `Run`, `RunStatus`, `Turn`, `Workspace`, `Profile`, `Event`, `Sta
 | --- | --- |
 | `type StatusLetter = 'A' \| 'D' \| 'R' \| 'M' \| 'U'` | Added, deleted, renamed, modified, conflicted: the letters of VS Code's review. |
 | `statusLetter(status: string): StatusLetter` | The letter for a change the daemon reports. |
-| `interface FileRow { kind: 'folder' \| 'file'; key: string; depth: number; name: string; path: string; status: StatusLetter \| null; statusText: string \| null; oldPath: string \| null; conflicted: boolean; added: number \| null; removed: number \| null; hunks: number \| null; reviewed: number \| null; tooltip: string; accessibilityLabel: string; expanded: boolean }` | A folder or a file of the changed-files list. Counts are `null` until the file's hunks are known. |
+| `interface FileRow { kind: 'folder' \| 'file'; key: string; depth: number; name: string; path: string; status: StatusLetter \| null; statusText: string \| null; oldPath: string \| null; conflicted: boolean; added: number \| null; removed: number \| null; hunks: number \| null; reviewed: number \| null; tooltip: string; accessibilityLabel: string; expanded: boolean; icon: string }` | A folder or a file of the changed-files list. Counts are `null` until the file's hunks are known. `icon` is a codicon's name: folder, file, warning. |
 | `interface FilesOptions { query?: string; collapsed?: ReadonlySet<string>; hunks?: Readonly<Record<string, ReadonlyArray<Hunk>>>; conflicted?: ReadonlyArray<string> }` | `hunks`: by path, for the files whose hunks were fetched. |
 | `changedFiles(changes: ReadonlyArray<Change>, options?: FilesOptions): ReadonlyArray<FileRow>` | The list, flat, grouped by folder as VS Code's tree groups it. |
 | `interface ChangesSummary { files: number; text: string; added: string; removed: string; names: string; tooltip: string }` | "3 files", "+10", "−2", "a.ts, b.ts, c.ts, …". |
 | `changesSummary(changes: { files: number; added?: number; removed?: number; names?: ReadonlyArray<string> }): ChangesSummary \| null` | The changes bar under a conversation; `null` when nothing changed. |
 | `interface ComparisonChoice { key: string; mode: string; branch: string \| null; label: string; description: string; detail: string; available: boolean; selected: boolean; base: string \| null }` | One comparison to choose. |
-| `comparisonChoices(options: ReadonlyArray<Comparison>, selected?: { mode: string; branch?: string \| null }): ReadonlyArray<ComparisonChoice>` | The daemon's comparisons with VS Code's labels, the selected one marked. |
+| `comparisonChoices(options: ReadonlyArray<Comparison>, selected?: { mode: string; branch?: string \| null }): ReadonlyArray<ComparisonChoice>` | The daemon's comparisons with VS Code's labels, the selected one marked. The last choice is "Other branch…" (`mode: 'other'`), as in VS Code's picker. |
 | `interface DiffRow { kind: 'removed' \| 'added'; key: string; hunk: string; baseLine: number \| null; modifiedLine: number \| null; text: string }` | One line of a hunk. |
 | `interface HunkView { key: string; index: number; reviewed: boolean; label: string; where: string; baseStart: number; modifiedStart: number; removed: number; added: number; rows: ReadonlyArray<DiffRow>; accept: { label: string; reviewed: boolean }; reject: { label: string }; hunk: Hunk }` | A hunk with its removed and added lines and its reviewed state. |
 | `interface FileDiff { path: string; shown: boolean; why: string; hunks: ReadonlyArray<HunkView>; added: number; removed: number; reviewed: number; note: string \| null }` | A file's changes. |
@@ -155,6 +156,7 @@ again: `Task`, `Run`, `RunStatus`, `Turn`, `Workspace`, `Profile`, `Event`, `Sta
 | `splitLine(text: string, width: number): ReadonlyArray<string>` | A long line in pieces of at most `width` characters, broken where words end. |
 | `editTarget(diff: FileDiff): { hunk: string; line: number } \| null` | Where an edit chip opens: the first hunk not yet reviewed. |
 | `acceptParams(path: string, hunk: Hunk, anchor?: string): { path: string; key: string; modified_start: number; modified_lines: ReadonlyArray<string>; base_lines: ReadonlyArray<string>; anchor?: string }` | The parameters of `review.accept` for a hunk (add `run_id`). |
+| `branchChoices(branch: string): { title: string; choices: ReadonlyArray<{ label: string; mode: string; branch: string }> }` | After "Other branch…": the two ways to compare with the branch chosen. |
 
 ## `pending`: messages on their way
 
@@ -164,6 +166,7 @@ again: `Task`, `Run`, `RunStatus`, `Turn`, `Workspace`, `Profile`, `Event`, `Sta
 | `withPending(conversation: Conversation, outbox: ReadonlyArray<OutboxEntry>, toggled?: ReadonlySet<string>): ReadonlyArray<Row>` | The visible rows, then the bubbles on their way. A message is one row with one key from queued to sent. |
 | `isWaiting(conversation: Conversation, entry: OutboxEntry): boolean` | True while an entry still shows as its own bubble. |
 | `sentLabel(row: UserRow): string` | "Queued", "Sending", "Not sent", or nothing for a message that was sent. |
+| `keyOf(requestId: string): string` | The key of a message's row, the same before and after it became a turn. |
 
 ## `text`: the words
 
@@ -180,3 +183,21 @@ again: `Task`, `Run`, `RunStatus`, `Turn`, `Workspace`, `Profile`, `Event`, `Sta
 | `compact(n: number): string` | "18k", "1.2k", "2.5M". |
 | `grouped(n: number): string` | "18,423". |
 | `basename(path: unknown): string`, `firstLine(value: unknown, max?: number): string`, `shortPath(path: unknown, home?: string, keep?: number): string` | A path's last part; a text's first line; "~/…/last/two". |
+
+## What the screens should know
+
+- **Rows have stable keys.** Use `row.key` as the list's key. A message sent from the phone keeps
+  one key (`pending.keyOf(requestId)`) from queued to sent.
+- **Rows that did not change are the same objects.** A row component that is memoized on its row
+  renders again only for the rows `append` names in `changed`.
+- **Depth, not nesting.** Rows are flat. `depth` says how far a row is indented; a fold of steps
+  or a closed child hides the rows after it that are deeper (`visibleRows` does this).
+- **Call `setRun` when the store's copy of the run changes.** A permission card is `pending` only
+  while the run's `attention` names its request; the working line shows only while the run goes.
+- **Feed every event to `append`.** It picks the agent's own and its native children's.
+- **Icons are names, not pictures.** `icon` is the name of the codicon VS Code shows (`check`,
+  `error`, `terminal`, `tools`); `logo` is the name of a file in `extension/media/logos`.
+- **Markdown is parsed when asked for.** `markdownOf(row, conversation)` parses once for each row;
+  call it for the rows on screen.
+- **After a reconnect, load `state` again.** A few things change in the daemon without an event
+  (README, "What events do not say").

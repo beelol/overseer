@@ -79,7 +79,9 @@ function run(log, command, args, options = {}) {
 async function startLab(log, platform, out) {
   const state = path.join(out, `lab-${platform}.json`);
   fs.rmSync(state, { force: true });
-  const child = spawn('node', [path.join(here, 'lab.mjs'), 'start', '--port', String(PORTS[platform]), '--state', state, '--push'], { cwd: phone, stdio: ['ignore', 'pipe', 'pipe'] });
+  // The daemon delivers notifications itself: to the iOS simulator through the simulator's own
+  // tool, and nothing to Android, which shows its own while the app is open.
+  const child = spawn('node', [path.join(here, 'lab.mjs'), 'start', '--port', String(PORTS[platform]), '--state', state], { cwd: phone, stdio: ['ignore', 'pipe', 'pipe'] });
   child.stdout.on('data', (chunk) => log.raw(`lab: ${String(chunk).slice(0, 400)}`));
   child.stderr.on('data', (chunk) => log.raw(`lab: ${chunk}`));
   const end = Date.now() + 60_000;
@@ -95,6 +97,7 @@ async function startLab(log, platform, out) {
     call: (method, params = {}) => JSON.parse(lab('call', state, method, JSON.stringify(params))),
     code: () => lab('code', state),
     agent: (mode, title, prompt = 'go') => lab('agent', state, mode, title, prompt),
+    mode: (mode) => lab('mode', state, mode),
     stop: async () => {
       child.kill('SIGTERM');
       await new Promise((resolve) => (child.exitCode !== null ? resolve() : child.on('exit', resolve)));

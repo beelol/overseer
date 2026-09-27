@@ -11,6 +11,7 @@
 //   events       every event of the stream, in order
 //   checkpoints  `state` after every 10 events, so also after every 50 (and at moments the scenario marks)
 //   final        `state` at the end
+//   calls        what the daemon answered to the requests a scenario marks (search, review)
 // Paths of the temporary directory, of this repository and of the home folder are replaced by
 // fixed ones, so a fixture does not say where it was recorded.
 import { spawn, execFileSync } from 'node:child_process';
@@ -88,7 +89,17 @@ function makeRepo(dir) {
 
 /** A daemon of its own, the stream of its events, and the helpers a scenario uses. */
 class Session {
-  constructor(name, env = {}) { this.name = name; this.extraEnv = env; this.events = []; this.checkpoints = []; this.marks = {}; this.waiters = []; this.pendingCheckpoints = []; }
+  constructor(name, env = {}) { this.name = name; this.extraEnv = env; this.events = []; this.checkpoints = []; this.marks = {}; this.calls = []; this.waiters = []; this.pendingCheckpoints = []; }
+
+  /** A request whose answer goes into the recording, with the last event the daemon had written by then. */
+  async call(method, params = {}) {
+    let result, error;
+    try { result = await this.rpc.request(method, params); } catch (e) { error = { code: e.code, message: e.message }; }
+    const state = await this.rpc.request('state');
+    this.calls.push({ method, params, ...(error ? { error } : { result }), cursor: state.cursor });
+    if (error) throw Object.assign(new Error(error.message), { code: error.code });
+    return result;
+  }
 
   async start() {
     const base = process.env.OVERSEER_RECORD_TMP || os.tmpdir();
@@ -211,6 +222,7 @@ class Session {
       about: 'Recorded from a real overseerd with fixture harnesses by phone/model/scripts/record.mjs. Paths are replaced by fixed ones.',
       daemon: { version: this.final.daemon.version, parser_version: this.final.daemon.parser_version, protocol: this.hello.protocol },
       marks: this.marks,
+      calls: this.calls,
       initial: this.initial,
       events: this.events,
       checkpoints: this.checkpoints,
@@ -223,7 +235,7 @@ class Session {
     const lines = list => (list.length ? '[\n' + list.map(x => '    ' + JSON.stringify(x)).join(',\n') + '\n  ]' : '[]');
     const text = '{\n' + [
       `  "scenario": ${JSON.stringify(r.scenario)}`, `  "about": ${JSON.stringify(r.about)}`, `  "daemon": ${JSON.stringify(r.daemon)}`, `  "marks": ${JSON.stringify(r.marks)}`,
-      `  "initial": ${JSON.stringify(r.initial)}`, `  "events": ${lines(r.events)}`, `  "checkpoints": ${lines(r.checkpoints)}`, `  "final": ${JSON.stringify(r.final)}`,
+      `  "calls": ${lines(r.calls)}`, `  "initial": ${JSON.stringify(r.initial)}`, `  "events": ${lines(r.events)}`, `  "checkpoints": ${lines(r.checkpoints)}`, `  "final": ${JSON.stringify(r.final)}`,
     ].join(',\n') + '\n}\n';
     fs.mkdirSync(out, { recursive: true });
     fs.writeFileSync(path.join(out, `${this.name}.json`), text);
@@ -404,6 +416,53 @@ const scenarios = {
     const i = await s.claude(shop, 'slow', 'Take your time with the migration', { title: 'A slow migration', env: undefined });
     await s.event(ev => ev.run_id === i.run.id && ev.kind === 'output', { from: i.from, what: 'the first reply' });
     Object.assign(s.marks, { showcase: a.run.id, nested: b.run.id, auth: c.run.id, ratelimit: d.run.id, archived: e.run.id, generic: f.run.id, failed: g.run.id, waiting: h.run.id, running: i.run.id, account: account.id });
+    await s.quiet(400);
+    // What the daemon's own search finds, to compare the phone's search with.
+    for (const query of ['migration', 'billing', 'Work account', 'fixture-small', 'generic', 'claude', 'Summarize', 'refresh', 'SESSIONS', 'perm', 'no-such-words-anywhere']) await s.call('search', { query, limit: 200 });
+    for (const run of [a.run.id, b.run.id, g.run.id]) await s.call('workspace.changes', { workspace_id: (await s.rpc.request('state')).runs.find(r => r.id === run).workspace_id });
+  },
+  /** An agent that changed files, then a review of them: comparisons, the diff, hunks, marks made and taken away, a hunk rejected. */
+  async review(s) {
+    const repo = makeRepo(path.join(s.root, 'shop'));
+    fs.mkdirSync(path.join(repo, 'docs/guides'), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'docs/guides/sessions.md'), '# Sessions\n\nOld text.\n');
+    fs.writeFileSync(path.join(repo, 'docs/old.md'), 'to be removed\n');
+    git(repo, 'add', '.');
+    git(repo, 'commit', '-q', '-m', 'docs');
+    const a = await s.claude(repo, 'showcase', 'Make expired sessions refresh once', { title: 'Refresh sessions once' });
+    s.marks.root = a.run.id;
+    await s.ended(a.run.id, a.from);
+    await s.quiet(300);
+    // More changes in the worktree, as a person or a later turn would make them.
+    const ws = a.workspace;
+    const at = (...parts) => path.join(ws.path, ...parts);
+    fs.writeFileSync(at('docs/guides/sessions.md'), '# Sessions\n\nNew text, with a very long line: ' + 'word '.repeat(60).trim() + '\n\nAnd an added paragraph.\n');
+    fs.rmSync(at('docs/old.md'));
+    fs.writeFileSync(at('a.txt'), 'a\nsecond line\n');
+    fs.writeFileSync(at('picture.bin'), Buffer.from([0, 1, 2, 3, 0, 255]));
+    s.marks.workspace = ws.id;
+    const options = await s.call('comparison.options', { run_id: a.run.id });
+    const base = options.options.find(o => o.mode === 'task_start').base;
+    s.marks.base = base;
+    await s.call('workspace.changes', { workspace_id: ws.id });
+    const diff = await s.call('workspace.diff', { workspace_id: ws.id, base, status: true });
+    for (const change of diff.changes) await s.call('workspace.hunks', { workspace_id: ws.id, path: change.path, base, run_id: a.run.id });
+    await s.call('review.marks', { run_id: a.run.id });
+    const readme = await s.rpc.request('workspace.hunks', { workspace_id: ws.id, path: 'README.md', base, run_id: a.run.id });
+    const guide = await s.rpc.request('workspace.hunks', { workspace_id: ws.id, path: 'docs/guides/sessions.md', base, run_id: a.run.id });
+    const accept = (file, hunk) => s.call('review.accept', { run_id: a.run.id, path: file, key: hunk.key, modified_start: hunk.modified_start, modified_lines: hunk.modified_lines, base_lines: hunk.base_lines });
+    await accept('README.md', readme.hunks[0]);
+    await s.call('review.marks', { run_id: a.run.id });
+    await accept('docs/guides/sessions.md', guide.hunks[0]);
+    await s.call('review.marks', { run_id: a.run.id });
+    await s.call('workspace.hunks', { workspace_id: ws.id, path: 'README.md', base, run_id: a.run.id });
+    await s.call('review.unaccept', { run_id: a.run.id, key: readme.hunks[0].key });
+    await s.call('review.marks', { run_id: a.run.id });
+    await s.call('review.reject', { workspace_id: ws.id, path: 'a.txt', base, key: (await s.rpc.request('workspace.hunks', { workspace_id: ws.id, path: 'a.txt', base, run_id: a.run.id })).hunks[0].key });
+    await s.call('review.reject', { workspace_id: ws.id, path: 'docs/guides/sessions.md', base, key: guide.hunks[0].key });
+    await s.call('review.marks', { run_id: a.run.id });
+    await s.call('workspace.diff', { workspace_id: ws.id, base, status: true });
+    await s.quiet(300);
   },
 };
 

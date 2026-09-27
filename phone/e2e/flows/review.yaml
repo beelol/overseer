@@ -1,0 +1,32 @@
+# The agent's changes: the files, one file's hunks, and a hunk marked reviewed.
+appId: ${APP}
+---
+- tapOn:
+    id: "agents.row.${RUN}"
+- extendedWaitUntil:
+    visible:
+      id: "agent.changes"
+    timeout: 30000
+- tapOn:
+    id: "agent.changes"
+- extendedWaitUntil:
+    visible:
+      id: "changes.row.${FILE}"
+    timeout: 30000
+- tapOn:
+    id: "changes.row.${FILE}"
+- extendedWaitUntil:
+    visible:
+      id: "file.hunk.accept"
+    timeout: 30000
+- tapOn:
+    id: "file.hunk.accept"
+    index: 0
+- tapOn:
+    id: "file.back"
+- tapOn:
+    id: "changes.back"
+- tapOn:
+    id: "agent.back"
+- assertVisible:
+    id: "agents.screen"

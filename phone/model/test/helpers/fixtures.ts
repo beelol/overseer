@@ -10,9 +10,19 @@ export interface Checkpoint {
   state: State;
 }
 
+export interface Call {
+  method: string;
+  params: unknown;
+  result?: unknown;
+  error?: { code?: string; message: string };
+  /** The last event the daemon had written when it answered. */
+  cursor: number;
+}
+
 export interface Fixture {
   scenario: string;
   marks: Record<string, string | number>;
+  calls: Call[];
   initial: State;
   events: DaemonEvent[];
   checkpoints: Checkpoint[];
@@ -26,7 +36,8 @@ const dir = path.resolve(here, '../fixtures');
 export const fixtureNames: string[] = fs.readdirSync(dir).filter(f => f.endsWith('.json')).map(f => f.replace(/\.json$/, '')).sort();
 
 export function fixture(name: string): Fixture {
-  return JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8')) as Fixture;
+  const recorded = JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), 'utf8')) as Fixture;
+  return { ...recorded, calls: recorded.calls ?? [] };
 }
 
 export const fixtures: Fixture[] = fixtureNames.map(fixture);

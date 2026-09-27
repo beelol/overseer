@@ -1,0 +1,9 @@
+# Phone access was turned off on the Mac: the app says so and keeps what it has.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    visible:
+      id: "connection.off"
+    timeout: 30000
+- assertVisible:
+    id: "agents.row.${SHOWCASE}"

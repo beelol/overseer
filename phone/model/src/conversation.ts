@@ -450,7 +450,8 @@ function sameRow(a: Row, b: Row): boolean {
 // ------------------------------------------------------------------ where things are
 
 const turnKey = (ordinal: number): string => `turn:${ordinal}`;
-const toolKey = (run: string, id: string): string => `tool:${run}\u0000${id}`;
+/** A run's id holds no slash, so the two parts cannot be taken for each other. */
+const toolKey = (run: string, id: string): string => `tool:${run}/${id}`;
 const childKey = (run: string): string => `child:${run}`;
 
 /** What holds the thing with this key: a fold's holder, a tool call's, a child's. */

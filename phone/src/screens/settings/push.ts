@@ -20,6 +20,9 @@ async function tellTheMac(
 ): Promise<void> {
   const simulator = launch.info().isSimulator;
   const token = simulator ? 'booted' : (await push.deviceToken()).token;
+  // The owner just said yes: notifications are on for this phone from now, until they turn
+  // them off in Settings. The Mac sends nothing to a phone that never said yes.
+  await session.setNotifications({ enabled: true });
   await session.request('device.notifications', {
     token,
     environment: simulator ? 'simulator' : 'device',

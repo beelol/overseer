@@ -302,6 +302,7 @@ export class Session {
   }
 
   private onEvent(event: DaemonEvent): void {
+    this.ownEvent(event);
     this.pending.push(event);
     if (this.cancelFrame === null) {
       this.cancelFrame = this.deps.nextFrame(() => {
@@ -309,6 +310,18 @@ export class Session {
         this.flush();
       });
     }
+  }
+
+  /**
+   * What the Mac changed about this phone while it is connected: what it may do. The controls
+   * follow at once; the Mac enforces the same whatever the app shows.
+   */
+  private ownEvent(event: DaemonEvent): void {
+    if (event.kind !== 'device_scope') return;
+    const payload = (event.payload !== null && typeof event.payload === 'object' ? event.payload : {}) as Record<string, unknown>;
+    const mine = this.deps.connection.gateway?.deviceId;
+    if (!mine || payload['device'] !== mine) return;
+    if (payload['scope'] === 'watch' || payload['scope'] === 'full') this.update({ scope: payload['scope'] });
   }
 
   /** Applies everything that arrived since the last frame, as one change. */

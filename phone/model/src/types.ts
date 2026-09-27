@@ -36,6 +36,9 @@ export function number(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+/** `text` and `number` under names that the package's `text` namespace does not take. */
+export { number as numberOf, text as textOf };
+
 export function isRun(value: unknown): value is Run {
   const r = record(value);
   return typeof r['id'] === 'string' && typeof r['task_id'] === 'string' && typeof r['status'] === 'string' && typeof r['created_ms'] === 'number';

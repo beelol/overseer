@@ -1,0 +1,21 @@
+# A phone that may only watch sees everything and no control that changes something.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    notVisible:
+      id: "agents.new"
+    timeout: 20000
+- tapOn:
+    id: "agents.row.${SHOWCASE}"
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 30000
+- assertVisible:
+    id: "watch.line"
+- assertNotVisible:
+    id: "agent.composer.text"
+- assertNotVisible:
+    id: "agent.composer.send"
+- tapOn:
+    id: "agent.back"

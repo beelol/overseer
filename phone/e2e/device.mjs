@@ -57,7 +57,6 @@ function ios() {
     uninstall: () => void quiet('xcrun', ['simctl', 'uninstall', udid, BUNDLE]),
     launch: () => void simctl('launch', udid, BUNDLE),
     stop: () => void quiet('xcrun', ['simctl', 'terminate', udid, BUNDLE]),
-    home: () => void quiet('xcrun', ['simctl', 'spawn', udid, 'launchctl', 'kickstart', '-k', 'system/com.apple.SpringBoard.none']),
     appearance: (mode) => void simctl('ui', udid, 'appearance', mode),
     read: (key) => quiet('sqlite3', [database(), `select value from storage where key=${sql(key)}`]),
     write: (key, value) => void out('sqlite3', [database(), `create table if not exists storage (key text primary key not null, value text); insert or replace into storage(key, value) values(${sql(key)}, ${sql(JSON.stringify(value))})`]),
@@ -96,7 +95,6 @@ function android() {
     uninstall: () => void quiet(ADB, ['-s', serial, 'uninstall', BUNDLE]),
     launch: () => void shell(`monkey -p ${BUNDLE} -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1`),
     stop: () => void shell(`am force-stop ${BUNDLE}`),
-    home: () => void shell('input keyevent KEYCODE_HOME'),
     appearance: (mode) => void shell(`cmd uimode night ${mode === 'dark' ? 'yes' : 'no'}`),
     read: (key) => quiet(ADB, ['-s', serial, 'shell', `sqlite3 ${database} "select value from storage where key=${sql(key)}"`]),
     write(key, value) {

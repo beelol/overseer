@@ -7,6 +7,7 @@
 //   node e2e/lab.mjs call <state file> <method> [json]        a request as the Mac makes it
 //   node e2e/lab.mjs code <state file>                        a new pairing code
 //   node e2e/lab.mjs agent <state file> <mode> <title>        starts a fixture agent
+//   node e2e/lab.mjs mode <state file> <mode>                 what the next fixture agent does
 //   node e2e/lab.mjs stop <state file>
 //
 // The state file (JSON) says where the lab is: home, socket, port, repo, the pairing code.
@@ -193,6 +194,10 @@ try {
     state.code = (await call(state.socket, 'gateway.pair_start')).code;
     fs.writeFileSync(file, JSON.stringify(state, null, 2));
     console.log(state.code);
+  } else if (command === 'mode') {
+    // What the next fixture agent does (showcase, echo, slow, showcase-permission, nested …).
+    const state = readState(args._[0]);
+    fs.writeFileSync(path.join(state.home, 'fixture-mode'), args._[1]);
   } else if (command === 'agent') {
     const state = readState(args._[0]);
     console.log(await agent(state, args._[1], args._[2] ?? args._[1], args._[3]));

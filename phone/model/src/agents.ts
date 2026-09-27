@@ -175,10 +175,17 @@ export function agentRows(state: PhoneState, options: AgentsOptions): ReadonlyAr
   const before = new Map((lastRows?.rows ?? []).map(r => [r.id, r]));
   const rows = built.map(row => {
     const was = before.get(row.id);
-    return was !== undefined && JSON.stringify(was) === JSON.stringify(row) ? was : row;
+    return was !== undefined && sameRow(was, row) ? was : row;
   });
   lastRows = { state, key, rows };
   return rows;
+}
+
+/** Every field of a row is text, a number, a truth or nothing: two rows are the same when every field is. */
+function sameRow(a: AgentRow, b: AgentRow): boolean {
+  const x = a as unknown as Record<string, unknown>, y = b as unknown as Record<string, unknown>;
+  for (const key in x) if (x[key] !== y[key]) return false;
+  return true;
 }
 
 function build(state: PhoneState, options: AgentsOptions): AgentRow[] {
@@ -216,8 +223,13 @@ function build(state: PhoneState, options: AgentsOptions): AgentRow[] {
     out.push({ id, kind: 'child', depth, label: run.title, description: isActive(run.status) ? '' : ago(run.ended_ms || run.created_ms, options.now), tooltip: `${run.title}\n${status} · ${t.nativeChild}${run.relation_confidence?.startsWith('exact') ? '' : t.inferred}`, accessibilityLabel: `${run.title}, ${status}, ${t.nativeChild}`, ...picture(run.harness), ...mark(run.status), runId: run.id, taskId: run.task_id, repo: taskOf(state, run.task_id)?.repo_root ?? null, expandable: kids.length > 0, expanded: open, context: 'agent-child', active: isActive(run.status), archived: false, pinned: false });
     if (open) for (const kid of kids) child(kid, depth + 1);
   };
-  for (const repo of new Set(tasks.map(x => x.repo_root))) {
-    const mine = tasks.filter(x => x.repo_root === repo);
+  const byRepo = new Map<string, Task[]>();
+  for (const x of tasks) {
+    const list = byRepo.get(x.repo_root);
+    if (list === undefined) byRepo.set(x.repo_root, [x]);
+    else list.push(x);
+  }
+  for (const [repo, mine] of byRepo) {
     const active = mine.filter(x => isActive(roots.get(x.id)?.status)).length;
     const id = 'repo:' + repo;
     const open = !collapsed.has(id);

@@ -1,0 +1,19 @@
+# One agent's conversation, with its composer.
+appId: ${APP}
+---
+- tapOn:
+    id: "agents.row.${SHOWCASE}"
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 30000
+- assertVisible:
+    id: "agent.composer.text"
+- assertVisible:
+    id: "agent.changes"
+- assertNotVisible:
+    id: "agent.error"
+- tapOn:
+    id: "agent.back"
+- assertVisible:
+    id: "agents.screen"

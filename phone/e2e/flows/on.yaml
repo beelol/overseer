@@ -1,0 +1,13 @@
+# Phone access is on again: the app is connected by itself, with nothing asked.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    notVisible:
+      id: "connection.off"
+    timeout: 60000
+- assertNotVisible:
+    id: "connection.unreachable"
+- assertNotVisible:
+    id: "pair.code"
+- assertVisible:
+    id: "agents.row.${SHOWCASE}"

@@ -249,7 +249,9 @@ describe('settings: notifications', () => {
     await fireEvent.press(at('settings.notifications.allow'));
     await app.settle();
     expect(app.platform.fakes.push.prompts()).toBe(1);
+    // The owner said yes: notifications are on for this phone, and the Mac knows where to send.
     expect(app.connection.calls('device.notifications')).toEqual([
+      { enabled: true },
       { token: 'booted', environment: 'simulator' },
     ]);
     expect(screen.queryByTestId('settings.notifications.allow')).toBeNull();

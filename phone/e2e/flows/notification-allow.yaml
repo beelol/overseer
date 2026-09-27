@@ -1,0 +1,11 @@
+# A notification's own Allow: the agent goes on without the app being opened.
+appId: ${APP}
+---
+- extendedWaitUntil:
+    visible: "Needs your permission"
+    timeout: 20000
+- longPressOn: "Needs your permission"
+- extendedWaitUntil:
+    visible: "Allow"
+    timeout: 10000
+- tapOn: "Allow"

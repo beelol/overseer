@@ -1,0 +1,17 @@
+# Accounts, as the Mac knows them.
+appId: ${APP}
+---
+- tapOn:
+    id: "agents.menu"
+- tapOn:
+    id: "agents.menu.accounts"
+- extendedWaitUntil:
+    visible:
+      id: "accounts.screen"
+    timeout: 30000
+- assertVisible:
+    id: "accounts.list"
+- tapOn:
+    id: "accounts.back"
+- assertVisible:
+    id: "agents.screen"
