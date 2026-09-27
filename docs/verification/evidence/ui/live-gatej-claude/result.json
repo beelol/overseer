@@ -1,0 +1,312 @@
+{
+  "checks": [
+    {
+      "name": "claude: an attached image and a mentioned worktree file reach the agent (reply names red and \"# fixture\")",
+      "ok": true,
+      "detail": {
+        "reply": "Red; first line of README.md is \"# fixture\"."
+      }
+    },
+    {
+      "name": "claude: per-turn model, effort and permission mode reach the harness",
+      "ok": true,
+      "detail": {
+        "argv": [
+          "-p",
+          "--output-format",
+          "stream-json",
+          "--input-format",
+          "stream-json",
+          "--verbose",
+          "--permission-prompt-tool",
+          "stdio",
+          "--model",
+          "haiku",
+          "--resume",
+          "8c700404-75e5-4caa-8b11-cde8ef4cb73c",
+          "--effort",
+          "low",
+          "--permission-mode",
+          "plan"
+        ]
+      }
+    },
+    {
+      "name": "claude: a running turn is interrupted and the next message is answered",
+      "ok": true,
+      "detail": [
+        [
+          1,
+          "Reply with exactly: ready",
+          "completed"
+        ],
+        [
+          2,
+          "What color is the attached image, and wh",
+          "completed"
+        ],
+        [
+          3,
+          "Write a numbered list of 60 short facts ",
+          "interrupted"
+        ],
+        [
+          4,
+          "Stop. Reply with exactly: stopped ok",
+          "completed"
+        ]
+      ]
+    },
+    {
+      "name": "claude: a finished run continues its session after the daemon restarts",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reply": "resumed ok",
+        "sameSession": true
+      }
+    },
+    {
+      "name": "Claude usage matches its own rate_limit_event (utilization and reset time per window)",
+      "ok": true,
+      "detail": {
+        "usage": {
+          "limited": false,
+          "observed_ms": 1790492110519,
+          "reported": true,
+          "source": "Claude rate_limit_event",
+          "status": "allowed",
+          "windows": [
+            {
+              "label": "5 hours",
+              "resets_at_ms": 1790509800000,
+              "used": 0.02
+            },
+            {
+              "label": "week",
+              "resets_at_ms": 1790884800000,
+              "used": 0
+            }
+          ]
+        },
+        "raw": {
+          "status": "allowed",
+          "resetsAt": 1790509800,
+          "rateLimitType": "five_hour",
+          "overageStatus": "rejected",
+          "overageDisabledReason": "org_level_disabled",
+          "isUsingOverage": false,
+          "unifiedWindows": {
+            "five_hour": {
+              "utilization": 0.02,
+              "resetsAt": 1790509800
+            },
+            "seven_day": {
+              "utilization": 0,
+              "resetsAt": 1790884800
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Codex ChatGPT A usage comes from its session log (or says not reported)",
+      "ok": true,
+      "detail": {
+        "limited": false,
+        "observed_ms": 1790469166545,
+        "plan": "team",
+        "reported": true,
+        "source": "Codex session log",
+        "windows": [
+          {
+            "label": "5 hours",
+            "resets_at_ms": 1790474013000,
+            "used": 0
+          },
+          {
+            "label": "week",
+            "resets_at_ms": 1791022451000,
+            "used": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "Codex ChatGPT B usage comes from its session log (or says not reported)",
+      "ok": true,
+      "detail": {
+        "limited": false,
+        "observed_ms": 1790469171862,
+        "plan": "plus",
+        "reported": true,
+        "source": "Codex session log",
+        "windows": [
+          {
+            "label": "5 hours",
+            "resets_at_ms": 1790487170000,
+            "used": 0
+          },
+          {
+            "label": "week",
+            "resets_at_ms": 1791051996000,
+            "used": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenCode says not reported",
+      "ok": true,
+      "detail": {
+        "reported": false
+      }
+    }
+  ],
+  "runs": {
+    "claude": {
+      "id": "r-7c684e7eec8f",
+      "first": {
+        "status": "completed",
+        "reply": "ready"
+      },
+      "rich": {
+        "status": "completed",
+        "reply": "Red; first line of README.md is \"# fixture\".",
+        "argv": [
+          "-p",
+          "--output-format",
+          "stream-json",
+          "--input-format",
+          "stream-json",
+          "--verbose",
+          "--permission-prompt-tool",
+          "stdio",
+          "--model",
+          "haiku",
+          "--resume",
+          "8c700404-75e5-4caa-8b11-cde8ef4cb73c",
+          "--effort",
+          "low",
+          "--permission-mode",
+          "plan"
+        ]
+      },
+      "stop": [
+        [
+          1,
+          "Reply with exactly: ready",
+          "completed"
+        ],
+        [
+          2,
+          "What color is the attached image, and wh",
+          "completed"
+        ],
+        [
+          3,
+          "Write a numbered list of 60 short facts ",
+          "interrupted"
+        ],
+        [
+          4,
+          "Stop. Reply with exactly: stopped ok",
+          "completed"
+        ]
+      ],
+      "resumed": {
+        "status": "completed",
+        "reply": "resumed ok",
+        "sameSession": true
+      }
+    }
+  },
+  "usage": {
+    "system-claude": {
+      "limited": false,
+      "observed_ms": 1790492110519,
+      "reported": true,
+      "source": "Claude rate_limit_event",
+      "status": "allowed",
+      "windows": [
+        {
+          "label": "5 hours",
+          "resets_at_ms": 1790509800000,
+          "used": 0.02
+        },
+        {
+          "label": "week",
+          "resets_at_ms": 1790884800000,
+          "used": 0
+        }
+      ]
+    },
+    "p-f262c1bc4958": {
+      "limited": false,
+      "observed_ms": 1790469166545,
+      "plan": "team",
+      "reported": true,
+      "source": "Codex session log",
+      "windows": [
+        {
+          "label": "5 hours",
+          "resets_at_ms": 1790474013000,
+          "used": 0
+        },
+        {
+          "label": "week",
+          "resets_at_ms": 1791022451000,
+          "used": 0
+        }
+      ]
+    },
+    "p-52fb6421edd2": {
+      "limited": false,
+      "observed_ms": 1790469171862,
+      "plan": "plus",
+      "reported": true,
+      "source": "Codex session log",
+      "windows": [
+        {
+          "label": "5 hours",
+          "resets_at_ms": 1790487170000,
+          "used": 0
+        },
+        {
+          "label": "week",
+          "resets_at_ms": 1791051996000,
+          "used": 0
+        }
+      ]
+    },
+    "system-opencode": {
+      "reported": false
+    }
+  },
+  "raw": {
+    "claude": {
+      "type": "rate_limit_event",
+      "rate_limit_info": {
+        "status": "allowed",
+        "resetsAt": 1790509800,
+        "rateLimitType": "five_hour",
+        "overageStatus": "rejected",
+        "overageDisabledReason": "org_level_disabled",
+        "isUsingOverage": false,
+        "unifiedWindows": {
+          "five_hour": {
+            "utilization": 0.02,
+            "resetsAt": 1790509800
+          },
+          "seven_day": {
+            "utilization": 0,
+            "resetsAt": 1790884800
+          }
+        }
+      },
+      "uuid": "078042fa-065b-48ac-886a-ef5d39486e54",
+      "session_id": "8c700404-75e5-4caa-8b11-cde8ef4cb73c"
+    },
+    "codex": null
+  }
+}
