@@ -101,7 +101,7 @@ Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 and AC-141 (Gate
 
 | Item | Needed for | When |
 | --- | --- | --- |
-| The Xcode license accepted and the developer tools pointed at Xcode | The iOS simulator | Before phase 1 |
+| The Xcode license accepted and the developer tools pointed at Xcode | The iOS simulator | Done on 2026-09-26 |
 | The session budget for the implementing agent | Activation | At activation |
 | Marks on the door and the transitions, on a review page | AC-136, AC-137 | Phase 5 |
 | A new app identifier and a new push key for Overseer, and signing | The real iPhone | Phase 9 |
