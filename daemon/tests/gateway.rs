@@ -798,3 +798,127 @@ async fn ac141_a_phone_pairs_once() {
     assert_ne!(renewed.device, paired.device);
     assert_eq!(again.call("hello", json!({"client": "phone"})).await["device"]["name"], "Paired Again");
 }
+
+// ---------------------------------------------------------------- AC-123
+
+fn assertions_of(pid: u32) -> Vec<String> {
+    let out = std::process::Command::new("/usr/bin/pmset").args(["-g", "assertions"]).output().unwrap();
+    String::from_utf8_lossy(&out.stdout).lines().filter(|l| l.contains(&format!("pid {pid}("))).map(str::to_string).collect()
+}
+
+fn wait_until(what: &str, secs: u64, mut ok: impl FnMut() -> bool) {
+    let end = Instant::now() + Duration::from_secs(secs);
+    while Instant::now() < end {
+        if ok() {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    panic!("{what} did not happen in {secs} s");
+}
+
+#[cfg(target_os = "macos")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac123_the_mac_stays_awake_while_it_matters() {
+    let d = daemon("slow", &[("FIXTURE_SLOW_MS", "4000")]);
+    let pid = d.call("hello", json!({}))["pid"].as_u64().unwrap() as u32;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    // Phone access off: an active agent takes no assertion.
+    let quiet = run_id(&d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "while phone access is off", "title": "off"})));
+    d.wait_status(&quiet, |s| s == "running", 15);
+    std::thread::sleep(Duration::from_millis(600));
+    assert!(assertions_of(pid).is_empty(), "no assertion with phone access off: {:?}", assertions_of(pid));
+    assert_eq!(d.call("gateway.status", json!({}))["awake"], false);
+    d.wait_done(&quiet, 20);
+
+    // Phone access on, no agent: nothing to stay awake for.
+    phone::enable(&d);
+    std::thread::sleep(Duration::from_millis(600));
+    assert!(assertions_of(pid).is_empty());
+
+    // An agent runs: the assertion is held, under Overseer's name, and released when it ends.
+    let run = run_id(&d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "while phone access is on", "title": "on"})));
+    wait_until("the assertion", 10, || !assertions_of(pid).is_empty());
+    let held = assertions_of(pid);
+    assert_eq!(held.len(), 1, "{held:?}");
+    assert!(held[0].contains("PreventUserIdleSystemSleep") && held[0].contains("Overseer: agents are running and phone access is on"), "{}", held[0]);
+    assert_eq!(d.call("gateway.status", json!({}))["awake"], true);
+    assert!(["starting", "running"].contains(&d.run(&run)["status"].as_str().unwrap()));
+    d.wait_done(&run, 20);
+    wait_until("the release", 10, || assertions_of(pid).is_empty());
+    assert_eq!(d.call("gateway.status", json!({}))["awake"], false);
+
+    // Waiting for the owner counts: the Mac must be reachable to be answered.
+    let d2 = daemon("permission", &[]);
+    let pid2 = d2.call("hello", json!({}))["pid"].as_u64().unwrap() as u32;
+    phone::enable(&d2);
+    let waiting = run_id(&d2.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "write perm.txt", "title": "waits"})));
+    let w = d2.wait_status(&waiting, |s| s == "waiting_for_user", 15);
+    wait_until("the assertion while an agent waits", 10, || !assertions_of(pid2).is_empty());
+    // Turning phone access off releases it even though the agent still waits.
+    d2.call("gateway.disable", json!({}));
+    wait_until("the release when phone access goes off", 10, || assertions_of(pid2).is_empty());
+    d2.call("run.permission", json!({"run_id": waiting, "request_id": w["attention"]["request_id"], "allow": false}));
+    d2.wait_done(&waiting, 15);
+
+    // Both changes are events, with the reason.
+    let power: Vec<(bool, String)> = events_of(&d, "power").iter().map(|e| (e["payload"]["awake"].as_bool().unwrap(), e["payload"]["why"].as_str().unwrap().to_string())).collect();
+    assert_eq!(power, vec![(true, "phone access is on and agents are active".to_string()), (false, "no agent is active".to_string())]);
+    let power2: Vec<(bool, String)> = events_of(&d2, "power").iter().map(|e| (e["payload"]["awake"].as_bool().unwrap(), e["payload"]["why"].as_str().unwrap().to_string())).collect();
+    assert_eq!(power2, vec![(true, "phone access is on and agents are active".to_string()), (false, "phone access is off".to_string())]);
+}
+
+// ---------------------------------------------------------------- AC-120
+
+/// What the network sees of `_overseer._tcp` right now, in zone format (names, ports, TXT).
+#[cfg(target_os = "macos")]
+fn advertised() -> String {
+    let mut child = std::process::Command::new("/usr/bin/dns-sd").args(["-Z", "_overseer._tcp", "local"]).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null()).spawn().unwrap();
+    std::thread::sleep(Duration::from_millis(1500));
+    let _ = child.kill();
+    let out = child.wait_with_output().unwrap();
+    String::from_utf8_lossy(&out.stdout).to_string()
+}
+
+#[cfg(target_os = "macos")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn ac120_the_gateway_is_advertised_only_while_phone_access_is_on() {
+    let claude = fixture("fake-harness/claude-fixture.js");
+    let mut d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude), ("FIXTURE_MODE", "echo")]);
+    let before = d.call("gateway.status", json!({}));
+    assert_eq!(before["enabled"], false);
+    let port = phone::enable(&d);
+    let fingerprint = d.call("gateway.status", json!({}))["fingerprint"].as_str().unwrap().to_string();
+    let record = format!("fp={fingerprint}");
+    wait_until("the advertisement", 10, || advertised().contains(&record));
+    let seen = advertised();
+    assert!(seen.contains(&format!(" {port} ")) || seen.contains(&format!("\t{port}\t")) || seen.contains(&port.to_string()), "the port is advertised: {seen}");
+    // A phone finds its Mac by key: the record carries the fingerprint of the key in the pairing code.
+    let code = parse_code(d.call("gateway.pair_start", json!({}))["code"].as_str().unwrap());
+    assert_eq!(noise::fingerprint(&code.gateway_public), fingerprint);
+    d.call("gateway.pair_cancel", json!({}));
+
+    // Another machine advertising the same service with another key is refused by the handshake.
+    let (first, mut paired) = pair(&d, "Finding Phone").await;
+    drop(first);
+    let impostor = daemon("echo", &[]);
+    let impostor_port = phone::enable(&impostor);
+    let mut fooled = paired.clone();
+    fooled.port = impostor_port;
+    assert!(Phone::connect(&mut fooled).await.is_err(), "an impostor with another key is refused");
+    assert!(Phone::connect(&mut paired).await.is_ok(), "the paired Mac still answers");
+
+    // Off: the advertisement is withdrawn. Killed: the next start withdraws what was left behind.
+    d.call("gateway.disable", json!({}));
+    wait_until("the withdrawal", 10, || !advertised().contains(&record));
+    d.call("gateway.enable", json!({"port": port}));
+    wait_until("the advertisement", 10, || advertised().contains(&record));
+    d.kill9();
+    let stale = std::fs::read_to_string(d.home.path().join("gateway/advertiser.pid")).unwrap();
+    d.spawn();
+    wait_until("one advertiser after a restart", 10, || !pid_alive(stale.trim().parse().unwrap()));
+    assert!(advertised().contains(&record), "advertised again after the restart");
+    d.call("gateway.disable", json!({}));
+    wait_until("the withdrawal", 10, || !advertised().contains(&record));
+}

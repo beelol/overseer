@@ -142,6 +142,7 @@ pub fn status(d: &Arc<Daemon>) -> Result<Value> {
         "sessions": d.gateway.session_count(),
         "paired": all.iter().filter(|dev| dev["revoked_ms"].is_null()).count(),
         "devices": all, "pairing": pairing, "settings": settings(d),
+        "awake": d.gateway.power.is_held(),
     }))
 }
 

@@ -9,6 +9,7 @@ pub mod local;
 pub mod net;
 pub mod noise;
 pub mod pairing;
+pub mod power;
 pub mod remote;
 
 use crate::daemon::Daemon;
@@ -109,6 +110,7 @@ pub struct Gateway {
     pub pairing: Mutex<Option<pairing::Pairing>>,
     pub inflight: Mutex<HashMap<(String, String), Arc<Inflight>>>,
     failures: Mutex<HashMap<IpAddr, (u32, Instant)>>,
+    pub power: power::Power,
 }
 
 impl Gateway {
@@ -122,6 +124,7 @@ impl Gateway {
             pairing: Mutex::new(None),
             inflight: Mutex::new(HashMap::new()),
             failures: Mutex::new(HashMap::new()),
+            power: power::Power::default(),
         }
     }
 
@@ -224,6 +227,7 @@ pub fn start(d: &Arc<Daemon>) {
     let _ = d.gateway.rt.set(tokio::runtime::Handle::current());
     let _ = d.store.lock().unwrap().requests_prune(now_ms());
     stop_stale_advertiser();
+    power::watch(d.clone());
     if setting(d, "enabled").as_deref() == Some("1") {
         match enable(d, None) {
             Ok(v) => crate::log(&format!("gateway: phone access is on (port {})", v["port"])),
