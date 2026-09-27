@@ -6,9 +6,11 @@ No SWARM or CONTRACT box changes status because of this review.
 
 Re-fetched `origin/main` on 2026-09-27 after the owner's later update; it still resolves
 to `7bccc3a`, which is an ancestor of the Swarm branch. The main checkout's older local
-`main` was left untouched. The latest Auto branch (`a7695fd`) also retains the same
-route/admission division. No further merge or change to the Swarm defaults, worker-count
-policy is needed. The joined Gate S and Auto checks below remain
+`main` was left untouched. A later read-only check of the separate local Auto branch at
+`925b3f4` found its run-bound managed-child bridge and Auto-only pool claims. They retain
+the route/admission division but do not yet provide the shared allowance transaction.
+No further merge or change to the Swarm defaults or worker-count policy is needed. The
+joined Gate S and Auto checks below remain
 open implementation dependencies, not new standalone Swarm criteria.
 
 The next fetch on 2026-09-27 again resolved to `7bccc3a`; no new main changes needed

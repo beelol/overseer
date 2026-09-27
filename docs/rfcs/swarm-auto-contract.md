@@ -1,13 +1,15 @@
 # Swarm ↔ Auto Mode integration contract (implementation boundary)
 
 Status: proposed boundary in `codex/swarm-mode`, checked read-only against the separate
-local `codex/automode-rfc` branch at `d2e9d34` on 2026-09-27 (its published branch was
-still at `c769383`). That implementation is not merged here. Auto's route type now
-exposes harness, provider, endpoint, profile, pool, model and effort; its selector,
-structured quota collection, and durable selected launch intent exist on that branch.
-Atomic measured-window allowance commitment across ordinary, Auto and Swarm work and
-complete crash reconciliation remain open. This contract defines their shared boundary,
-not an assertion that either side already implements it end to end.
+local `codex/automode-rfc` branch at `925b3f4` on 2026-09-27 (its published branch was
+still at `c769383`). That implementation is not merged here. Auto's route type exposes
+harness, provider, endpoint, profile, pool, model and effort; its selector, structured
+quota collection, durable selected launch intent, and run-bound managed-child bridge
+exist on that branch. Its `auto_pool_claims` serialize Auto's own unknown-draw child
+launches for a pool, but are not a measured-window allowance commitment shared with
+ordinary and Swarm launches. Atomic admission across all three callers and complete
+crash reconciliation remain open. This contract defines their shared boundary, not
+an assertion that either side already implements it end to end.
 
 ## Responsibilities
 
@@ -25,6 +27,12 @@ allowance, though that coordinating run does not occupy an `agents.max_active` s
 Overseer's Auto permission level does not grant a route, a Swarm allocation or a
 worker launch; starting a swarm and raising its limit require the owner's recorded
 confirmation before the transaction can admit additional work.
+Auto's run-bound child bridge is a transport for an Auto-enabled ordinary parent,
+not delegation authority for a Swarm worker or a second category director. A Swarm
+director may request a job only through the category plan, approved pool and shared
+admission transaction. A Swarm worker's attempt to invoke managed delegation must
+be refused unless its descendants are explicitly accounted and controlled under
+SWARM-17; the v1 one-worker-level policy leaves recursive launches disabled.
 
 Continuity (Gate L) owns daemon-wide connectivity and local-model memory eligibility. Auto
 may rank its qualified route, but neither Auto nor Swarm may reinterpret a single provider
@@ -103,7 +111,9 @@ Existing daemon `account.usage`, `account.list`, `harness.list`, and `profile.st
 are observations and UI discovery, not a reservation authority. Swarm's
 `swarm.policy.preview` and `swarm.admit` currently consume caller-provided fixture
 snapshots. Auto's `auto.dispatch` persists selected intent and can return
-`launch_pending`, but does not yet commit allowance across all launch paths. The
+`launch_pending`; its local `auto_pool_claims` also hold an Auto-only in-flight pool
+when draw is unknown. Neither path commits comparable allowance across ordinary,
+Auto and Swarm launches. The
 fixture path now persists the selected target's harness in its admission and
 refuses a worker launch under another harness. It also persists an injected
 target's profile, model and optional effort, passing the saved choices to the
@@ -115,6 +125,14 @@ adapter must translate Auto's account-generation, scoped quota/route observation
 into a versioned snapshot and submit both Auto and Swarm launches to the same
 transaction. It must not infer a balance from `account.usage` tokens or replace
 Auto's collector with another parser.
+During integration, migrate or subsume Auto's pool claims into that one transaction
+without releasing uncertain existing child commitments. Replay a running Auto parent
+delegating a managed child at the same moment as a Swarm director requests its next
+worker and an ordinary manual start: one binding account window and one writer may
+admit only the affordable, nonconflicting set. A linked director process consumes its
+category's reserved app slot once, not once for the category and again for its run.
+An Auto child result or run-bound capability never authorizes a Swarm worker to
+start another worker or bypass its director's plan revision.
 
 Shared proof is recorded once for each boundary, then cited by both RFC ledgers.
 These CONTRACT criteria remain unchecked until a single integrated implementation
