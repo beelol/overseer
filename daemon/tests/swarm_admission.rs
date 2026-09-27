@@ -181,6 +181,55 @@ fn newer_allowance_observation_fences_stale_admission_snapshot() {
 }
 
 #[test]
+fn lowering_one_run_worker_ceiling_drains_without_discarding_active_attempts() {
+    let mut d=Daemon::start(&[]);
+    let run=setup(&d,"Run ceiling change",3);
+    commit_beneficial_batch(&d,&run,&["j0".into(),"j1".into(),"j2".into()]);
+    let at=now();
+    let first=admit(&d,&run,"j0","codex-a","run-limit-first",at,100000,100).unwrap();
+    let second=admit(&d,&run,"j1","codex-a","run-limit-second",at,100000,100).unwrap();
+    assert_eq!(first["status"],"admitted","{first}");
+    assert_eq!(second["status"],"admitted","{second}");
+    let change=json!({"run_id":run,"request_id":"lower-run-ceiling",
+        "expected_limit_revision":0,"max_workers":1});
+    let lowered=d.call("swarm.limit.set",change.clone());
+    assert_eq!(lowered["limit_revision"],1,"{lowered}");
+    assert_eq!(lowered["max_workers"],1);
+    assert_eq!(d.call("swarm.limit.set",change.clone())["duplicate"],true);
+    let mut reused=change;
+    reused["max_workers"]=json!(2);
+    assert!(d.try_call("swarm.limit.set",reused).unwrap_err().contains("reused"));
+    assert!(d.try_call("swarm.limit.set",json!({"run_id":run,
+        "request_id":"stale-run-ceiling","expected_limit_revision":0,
+        "max_workers":3})).unwrap_err().contains("stale limit revision"));
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.limit.set",json!({"run_id":run,
+        "request_id":"lower-run-ceiling","expected_limit_revision":0,
+        "max_workers":1}))["duplicate"],true);
+    let current=d.call("swarm.get",json!({"id":run}));
+    assert_eq!(current["limit_revision"],1);
+    assert_eq!(current["policy"]["effective"]["max_workers"],1);
+    assert_eq!(current["policy"]["sources"]["max_workers"],"run_update");
+    let held=admit(&d,&run,"j2","codex-a","run-limit-held",at,100000,100).unwrap();
+    assert_eq!(held["reason"],"worker_limit","{held}");
+    for (job,attempt) in [("j0",&first),("j1",&second)] {
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":job,"attempt_id":attempt["attempt_id"]}));
+        if job=="j0" {
+            assert_eq!(admit(&d,&run,"j2","codex-a","run-limit-still-held",at,100000,100)
+                .unwrap()["reason"],"worker_limit");
+        }
+    }
+    let resumed=admit(&d,&run,"j2","codex-a","run-limit-resumed",at,100000,100).unwrap();
+    assert_eq!(resumed["status"],"admitted","{resumed}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let events:i64=db.query_row("SELECT COUNT(*) FROM swarm_limit_events WHERE run_id=?1",
+        [&run],|r|r.get(0)).unwrap();
+    assert_eq!(events,1);
+}
+
+#[test]
 fn ordinary_run_occupies_global_slot_until_confirmed_exit() {
     let d = Daemon::start(&[]);
     d.call("agents.limit.set",json!({"max_active":2}));

@@ -1312,3 +1312,106 @@ fn atlas_s5_run_deadline_expires_while_all_targets_are_blocked() {
         "summary":"Audit complete","verification":"Atlas attachment probe",
         "checks":[]})).is_err());
 }
+
+// S5: lowering a run's worker ceiling below its current activity drains the
+// existing supervised workers and holds a third without losing their evidence.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_lower_worker_ceiling_drains_existing_backend_probes() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d=Daemon::start(&[]);
+    let temp=tmp();
+    let checkout=repo(&temp.path().join("atlas-lower-ceiling"));
+    let j2_script=repo_root().join("fixtures/swarm/atlas-v1/swarm-j2-worker.mjs");
+    let j4_script=repo_root().join("fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs");
+    let database_url_file=temp.path().join("disposable-database-url");
+    let release_j2=temp.path().join("release-j2");
+    let probe_j4=temp.path().join("j4-probe-active");
+    std::fs::write(&database_url_file,std::env::var("ATLAS_DATABASE_URL").unwrap()).unwrap();
+    let created=d.call("swarm.create",json!({"category":"Atlas lower-ceiling fault",
+        "objective":"Audit tasks, attachments and tokens","allowed_targets":["fixture"],
+        "policy":{"max_workers":3}}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j2","title":"Tasks","acceptance":"foreign task mutation",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j2","mode":"write"}]},
+        {"id":"j4","title":"Attachments","acceptance":"foreign object retrieval",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j4","mode":"write"}]},
+        {"id":"j6","title":"Tokens","acceptance":"revoked token response",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j6","mode":"write"}]}
+    ]}));
+    commit_wave(&d,run,1,&["j2","j4","j6"]);
+    let at=now();
+    let snapshot=json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"fixture","account_id":"account","pool_ids":["pool"],
+            "capabilities":["audit"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+120000}]}]});
+    let a2=admit(&d,run,1,"j2","fixture",&snapshot,at);
+    let a4=admit(&d,run,1,"j4","fixture",&snapshot,at);
+    assert_eq!(a2["status"],"admitted","{a2}");
+    assert_eq!(a4["status"],"admitted","{a4}");
+    let j2=d.call("swarm.worker.launch",json!({"run_id":run,"job_id":"j2",
+        "attempt_id":a2["attempt_id"],"token":a2["token"],
+        "repo":checkout,"program":"/usr/bin/env",
+        "args":["node",j2_script,database_url_file,release_j2],
+        "prompt":"Audit Atlas task mutation","title":"Atlas J2 ceiling drain"}));
+    let j4=d.call("swarm.worker.launch",json!({"run_id":run,"job_id":"j4",
+        "attempt_id":a4["attempt_id"],"token":a4["token"],
+        "repo":checkout,"program":"/usr/bin/env",
+        "args":["node",j4_script,database_url_file,probe_j4],
+        "prompt":"Audit Atlas attachments","title":"Atlas J4 ceiling drain"}));
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(8);
+    loop {
+        let result_count:i64=db.query_row("SELECT COUNT(*) FROM swarm_messages
+            WHERE run_id=?1 AND job_id='j2' AND kind='result'",[run],|r|r.get(0)).unwrap();
+        if result_count==1 && probe_j4.exists() { break; }
+        assert!(std::time::Instant::now()<until,"two Atlas backend probes did not become active");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let probe:Value=serde_json::from_slice(&std::fs::read(&probe_j4).unwrap()).unwrap();
+    assert_eq!(probe["attachmentStatus"],200);
+    let active:i64=db.query_row("SELECT COUNT(*) FROM swarm_worker_launches l
+        JOIN runs r ON r.id=l.overseer_run_id
+        WHERE l.run_id=?1 AND r.status IN ('starting','running','waiting_for_user')",
+        [run],|r|r.get(0)).unwrap();
+    assert_eq!(active,2);
+    let lowered=d.call("swarm.limit.set",json!({"run_id":run,
+        "request_id":"atlas-lower-to-one","expected_limit_revision":0,"max_workers":1}));
+    assert_eq!(lowered["limit_revision"],1);
+    assert_eq!(lowered["previous_max_workers"],3);
+    assert_eq!(admit(&d,run,1,"j6","fixture",&snapshot,now())["reason"],"worker_limit");
+    let worker_ids=[j2["overseer_run_id"].as_str().unwrap(),j4["overseer_run_id"].as_str().unwrap()];
+    for worker in worker_ids {
+        let run_dir:String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[worker],|r|r.get(0)).unwrap();
+        assert!(!std::path::Path::new(&run_dir).join("interrupt.requested").exists());
+    }
+    std::fs::write(&release_j2,"continue").unwrap();
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(8);
+    loop {
+        let finished:i64=db.query_row("SELECT COUNT(*) FROM swarm_attempts
+            WHERE id=?1 AND status='finished'",[a2["attempt_id"].as_str().unwrap()],|r|r.get(0)).unwrap();
+        if finished==1 { break; }
+        assert!(std::time::Instant::now()<until,"J2 did not drain after its release");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert_eq!(admit(&d,run,1,"j6","fixture",&snapshot,now())["reason"],"worker_limit");
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(18);
+    loop {
+        let finished:i64=db.query_row("SELECT COUNT(*) FROM swarm_attempts
+            WHERE id=?1 AND status='finished'",[a4["attempt_id"].as_str().unwrap()],|r|r.get(0)).unwrap();
+        if finished==1 { break; }
+        assert!(std::time::Instant::now()<until,"J4 did not finish its held backend probe");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let resumed=admit(&d,run,1,"j6","fixture",&snapshot,now());
+    assert_eq!(resumed["status"],"admitted","{resumed}");
+    let counts:(i64,i64,i64)=db.query_row("SELECT
+        (SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1 AND job_id='j2'),
+        (SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1 AND job_id='j4'),
+        (SELECT COUNT(*) FROM swarm_admissions WHERE run_id=?1 AND job_id='j6')",
+        [run],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+    assert_eq!(counts,(1,1,1));
+}

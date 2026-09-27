@@ -19,6 +19,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           failed_planning_turns INTEGER NOT NULL DEFAULT 0,
           generation INTEGER NOT NULL,
           revision INTEGER NOT NULL,
+          limit_revision INTEGER NOT NULL DEFAULT 0,
           allowed_targets TEXT NOT NULL,
           policy TEXT NOT NULL,
           created_ms INTEGER NOT NULL,
@@ -28,6 +29,17 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         CREATE UNIQUE INDEX swarm_active_category
           ON swarm_runs(category_key)
           WHERE status IN ('planning','running','paused','stalled','draining','stopping');
+        CREATE TABLE IF NOT EXISTS swarm_limit_events(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          request_id TEXT NOT NULL,
+          expected_revision INTEGER NOT NULL,
+          limit_revision INTEGER NOT NULL,
+          old_max_workers INTEGER NOT NULL,
+          new_max_workers INTEGER NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,request_id),
+          UNIQUE(run_id,limit_revision)
+        );
         CREATE TABLE IF NOT EXISTS swarm_availability(
           run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
           state TEXT NOT NULL CHECK(state IN ('eligible','blocked')),
@@ -461,6 +473,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     if !has_stall_reason {
         conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN stall_reason TEXT;")?;
     }
+    let has_limit_revision = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='limit_revision'")?
+        .exists([])?;
+    if !has_limit_revision {
+        conn.execute_batch(
+            "ALTER TABLE swarm_runs ADD COLUMN limit_revision INTEGER NOT NULL DEFAULT 0;",
+        )?;
+    }
     let has_no_progress_turns = conn
         .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='no_progress_turns'")?
         .exists([])?;
@@ -619,6 +639,11 @@ mod tests {
             [], |row| row.get(0),
         ).unwrap();
         assert_eq!(permission, "none");
+        let limit_revision: i64 = conn.query_row(
+            "SELECT limit_revision FROM swarm_runs WHERE id='old-run'",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(limit_revision, 0);
         migrate(&conn).unwrap();
     }
 

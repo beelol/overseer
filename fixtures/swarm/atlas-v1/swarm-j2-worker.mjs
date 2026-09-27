@@ -1,7 +1,8 @@
 // Fixture-only worker: run the versioned J2 database probe and report its evidence.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const required = (name) => {
   const value = process.env[name];
@@ -16,6 +17,7 @@ const revision = Number(required('OVERSEER_SWARM_REVISION'));
 const binary = required('OVERSEER_BIN');
 if (jobId !== 'j2' || !Number.isInteger(revision)) throw new Error('unexpected assignment');
 const databaseUrlFile = process.argv[2];
+const releaseFile = process.argv[3];
 if (!databaseUrlFile) throw new Error('missing disposable database URL file');
 
 const probe = JSON.parse(execFileSync(process.execPath,
@@ -46,3 +48,8 @@ call('swarm.report', {
   message_id: `atlas-s5-result-${attemptId}`, type: 'result', revision,
   payload: { audit_outcome: 'confirmed_defect', artifact_ids: [artifact] },
 });
+// Opt-in S5 ceiling fault: keep this worker alive after durable evidence so
+// lowering the ceiling can be observed against two real supervised processes.
+if (releaseFile) {
+  while (!existsSync(releaseFile)) await delay(100);
+}

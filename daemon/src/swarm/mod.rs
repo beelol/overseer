@@ -12,6 +12,7 @@ mod owner;
 mod dispatch;
 mod effects;
 mod integration;
+mod limits;
 mod verification;
 mod plan;
 mod policy;
@@ -39,6 +40,7 @@ pub use dispatch::next as dispatch_next;
 pub use dispatch::recover_pending as recover_pending_dispatches;
 pub use effects::{begin as begin_effect, reconcile as reconcile_effect};
 pub use integration::integrate;
+pub use limits::set as set_run_limit;
 pub use verification::{prepare as prepare_verification, run as run_verification,
     record as record_verification, reconcile_control_verifications, PreparedVerification};
 pub use policy::preview;
@@ -192,6 +194,7 @@ fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
         "failed_planning_turns": row.get::<_, i64>("failed_planning_turns")?,
         "generation": row.get::<_, i64>("generation")?,
         "revision": row.get::<_, i64>("revision")?,
+        "limit_revision": row.get::<_, i64>("limit_revision")?,
         "allowed_targets": serde_json::from_str::<Value>(&targets).unwrap_or(Value::Null),
         "needs_account_selection": serde_json::from_str::<Value>(&targets).ok().and_then(|v|v.as_array().map(|a|a.is_empty())).unwrap_or(true),
         "policy": serde_json::from_str::<Value>(&policy).unwrap_or(Value::Null),
