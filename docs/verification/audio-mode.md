@@ -1,10 +1,10 @@
-# Audio Mode verification (pull request #5)
+# Audio Mode verification
 
-Criteria: AC-143 and AC-144, Gate O in [the RFC](../overseer-rfc.md); their ledger records are
-on main. AC-145 is the owner's confirmation by ear. The terminal UI (T-23, T-24) is pull
-request #6, with its evidence in [evidence/tui](evidence/tui/README.md). Design:
-[side RFC](../rfcs/audio-mode.md). Tested implementation commit: `106d3e8`; later commits on
-the branch change documents and evidence only. Date: 2026-09-26, macOS 26.6.2 arm64.
+Criteria: AC-143, AC-144 and AC-145, Gate O in [the RFC](../overseer-rfc.md), all verified.
+The terminal UI (T-23, T-24) has its evidence in [evidence/tui](evidence/tui/README.md).
+Design: [side RFC](../rfcs/audio-mode.md). Tested implementation commit: `106d3e8` (pull
+request #5, merged into main as `e0db692`; the terminal UI came with pull request #6, merged
+as `ea6a6c2`). Date: 2026-09-26 and 27, macOS 26.6.2 arm64.
 
 ## Commands and results
 
@@ -89,14 +89,18 @@ The seven checks the owner's cue ledger asks of this pull request:
 | An unknown or missing sound pack fails quietly | blocked cache test, missing Commander folder live |
 | Only original signal assets and synthetic fixtures are in the pull request | pack check: 12 tracked audio files, all in the pack |
 
+## By ear (AC-145)
+
+The owner listened on 2026-09-27 UTC: all twelve Reactor cues are marked *Right*, and the
+owner heard the core cues with VS Code open and closed, one cue for two agents at the same
+moment, System voice, the Commander recordings played where they are, silence with Audio Mode
+off, and the way back to Reactor and System voice. The records, with the players the daemon
+started in each step, are in [evidence/ui/audio-listening](evidence/ui/audio-listening/README.md).
+
 ## Not covered
 
 - No platform other than macOS was run.
-- The owner's Commander recordings were not read; the live check used three generated beeps
-  in a temporary private folder.
-- Nobody listened. The checks prove which files are played, not how they sound. That is
-  AC-145: `node test/ui/listen-audio.js` opens VS Code with its own profile and its own
-  Overseer home, plays real sound for the keys typed in its terminal, asks the owner for a
-  mark per cue and writes the record.
-- Pull requests #2 (Auto Mode) and #3 (Swarm) were not rechecked against this branch.
-  Pull request #6 (terminal UI) is built on this branch and tested together with it.
+- The automated Commander checks use three generated beeps in a temporary private folder. The
+  owner's recordings were played only in the listening session, from a private copy the owner
+  made of them.
+- Pull requests #2 (Auto Mode) and #3 (Swarm) were not rechecked against Audio Mode.

@@ -25,7 +25,7 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 - Say whether the Gate J design review still needs marks or the Gate K review replaces it [AC-66].
 - Work an hour using only Overseer [AC-64].
 - Answer the nine questions at the end of the [Voice Mode RFC](docs/rfcs/voice-mode.md#open-questions-for-the-owner); its defaults stand until then [Gate R, AC-162 to AC-177].
-- Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed sessions of Continuity, the phone app and Audio Mode when their agents finish [AC-97, AC-133, AC-145].
+- Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed sessions of Continuity and the phone app when their agents finish [AC-97, AC-133].
 
 ## Acceptance criteria
 

@@ -1193,11 +1193,10 @@ rec(142, "One Overseer mark everywhere", "partial", date="2026-09-27", commit="a
     actual="The owner's files are in docs/design/brand/ (app icon, colour logo, flat silhouette). On branch claude/brand-mark: a single-colour SVG fitted to the flat silhouette, exported sizes, the Marketplace icon, the activity bar and status bar mark (a one-glyph icon font), the colour logo on Overseer's tabs, the composer heading and the Overseer chat, and the Mac notification helper's icon; scenario-brand passes 9 of 9 on the packaged VSIX (sizes, VSIX icon, helper icon, no old eye mark left, the activity bar in four themes, the status bar glyph, the tab icon, the composer mark under the CSP).",
     live="—", blocker="Waits for the owner to approve the single-colour silhouette (it reads at 20 to 24 px; at 16 px the centre hole nearly closes, as in the flat PNG) and the Mac helper icon, then merges after the Gate M pull request. The phone app and a menu-bar or Android monochrome icon take their files from docs/design/brand/ when those surfaces are built.")
 
-# Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code are built in pull
-# request #5 and the terminal UI (T-23, T-24) in pull request #6. Neither is merged yet, so the evidence links point at
-# the commits on their branches.
+# Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code came with pull
+# request #5 (merged as e0db692) and the terminal UI (T-23, T-24) with pull request #6 (merged as ea6a6c2).
 rec(143, "Opt-in audio cues owned by the daemon", "verified", date="2026-09-26",
-    commit="106d3e8 (branch codex/reactor-audio-mode, pull request #5, not merged yet)",
+    commit="106d3e8 (pull request #5, merged into main as e0db692 on 2026-09-27)",
     harness="Fixture harnesses only (Claude fixture, Codex app-server fixture, generic programs); no paid tokens. Live playback through macOS `afplay` and `say`",
     fixture="Real Git repositories created per test; isolated OVERSEER_HOME; isolated VS Code profile for the UI scenario. The owner-approved pack was read through a copy the owner made of it, because the agent's tools cannot read the folder the voice lab is in",
     steps="""1. `CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline -- --test-threads=1` (unit tests in `daemon/src/audio.rs`, protocol tests in `daemon/tests/audio.rs` and `daemon/tests/protocol.rs`).
@@ -1219,12 +1218,12 @@ rec(143, "Opt-in audio cues owned by the daemon", "verified", date="2026-09-26",
 - **Failing quietly:** with the cache blocked, or the Commander folder removed, the agent completes and the failure is in the daemon log; an unknown cue key is refused.
 - **Other platforms:** with the players taken away by a test switch the daemon reports `available: false`, refuses to turn on, to preview and to list voices, and an agent completes in silence even when the setting was already on.
 - **VS Code:** the Agents title bar is unchanged from main (New Agent, Search Agents, Toggle Agent Grid, VS Code's Collapse All); *Audio Mode and Reactor Cues…* is in the overflow menu; turning on, choosing a track and a preview go through the daemon. 10 of 10 checks.
-- **Merge:** the virtual merge of the branch into main is clean.""",
-    evidence="[requirement by requirement](https://github.com/beelol/overseer/blob/0d01397/docs/verification/audio-mode.md), [daemon tests](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/cargo-test-overseerd.txt), [extension and whitespace checks](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/extension-check.txt), [pack check](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/pack-check.txt), [live playback](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/live-playback.txt), [VS Code scenario](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/ui/audio/result.json)",
+- **Merge:** merged into main as e0db692; main's daemon, extension and fixtures are the tested code.""",
+    evidence="[requirement by requirement](audio-mode.md), [daemon tests](evidence/audio-mode/cargo-test-overseerd.txt), [extension and whitespace checks](evidence/audio-mode/extension-check.txt), [pack check](evidence/audio-mode/pack-check.txt), [live playback](evidence/audio-mode/live-playback.txt), [VS Code scenario](evidence/ui/audio/result.json)",
     live="Live macOS playback (`afplay`, `say`) and the packaged VSIX in VS Code; agents are fixtures.",
-    limits="Not merged: the feature is on the branch of pull request #5. macOS only; no other platform was run (the unavailable path is exercised on macOS through a test switch; Linux belongs to AC-41). The Commander check used three generated beeps in a temporary private folder; the owner's recordings were not read. The pack was compared with the owner's copy of the approved folder. Nobody listened: that is AC-145.")
+    limits="macOS only; no other platform was run (the unavailable path is exercised on macOS through a test switch; Linux belongs to AC-41). The Commander check used three generated beeps in a temporary private folder; the owner's recordings were not read. The pack was compared with the owner's copy of the approved folder. Nobody listened: that is AC-145.")
 rec(144, "A lost session asks for attention", "verified", date="2026-09-26",
-    commit="106d3e8 (branch codex/reactor-audio-mode, pull request #5, not merged yet)",
+    commit="106d3e8 (pull request #5, merged into main as e0db692 on 2026-09-27)",
     harness="Generic fixture programs; no accounts, no paid tokens",
     fixture="Real Git repositories created per test; isolated OVERSEER_HOME; the daemon writes each cue it would play to a log",
     steps="""`CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline --test audio -- --test-threads=1`, three protocol tests:
@@ -1236,11 +1235,11 @@ rec(144, "A lost session asks for attention", "verified", date="2026-09-26",
 - **Stopped on request:** `interrupted`; the log holds the start cue only.
 - **Lost while the daemon was down:** after the restart the run reads `disconnected` with "lost" as its reason, Audio Mode is still on, and 800 ms later the log still holds the start cue only.
 - The daemon already behaved this way; nothing in it changed for this criterion.""",
-    evidence="[daemon tests](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/cargo-test-overseerd.txt), [requirement by requirement](https://github.com/beelol/overseer/blob/0d01397/docs/verification/audio-mode.md)",
+    evidence="[daemon tests](evidence/audio-mode/cargo-test-overseerd.txt), [requirement by requirement](audio-mode.md)",
     live="Fixtures with a real daemon.",
-    limits="Not merged: the tests are on the branch of pull request #5. A lost child agent staying silent is covered by AC-143's nested-child test, not by a test of its own here.")
+    limits="A lost child agent staying silent is covered by AC-143's nested-child test, not by a test of its own here.")
 rec(145, "Audio Mode by ear (owner-confirmed)", "verified", date="2026-09-27 UTC (the owner's sessions and confirmations)",
-    commit="106d3e8 (branch codex/reactor-audio-mode, pull request #5, not merged yet)",
+    commit="106d3e8 (pull request #5, merged into main as e0db692 on 2026-09-27)",
     harness="Fixture agents only (generic programs and the Claude fixture); no accounts, no paid tokens",
     fixture="`node test/ui/listen-audio.js` on the branch of pull request #5: VS Code with its own profile and its own Overseer home, so the owner's VS Code, daemon and agents are not touched. The build is the VSIX packaged from 106d3e8",
     steps="""1. The owner's own session: `node test/ui/listen-audio.js`, with the keys typed in its terminal. `o` on; `s` an agent that completes; `n` an agent that asks for permission; `f` off, then `s` and `n` again; `m` plays each of the twelve cues and asks for its mark.
@@ -1255,9 +1254,9 @@ rec(145, "Audio Mode by ear (owner-confirmed)", "verified", date="2026-09-27 UTC
 - **Off, then back to Reactor and System voice:** with Audio Mode off the daemon started no player; then `afplay` four times for Reactor and `say -v Daniel` four times for System voice. The owner: "that worked".
 - **The owner's Commander recordings:** the daemon ran `afplay` on `<commander folder>/<key>/transmission/commander.wav` four times (start, complete, start, attention), then nothing while off, then Reactor and System voice again. The owner: "worked".
 - **Nothing copied by Overseer:** after the session the recordings were unchanged, no WAV was under the session's daemon folder and none was in the repository; the record holds a flag that a folder was set, never its path.""",
-    evidence="[the records and what each session did](https://github.com/beelol/overseer/blob/a6c05f7/docs/verification/evidence/ui/audio-listening/README.md), [the owner's marks](https://github.com/beelol/overseer/blob/a6c05f7/docs/verification/evidence/ui/audio-listening/marks.json), [the Commander session](https://github.com/beelol/overseer/blob/a6c05f7/docs/verification/evidence/ui/audio-listening/marks-20260927-055821.json), [the session script](https://github.com/beelol/overseer/blob/a6c05f7/test/ui/listen-audio.js)",
+    evidence="[the records and what each session did](evidence/ui/audio-listening/README.md), [the owner's marks](evidence/ui/audio-listening/marks.json), [the Commander session](evidence/ui/audio-listening/marks-20260927-055821.json), [the session script](../../test/ui/listen-audio.js)",
     live="Real sound on the owner's Mac; agents are fixtures.",
-    limits="The owner's confirmations of the played steps were given in conversation, not written by the script; the record of the owner's own session says yes to steps that session did not do, and the evidence says which answers count. The Commander folder that was played is a copy the owner made of the three recordings, in a private folder in the home directory, because macOS does not let a process started by the agent open files in the folder the voice lab is in. Not merged: the feature is on the branch of pull request #5.")
+    limits="The owner's confirmations of the played steps were given in conversation, not written by the script; the record of the owner's own session says yes to steps that session did not do, and the evidence says which answers count. The Commander folder that was played is a copy the owner made of the three recordings, in a private folder in the home directory, because macOS does not let a process started by the agent open files in the folder the voice lab is in.")
 
 # Gate P, follow-through (added by the owner on 2026-09-27). Not started.
 rec(146, "Reconcile and merge the work in flight", "not started", date="—", commit="—",
