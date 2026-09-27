@@ -152,6 +152,8 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     if jobs.iter().any(|job| old.get(&job.id).is_some_and(|previous|
         previous.status == "superseded"
         || (previous.status == "cancel_requested" && previous.stop_reason.as_deref() == Some("scope_narrowed")))) {
+        drop(tx);
+        record_planning_failure(store, id)?;
         bail!("superseded job id cannot be reused in a later plan");
     }
     let mut omitted: Vec<String> = old.iter().filter_map(|(job, previous)| {

@@ -11,6 +11,41 @@ fn run_with_job(d: &Daemon, category: &str, job: &str) -> String {
 }
 
 #[test]
+fn two_semantically_invalid_repair_turns_stall_after_restart() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Repair loop",
+        "objective":"Audit","allowed_targets":["system-codex"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"keep","title":"Keep","acceptance":"evidence"},
+        {"id":"drop","title":"Drop","acceptance":"evidence"}
+    ]}));
+    d.call("swarm.revise", json!({"id":id,"generation":1,"expected_revision":1,
+        "reason":"Narrow scope","jobs":[
+            {"id":"keep","title":"Keep","acceptance":"evidence"}
+        ]}));
+    let invalid = json!({"id":id,"generation":1,"expected_revision":2,
+        "reason":"Reuse the retired logical job","jobs":[
+            {"id":"keep","title":"Keep","acceptance":"evidence"},
+            {"id":"drop","title":"Drop again","acceptance":"evidence"}
+        ]});
+    for failed in 1..=2 {
+        assert!(d.try_call("swarm.revise", invalid.clone()).unwrap_err()
+            .contains("superseded job id"));
+        let state = d.call("swarm.get", json!({"id":id}));
+        assert_eq!(state["revision"], 2);
+        assert_eq!(state["failed_planning_turns"], failed);
+        assert_eq!(state["status"], if failed == 1 { "planning" } else { "stalled" });
+        if failed == 1 {
+            d.kill9();
+            d.spawn();
+        }
+    }
+    assert_eq!(d.call("swarm.get", json!({"id":id}))["stall_reason"],
+        "planning_failed");
+}
+
+#[test]
 fn stop_does_not_retry_a_rejected_worker_when_it_exits() {
     let d = Daemon::start(&[]);
     let run = run_with_job(&d,"Stop rejected worker","inspect");
