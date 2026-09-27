@@ -161,8 +161,6 @@ class AgentsProvider {
     if (!node) {
       if (m.error) return [{ item: Object.assign(new vscode.TreeItem(`Daemon unavailable: ${m.error}`), { iconPath: new vscode.ThemeIcon('warning') }) }];
       const out = [];
-      // An active search shows as the first row: what was searched, how many match, and ✕ to clear.
-      if (this.filter) out.push(this.searchRow());
       const needs = this.filter || this.showArchived ? [] : (this.handlers.attention?.() || []);
       if (needs.length) out.push(this.needsSection(needs));
       const repos = [...new Set(this.visibleTasks().map(t => t.repo_root))];
@@ -182,18 +180,6 @@ class AgentsProvider {
     item.accessibilityInformation = { label: `Needs you, ${list.length}` };
     item.contextValue = 'section-needs';
     return { item, section: 'needs', list };
-  }
-  searchRow() {
-    const n = this.visibleTasks().length;
-    const item = new vscode.TreeItem(`“${this.filter.query}”`);
-    item.id = 'search';
-    item.iconPath = new vscode.ThemeIcon('search');
-    item.description = `${n} match${n === 1 ? '' : 'es'}`;
-    item.tooltip = 'Search results. Click to change the search; ✕ or Escape clears it.';
-    item.accessibilityInformation = { label: `Search for ${this.filter.query}, ${n} match${n === 1 ? '' : 'es'}` };
-    item.contextValue = 'search-query';
-    item.command = { command: 'overseer.searchAgents', title: 'Change Search' };
-    return { item, section: 'search' };
   }
   needsRow(a, parent) {
     const run = this.model.run(a.run_id); const task = run && this.model.task(run.task_id);

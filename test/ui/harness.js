@@ -180,6 +180,11 @@ class Session {
     await delay(settle);
   }
 
+  /** The side bar's search field (a webview view above the Agents list). */
+  searchFrame(ms = 15000) { return this.cdp.webview(`!!window.__overseerSearch`, ms); }
+  /** Waits until the search field has keyboard focus (after Search Agents or ⌥⌘F); returns its frame. */
+  async searchFocused(ms = 8000) { const f = await this.searchFrame(ms); await f.waitFor(`document.activeElement?.id === 'q'`, ms); return f; }
+
   /** Selects an agent by run id (its task's title) in the side bar. */
   async selectRun(runId, opts) {
     const st = this.ctl('state');

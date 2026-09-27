@@ -5,6 +5,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { DaemonClient, resolveBinary } = require('./daemon-client');
 const { Model, AgentsProvider, AccountsProvider, ACTIVE, accountName } = require('./views');
+const { SearchView } = require('./search-view');
 const { OutputPanels } = require('./output-panel');
 const { Review } = require('./review');
 const { CommandCenter } = require('./command-center');
@@ -33,6 +34,9 @@ async function activate(context) {
   const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned() });
   const accounts = new AccountsProvider(model, context.extensionUri);
   const agentsView = vscode.window.createTreeView('overseer.agents', { treeDataProvider: agents, showCollapseAll: true, dragAndDropController: agentDrag() });
+  // The search field above the Agents list (AC-112): typing filters the list through the daemon's search.
+  const searchView = new SearchView(context.extensionUri, { onQuery: q => runAgentSearch(q) });
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider('overseer.search', searchView, { webviewOptions: { retainContextWhenHidden: true } }));
   const accountsView = vscode.window.createTreeView('overseer.accounts', { treeDataProvider: accounts });
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(agents.decorations));
   const outputs = new OutputPanels(context, client, model);
@@ -200,34 +204,26 @@ async function activate(context) {
     // The match count sits beside the view title (not the debounced tree message).
     // Matches in the list shown (active agents, or archived ones under Show Archived).
     const shown = filter ? [...filter.taskIds].filter(id => { const t = model.task(id); return t && !!t.archived_ms === !!agents.showArchived; }).length : 0;
-    agentsView.description = filter ? `${shown} match${shown === 1 ? '' : 'es'} for “${filter.query}”` : undefined;
+    agentsView.description = undefined;
+    searchView.setCount(filter ? `${shown} match${shown === 1 ? '' : 'es'}` : '');
     vscode.commands.executeCommand('setContext', 'overseer.agentsFiltered', !!filter);
     // Keep the selected agent in view (and selected) when the list changes shape.
     if (selectedRun && (!filter || filter.taskIds.has(model.run(selectedRun)?.task_id))) setTimeout(() => revealInTree(selectedRun), 150);
   }
 
   /** Search agents by title, prompt, message text, file, repository, account or status (daemon search). */
-  async function searchAgents() {
-    const input = vscode.window.createInputBox();
-    input.title = 'Search agents';
-    input.placeholder = 'Title, message, file, repository, account or status';
-    input.value = agents.filter?.query || '';
-    let seq = 0, accepted = false, timer;
-    const run = async q => {
-      const mine = ++seq;
-      if (!q) { setAgentFilter(undefined); return; }
-      const lower = q.toLowerCase();
-      // One tree update with titles and the daemon's matches (messages, files, repository, account, status).
-      const local = (model.state.tasks || []).filter(t => (t.title || '').toLowerCase().includes(lower)).map(t => t.id);
-      const ids = await search(q);
-      if (mine === seq) setAgentFilter({ query: q, taskIds: new Set([...local, ...ids]) });
-    };
-    // Typing again right after clearing supersedes the clear, so the list updates once.
-    input.onDidChangeValue(q => { clearTimeout(timer); timer = setTimeout(() => run(q.trim()), q.trim() ? 25 : 200); });
-    input.onDidAccept(() => { accepted = true; input.hide(); });
-    input.onDidHide(() => { clearTimeout(timer); if (!accepted) setAgentFilter(undefined); input.dispose(); });
-    input.show();
+  let searchSeq = 0;
+  /** Filters the Agents list: titles at once plus the daemon's matches (messages, files, repository, account, status). */
+  async function runAgentSearch(q) {
+    const mine = ++searchSeq;
+    if (!q) { setAgentFilter(undefined); return; }
+    const lower = q.toLowerCase();
+    const local = (model.state.tasks || []).filter(t => (t.title || '').toLowerCase().includes(lower)).map(t => t.id);
+    const ids = await search(q);
+    if (mine === searchSeq) setAgentFilter({ query: q, taskIds: new Set([...local, ...ids]) });
   }
+  /** Search Agents (⌥⌘F, command palette): puts the cursor in the side bar's search field. */
+  async function searchAgents() { await searchView.focus(); }
 
   /** Read-only, empty files: the custom editor shows the chat instead of their content. */
   function chatFileSystem() {
@@ -612,7 +608,7 @@ async function activate(context) {
       await arrangement.enterGrid(); center.setMode('grid');
     })),
     vscode.commands.registerCommand('overseer.searchAgents', guard(searchAgents)),
-    vscode.commands.registerCommand('overseer.clearAgentSearch', guard(async () => setAgentFilter(undefined))),
+    vscode.commands.registerCommand('overseer.clearAgentSearch', guard(async () => { searchSeq++; setAgentFilter(undefined); searchView.clear(); })),
     vscode.commands.registerCommand('overseer.showArchived', guard(async () => { agents.showArchived = true; setAgentFilter(undefined); vscode.commands.executeCommand('setContext', 'overseer.showArchived', true); })),
     vscode.commands.registerCommand('overseer.hideArchived', guard(async () => { agents.showArchived = false; agents.refresh(); vscode.commands.executeCommand('setContext', 'overseer.showArchived', false); })),
     // Delete on an archived row (Show Archived) restores it, as it did in the Gate J rail.

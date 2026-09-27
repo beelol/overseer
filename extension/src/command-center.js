@@ -25,6 +25,9 @@ class CommandCenter {
 
   /** Opens (or moves) the view into an editor column; the arrangement decides which (Gate K). */
   async open({ column = vscode.ViewColumn.One, preserveFocus = false, reveal = true } = {}) {
+    // VS Code restores a webview tab lazily: until the tab is shown there is no panel yet. Show the
+    // restored tab (it then comes back through deserializeWebviewPanel) rather than open a copy.
+    if (!this.panel) await this.showRestoredTab();
     if (this.panel) {
       if (reveal && (this.panel.viewColumn !== column || !this.panel.visible)) this.panel.reveal(column, preserveFocus);
       return this.panel;
@@ -187,7 +190,23 @@ class CommandCenter {
   focus(target) { this.panel?.webview.postMessage({ type: 'focus', target }); }
 
   async deserializeWebviewPanel(panel) {
+    // One Overseer view per window: a second restored copy (from an earlier session) is closed.
+    if (this.panel && this.panel !== panel) { panel.dispose(); return; }
     this.attach(panel);
+  }
+
+  /** Brings a restored-but-not-yet-shown Overseer tab forward and waits for VS Code to hand it over. */
+  async showRestoredTab() {
+    for (const group of vscode.window.tabGroups.all) {
+      const index = group.tabs.findIndex(t => t.input?.viewType?.endsWith('overseer.center'));
+      if (index < 0) continue;
+      const focus = ['workbench.action.focusFirstEditorGroup', 'workbench.action.focusSecondEditorGroup', 'workbench.action.focusThirdEditorGroup'][group.viewColumn - 1];
+      if (!focus) return;
+      await vscode.commands.executeCommand(focus);
+      await vscode.commands.executeCommand('workbench.action.openEditorAtIndex', index);
+      for (let i = 0; i < 40 && !this.panel; i++) await new Promise(r => setTimeout(r, 50));
+      return;
+    }
   }
 }
 

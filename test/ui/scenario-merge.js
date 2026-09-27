@@ -23,15 +23,10 @@ const MODEL = process.env.CODEX_MODEL || 'gpt-5.6-luna';
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     const runState = id => s.ctl('state').runs.find(r => r.id === id);
     const waitDone = async (id, secs = 300) => { for (let i = 0; i < secs * 2 && ACTIVE.includes(runState(id).status); i++) await delay(500); return runState(id); };
-    const codex = (title, prompt) => s.ctl('task.create', { repo, harness: 'codex', profile_id: 'system-codex', model: MODEL, title, prompt });
-    const selectRun = async title => {
-      await s.openOverseerView();
-      const pt = await cdp.waitFor(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-        const i = rows.findIndex(r => r.textContent.includes(${JSON.stringify(title)})); const r = rows[i + 1]; if (!r || !/codex|generic/.test(r.textContent)) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 30000, 'run row ' + title);
-      await cdp.click(pt.x, pt.y);
-      await delay(1500);
-    };
-    const panel = runId => cdp.webview(`document.body.dataset.runId === ${JSON.stringify(runId)} && !!document.getElementById('more')`, 30000);
+    const codex = (title, prompt) => s.ctl('task.create', { repo, harness: 'codex', profile_id: 'system-codex', model: MODEL, effort: 'low', title, prompt });
+    // Gate K: agents are selected in the Overseer side bar; the chat is in the editor area.
+    const selectRun = title => s.selectAgent(title, { settle: 1500 });
+    const panel = runId => cdp.webview(`(document.body.dataset.runId === ${JSON.stringify(runId)} || window.__overseer?.selected?.() === ${JSON.stringify(runId)}) && !!document.getElementById('more')`, 30000);
     // Merge back lives in the chat's … menu.
     const openMenu = async p => { if (!(await p.eval(`!!document.getElementById('merge')`))) { const m = await s.webviewPoint(p, '#more'); await cdp.click(m.x, m.y); await delay(300); } };
     const clickMerge = async runId => {

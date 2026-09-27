@@ -30,8 +30,9 @@
     },
     "views": {
       "overseer": [
-        { "id": "overseer.agents", "name": "Agents" },
-        { "id": "overseer.accounts", "name": "Accounts" }
+        { "type": "webview", "id": "overseer.search", "name": "Search", "initialSize": 1 },
+        { "id": "overseer.agents", "name": "Agents", "initialSize": 14 },
+        { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 }
       ]
     },
     "viewsWelcome": [
@@ -118,7 +119,6 @@
         { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" }
       ],
       "view/item/context": [
-        { "command": "overseer.clearAgentSearch", "when": "view == overseer.agents && viewItem == search-query", "group": "inline@1" },
         { "command": "overseer.interrupt", "when": "view == overseer.agents && viewItem =~ /^agent-active/", "group": "inline@1" },
         { "command": "overseer.archiveAgent", "when": "view == overseer.agents && viewItem =~ /^agent-done(?!-archived)/", "group": "inline@2" },
         { "command": "overseer.restoreAgent", "when": "view == overseer.agents && viewItem =~ /^agent-done-archived/", "group": "inline@2" },

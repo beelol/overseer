@@ -90,36 +90,41 @@ const { auditExpression } = require('./audit');
     for (const t of ['Alpha refactor', 'Beta docs', 'Gamma tests']) s.ctl('task.create', { repo, harness: 'generic', program: '/bin/echo', args: [`${t} done`], prompt: '', title: t });
     await delay(2000);
     const agentsList = () => cdp.evalWorkbench(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || '')); return [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).map(r => ({ label: r.querySelector('.label-name')?.textContent.trim(), description: r.querySelector('.label-description')?.textContent.trim() || '', icon: (r.querySelector('.custom-view-tree-node-item-icon')?.className.match(/codicon-([a-z-]+)/) || [])[1] || '' })); })()`);
-    // From the editor: click into the composer, then ⌥⌘F.
+    const agentLabels = async () => (await agentsList()).filter(r => r.label && !/^“/.test(r.label)).map(r => r.label);
+    // The field: where it sits, what it looks like.
+    const field = async () => (await s.searchFrame()).eval(`(() => { const i = document.getElementById('q'), box = document.querySelector('.search-field').getBoundingClientRect();
+      return { value: i.value, focused: document.activeElement === i, count: document.getElementById('count').textContent, clearShown: !document.getElementById('clear').hidden,
+        input: i.tagName === 'INPUT' && i.type === 'text', placeholder: i.placeholder, border: getComputedStyle(document.querySelector('.search-field')).borderTopWidth, height: Math.round(box.height) }; })()`);
+    const above = await cdp.evalWorkbench(`(() => { const heads = [...document.querySelectorAll('.part.sidebar .pane-header')].filter(h => h.offsetParent).map(h => h.textContent.trim()); return heads; })()`);
+    // From the editor: click into the composer, then ⌥⌘F puts the cursor in the field.
     { const at = await s.webviewPoint(dash, '#task'); await cdp.click(at.x, at.y); await delay(300); }
-    await cdp.key('f', { meta: true, alt: true }); await delay(500);
-    const openedFromEditor = await cdp.waitQuickTitle('Search agents').then(() => true, () => false);
+    await cdp.key('f', { meta: true, alt: true });
+    const openedFromEditor = await s.searchFocused().then(() => true, () => false);
     await cdp.call('Input.insertText', { text: 'beta' }, cdp.workbench);
-    const t0 = Date.now(); let rows = [];
-    for (let i = 0; i < 200; i++) { rows = await agentsList(); if (rows[0]?.label === '“beta”') break; await delay(5); }
+    const t0 = Date.now(); let shown = [];
+    for (let i = 0; i < 200; i++) { shown = await agentLabels(); if (shown.includes('Beta docs') && !shown.includes('Alpha refactor')) break; await delay(5); }
     const ms = Date.now() - t0;
-    await cdp.key('Enter'); await delay(400);
-    rows = await agentsList();
-    await s.screenshot('search-row');
-    check('⌥⌘F from the editor starts a search; the query is the first row of the Agents list with its match count, within 200 ms',
-      openedFromEditor && rows[0]?.label === '“beta”' && /^1 match$/.test(rows[0]?.description) && rows[0]?.icon === 'search' && rows.some(r => r.label === 'Beta docs') && !rows.some(r => r.label === 'Alpha refactor') && ms < 200, { openedFromEditor, first: rows[0], ms, labels: rows.map(r => r.label) });
-    // Escape in the Agents view clears it.
-    await cdp.command('Focus on Agents View'); await delay(400);
+    await delay(300);
+    const typed = await field();
+    await s.screenshot('search-field');
+    check('the side bar has a search field above the Agents list; ⌥⌘F from the editor puts the cursor in it; typing filters the list within 200 ms and the field says how many match',
+      openedFromEditor && typed.input && typed.placeholder === 'Search agents' && parseFloat(typed.border) >= 1 && typed.height <= 32 && typed.value === 'beta' && typed.count === '1 match' && typed.clearShown &&
+      shown.includes('Beta docs') && !shown.includes('Alpha refactor') && ms < 200 && /Search/i.test(above[0] || '') && /Agents/.test(above[1] || ''), { openedFromEditor, typed, ms, shown, panes: above });
+    // Escape in the field clears it.
     await cdp.key('Escape'); await delay(800);
-    rows = await agentsList();
-    const clearedByKey = rows[0]?.label !== '“beta”' && rows.some(r => r.label === 'Alpha refactor');
-    // From the side bar: ⌥⌘F, search, then clear by mouse with the row's ✕.
+    const afterEsc = await field(); shown = await agentLabels();
+    const clearedByKey = afterEsc.value === '' && shown.includes('Alpha refactor') && shown.includes('Beta docs');
+    // From the side bar: ⌥⌘F, type, then clear with the field's ✕.
     await cdp.command('Focus on Agents View'); await delay(400);
-    await cdp.key('f', { meta: true, alt: true }); await delay(500);
-    const openedFromSide = await cdp.waitQuickTitle('Search agents').then(() => true, () => false);
-    await cdp.call('Input.insertText', { text: 'gamma' }, cdp.workbench); await delay(600); await cdp.key('Enter'); await delay(500);
-    const pt = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === '“gamma”'); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 5000, 'search row');
-    await cdp.move(pt.x, pt.y); await delay(500);
-    const x = await cdp.evalWorkbench(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === '“gamma”'); const a = [...r.querySelectorAll('.actions .action-label')].find(a => /^Clear Search/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const b = a.getBoundingClientRect(); return { x: b.left + 8, y: b.top + 8 }; })()`);
-    if (x) { await cdp.click(x.x, x.y); await delay(800); }
-    rows = await agentsList();
-    const clearedByMouse = !!x && rows[0]?.label !== '“gamma”' && rows.some(r => r.label === 'Alpha refactor');
-    check('⌥⌘F also works from the side bar; Escape and the row\'s ✕ each clear the search and bring the list back', openedFromSide && clearedByKey && clearedByMouse, { openedFromSide, clearedByKey, clearedByMouse });
+    await cdp.key('f', { meta: true, alt: true });
+    const openedFromSide = await s.searchFocused().then(() => true, () => false);
+    await cdp.call('Input.insertText', { text: 'gamma' }, cdp.workbench); await delay(700);
+    const narrowed = (await agentLabels()).includes('Gamma tests') && !(await agentLabels()).includes('Alpha refactor');
+    const sf = await s.searchFrame();
+    { const at = await s.webviewPoint(sf, '#clear'); await cdp.click(at.x, at.y); await delay(800); }
+    const afterX = await field(); shown = await agentLabels();
+    const clearedByMouse = afterX.value === '' && shown.includes('Alpha refactor');
+    check('⌥⌘F also works from the side bar; Escape and the field\'s ✕ each clear the search and bring the list back', openedFromSide && narrowed && clearedByKey && clearedByMouse, { openedFromSide, narrowed, clearedByKey, clearedByMouse });
 
     // AC-113: no empty grid. Nothing working and nothing pinned: the grid command goes home with a note.
     for (let i = 0; i < 40 && state().runs.some(r => ACTIVE.includes(r.status)); i++) await delay(300);
