@@ -219,7 +219,7 @@
         "daemon/tests/swarm_integration.rs",
         "daemon/src/store.rs"
       ],
-      "blocker": "Fixture startup automatically drains already-admitted unlinked intents only while their snapshots and target permission remain valid; it retains stale or revoked reservations without launching. Local launch-failure fixtures close an unstarted queued run and reconcile an asynchronously failed worker attempt. Task/run/link/owner insertion rolls back atomically when the worker intent is missing. The director-side spawn-record crash window now reattaches a private identity-matched live or exited supervisor without duplicate completion. External worktree cleanup, worker-side spawn-record loss, full result receipt replay, VS Code restart, live Auto Mode refresh and live harness recovery remain unverified."
+      "blocker": "Fixture startup automatically drains already-admitted unlinked intents only while their snapshots and target permission remain valid; it retains stale or revoked reservations without launching. Local launch-failure fixtures close an unstarted queued run and reconcile an asynchronously failed worker attempt. Task/run/link/owner insertion rolls back atomically when the worker intent is missing. Director and worker spawn-record crash windows reattach private identity-matched live or exited local supervisors without duplicate worker attempts or completion; mismatched or missing evidence retains reservations. External worktree cleanup, full accepted-result replay, VS Code restart, live Auto Mode refresh, usage reconciliation and supported live harness recovery remain unverified."
     },
     "SWARM-23": {
       "status": "partial",
