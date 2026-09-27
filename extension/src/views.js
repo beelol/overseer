@@ -261,7 +261,7 @@ class AgentsProvider {
     item.resourceUri = vscode.Uri.from({ scheme: 'overseer-agent', path: '/' + run.id });
     // Working agents show their badge (●); finished ones say how long ago. Oversight (AC-199):
     // held, watched, watching and in conflict, from the daemon's state.
-    const o = (m.state.oversight || {})[run.id] || {};
+    const o = (m.state.overseer && m.state.overseer.run_id ? (m.state.oversight || {})[run.id] : undefined) || {};
     const marks = [o.held && '⏸ held', o.watched && '◉ watched', o.watching && o.watching.length && '◉ watching', o.conflicts && `⚠ ${o.conflicts} conflict${o.conflicts === 1 ? '' : 's'}`].filter(Boolean);
     item.description = [ACTIVE.has(run.status) ? '' : ago(run.ended_ms || run.created_ms), ...marks].filter(Boolean).join(' · ');
     const profile = run.profile_id ? m.profile(run.profile_id) : undefined;

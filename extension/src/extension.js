@@ -98,7 +98,7 @@ async function activate(context) {
     const out = [];
     // Overseer needs the owner (AC-199): proposals waiting for a yes, conflicts needing a decision.
     const ov = model.state.overseer || {};
-    if (ov.open_proposals || ov.conflicts_needing_decision) {
+    if (ov.run_id && (ov.open_proposals || ov.conflicts_needing_decision)) {
       const parts = [ov.open_proposals && `${ov.open_proposals} proposal${ov.open_proposals === 1 ? '' : 's'}`, ov.conflicts_needing_decision && `${ov.conflicts_needing_decision} conflict${ov.conflicts_needing_decision === 1 ? '' : 's'}`].filter(Boolean);
       out.push({ run_id: 'overseer', overseer: true, rank: 0, label: 'Decide', detail: `Overseer: ${parts.join(', ')} waiting for you` });
     }

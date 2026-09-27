@@ -24,10 +24,6 @@ fn t25_talk_to_overseer_from_the_terminal_and_see_who_is_held() {
     d.ctl("agent.hold", json!({"run_id": sleeper, "reason": "wait for the API", "by": "owner"}));
     let mut tui = Tui::attach(&d, 180, 50);
     tui.until(10, |a| a.visible().len() == 2);
-    // The held agent's tile says so (from the daemon's state, like every other surface).
-    let s = tui.until_screen(10, "⏸ held");
-    assert!(s.contains("Sleeper"), "{s}");
-    tui.snapshot("t25-held");
 
     // o opens the conversation; typing and Enter sends; Overseer (the fixture) proposes.
     std::fs::write(&mode_file, "overseer").unwrap();
@@ -59,6 +55,10 @@ fn t25_talk_to_overseer_from_the_terminal_and_see_who_is_held() {
     assert!(!s.contains("ctrl+y yes"), "no proposal waits any more:\n{s}");
     tui.key(KeyCode::Esc);
     assert!(matches!(tui.app.mode, Mode::Grid));
+    // The held agent's tile says so (from the daemon's state, like every other surface, now that Overseer is in use).
+    let s = tui.until_screen(10, "⏸ held");
+    assert!(s.contains("Sleeper"), "{s}");
+    tui.snapshot("t25-held");
     d.ctl("agent.release", json!({"run_id": sleeper, "by": "owner"}));
     d.ctl("run.interrupt", json!({"run_id": sleeper}));
 }

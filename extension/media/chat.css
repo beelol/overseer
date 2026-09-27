@@ -226,4 +226,4 @@ pre.code.error { color: var(--ov-failed); }
 .card-head { display: flex; align-items: center; gap: var(--ov-space-2); color: var(--ov-text); }
 .card-head .codicon { color: var(--ov-accent); }
 .card-detail { margin-top: 4px; color: var(--ov-muted); font-size: var(--ov-font-sm); }
-.card-finding .card-head .codicon, .card-cannot_answer .card-head .codicon { color: var(--ov-warning, var(--ov-accent)); }
+.card-finding .card-head .codicon, .card-cannot_answer .card-head .codicon { color: var(--ov-accent); }

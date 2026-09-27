@@ -100,8 +100,12 @@ pub struct State {
 impl State {
     /// The oversight marks of a run, as short words: held, watched, watching, N conflicts.
     pub fn marks(&self, run_id: &str) -> Vec<String> {
-        let o = &self.oversight[run_id];
         let mut out = Vec::new();
+        // Shown once the owner has spoken to Overseer (its run exists), like the other surfaces.
+        if self.overseer["run_id"].is_null() {
+            return out;
+        }
+        let o = &self.oversight[run_id];
         if o["held"] == true {
             out.push("⏸ held".to_string());
         }

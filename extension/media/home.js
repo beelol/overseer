@@ -16,8 +16,8 @@
     fresh.addEventListener('click', () => post({ type: 'overseerFresh' }));
     head.append(el('span', 'spacer'), level, fresh);
     const list = el('div', 'home-list'); list.id = 'home-conv'; list.setAttribute('role', 'log'); list.setAttribute('aria-live', 'polite'); list.setAttribute('aria-label', 'Conversation with Overseer');
-    const empty = el('div', 'home-empty', 'Nothing yet. Type a task to start an agent, or @overseer to ask what your agents are doing.');
-    wrap.append(head, list, empty);
+    wrap.append(head, list);
+    wrap.hidden = true;
     host.prepend(wrap);
     let session, shown = new Map(); // message id -> element
 
@@ -101,7 +101,8 @@
           if (!shown.has(id)) { const e = proposal(p); shown.set(id, e); list.append(e); }
         }
         for (const [id, e] of shown) if (!keep.has(id)) { e.remove(); shown.delete(id); }
-        empty.hidden = messages.length > 0 || open.length > 0;
+        // Until the owner has spoken to Overseer (its run exists), home is the composer alone.
+        wrap.hidden = !(s && s.run_id) || (messages.length === 0 && open.length === 0);
         list.scrollTop = list.scrollHeight;
       },
       /** A message came back for a proposal card (an error, a state). */

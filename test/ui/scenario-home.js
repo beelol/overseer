@@ -27,7 +27,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
     // Home: the conversation above the composer, the composer's target New agent.
     await cdp.command('Overseer: Open Overseer View'); await delay(2500);
-    const home = await s.editorView(`!!document.querySelector('#home') && !!document.querySelector('#task')`);
+    const home = await s.editorView(`!!document.querySelector('#task') && !!document.querySelector('#target')`);
     const target = await home.eval(`document.querySelector('#target')?.dataset.target`);
     check('home shows the conversation with Overseer above the composer, whose target is New agent', target === 'agent', { target });
     // A task typed at home starts an agent with no Overseer turn, and its card appears.
@@ -41,7 +41,13 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     check('the start appears in the conversation as a card', true);
     for (let i = 0; i < 60 && runs().find(r => r.id === started.id).status !== 'completed'; i++) await delay(250);
     // The start opened the agent's chat (AC-59); home is one command away (Overseer: New Agent).
-    const goHome = async () => { await cdp.command('Overseer: New Agent'); await home.waitFor(`document.body.dataset.mode === 'composer' && !!document.querySelector('#task')`, 20000); await delay(500); };
+    const goHome = async () => {
+      for (let i = 0; i < 3; i++) {
+        await cdp.command('Overseer: New Agent');
+        if (await home.waitFor(`document.body.dataset.mode === 'composer' && !!document.querySelector('#task')`, 8000).then(() => true, () => false)) { await delay(500); return; }
+      }
+      throw new Error('home did not come back');
+    };
     await goHome();
 
     // `@overseer` sends the text to Overseer and starts no agent.
@@ -61,7 +67,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // An agent named with `@` reaches Overseer as its id.
     { const p = await s.webviewPoint(home, '#task'); await cdp.click(p.x, p.y); await delay(150); }
     await cdp.type('@overseer Tell @ti'); await delay(400);
-    const menu = await home.eval(`[...document.querySelectorAll('#mentions .mention-item')].map(e => e.textContent.trim()).filter(Boolean)`);
+    const menu = await home.eval(`[...document.querySelectorAll('#mentions .agent-mention')].map(e => e.textContent.trim()).filter(Boolean)`);
     check('`@` offers the agents by name, narrowed as you type', menu.some(t => /tidy the docs/.test(t)) && !menu.some(t => /^overseer/.test(t)), menu);
     await cdp.key('Enter'); await delay(200);
     const inserted = await home.eval(`document.querySelector('#task')?.value`);

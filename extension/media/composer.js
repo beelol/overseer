@@ -24,7 +24,7 @@
     // AC-182: where Enter sends the text. New agent by default; Overseer by the chip or `@overseer`.
     const targetChip = chip('target', 'Send to'); targetChip.id = 'target';
     const repoChip = chip('repo', 'Repository'), agentChip = chip('agent', 'Agent'), modelChip = chip('model', 'Model'), modeChip = chip('mode', 'Workspace');
-    chips.append(targetChip, repoChip, agentChip, modelChip, modeChip);
+    chips.append(repoChip, agentChip, modelChip, modeChip, targetChip);
     const toolsBar = el('div', 'composer-tools');
     const tray = el('div', 'composer-tray'); tray.hidden = true;
     const more = ui.iconButton('ellipsis', 'More options', { cls: 'sm', action: 'composer-more' }); more.setAttribute('aria-haspopup', 'menu');
@@ -55,6 +55,8 @@
     function renderTarget() {
       const ov = toOverseer();
       setChip(targetChip, ov ? ui.mark('sm') : 'rocket', ov ? 'Overseer' : 'New agent', ov ? 'Enter sends this to Overseer (the conversation above)' : 'Enter starts a new agent with this task; @overseer sends it to Overseer instead');
+      // Icon only for the default (the view's text budget, AC-81); the words appear when it matters.
+      targetChip.querySelector('.chip-label').hidden = !ov;
       targetChip.dataset.target = ov ? 'overseer' : 'agent';
       for (const c of [repoChip, agentChip, modelChip, modeChip]) c.hidden = ov && c !== repoChip ? true : c.hidden && !ov ? false : c.hidden;
       if (!ov) { repoChip.hidden = false; agentChip.hidden = false; modelChip.hidden = form.harness === 'generic'; modeChip.hidden = false; }
@@ -69,7 +71,7 @@
     // `@` offers the agents by name in a list under the text that never takes the keyboard: typing
     // narrows it, arrows move, Enter or Tab inserts, Escape closes; a named agent reaches Overseer
     // as its id.
-    const mentions = el('div', 'mentions'); mentions.hidden = true; mentions.setAttribute('role', 'listbox'); mentions.setAttribute('aria-label', 'Agents'); mentions.id = 'mentions';
+    const mentions = el('div', 'agent-mentions'); mentions.hidden = true; mentions.setAttribute('role', 'listbox'); mentions.setAttribute('aria-label', 'Agents'); mentions.id = 'mentions';
     let mentionAt = -1, mentionIndex = 0;
     function mentionPrefix() {
       const caret = task.selectionStart; const before = task.value.slice(0, caret);
@@ -83,8 +85,8 @@
       const items = [{ id: 'overseer', title: 'overseer', harness: '', status: 'Overseer' }, ...agents().slice(0, 12)].filter(a => a.title.toLowerCase().startsWith(q));
       if (!items.length) { mentions.hidden = true; mentionAt = -1; return; }
       mentionAt = m.at; mentionIndex = Math.min(mentionIndex, items.length - 1);
-      mentions.replaceChildren(...items.map((a, i) => { const b = el('button', 'mention-item' + (i === mentionIndex ? ' active' : '')); b.type = 'button'; b.setAttribute('role', 'option'); b.setAttribute('aria-selected', String(i === mentionIndex)); b.dataset.title = a.title;
-        b.append(a.harness ? ui.harnessMark(a.harness, 14) : ui.mark('sm'), el('span', 'mention-title', a.title), el('span', 'mention-hint', a.status || '')); b.addEventListener('mousedown', e => { e.preventDefault(); insertMention(a.title); }); return b; }));
+      mentions.replaceChildren(...items.map((a, i) => { const b = el('button', 'agent-mention' + (i === mentionIndex ? ' active' : '')); b.type = 'button'; b.setAttribute('role', 'option'); b.setAttribute('aria-selected', String(i === mentionIndex)); b.dataset.title = a.title;
+        b.append(a.harness ? ui.harnessMark(a.harness, 14) : ui.mark('sm'), el('span', 'agent-mention-title', a.title), el('span', 'agent-mention-hint', a.status || '')); b.addEventListener('mousedown', e => { e.preventDefault(); insertMention(a.title); }); return b; }));
       mentions.hidden = false;
     }
     function insertMention(title) {

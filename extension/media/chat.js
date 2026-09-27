@@ -235,12 +235,6 @@
       const t0 = performance.now();
       for (const x of events) this.add(x.event, x.label);
       if (truncated) this.conversation.truncated('Older history was trimmed. Raw output keeps everything.');
-    }
-
-    /** A proposal's answer could not be given (already answered elsewhere, or refused): say so on its card. */
-    proposalStatus(id, text) {
-      const card = this.conversation.proposals && this.conversation.proposals.get(id);
-      if (card) this.conversation.settleProposal(card, text);
       this.root.dataset.historyMs = String(Math.round(performance.now() - t0)); this.root.dataset.historyEvents = String(events.length);
       document.body.dataset.historyMs = this.root.dataset.historyMs; document.body.dataset.historyEvents = this.root.dataset.historyEvents;
       this.restored = true;
@@ -248,6 +242,12 @@
       else this.toBottom();
       // An unsent message comes back after a reload or restart (AC-49), unless one was typed since.
       if (restore && restore.draft && !this.prompt.value) { this.prompt.value = restore.draft; this.drafts.set(this.runId, restore.draft); this.grow(); }
+    }
+
+    /** A proposal's answer could not be given (already answered elsewhere, or refused): say so on its card. */
+    proposalStatus(id, text) {
+      const card = this.conversation.proposals && this.conversation.proposals.get(id);
+      if (card) this.conversation.settleProposal(card, text);
     }
     events(items) { for (const x of items) this.add(x.event, x.label); }
     notice(text) { this.noticeEl.textContent = text || ''; this.noticeEl.classList.toggle('error', !!text); }
