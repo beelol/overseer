@@ -307,6 +307,44 @@ pub fn get(store: &Store, id: &str) -> Result<Value> {
     Ok(run)
 }
 
+/// Bounded category summaries for control surfaces. Job rows and transcripts are fetched
+/// only when a user opens a run; a large backlog does not inflate this list response.
+pub fn list(store: &Store, p: &Value) -> Result<Value> {
+    let limit = p["limit"].as_i64().unwrap_or(20).clamp(1, 50);
+    let cursor = p["cursor"].as_str().filter(|s| !s.is_empty());
+    let before = match cursor {
+        Some(id) => Some(store.conn.query_row(
+            "SELECT created_ms FROM swarm_runs WHERE id=?1", [id], |row| row.get::<_, i64>(0),
+        ).optional()?.ok_or_else(|| anyhow!("unknown swarm cursor"))?),
+        None => None,
+    };
+    let mut stmt = store.conn.prepare(
+        "SELECT id FROM swarm_runs
+         WHERE (?1 IS NULL OR created_ms < ?1 OR (created_ms = ?1 AND id < ?2))
+         ORDER BY created_ms DESC,id DESC LIMIT ?3",
+    )?;
+    let ids = stmt.query_map(params![before, cursor, limit + 1], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let has_more = ids.len() as i64 > limit;
+    let mut runs = Vec::new();
+    for id in ids.into_iter().take(limit as usize) {
+        let full = get(store, &id)?;
+        runs.push(json!({
+            "id": full["id"], "category": full["category"], "objective": full["objective"],
+            "status": full["status"], "created_ms": full["created_ms"],
+            "updated_ms": full["updated_ms"], "revision": full["revision"],
+            "policy": full["policy"], "allowed_targets": full["allowed_targets"],
+            "job_counts": full["job_counts"],
+            "active_worker_processes": full["active_worker_processes"],
+            "registered_attempts": full["registered_attempts"],
+            "director": full["director"], "availability": full["availability"],
+            "benefit": full["benefit"], "unconfirmed_exit_count": full["unconfirmed_exit_count"],
+        }));
+    }
+    let next_cursor = if has_more { runs.last().and_then(|run| run["id"].as_str()) } else { None };
+    Ok(json!({"runs":runs,"next_cursor":next_cursor}))
+}
+
 pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
     let id = required(p, "id")?;
     owner::require(store,id,p)?;

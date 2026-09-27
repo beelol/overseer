@@ -70,6 +70,41 @@ fn one_active_category_run_survives_restart() {
 }
 
 #[test]
+fn swarm_list_pages_run_summaries_without_loading_job_rows() {
+    let mut d = Daemon::start(&[]);
+    let mut ids = Vec::new();
+    for category in ["Backend", "QA", "Research"] {
+        let made = d.call("swarm.create", json!({"category":category,
+            "objective":"Inspect the fixture", "allowed_targets":[]}));
+        ids.push(made["id"].as_str().unwrap().to_string());
+    }
+    d.call("swarm.plan", json!({"id":ids[0],"generation":1,"revision":0,
+        "jobs":[{"id":"j1","title":"Inspect","acceptance":"Evidence","deps":[]}]}));
+    d.kill9();
+    d.spawn();
+
+    let first = d.call("swarm.list", json!({"limit":2}));
+    let first_rows = first["runs"].as_array().unwrap();
+    assert_eq!(first_rows.len(), 2);
+    assert!(first["next_cursor"].is_string());
+    let second = d.call("swarm.list", json!({"limit":2,
+        "cursor":first["next_cursor"]}));
+    let second_rows = second["runs"].as_array().unwrap();
+    assert_eq!(second_rows.len(), 1);
+    assert!(second["next_cursor"].is_null());
+    let seen = first_rows.iter().chain(second_rows).map(|r| r["id"].as_str().unwrap())
+        .collect::<std::collections::HashSet<_>>();
+    assert_eq!(seen.len(), 3);
+    for id in &ids { assert!(seen.contains(id.as_str())); }
+    let backend = first_rows.iter().chain(second_rows)
+        .find(|r| r["id"] == ids[0]).unwrap();
+    assert_eq!(backend["job_counts"]["total"], 1);
+    assert_eq!(backend["job_counts"]["by_status"]["ready"], 1);
+    assert_eq!(backend["active_worker_processes"], 0);
+    assert!(backend.get("jobs").is_none());
+}
+
+#[test]
 fn stopped_empty_swarm_is_terminal_and_releases_category() {
     let d = Daemon::start(&[]);
     let made = d.call("swarm.create", json!({"category":"Reusable", "objective":"Audit",

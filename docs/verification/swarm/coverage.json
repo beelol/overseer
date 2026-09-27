@@ -374,7 +374,7 @@
         "daemon/tests/swarm_state.rs",
         "docs/verification/swarm/SWARM-37.md"
       ],
-      "blocker": "A 100-job daemon fixture verifies aggregate state counts, filtered cursor pages, director owner readout and separate supervised-worker count across restart. A separate one-attempt Atlas replay measured 7 ms Stop acknowledgement during duplicate traffic. It does not combine 32 supervised workers with the required VS Code view, account usage, blockers and worker detail; Pause latency remains unmeasured."
+      "blocker": "A 100-job daemon fixture verifies aggregate state counts, filtered cursor pages, director owner readout and separate supervised-worker count across restart. A second fixture verifies bounded category-run summary pages over the daemon protocol after restart. A separate one-attempt Atlas replay measured 7 ms Stop acknowledgement during duplicate traffic. The extension does not yet consume the list API; no fixture combines 32 supervised workers with the required VS Code view, account usage, blockers and worker detail. Pause latency remains unmeasured."
     },
     "SWARM-38": {
       "status": "partial",

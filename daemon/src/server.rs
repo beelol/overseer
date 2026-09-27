@@ -368,6 +368,7 @@ fn dispatch_inner(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             json!({"max_page_count":pages})
         }
         "swarm.get" => crate::swarm::get(&d.store.lock().unwrap(), s(p, "id")?)?,
+        "swarm.list" => crate::swarm::list(&d.store.lock().unwrap(), p)?,
         "swarm.plan" => {
             fixture_only()?;
             crate::swarm::plan(&mut d.store.lock().unwrap(), p)?
