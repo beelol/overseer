@@ -475,6 +475,18 @@ fn ac94_every_local_model_has_a_fit_that_the_guard_would_give() {
     let less = d.call("local.models", json!({}));
     assert_eq!(by(&less, "qwen3-coder:30b")["fit"]["status"], "too_big");
     assert_eq!((less["pick"].clone(), less["why_no_pick"].as_str().map(|s| s.starts_with("qwen3-coder:30b: too big")), gib(&less["budget"]["budget"])), (Value::Null, Some(true), 7.2));
+    // The prefetch offer: once, when downloads are first allowed, naming the model; declining leaves prefetch off.
+    w.memory(128.0, 115.2, "normal");
+    assert_eq!(d.call("continuity.prefetch_offer", json!({}))["show"], false, "downloads are off");
+    d.call("settings.set", json!({"values": {"allowModelDownloads": true}}));
+    let offer = d.call("continuity.prefetch_offer", json!({}));
+    assert_eq!((offer["show"].clone(), offer["model"].as_str(), offer["prefetch"].clone()), (json!(true), Some("qwen3-coder:30b"), json!(false)));
+    let declined = d.call("continuity.prefetch_offer", json!({"dismiss": true}));
+    assert_eq!((declined["show"].clone(), d.call("settings.get", json!({}))["settings"]["prefetch"].clone()), (json!(false), json!(false)));
+    assert!(declined["offered_ms"].is_i64());
+    d.call("settings.set", json!({"values": {"allowModelDownloads": false}}));
+    d.call("settings.set", json!({"values": {"allowModelDownloads": true}}));
+    assert_eq!(d.call("continuity.prefetch_offer", json!({}))["show"], false, "never a second time");
     // One answer has everything the interface shows.
     let ui = d.call("continuity.ui", json!({}));
     assert_eq!((ui["connection"]["state"].as_str(), ui["notice"]["show"].clone(), ui["settings"]["enabled"].clone(), ui["new_agents"]["local_only"].clone()), (Some("online"), json!(true), json!(true), json!(false)));

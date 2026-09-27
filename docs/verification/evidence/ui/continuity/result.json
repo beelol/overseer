@@ -25,6 +25,17 @@
       }
     },
     {
+      "name": "when downloads are first allowed, Overseer offers once to keep the best-fitting model ready, naming it and its size; Not now leaves prefetch off",
+      "ok": true,
+      "detail": {
+        "offerToast": "Source: Overseer\nKeep it ready\nNot now\nKeep qwen3-coder:30b ready for offline? (already installed)",
+        "afterOffer": {
+          "prefetch": false,
+          "again": false
+        }
+      }
+    },
+    {
       "name": "Allow downloads flips the setting in the daemon, and the notice shows it",
       "ok": true,
       "detail": {
@@ -42,7 +53,7 @@
           "allow_ollama_install": false,
           "enabled": true,
           "show": false,
-          "shown_ms": 1790517502737
+          "shown_ms": 1790518041288
         }
       }
     },
@@ -155,7 +166,7 @@
       "detail": [
         "Local model qwen3-coder:30b at a 64k context · 23.7 GiB, already loaded.",
         "This agent continues the work of another.Open the first agent",
-        "Continued from \"Rename the helpers\" after the connection was lost at 06:58."
+        "Continued from \"Rename the helpers\" after the connection was lost at 07:07."
       ]
     },
     {
@@ -193,7 +204,7 @@
       "detail": {
         "title": "Waiting for a connection",
         "line": "The connection to OpenAI failed: stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses): client error (Connect): dns error: failed to lookup address information. Your message is kept.",
-        "foot": "Next check in 8 s · waiting 5 s · gives up after 36 hours",
+        "foot": "Next check in 7 s · waiting 4 s · gives up after 36 hours",
         "actions": [
           "Use a local model now",
           "Retry now",
@@ -237,12 +248,12 @@
       "ok": true,
       "detail": {
         "taken": {
-          "at_ms": 1790517531173,
+          "at_ms": 1790518068613,
           "offered_ms": null,
-          "predecessor": "r-0fbc7a92e779",
+          "predecessor": "r-d992c2f7f648",
           "reason": "user",
           "stay": false,
-          "successor": "r-062750cb8a4a"
+          "successor": "r-1cae77dc2232"
         },
         "takenDone": "completed",
         "shownNext": true
@@ -272,11 +283,11 @@
       "ok": true,
       "detail": {
         "backDone": "completed",
-        "session": "fixture-thread-36109",
+        "session": "fixture-thread-91940",
         "args": [
           "exec",
           "resume",
-          "fixture-thread-36109"
+          "fixture-thread-91940"
         ]
       }
     },

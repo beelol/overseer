@@ -75,6 +75,7 @@ class Continuity {
     this.say('continuity: settings → daemon ' + JSON.stringify(values));
     await this.client.request('settings.set', { values });
     await this.refresh();
+    if (values.allowModelDownloads === true) this.offerPrefetch().catch(err => this.say('continuity: ' + err.message));
   }
   /** The daemon refused a value: say why, and show its own value again. */
   async refused(error) {
@@ -184,6 +185,19 @@ class Continuity {
     await this.client.request('settings.set', { values });
     const config = vscode.workspace.getConfiguration('overseer.continuity');
     for (const [key, value] of Object.entries(values)) await config.update(key, JSON.stringify(value) === JSON.stringify(text.SETTINGS[key].default) ? undefined : value, vscode.ConfigurationTarget.Global);
+    if (values.allowModelDownloads === true) this.offerPrefetch().catch(err => this.say('continuity: ' + err.message));
+  }
+
+  /** Once per machine, when downloads are first allowed: keep the best-fitting model downloaded? Declining leaves prefetch off. */
+  async offerPrefetch() {
+    const offer = await this.client.request('continuity.prefetch_offer', {});
+    if (!offer.show) return;
+    const size = offer.download_bytes ? `${text.gib(offer.download_bytes)} GiB download` : 'already installed';
+    const yes = 'Keep it ready';
+    const choice = await vscode.window.showInformationMessage(`Keep ${offer.model} ready for offline? (${size})`, { detail: 'While online, Overseer keeps the best-fitting local model downloaded, so going offline needs no download. It never downloads during a paid turn.' }, yes, 'Not now');
+    await this.client.request('continuity.prefetch_offer', { dismiss: true });
+    if (choice === yes) await this.set({ prefetch: true });
+    await this.refresh();
   }
 
   /** Moves an agent's work. A move that would ask less often than now is said first, and made only on a yes. */

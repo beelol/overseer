@@ -91,6 +91,12 @@ const G = 2 ** 30;
     check('the first time, one notice above the composer says what Continuity does and shows downloads and install as off', notice && notice.title === 'Continuity is on' && notice.switches.join(',') === 'allowModelDownloads:off,allowOllamaInstall:off', notice);
     await s.screenshot('notice-dark');
     { const at = await s.webviewPoint(dash, '[data-continuity="allow:allowModelDownloads"]'); await cdp.click(at.x, at.y); await delay(1200); }
+    // Downloads first allowed: the one-time offer to keep the best-fitting model ready, declined.
+    const offerToast = await cdp.waitFor(`[...document.querySelectorAll('.notification-toast, .notification-list-item')].map(t => t.innerText).find(t => /Keep qwen3-coder:30b ready for offline/.test(t)) || null`, 15000).catch(() => null);
+    const notNow = await cdp.evalWorkbench(`(() => { const b = [...document.querySelectorAll('.notification-toast .monaco-button, .notification-list-item .monaco-button')].find(b => b.textContent.trim() === 'Not now'); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    if (notNow) { await cdp.click(notNow.x, notNow.y); await delay(1200); }
+    const afterOffer = { prefetch: s.ctl('settings.get').settings.prefetch, again: s.ctl('continuity.prefetch_offer').show };
+    check('when downloads are first allowed, Overseer offers once to keep the best-fitting model ready, naming it and its size; Not now leaves prefetch off', /Keep qwen3-coder:30b ready for offline\? \(already installed\)/.test(offerToast || '') && !!notNow && afterOffer.prefetch === false && afterOffer.again === false, { offerToast, afterOffer });
     const allowed = s.ctl('settings.get').settings.allowModelDownloads;
     const switched = await dash.eval(`document.querySelector('[data-continuity="notice"] .cont-switch[data-setting="allowModelDownloads"] .state')?.textContent`);
     check('Allow downloads flips the setting in the daemon, and the notice shows it', allowed === true && switched === 'allowed', { allowed, switched });

@@ -841,7 +841,7 @@ pub fn prepare_local_run(d: &Arc<Daemon>, run: &mut crate::store::Run, profile_e
 // ------------------------------------------------------------------ protocol
 
 pub fn handles(method: &str) -> bool {
-    crate::downloads::handles(method) || crate::handoff::handles(method) || crate::ollama_install::handles(method) || matches!(method, "connection.status" | "connection.check" | "continuity.status" | "continuity.ui" | "continuity.notice" | "local.models" | "settings.get" | "settings.set" | "local.inventory" | "local.pick" | "local.approve" | "local.catalogue" | "local.load" | "local.unload")
+    crate::downloads::handles(method) || crate::handoff::handles(method) || crate::ollama_install::handles(method) || matches!(method, "connection.status" | "connection.check" | "continuity.status" | "continuity.ui" | "continuity.notice" | "continuity.prefetch_offer" | "local.models" | "settings.get" | "settings.set" | "local.inventory" | "local.pick" | "local.approve" | "local.catalogue" | "local.load" | "local.unload")
 }
 
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
@@ -883,6 +883,17 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "continuity.ui" => ui(d)?,
         "local.models" => local_models(d)?,
+        // Offered once, when downloads are first allowed: keep the best-fitting model downloaded (AC-89).
+        "continuity.prefetch_offer" => {
+            if p["dismiss"].as_bool().unwrap_or(false) {
+                meta_set(d, "continuity.prefetch_offered", &now().to_string())?;
+            }
+            let s = settings();
+            let offered = meta_get(d, "continuity.prefetch_offered").and_then(|v| v.parse::<i64>().ok());
+            let pick = pick_value(d).ok().map(|v| v["pick"]["chosen"].clone()).filter(|c| !c.is_null());
+            json!({"show": s.allow_model_downloads && !s.prefetch && offered.is_none() && pick.is_some(), "offered_ms": offered, "prefetch": s.prefetch,
+                   "model": pick.as_ref().map(|c| c["tag"].clone()), "download_bytes": pick.as_ref().and_then(|c| c["download_bytes"].as_u64().or_else(|| if c["installed"] == true { Some(0) } else { None }))})
+        }
         "local.inventory" => serde_json::to_value(gather(d).inventory)?,
         "local.pick" => pick_value(d)?,
         "local.approve" => approve(d, p["tag"].as_str().ok_or_else(|| anyhow!("missing string parameter tag"))?, p["context"].as_u64().ok_or_else(|| anyhow!("missing number parameter context"))?)?,

@@ -1,10 +1,10 @@
-[2026-09-27T13:59:38.827Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T13:59:41.461Z] PASS the daemon starts with its defaults, and reports them {"enabled":true}
-[2026-09-27T13:59:41.969Z] PASS every Continuity setting edited in VS Code is read back from the daemon "19 settings"
-[2026-09-27T13:59:42.016Z] screenshot docs/verification/evidence/ui/continuity-settings/01-settings-in-daemon.png
-[2026-09-27T13:59:43.931Z] PASS a value out of range is refused with the reason, the daemon keeps its value, and VS Code shows it again {"toast":"Overseer: ramCeilingPercent must be between 10 and 50 percent (one model never takes more than half of the memory); 80 was refused","kept":35,"shown":35}
-[2026-09-27T13:59:44.002Z] screenshot docs/verification/evidence/ui/continuity-settings/02-refused.png
-[2026-09-27T13:59:44.011Z] PASS `overseerd ctl continuity.status` prints the state, the budget and the pick {"state":"online","budget":48103633690,"pick":"qwen3-coder:30b"}
-[2026-09-27T13:59:45.802Z] PASS the daemon keeps running after VS Code quits
-[2026-09-27T13:59:51.079Z] PASS with Continuity off (set in VS Code) an offline agent waits instead of transitioning, VS Code closed {"st":"waiting_for_connection","later":"waiting_for_connection","handoffs":0}
-[2026-09-27T13:59:51.090Z] PASS the download setting is the daemon's too (allowed, first pull not yet confirmed) {"downloads":[],"first_pull_confirmed":false}
+[2026-09-27T14:08:29.498Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T14:08:32.152Z] PASS the daemon starts with its defaults, and reports them {"enabled":true}
+[2026-09-27T14:08:32.662Z] PASS every Continuity setting edited in VS Code is read back from the daemon "19 settings"
+[2026-09-27T14:08:32.718Z] screenshot docs/verification/evidence/ui/continuity-settings/01-settings-in-daemon.png
+[2026-09-27T14:08:34.636Z] PASS a value out of range is refused with the reason, the daemon keeps its value, and VS Code shows it again {"toast":"Overseer: ramCeilingPercent must be between 10 and 50 percent (one model never takes more than half of the memory); 80 was refused","kept":35,"shown":35}
+[2026-09-27T14:08:34.708Z] screenshot docs/verification/evidence/ui/continuity-settings/02-refused.png
+[2026-09-27T14:08:34.717Z] PASS `overseerd ctl continuity.status` prints the state, the budget and the pick {"state":"online","budget":48103633690,"pick":"qwen3-coder:30b"}
+[2026-09-27T14:08:36.534Z] PASS the daemon keeps running after VS Code quits
+[2026-09-27T14:08:41.759Z] PASS with Continuity off (set in VS Code) an offline agent waits instead of transitioning, VS Code closed {"st":"waiting_for_connection","later":"waiting_for_connection","handoffs":0}
+[2026-09-27T14:08:41.766Z] PASS the download setting is the daemon's too (allowed, first pull not yet confirmed) {"downloads":[],"first_pull_confirmed":false}

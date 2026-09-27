@@ -742,7 +742,11 @@ As built (2026-09-26), in `extension/src/continuity.js` (the host), `extension/m
   the title, *Your message is kept*, *Next check in 40 s · waiting 2 min · gives up after 36 hours*,
   and **Use a local model now** (or *Continue with Claude Code*), **Retry now**, **Stop**; a move
   that would ask less often is offered with the difference and made after a confirmation. Back
-  online, a local or failed-over agent shows **Switch back to Codex** and **Stay here**. The turn
+  online, a local or failed-over agent shows **Switch back to Codex** and **Stay here**.
+  When downloads are first allowed, one message offers to keep the best-fitting model ready
+  (*Keep qwen3-coder:30b ready for offline? (17.3 GiB download)*); Not now leaves prefetch off, and
+  the daemon records the offer so it is made once. Downloads in progress show above the composer
+  and in the Local models pick, with Cancel. The turn
   of a waiting agent never reads *Failed*. Tiles show the same, compact. The settings are 19
   `overseer.continuity.*` entries with the daemon's ranges; VS Code pushes what the user sets and
   mirrors what the daemon has.
