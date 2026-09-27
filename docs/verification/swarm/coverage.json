@@ -640,9 +640,11 @@
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/swarm_plan.rs",
         "daemon/tests/swarm_context.rs",
-        "daemon/src/swarm/schema.rs"
+        "daemon/src/swarm/schema.rs",
+        "daemon/tests/swarm_atlas.rs",
+        "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Pending local launch replay is rejected after Stop, a linked scripted worker is interrupted, and rejected/superseded work does not requeue after cancellation. User Stop is ID-only and commits under the launch lock, which is released before slow worker control I/O; a local paused-shim fixture proves another admission stays responsive. A crash fixture persists revocation, retries the dependent-worker interrupt after restart, and leaves an unrelated worker running. Four scripted Stop/revocation/result/acceptance orderings persist a shared sequence, preserve late results, and block new launches. A simulated failed Stop signal is retried after daemon restart. Simultaneous native races, native descendants, qualified live paths, and explicit user resume remain unverified."
+      "blocker": "Scripted local and Atlas-backed final-result/Stop orderings persist one operation sequence, preserve the artifact and result, reject acceptance/completion, and deduplicate replay. Simultaneous native races, native descendants, qualified live paths, and explicit user resume remain unverified."
     },
     "SWARM-62": {
       "status": "partial",
@@ -683,7 +685,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins seven named Atlas v1 faults: lost result receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, malformed dependencies with valid J2 continuation, real shared-schema contamination with isolated retries, and a 2,000-message duplicate-progress flood during Stop. Other named faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
+      "blocker": "S1/S2/S3/S4 have versioned local backends and joined scripted runs. S5 joins eight named Atlas v1 faults, adding both durable orders of last-result submission and user Stop with retained PostgreSQL evidence and no completion. Other named faults are not all replayed. Autonomous director/routing, real account outage, complete fault/report traces, live communication and S0 remain unverified."
     }
   },
   "scenarios": {
@@ -748,7 +750,7 @@
         "docs/verification/swarm/S5.md",
         "fixtures/swarm/atlas-v1/probe-shared.mjs"
       ],
-      "blocker": "Atlas v1 joins seven named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, two scripted clients sharing one mutable PostgreSQL schema before isolated retries, and 2,000 duplicate progress messages during a 7 ms Stop acknowledgement. Separate daemon fixtures cover SQLite-full replay and completed-run contamination. Other named S5 faults, Atlas-backed full storage and a full S1-sized ordered replay remain unverified. Live provider harness communication and automatic resource alias discovery are absent."
+      "blocker": "Atlas v1 joins eight named faults: J2 lost-result-receipt, director death after dispatch, held J4 redirect timeout, evidence-free J4 heartbeat through its deadline, invalid J8/J9/J99 dependencies rejected while valid J2 completes, two scripted clients sharing one mutable PostgreSQL schema before isolated retries, 2,000 duplicate progress messages during Stop, and both scripted last-result/Stop orderings retaining evidence without completion. Separate daemon fixtures cover SQLite-full replay and completed-run contamination. Other named S5 faults, Atlas-backed full storage and a full S1-sized ordered replay remain unverified. Live provider harness communication and automatic resource alias discovery are absent."
     }
   }
 }
