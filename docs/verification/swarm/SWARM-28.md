@@ -81,3 +81,44 @@ not Auto's live route discovery or account identity. The manual single-target
 pool, normal-path out-of-scope proposals, live account-generation/provider
 revalidation and shared admission authority are still unverified. SWARM-28
 remains partial.
+
+## Approved repository scope — `9dfcfd5`
+
+Input: a category run names one approved Git source in `repositories` when it
+is created. The fixture then tries to launch its director and an admitted
+generic worker from an unrelated repository, and separately launches a worker
+from a sibling worktree of the approved source. A second fixture advances the
+source checkout's HEAD and restarts the daemon before attempting a director
+launch.
+
+Expected: a launch request cannot expand the approved source scope or silently
+change the source revision. Refusal occurs before a director owner, worker
+launch intent, worktree or process is created. A worktree of the same Git
+repository at the pinned commit remains permitted. The scope is visible in
+the worker brief and survives restart.
+
+Actual: the focused test failed red because the new `repositories` field was
+absent. After the change, `swarm.create` persists canonical repository/common
+paths and HEAD commits; both launch paths compare the requested repository
+and commit before side effects. The unrelated requests leave zero director
+owners and worker launches; the sibling worktree launches. The changed HEAD
+is refused after daemon restart. Historical fixture runs keep a null scope
+through migration; only the fixture API may launch one without an explicit
+scope. The normal launch path must supply `repositories` when it is wired.
+
+Checks: `cargo test --offline -p overseerd --bin overseerd
+old_swarm_runs_do_not_inherit_source_change_permission --quiet` (1 passed);
+`cargo test --offline -p overseerd --test swarm_runtime --test swarm_context
+--test swarm_state --test swarm_director -- --test-threads=1` (21 + 5 + 19 +
+11 passed); focused `repository_scope_` rerun (2 passed); `git diff --check`
+passed. All were local daemon/Git fixtures, with no paid model or live service.
+Evidence: `daemon/tests/swarm_runtime.rs`, `daemon/src/swarm/mod.rs`,
+`daemon/src/swarm/runtime.rs`, `daemon/src/swarm/context.rs`,
+`daemon/src/swarm/schema.rs`.
+
+Remaining: this is launch-time source binding, not proof that a model worker
+stays within an audit-only permission mode or cannot access an external
+service. An authorized plan revision to change the pinned source is not yet
+implemented. Auto's live route/account identity, manual single-target pool,
+normal launch UI, and shared admission transaction remain open. SWARM-28 and
+SWARM-52 stay partial.

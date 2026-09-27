@@ -308,7 +308,7 @@
         "daemon/src/swarm/schema.rs",
         "docs/verification/swarm/SWARM-28.md"
       ],
-      "blocker": "Fixture admission binds harness, profile, model and optional effort to worker launch and enforces persisted per-job capabilities. A two-account fixture routes code and browser jobs to qualified allowed targets. Live Auto account-generation/provider/model-version revalidation, a manual single-target pool, normal-path scope rejection and shared account admission remain unverified."
+      "blocker": "Fixture admission binds harness, profile, model and optional effort to worker launch and enforces persisted per-job capabilities. A two-account fixture routes code and browser jobs to qualified allowed targets. Explicit approved repositories and source commits now bind director/worker process launches, including after restart; normal launch still needs to supply that scope. Live Auto account-generation/provider/model-version revalidation, a manual single-target pool, ordinary launch integration and shared account admission remain unverified."
     },
     "SWARM-29": {
       "status": "partial",
