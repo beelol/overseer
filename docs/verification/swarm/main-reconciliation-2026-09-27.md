@@ -229,3 +229,9 @@ successfully and `node test/ui/scenario-swarm-scale.js` passed after this merge:
 32 fixture workers were displayed and Stop confirmed their exits with no live
 process left behind. The generated screenshots and logs were discarded from
 this branch so the main evidence is not overwritten by a local replay.
+
+## Subsequent published main: `3041ea2`
+
+Main next updated AC-179's icon-helper evidence and tracker only. It changes
+no Swarm runtime, route, permission or UI behavior, so the preceding Swarm
+fixture results remain applicable and the SWARM-01–64 statuses are unchanged.
