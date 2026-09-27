@@ -77,3 +77,18 @@ reconciliation with the branch instead of treating a passing fixture as ready
 for merge. No Swarm scheduling, permission, UI, or acceptance criterion changes:
 the missing shared Auto admission path, normal launch, and joined Gate S checks
 remain open. This merge provides no new SWARM verification evidence.
+
+## Subsequent published main: `2ad4ef3`
+
+Main next verified Gate Q's AC-152 load scenario and Gate S's AC-180 research
+spike. AC-152 measures the base app, not Swarm's 100-job/32-worker behavior.
+AC-180 identifies daemon-issued MCP tools and concrete read-only settings for
+Claude Code, Codex and OpenCode. The Claude `Agent`/`Task` deny list and
+OpenCode `task: false` are useful candidates for the Swarm worker descendant
+control qualification; Codex's read-only sandbox still leaves its shell
+available and does not by itself establish a native-delegation limit. None of
+these Gate S probes ran a Swarm director/worker, enforced a total descendant
+budget, or qualified a live Swarm account route. SWARM-17/25/52 remain open.
+Keep one director, the current capability floor and the fail-closed live launch
+boundary; consume Gate S's harness findings in the future per-harness
+qualification rather than treating them as a new Swarm permission grant.
