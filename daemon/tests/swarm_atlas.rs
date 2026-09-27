@@ -550,7 +550,7 @@ fn atlas_s5_director_death_recovers_one_dispatched_worker() {
         "revision":1,"job_id":"j2","attempt_id":attempt,
         "message_id":"stale-director","type":"redirect","payload":{}})).is_err());
     let batch = d.call("swarm.director.claim_batch",json!({"run_id":run,
-        "generation":2,"revision":1,"now_ms":at+6000}));
+        "generation":2,"revision":1,"now_ms":now()+6000}));
     assert_eq!(batch["status"],"claimed","{batch}");
     assert!(batch["messages"].as_array().unwrap().iter()
         .any(|message| message["message_id"] == format!("atlas-s5-result-{attempt}")));
@@ -735,4 +735,77 @@ fn atlas_s5_progress_heartbeats_do_not_extend_job_deadline() {
     assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
         "revision":1,"request_id":"s5-heartbeat-complete","summary":"Attachment audit passed",
         "verification":"Repeated progress","checks":[]})).is_err());
+}
+
+// S5: malformed director dependencies are rejected as a subgraph. A valid J2
+// audit remains dispatchable and can still finish with real Atlas evidence.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_invalid_dependency_subgraph_does_not_block_valid_audit() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Atlas malformed plan fault",
+        "objective":"Audit foreign task mutation","allowed_targets":["fixture"]}));
+    let run=created["id"].as_str().unwrap();
+    let jobs=json!([
+        {"id":"j2","title":"Tasks","acceptance":"foreign patch and before-after rows",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j2","mode":"write"}]},
+        {"id":"j8","title":"Cycle A","acceptance":"check","deps":["j9"]},
+        {"id":"j9","title":"Cycle B","acceptance":"check","deps":["j8"]},
+        {"id":"j10","title":"Unknown dependency","acceptance":"check","deps":["j99"]},
+        {"id":"j11","title":"Depends on cycle","acceptance":"check","deps":["j8"]}
+    ]);
+    assert!(d.try_call("swarm.plan",json!({"id":run,"generation":1,
+        "revision":0,"jobs":jobs})).is_err());
+    assert_eq!(d.call("swarm.get",json!({"id":run}))["revision"],0);
+    assert!(d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap().is_empty());
+    let plan=d.call("swarm.plan",json!({"id":run,"generation":1,
+        "revision":0,"allow_partial":true,"jobs":jobs}));
+    assert_eq!(plan["revision"],1);
+    assert_eq!(plan["job_count"],1);
+    let rejected=plan["rejected"].as_array().unwrap();
+    assert_eq!(rejected.len(),4,"{plan}");
+    for id in ["j8","j9","j10","j11"] {
+        assert!(rejected.iter().any(|entry|entry["id"]==id),"{plan}");
+        assert!(d.try_call("swarm.attempt.register",json!({"run_id":run,
+            "generation":1,"revision":1,"job_id":id})).is_err());
+    }
+    assert!(rejected.iter().any(|entry|entry["id"]=="j10" &&
+        entry["reason"].as_str().unwrap().contains("j99")),"{plan}");
+    let current=d.call("swarm.jobs",json!({"id":run}));
+    assert_eq!(current["jobs"].as_array().unwrap().len(),1);
+    assert_eq!(current["jobs"][0]["id"],"j2");
+
+    let at=now();
+    let snapshot=json!({"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "targets":[{"id":"fixture","account_id":"account","pool_ids":["pool"],
+            "capabilities":["audit"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+120000}]}]});
+    let attempt=admit(&d,run,1,"j2","fixture",&snapshot,at);
+    assert_eq!(attempt["status"],"admitted","{attempt}");
+    let evidence=atlas_probe("j2");
+    assert_eq!(evidence["foreignPatchStatus"],200);
+    assert_eq!(evidence["taskBefore"],"Bob task");
+    assert_eq!(evidence["taskAfter"],"changed-by-alice");
+    let artifact=submit(&d,run,"j2",&attempt,1,&evidence,"confirmed_defect");
+    accept_and_exit(&d,run,1,"j2",&attempt,&artifact);
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let admissions:i64=db.query_row("SELECT COUNT(*) FROM swarm_admissions WHERE run_id=?1",
+        [run],|r|r.get(0)).unwrap();
+    assert_eq!(admissions,1);
+    let batch=d.call("swarm.director.claim_batch",json!({"run_id":run,
+        "generation":1,"revision":1,"now_ms":at+6000}));
+    assert_eq!(batch["status"],"claimed","{batch}");
+    assert!(batch["messages"].as_array().unwrap().iter()
+        .any(|message|message["job_id"]=="j2" && message["type"]=="result"));
+    d.call("swarm.director.complete_batch",json!({"run_id":run,"generation":1,
+        "turn_id":batch["turn_id"],"token":batch["token"],"outcome":"progress"}));
+    let completed=d.call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"atlas-s5-valid-subgraph-complete",
+        "summary":"Foreign task mutation reproduced; invalid dependency subgraph excluded",
+        "verification":"J2 Atlas PostgreSQL before-after probe",
+        "checks":[{"job_id":"j2","outcome":"passed","evidence":[artifact]}]}));
+    assert_eq!(completed["status"],"completed","{completed}");
 }
