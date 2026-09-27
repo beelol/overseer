@@ -26,3 +26,11 @@ passed 2 tests; `cargo test --offline -p overseerd --test swarm_admission`
 passed 32 tests; `git diff --check` passed. This verifies the fixture scheduler's
 same-category scan and durable fair cursor, not a live Auto route, worker launch
 or autonomous director. Status remains partial.
+
+At `6910688`, the same scheduler consumes durable per-job capability requirements.
+The two-account fixture admits a source job on a code-only target and a browser
+job on a browser-capable target without the caller restating either job's
+requirement. This closes the fixture's per-job-capability gap; the target
+snapshot is still injected and the scheduler does not autonomously ask Auto
+for the next route. The four-test scheduler suite and full offline Rust
+workspace suite passed. SWARM-36 remains partial.

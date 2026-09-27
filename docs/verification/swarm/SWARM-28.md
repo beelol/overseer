@@ -43,3 +43,41 @@ Commands and results:
 - `git diff --check`: passed. The last full Rust workspace pass was at `bab519b`; it has not been rerun for this follow-up.
 
 Remaining: the injected `account_id` is not yet a verified account-generation binding, and provider endpoint/model-version identity is not revalidated against an Auto producer immediately before launch. The shared numeric allowance transaction across ordinary, Auto and Swarm work remains absent. No mixed-account live route or normal UI workflow was exercised; SWARM-28 stays partial and CONTRACT-01 remains unverified.
+
+## Per-job capability follow-up — `6910688`
+
+Input: one fixture category has independent browser and source jobs. Its two
+allowed target snapshots describe separate account/pool identities: the first
+has `code`, the second has `browser` and `code`. The caller supplies no extra
+capability for scheduled requests. A second replay restarts the daemon before
+attempting direct admission of the browser job on a code-only target.
+
+Expected: the director's planned job requirement is durable and cannot be
+weakened by an admission caller. A code-only target skips the browser job and
+takes the source job; the browser-capable target can take the browser job.
+Changing a requirement revises only affected work. Malformed or duplicate
+requirements fail before dispatch; historical jobs migrate with an empty
+requirement rather than losing their plan.
+
+Actual: the focused direct-admission test failed red because the code-only
+target admitted the browser job. After the change, direct admission returns
+`missing_capability`, the fair scheduler admits `j001` on the code target and
+`j000` on the browser target, and saved requirements survive restart. Plan
+revision, invalid-input and old-database migration tests pass. The scheduler
+combines the caller's requirements with the saved job requirements; it never
+lets the caller replace the latter.
+
+Verification: `cargo test --offline -p overseerd --test swarm_scheduler`
+passed 4 tests; `--test swarm_plan` passed 10; `--test swarm_admission`
+passed 32. `cargo test --workspace --offline -- --test-threads=1` passed in
+full, with separately declared opt-in backend tests ignored. The first broad
+run hit a control-socket startup race in an unrelated director fixture; the
+focused test passed on retry, the fixture now waits for the socket, and its
+13-test suite plus the serial workspace run passed. The dedicated old-job
+migration test passed after that workspace run. `git diff --check` passed.
+
+This establishes deterministic fixture routing across two declared accounts,
+not Auto's live route discovery or account identity. The manual single-target
+pool, normal-path out-of-scope proposals, live account-generation/provider
+revalidation and shared admission authority are still unverified. SWARM-28
+remains partial.

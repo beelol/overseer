@@ -299,10 +299,12 @@
       "evidence": [
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/swarm_policy.rs",
+        "daemon/tests/swarm_scheduler.rs",
+        "daemon/tests/swarm_plan.rs",
         "daemon/src/swarm/schema.rs",
         "docs/verification/swarm/SWARM-28.md"
       ],
-      "blocker": "Fixture admission now binds harness, profile, model and optional effort to worker launch, rejects changed or incomplete routes before process intent, and passes a matching route to a synthetic Claude harness. Live Auto account-generation/provider/model-version revalidation, mixed qualified job routing, a manual single-target pool and normal-path scope rejection remain unverified."
+      "blocker": "Fixture admission binds harness, profile, model and optional effort to worker launch and enforces persisted per-job capabilities. A two-account fixture routes code and browser jobs to qualified allowed targets. Live Auto account-generation/provider/model-version revalidation, a manual single-target pool, normal-path scope rejection and shared account admission remain unverified."
     },
     "SWARM-29": {
       "status": "partial",
@@ -385,7 +387,7 @@
         "daemon/tests/swarm_scheduler.rs",
         "docs/verification/swarm/SWARM-36.md"
       ],
-      "blocker": "A fixture-only central queue fairly admits unequal category backlogs through one durable admission transaction and skips a conflicting first job to admit an independent job in that category after restart. It does not yet start directors/workers automatically, route per-job targets through Auto Mode, reserve an actual director process, or prove cross-category scope and handoff isolation in a live run."
+      "blocker": "A fixture-only central queue fairly admits unequal category backlogs, skips a conflicting first job to admit an independent job after restart, and applies each job's saved capability requirement. It does not yet start directors/workers automatically, request per-job routes from Auto Mode, reserve an actual director process, or prove cross-category scope and handoff isolation in a live run."
     },
     "SWARM-37": {
       "status": "partial",
