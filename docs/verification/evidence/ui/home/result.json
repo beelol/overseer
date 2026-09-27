@@ -11,7 +11,7 @@
       "name": "Enter at home starts an agent exactly as before, with no Overseer turn in the event log",
       "ok": true,
       "detail": {
-        "started": "r-4a3f206cd5a7",
+        "started": "r-d2daf9a19041",
         "overseerTurns": 0
       }
     },
@@ -52,14 +52,14 @@
       "name": "a named agent reaches Overseer as that agent's id",
       "ok": true,
       "detail": {
-        "sent": "Tell @tidy the docs (r-4a3f206cd5a7) to add a changelog"
+        "sent": "Tell @tidy the docs (r-d2daf9a19041) to add a changelog"
       }
     },
     {
       "name": "*Start as an agent* starts one from a message sent to Overseer",
       "ok": true,
       "detail": {
-        "corrected": "r-d735241cb1e6"
+        "corrected": "r-b3464b6c7d7c"
       }
     },
     {
@@ -75,8 +75,8 @@
       "name": "the docked chat and home show the same conversation",
       "ok": true,
       "detail": {
-        "docked": "What is everyone doing?\nShared the state of 1 agent\nUsed\nmcp__overseer__check_in\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nDone\n0s\n2 tokens\nTell @tidy the docs (r-4a3f206cd5a7) to add a changelog\nShared the state of 1 agent\n\nI could not find an agent called @tidy the docs (r-4a3f206",
-        "home": "Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nStart as an agent\nOverseer\nHere is what everyone is doing:\n\n- **tidy the docs**: completed\nYou\nTell @tidy the docs (r-4a3f206cd5a7) to add a changelog\nStart as an agent\nOverseer\nI could not fin"
+        "docked": "What is everyone doing?\nShared the state of 1 agent\nUsed\nmcp__overseer__check_in\n\nHere is what everyone is doing:\n\ntidy the docs: completed\nDone\n0s\n2 tokens\nTell @tidy the docs (r-d2daf9a19041) to add a changelog\nShared the state of 1 agent\n\nI could not find an agent called @tidy the docs (r-d2daf9a",
+        "home": "Started tidy the docs (claude) in home-repo\ntidy the docs\nAsk Overseer instead\nYou\nWhat is everyone doing?\nStart as an agent\nOverseer\nHere is what everyone is doing:\n\n- **tidy the docs**: completed\nYou\nTell @tidy the docs (r-d2daf9a19041) to add a changelog\nStart as an agent\nOverseer\nI could not fin"
       }
     },
     {
@@ -91,8 +91,8 @@
             "release_on": {
               "kind": "release"
             },
-            "run_id": "r-4a3f206cd5a7",
-            "set_ms": 1790546284056,
+            "run_id": "r-d2daf9a19041",
+            "set_ms": 1790550144624,
             "title": "tidy the docs"
           }
         ]
