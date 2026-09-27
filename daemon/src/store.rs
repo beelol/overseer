@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-pub const SCHEMA_VERSION: i64 = 17;
+pub const SCHEMA_VERSION: i64 = 18;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -138,6 +138,18 @@ pub struct Event {
     pub source: String,
     pub confidence: String,
     pub payload: Value,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct AutoRootIntent {
+    pub work_unit_id: String,
+    pub requirements_hash: String,
+    pub route_id: String,
+    pub account_generation: Option<i64>,
+    pub phase: String,
+    pub task_id: String,
+    pub run_id: String,
+    pub workspace_id: String,
 }
 
 fn json_col(row: &Row, idx: &str) -> rusqlite::Result<Value> {
@@ -285,8 +297,17 @@ impl Store {
               execution_budget_ms INTEGER,
               planned_branch TEXT, planned_path TEXT, snapshot_id TEXT, snapshot_commit TEXT,
               decision_event_seq INTEGER REFERENCES events(seq) ON DELETE SET NULL);
+            CREATE TABLE IF NOT EXISTS auto_root_intents(
+              work_unit_id TEXT PRIMARY KEY, requirements_hash TEXT NOT NULL,
+              repo_root TEXT NOT NULL, workspace_mode TEXT NOT NULL,
+              route_id TEXT NOT NULL, account_generation INTEGER, phase TEXT NOT NULL,
+              task_id TEXT NOT NULL UNIQUE REFERENCES tasks(id),
+              run_id TEXT NOT NULL UNIQUE REFERENCES runs(id),
+              workspace_id TEXT NOT NULL UNIQUE REFERENCES workspaces(id),
+              created_ms INTEGER NOT NULL,
+              decision_event_seq INTEGER REFERENCES events(seq) ON DELETE SET NULL);
             CREATE TABLE IF NOT EXISTS auto_pool_claims(
-              work_unit_id TEXT PRIMARY KEY REFERENCES auto_launch_intents(work_unit_id),
+              work_unit_id TEXT PRIMARY KEY,
               pool_id TEXT NOT NULL, account_generation INTEGER,
               state TEXT NOT NULL CHECK(state IN ('active','uncertain','released')),
               created_ms INTEGER NOT NULL, released_ms INTEGER);
@@ -359,6 +380,34 @@ impl Store {
                 CREATE INDEX auto_daily_last_observed ON auto_daily_aggregates(last_observed_ms);")?;
             tx.commit()?;
         }
+        // v17 claims referenced only child intents. Root and child launches
+        // now share one pool table; rebuild without that child-only FK while
+        // preserving all active and uncertain claims.
+        let child_only_claims: bool = self.conn.query_row(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='auto_pool_claims'",
+            [], |row| row.get::<_, String>(0))?.contains("REFERENCES auto_launch_intents");
+        if child_only_claims {
+            let tx = self.conn.unchecked_transaction()?;
+            tx.execute_batch("CREATE TABLE auto_pool_claims_v18(
+                work_unit_id TEXT PRIMARY KEY,
+                pool_id TEXT NOT NULL, account_generation INTEGER,
+                state TEXT NOT NULL CHECK(state IN ('active','uncertain','released')),
+                created_ms INTEGER NOT NULL, released_ms INTEGER);
+                INSERT INTO auto_pool_claims_v18 SELECT work_unit_id,pool_id,
+                    account_generation,state,created_ms,released_ms FROM auto_pool_claims;
+                DROP TABLE auto_pool_claims;
+                ALTER TABLE auto_pool_claims_v18 RENAME TO auto_pool_claims;
+                CREATE INDEX auto_pool_claims_active ON auto_pool_claims(pool_id,state);")?;
+            tx.commit()?;
+        }
+        self.conn.execute_batch("CREATE TRIGGER IF NOT EXISTS auto_pool_claim_owner
+            BEFORE INSERT ON auto_pool_claims BEGIN
+              SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM auto_launch_intents
+                  WHERE work_unit_id=NEW.work_unit_id)
+                AND NOT EXISTS(SELECT 1 FROM auto_root_intents
+                  WHERE work_unit_id=NEW.work_unit_id)
+              THEN RAISE(ABORT,'automatic pool claim has no launch intent') END;
+            END;")?;
         // A pre-v15 daemon may have admitted a child without a pool claim.
         // Its old route/account evidence cannot prove a shared pool after
         // restart, so occupy a single conservative legacy pool until every
@@ -693,6 +742,75 @@ impl Store {
         ).optional()?)
     }
 
+    pub fn auto_root_intent(&self, id: &str) -> Result<Option<AutoRootIntent>> {
+        Ok(self.conn.query_row(
+            "SELECT work_unit_id,requirements_hash,route_id,account_generation,phase,
+                task_id,run_id,workspace_id FROM auto_root_intents WHERE work_unit_id=?1",
+            [id], |row| Ok(AutoRootIntent { work_unit_id:row.get(0)?,
+                requirements_hash:row.get(1)?, route_id:row.get(2)?,
+                account_generation:row.get(3)?, phase:row.get(4)?, task_id:row.get(5)?,
+                run_id:row.get(6)?, workspace_id:row.get(7)? }),
+        ).optional()?)
+    }
+
+    /// Commit the selected root, its queued execution rows, pool claim and
+    /// decision together. Git and the harness are deliberately outside this
+    /// method and may start only after the transaction succeeds.
+    pub fn insert_auto_root_selected(&self, work_unit_id: &str, requirements_hash: &str,
+        route_id: &str, pool_id: &str, account_generation: Option<i64>,
+        workspace: &Workspace, task: &Task, run: &Run, launch: &Value,
+        decision: &Value) -> Result<Option<Event>> {
+        if pool_id.is_empty() || pool_id.len() > 256 || requirements_hash.len() != 64
+            || route_id.is_empty() || route_id.len() > 300 {
+            return Err(anyhow!("automatic root admission metadata is invalid"));
+        }
+        if !matches!(workspace.kind.as_str(), "current" | "worktree")
+            || workspace.owner_run_id.is_some() || workspace.removed_ms.is_some()
+            || task.workspace_id != workspace.id || run.workspace_id != workspace.id
+            || run.task_id != task.id || run.parent_run_id.is_some()
+            || run.status != "queued" || run.process_generation != 0
+            || task.repo_root != workspace.repo_root || task.prompt.is_empty() {
+            return Err(anyhow!("automatic root execution rows are inconsistent"));
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        if self.auto_launch_intent(work_unit_id)?.is_some()
+            || self.auto_root_intent(work_unit_id)?.is_some() {
+            return Err(anyhow!("automatic work-unit identity was already used"));
+        }
+        if self.auto_pool_claimed(pool_id)? { return Ok(None); }
+        let writer: bool = self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM runs r JOIN workspaces w ON w.id=r.workspace_id
+                WHERE w.path=?1 AND w.removed_ms IS NULL
+                  AND r.status IN ('queued','starting','running','waiting_for_user'))",
+            [&workspace.path], |row| row.get(0))?;
+        if writer { return Ok(None); }
+        self.insert_workspace(workspace)?;
+        self.insert_task(task)?;
+        self.insert_run(run)?;
+        self.set_workspace_owner(&workspace.id, Some(&run.id))?;
+        self.conn.execute("UPDATE runs SET launch=?2 WHERE id=?1",
+            params![run.id, launch.to_string()])?;
+        self.conn.execute(
+            "INSERT INTO auto_root_intents(work_unit_id,requirements_hash,repo_root,
+                workspace_mode,route_id,account_generation,phase,task_id,run_id,
+                workspace_id,created_ms) VALUES(?1,?2,?3,?4,?5,?6,'queued',?7,?8,?9,?10)",
+            params![work_unit_id, requirements_hash, workspace.repo_root, workspace.kind,
+                route_id, account_generation, task.id, run.id, workspace.id,
+                crate::daemon::now()],
+        )?;
+        self.conn.execute(
+            "INSERT INTO auto_pool_claims(work_unit_id,pool_id,account_generation,state,created_ms)
+                VALUES(?1,?2,?3,'active',?4)",
+            params![work_unit_id, pool_id, account_generation, crate::daemon::now()],
+        )?;
+        let event = self.insert_event(crate::daemon::now(), Some(&task.id), Some(&run.id),
+            "auto_decision", "daemon", "exact", decision)?;
+        self.conn.execute("UPDATE auto_root_intents SET decision_event_seq=?2
+            WHERE work_unit_id=?1", params![work_unit_id, event.seq])?;
+        tx.commit()?;
+        Ok(Some(event))
+    }
+
     pub fn insert_auto_launch_intent(&self, id: &str, parent: &str, requirements_hash: &str,
         route_id: &str, account_generation: Option<i64>, execution_budget_ms: u64) -> Result<()> {
         self.conn.execute(
@@ -764,8 +882,11 @@ impl Store {
     pub fn release_settled_auto_pool_claim(&self, child_run_id: &str) -> Result<()> {
         self.conn.execute(
             "UPDATE auto_pool_claims SET state='released',released_ms=?2
-             WHERE work_unit_id=(SELECT m.work_unit_id FROM managed_work_units m
+             WHERE work_unit_id IN (SELECT m.work_unit_id FROM managed_work_units m
                  JOIN runs r ON r.id=m.child_run_id WHERE m.child_run_id=?1
+                 AND r.status IN ('completed','failed','interrupted') AND r.ended_ms IS NOT NULL
+                 UNION SELECT i.work_unit_id FROM auto_root_intents i
+                 JOIN runs r ON r.id=i.run_id WHERE i.run_id=?1
                  AND r.status IN ('completed','failed','interrupted') AND r.ended_ms IS NOT NULL)
                AND state IN ('active','uncertain')",
             params![child_run_id, crate::daemon::now()],
@@ -781,7 +902,8 @@ impl Store {
         Ok(self.conn.execute(
             "UPDATE auto_pool_claims SET state='released',released_ms=?2
              WHERE work_unit_id=?1 AND state IN ('active','uncertain')
-               AND NOT EXISTS(SELECT 1 FROM managed_work_units m WHERE m.work_unit_id=?1)",
+               AND NOT EXISTS(SELECT 1 FROM managed_work_units m WHERE m.work_unit_id=?1)
+               AND NOT EXISTS(SELECT 1 FROM auto_root_intents i WHERE i.work_unit_id=?1)",
             params![work_unit_id, crate::daemon::now()],
         )? == 1)
     }
@@ -794,7 +916,9 @@ impl Store {
             "UPDATE auto_pool_claims SET state='released',released_ms=?1
              WHERE state IN ('active','uncertain')
                AND NOT EXISTS(SELECT 1 FROM managed_work_units m
-                   WHERE m.work_unit_id=auto_pool_claims.work_unit_id)",
+                   WHERE m.work_unit_id=auto_pool_claims.work_unit_id)
+               AND NOT EXISTS(SELECT 1 FROM auto_root_intents i
+                   WHERE i.work_unit_id=auto_pool_claims.work_unit_id)",
             [crate::daemon::now()],
         )?)
     }
@@ -2250,6 +2374,106 @@ mod schema_migration_tests {
             "account/shared", None, 300_000, &serde_json::json!({"unit":"two"})).unwrap().is_some());
         assert!(reopened.release_unstarted_auto_pool_claim("two").unwrap(),
             "a worker proven never spawned may release its claim");
+    }
+
+    #[test]
+    fn root_and_child_auto_admission_share_a_durable_pool_before_git_or_model_effects() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state.sqlite");
+        let store = Store::open(&path).unwrap();
+        store.conn.execute_batch("INSERT INTO workspaces
+            (id,path,repo_root,common_dir,kind,initial_dirty,created_ms)
+            VALUES('parent-w','/tmp/parent','/tmp/parent','/tmp/parent','current','{}',0);
+            INSERT INTO tasks(id,title,prompt,repo_root,workspace_id,created_ms)
+            VALUES('parent-t','parent','prompt','/tmp/parent','parent-w',0);
+            INSERT INTO runs(id,task_id,harness,workspace_id,status,created_ms,title,capabilities)
+            VALUES('parent-r','parent-t','codex-app','parent-w','completed',0,'parent','{}');").unwrap();
+        let parent = store.run("parent-r").unwrap().unwrap();
+        assert!(store.insert_auto_selected_decision("child-unit", &parent, "child-hash",
+            "profile/model/medium", "account/shared", Some(1), 300_000,
+            &serde_json::json!({"selected":"profile/model/medium"})).unwrap().is_some());
+        let workspace = Workspace { id:"root-w".into(), path:dir.path().join("planned-worktree")
+            .display().to_string(), repo_root:"/tmp/root".into(), common_dir:"/tmp/root/.git".into(),
+            kind:"worktree".into(), branch:Some("codex/root".into()), owner_run_id:None,
+            initial_dirty:serde_json::json!({"clean":true}), created_ms:1, removed_ms:None };
+        let task = Task { id:"root-t".into(), title:"root".into(), prompt:"private prompt".into(),
+            repo_root:workspace.repo_root.clone(), target_ref:None, workspace_id:workspace.id.clone(),
+            start_snapshot:None, fork_commit:Some("a".repeat(40)), fork_provenance:None,
+            created_ms:1, archived_ms:None };
+        let run = Run { id:"root-r".into(), task_id:task.id.clone(), parent_run_id:None,
+            harness:"codex-app".into(), harness_version:None, profile_id:Some("profile".into()),
+            model:Some("model".into()), effort:Some("medium".into()), workspace_id:workspace.id.clone(),
+            native_id:None, status:"queued".into(), exit_reason:None, created_ms:1, ended_ms:None,
+            title:task.title.clone(), relation_source:None, relation_confidence:None,
+            capabilities:serde_json::json!({}), process_generation:0, attention:None };
+        let decision = serde_json::json!({"selected":"profile/model/medium"});
+        let launch = serde_json::json!({"generic":{"auto_routing":true}});
+        let root_hash = "a".repeat(64);
+        assert!(store.insert_auto_root_selected("root-unit", &root_hash, "profile/model/medium",
+            "account/shared", Some(1), &workspace, &task, &run, &launch, &decision)
+            .unwrap().is_none(), "a child claim must block the root before any row is visible");
+        assert!(store.auto_root_intent("root-unit").unwrap().is_none());
+        assert!(store.workspace("root-w").unwrap().is_none());
+        assert!(store.release_unstarted_auto_pool_claim("child-unit").unwrap());
+        store.conn.execute_batch("CREATE TRIGGER reject_root_decision
+            BEFORE INSERT ON events WHEN NEW.kind='auto_decision'
+            BEGIN SELECT RAISE(FAIL,'decision storage unavailable'); END;").unwrap();
+        assert!(store.insert_auto_root_selected("root-unit", &root_hash, "profile/model/medium",
+            "account/shared", Some(1), &workspace, &task, &run, &launch, &decision).is_err());
+        assert!(store.auto_root_intent("root-unit").unwrap().is_none());
+        assert!(store.workspace("root-w").unwrap().is_none(),
+            "a failed decision write rolls back workspace, task, run, and pool claim");
+        assert!(!store.auto_pool_claimed("account/shared").unwrap());
+        store.conn.execute_batch("DROP TRIGGER reject_root_decision").unwrap();
+        assert!(store.insert_auto_root_selected("root-unit", &root_hash, "profile/model/medium",
+            "account/shared", Some(1), &workspace, &task, &run, &launch, &decision)
+            .unwrap().is_some());
+        assert!(store.auto_pool_claimed("account/shared").unwrap());
+        assert!(!store.release_unstarted_auto_pool_claim("root-unit").unwrap(),
+            "a queued root with a durable run cannot lose its claim as an unstarted child");
+        assert_eq!(store.release_stale_unstarted_auto_pool_claims().unwrap(), 0);
+        assert_eq!(store.task("root-t").unwrap().unwrap().prompt, "private prompt");
+        assert!(!decision.to_string().contains("private prompt"));
+        assert!(!std::path::Path::new(&workspace.path).exists(),
+            "admission may not perform the planned Git effect");
+        assert!(store.insert_auto_selected_decision("second-child", &parent, "hash",
+            "profile/model/medium", "account/shared", Some(1), 300_000,
+            &decision).unwrap().is_none(), "root claim must block a child");
+        drop(store);
+        let reopened = Store::open(&path).unwrap();
+        let saved = reopened.auto_root_intent("root-unit").unwrap().unwrap();
+        assert_eq!(saved.requirements_hash, root_hash);
+        assert_eq!(saved.phase, "queued");
+        assert_eq!(saved.run_id, "root-r");
+        assert!(reopened.auto_pool_claimed("account/shared").unwrap());
+        reopened.conn.execute("UPDATE runs SET status='completed',ended_ms=2 WHERE id='root-r'", []).unwrap();
+        reopened.release_settled_auto_pool_claim("root-r").unwrap();
+        assert!(!reopened.auto_pool_claimed("account/shared").unwrap());
+    }
+
+    #[test]
+    fn child_only_pool_claim_schema_upgrades_without_losing_an_active_claim() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE auto_launch_intents(
+            work_unit_id TEXT PRIMARY KEY, parent_run_id TEXT NOT NULL,
+            requirements_hash TEXT NOT NULL, route_id TEXT NOT NULL,
+            account_generation INTEGER, phase TEXT NOT NULL, created_ms INTEGER NOT NULL);
+            INSERT INTO auto_launch_intents VALUES('old-child','old-parent','hash','route',1,'preparing',1);
+            CREATE TABLE auto_pool_claims(
+            work_unit_id TEXT PRIMARY KEY REFERENCES auto_launch_intents(work_unit_id),
+            pool_id TEXT NOT NULL, account_generation INTEGER,
+            state TEXT NOT NULL CHECK(state IN ('active','uncertain','released')),
+            created_ms INTEGER NOT NULL, released_ms INTEGER);
+            INSERT INTO auto_pool_claims VALUES('old-child','account/shared',1,'active',1,NULL);").unwrap();
+        let store = Store { conn, learning_conn:Connection::open_in_memory().unwrap(),
+            learning_persistent:true };
+        store.migrate().unwrap();
+        store.migrate().unwrap();
+        assert!(store.auto_pool_claimed("account/shared").unwrap());
+        let foreign_keys: i64 = store.conn.query_row(
+            "SELECT COUNT(*) FROM pragma_foreign_key_list('auto_pool_claims')",
+            [], |row| row.get(0)).unwrap();
+        assert_eq!(foreign_keys, 0, "root and child intents now share the claim table");
     }
 
     #[test]
