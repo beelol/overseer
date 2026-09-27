@@ -1,0 +1,5 @@
+#!/bin/sh
+# Simulates /usr/bin/git on a Mac whose Xcode license was not accepted (AC-159 check).
+if [ "$DEVELOPER_DIR" = "/Library/Developer/CommandLineTools" ]; then exec /Library/Developer/CommandLineTools/usr/bin/git "$@"; fi
+echo "You have not agreed to the Xcode license agreements. Please run 'sudo xcodebuild -license' from within a Terminal window to review and agree to the Xcode and Apple SDKs license." >&2
+exit 69

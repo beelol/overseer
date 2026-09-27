@@ -14,7 +14,7 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 - Do not change another agent's area without saying so in your pull request.
 
 ## Brand
-- One Overseer mark everywhere (AC-142): see `docs/design/brand.md`. The files live in `docs/design/brand/`: the full-colour icon, the transparent mark and the single-colour glyph. Use nothing else, on VS Code, the Mac, the phone or anywhere.
+- One Overseer mark everywhere (AC-142): see `docs/design/brand.md`. The files live in `docs/design/brand/`: `overseer-app-icon.png` (the full app icon: Marketplace, any Mac app icon, the phone's home screen), `overseer-logo.png` (the colour mark: Overseer's own views, marks inside the apps, Android's adaptive foreground) and `overseer-icon-flat.png` (the single-colour silhouette: surfaces that tint one colour, the phone's door and launch screen, Android's themed icon, a Mac menu-bar template); `overseer-mark.svg` is the silhouette as SVG. Use nothing else, on VS Code, the Mac, the phone or anywhere (AC-178, AC-179).
 - Themes: Overseer Dark and Overseer Light, plus the bold "Overseer" theme of Gate M (AC-103). Colours come from the design tokens (`extension/design/tokens.js`), never hard-coded.
 
 ## Paid turns
@@ -22,7 +22,8 @@ Codex, Kilo and Claude all read this file (Claude through `CLAUDE.md`). The owne
 - Never touch the owner's checkouts, logins or credentials; never sign anything out. Restart or reinstall on the owner's daemon only when no runs are active.
 
 ## Tests
-- `cargo test --workspace` (daemon and TUI); `node test/unit/*.js`; `node extension/scripts/package.js`, then `node test/ui/scenario-<name>.js` (isolated VS Code profiles). `scripts/test-all` runs everything (AC-147).
+- `scripts/test-all` runs everything and prints one summary (AC-147): Rust (daemon and TUI), the extension's unit tests and source check, the ledger's link check, the VSIX build and every packaged-UI fixture scenario. `--jobs=3` runs UI scenarios three at a time; `--only=a,b` picks scenarios; `--no-ui` skips them; `--live` and `--perf` add the paid and load scenarios. Run it before asking for a merge, and run at least one UI scenario before pushing extension changes to `main` (a change that stops the extension activating breaks every agent's build).
+- Several agents run VS Code scenarios on the same machine: a timing check that fails under that load is rerun alone before it is called a regression.
 - Leave no test windows, daemons, shims or runs going.
 
 ## Where the designs are

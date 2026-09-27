@@ -1305,21 +1305,28 @@ rec(147, "One command runs every test", "verified", commit="fb43c9b (merge of pu
 rec(148, "Checks on every pull request", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate P).",
     actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
-rec(149, "A steady UI suite", "not started", date="—", commit="—",
+rec(149, "A steady UI suite", "partial", commit="91c7fc8", date="2026-09-27", harness="fixture harnesses; no paid tokens",
+    proven="causes fixed on main: the UI harness aims a click only once its target has stopped moving; the review no longer takes keyboard focus while following an agent; ⌥⌘J presses queue; the keyboard scenario waits for each selection; staging refreshes the review in 225 ms (was about 2 s); the hunk scenario's redo passed in every run this session",
+    deferred="three consecutive clean full runs on one build, and the first-edit p95 under 400 ms over ten runs (last single runs: 361 and 466 ms): both need a machine where no other agent is running VS Code scenarios at the same time (the phone and Continuity agents were running theirs throughout)",
     expected="See the RFC criterion (Gate P).",
-    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
-rec(150, "The first click always lands", "not started", date="—", commit="—",
+    actual="Full run on main plus pull requests #8, #11 to #13: 40 of 48; every failure since fixed on main or passing on rerun except keyboard, whose first ⌥⌘J reading still lags under load.",
+    evidence="[AC-147 runs](evidence/ac-147/)", live="—", blocker="Needs a quiet machine (no other agent running UI scenarios) for the three-in-a-row runs and the p95.")
+rec(150, "The first click always lands", "verified", commit="bc358a1", date="2026-09-27", harness="fixture harnesses; no paid tokens",
+    steps="`node test/ui/scenario-first-click.js`: focus in the side bar or another editor group, then one click on each view's first control, in the composer, review beside the chat, grid and dashboard arrangements.",
     expected="See the RFC criterion (Gate P).",
-    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+    actual="All seven first clicks acted: the composer's agent menu, the chat's More menu (after focus in the review and in the dashboard), the review's Changes only toggle both ways, the search field (and the typing after it), a grid tile's pin.",
+    evidence="[first-click scenario](evidence/ui/first-click/)", live="—")
 rec(151, "Every live scenario rerun on the current build", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate P).",
     actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
 rec(152, "Performance re-measured", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate P).",
     actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
-rec(153, "A ledger that stays true", "not started", date="—", commit="—",
+rec(153, "A ledger that stays true", "verified", commit="bc358a1", date="2026-09-27", harness="none (a script)",
+    steps="`python3 docs/verification/records.py <commit>` regenerates without errors; `scripts/check-links` (also run by `scripts/test-all`) checks every relative link in the README and the ledger.",
     expected="See the RFC criterion (Gate P).",
-    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+    actual="611 links checked in 206 files, none broken. The merged gates' criteria are recorded with their merge commits (Gate K follow-ups, Gate M, the logo, Gate P; Audio Mode's AC-143 to AC-145, T-23 and T-24 by its agent).",
+    evidence="[ledger](README.md)", live="—")
 
 # Gate Q, cover everything and oversee the agents (added by the owner on 2026-09-27). Not started.
 rec(154, "Composer choices fill the row", "verified", commit="8d239cb (merge of pull request #8)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
@@ -1482,11 +1489,11 @@ SHORT_BLOCKERS = {
     146: "not started (Gate P, added by the owner on 2026-09-27)",
     147: "verified",
     148: "not started (Gate P, added by the owner on 2026-09-27)",
-    149: "not started (Gate P, added by the owner on 2026-09-27)",
-    150: "not started (Gate P, added by the owner on 2026-09-27)",
+    149: "partial: the causes are fixed; three clean runs in a row need a machine where no other agent runs UI tests",
+    150: "verified",
     151: "not started (Gate P, added by the owner on 2026-09-27)",
     152: "not started (Gate P, added by the owner on 2026-09-27)",
-    153: "not started (Gate P, added by the owner on 2026-09-27)",
+    153: "verified",
     142: "verified",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
