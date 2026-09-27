@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-pub const SCHEMA_VERSION: i64 = 18;
+pub const SCHEMA_VERSION: i64 = 19;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -314,6 +314,20 @@ impl Store {
               created_ms INTEGER NOT NULL, released_ms INTEGER);
             CREATE INDEX IF NOT EXISTS auto_pool_claims_active
               ON auto_pool_claims(pool_id,state);
+            CREATE TABLE IF NOT EXISTS shared_booking_intents(
+              work_unit_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL,
+              caller TEXT NOT NULL, route_id TEXT NOT NULL, profile_id TEXT NOT NULL,
+              quota_profile_id TEXT NOT NULL, account_generation INTEGER NOT NULL,
+              quota_event_seq INTEGER NOT NULL, phase TEXT NOT NULL
+                CHECK(phase IN ('booked','uncertain','released')),
+              created_ms INTEGER NOT NULL, updated_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS shared_booking_windows(
+              work_unit_id TEXT NOT NULL REFERENCES shared_booking_intents(work_unit_id),
+              pool_id TEXT NOT NULL, window_key TEXT NOT NULL,
+              amount_milli INTEGER NOT NULL CHECK(amount_milli > 0),
+              PRIMARY KEY(work_unit_id,pool_id,window_key));
+            CREATE INDEX IF NOT EXISTS shared_booking_windows_pool
+              ON shared_booking_windows(pool_id,window_key);
             "#,
         )?;
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;
@@ -401,11 +415,14 @@ impl Store {
                 CREATE INDEX auto_pool_claims_active ON auto_pool_claims(pool_id,state);")?;
             tx.commit()?;
         }
-        self.conn.execute_batch("CREATE TRIGGER IF NOT EXISTS auto_pool_claim_owner
+        self.conn.execute_batch("DROP TRIGGER IF EXISTS auto_pool_claim_owner;
+            CREATE TRIGGER auto_pool_claim_owner
             BEFORE INSERT ON auto_pool_claims BEGIN
               SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM auto_launch_intents
                   WHERE work_unit_id=NEW.work_unit_id)
                 AND NOT EXISTS(SELECT 1 FROM auto_root_intents
+                  WHERE work_unit_id=NEW.work_unit_id)
+                AND NOT EXISTS(SELECT 1 FROM shared_booking_intents
                   WHERE work_unit_id=NEW.work_unit_id)
               THEN RAISE(ABORT,'automatic pool claim has no launch intent') END;
             END;")?;
@@ -974,7 +991,8 @@ impl Store {
             "UPDATE auto_pool_claims SET state='released',released_ms=?2
              WHERE work_unit_id=?1 AND state IN ('active','uncertain')
                AND NOT EXISTS(SELECT 1 FROM managed_work_units m WHERE m.work_unit_id=?1)
-               AND NOT EXISTS(SELECT 1 FROM auto_root_intents i WHERE i.work_unit_id=?1)",
+               AND NOT EXISTS(SELECT 1 FROM auto_root_intents i WHERE i.work_unit_id=?1)
+               AND NOT EXISTS(SELECT 1 FROM shared_booking_intents i WHERE i.work_unit_id=?1)",
             params![work_unit_id, crate::daemon::now()],
         )? == 1)
     }
@@ -1003,6 +1021,8 @@ impl Store {
                AND NOT EXISTS(SELECT 1 FROM managed_work_units m
                    WHERE m.work_unit_id=auto_pool_claims.work_unit_id)
                AND NOT EXISTS(SELECT 1 FROM auto_root_intents i
+                   WHERE i.work_unit_id=auto_pool_claims.work_unit_id)
+               AND NOT EXISTS(SELECT 1 FROM shared_booking_intents i
                    WHERE i.work_unit_id=auto_pool_claims.work_unit_id)",
             [crate::daemon::now()],
         )?)
