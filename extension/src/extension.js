@@ -18,6 +18,7 @@ const { Dashboard } = require('./dashboard-mode');
 const { Immersive } = require('./immersive');
 const { OverseerChat } = require('./overseer-chat');
 const { Continuity } = require('./continuity');
+const { AutoUsage } = require('./auto-usage');
 
 let client;
 let centerRef;
@@ -49,6 +50,7 @@ async function activate(context) {
   const binary = resolveBinary(context, vscode.workspace.getConfiguration('overseer').get('daemonPath'));
   client = new DaemonClient(binary, say);
   const model = new Model(client);
+  const autoUsage = new AutoUsage(client, context);
   // The side bar's agents list (Gate K): Needs you, then agents by repository.
   const agents = new AgentsProvider(model, context.workspaceState, context.extensionUri, { attention: () => attention(), pinned: () => pinned() });
   const accounts = new AccountsProvider(model, context.extensionUri);
@@ -689,6 +691,7 @@ async function activate(context) {
       await model.refresh();
     })),
     vscode.commands.registerCommand('overseer.refreshAccounts', guard(refreshAccounts)),
+    vscode.commands.registerCommand('overseer.autoUsage', guard(() => autoUsage.show())),
     vscode.commands.registerCommand('overseer.showCapabilities', guard(async () => {
       const list = await client.request('harness.list');
       const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: '# Harness capabilities (reported by this Overseer build)\n\n' + list.map(h =>

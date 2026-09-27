@@ -8,7 +8,7 @@
       "name": "the UI enabled Auto and the daemon chose one model and effort before the fixture turn",
       "ok": true,
       "detail": {
-        "run": "r-47a775cc7b6a4a4890e5b55b22e195ca",
+        "run": "r-492f6562426e46769258c14e9b52d7a7",
         "status": "completed",
         "model": "gpt-6-sol",
         "effort": "medium",
@@ -29,17 +29,17 @@
       "name": "Auto parent receives a browser-labelled child result and assigns a stronger diagnosis unit while healthy",
       "ok": true,
       "detail": {
-        "parent": "r-80e561b8840d42f495c1bd792d8cc367",
+        "parent": "r-bdbeb6f7cde846178de71d6e315f2700",
         "status": "completed",
         "children": [
           {
-            "id": "r-4a4a67f95eee",
+            "id": "r-a776e1296d15",
             "model": "gpt-6-sol",
             "effort": "medium",
             "status": "completed"
           },
           {
-            "id": "r-1b45d392e31d",
+            "id": "r-6dd6a25bc9e8",
             "model": "gpt-6-astra",
             "effort": "high",
             "status": "completed"
@@ -67,16 +67,36 @@
       "ok": true,
       "detail": [
         {
-          "run": "r-4a4a67f95eee",
+          "run": "r-a776e1296d15",
           "text": "browser check49 reported tokens",
           "title": "browser check\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
         },
         {
-          "run": "r-1b45d392e31d",
+          "run": "r-6dd6a25bc9e8",
           "text": "diagnosis49 reported tokens",
           "title": "diagnosis\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
         }
       ]
+    },
+    {
+      "name": "packaged VS Code exposes local Auto work and explicit export/clear without calling tokens allowance",
+      "ok": true,
+      "detail": {
+        "title": "Auto usage",
+        "rows": [
+          "gpt-6-sol · medium, completed · 9/27/2026, 12:54:42 PM, Token activity unavailable · subscription draw unverified",
+          "gpt-6-astra · high, completed · 9/27/2026, 12:54:41 PM, 49 reported tokens · subscription draw unverified",
+          "gpt-6-sol · medium, completed · 9/27/2026, 12:54:40 PM, 49 reported tokens · subscription draw unverified",
+          "gpt-6-sol · medium, completed · 9/27/2026, 12:54:37 PM, 49 reported tokens · subscription draw unverified",
+          "Export local usage…, Save a redacted JSON file on this Mac; nothing is uploaded.",
+          "Clear local usage…, Remove learning records and summaries; agents and task history stay."
+        ],
+        "value": ""
+      }
+    },
+    {
+      "name": "opening a local usage row shows its content-free report",
+      "ok": true
     },
     {
       "name": "window reload restores the same child decision history",
@@ -92,12 +112,12 @@
       "ok": true,
       "detail": [
         {
-          "run": "r-4a4a67f95eee",
+          "run": "r-a776e1296d15",
           "text": "browser check49 reported tokens",
           "title": "browser check\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
         },
         {
-          "run": "r-1b45d392e31d",
+          "run": "r-6dd6a25bc9e8",
           "text": "diagnosis49 reported tokens",
           "title": "diagnosis\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
         }
@@ -108,7 +128,7 @@
       "ok": true,
       "detail": {
         "runs": [
-          "r-47a775cc7b6a4a4890e5b55b22e195ca"
+          "r-492f6562426e46769258c14e9b52d7a7"
         ],
         "remembered": "Agent: Auto routing"
       }

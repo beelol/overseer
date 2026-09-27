@@ -70,13 +70,12 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // Leaving a webview textarea focused can swallow the command-palette shortcut.
     const statusPoint = await cdp.evalWorkbench(`(() => { const r = document.querySelector('.part.statusbar').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
     await cdp.click(statusPoint.x, statusPoint.y);
-    s.note('command row', await cdp.command('Overseer: New Agent'));
+    await cdp.focusWorkbench(); await cdp.key('n', { meta: true, alt: true });
     await dash.waitFor(`document.body.dataset.mode === 'composer' && !document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);
     const autoDefault = await dash.eval(`document.querySelector('[data-chip="agent"]').getAttribute('aria-label')`);
-    const nextPoint = await s.webviewPoint(dash, '#task');
-    await cdp.click(nextPoint.x, nextPoint.y); await cdp.type('fixture: delegate browser then diagnose');
+    await dash.eval(`(() => { const field = document.getElementById('task'); field.value = 'fixture: delegate browser then diagnose'; field.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     await dash.waitFor(`!document.getElementById('start').disabled`, 5000);
-    await cdp.key('Enter');
+    await dash.eval(`document.getElementById('start').click()`);
     let parent;
     for (let i = 0; i < 100 && !parent; i++) {
       await delay(250);
@@ -112,6 +111,20 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       children.every(c => childUsage.some(u => u.run === c.id && /49 reported tokens/.test(u.text) && /activity, not subscription allowance/.test(u.title))),
       childUsage);
     await s.screenshot('auto-delegation');
+    await cdp.command('Overseer: Auto Usage');
+    await cdp.waitQuickTitle('Auto usage');
+    const usageMenu = await cdp.quickInputState();
+    check('packaged VS Code exposes local Auto work and explicit export/clear without calling tokens allowance',
+      usageMenu.rows.some(row => /gpt-6-sol/.test(row)) &&
+      usageMenu.rows.some(row => /Export local usage/.test(row)) &&
+      usageMenu.rows.some(row => /Clear local usage/.test(row)) &&
+      usageMenu.rows.some(row => /subscription draw unverified/i.test(row)), usageMenu);
+    await s.screenshot('auto-local-usage');
+    await cdp.pick('Auto usage', 'gpt-6-astra');
+    const usageReport = await cdp.waitFor(`document.body.textContent.includes('auto-work-usage-1.md')`, 10000, 'local Auto usage report tab');
+    check('opening a local usage row shows its content-free report', usageReport);
+    await s.screenshot('auto-local-usage-report');
+    await cdp.key('w', { meta: true });
     await cdp.command('Developer: Reload Window'); await delay(6000);
     cdp = await s.connect(); s.cdp = cdp;
     dash = await s.editorView();
@@ -124,8 +137,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       children.every(c => reloadedChildUsage.some(u => u.run === c.id && /49 reported tokens/.test(u.text) && /activity, not subscription allowance/.test(u.title))),
       reloadedChildUsage);
     const after = s.ctl('state').runs.filter(r => !r.parent_run_id && r.title === 'seed context');
-    await cdp.command('Overseer: New Agent');
-    await dash.waitFor(`document.body.dataset.mode === 'composer' && !document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);
+    await cdp.focusWorkbench(); await cdp.key('n', { meta: true, alt: true });
+    await dash.waitFor(`document.body.dataset.mode === 'composer' && document.querySelector('[data-chip="agent"]')?.getAttribute('aria-label')?.includes('Auto routing')`, 20000);
     const remembered = await dash.eval(`document.querySelector('[data-chip="agent"]').getAttribute('aria-label')`);
     check('window reload keeps the original Auto run and remembers Auto as the next choice', after.length === 1 && after[0].id === root.id && /Auto routing/.test(remembered),
       { runs: after.map(r => r.id), remembered });

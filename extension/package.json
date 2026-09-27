@@ -104,6 +104,7 @@
       { "command": "overseer.signOut", "title": "Sign Out", "category": "Overseer", "icon": "$(sign-out)" },
       { "command": "overseer.renameProfile", "title": "Rename Account…", "category": "Overseer", "icon": "$(edit)" },
       { "command": "overseer.refreshAccounts", "title": "Refresh Account Status", "category": "Overseer", "icon": "$(refresh)" },
+      { "command": "overseer.autoUsage", "title": "Auto Usage…", "category": "Overseer", "icon": "$(graph)" },
       { "command": "overseer.openEdit", "title": "Open Edit in Review", "category": "Overseer" },
       { "command": "overseer.showCapabilities", "title": "Show Harness Capabilities", "category": "Overseer", "icon": "$(info)" },
       { "command": "overseer.openPullRequest", "title": "Open Pull Request…", "category": "Overseer", "icon": "$(git-pull-request)", "enablement": "isWorkspaceTrusted" },
@@ -146,7 +147,8 @@
         { "command": "overseer.audioMode", "when": "view == overseer.agents", "group": "5_audio@1" },
         { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
-        { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" }
+        { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
+        { "command": "overseer.autoUsage", "when": "view == overseer.accounts", "group": "4_info@1" }
       ],
       "view/item/context": [
         { "command": "overseer.interrupt", "when": "view == overseer.agents && viewItem =~ /^agent-active/", "group": "inline@1" },
