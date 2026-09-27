@@ -3,17 +3,28 @@
 The iOS and Android app of Overseer's phone remote, one Expo codebase
 ([the design](../docs/rfcs/phone-remote.md), Gate N in [the RFC](../docs/overseer-rfc.md)).
 
-This is the foundation: the project, the design tokens, the platform layer, the checks, and
-one temporary screen that proves them on both simulators. Pairing, the session and the screens
-come next.
+One app for both platforms. It lists every agent of the Mac, shows each conversation live,
+and controls what VS Code controls: messages, permission requests, review, merge back, pull
+requests, new agents, accounts. It talks to the Overseer daemon on the owner's Mac and to
+nothing else.
 
 ```
-app/                  routes (expo-router); the root creates the device's capabilities
+app/                  routes (expo-router); the root creates the capabilities and the session
 src/theme/            tokens.generated.ts (generated), the themes, useTheme()
 src/platform/         one interface per capability, an implementation per platform, fakes
-src/screens/          screens; HomeScreen is the foundation's scaffolding
-scripts/              token generator, asset generator, run scripts, the platform rule's check
-core/, model/, …      packages of their own beside the app, each with its own install and tests
+src/session/          the app's one connection: the daemon's state, kept live; conversations
+src/door/             the door of a cold start
+src/motion/           the one motion system: Tap, Arrive, Pulse, useMotion()
+src/ui/               the pieces screens are built from (docs/building-screens.md)
+src/screens/          the screens (docs/app-spec.md says what each holds)
+src/notifications/    the system's notifications, and the app's own banners where there are none
+src/perf/             the app's measurements of its own speed
+core/                 the connection library: pairing, the encrypted session, exactly-once requests
+model/                the view models, compared with VS Code's own code
+integration/          the connection library against a real overseerd
+e2e/                  the scenario run on both simulators, and the speed measurements
+scripts/              generators, run scripts, and the checks of the platform and token rules
+design/               the tokens only a phone has (touch sizes, the door, springs)
 assets/               icon and launch images, generated from the mark
 app.config.ts         the whole native configuration
 ```
@@ -189,3 +200,36 @@ build fails with `ninja: error: ... missing and no known rule to make it`.
   layer. Android refuses unencrypted connections in release builds unless the app allows
   them; that setting belongs with the transport and is not made here.
 - Signing, the real iPhone, TestFlight: the owner's steps in the design.
+
+## The scenario run
+
+One command builds the daemon and both release apps, installs each app anew on its simulator,
+starts a real `overseerd` with its own data folder and fixture agents, drives the app with
+Maestro through every scenario, asks the daemon what happened, and measures the speed budgets.
+
+```bash
+npm run e2e
+```
+
+```bash
+node e2e/run.mjs --platform ios --skip-build --only pair,send
+```
+
+It needs Maestro (`brew tap mobile-dev-inc/tap && brew install maestro`), the booted simulator
+and Overseer's own Android virtual device. Logs, screenshots and results go to
+`docs/verification/evidence/phone/e2e/`. It never touches the owner's daemon: the lab's daemon
+listens on its own ports (47821 and 47822) and is never advertised on the network.
+
+`node e2e/run.mjs --seed-slow 400` holds every start of the app for 400 ms: the budgets must
+notice and the run must fail. `node e2e/measure.mjs --platform ios --write-baseline` records a
+platform's baseline in `e2e/baselines.json`.
+
+## Checks
+
+```bash
+npm run check
+```
+
+Tokens and icons current with their sources, the lint (with the platform rule and the token
+rule), the types, the unit tests, and the two rules proven with seeded violations.
+The packages beside the app: `npm test` in `core/`, `model/` and `integration/`.

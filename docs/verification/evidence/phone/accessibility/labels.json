@@ -1,0 +1,452 @@
+[
+  {
+    "screen": "Pair with your Mac",
+    "kind": "field",
+    "testID": "pair.name",
+    "label": "This phone's name"
+  },
+  {
+    "screen": "Pair with your Mac",
+    "kind": "field",
+    "testID": "pair.code",
+    "label": "Code"
+  },
+  {
+    "screen": "Pair with your Mac",
+    "kind": "button",
+    "testID": "pair.submit",
+    "label": "Pair"
+  },
+  {
+    "screen": "Agents",
+    "kind": "button",
+    "testID": "agents.search",
+    "label": "Search Agents"
+  },
+  {
+    "screen": "Agents",
+    "kind": "button",
+    "testID": "agents.menu",
+    "label": "Menu"
+  },
+  {
+    "screen": "Agents",
+    "kind": "button",
+    "testID": "agents.filter.all",
+    "label": "All"
+  },
+  {
+    "screen": "Agents",
+    "kind": "button",
+    "testID": "agents.filter.active",
+    "label": "Active"
+  },
+  {
+    "screen": "Agents",
+    "kind": "button",
+    "testID": "agents.filter.needs",
+    "label": "Needs you, 0"
+  },
+  {
+    "screen": "Agents",
+    "kind": "button",
+    "testID": "agents.repo.shop",
+    "label": "shop, 1 agent"
+  },
+  {
+    "screen": "Agents",
+    "kind": "button",
+    "testID": "agents.row.r-e230dd1eaaa5",
+    "label": "Refresh sessions and changelog, done, claude, claude (existing login)"
+  },
+  {
+    "screen": "Agents",
+    "kind": "button",
+    "testID": "agents.row.r-e230dd1eaaa5.archive",
+    "label": "Archive, Refresh sessions and changelog"
+  },
+  {
+    "screen": "Agents",
+    "kind": "button",
+    "testID": "agents.new",
+    "label": "New agent"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.back",
+    "label": "Back"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.changes",
+    "label": "Changes"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.more",
+    "label": "More"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.row.edit:30.file.0",
+    "label": "CHANGELOG.md, Open at the edited hunk in the review"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.row.tool:r-e230dd1eaaa5_toolu_changelog",
+    "label": "Created CHANGELOG.md, +3 −0"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.row.edit:18.file.0",
+    "label": "session-refresh-coordinator.ts, Open at the edited hunk in the review"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.row.edit:22.file.0",
+    "label": "README.md, Open at the edited hunk in the review"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.row.msg:29.md.4.copy",
+    "label": "Copy code"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.row.msg:29.md.5.1",
+    "label": "/fixture/home/worktrees/shop-21f518a0/refresh-sessions-and-changelog/src/auth/session-refresh-coordinator.ts"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "link",
+    "testID": "agent.row.msg:29.md.5.3",
+    "label": "refresh token spec"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.row.steps:9",
+    "label": "6 steps, Read, Searched, Found files, Created, Edited, Ran"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "field",
+    "testID": "agent.composer.text",
+    "label": "Message to this agent"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.composer.model",
+    "label": "Model: Default"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.composer.effort",
+    "label": "Effort: Default"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.composer.mode",
+    "label": "Permissions: Default"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.composer.attach",
+    "label": "Attach a photo or an image"
+  },
+  {
+    "screen": "Conversation",
+    "kind": "button",
+    "testID": "agent.composer.send",
+    "label": "Send"
+  },
+  {
+    "screen": "Changes",
+    "kind": "button",
+    "testID": "changes.back",
+    "label": "Back"
+  },
+  {
+    "screen": "Changes",
+    "kind": "button",
+    "testID": "changes.folder.src/",
+    "label": "Fold src"
+  },
+  {
+    "screen": "Changes",
+    "kind": "button",
+    "testID": "changes.row.src/cart.ts",
+    "label": "src/cart.ts, M, +2 −1, 0 of 2 reviewed"
+  },
+  {
+    "screen": "Changes",
+    "kind": "button",
+    "testID": "changes.row.src/tax.ts",
+    "label": "src/tax.ts, A, New file, +2 −1, 0 of 2 reviewed"
+  },
+  {
+    "screen": "Changes",
+    "kind": "field",
+    "testID": "changes.filter",
+    "label": "Filter files"
+  },
+  {
+    "screen": "Changes",
+    "kind": "button",
+    "testID": "changes.comparison",
+    "label": "Comparison: Latest run"
+  },
+  {
+    "screen": "A file's changes",
+    "kind": "button",
+    "testID": "file.back",
+    "label": "Back"
+  },
+  {
+    "screen": "A file's changes",
+    "kind": "button",
+    "testID": "file.wrap",
+    "label": "Scroll long lines sideways"
+  },
+  {
+    "screen": "A file's changes",
+    "kind": "button",
+    "testID": "file.hunk.accept",
+    "label": "Accept hunk 1"
+  },
+  {
+    "screen": "A file's changes",
+    "kind": "button",
+    "testID": "file.hunk.reject",
+    "label": "Reject hunk 1"
+  },
+  {
+    "screen": "A file's changes",
+    "kind": "button",
+    "testID": "file.hunk.accept",
+    "label": "Accept hunk 2"
+  },
+  {
+    "screen": "A file's changes",
+    "kind": "button",
+    "testID": "file.hunk.reject",
+    "label": "Reject hunk 2"
+  },
+  {
+    "screen": "A file's changes",
+    "kind": "button",
+    "testID": "file.hunk.accept",
+    "label": "Accept hunk 2"
+  },
+  {
+    "screen": "A file's changes",
+    "kind": "button",
+    "testID": "file.hunk.reject",
+    "label": "Reject hunk 2"
+  },
+  {
+    "screen": "Merge back",
+    "kind": "button",
+    "testID": "merge.back",
+    "label": "Back"
+  },
+  {
+    "screen": "Merge back",
+    "kind": "button",
+    "testID": "merge.lands",
+    "label": "2 files, overseer/fix-cart → main"
+  },
+  {
+    "screen": "Merge back",
+    "kind": "button",
+    "testID": "merge.lands.src/cart.ts",
+    "label": "cart.ts, M, src/cart.ts"
+  },
+  {
+    "screen": "Merge back",
+    "kind": "button",
+    "testID": "merge.lands.src/tax.ts",
+    "label": "tax.ts, A, src/tax.ts"
+  },
+  {
+    "screen": "Merge back",
+    "kind": "button",
+    "testID": "merge.complete",
+    "label": "Complete"
+  },
+  {
+    "screen": "Pull request",
+    "kind": "button",
+    "testID": "pr.back",
+    "label": "Back"
+  },
+  {
+    "screen": "Pull request",
+    "kind": "field",
+    "testID": "pr.field.title",
+    "label": "Title"
+  },
+  {
+    "screen": "Pull request",
+    "kind": "field",
+    "testID": "pr.field.body",
+    "label": "Description"
+  },
+  {
+    "screen": "Pull request",
+    "kind": "button",
+    "testID": "pr.open",
+    "label": "Open. Pushes overseer/fix-cart to origin and opens a pull request on owner/shop. Nothing is merged."
+  },
+  {
+    "screen": "New agent",
+    "kind": "button",
+    "testID": "new.back",
+    "label": "Back"
+  },
+  {
+    "screen": "New agent",
+    "kind": "field",
+    "testID": "new.task",
+    "label": "Task"
+  },
+  {
+    "screen": "New agent",
+    "kind": "button",
+    "testID": "new.repo",
+    "label": "Repository, shop"
+  },
+  {
+    "screen": "New agent",
+    "kind": "button",
+    "testID": "new.agent",
+    "label": "Agent, Claude Code"
+  },
+  {
+    "screen": "New agent",
+    "kind": "button",
+    "testID": "new.account",
+    "label": "Account, claude (existing login)"
+  },
+  {
+    "screen": "New agent",
+    "kind": "button",
+    "testID": "new.model",
+    "label": "Model, Default"
+  },
+  {
+    "screen": "New agent",
+    "kind": "button",
+    "testID": "new.effort",
+    "label": "Effort, Default"
+  },
+  {
+    "screen": "New agent",
+    "kind": "button",
+    "testID": "new.mode",
+    "label": "Permissions, Default"
+  },
+  {
+    "screen": "New agent",
+    "kind": "button",
+    "testID": "new.where",
+    "label": "Workspace, New worktree"
+  },
+  {
+    "screen": "New agent",
+    "kind": "button",
+    "testID": "new.start",
+    "label": "Start"
+  },
+  {
+    "screen": "Accounts",
+    "kind": "button",
+    "testID": "accounts.back",
+    "label": "Back"
+  },
+  {
+    "screen": "Accounts",
+    "kind": "button",
+    "testID": "accounts.signin.p-work",
+    "label": "Sign in, Work"
+  },
+  {
+    "screen": "Settings",
+    "kind": "button",
+    "testID": "settings.back",
+    "label": "Back"
+  },
+  {
+    "screen": "Settings",
+    "kind": "button",
+    "testID": "settings.notifications.allow",
+    "label": "Allow notifications"
+  },
+  {
+    "screen": "Settings",
+    "kind": "switch",
+    "testID": "settings.notifications.all",
+    "label": "Notifications"
+  },
+  {
+    "screen": "Settings",
+    "kind": "switch",
+    "testID": "settings.notifications.permission",
+    "label": "Permission requests"
+  },
+  {
+    "screen": "Settings",
+    "kind": "switch",
+    "testID": "settings.notifications.question",
+    "label": "Questions"
+  },
+  {
+    "screen": "Settings",
+    "kind": "switch",
+    "testID": "settings.notifications.failure",
+    "label": "Errors"
+  },
+  {
+    "screen": "Settings",
+    "kind": "switch",
+    "testID": "settings.notifications.finished",
+    "label": "Finished"
+  },
+  {
+    "screen": "Settings",
+    "kind": "switch",
+    "testID": "settings.notifications.text",
+    "label": "Show text in notifications"
+  },
+  {
+    "screen": "Settings",
+    "kind": "switch",
+    "testID": "settings.safety.lock",
+    "label": "App lock"
+  },
+  {
+    "screen": "Settings",
+    "kind": "switch",
+    "testID": "settings.safety.unlock",
+    "label": "Ask for unlock before changes that cannot be undone"
+  },
+  {
+    "screen": "Settings",
+    "kind": "button",
+    "testID": "settings.forget",
+    "label": "Forget this Mac"
+  }
+]
