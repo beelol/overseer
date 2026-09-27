@@ -68,6 +68,7 @@ class CommandCenter {
       case 'select': if (typeof m.runId === 'string') { if (m.restore) await this.showChat(m.runId); else await this.handlers.select(m.runId); } return;
       case 'mode': { const was = this.mode; this.mode = m.mode; if (was !== m.mode) await this.handlers.onMode?.(m.mode, was); return; }
       case 'focusComposer': post({ type: 'mode', mode: 'composer' }); return;
+      case 'gridEmpty': if (this.mode === 'grid') await this.handlers.gridEmpty?.(); return;
       case 'gridSubscribe': {
         const ids = (m.runIds || []).filter(id => this.model.run(id));
         // Metadata first: the tile needs its root run id before history arrives.

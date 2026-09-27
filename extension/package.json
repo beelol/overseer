@@ -88,6 +88,8 @@
     ],
     "keybindings": [
       { "command": "overseer.archiveAgent", "key": "delete", "mac": "cmd+backspace", "when": "focusedView == overseer.agents" },
+      { "command": "overseer.searchAgents", "key": "ctrl+alt+f", "mac": "cmd+alt+f", "when": "!editorTextFocus" },
+      { "command": "overseer.clearAgentSearch", "key": "escape", "when": "focusedView == overseer.agents && overseer.agentsFiltered" },
       { "command": "overseer.toggleDashboard", "key": "ctrl+alt+o", "mac": "cmd+alt+o" },
       { "command": "overseer.newAgent", "key": "ctrl+alt+n", "mac": "cmd+alt+n" },
       { "command": "overseer.toggleGrid", "key": "ctrl+alt+g", "mac": "cmd+alt+g" },
@@ -116,6 +118,7 @@
         { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" }
       ],
       "view/item/context": [
+        { "command": "overseer.clearAgentSearch", "when": "view == overseer.agents && viewItem == search-query", "group": "inline@1" },
         { "command": "overseer.interrupt", "when": "view == overseer.agents && viewItem =~ /^agent-active/", "group": "inline@1" },
         { "command": "overseer.archiveAgent", "when": "view == overseer.agents && viewItem =~ /^agent-done(?!-archived)/", "group": "inline@2" },
         { "command": "overseer.restoreAgent", "when": "view == overseer.agents && viewItem =~ /^agent-done-archived/", "group": "inline@2" },

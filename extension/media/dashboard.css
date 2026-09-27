@@ -73,3 +73,8 @@ body { overflow: hidden; background: var(--ov-bg); }
 }
 @keyframes slide-in { from { transform: translateX(16px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .files-panel { animation: none; } }
+/* AC-109: choices sit in a row under the field (wrapping below it, never inside it). */
+.composer-hero > .composer-choices { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: calc(var(--ov-space-2) * -0.5); }
+.composer-hero > .composer-choices .chip { max-width: min(260px, calc(50% - 3px)); }
+.composer.big .composer-row .spacer { flex: 1; }
+.hero-mark svg { color: var(--ov-accent); }

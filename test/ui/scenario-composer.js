@@ -38,14 +38,15 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const chip = sel => dash.eval(`document.querySelector('[data-chip="${sel}"]').getAttribute('aria-label')`);
     const note = () => dash.eval(`document.querySelector('.view-composer .composer-note').textContent`);
     // Keyboard: focus the task, Shift+Tab to reach chips, open the agent menu, pick an entry by label.
-    const pickAgent = async label => {
+    // label: the item's text; under (optional): a pattern its menu heading must match (both logins read "Your login").
+    const pickAgent = async (label, under) => {
       // Focus the webview on the agent chip (keyboard from here on), then open its menu with Enter.
       const at = await s.webviewPoint(dash, '[data-chip="agent"]'); await cdp.click(at.x, at.y); await delay(300);
       if (!(await dash.eval(`!!document.querySelector('.menu')`))) await key('Enter');
       await dash.waitFor(`!!document.querySelector('.menu')`, 5000);
       for (let i = 0; i < 20; i++) {
-        const f = await dash.eval(`document.activeElement.closest('.menu') && document.activeElement.textContent`);
-        if (f && f.startsWith(label)) break;
+        const f = await dash.eval(`(() => { const a = document.activeElement; if (!a.closest('.menu')) return null; let h = a.previousElementSibling; while (h && !h.classList.contains('menu-head')) h = h.previousElementSibling; return { text: a.textContent, head: h ? h.textContent : '' }; })()`);
+        if (f && f.text.startsWith(label) && (!under || under.test(f.head))) break;
         await key('ArrowDown');
       }
       await key('Enter');
@@ -63,7 +64,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     };
 
     // Claude, keyboard only.
-    await pickAgent('claude (existing login)');
+    await pickAgent('Your login', /Claude/);
     const claudeChip = await chip('agent');
     const c = await start('Say hello from Claude', 'claude');
     check('Claude agent started keyboard-only from the composer; it becomes selected and streams in place', /Claude Code/.test(claudeChip) && c.run && c.shown, { claudeChip, run: c.run?.id, shown: c.shown });
@@ -74,7 +75,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // Codex.
     await cdp.command('Overseer: New Agent'); await delay(800);
     await dash.waitFor(`document.body.dataset.mode === 'composer'`, 5000);
-    await pickAgent('codex (existing login)');
+    await pickAgent('Your login', /Codex/);
     const x = await start('Say hello from Codex', 'codex');
     check('Codex agent started keyboard-only', x.run && x.shown, { run: x.run?.id, shown: x.shown });
     // Generic program.
