@@ -246,6 +246,7 @@ fn row_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
         "failed_planning_turns": row.get::<_, i64>("failed_planning_turns")?,
         "generation": row.get::<_, i64>("generation")?,
         "revision": row.get::<_, i64>("revision")?,
+        "control_revision": row.get::<_, i64>("control_revision")?,
         "limit_revision": row.get::<_, i64>("limit_revision")?,
         "allowed_targets": serde_json::from_str::<Value>(&targets).unwrap_or(Value::Null),
         "needs_account_selection": serde_json::from_str::<Value>(&targets).ok().and_then(|v|v.as_array().map(|a|a.is_empty())).unwrap_or(true),
@@ -707,6 +708,57 @@ pub(super) fn stop_for_deadline(store: &mut Store, p: &Value) -> Result<Value> {
 
 fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version: bool) -> Result<Value> {
     let id = required(p, "run_id")?;
+    let request_id = if reason == "requested" { p.get("request_id")
+        .map(|v| v.as_str().ok_or_else(|| anyhow!("invalid stop request id"))).transpose()? }
+        else { None };
+    let request_scope = p.get("request_scope").map(|v| v.as_str()
+        .ok_or_else(|| anyhow!("invalid stop request scope"))).transpose()?;
+    if request_scope.is_some() && request_id.is_none() {
+        bail!("stop request scope requires request id");
+    }
+    let request_scope = request_scope.unwrap_or("local");
+    if request_id.is_some_and(|key| key.is_empty() || key.len() > 128
+        || key.chars().any(char::is_control) || crate::redact::redact(key) != key)
+        || request_scope.is_empty() || request_scope.len() > 128
+        || request_scope.chars().any(char::is_control)
+        || crate::redact::redact(request_scope) != request_scope {
+        bail!("invalid stop request identity");
+    }
+    if request_id.is_none() && (p.get("expected_control_revision").is_some()
+        || p.get("expected_revision").is_some()) {
+        bail!("versioned Stop requires a request id");
+    }
+    let expected = if request_id.is_some() {
+        let plan = p["expected_revision"].as_i64()
+            .ok_or_else(|| anyhow!("missing expected stop plan revision"))?;
+        let control = p["expected_control_revision"].as_i64()
+            .ok_or_else(|| anyhow!("missing expected stop control revision"))?;
+        if plan < 0 || control < 0 { bail!("invalid expected stop revision"); }
+        Some((plan,control))
+    } else { None };
+    let request_sha256 = if request_id.is_some() {
+        let mut effect=p.clone();
+        if let Value::Object(fields)=&mut effect {
+            fields.remove("request_id");
+            fields.remove("request_scope");
+        }
+        Some(format!("{:x}",Sha256::digest(effect.to_string().as_bytes())))
+    } else { None };
+    if let (Some(request_id),Some(request_sha256))=(request_id,request_sha256.as_deref()) {
+        let prior: Option<(String,String,String)> = store.conn.query_row(
+            "SELECT request_sha256,run_id,result_json FROM swarm_stop_requests
+             WHERE request_scope=?1 AND request_id=?2",
+            params![request_scope,request_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+        ).optional()?;
+        if let Some((old_hash,old_run,result_json))=prior {
+            if old_hash!=request_sha256 || old_run!=id {
+                bail!("stop request id reused with different input");
+            }
+            let mut result:Value=serde_json::from_str(&result_json)?;
+            result["duplicate"]=json!(true);
+            return Ok(result);
+        }
+    }
     let current = get(store, id)?;
     // Stop is a user safety control. A stale view must not prevent it; only
     // internal deadline transitions carry a director-version precondition.
@@ -724,11 +776,29 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
             bail!("stale plan revision");
         }
     }
+    if let Some((plan,control))=expected {
+        if current["revision"]!=plan { bail!("stale stop plan revision"); }
+        if current["control_revision"]!=control { bail!("stale stop control revision"); }
+    }
     if current["status"] == "stopping" {
-        return Ok(json!({"id":id,"status":"stopping","duplicate":true}));
+        let result=json!({"id":id,"status":"stopping","duplicate":true,
+            "control_revision":current["control_revision"]});
+        if let (Some(key),Some(hash))=(request_id,request_sha256.as_deref()) {
+            store.conn.execute("INSERT INTO swarm_stop_requests(request_scope,request_id,
+                request_sha256,run_id,result_json,created_ms) VALUES(?1,?2,?3,?4,?5,?6)",
+                params![request_scope,key,hash,id,result.to_string(),crate::daemon::now()])?;
+        }
+        return Ok(result);
     }
     if current["status"] == "stopped" && !current["stop_reason"].is_null() {
-        return Ok(json!({"id":id,"status":"stopped","duplicate":true}));
+        let result=json!({"id":id,"status":"stopped","duplicate":true,
+            "control_revision":current["control_revision"]});
+        if let (Some(key),Some(hash))=(request_id,request_sha256.as_deref()) {
+            store.conn.execute("INSERT INTO swarm_stop_requests(request_scope,request_id,
+                request_sha256,run_id,result_json,created_ms) VALUES(?1,?2,?3,?4,?5,?6)",
+                params![request_scope,key,hash,id,result.to_string(),crate::daemon::now()])?;
+        }
+        return Ok(result);
     }
     if ["stopped","completed","invalidated"].contains(&current["status"].as_str().unwrap_or("")) {
         bail!("swarm run is terminal");
@@ -736,7 +806,7 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
     tx.execute(
-        "UPDATE swarm_runs SET status='stopping',stop_reason=?3,updated_ms=?2 WHERE id=?1",
+        "UPDATE swarm_runs SET status='stopping',stop_reason=?3,control_revision=control_revision+1,updated_ms=?2 WHERE id=?1",
         params![id, now, reason],
     )?;
     tx.execute("UPDATE swarm_jobs SET status='cancelled',updated_ms=?2 WHERE run_id=?1 AND status IN ('planned','ready')", params![id,now])?;
@@ -759,8 +829,15 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
     )?;
     record_operation(&tx, id, "stop")?;
     let status = finalize_control_if_idle(&tx,id,now)?;
+    let result=json!({"id":id,"status":status,"stop_reason":reason,"duplicate":false,
+        "control_revision":current["control_revision"].as_i64().unwrap_or(0)+1});
+    if let (Some(key),Some(hash))=(request_id,request_sha256.as_deref()) {
+        tx.execute("INSERT INTO swarm_stop_requests(request_scope,request_id,
+            request_sha256,run_id,result_json,created_ms) VALUES(?1,?2,?3,?4,?5,?6)",
+            params![request_scope,key,hash,id,result.to_string(),now])?;
+    }
     tx.commit()?;
-    Ok(json!({"id":id,"status":status,"stop_reason":reason,"duplicate":false}))
+    Ok(result)
 }
 
 pub fn claim(store: &mut Store, p: &Value) -> Result<Value> {

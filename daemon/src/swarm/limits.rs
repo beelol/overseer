@@ -95,7 +95,7 @@ pub fn set(store: &mut Store, p: &Value) -> Result<Value> {
     let next = revision + 1;
     let now = crate::daemon::now();
     tx.execute(
-        "UPDATE swarm_runs SET policy=?2,limit_revision=?3,updated_ms=?4
+        "UPDATE swarm_runs SET policy=?2,limit_revision=?3,control_revision=control_revision+1,updated_ms=?4
          WHERE id=?1 AND limit_revision=?5",
         params![run, policy.to_string(), next, now, revision],
     )?;

@@ -36,7 +36,7 @@ pub fn pause(store: &mut Store, p: &Value) -> Result<Value> {
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
     tx.execute(
-        "UPDATE swarm_runs SET status='paused',updated_ms=?2 WHERE id=?1",
+        "UPDATE swarm_runs SET status='paused',control_revision=control_revision+1,updated_ms=?2 WHERE id=?1",
         params![id, now],
     )?;
     tx.execute("INSERT OR IGNORE INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms) SELECT a.run_id,'pause-'||a.id,a.job_id,a.id,'control',a.id,'checkpoint',a.revision,'{}','queued',?2,?2 FROM swarm_attempts a WHERE a.run_id=?1 AND a.status='registered'",params![id,now])?;
@@ -53,7 +53,7 @@ pub fn resume(store: &mut Store, p: &Value) -> Result<Value> {
         bail!("run is not paused");
     }
     store.conn.execute(
-        "UPDATE swarm_runs SET status='running',updated_ms=?2 WHERE id=?1",
+        "UPDATE swarm_runs SET status='running',control_revision=control_revision+1,updated_ms=?2 WHERE id=?1",
         params![id, crate::daemon::now()],
     )?;
     Ok(json!({"id":id,"status":"running","duplicate":false}))
@@ -70,7 +70,7 @@ pub fn off(store: &mut Store, p: &Value) -> Result<Value> {
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
     tx.execute(
-        "UPDATE swarm_runs SET status='draining',stalled_from=NULL,updated_ms=?2 WHERE id=?1",
+        "UPDATE swarm_runs SET status='draining',stalled_from=NULL,control_revision=control_revision+1,updated_ms=?2 WHERE id=?1",
         params![id, now],
     )?;
     tx.execute("UPDATE swarm_jobs SET status='cancelled',updated_ms=?2 WHERE run_id=?1 AND status IN ('planned','ready')",params![id,now])?;
@@ -127,7 +127,7 @@ pub fn extend_deadline(store: &mut Store, p: &Value) -> Result<Value> {
         .ok_or_else(||anyhow!("deadline extension overflow"))?;
     policy["effective"]["deadline_ms"] = json!(new_duration);
     policy["sources"]["deadline_ms"] = json!("run_extension");
-    tx.execute("UPDATE swarm_runs SET policy=?2,updated_ms=?3 WHERE id=?1",
+    tx.execute("UPDATE swarm_runs SET policy=?2,control_revision=control_revision+1,updated_ms=?3 WHERE id=?1",
         params![run,policy.to_string(),now])?;
     tx.execute("INSERT INTO swarm_deadline_extensions(run_id,request_id,
         expected_deadline_at_ms,additional_ms,old_deadline_at_ms,new_deadline_at_ms,created_ms)

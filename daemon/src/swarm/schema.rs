@@ -20,6 +20,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           failed_planning_turns INTEGER NOT NULL DEFAULT 0,
           generation INTEGER NOT NULL,
           revision INTEGER NOT NULL,
+          control_revision INTEGER NOT NULL DEFAULT 0,
           limit_revision INTEGER NOT NULL DEFAULT 0,
           allowed_targets TEXT NOT NULL,
           policy TEXT NOT NULL,
@@ -45,6 +46,15 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           result_json TEXT NOT NULL,
           created_ms INTEGER NOT NULL,
           PRIMARY KEY(run_id,request_id)
+        );
+        CREATE TABLE IF NOT EXISTS swarm_stop_requests(
+          request_scope TEXT NOT NULL,
+          request_id TEXT NOT NULL,
+          request_sha256 TEXT NOT NULL,
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          result_json TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(request_scope,request_id)
         );
         CREATE TABLE IF NOT EXISTS swarm_limit_events(
           run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
@@ -539,6 +549,12 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         // infer a grant from their objective or from an existing process path.
         conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN repository_scope TEXT;")?;
     }
+    let has_control_revision = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='control_revision'")?
+        .exists([])?;
+    if !has_control_revision {
+        conn.execute_batch("ALTER TABLE swarm_runs ADD COLUMN control_revision INTEGER NOT NULL DEFAULT 0;")?;
+    }
     let has_stalled_from = conn
         .prepare("SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='stalled_from'")?
         .exists([])?;
@@ -797,6 +813,11 @@ mod tests {
             [], |row| row.get(0),
         ).unwrap();
         assert_eq!(limit_revision, 0);
+        let control_revision: i64 = conn.query_row(
+            "SELECT control_revision FROM swarm_runs WHERE id='old-run'",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(control_revision, 0);
         migrate(&conn).unwrap();
     }
 
