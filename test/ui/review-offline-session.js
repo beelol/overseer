@@ -1,16 +1,16 @@
-// Reopens a RECORDED offline session (the OVERSEER_HOME, profile and extensions folder that
+// A TOOL, not a scenario (so scripts/test-all does not pick it up): reopens a RECORDED offline session (the OVERSEER_HOME, profile and extensions folder that
 // scenario-offline-session.js left behind) in the current build, without running any agent: the
 // chats are drawn from the daemon's stored events. For checking an interface change on real
 // data without spending a paid turn again.
 //
-//   node test/ui/scenario-offline-review.js /tmp/ovs-ui-XXXXXX
+//   node test/ui/review-offline-session.js /tmp/ovs-ui-XXXXXX
 const fs = require('fs');
 const path = require('path');
 const { Session, latestVsix, delay } = require('./harness');
 
 (async () => {
   const recorded = process.argv[2];
-  if (!recorded || !fs.existsSync(path.join(recorded, 'overseer-home'))) { console.error('usage: scenario-offline-review.js <recorded session folder>'); process.exit(2); }
+  if (!recorded || !fs.existsSync(path.join(recorded, 'overseer-home'))) { console.error('usage: review-offline-session.js <recorded session folder>'); process.exit(2); }
   const s = new Session('offline-session-review');
   Object.assign(s, { home: path.join(recorded, 'overseer-home'), profile: path.join(recorded, 'profile'), extensions: path.join(recorded, 'extensions') });
   const result = { checks: [], recorded: path.basename(recorded) };
