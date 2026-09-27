@@ -128,3 +128,24 @@ No worker ceiling, budget default or acceptance box changes. Main's tracker
 also now names the separate Gate S and Auto Mode PRs; those still need a joined
 authority before live Swarm launch. This merge changes documentation and live
 evidence only, so it does not invalidate the offline Start replay suite.
+
+## Subsequent published main: `b3ea1e7`
+
+The branch merged the latest published `origin/main` at `b3ea1e7` without a
+conflict. This commit changes the ledger, README and Gate S verification
+evidence; it adds no daemon or extension implementation to main. AC-181 now
+records a daemon-owned Overseer conversation and AC-184 records bounded,
+read-only Overseer tools as verified by fixtures and a packaged chat scenario
+on Gate S pull request #14. The Swarm design already places Overseer above one
+category director and requires shared daemon records. Once that Gate S code
+lands, Swarm should attach its director summary and sourced advisories to the
+existing conversation rather than start another one. A Swarm worker still has
+no direct Overseer assignment channel, and Overseer's read-only tools still
+grant no worker permission or account allowance. Joined SWARM-24/27/60 and
+Gate S AC-195/196 remain open; no Swarm acceptance box changes.
+
+The same ledger edit resets AC-151 to *not started* instead of reporting its
+earlier partial live reruns. That administrative status change is not evidence
+that the observed Claude background-child lifecycle issue was fixed. Keep
+SWARM-17's version-pinned descendant-control qualification and fail-closed
+target eligibility; rerun it against any enabled harness before live fan-out.
