@@ -1190,19 +1190,70 @@ rec(142, "One Overseer mark everywhere", "not started", date="—", commit="—"
     actual="Not started.", live="—", blocker="Not started: the owner's two images need to be added to docs/design/brand/ as files; then the single-colour glyph is drawn for VS Code and approved.")
 
 # Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code are built in pull
-# request #5, whose branch holds the evidence and the verified record for AC-143; the terminal UI is T-23 and T-24 (pull request #6).
-rec(143, "Opt-in audio cues owned by the daemon", "in progress", date="—", commit="—",
+# request #5 and the terminal UI (T-23, T-24) in pull request #6. Neither is merged yet, so the evidence links point at
+# the commits on their branches.
+rec(143, "Opt-in audio cues owned by the daemon", "verified", date="2026-09-26",
+    commit="106d3e8 (branch codex/reactor-audio-mode, pull request #5, not merged yet)",
+    harness="Fixture harnesses only (Claude fixture, Codex app-server fixture, generic programs); no paid tokens. Live playback through macOS `afplay` and `say`",
+    fixture="Real Git repositories created per test; isolated OVERSEER_HOME; isolated VS Code profile for the UI scenario. The owner-approved pack was read through a copy the owner made of it, because the agent's tools cannot read the folder the voice lab is in",
+    steps="""1. `CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline -- --test-threads=1` (unit tests in `daemon/src/audio.rs`, protocol tests in `daemon/tests/audio.rs` and `daemon/tests/protocol.rs`).
+2. `npm run check --prefix extension` and `git diff --check origin/main HEAD`.
+3. `python3 docs/verification/evidence/audio-mode/check-pack.py --approved <owner-approved folder>`: decodes every MP3 with ffmpeg, measures it, compares it with the manifest, the pack's README and the approved folder, and lists the audio files Git tracks.
+4. `node docs/verification/evidence/audio-mode/live-playback.js`: a release `overseerd` with its own home and no test sink; the script watches the daemon's child processes while agents run and previews are requested. It plays real sound.
+5. `node extension/scripts/package.js`, then `node test/ui/scenario-audio.js`: the packaged VSIX in VS Code with two Claude fixture agents that ask for permission at the same moment; cues go to a log instead of the speakers so they can be counted.
+6. `git merge-tree --write-tree origin/main HEAD`.""",
     expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
-    actual="Built in pull request #5 and verified on its branch at d7be0a3 (daemon tests, the pack compared with the owner-approved files, live playback, the packaged VSIX in VS Code). Nothing of it is on main yet.", live="—",
-    blocker="Waits for pull request #5 to merge; its branch carries the evidence and the verified record.")
-rec(144, "A lost session asks for attention", "not started", date="—", commit="—",
+    actual="""- **Tests:** 81 passed, 0 failed: 16 unit, 15 audio protocol, 50 protocol.
+- **Off until asked:** off on a new install and kept across a daemon kill; while off a finished agent starts no player and no `audio` folder exists (test, live and in VS Code).
+- **Daemon-owned:** with no UI client a root's start and completion play once each; with two clients attached its failure plays once; with VS Code closed a new agent's start and completion play once each.
+- **What makes a sound:** a nested Codex child completes while its root waits and makes no sound; the run plays start, attention and completion, three cues in all. A permission request and its waiting status play one cue. An authentication failure plays one attention cue and no completion cue.
+- **Simultaneous needs:** two permission requests released together play one cue; `state` holds two waiting roots; VS Code shows 2 on *Needs you*, on the Overseer icon and in the status bar.
+- **Bounds:** routine queue 4, urgent queue 2, attention history at most 1,024 runs. Live: of 40 preview requests in a burst 5 were accepted (one playing, four queued) and 35 refused; never more than one player process; the daemon's resident size was 8,528 KB before the burst and 8,528 KB after.
+- **Reactor:** 12 MP3s, 31,488 bytes, longest 0.365 s, all decode; each is byte-identical to the approved file and to its SHA-256 in the manifest, which a unit test compares with the bytes built into the daemon. Live: `afplay` plays from an owner-only cache (folder 700, files 600) holding only the cues played, identical to the bundled files; a cached cue from another pack is replaced.
+- **System voice:** `say -v Daniel "Agent started."` ran on the Mac (185 installed voices listed); a voice that is not installed is refused.
+- **Commander:** refused before a folder is chosen; a folder that is not a pack is refused with the reason (the missing file is named); then `afplay` played `<private folder>/agent_complete/transmission/commander.wav` where it is; no WAV under the daemon's folder or in the repository; the private files unchanged. Git tracks 12 audio files, all in the pack, and no Commander path.
+- **Failing quietly:** with the cache blocked, or the Commander folder removed, the agent completes and the failure is in the daemon log; an unknown cue key is refused.
+- **Other platforms:** with the players taken away by a test switch the daemon reports `available: false`, refuses to turn on, to preview and to list voices, and an agent completes in silence even when the setting was already on.
+- **VS Code:** the Agents title bar is unchanged from main (New Agent, Search Agents, Toggle Agent Grid, VS Code's Collapse All); *Audio Mode and Reactor Cues…* is in the overflow menu; turning on, choosing a track and a preview go through the daemon. 10 of 10 checks.
+- **Merge:** the virtual merge of the branch into main is clean.""",
+    evidence="[requirement by requirement](https://github.com/beelol/overseer/blob/0d01397/docs/verification/audio-mode.md), [daemon tests](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/cargo-test-overseerd.txt), [extension and whitespace checks](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/extension-check.txt), [pack check](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/pack-check.txt), [live playback](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/live-playback.txt), [VS Code scenario](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/ui/audio/result.json)",
+    live="Live macOS playback (`afplay`, `say`) and the packaged VSIX in VS Code; agents are fixtures.",
+    limits="Not merged: the feature is on the branch of pull request #5. macOS only; no other platform was run (the unavailable path is exercised on macOS through a test switch; Linux belongs to AC-41). The Commander check used three generated beeps in a temporary private folder; the owner's recordings were not read. The pack was compared with the owner's copy of the approved folder. Nobody listened: that is AC-145.")
+rec(144, "A lost session asks for attention", "verified", date="2026-09-26",
+    commit="106d3e8 (branch codex/reactor-audio-mode, pull request #5, not merged yet)",
+    harness="Generic fixture programs; no accounts, no paid tokens",
+    fixture="Real Git repositories created per test; isolated OVERSEER_HOME; the daemon writes each cue it would play to a log",
+    steps="""`CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline --test audio -- --test-threads=1`, three protocol tests:
+1. `a_lost_session_plays_one_attention_cue`: Audio Mode on; a top-level agent runs; its supervisor is killed.
+2. `an_agent_stopped_on_request_stays_silent`: a running agent is interrupted.
+3. `a_session_lost_while_the_daemon_was_down_makes_no_sound`: the daemon, the agent and its supervisor are killed; the daemon starts again.""",
     expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
-    actual="Not started. The daemon already plays the attention cue for a lost session; only a unit test touches it.", live="—",
-    blocker="Not started (Gate O, the owner's decision of 2026-09-26; the tests belong to pull request #5; see docs/rfcs/audio-mode-goal.md).")
-rec(145, "Audio Mode by ear (owner-confirmed)", "not started", date="—", commit="—",
+    actual="""- **Lost while the daemon runs:** the run becomes `disconnected`; the log holds the start cue and exactly one `agent_needs_attention`, also 500 ms after the agent itself is gone.
+- **Stopped on request:** `interrupted`; the log holds the start cue only.
+- **Lost while the daemon was down:** after the restart the run reads `disconnected` with "lost" as its reason, Audio Mode is still on, and 800 ms later the log still holds the start cue only.
+- The daemon already behaved this way; nothing in it changed for this criterion.""",
+    evidence="[daemon tests](https://github.com/beelol/overseer/blob/0d01397/docs/verification/evidence/audio-mode/cargo-test-overseerd.txt), [requirement by requirement](https://github.com/beelol/overseer/blob/0d01397/docs/verification/audio-mode.md)",
+    live="Fixtures with a real daemon.",
+    limits="Not merged: the tests are on the branch of pull request #5. A lost child agent staying silent is covered by AC-143's nested-child test, not by a test of its own here.")
+rec(145, "Audio Mode by ear (owner-confirmed)", "in progress", date="—",
+    commit="106d3e8 (branch codex/reactor-audio-mode, pull request #5, not merged yet)",
+    harness="Fixture agents only (generic programs and the Claude fixture); no accounts, no paid tokens",
+    fixture="`node test/ui/listen-audio.js` on the branch of pull request #5: VS Code with its own profile and its own Overseer home, so the owner's VS Code, daemon and agents are not touched",
+    steps="""The owner's listening session, about ten minutes, on the branch of pull request #5:
+1. `node extension/scripts/package.js`, then `node test/ui/listen-audio.js`. A VS Code window opens; the keys below are typed in the terminal. Set the volume to what you work with.
+2. `o` turns Audio Mode on. `1` to `9`, `a`, `b`, `c` preview the twelve Reactor cues.
+3. `s`: an agent starts and completes 3 s later (start, then complete). `n`: an agent asks for permission (start, then attention). `t`: two agents ask at the same moment (one attention cue; VS Code counts 2).
+4. Quit that VS Code window (Cmd+Q in it) and press `s` and `n` again: the cues still play.
+5. `v` switches to System voice; press `s` and `n`.
+6. For your Commander folder, run the script again, and in its VS Code window choose *Audio Mode and Reactor Cues…* in the Agents view's menu, then *Import private Commander pack…* and your folder. `p` selects the track; press `s` and `n`. The files stay where they are.
+7. `f` turns Audio Mode off; `s` and `n` must be silent.
+8. `m` plays each cue again and asks for its mark (Right or Needs work), asks what you heard in steps 3 to 7, and writes `docs/verification/evidence/ui/audio-listening/marks.json`. `q` closes the window, the agents and the session's daemon.""",
     expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
-    actual="Not started.", live="—",
-    blocker="Not started: needs the owner's listening session on the build of pull request #5 (see docs/rfcs/audio-mode-goal.md).")
+    actual="Prepared, not confirmed. The session script was run through a pseudo-terminal: on, a preview, an agent that completes, one that needs you, off, and quit each did what the key says and left nothing running. The owner has not listened yet.",
+    evidence="[the session script](https://github.com/beelol/overseer/blob/0d01397/test/ui/listen-audio.js)",
+    live="Real sound on the owner's Mac; agents are fixtures.",
+    limits="A cue marked Needs work is replaced only by a file the owner selects in the voice lab; nothing is regenerated here.",
+    blocker="Waits for the owner's listening session (the steps above) and the marks it writes.")
 
 # Gate P, follow-through (added by the owner on 2026-09-27). Not started.
 rec(146, "Reconcile and merge the work in flight", "not started", date="—", commit="—",
@@ -1274,9 +1325,7 @@ SHORT_BLOCKERS = {
     152: "not started (Gate P, added by the owner on 2026-09-27)",
     153: "not started (Gate P, added by the owner on 2026-09-27)",
     142: "not started: waits for the owner\'s logo files",
-    143: "in progress: built and verified in pull request #5, not merged",
-    144: "not started (Gate O, the owner's decision of 2026-09-26)",
-    145: "not started: the owner's listening session",
+    145: "prepared: waits for the owner's listening session",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
     41: "deferred: no Linux environment",
