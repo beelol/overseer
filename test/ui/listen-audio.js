@@ -6,21 +6,35 @@
 // so the owner's own VS Code, daemon and agents are not touched. Agents are fixtures: no account
 // is used and no tokens are spent. Keys typed in this terminal make the events to listen for, and
 // they keep working after that VS Code window is closed. `m` asks for the marks and writes the
-// record to docs/verification/evidence/ui/audio-listening/.
+// session's record to docs/verification/evidence/ui/audio-listening/. It asks only about the steps this
+// session did: a step that was not done is recorded as not tried, whatever was heard elsewhere.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const cp = require('child_process');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
+// Records of earlier sessions are kept: a new session adds its own file.
+const kept = path.join(repoRoot, 'docs/verification/evidence/ui/audio-listening');
+const earlier = fs.existsSync(kept) ? fs.readdirSync(kept).filter(f => /^marks.*\.json$/.test(f)).map(f => [f, fs.readFileSync(path.join(kept, f))]) : [];
 const s = new Session('audio-listening');
+for (const [name, data] of earlier) fs.writeFileSync(path.join(s.evidence, name), data);
+const recordFile = `marks-${new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15)}.json`;
 const barrier = path.join(s.root, 'release-permissions');
 const say = text => process.stdout.write(text + '\n');
 const tryCtl = (method, params) => { try { return s.ctl(method, params); } catch (error) { say(`  ${method}: ${error.message}`); return null; } };
 const state = id => s.ctl('state').runs.find(r => r.id === id);
 const waitStatus = async (id, re, ms = 20000) => { for (let t = 0; t < ms; t += 200) { if (re.test(state(id)?.status || '')) return true; await delay(200); } return false; };
-const record = { date: new Date().toISOString().slice(0, 10), heard: [], marks: {}, steps: {} };
+const record = { date: new Date().toISOString().slice(0, 10), heard: [], events: [], marks: {}, steps: {} };
 const note = text => { record.heard.push(`${new Date().toISOString().slice(11, 19)} ${text}`); say(`  ${text}`); };
+const windowOpen = () => !!cp.spawnSync('pgrep', ['-f', s.profile], { encoding: 'utf8' }).stdout.trim();
+/** What the session did, with the settings and the window at that moment. */
+function did(key) {
+  const audio = s.ctl('audio.get');
+  const event = { key, enabled: audio.enabled, track: audio.track, commander_folder_set: audio.commander_imported, vscode: windowOpen() ? 'open' : 'closed' };
+  record.events.push(event);
+  return `Audio Mode ${event.enabled ? 'on' : 'off'} · ${event.track} · VS Code ${event.vscode}`;
+}
 let cues = [], repo, n = 0, busy = false;
 
 const KEYS = '123456789abc';
@@ -40,7 +54,7 @@ function menu() {
 async function generic() {
   const t = tryCtl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'sleep 3; exit 0'], prompt: '', title: `Listening ${++n}: completes` });
   if (!t) return;
-  note('an agent started; it completes in 3 s');
+  note(`an agent started; it completes in 3 s  [${did('s')}]`);
   await waitStatus(t.run.id, /completed|failed/);
   note('the agent completed');
 }
@@ -56,7 +70,7 @@ async function needs(count) {
   await delay(1200); // past the start cue
   fs.writeFileSync(barrier, 'go');
   for (const id of runs) await waitStatus(id, /waiting_for_user/);
-  note(`${runs.length === 1 ? 'an agent needs' : runs.length + ' agents need'} you`);
+  note(`${runs.length === 1 ? 'an agent needs' : runs.length + ' agents need'} you  [${did(count === 1 ? 'n' : 't')}]`);
 }
 
 function stopAgents() {
@@ -77,15 +91,20 @@ async function marks() {
       await delay(600);
     }
   }
-  say('\nWhat you heard. y yes, n no, - not tried.');
-  for (const [key, text] of [
-    ['open', 'Start, completion and attention with VS Code open'],
-    ['closed', 'Start, completion and attention with VS Code closed'],
-    ['once', 'Two agents at the same moment made one attention cue'],
-    ['system', 'System voice spoke with an installed voice'],
-    ['commander', 'Your own Commander folder played'],
-    ['off', 'With Audio Mode off, s and n were silent'],
-  ]) record.steps[key] = { y: 'yes', n: 'no' }[await ask(`  ${text}? y / n / - `)] || 'not tried';
+  say('\nWhat you heard in this session. y yes, n no.');
+  const both = test => ['s', 'n'].every(key => record.events.some(e => e.key === key && test(e)));
+  const any = test => record.events.some(e => e.key !== 't' && test(e));
+  for (const [key, text, done, how] of [
+    ['open', 'Start, completion and attention with VS Code open', both(e => e.enabled && e.vscode === 'open'), 'o, then s and n'],
+    ['closed', 'Start, completion and attention with VS Code closed', both(e => e.enabled && e.vscode === 'closed'), 'quit the VS Code window, then s and n with Audio Mode on'],
+    ['once', 'Two agents at the same moment made one attention cue', record.events.some(e => e.key === 't' && e.enabled), 't with Audio Mode on'],
+    ['system', 'System voice spoke with an installed voice', any(e => e.enabled && e.track === 'system'), 'v, then s or n'],
+    ['commander', 'Your own Commander folder played', any(e => e.enabled && e.track === 'commander' && e.commander_folder_set), 'import your folder in the VS Code window, p, then s or n'],
+    ['off', 'With Audio Mode off, s and n were silent', both(e => !e.enabled), 'f, then s and n'],
+  ]) {
+    if (done) record.steps[key] = { y: 'yes', n: 'no' }[await ask(`  ${text}? y / n `)] || 'no';
+    else { record.steps[key] = 'not tried'; say(`  ${text}: not done in this session (${how})`); }
+  }
   const audio = s.ctl('audio.get');
   const bin = path.join(s.extensions, fs.readdirSync(s.extensions).find(d => d.startsWith('beelol.overseer')), 'bin', `overseerd-${process.platform}-${process.arch}`);
   Object.assign(record, {
@@ -95,8 +114,8 @@ async function marks() {
     pack: cues.map(c => ({ key: c.key, sha256: c.sha256 })),
     commander_folder_set: audio.commander_imported, // whether one was chosen; never its path or its files
   });
-  fs.writeFileSync(path.join(s.evidence, 'marks.json'), JSON.stringify(record, null, 2) + '\n');
-  say(`\nWritten: ${path.relative(repoRoot, path.join(s.evidence, 'marks.json'))}`);
+  fs.writeFileSync(path.join(s.evidence, recordFile), JSON.stringify(record, null, 2) + '\n');
+  say(`\nWritten: ${path.relative(repoRoot, path.join(s.evidence, recordFile))}`);
 }
 
 (async () => {
@@ -144,7 +163,7 @@ async function marks() {
     await s.quit();
     s.stopDaemon();
     fs.rmSync(s.root, { recursive: true, force: true });
-    if (!fs.existsSync(path.join(s.evidence, 'marks.json'))) fs.rmSync(s.evidence, { recursive: true, force: true });
+    if (!fs.readdirSync(s.evidence).some(f => /^marks.*\.json$/.test(f))) fs.rmSync(s.evidence, { recursive: true, force: true });
     say('Session closed: VS Code window, agents and daemon stopped.');
     process.exit(0);
   }
