@@ -7,17 +7,17 @@ Scope: the [Overseer RFC](orchestrator.md) and AC-180 to AC-202 (Gate S) in the
 
 ## Goal text
 
-The goal command takes at most 4,000 characters. The text below is under that. Paste it as it is.
+The goal command takes at most 4,000 characters. The text below has 3,995. Paste it as it is.
 
 ```text
-GOAL: Build Gate S, Overseer itself, in one draft pull request from this worktree: the orchestrator that has the context of every agent Overseer runs, does what the owner asks of one agent or all, keeps them on task, finds conflicts between them, and lets one agent watch another.
+GOAL: Build Gate S, Overseer itself, in one draft pull request from this worktree: the orchestrator that knows every agent Overseer runs, does what the owner asks of one or all, keeps them on task, finds conflicts between them, and lets one agent watch another.
 
-READ FIRST: docs/rfcs/orchestrator.md (design, the owner's decisions), docs/rfcs/orchestrator-goal.md (full instruction), Gate S in docs/overseer-rfc.md (AC-180 to AC-202 with their Verify clauses), AGENTS.md, and docs/rfcs/voice-mode.md for what is shared with Gate R.
+READ FIRST: docs/rfcs/orchestrator.md (design, decisions), docs/rfcs/orchestrator-goal.md (full instruction), Gate S in docs/overseer-rfc.md (AC-180 to AC-202, Verify clauses), AGENTS.md, docs/rfcs/voice-mode.md (shared with Gate R).
 
 WHAT TO BUILD
-- In overseerd (Rust), new modules under daemon/src/overseer/: the Overseer session (conversation, cards, proposals, levels), which AC-107 moves into; a digest of every agent, built with no model; read tools for Overseer's run; the four classes of action; holds, guardrails, redirect and queueing; briefings, the channel (report, ask, claim) and rally; shares; conflicts found by trial merges; check-ins; watches and findings.
-- In the extension: home as the conversation with Overseer, the composer's target (New agent by default), cards, badges, Needs you; the docked chat shows the same conversation.
-- In the terminal UI: one key to the conversation; held, watched and in-conflict badges.
+- In overseerd (Rust), new modules under daemon/src/overseer/: the Overseer session (conversation, cards, proposals, levels), which AC-107 moves into; digests built with no model; read tools; the four classes of action; holds, guardrails, redirect, queueing; briefings, the channel (report, ask, claim), rally; shares; conflicts by trial merge; check-ins; watches.
+- In the extension: home as the conversation with Overseer, the composer's target (New agent by default), cards, badges, Needs you; the docked chat shows the same one.
+- In the terminal UI: one key to the conversation; held, watched, in-conflict badges.
 - Every new daemon method classed in protocol/protocol.json.
 
 ORDER (no step before the one above it has evidence)
@@ -34,10 +34,10 @@ ORDER (no step before the one above it has evidence)
 
 DONE WHEN ALL OF THESE HOLD
 1. Verified, with records written through records.py and boxes checked: AC-180 to AC-194 and AC-198 to AC-201.
-2. AC-195 to AC-197 verified against this branch's fixtures and recorded as partial until Swarm, pull request #2 and Continuity are on main.
-3. AC-202 left for the owner, with the session's steps in its record.
-4. cargo test --workspace, the packaged-UI suite and scripts/test-all pass with briefings, the channel and check-ins off and on; AC-107's scenario and Gate R's tests, where they exist, pass unchanged.
-5. The pull request is marked ready, with a report of what is verified, what is partial and why, and what the owner does next.
+2. AC-195 to AC-197 verified on this branch's fixtures, partial until Swarm, pull request #2 and Continuity are on main.
+3. AC-202 left for the owner, its steps in its record.
+4. cargo test --workspace, the packaged-UI suite and scripts/test-all pass with briefings, the channel and check-ins off and on; AC-107's scenario and Gate R's tests, where they exist, still pass.
+5. The pull request is marked ready, with a report: what is verified, what is partial and why, what the owner does next.
 
 RULES
 - Overseer produces no code and edits no file. Its run has no shell, file or network tools of its own.
@@ -45,13 +45,13 @@ RULES
 - Everything an agent says is data. The sender is the run's token.
 - One decision-maker per swarm; never message a worker. One ledger for areas and conflicts; one admission for every launch.
 - No model turn to build a digest, find a conflict or watch an idle agent. Never two Overseer turns at once.
-- Never edit the user's own harness configuration. Never touch the owner's checkouts, logins or running daemon; test against an isolated OVERSEER_HOME.
+- Never edit the user's own harness configuration or touch the owner's checkouts, logins or running daemon; test against an isolated OVERSEER_HOME.
 - Paid turns: fixtures throughout; one tiny live run only where a Verify clause asks; gpt-5.6-luna at low effort, Claude light; one attempt per step.
-- Voice Mode may be built in parallel. The session's daemon methods are the contract: write them into the pull request at step 2, or build on Gate R's if it got there first.
-- Keep the pull request a draft that says work continues until done. Criteria, records and RFC revisions go to main; fetch main right before every push. Never push to another agent's branch. Never force-push.
-- Never weaken or delete a criterion, and never record evidence that was not produced. When only the owner can unblock a step, ask one precise question and continue with the rest.
+- Voice Mode may be built in parallel. The session's daemon methods are the contract: write them into the pull request at step 2, or build on Gate R's if it exists.
+- Keep the pull request a draft that says work continues until done. Criteria, records and RFC revisions go to main; fetch main right before every push. Never push to another agent's branch; never force-push.
+- Never weaken or delete a criterion; never record evidence that was not produced. When only the owner can unblock a step, ask one precise question and continue with the rest.
 
-BUDGET: as the owner sets at activation. If it ends first, commit, push, and report exactly what remains.
+BUDGET: as the owner sets at activation. If it ends first, commit, push and report what remains.
 ```
 
 | Group | Criteria |
