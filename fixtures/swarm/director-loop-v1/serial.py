@@ -46,7 +46,15 @@ admission = call("swarm.admit", {**auth, "revision": 1, "job_id": "inspect",
     "estimate_milli": {"points": 100}, "purpose": "director_self"})
 assert admission["status"] == "admitted", admission
 assert call("agents.limit.get", {})["active"] == 1
-if len(sys.argv) > 2:
+if len(sys.argv) > 3 and sys.argv[3] == "after_effect_begin":
+    effect = call("swarm.effect.begin", {"run_id": run, "job_id": "inspect",
+        "attempt_id": admission["attempt_id"], "token": admission["token"],
+        "effect_id": "inspect-effect", "operation_id": "fixture:inspect:effect",
+        "revision": 1})
+    assert effect["outcome"] == "unknown", effect
+    Path(sys.argv[2]).write_text(admission["attempt_id"])
+    time.sleep(30)
+if len(sys.argv) > 2 and (len(sys.argv) < 4 or sys.argv[3] == "after_admit"):
     Path(sys.argv[2]).write_text(admission["attempt_id"])
     time.sleep(30)
 
@@ -78,6 +86,9 @@ call("swarm.report", {"run_id": run, "job_id": "inspect",
     "attempt_id": admission["attempt_id"], "token": admission["token"],
     "message_id": "serial-result", "type": "result", "revision": 1,
     "payload": {"artifact_ids": ["serial-proof"], "audit_outcome": "negative"}})
+if len(sys.argv) > 3 and sys.argv[3] == "after_report":
+    Path(sys.argv[2]).write_text(admission["attempt_id"])
+    time.sleep(30)
 decision = call("swarm.decide", {**auth, "revision": 1, "job_id": "inspect",
     "decision": "accept", "evidence": ["serial-proof"]})
 assert decision["status"] == "accepted", decision

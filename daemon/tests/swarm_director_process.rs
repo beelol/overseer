@@ -106,6 +106,36 @@ fn restart_retries_a_missed_director_stop_signal() {
 }
 
 #[test]
+fn director_replacement_waits_for_native_descendant_receipts() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("director-descendant-source"));
+    let run = d.call("swarm.create",json!({"category":"Director descendants",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":id,
+        "generation":1,"repo":checkout,"program":"/bin/sleep",
+        "args":["30"],"prompt":"Audit backend","title":"Director with child receipt"}));
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    d.call("run.interrupt",json!({"run_id":process}));
+    d.wait_done(process,8);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute("INSERT INTO runs(id,task_id,parent_run_id,harness,workspace_id,status,
+        created_ms,title) SELECT 'fixture-native-child',task_id,id,harness,workspace_id,
+        'running',created_ms,'Unconfirmed native child' FROM runs WHERE id=?1",
+        [process]).unwrap();
+    let error = d.try_call("swarm.director.recover",json!({"run_id":id,
+        "generation":1,"revision":0,"termination":"confirmed_dead"})).unwrap_err();
+    assert!(error.contains("unconfirmed native descendants"),"{error}");
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["generation"],1);
+    db.execute("UPDATE runs SET status='interrupted',ended_ms=?1 WHERE id='fixture-native-child'",
+        [crate_now()]).unwrap();
+    let recovered = d.call("swarm.director.recover",json!({"run_id":id,
+        "generation":1,"revision":0,"termination":"confirmed_dead"}));
+    assert_eq!(recovered["generation"],2);
+}
+
+#[test]
 fn linked_healthy_director_renews_lease_but_exited_director_does_not() {
     let mut d = Daemon::start(&[]);
     let temp = tmp();

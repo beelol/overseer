@@ -126,3 +126,150 @@ fn stop_closes_unreviewed_director_self_attempt_only_after_process_exit() {
         [run],|r|r.get(0)).unwrap();
     assert_eq!(decisions,0,"process exit is not an acceptance decision");
 }
+
+#[test]
+fn confirmed_director_death_requeues_unsubmitted_self_job_for_replacement() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":1}));
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("director-self-crash-source"));
+    let ready = temp.path().join("self-attempt-ready");
+    let fixture = repo_root().join("fixtures/swarm/director-loop-v1/serial.py");
+    let created = d.call("swarm.create",json!({"category":"Recover self attempt",
+        "objective":"Inspect a.txt", "allowed_targets":["fixture-local"]}));
+    let run = created["id"].as_str().unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":run,
+        "generation":1,"repo":checkout,"program":"/usr/bin/python3",
+        "args":[fixture,checkout,ready],"prompt":"Inspect the file",
+        "title":"Self attempt before crash"}));
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    let deadline = Instant::now()+Duration::from_secs(8);
+    while !ready.exists() {
+        assert!(Instant::now()<deadline,"director did not admit its self attempt");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let attempt = std::fs::read_to_string(&ready).unwrap();
+    d.call("run.interrupt",json!({"run_id":process}));
+    d.wait_done(process,8);
+    let recovered = d.call("swarm.director.recover",json!({"run_id":run,
+        "generation":1,"revision":1,"termination":"confirmed_dead"}));
+    assert_eq!(recovered["generation"],2);
+    assert_eq!(recovered["replacement_pending"],true);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let attempt_status: String = db.query_row("SELECT status FROM swarm_attempts WHERE id=?1",
+        [&attempt],|r|r.get(0)).unwrap();
+    assert_eq!(attempt_status,"finished","dead director must not hold a job forever");
+    let reservation: String = db.query_row(
+        "SELECT status FROM swarm_reservations WHERE attempt_id=?1",[&attempt],
+        |r|r.get(0)).unwrap();
+    assert_eq!(reservation,"uncertain","exit does not measure account usage");
+    let (job_status,count): (String,i64) = db.query_row(
+        "SELECT status,attempt_count FROM swarm_jobs WHERE run_id=?1 AND id='inspect'",
+        [run],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!(job_status,"ready");
+    assert_eq!(count,1,"replacement must consume the second attempt, not reset the cap");
+    let (kind,payload): (String,String) = db.query_row(
+        "SELECT kind,payload FROM swarm_messages WHERE run_id=?1 AND message_id=?2",
+        rusqlite::params![run,format!("terminal-self-{attempt}")],
+        |r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!(kind,"terminal");
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&payload).unwrap()["result_submitted"],false);
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],1,
+        "replacement-pending category still owns its director slot");
+}
+
+#[test]
+fn replacement_reviews_submitted_self_result_without_reexecuting_job() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":1}));
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("director-self-submitted-source"));
+    let ready = temp.path().join("submitted-self-attempt-ready");
+    let fixture = repo_root().join("fixtures/swarm/director-loop-v1");
+    let created = d.call("swarm.create",json!({"category":"Recover submitted self result",
+        "objective":"Inspect a.txt", "allowed_targets":["fixture-local"]}));
+    let run = created["id"].as_str().unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":run,
+        "generation":1,"repo":checkout,"program":"/usr/bin/python3",
+        "args":[fixture.join("serial.py"),checkout,ready,"after_report"],
+        "prompt":"Inspect the file","title":"Submitted self result"}));
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    let deadline = Instant::now()+Duration::from_secs(8);
+    while !ready.exists() {
+        assert!(Instant::now()<deadline,"director did not submit its result");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let attempt = std::fs::read_to_string(&ready).unwrap();
+    d.call("run.interrupt",json!({"run_id":process}));
+    d.wait_done(process,8);
+    d.call("swarm.director.recover",json!({"run_id":run,
+        "generation":1,"revision":1,"termination":"confirmed_dead"}));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let (attempt_status,job_status): (String,String) = db.query_row(
+        "SELECT a.status,j.status FROM swarm_attempts a JOIN swarm_jobs j
+         ON j.run_id=a.run_id AND j.id=a.job_id WHERE a.id=?1",[&attempt],
+        |r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!((attempt_status.as_str(),job_status.as_str()),("registered","submitted"),
+        "submitted evidence must wait for replacement review, not be retried");
+    let payload: String = db.query_row(
+        "SELECT payload FROM swarm_messages WHERE run_id=?1 AND message_id=?2",
+        rusqlite::params![run,format!("terminal-self-{attempt}")],
+        |r|r.get(0)).unwrap();
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&payload).unwrap()["result_submitted"],true);
+    let replacement = d.call("swarm.director.launch",json!({"run_id":run,
+        "generation":2,"repo":checkout,"program":"/usr/bin/python3",
+        "args":[fixture.join("serial_review.py"),attempt],
+        "prompt":"Review the preserved result","title":"Replacement reviewer"}));
+    let replacement_run = replacement["overseer_run_id"].as_str().unwrap();
+    let finished = d.wait_done(replacement_run,8);
+    assert_eq!(finished["status"],"completed","{finished}; output={}",
+        d.call("run.raw_output",json!({"run_id":replacement_run})));
+    let (attempt_status,job_status,attempt_count): (String,String,i64) = db.query_row(
+        "SELECT a.status,j.status,j.attempt_count FROM swarm_attempts a JOIN swarm_jobs j
+         ON j.run_id=a.run_id AND j.id=a.job_id WHERE a.id=?1",[&attempt],
+        |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+    assert_eq!((attempt_status.as_str(),job_status.as_str(),attempt_count),
+        ("finished","accepted",1));
+}
+
+#[test]
+fn director_death_with_unknown_effect_blocks_self_job_retry() {
+    let d = Daemon::start(&[]);
+    d.call("agents.limit.set",json!({"max_active":1}));
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("director-self-effect-source"));
+    let ready = temp.path().join("self-effect-ready");
+    let fixture = repo_root().join("fixtures/swarm/director-loop-v1/serial.py");
+    let created = d.call("swarm.create",json!({"category":"Recover uncertain effect",
+        "objective":"Inspect a.txt", "allowed_targets":["fixture-local"]}));
+    let run = created["id"].as_str().unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":run,
+        "generation":1,"repo":checkout,"program":"/usr/bin/python3",
+        "args":[fixture,checkout,ready,"after_effect_begin"],
+        "prompt":"Inspect the file","title":"Self effect before crash"}));
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    let deadline = Instant::now()+Duration::from_secs(8);
+    while !ready.exists() {
+        assert!(Instant::now()<deadline,"director did not journal its effect");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let attempt = std::fs::read_to_string(&ready).unwrap();
+    d.call("run.interrupt",json!({"run_id":process}));
+    d.wait_done(process,8);
+    d.call("swarm.director.recover",json!({"run_id":run,
+        "generation":1,"revision":1,"termination":"confirmed_dead"}));
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let (attempt_status,job_status): (String,String) = db.query_row(
+        "SELECT a.status,j.status FROM swarm_attempts a JOIN swarm_jobs j
+         ON j.run_id=a.run_id AND j.id=a.job_id WHERE a.id=?1",[&attempt],
+        |r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert_eq!((attempt_status.as_str(),job_status.as_str()),("finished","blocked"));
+    let effect: String = db.query_row(
+        "SELECT outcome FROM swarm_effects WHERE run_id=?1 AND effect_id='inspect-effect'",
+        [run],|r|r.get(0)).unwrap();
+    assert_eq!(effect,"unknown");
+    let reservation: String = db.query_row(
+        "SELECT status FROM swarm_reservations WHERE attempt_id=?1",[&attempt],
+        |r|r.get(0)).unwrap();
+    assert_eq!(reservation,"uncertain");
+}

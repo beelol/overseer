@@ -151,6 +151,7 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
     if current["status"] == "stalled" && current["stall_reason"] != "director_termination_unknown" {
         bail!("director is stalled by planning or no-progress policy; process recovery cannot clear it");
     }
+    let mut confirmed_process = None;
     if termination != "unknown" {
         let linked: Option<(Option<String>,i64,Option<String>)> = store.conn.query_row(
             "SELECT overseer_run_id,supervised_launch,launch_phase FROM swarm_director_owners
@@ -181,9 +182,13 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
                 )?;
                 let exit_recorded = dir.as_deref().is_some_and(|path|
                     std::path::Path::new(path).join("exit.json").exists());
-                if ended.is_none() || status == "disconnected" || !exit_recorded {
+                if ended.is_none() || !["completed","failed","interrupted"].contains(&status.as_str()) || !exit_recorded {
                     bail!("linked director process has no confirmed exit");
                 }
+                if super::runtime::descendant_receipts(&store.conn,&process)?.0 > 0 {
+                    bail!("linked director has unconfirmed native descendants");
+                }
+                confirmed_process = Some(process);
             }
         }
     }
@@ -217,6 +222,59 @@ pub fn recover(store: &mut Store, p: &Value) -> Result<Value> {
             "UPDATE swarm_director_turns SET status='complete',completed_ms=?2 WHERE id=?1",
             params![turn_id, now],
         )?;
+    }
+    if let Some(process) = confirmed_process {
+        let mut stmt = tx.prepare(
+            "SELECT a.id,a.job_id,a.revision,EXISTS(
+                 SELECT 1 FROM swarm_messages m WHERE m.run_id=a.run_id
+                   AND m.attempt_id=a.id AND m.kind='result') FROM swarm_attempts a
+             WHERE a.run_id=?1 AND a.executor='director' AND a.executor_run_id=?2
+               AND a.status='registered'",
+        )?;
+        let unfinished = stmt.query_map(params![run,process], |r|
+            Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,
+                r.get::<_,i64>(2)?,r.get::<_,i64>(3)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(stmt);
+        for (attempt,job,attempt_revision,has_result) in unfinished {
+            let message_id = format!("terminal-self-{attempt}");
+            let payload = json!({"overseer_run_id":process,"reason":"director_process_exited",
+                "result_submitted":has_result != 0,"usage":"uncertain"});
+            tx.execute("INSERT OR IGNORE INTO swarm_messages(run_id,message_id,job_id,attempt_id,
+                sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+                VALUES(?1,?2,?3,?4,'runtime','director','terminal',?5,?6,'queued',?7,?7)",
+                params![run,message_id,job,attempt,attempt_revision,payload.to_string(),now])?;
+            if has_result != 0 { continue; }
+            tx.execute("UPDATE swarm_attempts SET status='finished' WHERE id=?1 AND status='registered'",
+                [&attempt])?;
+            tx.execute("UPDATE swarm_reservations SET status='uncertain'
+                WHERE attempt_id=?1 AND run_id=?2 AND status='active'",
+                params![attempt,run])?;
+            let unsafe_effects: i64 = tx.query_row(
+                "SELECT COUNT(*) FROM swarm_effects WHERE run_id=?1 AND job_id=?2
+                 AND outcome IN ('unknown','applied')",params![run,job], |r|r.get(0))?;
+            let (job_status,count,deadline,deps_raw): (String,i64,Option<i64>,String) = tx.query_row(
+                "SELECT status,attempt_count,deadline_at_ms,deps FROM swarm_jobs
+                 WHERE run_id=?1 AND id=?2",params![run,job],
+                |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)))?;
+            if ["reserved","launching","running"].contains(&job_status.as_str()) {
+                let deps: Vec<String> = serde_json::from_str(&deps_raw)?;
+                let deps_ready = deps.iter().try_fold(true, |ready, dep| {
+                    Ok::<bool,anyhow::Error>(ready && super::artifacts::dep_satisfied(&tx,run,dep)?)
+                })?;
+                let next = if unsafe_effects > 0 { "blocked" }
+                    else if current["status"] == "draining" || current["stalled_from"] == "draining" { "cancelled" }
+                    else if count >= 2 || deadline.is_some_and(|at| now >= at) { "failed" }
+                    else if deps_ready { "ready" } else { "planned" };
+                tx.execute("UPDATE swarm_jobs SET status=?3,updated_ms=?4
+                    WHERE run_id=?1 AND id=?2",params![run,job,next,now])?;
+                if unsafe_effects == 0 {
+                    tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3
+                        WHERE run_id=?1 AND job_id=?2 AND status='active'",
+                        params![run,job,now])?;
+                }
+            }
+        }
     }
     let workers: i64 = tx.query_row(
         "SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1 AND status='registered'",
