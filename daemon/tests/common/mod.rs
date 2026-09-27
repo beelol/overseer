@@ -44,17 +44,22 @@ impl Daemon {
     }
 
     pub fn spawn(&mut self) {
+        self.spawn_from(Path::new(BIN));
+    }
+
+    pub fn spawn_from(&mut self, binary: &Path) {
         #[cfg(target_os = "macos")]
         let deny_egress = self.env.iter().any(|(key, value)|
             key == "OVERSEER_TEST_DENY_EGRESS" && value == "1");
         #[cfg(target_os = "macos")]
         let mut cmd = if deny_egress {
             let mut sandbox = Command::new("/usr/bin/sandbox-exec");
-            sandbox.args(["-p", "(version 1) (allow default) (deny network-outbound)", BIN]);
+            sandbox.args(["-p", "(version 1) (allow default) (deny network-outbound)"])
+                .arg(binary);
             sandbox
-        } else { Command::new(BIN) };
+        } else { Command::new(binary) };
         #[cfg(not(target_os = "macos"))]
-        let mut cmd = Command::new(BIN);
+        let mut cmd = Command::new(binary);
         #[cfg(target_os = "macos")]
         if deny_egress {
             cmd.env_clear();

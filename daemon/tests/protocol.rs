@@ -6036,6 +6036,97 @@ fn auto_root_executor_never_spawns_without_a_durable_supervisor_identity() {
 }
 
 #[test]
+fn auto_root_os_spawn_failure_releases_only_confirmed_unspent_allowance() {
+    use std::os::unix::fs::PermissionsExt;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let binary = r.path().join("overseerd-private-copy");
+    std::fs::copy(BIN, &binary).unwrap();
+    std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let mut d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE"),
+        ("CLAUDE_FIXTURE_MODE", "prose")]);
+    d.kill9();
+    d.spawn_from(&binary);
+    std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let request = json!({"work_unit_id":"root-os-spawn-rejected", "repo":repo,
+        "workspace_mode":"worktree", "prompt":"bounded root summary", "title":"root summary",
+        "allowed_profiles":["system-claude"], "min_tier":"general", "required_tools":[]});
+    let first = d.call("auto.start", request.clone());
+    assert_eq!(first["decision"]["selected"], "system-claude/sonnet/medium", "{first}");
+    let run = run_id(&first);
+    assert_eq!(d.wait_done(&run, 15)["status"], "unknown");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let (generation, run_dir): (i64, Option<String>) = db.query_row(
+        "SELECT process_generation,run_dir FROM runs WHERE id=?1", [&run],
+        |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    assert_eq!(generation, 1, "the supervisor identity was recorded before OS spawn");
+    assert!(run_dir.is_none(), "a confirmed OS spawn rejection clears that identity");
+    assert!(!d.home.path().join("runs").join(&run).join("p1/shim.json").exists());
+    let claim: String = db.query_row(
+        "SELECT state FROM auto_pool_claims WHERE work_unit_id='root-os-spawn-rejected'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(claim, "released", "no process could have spent this root's allowance");
+    d.kill9();
+    d.spawn();
+    let replay = d.call("auto.start", request);
+    assert_eq!(replay["state"], "paused", "{replay}");
+    assert_eq!(replay["run"]["id"], run);
+    assert_eq!(d.runs().len(), 1);
+}
+
+#[test]
+fn auto_root_post_spawn_write_failure_keeps_claim_until_reconciled_supervisor_settles() {
+    use std::time::Instant;
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mut d = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE,FIXTURE_SLOW_MS"),
+        ("CLAUDE_FIXTURE_MODE", "slow"), ("FIXTURE_SLOW_MS", "5000")]);
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER reject_root_start_status
+        BEFORE UPDATE OF status ON runs
+        WHEN NEW.status='starting' AND EXISTS(
+            SELECT 1 FROM auto_root_intents i WHERE i.run_id=NEW.id)
+        BEGIN SELECT RAISE(FAIL, 'injected root post-spawn status failure'); END;").unwrap();
+    let request = json!({"work_unit_id":"root-post-spawn-status", "repo":repo,
+        "workspace_mode":"worktree", "prompt":"bounded root summary", "title":"root summary",
+        "allowed_profiles":["system-claude"], "min_tier":"general", "required_tools":[]});
+    let first = d.call("auto.start", request.clone());
+    let run = run_id(&first);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let paused = loop {
+        let response = d.call("auto.start", request.clone());
+        if response["state"] == "paused" { break response; }
+        assert!(Instant::now() < deadline, "root did not reach the post-spawn failure");
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(paused["run"]["id"], run);
+    let (generation, run_dir): (i64, Option<String>) = db.query_row(
+        "SELECT process_generation,run_dir FROM runs WHERE id=?1", [&run],
+        |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    assert_eq!(generation, 1);
+    assert!(run_dir.is_some(), "the actual supervisor identity must stay durable");
+    let claim: String = db.query_row(
+        "SELECT state FROM auto_pool_claims WHERE work_unit_id='root-post-spawn-status'",
+        [], |row| row.get(0)).unwrap();
+    assert_ne!(claim, "released", "the spawned supervisor may still consume allowance");
+    db.execute_batch("DROP TRIGGER reject_root_start_status;").unwrap();
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.wait_done(&run, 15)["status"], "completed");
+    assert_eq!(d.run(&run)["process_generation"], 1);
+    let settled_claim: String = db.query_row(
+        "SELECT state FROM auto_pool_claims WHERE work_unit_id='root-post-spawn-status'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(settled_claim, "released");
+    assert_eq!(d.runs().len(), 1);
+    let decisions: i64 = db.query_row("SELECT COUNT(*) FROM events WHERE kind='auto_decision'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(decisions, 1);
+}
+
+#[test]
 fn auto_root_crash_after_git_effect_reports_planned_resource_without_retry() {
     use std::os::unix::fs::PermissionsExt;
     use std::time::Instant;

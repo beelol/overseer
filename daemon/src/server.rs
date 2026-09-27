@@ -1375,7 +1375,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                     let _ = store.set_auto_root_phase(&id, "paused");
                     if let Ok(Some(intent)) = store.auto_root_intent(&id) {
                         let _ = store.conn.execute("UPDATE runs SET status='unknown',
-                            exit_reason=?2 WHERE id=?1 AND process_generation=0",
+                            exit_reason=?2 WHERE id=?1 AND run_dir IS NULL
+                            AND status IN ('queued','starting')",
                             rusqlite::params![intent.run_id, format!("automatic root launch paused: {error}")]);
                     }
                     let _ = store.release_unstarted_auto_root_pool_claim(&id);

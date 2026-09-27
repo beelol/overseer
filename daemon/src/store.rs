@@ -925,14 +925,16 @@ impl Store {
         )? == 1)
     }
 
-    /// A stopped root launch with no durable supervisor identity cannot have
-    /// started a model process. Its Git resource may still need inspection.
+    /// A stopped root launch with no supervisor path cannot have started a
+    /// model process. The generation may already have advanced when the OS
+    /// rejected cmd.spawn and the launch code cleared its recorded path.
+    /// Its Git resource may still need inspection.
     pub fn release_unstarted_auto_root_pool_claim(&self, work_unit_id: &str) -> Result<bool> {
         Ok(self.conn.execute(
             "UPDATE auto_pool_claims SET state='released',released_ms=?2
              WHERE work_unit_id=?1 AND state IN ('active','uncertain')
                AND EXISTS(SELECT 1 FROM auto_root_intents i JOIN runs r ON r.id=i.run_id
-                   WHERE i.work_unit_id=?1 AND r.process_generation=0 AND r.run_dir IS NULL)",
+                   WHERE i.work_unit_id=?1 AND r.run_dir IS NULL)",
             params![work_unit_id, crate::daemon::now()],
         )? == 1)
     }
