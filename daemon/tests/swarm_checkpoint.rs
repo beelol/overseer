@@ -39,7 +39,7 @@ fn admit(d: &Daemon, run: &str, target: &str, at: i64, request: &str) -> Value {
 }
 
 #[test]
-fn failed_worker_checkpoint_requires_destination_grant_before_replacement() {
+fn failed_worker_checkpoint_and_evidence_require_destination_grants_before_replacement() {
     let mut d = Daemon::start(&[]);
     let tmp = tmp();
     let checkout = repo(&tmp.path().join("shipment"));
@@ -68,6 +68,14 @@ fn failed_worker_checkpoint_requires_destination_grant_before_replacement() {
         "attempt_id":first["attempt_id"],"token":first["token"],
         "artifact_id":"sql-checkpoint","source_revision":1,
         "kind":"checkpoint","content":content}),
+    );
+    let prior_evidence = "Trace ship-trace-021 shows the retry holding a connection";
+    d.call(
+        "swarm.artifact.put",
+        json!({"run_id":id,"job_id":"sql",
+        "attempt_id":first["attempt_id"],"token":first["token"],
+        "artifact_id":"sql-trace","source_revision":1,
+        "kind":"evidence","content":prior_evidence}),
     );
     let launched = d.call(
         "swarm.worker.launch",
@@ -113,6 +121,11 @@ fn failed_worker_checkpoint_requires_destination_grant_before_replacement() {
         "generation":1,"revision":1,"artifact_id":"sql-checkpoint","target_id":"c"})
         )
         .is_err());
+    assert!(d.try_call("swarm.context.grant",json!({"run_id":id,
+        "generation":1,"revision":1,"artifact_id":"sql-trace","target_id":"c"})).is_err());
+    let evidence_grant=d.call("swarm.context.grant",json!({"run_id":id,
+        "generation":1,"revision":1,"artifact_id":"sql-trace","target_id":"b"}));
+    assert_eq!(evidence_grant["status"],"granted");
     assert_eq!(
         d.call("swarm.context.grant", grant.clone())["status"],
         "granted"
@@ -132,11 +145,17 @@ fn failed_worker_checkpoint_requires_destination_grant_before_replacement() {
         json!({"run_id":id,"job_id":"sql",
         "attempt_id":second["attempt_id"],"token":second["token"]}),
     );
-    assert_eq!(brief["artifacts"][0]["id"], "sql-checkpoint");
+    let ids: Vec<_> = brief["artifacts"].as_array().unwrap().iter()
+        .map(|artifact|artifact["id"].as_str().unwrap()).collect();
+    assert_eq!(ids,["sql-checkpoint","sql-trace"]);
     assert_eq!(
         d.call("swarm.context.get", context.clone())["content"],
         content
     );
+    let evidence_context=json!({"run_id":id,"job_id":"sql",
+        "attempt_id":second["attempt_id"],"token":second["token"],
+        "artifact_id":"sql-trace"});
+    assert_eq!(d.call("swarm.context.get",evidence_context.clone())["content"],prior_evidence);
     let replacement = d.call(
         "swarm.worker.launch",
         json!({"run_id":id,
@@ -146,18 +165,26 @@ fn failed_worker_checkpoint_requires_destination_grant_before_replacement() {
     );
     let replacement_worker = replacement["overseer_run_id"].as_str().unwrap();
     d.wait_status(replacement_worker, |status| status == "running", 10);
+    let evidence_revoked = d.call(
+        "swarm.context.revoke",
+        json!({"run_id":id,
+        "generation":1,"revision":1,"artifact_id":"sql-trace","target_id":"b",
+        "fault_persist_only":true}),
+    );
+    assert_eq!(evidence_revoked["status"],"revoked");
+    assert_eq!(evidence_revoked["affected_jobs"],json!(["sql"]));
+    assert!(evidence_revoked["unconfirmed"].as_array().unwrap()
+        .iter().any(|id| id == replacement_worker));
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.wait_done(replacement_worker, 10)["status"], "interrupted");
+    assert!(d.try_call("swarm.context.get", evidence_context).is_err());
     let revoked = d.call(
         "swarm.context.revoke",
         json!({"run_id":id,
         "generation":1,"revision":1,"artifact_id":"sql-checkpoint","target_id":"b"}),
     );
     assert_eq!(revoked["status"], "revoked");
-    assert!(revoked["interrupt_requested"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|id| id == replacement_worker));
-    assert_ne!(d.wait_done(replacement_worker, 10)["status"], "completed");
     assert!(d.try_call("swarm.context.get", context).is_err());
     assert_eq!(
         d.call("swarm.jobs", json!({"id":id}))["jobs"][0]["status"],

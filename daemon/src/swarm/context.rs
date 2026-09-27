@@ -25,7 +25,7 @@ pub(super) fn revoked_dependency(
          JOIN swarm_jobs j ON j.run_id=v.run_id AND j.id=?2
          WHERE v.run_id=?1 AND v.target_id=?3
          AND (EXISTS (SELECT 1 FROM json_each(j.deps) dep WHERE dep.value=a.job_id)
-              OR (a.job_id=j.id AND a.kind='checkpoint'
+              OR (a.job_id=j.id
                   AND a.source_revision=j.plan_revision))
          LIMIT 1",
         )?
@@ -111,23 +111,23 @@ pub fn grant_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let row = if row.is_some() {
         row
     } else {
-        // A checkpoint from a confirmed-finished attempt may be transferred to
-        // the *same logical job* before its next admission. The director must
-        // explicitly grant each destination; a failed attempt's arbitrary
-        // artifact is not accepted evidence for dependent jobs.
+        // Durable artifacts from a confirmed-finished attempt may be handed to
+        // the *same logical job* on another approved target. Each artifact
+        // needs an explicit destination grant. This never makes a failed
+        // attempt's evidence accepted for a dependent job.
         store.conn.query_row(
             "SELECT a.content,a.sha256 FROM swarm_artifacts a
              JOIN swarm_attempts prior ON prior.id=a.attempt_id AND prior.status='finished'
              JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
              JOIN swarm_admissions source ON source.run_id=a.run_id AND source.attempt_id=a.attempt_id
-             WHERE a.run_id=?1 AND a.id=?2 AND a.kind='checkpoint'
+             WHERE a.run_id=?1 AND a.id=?2
                AND j.status='ready' AND j.plan_revision=a.source_revision
                AND source.target_id<>?3",
             params![run,artifact,target], |r| Ok((r.get(0)?,r.get(1)?)),
         ).optional()?
     };
     let (content, digest) = row
-        .ok_or_else(|| anyhow!("no accepted dependency or finished checkpoint for destination"))?;
+        .ok_or_else(|| anyhow!("no accepted dependency or finished same-job artifact for destination"))?;
     if format!("{:x}", Sha256::digest(content.as_bytes())) != digest {
         bail!("artifact integrity check failed");
     }
@@ -169,12 +169,12 @@ pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
         {
             bail!("unknown or disallowed destination");
         }
-        let (source_job, source_attempt, source_kind, source_revision): (String, String, String, i64) = store
+        let (source_job, source_attempt, source_revision): (String, String, i64) = store
             .conn
             .query_row(
-                "SELECT job_id,attempt_id,kind,source_revision FROM swarm_artifacts WHERE run_id=?1 AND id=?2",
+                "SELECT job_id,attempt_id,source_revision FROM swarm_artifacts WHERE run_id=?1 AND id=?2",
                 params![run, artifact],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
             .optional()?
             .ok_or_else(|| anyhow!("unknown artifact"))?;
@@ -190,8 +190,8 @@ pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
              JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
              WHERE a.run_id=?1 AND s.target_id=?2
              AND (EXISTS (SELECT 1 FROM json_each(j.deps) dep WHERE dep.value=?3)
-                  OR (?4='checkpoint' AND j.id=?3 AND a.id<>?5
-                      AND j.plan_revision=?6))",
+                  OR (j.id=?3 AND a.id<>?4
+                      AND j.plan_revision=?5))",
         )?;
         let affected_jobs = jobs_stmt
             .query_map(
@@ -199,7 +199,6 @@ pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
                     run,
                     target,
                     source_job,
-                    source_kind,
                     source_attempt,
                     source_revision
                 ],
@@ -216,8 +215,8 @@ pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
                AND r.status IN ('queued','starting','running','waiting_for_user')
              WHERE a.run_id=?1
              AND (EXISTS (SELECT 1 FROM json_each(j.deps) dep WHERE dep.value=?3)
-                  OR (?4='checkpoint' AND j.id=?3 AND a.id<>?5
-                      AND j.plan_revision=?6))",
+                  OR (j.id=?3 AND a.id<>?4
+                      AND j.plan_revision=?5))",
         )?;
         let workers = worker_stmt
             .query_map(
@@ -225,7 +224,6 @@ pub fn revoke_artifact(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
                     run,
                     target,
                     source_job,
-                    source_kind,
                     source_attempt,
                     source_revision
                 ],
@@ -285,8 +283,7 @@ pub fn retry_revoked_interrupts(d: &Arc<Daemon>) -> Result<usize> {
                JOIN swarm_artifacts a ON a.run_id=v.run_id AND a.id=v.artifact_id
                LEFT JOIN json_each(j.deps) dep ON dep.value=a.job_id
                WHERE v.run_id=t.run_id AND v.target_id=s.target_id
-                 AND (dep.value=a.job_id OR (a.kind='checkpoint'
-                      AND a.job_id=t.job_id AND a.attempt_id<>t.id
+                 AND (dep.value=a.job_id OR (a.job_id=t.job_id AND a.attempt_id<>t.id
                       AND a.source_revision=j.plan_revision)))
              ORDER BY l.overseer_run_id",
         )?;
