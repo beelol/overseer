@@ -15,8 +15,6 @@ which is out of scope for now. The full list is under [Acceptance criteria](#acc
 
 Only the owner can do these (AC-160). Each is one step; the criterion it unblocks is in brackets. The everything goal (`docs/goals/everything.md`) keeps this list current.
 
-- Decide where the one-line search should live: VS Code keeps every extension side-bar pane at least 120 px tall, so a separate search pane is never one line [AC-155].
-- Sign in to Claude Code again (`claude`, then `/login`) [the Claude half of AC-81, AC-45].
 - Try the Gate K build in your own VS Code [AC-114].
 - Let the GitHub CLI push workflow files: `gh auth refresh -s workflow` (the checks for every pull request are written and waiting) [AC-148].
 - Say whether the Gate J design review still needs marks or the Gate K review replaces it [AC-66].
