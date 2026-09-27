@@ -407,7 +407,8 @@ impl Daemon {
         let lines: Vec<String> = checked.iter().map(|a| self.describe(a)).collect();
         let last_message: Option<String> = self.store.lock().unwrap().conn.query_row("SELECT id FROM overseer_messages WHERE session_id=?1 AND source='overseer' ORDER BY seq DESC LIMIT 1", [&sid], |r| r.get(0)).ok();
         self.store.lock().unwrap().conn.execute("INSERT INTO overseer_proposals(id, session_id, message_id, ts, actions, state, source) VALUES(?1, ?2, ?3, ?4, ?5, 'open', ?6)", rusqlite::params![id, sid, last_message, now, serde_json::to_string(&checked)?, source])?;
-        let card = json!({"id": id, "actions": checked, "lines": lines, "state": "open", "level": level});
+        let card = json!({"id": id, "actions": checked, "lines": lines, "state": "open", "level": level, "via": source,
+            "note": if source == "text" { "Proposed in text: this harness has no tools, so the state was sent with the message." } else { "" }});
         let run_id = session["run_id"].as_str().map(str::to_string);
         self.emit(None, run_id.as_deref(), "proposal", "overseer", "exact", card.clone())?;
         if at_once {

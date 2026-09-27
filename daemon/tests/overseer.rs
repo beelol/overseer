@@ -577,3 +577,66 @@ fn ac184_overseer_reads_on_demand_and_only_reads() {
     let entries: Vec<String> = std::fs::read_dir(&scratch).unwrap().flatten().map(|e| e.file_name().to_string_lossy().to_string()).collect();
     assert!(entries.iter().all(|e| [".git", "README.md", "mcp.json"].contains(&e.as_str())), "{entries:?}");
 }
+
+/// AC-184: a binary file is refused as text; Overseer quotes a diff it read through its tool;
+/// with sixteen agents the turn's input stays within the bound; a harness without tools gets
+/// the state with the message and its proposal comes from its text, said so on the card.
+#[test]
+fn ac184_quotes_diffs_bounds_turns_and_falls_back_without_tools() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::write(repo.join("README.md"), "# Demo\n").unwrap();
+    git(&repo, &["add", "README.md"]);
+    git(&repo, &["commit", "-qm", "readme"]);
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    let sessions = claude_task(&d, &repo, &mode_file, "showcase", "Sessions", "Make expired sessions refresh once");
+    d.wait_done(&sessions, 30);
+    let token = d.call("overseer.token", json!({"run_id": "t-overseer", "role": "overseer"}))["token"].as_str().unwrap().to_string();
+    let ws = PathBuf::from(d.call("state", json!({}))["workspaces"].as_array().unwrap().iter().find(|w| w["id"] == d.run(&sessions)["workspace_id"]).unwrap()["path"].as_str().unwrap());
+    std::fs::write(ws.join("blob.bin"), [0u8, 159, 146, 150, 255, 0, 1]).unwrap();
+    let err = d.try_call("overseer.tool", json!({"token": token, "name": "file", "arguments": {"id": sessions, "path": "blob.bin"}})).unwrap_err();
+    assert!(err.contains("not a text file"), "{err}");
+    // Overseer answers about a file with the diff it read through its tool.
+    std::fs::write(&mode_file, "overseer").unwrap();
+    d.call("overseer.send", json!({"text": "What did Sessions change in README.md?", "surface": "ctl", "harness": "claude"}));
+    let s = wait_overseer_idle(&d, 30);
+    let reply = s["messages"].as_array().unwrap().iter().rev().find(|m| m["source"] == "overseer").unwrap();
+    assert!(reply["text"].as_str().unwrap().contains("+## Sessions"), "{}", reply["text"]);
+    let run = s["run_id"].as_str().unwrap().to_string();
+    assert!(d.events(&run).iter().any(|e| e["kind"] == "overseer_tool_call" && e["payload"]["name"] == "diff"));
+    // Sixteen agents: the turn's input stays within 32 KiB.
+    for i in 0..15 {
+        let id = claude_task(&d, &repo, &mode_file, "showcase", &format!("Agent {i}"), &format!("Task {i}: {}", "make it good ".repeat(30)));
+        d.wait_done(&id, 60);
+    }
+    std::fs::write(&mode_file, "overseer").unwrap();
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl"}));
+    let s = wait_overseer_idle(&d, 60);
+    let turns = d.call("run.turns", json!({"run_id": run}));
+    let last = turns.as_array().unwrap().last().unwrap();
+    let prompt = last["prompt"].as_str().unwrap();
+    assert!(prompt.len() <= 32 * 1024, "turn input {} bytes", prompt.len());
+    assert!(prompt.contains("Agents (JSON):") && prompt.ends_with("What is everyone doing?"));
+    let reply = s["messages"].as_array().unwrap().iter().rev().find(|m| m["source"] == "overseer").unwrap();
+    assert!(reply["text"].as_str().unwrap().contains("Agent 14"));
+    // A harness without tools: the state goes with the message, the proposal comes from the text.
+    let d2 = Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude_fixture()), ("CLAUDE_FIXTURE_MODE_FILE", &mode_file.display().to_string()), ("CLAUDE_FIXTURE_NO_MCP", "1"), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE,CLAUDE_FIXTURE_NO_MCP")]);
+    std::fs::write(&mode_file, "echo").unwrap();
+    let api = claude_task(&d2, &repo, &mode_file, "echo", "API tests", "write the API");
+    d2.wait_done(&api, 30);
+    std::fs::write(&mode_file, "overseer").unwrap();
+    d2.call("overseer.send", json!({"text": "Tell API tests to add tests", "surface": "ctl", "harness": "claude"}));
+    let s = wait_overseer_idle(&d2, 30);
+    let open = s["proposals"].as_array().unwrap();
+    assert_eq!(open.len(), 1, "{s}");
+    let run2 = s["run_id"].as_str().unwrap();
+    let card = d2.events(run2).into_iter().find(|e| e["kind"] == "proposal").unwrap();
+    assert_eq!(card["payload"]["via"], "text");
+    assert!(card["payload"]["note"].as_str().unwrap().contains("no tools"));
+    assert!(!d2.events(run2).iter().any(|e| e["kind"] == "tool"), "no tool was called");
+    let said = s["messages"].as_array().unwrap().iter().rev().find(|m| m["source"] == "overseer").unwrap();
+    assert!(!said["text"].as_str().unwrap().contains("overseer-actions"), "the block is not shown as text: {}", said["text"]);
+    let yes = d2.call("overseer.answer", json!({"id": open[0]["id"], "yes": true, "surface": "ctl"}));
+    assert!(yes["result"].as_str().unwrap().starts_with("Done: sent"));
+}

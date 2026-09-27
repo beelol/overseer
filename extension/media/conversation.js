@@ -413,6 +413,7 @@
       const head = ui.el('div', 'proposal-head'); head.append(ui.mark('sm'), ui.el('span', null, 'Overseer will'));
       const list = ui.el('ul', 'proposal-list');
       for (const line of p.lines || []) list.append(ui.el('li', null, line));
+      if (p.note) list.append(ui.el('li', 'muted', p.note));
       const status = ui.el('div', 'proposal-status'); status.setAttribute('role', 'status');
       const yes = ui.el('button', 'btn primary sm', 'Yes'); yes.type = 'button'; yes.dataset.proposal = 'yes';
       const no = ui.el('button', 'btn sm', 'No'); no.type = 'button'; no.dataset.proposal = 'no';
