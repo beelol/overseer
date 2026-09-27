@@ -54,7 +54,7 @@
         "reason": "beneficial",
         "replay": false,
         "revision": 1,
-        "run_id": "sw-a0f845e3e88e",
+        "run_id": "sw-85a8bd6a3fc7",
         "serial": {
           "affordable": true,
           "elapsed_ms": 3240,
@@ -216,6 +216,14 @@
     {
       "name": "selecting one Swarm worker opens its run view",
       "ok": true
+    },
+    {
+      "name": "all fixture worker processes exit after Stop and teardown",
+      "ok": true,
+      "detail": {
+        "count": 32,
+        "live": 0
+      }
     }
   ]
 }

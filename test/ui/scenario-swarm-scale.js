@@ -127,9 +127,19 @@ print(json.dumps([json.loads((pathlib.Path(row[0]) / 'shim.json').read_text())['
     try { await s.screenshot('error'); } catch {}
   } finally {
     if (runId) { try { s.ctl('swarm.stop', { run_id: runId }); } catch (error) { s.note('cleanup Stop failed', error.message); } }
+    if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }
+    if (runId && !process.env.KEEP_OPEN) {
+      let processes;
+      for (let n = 0; n < 50; n++) {
+        processes = liveWorkerPids(s.home, runId);
+        if (processes.live === 0) break;
+        await delay(100);
+      }
+      check('all fixture worker processes exit after Stop and teardown',
+        processes.count === 32 && processes.live === 0, processes);
+    }
     s.writeLog();
     fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
-    if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }
     const failed = result.error || result.checks.some(c => !c.ok);
     console.log(failed ? 'SCENARIO FAILED' : 'SCENARIO PASSED', s.root);
     process.exit(failed ? 1 : 0);
