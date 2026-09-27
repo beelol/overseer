@@ -28,18 +28,15 @@ const SPECS = [
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent))`, 60000, 'status bar');
     await s.openOverseerView();
     const runState = id => s.ctl('state').runs.find(r => r.id === id);
-    const selectRun = async (title, harness) => {
-      const pt = await cdp.waitFor(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-        const i = rows.findIndex(r => r.textContent.includes(${JSON.stringify(title)})); const r = rows[i + 1]; if (!r || !r.textContent.includes(${JSON.stringify(harness)})) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 30000, 'run row ' + title);
-      await cdp.click(pt.x, pt.y);
-      await delay(1500);
-    };
+    // Gate K and later: one row per agent in the Overseer side bar.
+    const selectRun = async title => { await s.selectAgent(title, { settle: 1500 }); };
     const clickIn = async (frame, selector) => { const p = await s.webviewPoint(frame, selector); await cdp.click(p.x, p.y); await delay(500); };
     for (const spec of SPECS.filter(x => !process.env.ONLY || process.env.ONLY.split(',').includes(x.harness))) {
-      const created = s.ctl('task.create', { repo, harness: spec.harness, profile_id: spec.harness === 'claude' ? 'system-claude' : 'system-codex', model: spec.model, prompt: spec.prompt, title: spec.title, approval_policy: spec.approval_policy });
+      const created = s.ctl('task.create', { repo, harness: spec.harness, profile_id: spec.harness === 'claude' ? 'system-claude' : 'system-codex', model: spec.model, ...(spec.harness === 'codex' ? { effort: 'low' } : {}), prompt: spec.prompt, title: spec.title, approval_policy: spec.approval_policy });
       const run = created.run.id;
       await selectRun(spec.title, spec.harness);
-      const panel = await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(run)} && !!document.getElementById('conv')`, 60000);
+      // The agent's chat is the Overseer view (Gate K): it says which agent it shows.
+      const panel = await cdp.webview(`window.__overseer?.selected?.() === ${JSON.stringify(run)} && !!document.getElementById('conv')`, 60000);
       const decisions = [];
       for (let i = 0; i < 480; i++) {
         const r = runState(run);
@@ -54,8 +51,8 @@ const SPECS = [
       await cdp.command('Notifications: Clear All Notifications');
       await delay(500);
       const conv = await panel.eval(`(() => {
-        const tools = [...document.querySelectorAll('#conv details.tool')].map(t => t.querySelector('.tool-name').textContent);
-        const nested = [...document.querySelectorAll('#conv .tool-children > details.child')].map(c => ({ title: c.querySelector('.child-title').textContent, spawnedBy: c.parentElement.previousElementSibling?.querySelector('.tool-name')?.textContent, replies: [...c.querySelectorAll('.child-body .msg .text')].map(t => t.textContent.trim()).filter(t => !t.startsWith('[tool ') && !t.startsWith('Prompt: ')).slice(-3) }));
+        const tools = [...document.querySelectorAll('#conv details.tool')].map(t => t.dataset.name);
+        const nested = [...document.querySelectorAll('#conv .tool-children > details.child')].map(c => ({ title: c.querySelector('.child-title').textContent, spawnedBy: c.parentElement.previousElementSibling?.dataset?.name, replies: [...c.querySelectorAll('.child-body .msg .text')].map(t => t.textContent.trim()).filter(t => !t.startsWith('[tool ') && !t.startsWith('Prompt: ')).slice(-3) }));
         const loose = [...document.querySelectorAll('#conv .turn-body > details.child')].map(c => c.querySelector('.child-title').textContent);
         return { turns: document.querySelectorAll('#conv .turn').length, prompt: document.querySelector('#conv .msg.user .text')?.textContent.slice(0, 60), agent: [...document.querySelectorAll('#conv .msg.agent .text')].map(t => t.textContent).pop(),
           tools, nested, loose, perms: [...document.querySelectorAll('#conv .perm-card .perm-head')].map(h => h.textContent), edits: [...document.querySelectorAll('#conv .edit-path')].map(b => b.textContent),
@@ -64,7 +61,7 @@ const SPECS = [
       s.note(spec.harness + ' conversation', result.runs[spec.harness]);
       await s.screenshot(`${spec.harness}-conversation`);
       check(`${spec.harness}: run completed`, done.status === 'completed', { status: done.status, reason: done.exit_reason });
-      check(`${spec.harness}: conversation has the prompt, agent reply, tool calls and per-turn usage`, conv.turns >= 1 && conv.prompt && conv.agent && conv.tools.length >= 1 && /completed/.test(conv.done || '') && !!conv.usage, conv);
+      check(`${spec.harness}: conversation has the prompt, agent reply, tool calls and per-turn usage`, conv.turns >= 1 && conv.prompt && conv.agent && conv.tools.length >= 1 && /completed|Done/.test(conv.done || '') && !!conv.usage, conv);
       check(`${spec.harness}: native child nested under the tool call that spawned it, with its own output`, conv.nested.length >= 1 && conv.nested.every(c => /Agent|Task|spawn/.test(c.spawnedBy || '')) && conv.nested.some(c => c.replies.some(t => /^hi\.?$/i.test(t))), { nested: conv.nested, loose: conv.loose });
       if (spec.harness !== 'codex') check(`${spec.harness}: permission request answered inline and recorded`, decisions.length >= 1 && conv.perms.some(p => /Allowed/.test(p)), { decisions, perms: conv.perms });
       // Expand the first tool call and collapse it again.
