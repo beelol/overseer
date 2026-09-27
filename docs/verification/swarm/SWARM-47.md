@@ -233,3 +233,24 @@ multi-patch repair with overlapping edits, an exhausted attempt budget,
 explicit no-code-change disposition, autonomous semantic judgment, unresolved
 partial reporting, and qualified live director review remain unverified.
 SWARM-47 remains partial.
+
+Exhausted integrated repair at `884ac97` (2026-09-27): a local fixture uses
+two actual patch-job attempts. The first submits evidence that fails review;
+the second is accepted, exits, and integrates its patch. A later route
+contradiction invalidates that accepted patch. Revising its acceptance check
+does not reset the two-attempt budget: the job becomes `failed` with durable
+`attempts_exhausted`, and the coverage row now says `attempts_exhausted`
+instead of `unreported` while exposing the count and stop reason. A third
+attempt is refused. An independent accepted reproduction can resolve the
+route disagreement, but combined verification still refuses the stale
+integrated branch. The acknowledged commit stays in the private worktree,
+and the user's source checkout is unchanged. The fixture failed first because
+revision cleared the stop reason; it passed after the readout change.
+
+The affected integration (25), broker, conflict (8), plan (11), and state
+(19) suites passed with `--offline -- --test-threads=1`; `git diff --check`
+passed. This proves truthful incompletion for exhausted attempts in the
+local integration path. An explicit disposition that can close an unrepaired
+run with a partial report, independent overlapping patch repair, autonomous
+semantic judgment, and a qualified live director remain unverified. SWARM-47
+stays partial.

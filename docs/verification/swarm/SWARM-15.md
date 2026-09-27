@@ -22,3 +22,14 @@ Swarm admission. The fixture tests in `swarm_runtime.rs` and
 `swarm_director_process.rs` prove the command boundary; they do not prove a
 joined live provider outage or same-job failover. See
 `main-reconciliation-2026-09-27.md`.
+
+Cross-check at `884ac97` (2026-09-27):
+`daemon/tests/swarm_integration.rs::exhausted_integrated_patch_stays_incomplete_after_late_conflict`
+uses two real attempts for a dependent patch: rejected evidence, then an
+accepted integrated patch. A late evidence conflict and plan revision leave
+the same logical job failed at count two with `attempts_exhausted` in the
+coverage readout; a third attempt is refused. Independent reproduction can
+resolve the route disagreement, but it does not restore attempt budget or
+qualify the stale integrated branch. This extends fixture evidence for the
+cross-revision cap. Shared Auto Mode routing and unchanged waiting-state
+model wakeups remain unverified, so SWARM-15 stays partial.
