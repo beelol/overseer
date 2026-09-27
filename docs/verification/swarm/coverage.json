@@ -264,9 +264,11 @@
         "test/ui/scenario-swarm-scale.js",
         "docs/verification/evidence/ui/swarm-scale/result.json",
         "daemon/tests/swarm_admission.rs",
-        "docs/verification/evidence/ui/swarm-scale/04-capacity-expanded.png"
+        "docs/verification/evidence/ui/swarm-scale/04-capacity-expanded.png",
+        "docs/verification/evidence/ui/swarm-status/result.json",
+        "docs/verification/evidence/ui/swarm-status/03-swarm-blocked-capacity.png"
       ],
-      "blocker": "A packaged 100-job/32-worker category now shows aggregate work, nested workers, selected fixture target, frozen allocation and finishing reserve, recorded parallel decision, and the last held admission reason (`worker_limit`) without claiming current live usage. That hold is a past observation, not a current limiting constraint. Live Auto account usage and account names, current constraint reconciliation, serial/scaled-down/blocked explanation variants, and joined credential-redaction evidence remain unverified."
+      "blocker": "Packaged fixtures show aggregate work, nested workers, selected fixture target, frozen allocation and reserve, a three-of-eight scaled planning decision, a blocked no-approved-target eligibility observation, and the last held admission reason. These are past observations, not a continuously current constraint. Live Auto account usage and names, current constraint reconciliation, packaged serial explanation, and joined credential-redaction evidence remain unverified."
     },
     "SWARM-24": {
       "status": "partial",

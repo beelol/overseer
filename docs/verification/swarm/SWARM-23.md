@@ -51,3 +51,25 @@ The last hold is a past daemon decision, not a continuously recomputed current
 limit. A live Auto producer, fresh account usage, selected account labels,
 serial/scaled-down/blocked explanations across the full UI matrix and joined
 credential-redaction evidence remain open. SWARM-23 stays partial.
+
+Blocked and scaled-down UI follow-up (`f4c6f4f`): the Capacity section now shows
+the last durable eligibility observation and its reason, marking an expired
+observation as expired rather than current. The planning row shows the recorded
+parallel-worker cap against the run's effective worker ceiling. The unit test
+first failed because the blocked eligibility row was absent, then passed after
+the renderer change; it also checks an expired observation and a three-of-eight
+parallel decision. A packaged VS Code fixture with 100 ready jobs, a four-slot
+app limit, and no approved target recorded a beneficial batch capped at three
+workers plus a `no_allowed_target` observation. The expanded Capacity row showed
+both facts. Screenshot, ordered checks, and log are under
+`docs/verification/evidence/ui/swarm-status/` (`03-swarm-blocked-capacity.png`,
+`result.json`, `scenario.log`). The screenshot was visually inspected. The
+packaged scenario still passed its existing deadline, Pause, Resume, Off, and
+Stop checks. `node test/unit/run.js` passed 5/5, the extension source check and
+VSIX build passed, and `git diff --check` passed. This is fixture evidence of
+past decisions, not proof of a continuously current account constraint.
+
+Remaining: serial decision needs packaged UI evidence; Auto integration must
+provide selected live account labels and measured/estimated/stale usage with a
+fresh limiting constraint. The combined status/log surface needs credential
+redaction evidence. SWARM-23 remains partial and its RFC box stays unchecked.

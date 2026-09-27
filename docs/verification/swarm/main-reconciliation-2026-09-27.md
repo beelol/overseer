@@ -242,3 +242,12 @@ Main restored Gate L and AC-151 ledger records lost in an earlier generated
 ledger update. It changed documentation only. The Swarm/Continuity handoff
 fence and the SWARM-23 admission readout remain unchanged; no Swarm criterion
 or supported target is newly qualified by the ledger restoration.
+
+## Subsequent published main: `dc21391`
+
+Main revised the verification ledger and marked Gate S AC-193/194/196/197
+partial for its watch/finding implementation on separate pull request #14.
+This published change includes no Swarm runtime or Auto route implementation.
+In particular, AC-196's account sharing is still partial, so SWARM-08/24 and
+the common admission contract remain open. The merged ledger does not change
+Swarm's one-director authority, worker count defaults or acceptance boxes.
