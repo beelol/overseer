@@ -1,12 +1,12 @@
 # Prepared goal: implement the phone remote on the same network
 
 Status: not activated. This file is a reusable instruction for a future implementation session.
-Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 (Gate N) in the
+Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 and AC-141 (Gate N) in the
 [main RFC](../overseer-rfc.md#gate-n--phone-remote-on-the-same-network-added-by-the-owner-2026-09-26).
 
 ## Goal text
 
-> Implement Gate N, the phone remote on the same network, against AC-115 to AC-137 in
+> Implement Gate N, the phone remote on the same network, against AC-115 to AC-137 and AC-141 in
 > `docs/overseer-rfc.md`, following `docs/rfcs/phone-remote.md`. Deliver a gateway inside
 > `overseerd` that is off by default, pairing that needs the Mac, an encrypted and mutually
 > authenticated session, and one phone app for iOS and Android in `phone/` that sees and controls
@@ -19,17 +19,34 @@ Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 (Gate N) in the
 > platform layer, behind generic interfaces, and prefer a maintained cross-platform library to
 > own native code.
 >
+> The app follows the phone's light or dark setting and looks the same as Overseer Light and
+> Overseer Dark in VS Code. Generate its tokens from `extension/design/tokens.js`; never copy
+> values by hand. The door appears on a cold start only.
+>
+> Build and verify on the iOS simulator and the Android emulator first, with Expo as the stack.
+> The parts of a criterion that need the owner's iPhone stay unchecked, named in its record, until
+> the owner has done the device steps in the RFC. A simulator never satisfies a device check. End
+> the session's report with the steps the owner still has to do.
+>
+> The Apple developer assets already on this Mac (identifiers, keys, certificates, profiles) and
+> the Android virtual devices already there belong to other projects of the owner's. Do not read,
+> use or change them. Overseer gets its own identifier, its own keys and its own virtual device.
+>
+> The owner pairs once. After that the app never asks to pair, sign in or confirm, and it does not
+> lock itself. Phone access is switched on and off on the desktop only. Notifications can be
+> switched on and off. There is no voice mode.
+>
 > The phone talks only to the Overseer daemon. Do not build a relay, a server, or anything that
 > runs agents away from the Mac; those belong to a later RFC. Do not change the Unix socket
 > boundary (AC-08).
 >
 > Work in this order, and do not start a phase before the one above it has evidence:
 >
-> 1. **Prove (AC-115).** Measure both app stacks on the owner's iPhone and choose by the numbers,
->    unless the owner has named the stack. Run the other spikes and write the reuse decision. If a
->    spike fails, revise the RFC's proposed default and record why before building on it.
-> 2. **Connect (AC-116 to AC-120, AC-134).** Gateway, pairing, encryption, devices, discovery,
->    with a minimal app built on the platform layer and the generated protocol types.
+> 1. **Prove (AC-115).** Run the spikes on the simulators and record the speed baselines. Write
+>    the reuse decision. If a spike fails, revise the RFC and record why before building on it.
+> 2. **Connect (AC-116 to AC-120, AC-134, AC-141).** Gateway with its desktop switch, pairing
+>    once, encryption, devices, discovery, with a minimal app built on the platform layer and the
+>    generated protocol types.
 > 3. **Hold (AC-121 to AC-123).** Resume from the cursor, exactly-once requests, an awake Mac.
 > 4. **See and control (AC-124 to AC-127, AC-131).** Agents, conversations, control, review and
 >    the rest of Overseer. Move file reading, reviewed marks and pull request creation behind
@@ -40,7 +57,10 @@ Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 (Gate N) in the
 >    review and the fuzz test.
 > 7. **Overseer itself (AC-128).** Only when AC-107 exists; otherwise leave it not started with
 >    that blocker recorded, and continue.
-> 8. **Confirm (AC-132, AC-133).** Regression coverage, then the owner's session.
+> 8. **Confirm on the simulators (AC-132).** Regression coverage. This completes the simulator
+>    milestone.
+> 9. **The real iPhone.** After the owner's device steps: measure the speed budget first and
+>    confirm or change the stack, then discovery, push, and the owner's session (AC-133).
 >
 > For each criterion: reproduce what is missing with a focused test or scenario, implement a
 > bounded change, run the relevant checks and the regressions for what the change touches, and
@@ -52,9 +72,14 @@ Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 (Gate N) in the
 > the owner's paid-turn rules: tiny prompts, one attempt per step, no retry loops. Fixture evidence
 > never satisfies a criterion that asks for the owner's iPhone.
 >
-> Steps that need the owner (scanning the code on the iPhone, the local network permission, the
-> push key, Face ID, the final session): prepare everything first, ask one precise question, and
-> continue independent work while waiting. Never block on a foreground wait.
+> Steps that need the owner (accepting the Xcode license, and later signing, the push key,
+> scanning the code and the final session): prepare everything first, ask one precise question,
+> and continue independent work while waiting. Never block on a foreground wait. Never accept a
+> license, enter a password or change a system setting on the owner's behalf.
+>
+> Other gates are being built at the same time. Before changing shared daemon code, fetch `main`
+> and build on what is there; define the file, review and pull request methods once and let other
+> surfaces use them. Gate M is ignored for now.
 >
 > Build the implementation in its own worktree and pull request. Criteria, records and RFC
 > revisions go to `main`. Keep the license and notice of anything adopted from another project.
@@ -64,7 +89,11 @@ Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 (Gate N) in the
 > When what remains needs the owner, a device or a product decision, preserve the work and report
 > that exact blocker. A partial milestone is progress, not completion.
 >
-> Done means: AC-115 to AC-137 are verified with reproducible evidence, except AC-128 while AC-107
+> The simulator milestone is done when every part of AC-115 to AC-137 and AC-141 that the
+> simulators can verify is verified with reproducible evidence, except AC-128 while AC-107 does
+> not exist, and every device part is named in its record with the owner's next step.
+>
+> Done means: AC-115 to AC-137 and AC-141 are verified with reproducible evidence, except AC-128 while AC-107
 > does not exist; the existing suites pass with phone access off and on; the README's capability
 > table and limits are current; and the owner has confirmed the session on their iPhone.
 
@@ -72,16 +101,18 @@ Scope: [phone remote RFC](phone-remote.md) and AC-115 to AC-137 (Gate N) in the
 
 | Item | Needed for | When |
 | --- | --- | --- |
-| The iPhone, on the same network as the Mac | AC-115, AC-117, AC-120, AC-129, AC-133, AC-135, AC-136 | From phase 1 |
-| Apple Developer team and signing for a development build | Installing on the iPhone | Phase 1 |
-| A push key from the Apple Developer account, stored in the Mac's Keychain | AC-115, AC-129 | Phase 1, then phase 5 |
-| Answers to the RFC's open questions, or acceptance of the recommendations | Every phase | Before phase 2 |
-| Marks on the door and the transitions, on a review page | AC-136, AC-137 | Phase 5 |
+| The Xcode license accepted and the developer tools pointed at Xcode | The iOS simulator | Before phase 1 |
 | The session budget for the implementing agent | Activation | At activation |
+| Marks on the door and the transitions, on a review page | AC-136, AC-137 | Phase 5 |
+| A new app identifier and a new push key for Overseer, and signing | The real iPhone | Phase 9 |
+| The iPhone, on the same network as the Mac | The device parts and AC-133 | Phase 9 |
+
+The exact steps are in the RFC under [Steps for the owner](phone-remote.md#steps-for-the-owner).
+The Android emulator needs nothing from the owner.
 
 ## Activation boundary
 
 Writing this document is planning. No goal, scheduled task, implementation, live test or app build
 has been started. The owner activates the goal by starting a session with the goal text above and
-the session's limits. Until the open questions are answered, the recommendations in the RFC stand
-as proposed defaults, not as the owner's decisions.
+the session's limits. The owner left the remaining choices to the implementing agent on
+2026-09-26; the RFC lists them, and the owner can change any of them.

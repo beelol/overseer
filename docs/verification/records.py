@@ -1102,7 +1102,7 @@ rec(114, "Gate K in the owner's VS Code (owner-confirmed)", "not started", date=
 rec(115, "Feasibility and reuse before lock-in", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(116, "A gateway that is off by default", "not started", date="—", commit="—",
+rec(116, "A gateway switched on and off on the desktop", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
 rec(117, "Pairing needs the Mac", "not started", date="—", commit="—",
@@ -1141,13 +1141,13 @@ rec(127, "Everything else Overseer has", "not started", date="—", commit="—"
 rec(128, "Talk to Overseer from the phone", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(129, "Needs-you notifications on the phone", "not started", date="—", commit="—",
+rec(129, "Needs-you notifications you can switch", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(130, "Safe by default", "not started", date="—", commit="—",
+rec(130, "Safe without friction", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
-rec(131, "One app, iOS and Android", "not started", date="—", commit="—",
+rec(131, "One app, iOS and Android, that looks like Overseer", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
 rec(132, "Regression coverage for the phone", "not started", date="—", commit="—",
@@ -1166,6 +1166,21 @@ rec(136, "The door", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
 rec(137, "Motion throughout", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+
+# Gate L addition (Continuity): permission modes on handoff.
+rec(138, "Permission modes carry over", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#permission-modes-carry-over-ac-138).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(139, "OpenCode session transport spike", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(140, "Memory safety guard", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+# Gate N addition: pair once (the owner's decision of 2026-09-26).
+rec(141, "Pair once", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
 
@@ -1249,6 +1264,10 @@ SHORT_BLOCKERS = {
     135: "not started (Gate N, added by the owner on 2026-09-26)",
     136: "not started (Gate N, added by the owner on 2026-09-26)",
     137: "not started (Gate N, added by the owner on 2026-09-26)",
+    138: "not started (Gate L, added by the owner on 2026-09-26)",
+    139: "not started (Gate L, added by the owner on 2026-09-26; the goal's first step)",
+    140: "not started (Gate L, added by the owner on 2026-09-26)",
+    141: "not started (Gate N, added by the owner on 2026-09-26)",
 }
 TOTAL = 53
 

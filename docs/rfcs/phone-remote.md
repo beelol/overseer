@@ -1,6 +1,6 @@
 # Side RFC: phone remote on the same network
 
-Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-115 to AC-137 (Gate N) in the
+Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-115 to AC-137 and AC-141 (Gate N) in the
 [main RFC](../overseer-rfc.md#gate-n--phone-remote-on-the-same-network-added-by-the-owner-2026-09-26).
 Prepared goal: [phone-remote-goal.md](phone-remote-goal.md) (not activated).
 Builds on the daemon's event replay ([AC-10](../verification/AC-10.md)), the local access boundary
@@ -32,25 +32,40 @@ already replays its event log from a cursor.
 | Sessions | No lost sessions ("no disconnect"). |
 | Platforms | An iOS app, tested on the owner's iPhone. Android tested on the emulator only for now. |
 | Apple Developer Program | The owner has a membership: device installs, TestFlight and push notifications are available. |
-| App stack | The best option that is not slow. Expo is acceptable. Rust is not forced: it is used only where it is needed. |
+| App stack | The best option that is not slow. Expo is acceptable. Rust is not forced: it is used only where it is needed. The owner likes native views. |
 | Platform behaviour | Separated per platform behind generic interfaces. Cross-platform libraries are used where they fit. |
 | Speed | The app is hyper fast. |
 | Motion | Cool animations, with a signature launch: a sci-fi gradient door carrying a grayscale logo that splits open diagonally when the app is ready. |
+| The door | On a cold start only. |
+| Themes | Light and dark, following the phone's system setting. The app looks the same as Overseer Light and Overseer Dark in VS Code. |
+| Gate M | Ignored for now. No third theme on the phone. The chat with Overseer on the phone (AC-128) waits for AC-107 and does not hold up the rest. |
+| Default scope | Full control (confirmed). |
+| Pair once | After the first pairing the owner never pairs or signs in again. The mechanism is the implementing agent's choice. |
+| On and off | Phone access is turned on and off on the desktop. |
+| Notifications | Wanted, and they can be turned on and off. |
+| Simulators first | Build and verify on the iOS simulator and the Android emulator now. The real iPhone comes later, with the steps for the owner listed at the end. |
+| Apple assets | The Apple developer assets already on this Mac belong to another project of the owner's. They are not read, used or changed. Overseer gets its own. |
+| Voice mode | Not wanted. |
+| The Mac | Stays on. |
+| Everything else | Left to the implementing agent: *you pick the best option*. |
 
 ## Proposed defaults, distinguished from the decisions above
 
-These are the implementing agent's proposals. The owner can change any of them; a change is a
-recorded revision of this RFC.
+On 2026-09-26 the owner left the remaining choices to the implementing agent. These are the
+choices made. The owner can change any of them; a change is a recorded revision of this RFC.
 
-- **Flutter for the app**, in `phone/`, because it is compiled ahead of time and draws every
-  frame itself. Expo with React Native, which the owner accepted, is the second candidate. AC-115
-  measures both on the owner's iPhone and the numbers decide (see [The app stack](#the-app-stack)).
+- **Expo with React Native for the app**, in `phone/`: it draws native views, which the owner
+  likes, and it can share the extension's design tokens and conversation code. It is the stack of
+  the simulator milestone. The speed budget is measured on the owner's iPhone as the first device
+  step; **Flutter is the fallback** if Expo misses it (see [The app stack](#the-app-stack)).
+- **Pairing with keys, not a cloud account.** A cloud link would need a server, an account and a
+  sign-in, which is exactly what the owner does not want to repeat. Keys are exchanged once and
+  kept (see [Pair once](#pair-once)).
+- **No app lock by default.** The phone's own lock protects it. An app lock is a setting.
 - **Rust on the phone only for the encrypted session**, and only if the spike shows a clean
   binding. Everything else is written in the app's own language.
-- **The door shows on a cold start only**, never when returning from the background.
 - **Message-layer encryption** with an established handshake (Noise IK proposed), so the same
   session can later cross a relay that sees only ciphertext. Chosen in AC-115.
-- **Full control is the default scope** of a paired phone; *Watch only* exists as a choice.
 - **Three things stay on the Mac**: pairing a device, managing devices, and stopping the daemon.
   A phone that could do these could lock itself out or let another device in.
 - **Review on the phone** reads diffs and accepts or rejects hunks. Editing files on the phone is
@@ -58,7 +73,7 @@ recorded revision of this RFC.
 - **New agents start in repositories Overseer already knows.** Typing an arbitrary path on the
   phone is not in this gate.
 - **Notifications carry no prompt, code or file content** by default.
-- **Push on iOS only** in this gate, sent by the daemon straight to Apple with the owner's key.
+- **Push on iOS only** in this gate, sent by the daemon straight to Apple with Overseer's own key.
   Android gets in-app notifications; Android push needs a Firebase project and comes with the relay.
 - **Private addresses only**: the gateway accepts connections from private and link-local ranges.
 
@@ -99,9 +114,14 @@ daemon; everything it does is a daemon request.
 - **A second entrance, not a wider first one.** The Unix socket, its owner-only permissions and its
   peer check (AC-08) do not change. The gateway is a separate listener with its own authentication.
   This is a recorded revision of the main RFC's local-only default.
-- **Off by default.** *Overseer: Turn On Phone Access* (and `overseerd ctl gateway.enable`) starts
-  it; turning it off closes the listener and every session. The daemon persists and enforces the
-  setting, so it holds with VS Code closed.
+- **Switched on the desktop.** Phone access is off until the owner turns it on, and it is turned
+  on and off on the Mac only: a command and a status bar item in VS Code, a key in the terminal
+  UI, and `overseerd ctl`. The Mac shows whether it is on and how many phones are connected. A
+  phone cannot change it. The daemon persists and enforces the setting, so it holds with VS Code
+  closed.
+- **Off is said, not guessed.** Turning it off tells the connected phones first, then closes the
+  listener and every session. The phone says *Phone access is off on the Mac*, which is different
+  from *Mac unreachable*. Turning it on again lets paired phones reconnect by themselves.
 - **Transport.** WebSocket over TCP on one port (default 47810, configurable), on the Mac's network
   interfaces and on loopback (the iOS simulator and the Android emulator connect through loopback).
 - **Same protocol.** Inside a session the phone speaks the daemon's versioned JSON protocol: the
@@ -124,6 +144,19 @@ daemon; everything it does is a daemon request.
 4. The Mac shows *Pair "Bilal's iPhone"?* The owner confirms on the Mac.
 5. The daemon stores the device. The phone stores the Mac's key and its own private key in the
    system keystore (Keychain on iOS, Keystore on Android). Keys never leave the device.
+
+### Pair once
+
+Pairing happens one time. After it, opening the app never asks for anything: no pairing, no
+sign-in, no confirmation. The app has no account, no password and no sign-in screen. It reconnects
+by itself after the app or the phone restarts, the app is updated, the Mac or the daemon restarts
+or is updated, the Mac's address changes, phone access is turned off and on again, and a month
+without use. Pairing ends only when the owner revokes the device on the Mac or removes the app.
+
+The device's keys are its identity on every route. When the relay is added later, the same keys
+work through it, so nothing is paired again.
+
+### Refusals and the device list
 
 A wrong, expired or reused secret pairs nothing. Five failures close pairing until it is started
 again. The **Devices** list on the Mac shows each device's name, platform, scope, paired time, last
@@ -175,6 +208,13 @@ The session state is never in the connection.
   on battery sleeps anyway; the README says so. When the Mac cannot be reached the phone says *Mac
   unreachable* with the last contact time.
 
+## Several surfaces at once
+
+The phone, VS Code and the terminal UI can all be connected at the same time. They share one
+daemon and one event stream, so what is done on one shows on the others at once. When two
+surfaces answer the same permission request, the daemon takes the first answer and refuses the
+second with the first one's outcome. No surface ever shows a request as open after it was answered.
+
 ## What the phone can do
 
 | Area | On the phone | Daemon work needed |
@@ -201,8 +241,12 @@ Mac only with the reason, or not yet. It is generated from the gateway's method 
 ## Notifications
 
 The daemon sends needs-you notifications (a permission request, a question, a failure, a finished
-turn) to paired iPhones that opted in. It talks to Apple's push service directly, with the owner's
-push key kept in the macOS Keychain. There is no Overseer server.
+turn) to paired iPhones. It talks to Apple's push service directly, with Overseer's own push key
+kept in the macOS Keychain. There is no Overseer server.
+
+- **Switches.** On the phone: one switch for all notifications and one per kind. On the Mac: one
+  switch for every phone. Off means nothing is sent, not sent and hidden.
+- The system's permission is asked once, after pairing, with the reason given first.
 
 - The notification names the agent and the kind of event. It carries no prompt, code or file
   content unless the owner turns that on.
@@ -223,8 +267,9 @@ as the most sensitive surface in Overseer.
 - Pairing needs the Mac's screen and a confirmation on the Mac.
 - No credential, token, key or credential file content is ever sent to a phone. Sign-in on the
   phone uses the provider's device-code flow in the phone's own browser.
-- Destructive actions from the phone name what will be lost and ask for the device's unlock
-  (Face ID, Touch ID or passcode). The app locks after five minutes in the background.
+- Destructive actions from the phone name what will be lost and ask for one confirmation.
+- The app does not lock itself by default; the phone's own lock is its protection. An app lock
+  and a device unlock before destructive actions are settings, both off by default.
 - Every command from a phone is recorded as an event with the device as its source.
 - The daemon's secret redaction applies to everything sent, as it does for VS Code.
 - The gateway change gets a security review and a fuzz test of its handshake and frame parser.
@@ -266,11 +311,17 @@ on the phone.
 | Platform features | Plugins, with native code where none fits | Expo's modules | First party |
 | Tests without a device | Screen and screenshot tests run on the Mac | Logic tests on the Mac; screens need a simulator | Simulator |
 
-React Native is not a web page in an app: its screens are real native views, and it is fast enough
-for many well-known apps. It is still JavaScript at run time, and the owner asked for hyper fast
-with heavy custom animation, which is where a compiled stack with its own renderer has the
-advantage. Two native apps would be fastest and would double every screen. The proposal is
-Flutter, with the choice made by AC-115's measurements rather than by opinion.
+React Native is not a web page in an app: its screens are real native views, so text selection,
+scrolling, the keyboard and accessibility behave exactly as the platform's own. Its logic is
+JavaScript at run time. This app does little computing on the phone (the Mac does the work and
+the phone displays it), so the risk is not raw speed but busy JavaScript delaying what it drives.
+Flutter is compiled and draws every frame itself, which makes animation consistent, but its views
+are drawn to resemble the platform's rather than being them. Two native apps would be fastest and
+would double every screen.
+
+The rule: Expo is measured first and chosen when it meets the speed budget (AC-135) on the
+owner's iPhone, because the owner likes native views. Flutter is measured and chosen if Expo
+misses. The numbers decide, not opinion.
 
 ## App architecture
 
@@ -308,6 +359,15 @@ Flutter, with the choice made by AC-115's measurements rather than by opinion.
 Android 12 and later allow only a centered icon on one color as a launch screen, so the two
 platforms start differently and meet at the same door.
 
+## Look
+
+The app has two themes, light and dark. They follow the phone's system setting and change at once
+when it changes. They look the same as Overseer Light and Overseer Dark in VS Code, because both
+are generated from one source, `extension/design/tokens.js`: colors, type scale, spacing, radii
+and motion values. A check fails when a phone token differs from that source. Provider logos are
+the same files. What differs on purpose is what a phone needs: larger touch targets, the system
+text size, and each platform's own conventions.
+
 ## Speed
 
 | Budget | The owner's iPhone | Android emulator |
@@ -342,32 +402,49 @@ must stay within 10% of it. How the app meets the budget:
   └───────────────┘          └───────────────┘          └───────────────┘
 ```
 
-- **Closed.** A dark, sci-fi gradient in the Overseer theme's colors fills the screen. A grayscale
-  Overseer logo (from `extension/media/overseer.svg`) sits across a diagonal seam.
+- **Closed.** A sci-fi gradient built from the active theme's colors fills the screen: a dark
+  door in dark mode and a light door in light mode, following the phone's system setting. A
+  grayscale Overseer logo (from `extension/media/overseer.svg`) sits across a diagonal seam.
 - **Waiting.** A slow light travels along the seam, so the door is clearly alive.
 - **Opening.** When the first screen is drawn, the door splits along the seam. The halves slide
   apart and the logo splits with them. The app is already in place underneath.
-- **No jump.** The system's launch screen shows the same closed door in the same place.
+- **No jump.** The system's launch screen shows the same closed door in the same place and mode.
 - **Never slower.** The door opens as soon as the first screen is ready from the cache. It does
   not wait for the connection and has no minimum time on screen. Launch to a usable list is the
   same with the door turned off.
-- **Cold start only**, about 600 ms, interruptible by a touch. With Reduce Motion on it fades.
+- **Cold start only** (the owner's decision): returning from the background shows no door.
+- **About 600 ms**, interruptible by a touch. With Reduce Motion on it fades.
 
 The rest of the app moves with the same care. One motion system, with durations, easing and
 springs as tokens, drives every transition. Motion explains where a thing came from or what
 changed. It can be interrupted, follows the finger, and is replaced by fades under Reduce Motion.
 The owner marks the door and each transition on a review page until they look right.
 
+## Working alongside the other gates
+
+Other gates are being built while this one is planned. Where they meet:
+
+- **Phases 1 to 3** add a new module to the daemon and change little existing code. They can be
+  built while anything else is in flight.
+- **Phase 4** moves file reading, reviewed marks and pull request creation behind daemon methods.
+  Gate M reworks the review in VS Code (AC-99). The daemon methods are the contract between them:
+  this gate defines them, and whichever lands second builds on the first.
+- **Continuity (Gate L)** adds a connection state. The phone shows it when it exists.
+- **The terminal UI** does merge back, pull requests and cleanup in its own code today. It can
+  use the daemon methods after phase 4; this gate does not require it.
+- **Gate M is ignored for now** (the owner's decision). Only AC-128 depends on it.
+
 ## Testing
 
 - **Daemon:** gateway protocol tests in `cargo test` with a real daemon binary, as today.
-- **iOS simulator:** shares the Mac's network; connects through loopback. No camera, no push.
+- **iOS simulator:** shares the Mac's network; connects through loopback. No camera. A
+  notification with the daemon's exact payload is delivered with `xcrun simctl push`.
 - **Android emulator:** connects to `10.0.2.2`. No Bonjour, no camera.
-- **The owner's iPhone:** Bonjour, the local network permission, the camera, push notifications,
-  Face ID, and performance. Only a real device can verify these.
+- **The owner's iPhone, after the device steps:** Bonjour, the local network permission, the
+  camera, push through Apple's service, and real speed. Only a real device can verify these.
 - **Phone scenarios** run against a real daemon with fixture harnesses, from one command.
-- **Speed** is measured on release builds, on the owner's iPhone and the emulator, by the same
-  run that checks everything else.
+- **Speed** is measured on release builds by the same run that checks everything else: baselines
+  on the simulator and the emulator now, the budget itself on the owner's iPhone later.
 - **Live turns** follow the owner's paid-turn rules: tiny prompts, one attempt per step.
 
 ## Limits and out of scope
@@ -376,29 +453,92 @@ The owner marks the door and each transition on a review page until they look ri
   phone and Mac on one private network may carry the same connection; it is untested and not
   claimed by this gate.
 - **The Mac must be on.** Nothing runs in the cloud. A sleeping or shut Mac is unreachable.
+- **Voice mode** is not wanted (the owner's decision). The keyboard's own dictation works in
+  every text box.
 - **Editing files on the phone**, typing an arbitrary repository path, Android push, tablets,
   watch apps, widgets and App Store distribution are later work.
 - **Linux hosts** belong to AC-41. The gateway's platform-specific parts (power assertion,
   Bonjour, Keychain) sit behind the same portable boundaries as the rest of the daemon.
 - **Several Macs from one phone** is not required; the design does not prevent it.
 
-## Open questions
+## Choices left to the implementing agent
 
-| Question | Recommendation |
+The owner delegated these on 2026-09-26. Each can still be changed by the owner.
+
+| Question | Choice |
 | --- | --- |
-| App stack | Flutter, confirmed by AC-115's measurement against Expo on the owner's iPhone. The owner can name the stack instead and skip the comparison. |
+| App stack | Expo for the simulator milestone. Measured on the owner's iPhone as the first device step; Flutter if it misses the speed budget (AC-115). |
 | Where Rust is used on the phone | Only the encrypted session, if the binding is clean. Otherwise a vetted library with shared test vectors. |
-| When the door shows | On a cold start only. |
-| The door in the light theme | A light variant. The dark door is the default. |
 | Sound with the door | None. |
-| Default scope of a new device | Full control, as the owner asked. |
 | Which addresses may connect | Private and link-local ranges only. A setting can add the VPN range. |
-| App lock | On, after five minutes in the background. |
+| App lock | Off by default. A setting turns it on. |
 | Text in notifications | Agent name and event kind only. A setting can add the agent's last line. |
 | Stop the daemon from the phone | Mac only. *Stop all agents* is available on the phone. |
 | Start an agent in a folder Overseer has never used | Not from the phone in this gate. |
 | Does a connected phone count as a watching UI (AC-45)? | Yes while the app is in the foreground; the Mac's banner is replaced by the phone's notification when the phone opted in. |
-| Distribution | TestFlight to the owner's devices. App Store with the relay gate. |
+| Distribution | A development build on the owner's iPhone, then TestFlight. App Store with the relay gate. |
+| Android emulator | A new virtual device made for Overseer. The ones already on this Mac belong to other projects and are left alone. |
+
+## Simulators first
+
+The first milestone is built and verified on the iOS simulator and the Android emulator. It needs
+no Apple account, no signing and no push key.
+
+| Part | On the simulators now | On the iPhone later |
+| --- | --- | --- |
+| Pairing | By typing the code | By scanning the code |
+| Finding the Mac | Through loopback and a manual address | Bonjour and the local network permission |
+| Notifications | The daemon's exact payload, delivered by the simulator's own tool | Through Apple's push service, on a locked phone |
+| Speed | Baselines, so a slow change is caught | The budget itself |
+| The door | Frame recordings | Frame recordings at the phone's real refresh rate |
+| Everything else | Fully verified | — |
+
+A criterion whose Verify clause names the iPhone stays unchecked until that part is done. Its
+record says what is proven on the simulators and what waits for the device. A simulator never
+satisfies a device check.
+
+## Steps for the owner
+
+The implementing agent cannot do these: they need the owner's password, the owner's agreement or
+the owner's Apple account.
+
+### Now, so the iOS simulator can run
+
+Checked on this Mac on 2026-09-26: Xcode 27.0 is installed, its license has not been accepted,
+and the active developer directory is the command line tools. The Android tools and an Android 35
+system image are installed and need nothing from the owner.
+
+1. Accept the Xcode license:
+
+   ```bash
+   sudo xcodebuild -license
+   ```
+
+2. Point the developer tools at Xcode:
+
+   ```bash
+   sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+   ```
+
+3. Open Xcode once and let it install the iOS simulator, if it offers to.
+
+### Later, for the real iPhone
+
+Nothing here reuses an identifier, key or profile from another project.
+
+1. In the Apple Developer account, register a new app identifier for Overseer (proposed:
+   `com.beelol.overseer.phone`) with the Push Notifications capability.
+2. Create a new push key for Overseer. Choose a key for that one app identifier only, not a key
+   for the whole team. Download it once and note its key ID and the team ID.
+3. Give the key to Overseer on the Mac with the command the implementation provides. It is stored
+   in the macOS Keychain and nowhere else.
+4. Connect the iPhone, choose the team for signing in Xcode, and install the development build.
+5. On the iPhone, allow Overseer to find devices on the local network and to send notifications.
+6. Turn phone access on in VS Code, choose Pair a Phone, and scan the code. This is the only
+   pairing.
+7. Tell the implementing agent the phone is paired. It runs the device checks: the speed budget,
+   the door, a push on the locked phone, and a changed address.
+8. Do the phone session (AC-133) and mark the door and the transitions on the review page.
 
 ## Phases (goal candidates)
 
@@ -406,21 +546,24 @@ Each phase is independently useful and verifiable; the criteria are in the main 
 
 | Phase | Criteria | Outcome |
 | --- | --- | --- |
-| 1. Prove | AC-115 | The app stack chosen by measurement, the encryption on both sides, Bonjour and push on a real iPhone, and the reuse decision. Nothing is locked in before this. |
-| 2. Connect | AC-116, AC-117, AC-118, AC-119, AC-120, AC-134 | The gateway, pairing, encryption, devices and discovery, with a minimal app built on the platform layer and the generated protocol types. |
+| 1. Prove | AC-115 | On the simulators: the door and a long streaming conversation, the encryption on both sides, a handled notification, and the reuse decision. Nothing is locked in before this. |
+| 2. Connect | AC-116, AC-117, AC-118, AC-119, AC-120, AC-134, AC-141 | The gateway with its desktop switch, pairing once, encryption, devices and discovery, with a minimal app built on the platform layer and the generated protocol types. |
 | 3. Hold | AC-121, AC-122, AC-123 | Resume from the cursor, exactly-once requests, an awake Mac. |
 | 4. See and control | AC-124, AC-125, AC-126, AC-127, AC-131 | Agents, conversations, control, review and the rest of Overseer, in one app for iOS and Android. |
 | 5. Feel | AC-135, AC-136, AC-137 | The speed budget, the door, and motion throughout. |
-| 6. Needs you, safely | AC-129, AC-130 | Push notifications and the safety rules. |
+| 6. Needs you, safely | AC-129, AC-130 | Notifications with their switches, and safety without friction. |
 | 7. Overseer itself | AC-128 | The chat with Overseer on the phone. Waits for AC-107. |
-| 8. Confirm | AC-132, AC-133 | Regression coverage; the owner's session on their iPhone. |
+| 8. Confirm on the simulators | AC-132 | Regression coverage. The simulator milestone is complete. |
+| 9. The real iPhone | The device parts of AC-115, AC-117, AC-120, AC-129, AC-135 and AC-136, then AC-133 | After the owner's device steps: the speed budget and the stack decision first, then discovery, push, and the owner's session. |
 
 ## Acceptance
 
-AC-115 to AC-137 in the main RFC are the acceptance criteria. Their Verify clauses cover, in short:
+AC-115 to AC-137 and AC-141 in the main RFC are the acceptance criteria. Their Verify clauses cover, in short:
 
-- spikes that prove the parts, and an app stack chosen by measuring both candidates on the
+- spikes that prove the parts on the simulators, and the stack confirmed by measuring on the
   owner's iPhone;
+- a switch on the desktop, and a phone that says off when it is off;
+- one pairing that survives restarts, updates, a changed address and a month away;
 - a gateway that is closed by default, answers nothing before authentication, and leaves the local
   socket boundary untouched;
 - pairing that needs the Mac, with expiry, single use and lockout;
@@ -431,14 +574,19 @@ AC-115 to AC-137 in the main RFC are the acceptance criteria. Their Verify claus
 - requests that act once no matter how often they are retried;
 - a power assertion that is held during runs and released after;
 - the phone's list and conversations equal to the daemon's state and VS Code's chat;
-- the same launch records from the phone as from VS Code, and one tiny live turn per harness;
+- the same launch records from the phone as from VS Code, one answer when two surfaces answer
+  at once, and one tiny live turn per harness;
 - diffs equal to Git's, hunk actions checked on disk, and file methods that cannot leave the workspace;
 - no credential in any traffic, and every daemon method listed with its phone status;
-- a notification on a locked iPhone within five seconds, answered from the notification;
-- a security review, a fuzz test, and confirmations for everything destructive;
-- both platforms in both themes, accessible, each with its own conventions;
+- notifications that send nothing when switched off, and on a locked iPhone arrive within five
+  seconds and are answered from the notification;
+- a security review, a fuzz test, confirmations for everything destructive, and an app that
+  opens twenty times without asking for anything;
+- both platforms in both themes, following the system setting, matching VS Code's Overseer
+  themes from one token source, accessible, each with its own conventions;
 - no platform test outside the platform layer, and protocol types that cannot drift;
 - every speed budget met on the owner's iPhone, and a slow change failing the run;
-- the door matching the launch screen frame for frame, never adding to the launch time;
+- the door matching the launch screen frame for frame in both modes, on a cold start only, never
+  adding to the launch time;
 - every transition recorded, on tokens, and marked right by the owner;
 - the owner's dated confirmation after a real session on their iPhone.
