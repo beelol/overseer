@@ -450,10 +450,19 @@ impl Daemon {
         if prompt.is_empty() && harness != "generic" {
             bail!("prompt is required");
         }
-        let mut slot = if !matches!(swarm_identity.as_ref(), Some(SwarmLaunchIdentity::Worker(_))) {
-            Some(self.reserve_agent_slot()?)
-        } else {
-            None
+        let mut slot = match swarm_identity.as_ref() {
+            Some(SwarmLaunchIdentity::Worker(_)) => None,
+            Some(SwarmLaunchIdentity::Director(identity)) => {
+                // A running category already holds its director slot. Planning
+                // categories have no reserved slot yet, so their first director
+                // launch still competes with ordinary starts.
+                let reserved = self.store.lock().unwrap().conn.query_row(
+                    "SELECT status IN ('running','paused','stalled','stopping') FROM swarm_runs WHERE id=?1",
+                    [&identity.run_id], |row| row.get::<_, bool>(0),
+                )?;
+                if reserved { None } else { Some(self.reserve_agent_slot()?) }
+            }
+            None => Some(self.reserve_agent_slot()?),
         };
         let title = p["title"].as_str().map(str::to_string).unwrap_or_else(|| prompt.chars().take(60).collect());
         let mode = p["workspace_mode"].as_str().unwrap_or("worktree");
@@ -586,8 +595,16 @@ impl Daemon {
                 };
                 reservation.insert_task_and_run(&task, &run, director)?;
             } else {
+                let director = match swarm_identity.as_ref() {
+                    Some(SwarmLaunchIdentity::Director(identity)) => Some(DirectorOwnerLink {
+                        swarm_run_id: &identity.run_id,
+                        generation: identity.generation,
+                        token: &identity.token,
+                    }),
+                    _ => None,
+                };
                 self.store.lock().unwrap().insert_task_and_run(
-                    &task, &run, match swarm_identity.as_ref() { Some(SwarmLaunchIdentity::Worker(identity)) => Some(identity.attempt_id.as_str()), _ => None }, None
+                    &task, &run, match swarm_identity.as_ref() { Some(SwarmLaunchIdentity::Worker(identity)) => Some(identity.attempt_id.as_str()), _ => None }, director
                 )?;
             }
         }

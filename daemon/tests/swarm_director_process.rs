@@ -5,6 +5,33 @@ use serde_json::json;
 use std::time::{Duration, Instant};
 
 #[test]
+fn active_category_director_uses_its_reserved_app_slot() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("reserved-director-source"));
+    d.call("agents.limit.set", json!({"max_active":1}));
+    let run = d.call("swarm.create", json!({"category":"Reserved director",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,
+        "jobs":[{"id":"one","title":"Audit route","acceptance":"Evidence","deps":[]}]}));
+    rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap()
+        .execute("UPDATE swarm_runs SET status='running' WHERE id=?1",[id]).unwrap();
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],1);
+    let launched = d.call("swarm.director.launch",json!({"run_id":id,
+        "generation":1,"repo":checkout,"program":"/bin/sleep",
+        "args":["30"],"prompt":"Audit backend","title":"Reserved director process"}));
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    assert_eq!(launched["status"],"launched");
+    let current = d.call("swarm.get",json!({"id":id}));
+    assert_eq!(current["director"]["overseer_run_id"],process);
+    assert_eq!(d.call("agents.limit.get",json!({}))["active"],1,
+        "linked director process must not consume a second slot");
+    d.call("run.interrupt",json!({"run_id":process}));
+    d.wait_done(process,8);
+}
+
+#[test]
 fn linked_healthy_director_renews_lease_but_exited_director_does_not() {
     let mut d = Daemon::start(&[]);
     let temp = tmp();

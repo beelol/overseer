@@ -31,6 +31,17 @@ function liveWorkerPids(home, runId) {
   return { count: pids.length, live: pids.filter(pid => { try { process.kill(pid, 0); return true; } catch { return false; } }).length };
 }
 
+function blockReadyJobs(home, runId, ids) {
+  const code = `import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+ids = sys.argv[3:]
+rows = db.execute("SELECT id FROM swarm_jobs WHERE run_id=? AND status='ready' AND id IN (" + ",".join("?" for _ in ids) + ")", [sys.argv[2], *ids]).fetchall()
+assert len(rows) == len(ids), (rows, ids)
+db.executemany("UPDATE swarm_jobs SET status='blocked', stop_reason='fixture_blocker' WHERE run_id=? AND id=?", [(sys.argv[2], id) for id in ids])
+db.commit()`;
+  cp.execFileSync('python3', ['-c', code, path.join(home, 'overseer.sqlite'), runId, ...ids]);
+}
+
 (async () => {
   const s = new Session('swarm-scale');
   const result = { checks: [] };
@@ -39,6 +50,7 @@ function liveWorkerPids(home, runId) {
     s.note(`${ok ? 'PASS' : 'FAIL'} ${name}`, detail);
   };
   let runId;
+  let directorRunId;
   try {
     const repo = makeRepo(path.join(s.root, 'backend'), { dirty: false });
     s.settings({ 'window.menuStyle': 'custom' });
@@ -109,19 +121,27 @@ function liveWorkerPids(home, runId) {
         prompt: 'Inspect', title: `Fixture worker ${n}` });
       if (launched.status !== 'launched') throw new Error(`worker ${n} not launched: ${JSON.stringify(launched)}`);
     }
+    blockReadyJobs(s.home, runId, ['j032', 'j033', 'j034', 'j035']);
+    const director = s.ctl('swarm.director.launch', { run_id: runId, generation: 1, repo,
+      program: '/bin/sleep', args: ['180'], prompt: 'Direct the backend audit', title: 'Fixture director' });
+    if (director.status !== 'launched') throw new Error(`director not launched: ${JSON.stringify(director)}`);
+    directorRunId = director.overseer_run_id;
     let run;
     for (let n = 0; n < 100; n++) {
       run = s.ctl('swarm.get', { id: runId });
-      if (run.active_worker_processes === 32) break;
+      if (run.active_worker_processes === 32 && run.director?.process_status === 'running') break;
       await delay(100);
     }
     const processes = liveWorkerPids(s.home, runId);
     check('32 distinct supervised fixture workers are alive',
       run.active_worker_processes === 32 && processes.count === 32 && processes.live === 32,
       { active_worker_processes: run.active_worker_processes, ...processes });
-    check('remaining 68 jobs stay ready while 32 attempts hold reservations',
+    check('remaining jobs include four blockers while 32 attempts hold reservations',
       run.job_counts.total === 100 && run.job_counts.by_status.reserved === 32 &&
-      run.job_counts.by_status.ready === 68, run.job_counts);
+      run.job_counts.by_status.ready === 64 && run.job_counts.by_status.blocked === 4, run.job_counts);
+    check('supervised category director is running alongside 32 workers',
+      run.director?.process_status === 'running' && run.director?.overseer_run_id === directorRunId,
+      run.director);
     check('daemon exposes only fixture commitments, with provider usage unknown',
       run.capacity?.provider_usage_state === 'unknown' &&
       run.capacity?.selected_targets?.[0]?.id === 'fixture-local' &&
@@ -142,19 +162,40 @@ function liveWorkerPids(home, runId) {
         description: r.querySelector('.label-description')?.textContent.trim() || '',
         level: Number(r.getAttribute('aria-level')) }));
     })()`, 20000, 'large Swarm row');
-    check('packaged Agents sidebar shows 32 working and 68 ready',
+    check('packaged Agents sidebar shows 32 working, 64 ready and four blocked',
       rows.some(row => row.label === 'Large backend audit' && /32 working/.test(row.description) &&
-        /68 ready/.test(row.description)), rows.slice(0, 4));
+        /64 ready/.test(row.description) && /4 blocked/.test(row.description)), rows.slice(0, 4));
     check('workers are grouped under Swarm without duplicate ordinary agent rows',
       !rows.some(row => row.label === 'backend' || row.label === 'Fixture worker 0'), rows.slice(0, 4));
     await s.screenshot('32-workers-compact');
     await s.clickAgentRow('Large backend audit', { twisty: true });
     const expanded = await s.agentRows();
     check('expanded category shows director and bounded job page',
-      expanded.some(row => row.label === 'Director') && expanded.some(row => row.label === 'Capacity') &&
+      expanded.some(row => row.label === 'Director' && row.description === 'running') &&
+      expanded.some(row => row.label === 'Capacity') &&
       expanded.some(row => row.label === 'Inspect route 0') &&
       !expanded.some(row => row.label === 'Inspect route 99'), expanded.slice(0, 8));
     await s.screenshot('32-workers-expanded');
+    await cdp.command('Overseer: Filter Swarm Jobs…');
+    await cdp.waitQuickTitle('Show Swarm jobs');
+    await cdp.type('Blocked');
+    await cdp.key('Enter');
+    const blockedRows = await cdp.waitFor(`(() => {
+      const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent);
+      const labels = rows.map(r => r.querySelector('.label-name')?.textContent.trim()).filter(Boolean);
+      return labels.includes('Inspect route 32') ? labels : null;
+    })()`, 10000, 'blocked Swarm jobs');
+    check('packaged state filter shows four blocked jobs and no ready or reserved job rows',
+      ['Inspect route 32', 'Inspect route 33', 'Inspect route 34', 'Inspect route 35'].every(label => blockedRows.includes(label)) &&
+      !blockedRows.includes('Inspect route 0') && !blockedRows.includes('Inspect route 36'), blockedRows);
+    await s.screenshot('blocked-jobs-filtered');
+    await cdp.command('Overseer: Filter Swarm Jobs…');
+    await cdp.waitQuickTitle('Show Swarm jobs');
+    await cdp.type('All jobs');
+    await cdp.key('Enter');
+    await cdp.waitFor(`[...document.querySelectorAll('.monaco-list-row')].some(r =>
+      r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === 'Inspect route 0')`,
+      10000, 'all Swarm jobs restored');
     await s.clickAgentRow('Capacity', { twisty: true });
     const capacityRows = await s.agentRows();
     check('expanded capacity names target, reserve and planning decision without claiming live usage',
@@ -232,6 +273,7 @@ function liveWorkerPids(home, runId) {
     try { await s.screenshot('error'); } catch {}
   } finally {
     if (runId) { try { s.ctl('swarm.stop', { run_id: runId }); } catch (error) { s.note('cleanup Stop failed', error.message); } }
+    if (directorRunId) { try { s.ctl('run.interrupt', { run_id: directorRunId }); } catch (error) { s.note('cleanup director interrupt failed', error.message); } }
     let forcedCleanup = false;
     if (runId && !process.env.KEEP_OPEN) {
       try {
@@ -245,6 +287,17 @@ function liveWorkerPids(home, runId) {
           for (const pid of survivors) { try { process.kill(pid, 0); process.kill(pid, 'SIGKILL'); } catch {} }
         }
       } catch (error) { forcedCleanup = true; s.note('Fixture cleanup inspection failed', error.message); }
+    }
+    if (directorRunId && !process.env.KEEP_OPEN) {
+      let director;
+      for (let n = 0; n < 80; n++) {
+        director = s.ctl('state').runs.find(row => row.id === directorRunId);
+        if (director?.ended_ms) break;
+        await delay(100);
+      }
+      check('fixture director also confirms exit during teardown',
+        !!director?.ended_ms && !['queued', 'starting', 'running', 'waiting_for_user'].includes(director.status),
+        { status: director?.status, ended_ms: director?.ended_ms });
     }
     if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }
     if (runId && !process.env.KEEP_OPEN) {

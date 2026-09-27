@@ -156,7 +156,10 @@ impl Store {
                AND r.status IN ('queued','starting','running','waiting_for_user')
                AND NOT EXISTS (SELECT 1 FROM swarm_worker_launches l
                  JOIN swarm_attempts a ON a.id=l.attempt_id
-                 WHERE l.overseer_run_id=r.id AND a.status='registered'))
+                 WHERE l.overseer_run_id=r.id AND a.status='registered')
+               AND NOT EXISTS (SELECT 1 FROM swarm_director_owners o
+                 JOIN swarm_runs s ON s.id=o.run_id
+                 WHERE o.overseer_run_id=r.id AND s.status IN ('running','paused','stalled','stopping')))
               + (SELECT COUNT(*) FROM swarm_attempts WHERE status='registered')
               + (SELECT COUNT(*) FROM swarm_runs
                  WHERE status IN ('running','paused','stalled','stopping'))",
@@ -172,6 +175,9 @@ impl Store {
              AND NOT EXISTS (SELECT 1 FROM swarm_worker_launches l
                JOIN swarm_attempts a ON a.id=l.attempt_id
                WHERE l.overseer_run_id=r.id AND a.status='registered')
+             AND NOT EXISTS (SELECT 1 FROM swarm_director_owners o
+               JOIN swarm_runs s ON s.id=o.run_id
+               WHERE o.overseer_run_id=r.id AND s.status IN ('running','paused','stalled','stopping'))
              UNION ALL SELECT id,job_id,status,'swarm_worker' FROM swarm_attempts
                WHERE status='registered'
              UNION ALL SELECT id,category,status,'swarm_director' FROM swarm_runs

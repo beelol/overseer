@@ -54,7 +54,7 @@
         "reason": "beneficial",
         "replay": false,
         "revision": 1,
-        "run_id": "sw-0a17d4039ba3",
+        "run_id": "sw-0c3fcf942265",
         "serial": {
           "affordable": true,
           "elapsed_ms": 3240,
@@ -78,14 +78,24 @@
       }
     },
     {
-      "name": "remaining 68 jobs stay ready while 32 attempts hold reservations",
+      "name": "remaining jobs include four blockers while 32 attempts hold reservations",
       "ok": true,
       "detail": {
         "by_status": {
-          "ready": 68,
+          "blocked": 4,
+          "ready": 64,
           "reserved": 32
         },
         "total": 100
+      }
+    },
+    {
+      "name": "supervised category director is running alongside 32 workers",
+      "ok": true,
+      "detail": {
+        "overseer_run_id": "r-22108b229474",
+        "owner_status": "active",
+        "process_status": "running"
       }
     },
     {
@@ -119,7 +129,7 @@
       }
     },
     {
-      "name": "packaged Agents sidebar shows 32 working and 68 ready",
+      "name": "packaged Agents sidebar shows 32 working, 64 ready and four blocked",
       "ok": true,
       "detail": [
         {
@@ -129,7 +139,7 @@
         },
         {
           "label": "Large backend audit",
-          "description": "32 working · 68 ready · 0 blocked",
+          "description": "32 working · 64 ready · 4 blocked",
           "level": 2
         }
       ]
@@ -145,7 +155,7 @@
         },
         {
           "label": "Large backend audit",
-          "description": "32 working · 68 ready · 0 blocked",
+          "description": "32 working · 64 ready · 4 blocked",
           "level": 2
         }
       ]
@@ -165,21 +175,21 @@
         },
         {
           "label": "Large backend audit",
-          "description": "32 working · 68 ready · 0 blocked",
+          "description": "32 working · 64 ready · 4 blocked",
           "level": 2,
           "expanded": "true",
           "selected": false,
           "focused": true,
-          "aria": "Large backend audit swarm, running, 32 working · 68 ready · 0 blocked"
+          "aria": "Large backend audit swarm, running, 32 working · 64 ready · 4 blocked"
         },
         {
           "label": "Director",
-          "description": "not started",
+          "description": "running",
           "level": 3,
           "expanded": null,
           "selected": false,
           "focused": false,
-          "aria": "Director not started"
+          "aria": "Director running"
         },
         {
           "label": "Capacity",
@@ -226,6 +236,21 @@
           "focused": false,
           "aria": "Inspect route 3, working, 1 attempts"
         }
+      ]
+    },
+    {
+      "name": "packaged state filter shows four blocked jobs and no ready or reserved job rows",
+      "ok": true,
+      "detail": [
+        "Swarms",
+        "Large backend audit",
+        "Director",
+        "Capacity",
+        "Inspect route 32",
+        "Inspect route 33",
+        "Inspect route 34",
+        "Inspect route 35",
+        "Blocked"
       ]
     },
     {
@@ -304,7 +329,7 @@
       "detail": {
         "status": "paused",
         "active_worker_processes": 32,
-        "pause_ms": 100
+        "pause_ms": 94
       }
     },
     {
@@ -324,15 +349,15 @@
       "ok": true,
       "detail": {
         "status": "stopping",
-        "unconfirmed_exit_count": 11,
-        "stop_ms": 73
+        "unconfirmed_exit_count": 6,
+        "stop_ms": 75
       }
     },
     {
       "name": "the SIGINT-resistant fixture worker remains unconfirmed with its estimate reserved",
       "ok": true,
       "detail": {
-        "unconfirmed_exit_count": 11,
+        "unconfirmed_exit_count": 6,
         "capacity": {
           "provider_usage_state": "unknown",
           "selected_targets": [
@@ -371,11 +396,11 @@
         },
         {
           "label": "Large backend audit",
-          "description": "1 working · 0 ready · 0 blocked · 1 exit unconfirmed"
+          "description": "1 working · 0 ready · 4 blocked · 1 exit unconfirmed"
         },
         {
           "label": "Director",
-          "description": "not started"
+          "description": "running"
         },
         {
           "label": "Capacity",
@@ -409,6 +434,14 @@
       "detail": {
         "status": "stopped",
         "unconfirmed_exit_count": 0
+      }
+    },
+    {
+      "name": "fixture director also confirms exit during teardown",
+      "ok": true,
+      "detail": {
+        "status": "interrupted",
+        "ended_ms": 1790508603224
       }
     },
     {
