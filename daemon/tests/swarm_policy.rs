@@ -170,6 +170,41 @@ fn revoked_account_blocks_all_of_its_target_aliases() {
 }
 
 #[test]
+fn rate_limit_and_local_harness_failure_leave_another_provider_eligible() {
+    let d=Daemon::start(&[]);
+    let mut input=snapshot(Some(60000),true);
+    input["targets"].as_array_mut().unwrap().truncate(2);
+    input["targets"][0]["id"]=json!("opencode-provider-a");
+    input["targets"][0]["account_id"]=json!("account-a");
+    input["targets"][0]["capabilities"]=json!(["write"]);
+    input["targets"][0]["health"]=json!("rate_limited");
+    input["targets"][1]["id"]=json!("opencode-provider-b");
+    input["targets"][1]["account_id"]=json!("account-b");
+    input["targets"][1]["pool_ids"]=json!(["other-pool"]);
+    let allowed=["opencode-provider-a","opencode-provider-b"];
+    for (health,expected) in [
+        ("rate_limited","rate_limited"),
+        ("local_unavailable","local_harness_unavailable"),
+        ("down","target_unhealthy"),
+    ] {
+        input["targets"][0]["health"]=json!(health);
+        let result=preview(&d,input.clone(),&allowed,1000,0);
+        assert_eq!(result["targets"][allowed[0]]["reason"],expected);
+        assert_eq!(result["targets"][allowed[1]]["eligible"],true);
+    }
+    input["targets"][0]["health"]=json!("up");
+    input["targets"][0]["auth"]=json!("expired");
+    let auth=preview(&d,input.clone(),&allowed,1000,0);
+    assert_eq!(auth["targets"][allowed[0]]["reason"],"auth_unavailable");
+    assert_eq!(auth["targets"][allowed[1]]["eligible"],true);
+    input["targets"][0]["auth"]=json!("ok");
+    input["pools"][0]["windows"][0]["remaining_milli"]=json!(0);
+    let quota=preview(&d,input,&allowed,1000,0);
+    assert_eq!(quota["targets"][allowed[0]]["reason"],"finishing_reserve");
+    assert_eq!(quota["targets"][allowed[1]]["eligible"],true);
+}
+
+#[test]
 fn preview_uses_explicit_percentage_bounds_instead_of_builtin_values() {
     let d=Daemon::start(&[]);
     let result=d.call("swarm.policy.preview",json!({

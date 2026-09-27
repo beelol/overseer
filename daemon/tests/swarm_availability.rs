@@ -98,6 +98,67 @@ fn revoked_selected_identity_cancels_only_its_active_attempt_and_keeps_usage_unc
 }
 
 #[test]
+fn rate_limited_provider_blocks_new_launches_without_stopping_an_independent_peer() {
+    let d=Daemon::start(&[]);
+    let created=d.call("swarm.create",json!({"category":"Scoped provider rate limit",
+        "objective":"Audit separate routes","allowed_targets":["opencode-a","opencode-b"]}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"a","title":"Inspect A","acceptance":"A evidence","deps":[]},
+        {"id":"b","title":"Inspect B","acceptance":"B evidence","deps":[]},
+        {"id":"c","title":"Continue B","acceptance":"C evidence","deps":[]}
+    ]}));
+    commit_beneficial_batch(&d,run,&["a".into(),"b".into(),"c".into()]);
+    let at=now();
+    let snap=|time:i64,limited:bool|json!({"version":1,"observed_ms":time,
+        "expires_ms":time+60000,"targets":[
+            {"id":"opencode-a","account_id":"account-a","pool_ids":["pool-a"],
+                "capabilities":["code"],"health":if limited {"rate_limited"} else {"up"},"auth":"ok"},
+            {"id":"opencode-b","account_id":"account-b","pool_ids":["pool-b"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+        "pools":[{"id":"pool-a","windows":[{"id":"week","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":time+60000}]},
+            {"id":"pool-b","windows":[{"id":"week","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":time+60000}]}]});
+    let healthy=snap(at-1000,false);
+    d.call("swarm.availability.observe",json!({"run_id":run,"snapshot":healthy,
+        "now_ms":at,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"}));
+    let admit=|job:&str,target:&str,id:&str,snapshot:Value,time:i64|d.call("swarm.admit",json!({
+        "run_id":run,"generation":1,"revision":1,"job_id":job,"target_id":target,
+        "request_id":id,"snapshot":snapshot,"now_ms":time,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    let a=admit("a","opencode-a","first-a",healthy.clone(),at);
+    let b=admit("b","opencode-b","first-b",healthy,at);
+    assert_eq!(a["status"],"admitted");
+    assert_eq!(b["status"],"admitted");
+    let limited=snap(at+1000,true);
+    let observed=d.call("swarm.availability.observe",json!({"run_id":run,
+        "snapshot":limited,"now_ms":at+1500,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(observed["state"],"eligible");
+    assert_eq!(observed["eligible_targets"],json!(["opencode-b"]));
+    assert_eq!(observed["revoked_jobs"],json!([]));
+    let denied=admit("c","opencode-a","limited-a",limited.clone(),at+1500);
+    assert_eq!(denied["reason"],"rate_limited");
+    let replacement=admit("c","opencode-b","healthy-b",limited,at+1500);
+    assert_eq!(replacement["status"],"admitted","{replacement}");
+    let jobs=d.call("swarm.jobs",json!({"id":run}));
+    for job in ["a","b"] {
+        assert_eq!(jobs["jobs"].as_array().unwrap().iter()
+            .find(|record|record["id"]==job).unwrap()["status"],"reserved");
+    }
+    let reported=d.call("swarm.report",json!({"run_id":run,"job_id":"b",
+        "attempt_id":b["attempt_id"],"token":b["token"],
+        "message_id":"peer-still-working","type":"discovery","revision":1,
+        "payload":{"note":"independent route still has evidence"}}));
+    assert_eq!(reported["duplicate"],false);
+}
+
+#[test]
 fn identity_revocation_stop_result_and_review_have_one_durable_order() {
     for steps in [
         ["result","accept","revoke","stop"],

@@ -142,7 +142,11 @@ pub fn preview(p: &Value) -> Result<Value> {
         } else if revoked_accounts.contains(target.account_id.as_str()) {
             reason = Some("auth_unavailable");
         } else if target.health != "up" {
-            reason = Some("target_unhealthy");
+            reason = Some(match target.health.as_str() {
+                "rate_limited" => "rate_limited",
+                "local_unavailable" => "local_harness_unavailable",
+                _ => "target_unhealthy",
+            });
         } else if target.auth != "ok" {
             reason = Some("auth_unavailable");
         } else if !required
