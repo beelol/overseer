@@ -6,7 +6,7 @@
       "detail": {
         "title": "What's next?",
         "mark": "Overseer",
-        "svg": true,
+        "logo": true,
         "codicon": false,
         "placeholder": "Send off a task"
       }
@@ -28,7 +28,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -59,7 +59,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -90,7 +90,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -130,7 +130,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -156,7 +156,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -182,7 +182,7 @@
           "clipped": [
             {
               "chip": "repo",
-              "tooltip": "/private/tmp/ovs-ui-qrXdZZ/followups-repo\nOn main"
+              "tooltip": "/private/tmp/ovs-ui-v2cZ4f/followups-repo\nOn main"
             },
             {
               "chip": "agent",
@@ -236,7 +236,7 @@
           "border": "1px",
           "height": 26
         },
-        "ms": 34,
+        "ms": 33,
         "shown": [
           "followups-repo",
           "Beta docs"
