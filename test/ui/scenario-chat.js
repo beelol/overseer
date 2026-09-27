@@ -31,8 +31,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     for (let i = 0; i < 40 && s.ctl('state').runs.find(r => r.id === show.run.id).status !== 'completed'; i++) await delay(300);
 
     await cdp.command('Overseer: Open Overseer View');
-    const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list .row[data-run]')`, 30000);
-    await dash.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(show.run.id)}]').click()`);
+    await s.selectRun(show.run.id);
+    const dash = await s.editorView();
     await dash.waitFor(`!!document.querySelector('#conv .msg.agent table')`, 20000);
     await setWidth(1600);
 
@@ -77,8 +77,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
     // Streaming: earlier content does not move while new content arrives (no layout shift).
     stream = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'sleep 2; i=0; while [ $i -lt 2000 ]; do echo "stream line $i"; i=$((i+1)); if [ $((i % 200)) -eq 0 ]; then sleep 0.3; fi; done'], prompt: '', title: 'Stream 2000' });
-    await dash.waitFor(`!!document.querySelector('.rail-list .row[data-run=${JSON.stringify(stream.run.id)}]')`, 10000);
-    await dash.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(stream.run.id)}]').click()`);
+    await s.selectRun(stream.run.id, { settle: 600 });
     await dash.waitFor(`document.getElementById('title')?.textContent === 'Stream 2000' && document.querySelectorAll('#conv .msg').length >= 1`, 20000);
     const shift = await dash.eval(`new Promise(resolve => {
       const conv = document.getElementById('conv');
@@ -95,14 +94,17 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // 2,000-event conversation: scroll frame times and append latency.
     const perf = await dash.eval(`new Promise(resolve => {
       const sc = document.getElementById('scroll'); sc.scrollTop = 0;
-      const frames = []; let prev = performance.now(); let y = 0; const step = sc.scrollHeight / 240;
-      function frame(t) { frames.push(t - prev); prev = t; y += step; sc.scrollTop = y; if (frames.length < 240) requestAnimationFrame(frame); else done(); }
+      // Frame interval (rAF to rAF) and the frame's own work (scroll, style and layout, forced synchronously).
+      const frames = [], work = []; let prev = performance.now(); let y = 0; const step = sc.scrollHeight / 240;
+      function frame(t) { frames.push(t - prev); prev = t; y += step; const w0 = performance.now(); sc.scrollTop = y; document.getElementById('conv').getBoundingClientRect(); sc.querySelector('.msg:last-child')?.getBoundingClientRect(); work.push(performance.now() - w0); if (frames.length < 240) requestAnimationFrame(frame); else done(); }
       function done() {
         const f = frames.slice(5).sort((a, b) => a - b);
+        const wk = work.slice(5).sort((a, b) => a - b);
         const p95 = f[Math.floor(f.length * 0.95)];
         // Append: time for one new event to reach the DOM (render work only).
         const chatEl = window.__chat;
-        resolve({ frames: f.length, p95: Math.round(p95 * 10) / 10, median: Math.round(f[Math.floor(f.length / 2)] * 10) / 10, max: Math.round(f[f.length - 1]) });
+        resolve({ frames: f.length, p95: Math.round(p95 * 10) / 10, median: Math.round(f[Math.floor(f.length / 2)] * 10) / 10, max: Math.round(f[f.length - 1]),
+          workP95: Math.round(wk[Math.floor(wk.length * 0.95)] * 10) / 10, workMax: Math.round(wk[wk.length - 1] * 10) / 10 });
       }
       requestAnimationFrame(t => { prev = t; requestAnimationFrame(frame); });
     })`);
@@ -119,7 +121,10 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
         resolve({ found, perAppendMs: Math.round((performance.now() - times[0]) / 20 * 10) / 10 });
       }, 50));
     })()`);
-    check('a 2,000-event conversation scrolls with p95 frame time under 16 ms (refresh-rate frames, no dropped frames)', perf.frames >= 200 && perf.p95 < 16.7, perf);
+    // On a 60 Hz display every frame interval is 16.7 ms, so the interval alone cannot show "under 16 ms":
+    // the frame's own work (p95) must be under 16 ms and no frame may be dropped (no interval over 1.5× the refresh).
+    check('a 2,000-event conversation scrolls with p95 frame time under 16 ms (frame work p95 < 16 ms, no dropped frames at the display refresh rate)',
+      perf.frames >= 200 && perf.workP95 < 16 && (perf.p95 < 16.7 || perf.max < perf.median * 1.5), perf);
     check('appending a new event takes under 100 ms', append.found === 20 && append.perAppendMs < 100, append);
     await s.screenshot('stream-2000');
   } catch (error) {

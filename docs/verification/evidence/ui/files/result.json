@@ -24,11 +24,12 @@
       }
     },
     {
-      "name": "clicking a file opens it in the editor from the X worktree",
+      "name": "clicking a file opens it in the editor from the X worktree (in the review's group, no third column)",
       "ok": true,
       "detail": {
-        "label": "a.txt, preview, Editor Group 2",
-        "path": "private/tmp/ovs-ui-HrejRk/overseer-home/worktrees/repo-x-f8a0e5ce/x-files/a.txt"
+        "label": "a.txt, Editor Group 1",
+        "path": "private/tmp/ovs-ui-Moo9Yq/overseer-home/worktrees/repo-x-87d9330f/x-files/a.txt",
+        "groups": 2
       }
     },
     {
@@ -42,8 +43,9 @@
           "README.md "
         ],
         "tabY": {
-          "label": "b.txt, preview, Editor Group 2",
-          "path": "private/tmp/ovs-ui-HrejRk/overseer-home/worktrees/repo-y-888fd97d/y-files/b.txt"
+          "label": "b.txt, Editor Group 1",
+          "path": "private/tmp/ovs-ui-Moo9Yq/overseer-home/worktrees/repo-y-2bae87a8/y-files/b.txt",
+          "groups": 2
         }
       }
     },
@@ -63,12 +65,12 @@
       "name": "a 6,000-entry folder opens within 2 s, is capped with a visible note, and scrolling stays responsive (p95 lag < 250 ms)",
       "ok": true,
       "detail": {
-        "openMs": 985,
+        "openMs": 996,
         "truncated": "+1000 more (1000 more entries not shown)",
         "lag": {
           "n": 80,
-          "p95": 3,
-          "max": 3
+          "p95": 2,
+          "max": 4
         }
       }
     },
@@ -85,8 +87,9 @@
           "dir": false
         },
         "tabZ": {
-          "label": "x99.txt, preview, Editor Group 2",
-          "path": "private/tmp/ovs-ui-HrejRk/overseer-home/worktrees/repo-z-e79a20ee/z-large/pkg/m39/x99.txt"
+          "label": "x99.txt, Editor Group 1",
+          "path": "private/tmp/ovs-ui-Moo9Yq/overseer-home/worktrees/repo-z-315f5e0a/z-large/pkg/m39/x99.txt",
+          "groups": 2
         }
       }
     },

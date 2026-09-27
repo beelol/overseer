@@ -6,57 +6,57 @@
       "detail": {
         "claude": {
           "limited": false,
-          "observed_ms": 1790417363567,
+          "observed_ms": 1790462990124,
           "reported": true,
           "source": "Claude rate_limit_event",
           "status": "allowed",
           "windows": [
             {
               "label": "5 hours",
-              "resets_at_ms": 1790420963000,
+              "resets_at_ms": 1790466590000,
               "used": 0.95
             },
             {
               "label": "week",
-              "resets_at_ms": 1790680163000,
+              "resets_at_ms": 1790725790000,
               "used": 0.4
             }
           ]
         },
         "second": {
           "limited": false,
-          "observed_ms": 1790417364323,
+          "observed_ms": 1790462990922,
           "reported": true,
           "source": "Claude rate_limit_event",
           "status": "allowed",
           "windows": [
             {
               "label": "5 hours",
-              "resets_at_ms": 1790420964000,
+              "resets_at_ms": 1790466590000,
               "used": 0.12
             },
             {
               "label": "week",
-              "resets_at_ms": 1790680164000,
+              "resets_at_ms": 1790725790000,
               "used": 0.4
             }
           ]
         },
         "codex": {
           "limited": false,
-          "observed_ms": 1790417366012,
+          "observed_ms": 1790462992717,
           "plan": "plus",
           "reported": true,
           "source": "Codex session log",
           "windows": [
             {
               "label": "5 hours",
-              "resets_at_ms": 1790420966000,
+              "resets_at_ms": 1790466592000,
               "used": 0.2
             },
             {
               "label": "week",
-              "resets_at_ms": 1790680166000,
+              "resets_at_ms": 1790725792000,
               "used": 0.4
             }
           ]
@@ -67,40 +67,12 @@
       }
     },
     {
-      "name": "the dashboard accounts menu shows reported usage per account, with reset times in the tooltip",
+      "name": "the Accounts view shows reported usage per account, with reset times, on hover",
       "ok": true,
-      "detail": [
-        {
-          "label": "claude (existing login)",
-          "hint": "5 hours 95% · week 40%",
-          "title": "claude (existing login) · signed in · max · cc6d9661\nUsage (Claude rate_limit_event)\n5 hours: 95% used, resets Sat 4:09 AM\nweek: 40% used, resets Tue 4:09 AM\nAs of Sat 3:09 AM"
-        },
-        {
-          "label": "codex (existing login)",
-          "hint": "5 hours 20% · week 40%",
-          "title": "codex (existing login) · signed in · pro · 55b9da0f\nUsage (Codex session log)\n5 hours: 20% used, resets Sat 4:09 AM\nweek: 40% used, resets Tue 4:09 AM\nAs of Sat 3:09 AM"
-        },
-        {
-          "label": "opencode (existing login)",
-          "hint": "sign in",
-          "title": "Sign in opencode (existing login)"
-        },
-        {
-          "label": "Claude Second",
-          "hint": "5 hours 12% · week 40%",
-          "title": "Claude Second · signed in · max · cc6d9661\nUsage (Claude rate_limit_event)\n5 hours: 12% used, resets Sat 4:09 AM\nweek: 40% used, resets Tue 4:09 AM\nAs of Sat 3:09 AM"
-        },
-        {
-          "label": "Add account…",
-          "hint": "",
-          "title": ""
-        },
-        {
-          "label": "Manage accounts",
-          "hint": "",
-          "title": ""
-        }
-      ]
+      "detail": {
+        "claudeHover": "claude (existing login) — Anthropic / Claude\n\nFollows the Claude app login (~/.claude). It changes when that app switches accounts; Overseer never signs it out.\n\nUsable by: claude\n\nLast used 9/26/2026, 3:49:51 PM\n\nUsage (Claude rate_limit_event): 5 hours 95%, resets 9/26/2026, 4:49:50 PM; week 40%, resets 9/29/2026, 4:49:50 PM",
+        "codexHover": "codex (existing login) — OpenAI / ChatGPT\n\nFollows the ChatGPT / Codex app login (~/.codex). It changes when that app switches accounts; Overseer never signs it out.\n\nUsable by: codex, codex-app\n\nLast used 9/26/2026, 3:49:52 PM\n\nUsage (Codex session log): 5 hours 20%, resets 9/26/2026, 4:49:52 PM; week 40%, resets 9/29/2026, 4:49:52 PM\n\nLogged in using ChatGPT"
+      }
     },
     {
       "name": "per-run tokens and cost as the harness reported them (chat turn footer)",
@@ -115,7 +87,7 @@
       "ok": true,
       "detail": {
         "warn": {
-          "text": "claude (existing login) is at 95% of its 5 hours limit (resets 4:09 AM).Use Claude Second",
+          "text": "claude (existing login) is at 95% of its 5 hours limit (resets 4:49 PM).Use Claude Second",
           "fix": "Use Claude Second",
           "cls": "composer-note warn",
           "startDisabled": false
@@ -134,22 +106,11 @@
       "name": "the Accounts view marks an account near its limit",
       "ok": true,
       "detail": [
-        "Codex usage | overseer/codex-usage · usage-repo",
-        "codex | completed · codex (existing login)",
-        "Costed run | overseer/costed-run · usage-repo",
-        "claude | completed · claude (existing login)",
-        "Plenty left | overseer/plenty-left · usage-repo",
-        "claude | completed · Claude Second",
-        "Near the limit | overseer/near-the-limit · usage-repo",
-        "claude | completed · claude (existing login)",
-        "Worktree · overseer/costed-run | /private/tmp/ovs-ui-TWryvS/overseer-home/worktrees/usage-repo-9ec0092e/costed-run",
-        "Staged (HEAD → index) (0) | ",
-        "Unstaged (index → working tree) (1) | ",
-        "README.md | M",
-        "Untracked (1) | ",
-        "session-refresh-coordinator.ts | src/auth · ?",
-        "Conflicted (0) | ",
-        "Unsaved drafts (0) | ",
+        "usage-repo | ",
+        "Codex usage | now",
+        "Costed run | now",
+        "Plenty left | now",
+        "Near the limit | now",
         "ChatGPT | ",
         "codex (existing login) | pro · 55b9da0f · desktop",
         "Claude | ",

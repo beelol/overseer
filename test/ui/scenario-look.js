@@ -1,7 +1,7 @@
 // Packaged-UI scenario for AC-56 (Overseer themes) and AC-65 (provider logos), fixture runs only.
 // In Overseer Dark, Overseer Light and High Contrast: screenshots of the dashboard with a chat and
 // a diff, a terminal with ANSI colors, the agent grid, the new-agent composer and the Accounts view;
-// provider logos appear on agent rows, the chat header, the composer's agent chip and menu, grid
+// provider logos appear on agent rows (side-bar tree icons in Gate K), the chat header, the composer's agent chip and menu, grid
 // tiles and the Accounts view (native SVG icons); switching themes restyles open Overseer views
 // live; the VSIX ships the third-party notices and license texts for every bundled logo.
 const fs = require('fs');
@@ -45,38 +45,37 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Default High Contrast'];
     s.ctl('account.create', { provider: 'openai', name: 'ChatGPT Work' });
     await cdp.command('Overseer: Refresh Account Status'); await delay(1500);
 
-    await cdp.command('Overseer: Open Overseer View');
-    const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list .row[data-run]')`, 30000);
-    await dash.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(show.run.id)}]').click()`);
-    await dash.waitFor(`!!document.querySelector('#conv .msg.agent')`, 20000);
+    // Gate K: agents are picked in the side bar; the editor view shows the chat, composer or grid.
+    await s.selectRun(show.run.id, { settle: 2500 });
+    const dash = await s.editorView(`!!document.querySelector('#conv .msg.agent')`);
     const setTheme = async t => { const cur = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); cur['workbench.colorTheme'] = t; fs.writeFileSync(settingsFile, JSON.stringify(cur, null, 2)); await delay(2000); };
+    const rowLogos = () => cdp.evalWorkbench(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || ''));
+      return [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.getAttribute('aria-level') === '2').map(r => { const i = r.querySelector('.custom-view-tree-node-item-icon'); return ((i ? getComputedStyle(i).backgroundImage : '').match(/logos\\/([a-z-]+)\\.svg/) || [])[1] || ''; }).filter(Boolean); })()`);
 
-    // Logos in the dashboard.
-    const logos = await dash.eval(`({
-      rows: [...document.querySelectorAll('.rail-list .row[data-run] .meta-mark svg.logo')].map(e => e.getAttribute('class')),
-      chatHeader: [...document.querySelectorAll('.chat-meta svg.logo')].map(e => e.getAttribute('class')) })`);
-    await dash.eval(`document.querySelector('[data-action="new-agent"]').click()`);
-    await dash.waitFor(`!document.querySelector('[data-chip="agent"]').textContent.includes('Loading') && !!document.querySelector('[data-chip="agent"] svg.logo')`, 20000).catch(() => {});
+    // Logos: side-bar rows (tree icons) and the chat header.
+    const logos = { rows: await rowLogos(), chatHeader: await dash.eval(`[...document.querySelectorAll('.chat-meta svg.logo')].map(e => e.getAttribute('class'))`) };
+    await cdp.command('Overseer: New Agent'); await delay(1500);
+    await dash.waitFor(`!!document.querySelector('[data-chip="agent"]') && !document.querySelector('[data-chip="agent"]').textContent.includes('Loading') && !!document.querySelector('[data-chip="agent"] svg.logo')`, 20000).catch(() => {});
     logos.composerChip = await dash.eval(`document.querySelector('[data-chip="agent"] svg.logo')?.getAttribute('class')`);
     await dash.eval(`document.querySelector('[data-chip="agent"]').click()`); await delay(400);
     logos.agentMenu = await dash.eval(`[...document.querySelectorAll('.menu .menu-item svg.logo')].map(e => e.getAttribute('class'))`);
     await s.screenshot('composer-agent-menu-dark');
     await cdp.key('Escape');
-    await dash.eval(`document.querySelector('[data-action="grid"]').click()`);
-    await dash.waitFor(`!!document.querySelector('.grid .tile')`, 20000);
-    logos.gridTiles = await dash.eval(`[...document.querySelectorAll('.grid .tile .tile-who svg.logo, .grid .tile .tile-who .codicon')].map(e => e.getAttribute('class'))`);
-    await dash.eval(`document.querySelector('[data-action="grid"]').click()`);
-    await dash.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(show.run.id)}]').click()`); await delay(1500);
+    await cdp.command('Overseer: Toggle Agent Grid'); await delay(2000);
+    const grid = await cdp.webview(`!!document.querySelector('.grid .tile')`, 20000);
+    logos.gridTiles = await grid.eval(`[...document.querySelectorAll('.grid .tile .tile-who svg.logo, .grid .tile .tile-who .codicon')].map(e => e.getAttribute('class'))`);
+    await cdp.command('Overseer: Toggle Agent Grid'); await delay(2000);
+    await s.selectRun(show.run.id, { settle: 2000 });
     // Native Accounts view icons.
     await s.openOverseerView();
     logos.accounts = await cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).map(r => { const i = r.querySelector('.custom-view-tree-node-item-icon'); return i ? getComputedStyle(i).backgroundImage : ''; }).filter(u => /logos\\//.test(u)).map(u => u.split('logos/')[1].split(/[")]/)[0])`);
     s.note('logos', logos);
     check('provider logos on agent rows, the chat header, the composer agent chip and menu, grid tiles and the Accounts view',
-      logos.rows.some(c => /logo-claudecode/.test(c)) && logos.rows.some(c => /logo-codex/.test(c)) && logos.chatHeader.some(c => /logo-claudecode/.test(c)) && /logo-/.test(logos.composerChip || '') &&
+      logos.rows.some(c => /^claudecode-/.test(c)) && logos.rows.some(c => /^codex-/.test(c)) && logos.chatHeader.some(c => /logo-claudecode/.test(c)) && /logo-/.test(logos.composerChip || '') &&
       logos.agentMenu.some(c => /logo-codex/.test(c)) && logos.agentMenu.some(c => /logo-claudecode/.test(c)) && logos.gridTiles.length > 0 && logos.accounts.some(u => /^openai-/.test(u)) && logos.accounts.some(u => /^claude-/.test(u)), logos);
 
     // Live theme switch: open views restyle without a reload.
-    const bg = () => dash.eval(`getComputedStyle(document.body).backgroundColor`);
+    const bg = async () => (await s.editorView()).eval(`getComputedStyle(document.body).backgroundColor`);
     const darkBg = await bg();
     await setTheme('Overseer Light');
     const lightBg = await bg();
@@ -86,12 +85,12 @@ const THEMES = ['Overseer Dark', 'Overseer Light', 'Default High Contrast'];
     for (const theme of THEMES) {
       await setTheme(theme);
       const slug = theme.replace(/^Default /, '').replace(/\W+/g, '-').toLowerCase();
-      await dash.eval(`document.querySelector('.rail-list .row[data-run=${JSON.stringify(show.run.id)}]').click()`); await delay(2000);
+      await s.selectRun(show.run.id, { settle: 2000 });
       await cdp.command('Overseer: Open Review'); await delay(2000);
       await s.screenshot(`dashboard-diff-${slug}`);
-      await dash.eval(`document.querySelector('[data-action="grid"]').click()`); await delay(1500);
+      await cdp.command('Overseer: Toggle Agent Grid'); await delay(2000);
       await s.screenshot(`grid-${slug}`);
-      await dash.eval(`document.querySelector('[data-action="grid"]').click()`); await delay(800);
+      await cdp.command('Overseer: Toggle Agent Grid'); await delay(1500);
       await cdp.command('View: Toggle Terminal'); await delay(1500);
       await cdp.type("printf '\\033[31mred \\033[32mgreen \\033[33myellow \\033[34mblue \\033[35mmagenta \\033[36mcyan \\033[0mdefault\\n'"); await cdp.key('Enter'); await delay(1000);
       await s.screenshot(`terminal-${slug}`);

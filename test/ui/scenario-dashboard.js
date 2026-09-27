@@ -35,31 +35,33 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     const layout = () => cdp.evalWorkbench(`(() => {
       const vis = sel => { const e = document.querySelector(sel); return !!e && e.offsetWidth > 0 && e.offsetHeight > 0 && getComputedStyle(e).display !== 'none' && !e.classList.contains('hidden'); };
       const groups = [...document.querySelectorAll('.editor-group-container')].map(g => { const r = g.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height) }; });
-      return { sidebar: vis('.part.sidebar'), panel: vis('.part.panel'), auxiliary: vis('.part.auxiliarybar'), groups: groups.length, sizes: groups };
+      return { sidebar: vis('.part.sidebar'), sidebarTitle: document.querySelector('.part.sidebar .title-label')?.textContent.trim() || '', panel: vis('.part.panel'), auxiliary: vis('.part.auxiliarybar'), groups: groups.length, sizes: groups };
     })()`);
+    // The agents list is the side bar (Gate K).
+    const sideAgents = () => cdp.evalWorkbench(`[...document.querySelectorAll('.part.sidebar .monaco-list-row')].filter(r => r.offsetParent && r.getAttribute('aria-level') === '2').map(r => r.querySelector('.label-name')?.textContent.trim())`);
     const before = await layout();
     s.note('layout before', before);
     await s.screenshot('before');
     check('starting layout: side bar and panel open, two editor groups', before.sidebar && before.panel && before.groups === 2, before);
 
     await cdp.command('Overseer: Open Dashboard');
-    const dash = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list .row')`, 30000);
+    const dash = await s.editorView();
     await delay(1500);
     const during = await layout();
-    const agents = await dash.eval(`[...document.querySelectorAll('.rail-list .row[data-run] .title')].map(e => e.textContent)`);
+    const agents = await sideAgents();
     await s.screenshot('dashboard');
-    check('dashboard mode hides side bar, panel and secondary side bar; the dashboard works in a window without a folder',
-      !during.sidebar && !during.panel && !during.auxiliary && agents.includes('Dashboard demo') && await dash.eval(`document.body.dataset.dashboard === '1'`), { during, agents });
+    check('dashboard mode hides the panel and secondary side bar and keeps the side bar on the Overseer agents list (Gate K, AC-79); it works in a window without a folder',
+      during.sidebar && /Overseer/i.test(during.sidebarTitle) && !during.panel && !during.auxiliary && agents.includes('Dashboard demo') && await dash.eval(`document.body.dataset.dashboard === '1'`), { during, agents });
 
     // Reload: the dashboard is restored and still in dashboard mode.
     await cdp.command('Developer: Reload Window');
     await delay(6000);
     cdp = await s.connect(); s.cdp = cdp;
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer \\d+ active/.test(e.textContent)) || !!document.querySelector('iframe.webview')`, 60000, 'after reload');
-    const dash2 = await cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.rail-list .row')`, 30000).catch(() => null);
+    const dash2 = await s.editorView('true', 30000).catch(() => null);
     await delay(1500);
     const afterReload = await layout();
-    check('the dashboard survives a window reload (still in dashboard mode)', !!dash2 && !afterReload.sidebar && !afterReload.panel && await dash2.eval(`document.body.dataset.dashboard === '1'`), afterReload);
+    check('the dashboard survives a window reload (still in dashboard mode)', !!dash2 && afterReload.sidebar && !afterReload.panel && await dash2.eval(`document.body.dataset.dashboard === '1'`), afterReload);
 
     // Exit restores the previous layout exactly.
     await cdp.command('Overseer: Exit Dashboard');

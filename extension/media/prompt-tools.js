@@ -54,7 +54,8 @@
         ...o.efforts.map(e => ({ label: e, icon: 'dashboard', checked: state.effort === e, run: () => { state.effort = e; renderTray(); } }))); }
       if (o.modes.length) { if (items.length) items.push('sep'); items.push({ head: 'Permissions' }, { label: 'Default', icon: 'shield', checked: !state.mode, run: () => { state.mode = ''; renderTray(); } },
         ...o.modes.map(([v, label, icon]) => ({ label, icon, checked: state.mode === v, run: () => { state.mode = v; renderTray(); } }))); }
-      ui.menu(tune, items, { label: 'Options', align: 'start' });
+      // After a choice the user goes on typing (and Enter sends), so focus returns to the prompt.
+      ui.menu(tune, items, { label: 'Options', align: 'start', returnFocus: textarea });
     }
     tune.addEventListener('click', menu);
     attach.addEventListener('click', () => file.click());

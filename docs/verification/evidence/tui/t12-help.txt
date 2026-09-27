@@ -1,0 +1,30 @@
+overseer-tui — nine live Overseer agents per page, from the same overseerd daemon VS Code uses.
+
+USAGE:
+    overseer-tui [OPTIONS]
+
+OPTIONS:
+    --daemon PATH   overseerd binary (default: $OVERSEERD, next to this binary, $PATH, or the one
+                    bundled with the Overseer VS Code extension)
+    --home DIR      Overseer data directory (sets OVERSEER_HOME; default: the same as VS Code)
+    --no-mouse      Leave the mouse to the terminal (text selection) instead of clicking tiles
+    --no-bell       No terminal bell when an agent starts waiting for you
+    -h, --help      Show this help
+    -V, --version   Show the version
+
+KEYS:
+    ←↓↑→ / h j k l  move between agents        1–9   focus agent n on this page
+    tab / shift+tab next / previous agent      ] [   next / previous page (also PgDn/PgUp)
+    i / enter       message the focused agent  z     zoom (full screen, scrollback)
+    a / d           allow / deny a permission  w     next agent waiting for you
+    x               interrupt                  n     new agent
+    C               remove a finished agent's worktree (branch kept)
+    P               open a GitHub pull request (your git credentials and gh)
+    X               stop all agents and the daemon (r starts it again)
+    v               changes (files, diffs)     M     merge back (asks each step)
+    /               search agents              A     accounts and sign-in
+    e               in zoom: expand tool calls
+    f               filter all/active/needs you ?     all keys
+    q               quit (agents keep running)
+
+Agents are pages of nine, newest first: page 1 is the newest nine.

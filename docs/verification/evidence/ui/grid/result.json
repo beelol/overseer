@@ -11,14 +11,22 @@
     },
     {
       "name": "nine concurrent streams: each tile shows a line within 250 ms (p95) and event-loop lag p95 stays under 50 ms",
-      "ok": false,
+      "ok": true,
       "detail": {
-        "lines": 346,
-        "latP95": 853,
-        "latMax": 2279,
-        "lagN": 349,
+        "lines": 314,
+        "latP95": 98,
+        "latMax": 105,
+        "lagN": 348,
         "lagP95": 2,
-        "lagMax": 3
+        "lagMax": 5,
+        "stages": {
+          "n": 314,
+          "toDaemonP50": 32,
+          "toDaemonP95": 60,
+          "daemonToWebviewP50": 38,
+          "daemonToWebviewP95": 44,
+          "arriveP95": 98
+        }
       }
     },
     {
@@ -49,12 +57,12 @@
       "name": "arrow keys move between tiles and Enter opens the agent in the chat",
       "ok": true,
       "detail": {
-        "first": "r-6f23aa136150",
-        "second": "r-ce5ea2ad5c13",
+        "first": "r-4928080ce2ed",
+        "second": "r-76380af1b289",
         "opened": {
           "mode": "chat",
           "title": "Short 2",
-          "selected": "r-ce5ea2ad5c13"
+          "selected": "r-76380af1b289"
         }
       }
     }

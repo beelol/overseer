@@ -52,7 +52,7 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     const run = state1.runs.find(r => !r.parent_run_id && r.harness === 'opencode');
     const ws = state1.workspaces.find(w => w.id === run.workspace_id);
     check('run created in isolated worktree', ws.kind === 'worktree' && ws.path !== repo, { run: run.id, workspace: ws.path, branch: ws.branch });
-    check('follow on for launched run', await review.waitFor(`document.getElementById('follow').checked`, 15000));
+    check('follow on for launched run', await review.waitFor(`(document.getElementById('follow').dataset.state !== 'off')`, 15000));
 
     // Follow across and within files: record reveal targets as the agent edits.
     const reveals = [];
@@ -73,16 +73,16 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     const point = await s.webviewPoint(review, '#diffs');
     await cdp.wheel(point.x, point.y + 100, 400);
     await delay(500);
-    const paused = await review.eval(`({ state: document.getElementById('follow-state').textContent, resume: !document.getElementById('resume').hidden, top: document.getElementById('diffs').scrollTop })`);
+    const paused = await review.eval(`({ state: document.getElementById('follow-state').textContent, resume: (document.getElementById('follow').dataset.state === 'paused'), top: document.getElementById('diffs').scrollTop })`);
     check('scroll pauses follow with visible Resume', paused.resume && /paused/i.test(paused.state), paused);
     await s.screenshot('paused');
     await delay(6000);
     const stillPaused = await review.eval(`({ state: document.getElementById('follow-state').textContent, top: document.getElementById('diffs').scrollTop })`);
     check('paused follow does not move the view', Math.abs(stillPaused.top - paused.top) < 2 && /paused/i.test(stillPaused.state), stillPaused);
-    const resume = await s.webviewPoint(review, '#resume');
+    const resume = await s.webviewPoint(review, '#follow');
     await cdp.click(resume.x, resume.y);
     await delay(800);
-    const resumed = await review.eval(`({ state: document.getElementById('follow-state').textContent, resume: !document.getElementById('resume').hidden })`);
+    const resumed = await review.eval(`({ state: document.getElementById('follow-state').textContent, resume: (document.getElementById('follow').dataset.state === 'paused') })`);
     check('resume restarts follow', !resumed.resume && /Following/.test(resumed.state), resumed);
 
     // Selecting another file in the navigator also pauses Follow.
@@ -90,9 +90,9 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     const navB = await s.webviewPoint(review, '#nav-b');
     await cdp.click(navB.x, navB.y);
     await delay(500);
-    const pausedBySelect = await review.eval(`({ state: document.getElementById('follow-state').textContent, resume: !document.getElementById('resume').hidden })`);
+    const pausedBySelect = await review.eval(`({ state: document.getElementById('follow-state').textContent, resume: (document.getElementById('follow').dataset.state === 'paused') })`);
     check('selecting another file pauses follow', pausedBySelect.resume && /paused/i.test(pausedBySelect.state), pausedBySelect);
-    const resume2 = await s.webviewPoint(review, '#resume');
+    const resume2 = await s.webviewPoint(review, '#follow');
     await cdp.click(resume2.x, resume2.y);
     await delay(500);
     const baseTitle = await review.eval(`document.getElementById('base').title`);
@@ -104,7 +104,7 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     await delay(500);
     const offTop = await review.eval(`document.getElementById('diffs').scrollTop`);
     await delay(6000);
-    const offAfter = await review.eval(`({ top: document.getElementById('diffs').scrollTop, checked: document.getElementById('follow').checked })`);
+    const offAfter = await review.eval(`({ top: document.getElementById('diffs').scrollTop, checked: (document.getElementById('follow').dataset.state !== 'off') })`);
     check('follow off preserves position', !offAfter.checked && Math.abs(offAfter.top - offTop) < 2, { offTop, ...offAfter });
 
     // Wait for the run to finish its 8 edits.
@@ -161,8 +161,9 @@ const { Session, makeRepo, snapshotTree, startMock, openCodeConfig, latestVsix, 
     for (let i = 0; i < 40; i++) { if (s.ctl('state').runs.filter(r => r.task_id === deleg.task.id).length >= 3 && s.ctl('state').runs.find(r => r.id === deleg.run.id).status === 'completed') break; await delay(500); }
     const icon = await cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.activitybar .action-item a, .activitybar .action-label')].find(a => /^Overseer/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const b = a.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000);
     await cdp.click(icon.x, icon.y);
-    const childRow = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && /grandchild hi/.test(r.textContent)); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2, text: r.textContent }; })()`, 20000, 'grandchild row');
-    check('three-level native tree visible in the UI', /native child/.test(childRow.text), childRow.text);
+    const childRow = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent && /grandchild hi/.test(r.textContent)); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2, text: r.textContent, level: Number(r.getAttribute('aria-level')) }; })()`, 20000, 'grandchild row');
+    // Gate K side bar: repository (1) → task (2) → native child (3) → grandchild (4).
+    check('three-level native tree visible in the UI', childRow.level >= 4, { text: childRow.text, level: childRow.level });
     await cdp.click(childRow.x, childRow.y);
     const childOut = await cdp.webview(`document.getElementById('title')?.textContent.includes('grandchild hi')`, 20000);
     const ctl = await childOut.eval(`({ stopHidden: document.getElementById('interrupt').hidden, send: document.getElementById('send').disabled, why: document.getElementById('prompt').placeholder, sendWhy: document.getElementById('send').title, worktree: document.getElementById('details').textContent })`);

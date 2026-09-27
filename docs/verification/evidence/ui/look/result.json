@@ -35,8 +35,8 @@
       "ok": true,
       "detail": {
         "rows": [
-          "logo logo-codex",
-          "logo logo-claudecode"
+          "codex-dark",
+          "claudecode-dark"
         ],
         "chatHeader": [
           "logo logo-claudecode"
@@ -52,6 +52,8 @@
           "codicon codicon-terminal sm"
         ],
         "accounts": [
+          "codex-dark.svg",
+          "claudecode-dark.svg",
           "openai-dark.svg",
           "openai-dark.svg",
           "claude-dark.svg",

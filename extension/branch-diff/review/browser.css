@@ -78,11 +78,22 @@ button:focus-visible, a:focus-visible, summary:focus-visible, #resize:focus-visi
 
 /* Overseer additions */
 button.base { display: inline-flex; align-items: center; gap: 4px; }
-label.follow { display: inline-flex; align-items: center; gap: 3px; }
-#follow-state { opacity: .8; font-size: .9em; max-width: 30em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.icon { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border-radius: 5px; background: transparent; color: var(--vscode-icon-foreground, currentColor); }
+button.icon:hover { background: var(--vscode-toolbar-hoverBackground, var(--vscode-button-secondaryHoverBackground)); }
+#follow[aria-pressed="true"] { background: var(--vscode-inputOption-activeBackground, var(--vscode-toolbar-activeBackground)); color: var(--vscode-inputOption-activeForeground, var(--vscode-focusBorder)); outline: 1px solid var(--vscode-inputOption-activeBorder, transparent); }
+#follow[data-state="paused"] { color: var(--vscode-editorWarning-foreground, currentColor); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 #workspace-note { font-size: .85em; opacity: .75; padding: 2px 8px; }
 .follow-line { background: var(--vscode-editor-rangeHighlightBackground); }
-#toolbar { flex-wrap: wrap; row-gap: 4px; }
+/* Overseer (AC-76): the header stays on one line; the title shortens first. */
+#toolbar { flex-wrap: nowrap; gap: 8px; }
+#toolbar > * { flex: none; }
+#toolbar #comparison { flex: 0 1 auto; min-width: 3em; }
+#toolbar .spacer { flex: 1 1 0; min-width: 0; }
+/* Narrow reviews (beside the chat on a small window): icons first, words go to tooltips. */
+@media (max-width: 700px) { #base-label, #total { display: none; } #scope { max-width: 7.5em; } }
+@media (max-width: 520px) { #layout, #comparison { display: none; } }
+@media (max-width: 760px) { #review { grid-template-columns: min(var(--nav-width), 32%) 5px minmax(0, 1fr); } }
 .file-header .file-path { min-width: 5em; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Overseer hunk actions */
@@ -101,3 +112,14 @@ label.follow { display: inline-flex; align-items: center; gap: 3px; }
 /* Overseer: quieter file headers (AC-54) — Save appears only when there is something to save. */
 .save-file:disabled { display: none; }
 button.open-native { min-width: 26px; }
+
+/* Overseer: scope picker and file markers (AC-75, AC-76). */
+#scope { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border, transparent); border-radius: 4px; padding: 3px 4px; }
+.file .codicon { font-size: 14px; opacity: .75; flex: none; }
+.file .marker { font-size: 8px; opacity: .9; }
+.file.conflicted .codicon-warning { color: var(--vscode-editorWarning-foreground); opacity: 1; }
+
+.hunk-strip { background: transparent; }
+.file-header { flex-wrap: nowrap; }
+.file-header > * { flex: none; }
+.file-header .file-path { flex: 0 1 auto; }

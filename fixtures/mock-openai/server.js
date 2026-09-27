@@ -7,6 +7,7 @@
 //   contains "write <file>" -> tool call `write` creating <file> in the working directory, then "done"
 //   contains "slow"         -> streams one word per second for 60 seconds (interrupt tests)
 //   contains "sequence N"   -> N `edit` tool calls alternating a.txt/b.txt at distant lines
+//   contains "sequence3 N"  -> the same across a.txt, b.txt and c.txt
 //                              ("L<n>: original" -> "L<n>: agent edit <k>"), paced by MOCK_STEP_DELAY_MS
 //   anything else           -> "hello from mock"
 // Every request is appended to $MOCK_LOG (JSON lines) for evidence.
@@ -30,14 +31,16 @@ function plan(body) {
   const cwd = (system.match(/Working directory:\s*(\S+)/) || [])[1] || process.cwd();
   const users = messages.filter(m => m.role === 'user');
   const user = textOf(users[users.length - 1]?.content);
-  const sequence = user.match(/sequence (\d+)/i);
+  // "sequence3 N" cycles three files (a.txt, b.txt, c.txt); "sequence N" alternates a.txt/b.txt.
+  const three = /sequence3 \d+/i.test(user);
+  const sequence = user.match(/sequence3? (\d+)/i);
   if (sequence && (body.tools || []).some(t => t.function?.name === 'edit')) {
     const lastUser = messages.lastIndexOf(users[users.length - 1]);
     const done = messages.slice(lastUser).filter(m => m.role === 'tool').length;
     if (done < Number(sequence[1])) {
       const lines = [20, 280, 60, 240, 150, 200, 100, 30, 260, 180];
       const line = lines[done % lines.length] + Math.floor(done / lines.length);
-      const file = `${cwd}/${done % 2 ? 'b.txt' : 'a.txt'}`;
+      const file = `${cwd}/${three ? ['a.txt', 'b.txt', 'c.txt'][done % 3] : done % 2 ? 'b.txt' : 'a.txt'}`;
       return { tool: 'edit', args: { filePath: file, oldString: `L${line}: original`, newString: `L${line}: agent edit ${done + 1}` }, pace: true };
     }
     return { text: `done after ${done} edits` };
