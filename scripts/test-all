@@ -3,6 +3,7 @@
 //   Rust      cargo test --workspace (daemon and TUI)
 //   Unit      node test/unit/run.js (extension unit tests)
 //   Check     npm run check --prefix extension (syntax of the extension's sources)
+//   Links     scripts/check-links (every relative link in the README and the ledger, AC-153)
 //   UI        the packaged-VSIX fixture scenarios in test/ui (built VSIX, isolated VS Code profiles)
 // Flags: --no-ui (skip UI), --only=a,b (UI scenarios by name), --live (also the LIVE scenarios, which
 // spend paid turns within the budget in AGENTS.md), --perf (also the ten-minute AC-35 load test),
@@ -76,6 +77,7 @@ run('Rust (cargo test --workspace)', 'cargo', ['test', '--workspace'], {
 // Extension unit tests and source check.
 run('Unit (test/unit)', 'node', ['test/unit/run.js'], { summary: out => (out.match(/(\d+) of (\d+) passed/) || [''])[0] });
 run('Check (extension sources)', 'npm', ['run', '--silent', 'check', '--prefix', 'extension']);
+run('Links (README and ledger)', 'node', ['scripts/check-links'], { summary: out => (out.match(/(\d+) links checked.*?(\d+) broken/) || [''])[0] });
 
 // UI: every fixture scenario (LIVE ones and perf only when asked).
 if (!flag('--no-ui')) {
