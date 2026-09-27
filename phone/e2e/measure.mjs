@@ -10,6 +10,7 @@
 // missed; `--write-baseline` records this run as the baseline of its platform.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -153,6 +154,10 @@ async function main() {
   };
   if (!dev.installed()) throw new Error('the app is not installed on this device');
   log(`Measuring on ${args.platform} (${dev.id}), ${args.runs} cold starts, ${new Date().toISOString()}`);
+  // The machine's load beside the figures: a simulator shares the Mac with everything else on it.
+  const load = () => os.loadavg().map((n) => n.toFixed(1)).join(' ');
+  log(`Load average (1, 5, 15 min) at the start: ${load()}`);
+  const startLoad = os.loadavg();
 
   log('With the door:');
   dev.stop();
@@ -172,6 +177,8 @@ async function main() {
   const baselines = fs.existsSync(BASELINES) ? JSON.parse(fs.readFileSync(BASELINES, 'utf8')) : {};
   const result = { platform: args.platform, device: dev.id, at: new Date().toISOString(), runs: args.runs, withDoor, withoutDoor };
   const checks = verdicts(args.platform, withDoor, withoutDoor, args.writeBaseline ? null : baselines[args.platform]);
+  log(`Load average (1, 5, 15 min) at the end: ${load()}`);
+  result.load = { start: startLoad, end: os.loadavg() };
   log('');
   for (const c of checks) log(`${c.ok ? 'ok  ' : 'FAIL'} ${c.name}: ${c.value} (limit ${c.limit})${c.note ? ` — ${c.note}` : ''}`);
   result.checks = checks;
