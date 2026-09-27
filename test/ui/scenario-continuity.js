@@ -17,6 +17,7 @@ const path = require('path');
 const cp = require('child_process');
 const net = require('net');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
+const { auditExpression } = require('./audit');
 
 const freePort = () => new Promise(resolve => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); }); });
 const writeWhole = (file, text) => { fs.writeFileSync(file + '.tmp', text); fs.renameSync(file + '.tmp', file); };
@@ -62,6 +63,19 @@ const G = 2 ** 30;
     const connectionItem = async () => (await statusItems()).find(i => /^Connection:/.test(i.aria));
     const sideMessage = () => cdp.evalWorkbench(`[...document.querySelectorAll('.pane')].filter(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || '')).map(p => p.querySelector('.message')?.textContent.trim() || '')[0] ?? null`);
     const waitConn = async (re, ms = 20000) => { for (let t = 0; t < ms; t += 300) { const c = await connectionItem(); if (c && re.test(c.aria)) return c; await delay(300); } return connectionItem(); };
+    /** Opens the new-agent composer: the palette command, or the Agents view's own New Agent action when a webview keeps the keys. */
+    const newAgent = async () => {
+      await cdp.command('Overseer: New Agent'); await delay(800);
+      const shown = await cdp.webview(`document.body.dataset.mode === 'composer'`, 5000).then(() => true, () => false);
+      if (!shown) {
+        await s.openOverseerView();
+        const at = await cdp.evalWorkbench(`(() => { const a = [...document.querySelectorAll('.pane-header .actions .action-label')].find(a => /^New Agent/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const r = a.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+        if (at) { await cdp.click(at.x, at.y); await delay(800); }
+      }
+      const d = await s.editorView(`document.body.dataset.mode === 'composer'`);
+      await d.waitFor(`!document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);
+      return d;
+    };
 
     // ---- Online: the status bar has the connection, the side bar says nothing ----
     const online = await waitConn(/Online/);
@@ -208,17 +222,23 @@ const G = 2 ** 30;
     const resume = starts[starts.length - 1];
     check('Switch back continues in Codex, in the same worktree, in its own session', backDone === 'completed' && resumed.harness === 'codex' && resumed.workspace_id === first.workspace_id && resumed.native_id === first.native_id && resume.args[0] === 'exec' && resume.args[1] === 'resume' && resume.args[2] === first.native_id, { backDone, session: first.native_id, args: resume?.args?.slice(0, 3) });
     await s.screenshot('switched-back-dark');
+    // Back online, a new agent is the online one again (the last local start does not become the default).
+    dash = await newAgent();
+    await delay(600);
+    const defaultAgent = await dash.eval(`document.querySelector('[data-chip="agent"]').getAttribute('aria-label')`);
+    check('back online, a new agent defaults to the online agent again, not the local one', /Codex/.test(defaultAgent || ''), defaultAgent);
 
     // ---- The light theme: the same states ----
     await setTheme('Overseer Light');
-    await cdp.command('Overseer: New Agent'); await delay(800);
-    dash = await s.editorView(`document.body.dataset.mode === 'composer'`);
-    await dash.waitFor(`!document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);
+    dash = await newAgent();
     await pickMenu('Codex', 'Your login');
     network(OFFLINE);
     await waitConn(/Offline/);
     await dash.waitFor(`(() => { const n = document.querySelector('.view-composer .composer-note'); return n && /Offline/.test(n.textContent); })()`, 10000);
     await s.screenshot('offline-composer-light');
+    { const at = await s.webviewPoint(dash, '[data-chip="agent"]'); await cdp.click(at.x, at.y); await delay(400); await dash.waitFor(`!!document.querySelector('.menu')`, 5000); }
+    await s.screenshot('agent-menu-local-light');
+    await cdp.key('Escape'); await delay(200);
     s.ctl('settings.set', { values: { enabled: false } });
     behave('network', 'ok');
     const waiting2 = s.ctl('task.create', { repo, harness: 'codex', title: 'Tidy the tests', prompt: 'write tidy.txt later; say done' });
@@ -229,6 +249,16 @@ const G = 2 ** 30;
     await s.selectAgent('Rename the helpers');
     dash = await s.editorView(`/Rename the helpers/.test(document.getElementById('title')?.textContent || '')`);
     await s.screenshot('transition-light');
+    // A stock theme, and the text budget: the side bar with its offline line, the chat with a waiting card.
+    await setTheme('Default Dark Modern');
+    await s.selectAgent('Tidy the tests');
+    dash = await s.editorView(`document.getElementById('title')?.textContent === 'Tidy the tests' && !!document.querySelector('#conv [data-continuity-card="waiting"]')`);
+    await s.screenshot('waiting-default-dark');
+    const chatAudit = await dash.eval(auditExpression({ root: '.view-chat' }));
+    const sideAudit = await cdp.evalWorkbench(auditExpression({ root: '.sidebar', exclude: ['.pane:has(.pane-header[aria-label*="Accounts"])', '.pane:has(.pane-header[aria-label*="Search"])'], nativeHover: true }));
+    result.textBudget = { chat: { chars: chatAudit.chars, longRuns: chatAudit.longRuns, overflow: chatAudit.overflow.length, unnamed: chatAudit.unnamed.length }, agents: { chars: sideAudit.chars, overflow: sideAudit.overflow.length } };
+    check('offline, no view overflows sideways, no unbroken run over 80 characters outside code, every icon-only control has a name', chatAudit.overflow.length === 0 && chatAudit.longRuns.length === 0 && chatAudit.unnamed.length === 0 && sideAudit.overflow.length === 0, result.textBudget);
+    check('the text budget: the chat with a waiting card stays under Gate J\'s chat budget (1050 characters), and the side bar with its offline line and a waiting row stays near its 238', chatAudit.chars <= 1050 && sideAudit.chars <= 238 + 120, result.textBudget);
     s.ctl('settings.set', { values: { enabled: true } });
     s.ctl('run.interrupt', { run_id: waiting2.run.id });
     network(ONLINE); behave('ok', 'ok');
@@ -237,8 +267,7 @@ const G = 2 ** 30;
     await cdp.command('Developer: Reload Window'); await delay(6000);
     cdp = await s.connect(); s.cdp = cdp;
     dash = await s.editorView();
-    await cdp.command('Overseer: New Agent'); await delay(800);
-    await dash.waitFor(`document.body.dataset.mode === 'composer' && !document.querySelector('[data-chip="repo"]').textContent.includes('Loading')`, 20000);
+    dash = await newAgent();
     await delay(1500);
     const again = await dash.eval(`!!document.querySelector('[data-continuity="notice"]')`);
     check('after a reload the notice is not shown again', again === false, { again });
