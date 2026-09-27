@@ -143,7 +143,9 @@ fn valid_commander_pack(dir: &Path) -> Result<()> {
     use std::io::Read;
     for key in DEFAULT_KEYS {
         let path = commander_file(dir, key);
-        let meta = std::fs::metadata(&path)?;
+        let meta = std::fs::metadata(&path).map_err(|_| {
+            anyhow!("not a Commander pack: {key}/transmission/commander.wav is missing")
+        })?;
         if !meta.is_file() || !(16..=10_000_000).contains(&meta.len()) {
             return Err(anyhow!(
                 "private Commander pack needs three valid WAV files"
@@ -247,7 +249,8 @@ pub fn import_commander(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     let path = p["path"]
         .as_str()
         .ok_or_else(|| anyhow!("path must be a string"))?;
-    let directory = std::fs::canonicalize(path)?;
+    let directory =
+        std::fs::canonicalize(path).map_err(|_| anyhow!("that folder does not exist"))?;
     valid_commander_pack(&directory)?;
     d.store.lock().unwrap().conn.execute(
         "INSERT INTO meta(key,value) VALUES('audio.commander_dir',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
