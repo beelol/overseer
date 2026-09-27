@@ -95,6 +95,50 @@ impl Daemon {
         Ok(json!({"plan": plan, "committed": committed, "head": head, "files": files, "commits": commits}))
     }
 
+    /// Opens the pull request from the daemon (Gate N): commits, pushes the branch with the
+    /// owner's own Git credentials and creates it with their GitHub CLI. The daemon starts `git`
+    /// and `gh`; it reads no token, and none is sent to the phone that asked. Reuses an open
+    /// pull request for the branch. Nothing is merged.
+    pub fn pr_open(&self, workspace_id: &str, p: &Value) -> Result<Value> {
+        let prepared = self.pr_prepare(workspace_id)?;
+        let plan = &prepared["plan"];
+        let text = |k: &str| plan[k].as_str().unwrap_or_default().to_string();
+        let ws = self.workspace(workspace_id)?;
+        let (remote, branch, target, repo) = (text("remote"), text("branch"), text("target"), format!("{}/{}", text("owner"), text("repo")));
+        let title: String = p["title"].as_str().map(str::trim).filter(|t| !t.is_empty()).map(str::to_string).unwrap_or_else(|| text("title")).chars().take(200).collect();
+        let body = match p["body"].as_str().filter(|b| !b.trim().is_empty()) {
+            Some(b) => b.chars().take(20_000).collect::<String>(),
+            None => pr_body(&prepared),
+        };
+        let push = std::process::Command::new("git").args(["-C", &ws.path, "push", "--no-verify", &remote, &format!("HEAD:refs/heads/{branch}")]).env("GIT_TERMINAL_PROMPT", "0").output()?;
+        if !push.status.success() {
+            bail!("git push failed: {}", crate::redact::redact(String::from_utf8_lossy(&push.stderr).trim()));
+        }
+        let gh = std::env::var("OVERSEER_GH").unwrap_or_else(|_| "gh".into());
+        let mut args = vec!["pr", "create", "--repo", &repo, "--head", &branch, "--base", &target, "--title", &title, "--body", &body];
+        if p["draft"].as_bool() == Some(true) {
+            args.push("--draft");
+        }
+        let created = std::process::Command::new(&gh).args(&args).current_dir(&ws.path).output().map_err(|e| {
+            crate::server::ProtoError::new("mac_setup", format!("The GitHub CLI (gh) was not found on the Mac ({e}). Install it and run gh auth login there, or open the pull request in VS Code."))
+        })?;
+        let out = String::from_utf8_lossy(&created.stdout).to_string();
+        let err = String::from_utf8_lossy(&created.stderr).to_string();
+        let (url, reused) = if created.status.success() {
+            (out.lines().rev().find(|l| l.starts_with("https://")).map(str::to_string), false)
+        } else if err.contains("already exists") {
+            (err.lines().chain(out.lines()).find_map(|l| l.split_whitespace().find(|w| w.starts_with("https://")).map(str::to_string)), true)
+        } else if err.contains("gh auth login") || err.contains("not logged") {
+            return Err(crate::server::ProtoError::new("mac_setup", "The GitHub CLI on the Mac is not signed in. Run gh auth login there.").into());
+        } else {
+            bail!("gh pr create failed: {}", crate::redact::redact(err.trim()));
+        };
+        let url = url.ok_or_else(|| anyhow!("gh did not report the pull request's address"))?;
+        let number = url.rsplit('/').next().and_then(|n| n.parse::<i64>().ok()).unwrap_or(0);
+        self.pr_opened(workspace_id, &url, number)?;
+        Ok(json!({"url": url, "number": number, "reused": reused, "branch": branch, "target": target, "repo": repo, "committed": prepared["committed"], "head": prepared["head"]}))
+    }
+
     /// Records the PR the extension created (URL and number only).
     pub fn pr_opened(&self, workspace_id: &str, url: &str, number: i64) -> Result<Value> {
         let ws = self.workspace(workspace_id)?;
@@ -110,6 +154,41 @@ impl Daemon {
         self.emit(task_id.as_deref(), run_id.as_deref(), "pull_request", "user", "exact", json!({"url": url, "number": number, "branch": ws.branch}))?;
         Ok(json!({"recorded": true}))
     }
+}
+
+/// What a pull request says when the owner wrote nothing: the task, the commits and the files.
+fn pr_body(prepared: &Value) -> String {
+    let plan = &prepared["plan"];
+    let mut out = String::new();
+    let prompt = plan["prompt"].as_str().unwrap_or_default().trim();
+    if !prompt.is_empty() {
+        out.push_str("**Task**\n\n");
+        for line in prompt.lines().take(40) {
+            out.push_str(&format!("> {line}\n"));
+        }
+        out.push('\n');
+    }
+    if let Some(h) = plan["harness"].as_str() {
+        out.push_str(&format!("Agent: {h}{}\n\n", plan["model"].as_str().map(|m| format!(" ({m})")).unwrap_or_default()));
+    }
+    let commits = prepared["commits"].as_array().cloned().unwrap_or_default();
+    if !commits.is_empty() {
+        out.push_str(&format!("**Commits** ({})\n\n", commits.len()));
+        for c in commits.iter().take(50) {
+            out.push_str(&format!("- {}\n", c.as_str().unwrap_or_default()));
+        }
+        out.push('\n');
+    }
+    let files = prepared["files"].as_array().cloned().unwrap_or_default();
+    if !files.is_empty() {
+        out.push_str(&format!("**Files changed** ({})\n\n", files.len()));
+        for f in files.iter().take(50) {
+            out.push_str(&format!("- `{}` {}\n", f["status"].as_str().unwrap_or("M"), f["path"].as_str().unwrap_or_default()));
+        }
+        out.push('\n');
+    }
+    out.push_str("_Review before merging. Overseer never merges automatically._");
+    out
 }
 
 #[cfg(test)]

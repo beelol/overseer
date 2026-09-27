@@ -111,8 +111,12 @@
     "workspace.file": {
       "class": "read",
       "summary": "One file of a workspace, at a comparison and in the working copy",
-      "phone": "not_yet",
-      "planned": true
+      "phone": "available"
+    },
+    "workspace.hunks": {
+      "class": "read",
+      "summary": "The changes of one file as hunks, with their keys and reviewed marks",
+      "phone": "available"
     },
     "workspace.cleanup_plan": {
       "class": "read",
@@ -132,8 +136,7 @@
     "review.marks": {
       "class": "read",
       "summary": "The hunks marked reviewed for a run",
-      "phone": "not_yet",
-      "planned": true
+      "phone": "available"
     },
     "account.list": {
       "class": "read",
@@ -203,8 +206,7 @@
     "workspace.pr_open": {
       "class": "control",
       "summary": "Open the pull request with the Mac's Git and GitHub credentials",
-      "phone": "not_yet",
-      "planned": true
+      "phone": "available"
     },
     "workspace.pr_opened": {
       "class": "control",
@@ -234,20 +236,22 @@
     "review.accept": {
       "class": "control",
       "summary": "Mark a hunk reviewed",
-      "phone": "not_yet",
-      "planned": true
+      "phone": "available"
     },
     "review.unaccept": {
       "class": "control",
       "summary": "Remove a hunk's reviewed mark",
-      "phone": "not_yet",
-      "planned": true
+      "phone": "available"
+    },
+    "review.import": {
+      "class": "control",
+      "summary": "Hand the daemon marks a surface kept before",
+      "phone": "available"
     },
     "review.reject": {
       "class": "control",
       "summary": "Revert a hunk in the worktree",
-      "phone": "not_yet",
-      "planned": true
+      "phone": "available"
     },
     "profile.create": {
       "class": "control",
@@ -267,8 +271,7 @@
     "profile.device_login": {
       "class": "control",
       "summary": "Sign in with the provider's device code, in the phone's browser",
-      "phone": "not_yet",
-      "planned": true
+      "phone": "available"
     },
     "account.create": {
       "class": "control",
@@ -375,6 +378,12 @@
       "summary": "Rename a device",
       "phone": "mac_only",
       "reason": "Devices are managed on the Mac"
+    },
+    "ui.focus": {
+      "class": "mac_only",
+      "summary": "Which agent a window on the Mac is looking at",
+      "phone": "mac_only",
+      "reason": "It describes the Mac's own windows"
     }
   }
 }

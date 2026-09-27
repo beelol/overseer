@@ -10,6 +10,7 @@ pub mod net;
 pub mod noise;
 pub mod pairing;
 pub mod power;
+pub mod push;
 pub mod remote;
 
 use crate::daemon::Daemon;
@@ -111,6 +112,8 @@ pub struct Gateway {
     pub inflight: Mutex<HashMap<(String, String), Arc<Inflight>>>,
     failures: Mutex<HashMap<IpAddr, (u32, Instant)>>,
     pub power: power::Power,
+    /// The agent each window on the Mac is focused on, by connection.
+    pub focus: Mutex<HashMap<u64, String>>,
 }
 
 impl Gateway {
@@ -125,6 +128,7 @@ impl Gateway {
             inflight: Mutex::new(HashMap::new()),
             failures: Mutex::new(HashMap::new()),
             power: power::Power::default(),
+            focus: Mutex::new(HashMap::new()),
         }
     }
 
@@ -228,6 +232,7 @@ pub fn start(d: &Arc<Daemon>) {
     let _ = d.store.lock().unwrap().requests_prune(now_ms());
     stop_stale_advertiser();
     power::watch(d.clone());
+    push::watch(d.clone());
     if setting(d, "enabled").as_deref() == Some("1") {
         match enable(d, None) {
             Ok(v) => crate::log(&format!("gateway: phone access is on (port {})", v["port"])),

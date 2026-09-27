@@ -126,7 +126,10 @@ async fn connection(daemon: Arc<Daemon>, stream: UnixStream) -> Result<()> {
     let mut reader = BufReader::new(read);
     let mut buf = Vec::new();
     let mut ui = false;
-    let result = connection_loop(&daemon, &mut reader, &mut buf, &tx, &mut ui).await;
+    static CONNECTIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let connection_id = CONNECTIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let result = connection_loop(&daemon, &mut reader, &mut buf, &tx, &mut ui, connection_id).await;
+    daemon.gateway.focus.lock().unwrap().remove(&connection_id);
     if ui {
         daemon.ui_disconnected();
     }
@@ -141,6 +144,7 @@ async fn connection_loop(
     buf: &mut Vec<u8>,
     tx: &mpsc::Sender<Value>,
     ui: &mut bool,
+    connection_id: u64,
 ) -> Result<()> {
     loop {
         buf.clear();
@@ -171,6 +175,18 @@ async fn connection_loop(
         }
         if method == "events.subscribe" {
             subscribe(daemon.clone(), id, params, tx.clone());
+            continue;
+        }
+        if method == "ui.focus" {
+            // Which agent this window is looking at, so a phone is not notified about it (AC-129).
+            {
+                let mut focus = daemon.gateway.focus.lock().unwrap();
+                match params["run_id"].as_str().filter(|_| params["focused"].as_bool() != Some(false)) {
+                    Some(run) => focus.insert(connection_id, run.to_string()),
+                    None => focus.remove(&connection_id),
+                };
+            }
+            let _ = tx.send(json!({"id": id, "result": {"ok": true}})).await;
             continue;
         }
         if method == "hello" && (params["client"] == "vscode" || params["client"] == "tui") && !*ui {
@@ -372,6 +388,15 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
             let n = d.ui_clients.load(std::sync::atomic::Ordering::SeqCst);
             json!({"vscode": n, "ui": n})
         }
+        "workspace.file" => d.workspace_file(s(p, "workspace_id")?, s(p, "path")?, p["base"].as_str())?,
+        "workspace.hunks" => d.workspace_hunks(s(p, "workspace_id")?, s(p, "path")?, s(p, "base")?, p["run_id"].as_str())?,
+        "review.marks" => d.review_marks(s(p, "run_id")?)?,
+        "review.accept" => d.review_accept(s(p, "run_id")?, p)?,
+        "review.unaccept" => d.review_unaccept(s(p, "run_id")?, s(p, "key")?)?,
+        "review.import" => d.review_import(s(p, "run_id")?, &p["marks"])?,
+        "review.reject" => d.review_reject(s(p, "workspace_id")?, p)?,
+        "workspace.pr_open" => d.pr_open(s(p, "workspace_id")?, p)?,
+        "profile.device_login" => d.device_login(s(p, "id")?)?,
         "repo.known" => d.known_repos()?,
         "runs.stop_all" => d.stop_all_runs()?,
         m if m.starts_with("gateway.") => crate::gateway::local::dispatch(d, m, p)?,

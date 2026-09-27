@@ -132,7 +132,7 @@ mod tests {
         assert!(dispatched.len() > 40, "the dispatch tables were not found: {dispatched:?}");
         let missing: Vec<&String> = dispatched.iter().filter(|m| class_of(m).is_none()).collect();
         assert!(missing.is_empty(), "methods without a class in protocol/protocol.json: {missing:?}");
-        let stale: Vec<String> = methods().into_iter().map(|(m, _)| m).filter(|m| !dispatched.contains(m) && m != "events.subscribe").collect();
+        let stale: Vec<String> = methods().into_iter().map(|(m, _)| m).filter(|m| !dispatched.contains(m) && !["events.subscribe", "ui.focus"].contains(&m.as_str())).collect();
         assert!(stale.is_empty(), "protocol/protocol.json lists methods the daemon does not have: {stale:?}");
         let built: Vec<String> = planned().into_iter().filter(|m| dispatched.contains(m)).collect();
         assert!(built.is_empty(), "these methods exist now; remove \"planned\" from them in protocol/protocol.json: {built:?}");
