@@ -258,6 +258,9 @@ fn late_conflict_holds_a_ready_transitive_dependent_before_admission() {
         "revision":1,"conflict_id":"ancestor-disagreement","left_job_id":"left",
         "left_artifact_id":"left-evidence","right_job_id":"right",
         "right_artifact_id":"right-evidence","reason":"Different route responses"}));
+    let middle_held=d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|job|job["id"]=="middle").unwrap().clone();
+    assert_eq!(middle_held["status"],"blocked");
     let leaf_after = d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
         .iter().find(|job|job["id"]=="leaf").unwrap().clone();
     assert_eq!(leaf_after["status"],"planned");
@@ -285,7 +288,32 @@ fn late_conflict_holds_a_ready_transitive_dependent_before_admission() {
         "revision":1,"conflict_id":"ancestor-disagreement","outcome":"supports_right",
         "reproduction_job_id":"repro","reproduction_artifact_id":"repro-evidence"}))["status"],
         "resolved");
-    let leaf_restored = d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+    let leaf_still_held = d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
+        .iter().find(|job|job["id"]=="leaf").unwrap().clone();
+    assert_eq!(leaf_still_held["status"],"planned");
+    d.call("swarm.revise",json!({"id":run,"generation":1,"expected_revision":1,
+        "reason":"Recheck the middle conclusion after independent reproduction","jobs":[
+            {"id":"left","title":"Left probe","acceptance":"response proof"},
+            {"id":"right","title":"Right probe","acceptance":"response proof"},
+            {"id":"middle","title":"Use right result","acceptance":"rechecked consumer proof","deps":["right"]},
+            {"id":"leaf","title":"Use middle result","acceptance":"final proof","deps":["middle"]},
+            {"id":"repro","title":"Independent probe","acceptance":"fresh proof"}
+        ]}));
+    let middle=d.call("swarm.attempt.register",json!({"run_id":run,
+        "generation":1,"revision":2,"job_id":"middle"}));
+    d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"middle",
+        "attempt_id":middle["id"],"token":middle["token"],
+        "artifact_id":"middle-rechecked","source_revision":2,"kind":"finding",
+        "content":"fresh consumer proof after route reproduction"}));
+    d.call("swarm.report",json!({"run_id":run,"job_id":"middle",
+        "attempt_id":middle["id"],"token":middle["token"],
+        "message_id":"middle-rechecked-result","type":"result","revision":2,
+        "payload":{"artifact_ids":["middle-rechecked"],"audit_outcome":"negative"}}));
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":2,
+        "job_id":"middle","decision":"accept","evidence":["middle-rechecked"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":2,"job_id":"middle","attempt_id":middle["id"]}));
+    let leaf_restored=d.call("swarm.jobs",json!({"id":run}))["jobs"].as_array().unwrap()
         .iter().find(|job|job["id"]=="leaf").unwrap().clone();
     assert_eq!(leaf_restored["status"],"ready");
 }
@@ -398,4 +426,98 @@ fn late_conflict_interrupts_only_the_linked_dependent_worker() {
         rusqlite::params![run,workers[0].2],|r|r.get(0)).unwrap();
     assert_eq!(signal_count,1);
     d.call("swarm.stop",json!({"run_id":run}));
+}
+
+#[test]
+fn late_conflict_invalidates_accepted_dependents_until_explicit_re_review() {
+    let mut d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Accepted dependent conflict",
+        "objective":"Audit route-dependent results","allowed_targets":["fixture"]}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"left","title":"Left probe","acceptance":"response proof"},
+        {"id":"right","title":"Right probe","acceptance":"response proof"},
+        {"id":"consumer","title":"Use right result","acceptance":"consumer proof","deps":["right"]},
+        {"id":"leaf","title":"Use consumer result","acceptance":"final proof","deps":["consumer"]},
+        {"id":"unrelated","title":"Independent check","acceptance":"separate proof"},
+        {"id":"repro","title":"Independent reproduction","acceptance":"fresh proof"}
+    ]}));
+    for (job,content) in [
+        ("right","foreign request returned 403"),
+        ("consumer","consumer concluded route denies foreign request"),
+        ("leaf","summary adopted consumer's conclusion"),
+        ("unrelated","separate authorization check passed")
+    ] {
+        let attempt=submit(&d,run,job,"finding",content);
+        d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+            "job_id":job,"decision":"accept","evidence":[format!("{job}-evidence")]}));
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":job,"attempt_id":attempt["id"]}));
+    }
+    submit(&d,run,"left","finding","foreign request returned 200");
+    let conflict=json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"accepted-chain-disagreement","left_job_id":"left",
+        "left_artifact_id":"left-evidence","right_job_id":"right",
+        "right_artifact_id":"right-evidence","reason":"Route results disagree"});
+    d.call("swarm.conflict.open",conflict.clone());
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.call("swarm.conflict.open",conflict)["duplicate"],true);
+    let jobs=d.call("swarm.jobs",json!({"id":run}));
+    for job in ["consumer","leaf"] {
+        let row=jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]==job).unwrap();
+        assert_eq!(row["status"],"blocked","{job}: {row}");
+        assert_eq!(row["stop_reason"],"evidence_conflict");
+        assert_eq!(row["attempt_count"],1);
+    }
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    for job in ["consumer","leaf"] {
+        let history:i64=db.query_row("SELECT COUNT(*) FROM swarm_decisions
+            WHERE run_id=?1 AND job_id=?2 AND decision='accept'",
+            rusqlite::params![run,job],|r|r.get(0)).unwrap();
+        assert_eq!(history,1);
+    }
+    let unrelated=jobs["jobs"].as_array().unwrap().iter()
+        .find(|j|j["id"]=="unrelated").unwrap();
+    assert_eq!(unrelated["status"],"accepted");
+    let coverage=d.call("swarm.coverage",json!({"run_id":run}));
+    for job in ["consumer","leaf"] {
+        let row=coverage["rows"].as_array().unwrap().iter().find(|r|r["job_id"]==job).unwrap();
+        assert_eq!(row["coverage_state"],"dependency_conflict","{job}: {row}");
+    }
+    let repro=submit(&d,run,"repro","reproduction","fresh independent probe supports right");
+    d.call("swarm.decide",json!({"run_id":run,"generation":1,"revision":1,
+        "job_id":"repro","decision":"accept","evidence":["repro-evidence"]}));
+    d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+        "revision":1,"job_id":"repro","attempt_id":repro["id"]}));
+    d.call("swarm.conflict.resolve",json!({"run_id":run,"generation":1,"revision":1,
+        "conflict_id":"accepted-chain-disagreement","outcome":"supports_right",
+        "reproduction_job_id":"repro","reproduction_artifact_id":"repro-evidence"}));
+    let after=d.call("swarm.jobs",json!({"id":run}));
+    for job in ["consumer","leaf"] {
+        assert_eq!(after["jobs"].as_array().unwrap().iter()
+            .find(|j|j["id"]==job).unwrap()["status"],"blocked");
+    }
+    let revised=d.call("swarm.revise",json!({"id":run,"generation":1,
+        "expected_revision":1,"reason":"Recheck conclusions after route disagreement",
+        "jobs":[
+            {"id":"left","title":"Left probe","acceptance":"response proof"},
+            {"id":"right","title":"Right probe","acceptance":"response proof"},
+            {"id":"consumer","title":"Use right result","acceptance":"recheck consumer proof","deps":["right"]},
+            {"id":"leaf","title":"Use consumer result","acceptance":"final proof","deps":["consumer"]},
+            {"id":"unrelated","title":"Independent check","acceptance":"separate proof"},
+            {"id":"repro","title":"Independent reproduction","acceptance":"fresh proof"}
+        ]}));
+    assert_eq!(revised["affected"],2);
+    let after_replan=d.call("swarm.jobs",json!({"id":run}));
+    assert_eq!(after_replan["jobs"].as_array().unwrap().iter()
+        .find(|j|j["id"]=="consumer").unwrap()["status"],"ready");
+    assert_eq!(after_replan["jobs"].as_array().unwrap().iter()
+        .find(|j|j["id"]=="leaf").unwrap()["status"],"planned");
+    assert_eq!(after_replan["jobs"].as_array().unwrap().iter()
+        .find(|j|j["id"]=="unrelated").unwrap()["status"],"accepted");
+    let stale=d.try_call("swarm.decide",json!({"run_id":run,"generation":1,
+        "revision":2,"job_id":"consumer","decision":"accept",
+        "evidence":["consumer-evidence"]})).unwrap_err();
+    assert!(stale.contains("stale artifact source revision"),"{stale}");
 }

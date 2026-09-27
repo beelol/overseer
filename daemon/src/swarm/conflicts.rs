@@ -119,7 +119,7 @@ pub fn open(store: &mut Store, p: &Value) -> Result<Value> {
          JOIN swarm_attempts a ON a.run_id=?1 AND a.job_id=d.job_id
          JOIN swarm_jobs j ON j.run_id=a.run_id AND j.id=a.job_id
          WHERE a.status='registered' AND a.job_id NOT IN (?2,?3)
-           AND j.status IN ('reserved','launching','running','submitted')
+           AND j.status IN ('reserved','launching','running','submitted','accepted')
            AND j.stop_reason IS NULL")?;
     let active=stmt.query_map(params![run,left_job,right_job],|r|
         Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,i64>(2)?)))?
@@ -138,6 +138,32 @@ pub fn open(store: &mut Store, p: &Value) -> Result<Value> {
                 params![run,format!("conflict-checkpoint-{id}-{attempt}"),job,attempt,
                     revision,json!({"reason":"evidence_conflict","conflict_id":id}).to_string(),now])?;
         }
+    }
+    // A completed dependent may already have an accepted review or a submitted
+    // result. Retain its historical decision and artifacts, but remove its
+    // current authority: resolving the ancestor does not re-accept the child.
+    let mut stmt=tx.prepare(
+        "WITH RECURSIVE downstream(job_id) AS (
+             SELECT ?2 UNION SELECT ?3
+             UNION
+             SELECT j.id FROM swarm_jobs j
+             JOIN json_each(j.deps) dep
+             JOIN downstream d ON dep.value=d.job_id
+             WHERE j.run_id=?1
+         )
+         SELECT j.id FROM downstream d
+         JOIN swarm_jobs j ON j.run_id=?1 AND j.id=d.job_id
+         WHERE j.id NOT IN (?2,?3) AND j.status IN ('accepted','submitted')
+           AND j.stop_reason IS NULL
+           AND NOT EXISTS (SELECT 1 FROM swarm_attempts a
+               WHERE a.run_id=j.run_id AND a.job_id=j.id AND a.status='registered')")?;
+    let finished=stmt.query_map(params![run,left_job,right_job],|r|r.get::<_,String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(stmt);
+    for job in finished {
+        tx.execute("UPDATE swarm_jobs SET status='blocked',stop_reason='evidence_conflict',
+            updated_ms=?3 WHERE run_id=?1 AND id=?2 AND stop_reason IS NULL",
+            params![run,job,now])?;
     }
     tx.commit()?;
     Ok(json!({"conflict_id":id,"status":"open","duplicate":false}))

@@ -9,19 +9,20 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
     get(store, run)?;
     let mut stmt = store
         .conn
-        .prepare("SELECT id,plan_revision,status FROM swarm_jobs WHERE run_id=?1 ORDER BY id")?;
+        .prepare("SELECT id,plan_revision,status,stop_reason FROM swarm_jobs WHERE run_id=?1 ORDER BY id")?;
     let jobs = stmt
         .query_map(params![run], |r| {
             Ok((
                 r.get::<_, String>(0)?,
                 r.get::<_, i64>(1)?,
                 r.get::<_, String>(2)?,
+                r.get::<_, Option<String>>(3)?,
             ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
     let mut rows = Vec::with_capacity(jobs.len());
-    for (job, revision, status) in jobs {
+    for (job, revision, status, stop_reason) in jobs {
         let mut results_stmt = store.conn.prepare(
             "SELECT attempt_id,message_id,payload FROM swarm_messages WHERE run_id=?1 AND job_id=?2 AND revision=?3 AND sender=attempt_id AND kind='result' ORDER BY seq DESC",
         )?;
@@ -88,6 +89,7 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
             .exists(params![run,job])?;
         let state = if contaminated { "contaminated" }
         else if conflict_unresolved { "conflict_unresolved" }
+        else if stop_reason.as_deref()==Some("evidence_conflict") { "dependency_conflict" }
         else if status == "superseded" { "excluded_by_scope" }
         else { match outcome {
             Some("environment_failure") => "environment_blocked",
