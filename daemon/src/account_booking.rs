@@ -31,6 +31,211 @@ pub enum BookingDecision {
     Blocked(&'static str),
 }
 
+pub struct LaunchBookingRequest<'a> {
+    pub account: &'a AccountBookingRequest<'a>,
+    pub workspace_path: Option<&'a str>,
+    pub consume_agent_slot: bool,
+    /// Binds the caller's durable permission/launch inputs. The shared
+    /// service also hashes the resource fields; this is not a spawn command.
+    pub launch_hash: &'a str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedLaunchIntent {
+    pub work_unit_id: String,
+    pub route_id: String,
+    pub profile_id: String,
+    pub account_generation: i64,
+    pub phase: String,
+    pub workspace_path: Option<String>,
+    pub slot_held: bool,
+    pub writer_held: bool,
+    pub effects_claimed_ms: Option<i64>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum LaunchBookingDecision {
+    Booked(SharedLaunchIntent),
+    Replayed(SharedLaunchIntent),
+    Blocked(&'static str),
+}
+
+fn launch_intent(conn: &Connection, id: &str) -> Result<Option<SharedLaunchIntent>> {
+    Ok(conn
+        .query_row(
+            "SELECT work_unit_id,route_id,profile_id,account_generation,phase,
+        workspace_path,slot_held,writer_held,effects_claimed_ms
+        FROM shared_booking_intents WHERE work_unit_id=?1 AND launch_hash IS NOT NULL",
+            [id],
+            |row| {
+                Ok(SharedLaunchIntent {
+                    work_unit_id: row.get(0)?,
+                    route_id: row.get(1)?,
+                    profile_id: row.get(2)?,
+                    account_generation: row.get(3)?,
+                    phase: row.get(4)?,
+                    workspace_path: row.get(5)?,
+                    slot_held: row.get(6)?,
+                    writer_held: row.get(7)?,
+                    effects_claimed_ms: row.get(8)?,
+                })
+            },
+        )
+        .optional()?)
+}
+
+/// Reserve account windows, an app slot and the planned workspace writer in
+/// one transaction. The returned intent is inspectable state, not permission
+/// to attempt effects: the launch worker must win claim_shared_launch_effects.
+pub fn book_shared_launch_in_tx(
+    conn: &Connection,
+    req: &LaunchBookingRequest<'_>,
+) -> Result<LaunchBookingDecision> {
+    if conn.is_autocommit() {
+        return Err(anyhow!(
+            "shared launch booking requires an admission transaction"
+        ));
+    }
+    if !valid_label(req.launch_hash, 128)
+        || req.workspace_path.is_some_and(|path| {
+            !valid_label(path, 4096)
+                || !std::path::Path::new(path).is_absolute()
+                || std::path::Path::new(path).components().any(|part| {
+                    matches!(
+                        part,
+                        std::path::Component::ParentDir | std::path::Component::CurDir
+                    )
+                })
+        })
+    {
+        return Err(anyhow!("invalid shared launch resource identity"));
+    }
+    let resource_hash = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&(
+            req.launch_hash,
+            req.workspace_path,
+            req.consume_agent_slot
+        ))?)
+    );
+    let prior: Option<Option<String>> = conn
+        .query_row(
+            "SELECT launch_hash FROM shared_booking_intents WHERE work_unit_id=?1",
+            [req.account.id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if let Some(prior_hash) = prior {
+        if prior_hash.as_deref() != Some(&resource_hash) {
+            return Err(anyhow!(
+                "shared launch id reused with different resource inputs"
+            ));
+        }
+        match book_shared_account_in_tx(conn, req.account)? {
+            BookingDecision::Replayed => {
+                return Ok(LaunchBookingDecision::Replayed(
+                    launch_intent(conn, req.account.id)?
+                        .ok_or_else(|| anyhow!("shared launch intent disappeared"))?,
+                ))
+            }
+            _ => return Err(anyhow!("shared launch replay lost its account booking")),
+        }
+    }
+    if let Some(path) = req.workspace_path {
+        let held: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM shared_booking_intents
+            WHERE workspace_path=?1 AND writer_held=1)",
+            [path],
+            |row| row.get(0),
+        )?;
+        let active_writer: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM runs r
+            JOIN workspaces w ON w.id=r.workspace_id WHERE w.path=?1 AND w.removed_ms IS NULL
+            AND (r.status IN ('queued','starting','running','waiting_for_user',
+                'waiting_for_connection','waiting_for_memory','unknown','disconnected')
+                OR EXISTS(SELECT 1 FROM turns t WHERE t.run_id=r.id
+                    AND t.status='running' AND t.ended_ms IS NULL)))",
+            [path],
+            |row| row.get(0),
+        )?;
+        let planned_writer: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM auto_launch_intents i
+            JOIN auto_pool_claims c ON c.work_unit_id=i.work_unit_id
+            WHERE i.planned_path=?1 AND c.state IN ('active','uncertain'))",
+            [path],
+            |row| row.get(0),
+        )?;
+        if held || active_writer || planned_writer {
+            return Ok(LaunchBookingDecision::Blocked("workspace_writer_busy"));
+        }
+    }
+    if req.consume_agent_slot {
+        let setting: Option<String> = conn
+            .query_row(
+                "SELECT value FROM meta WHERE key='agents.max_active'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let limit = match setting {
+            None => 9,
+            Some(value) => value
+                .parse::<i64>()
+                .ok()
+                .filter(|n| (1..=256).contains(n))
+                .ok_or_else(|| anyhow!("invalid app agent limit"))?,
+        };
+        let active: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM runs r
+            WHERE (r.parent_run_id IS NULL OR r.relation_source='managed-delegation')
+            AND (r.status IN ('queued','starting','running','waiting_for_user',
+                'waiting_for_connection','waiting_for_memory','unknown','disconnected')
+                OR EXISTS(SELECT 1 FROM turns t WHERE t.run_id=r.id
+                    AND t.status='running' AND t.ended_ms IS NULL))",
+            [],
+            |row| row.get(0),
+        )?;
+        let held: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM shared_booking_intents
+            WHERE slot_held=1",
+            [],
+            |row| row.get(0),
+        )?;
+        let pending_auto: i64 = conn.query_row("SELECT COUNT(*) FROM auto_launch_intents i
+            JOIN auto_pool_claims c ON c.work_unit_id=i.work_unit_id
+            WHERE c.state IN ('active','uncertain')
+              AND NOT EXISTS(SELECT 1 FROM managed_work_units m WHERE m.work_unit_id=i.work_unit_id)",
+            [], |row| row.get(0))?;
+        if active.saturating_add(held).saturating_add(pending_auto) >= limit {
+            return Ok(LaunchBookingDecision::Blocked("global_agent_limit"));
+        }
+    }
+    match book_shared_account_in_tx(conn, req.account)? {
+        BookingDecision::Blocked(reason) => return Ok(LaunchBookingDecision::Blocked(reason)),
+        BookingDecision::Replayed => {
+            return Err(anyhow!(
+                "account booking cannot be promoted to a launch implicitly"
+            ))
+        }
+        BookingDecision::Booked => {}
+    }
+    conn.execute(
+        "UPDATE shared_booking_intents SET launch_hash=?2,workspace_path=?3,
+        slot_held=?4,writer_held=?5 WHERE work_unit_id=?1",
+        params![
+            req.account.id,
+            resource_hash,
+            req.workspace_path,
+            req.consume_agent_slot,
+            req.workspace_path.is_some()
+        ],
+    )?;
+    Ok(LaunchBookingDecision::Booked(
+        launch_intent(conn, req.account.id)?
+            .ok_or_else(|| anyhow!("shared launch intent was not recorded"))?,
+    ))
+}
+
 fn window_key(window: &crate::auto_quota::QuotaWindow) -> Result<String> {
     let encoded = serde_json::to_vec(&(
         &window.bucket_id,
@@ -236,6 +441,37 @@ pub fn book_shared_account_in_tx(
 }
 
 impl Store {
+    pub fn book_shared_launch(
+        &self,
+        req: &LaunchBookingRequest<'_>,
+    ) -> Result<LaunchBookingDecision> {
+        let tx = Transaction::new_unchecked(&self.conn, TransactionBehavior::Immediate)?;
+        let result = book_shared_launch_in_tx(&tx, req)?;
+        tx.commit()?;
+        Ok(result)
+    }
+
+    /// Exclusive durable permission for this launch worker to attempt effects.
+    /// Record uncertainty *before* Git/spawn/stdin, so reconnect/restart cannot
+    /// turn an unobserved outcome into a second attempt.
+    pub fn claim_shared_launch_effects(&self, id: &str) -> Result<bool> {
+        let tx = Transaction::new_unchecked(&self.conn, TransactionBehavior::Immediate)?;
+        let changed = tx.execute(
+            "UPDATE shared_booking_intents SET phase='uncertain',
+            effects_claimed_ms=?2,updated_ms=?2 WHERE work_unit_id=?1 AND phase='booked'
+            AND launch_hash IS NOT NULL AND effects_claimed_ms IS NULL",
+            params![id, crate::daemon::now()],
+        )? == 1;
+        if changed {
+            tx.execute(
+                "UPDATE auto_pool_claims SET state='uncertain'
+                WHERE work_unit_id=?1 AND state='active'",
+                [id],
+            )?;
+        }
+        tx.commit()?;
+        Ok(changed)
+    }
     pub fn book_shared_account(&self, req: &AccountBookingRequest<'_>) -> Result<BookingDecision> {
         let tx = Transaction::new_unchecked(&self.conn, TransactionBehavior::Immediate)?;
         let result = book_shared_account_in_tx(&tx, req)?;
@@ -248,7 +484,7 @@ impl Store {
     pub fn release_shared_booking_pre_effect(&self, id: &str) -> Result<bool> {
         let tx = Transaction::new_unchecked(&self.conn, TransactionBehavior::Immediate)?;
         let changed = tx.execute(
-            "UPDATE shared_booking_intents SET phase='released',updated_ms=?2
+            "UPDATE shared_booking_intents SET phase='released',updated_ms=?2,slot_held=0,writer_held=0
             WHERE work_unit_id=?1 AND phase='booked'",
             params![id, crate::daemon::now()],
         )? == 1;
@@ -545,6 +781,99 @@ mod tests {
         assert_eq!(
             store.book_shared_account(&current).unwrap(),
             BookingDecision::Booked
+        );
+    }
+
+    #[test]
+    fn launch_booking_holds_writer_slot_and_claims_effects_once() {
+        let store = Store::open(Path::new(":memory:")).unwrap();
+        for (profile, fingerprint) in [("first", "d".repeat(64)), ("second", "e".repeat(64))] {
+            store
+                .record_auto_account_identity(profile, &fingerprint)
+                .unwrap();
+        }
+        let first_event = observed(&store, "first", [90.0, 90.0]);
+        let second_event = observed(&store, "second", [90.0, 90.0]);
+        store
+            .conn
+            .execute(
+                "INSERT INTO meta(key,value) VALUES('agents.max_active','1')",
+                [],
+            )
+            .unwrap();
+        let first_account = AccountBookingRequest {
+            id: "launch/first",
+            request_hash: "first",
+            caller: "swarm",
+            route_id: "codex/sol",
+            profile_id: "first",
+            quota_profile_id: "first",
+            account_generation: 1,
+            quota_event_seq: first_event,
+            now_ms: 2000,
+            upper_draw_milli: &[4_000, 4_000],
+            allocation_remaining_milli: None,
+        };
+        let first = LaunchBookingRequest {
+            account: &first_account,
+            workspace_path: Some("/repo/shared"),
+            consume_agent_slot: true,
+            launch_hash: "first-launch",
+        };
+        let admitted = store.book_shared_launch(&first).unwrap();
+        assert!(
+            matches!(admitted, LaunchBookingDecision::Booked(ref intent) if intent.phase == "booked")
+        );
+        let second_account = AccountBookingRequest {
+            id: "launch/second",
+            request_hash: "second",
+            profile_id: "second",
+            quota_profile_id: "second",
+            quota_event_seq: second_event,
+            ..first_account
+        };
+        let competing_writer = LaunchBookingRequest {
+            account: &second_account,
+            ..first
+        };
+        assert_eq!(
+            store.book_shared_launch(&competing_writer).unwrap(),
+            LaunchBookingDecision::Blocked("workspace_writer_busy")
+        );
+        let independent_writer = LaunchBookingRequest {
+            workspace_path: Some("/repo/other"),
+            ..competing_writer
+        };
+        assert_eq!(
+            store.book_shared_launch(&independent_writer).unwrap(),
+            LaunchBookingDecision::Blocked("global_agent_limit")
+        );
+        assert!(store.claim_shared_launch_effects(first_account.id).unwrap());
+        assert!(
+            !store.claim_shared_launch_effects(first_account.id).unwrap(),
+            "only one reconnecting caller may attempt launch effects"
+        );
+        assert!(!store
+            .release_shared_booking_pre_effect(first_account.id)
+            .unwrap());
+        let replay = store.book_shared_launch(&first).unwrap();
+        assert!(
+            matches!(replay, LaunchBookingDecision::Replayed(ref intent) if intent.phase == "uncertain")
+        );
+        let changed = LaunchBookingRequest {
+            workspace_path: Some("/repo/changed"),
+            ..first
+        };
+        assert!(store.book_shared_launch(&changed).is_err());
+        let claims: i64 = store
+            .conn
+            .query_row("SELECT COUNT(*) FROM auto_pool_claims", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            claims, 1,
+            "blocked writer/slot requests cannot retain account claims"
         );
     }
 }

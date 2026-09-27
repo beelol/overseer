@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-pub const SCHEMA_VERSION: i64 = 19;
+pub const SCHEMA_VERSION: i64 = 20;
 /// Retained normalized events per run before older ones are pruned (with a marker).
 pub const EVENTS_PER_RUN: i64 = 5000;
 
@@ -369,6 +369,20 @@ impl Store {
         if !has_execution_budget {
             self.conn.execute_batch("ALTER TABLE auto_launch_intents ADD COLUMN execution_budget_ms INTEGER;")?;
         }
+        for (column, definition) in [
+            ("launch_hash", "TEXT"), ("workspace_path", "TEXT"),
+            ("slot_held", "INTEGER NOT NULL DEFAULT 0"),
+            ("writer_held", "INTEGER NOT NULL DEFAULT 0"),
+            ("effects_claimed_ms", "INTEGER"),
+        ] {
+            let present = self.conn.prepare("SELECT 1 FROM pragma_table_info('shared_booking_intents') WHERE name=?1")?
+                .exists([column])?;
+            if !present {
+                self.conn.execute_batch(&format!("ALTER TABLE shared_booking_intents ADD COLUMN {column} {definition};"))?;
+            }
+        }
+        self.conn.execute_batch("CREATE INDEX IF NOT EXISTS shared_booking_writer
+            ON shared_booking_intents(workspace_path,writer_held);")?;
         let has_measurement_effort: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('auto_measurements') WHERE name='effort'")?.exists([])?;
         if !has_measurement_effort {
             self.conn.execute_batch("ALTER TABLE auto_measurements ADD COLUMN effort TEXT;")?;
