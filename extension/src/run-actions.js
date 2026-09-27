@@ -3,7 +3,8 @@
 const vscode = require('vscode');
 
 const CONTROL = ['followUp', 'interrupt', 'permission', 'mergeBack', 'signIn', 'openPullRequest', 'cleanup', 'steer'];
-const ACTIVE = new Set(['queued', 'starting', 'running']);
+// A message typed while an agent waits for its connection is kept until the wait is over (Gate L).
+const ACTIVE = new Set(['queued', 'starting', 'running', 'waiting_for_connection', 'waiting_for_memory']);
 
 /**
  * Steering a working agent (AC-60): a message queued for when the turn ends, or "stop and send"
@@ -63,6 +64,7 @@ async function handleRunMessage({ client, model, steering }, runId, message, rep
       return true;
     }
     case 'interrupt': await client.request('run.interrupt', { run_id: runId }); return true;
+    case 'continuity': return require('./continuity').handleMessage(steering?.continuity, runId, message);
     case 'permission':
       await client.request('run.permission', { run_id: runId, request_id: String(message.request_id), allow: !!message.allow });
       model.scheduleRefresh();

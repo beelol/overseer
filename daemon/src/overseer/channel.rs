@@ -697,3 +697,30 @@ impl Daemon {
         Ok(json!({"shares": rows}))
     }
 }
+
+impl Daemon {
+    /// Continuity handed an agent off: its holds, guardrails, area, watches, conflicts, cadence,
+    /// channel setting and queued messages move to the successor, so it stays one agent to
+    /// Overseer (AC-197).
+    pub fn adopt_successor(self: &Arc<Self>, predecessor: &str, successor: &str) -> Result<()> {
+        let moved: Vec<(&str, usize)> = {
+            let store = self.store.lock().unwrap();
+            let mut moved = Vec::new();
+            for (table, column) in [("holds", "run_id"), ("guardrails", "run_id"), ("areas", "run_id"), ("cadences", "run_id"), ("channels", "run_id"), ("queued_messages", "run_id"), ("share_denials", "run_id"), ("watches", "subject"), ("watches", "watcher"), ("conflicts", "run_a"), ("conflicts", "run_b"), ("dispatches", "run_id")] {
+                // Keys that would collide keep the successor's own row.
+                let n = store.conn.execute(&format!("UPDATE OR IGNORE {table} SET {column}=?2 WHERE {column}=?1"), rusqlite::params![predecessor, successor])?;
+                if n > 0 {
+                    moved.push((table, n));
+                }
+            }
+            moved
+        };
+        if moved.is_empty() {
+            return Ok(());
+        }
+        let run = self.run(successor)?;
+        self.emit(Some(&run.task_id), Some(successor), "oversight_moved", "daemon", "exact", json!({"from": predecessor, "moved": moved.iter().map(|(t, n)| json!({"table": t, "rows": n})).collect::<Vec<_>>()}))?;
+        self.conflicts_touch(successor);
+        Ok(())
+    }
+}

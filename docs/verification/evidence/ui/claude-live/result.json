@@ -11,20 +11,20 @@
     },
     {
       "name": "turn 1 reaches a permission request (not auto-approved)",
-      "ok": false,
+      "ok": true,
       "detail": {
-        "status": "running",
-        "attention": null,
+        "status": "waiting_for_user",
+        "attention": "Write",
         "reason": null
       }
     },
     {
       "name": "turn 1 completed",
-      "ok": false,
+      "ok": true,
       "detail": {
-        "status": "running",
-        "reason": null,
-        "native": "604bb7f5-1a86-4ce0-986a-4356aa185c2b"
+        "status": "completed",
+        "reason": "turn completed; exit 0",
+        "native": "a76b6798-61d5-4262-b2b5-1c7edc8cf4ea"
       }
     },
     {
@@ -32,27 +32,27 @@
       "ok": true,
       "detail": [
         {
-          "id": "r-2e516f1269f1",
+          "id": "r-10d000c42df3",
           "parent": null,
-          "native": "604bb7f5-1a86-4ce0-986a-4356aa185c2b",
-          "status": "running",
+          "native": "a76b6798-61d5-4262-b2b5-1c7edc8cf4ea",
+          "status": "completed",
           "title": "Use the Agent tool to launch one general-purpose subagent wi",
           "confidence": null
         },
         {
-          "id": "r-4f0f79e33386",
-          "parent": "r-2e516f1269f1",
-          "native": "toolu_019j593tRvzGhdRLxqZdcUNh",
+          "id": "r-472ccbc95589",
+          "parent": "r-10d000c42df3",
+          "native": "toolu_01XiUX36CDcB8jLGsjqkPH8J",
           "status": "completed",
-          "title": "Launch nested subagent",
+          "title": "Launch subagent",
           "confidence": "exact (structured harness event)"
         },
         {
-          "id": "r-5306aa74aa61",
-          "parent": "r-4f0f79e33386",
-          "native": "toolu_01WTnVLrExFzYCm7Epd5oHTS",
+          "id": "r-022da510ac3a",
+          "parent": "r-472ccbc95589",
+          "native": "toolu_01XR6QeaT7pUCsqBaUDYr17m",
           "status": "completed",
-          "title": "Launch subagent to output hi",
+          "title": "reply with hi",
           "confidence": "exact (structured harness event)"
         }
       ]
@@ -62,77 +62,88 @@
       "ok": true,
       "detail": [
         {
-          "title": "Launch subagent to output hi",
+          "title": "reply with hi",
           "status": "completed"
         }
       ]
     },
     {
       "name": "allowed Write landed in the worktree",
-      "ok": false,
-      "detail": false
+      "ok": true,
+      "detail": "Hello from Claude via Overseer"
     },
     {
       "name": "follow-up turn completed",
-      "ok": false,
+      "ok": true,
       "detail": {
-        "status": "running",
-        "reason": null
+        "status": "completed",
+        "reason": "turn completed; exit 0"
       }
     },
     {
       "name": "latest-run comparison shows only turn-2 changes",
-      "ok": false,
-      "detail": []
+      "ok": true,
+      "detail": [
+        {
+          "path": "hello.md",
+          "status": "M"
+        }
+      ]
     },
     {
       "name": "interrupt from UI stops the Claude run",
       "ok": true,
       "detail": {
         "status": "interrupted",
-        "reason": "interrupted by user (exit code 0)"
+        "reason": "interrupted by user (exit code 1)"
       }
     }
   ],
   "model": "haiku",
   "sharedDaemon": false,
+  "perm1": "Allow Create hello.md?Allow onceDeny",
   "tree": [
     {
-      "id": "r-2e516f1269f1",
+      "id": "r-10d000c42df3",
       "parent": null,
-      "native": "604bb7f5-1a86-4ce0-986a-4356aa185c2b",
-      "status": "running",
+      "native": "a76b6798-61d5-4262-b2b5-1c7edc8cf4ea",
+      "status": "completed",
       "title": "Use the Agent tool to launch one general-purpose subagent wi",
       "confidence": null
     },
     {
-      "id": "r-4f0f79e33386",
-      "parent": "r-2e516f1269f1",
-      "native": "toolu_019j593tRvzGhdRLxqZdcUNh",
+      "id": "r-472ccbc95589",
+      "parent": "r-10d000c42df3",
+      "native": "toolu_01XiUX36CDcB8jLGsjqkPH8J",
       "status": "completed",
-      "title": "Launch nested subagent",
+      "title": "Launch subagent",
       "confidence": "exact (structured harness event)"
     },
     {
-      "id": "r-5306aa74aa61",
-      "parent": "r-4f0f79e33386",
-      "native": "toolu_01WTnVLrExFzYCm7Epd5oHTS",
+      "id": "r-022da510ac3a",
+      "parent": "r-472ccbc95589",
+      "native": "toolu_01XR6QeaT7pUCsqBaUDYr17m",
       "status": "completed",
-      "title": "Launch subagent to output hi",
+      "title": "reply with hi",
       "confidence": "exact (structured harness event)"
     }
   ],
-  "turn3Seq": 25,
+  "turn3Seq": 56,
   "turns": [
     {
       "n": 1,
-      "status": "interrupted",
-      "snapshot": "s-4c1f7ceeff83"
+      "status": "completed",
+      "snapshot": "s-14652f3d463e"
     },
     {
       "n": 2,
-      "status": "running",
-      "snapshot": "s-87db018861f5"
+      "status": "completed",
+      "snapshot": "s-979b5c3c8b69"
+    },
+    {
+      "n": 3,
+      "status": "interrupted",
+      "snapshot": "s-967374af4163"
     }
   ],
   "usage": [
@@ -148,7 +159,103 @@
           "unifiedWindows": {
             "five_hour": {
               "resetsAt": 1790536200,
-              "utilization": 0.03
+              "utilization": 0.08
+            },
+            "seven_day": {
+              "resetsAt": 1790884800,
+              "utilization": 0.01
+            }
+          }
+        }
+      }
+    },
+    {
+      "num_turns": 2,
+      "total_cost_usd": 0.0254779,
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 9167,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 9167,
+        "cache_read_input_tokens": 35989,
+        "inference_geo": "not_available",
+        "input_tokens": 20,
+        "iterations": [
+          {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 704,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "cache_creation_input_tokens": 704,
+            "cache_read_input_tokens": 22226,
+            "input_tokens": 10,
+            "output_tokens": 169,
+            "type": "message"
+          }
+        ],
+        "output_tokens": 496,
+        "output_tokens_details": {
+          "thinking_tokens": 328
+        },
+        "server_tool_use": {
+          "web_fetch_requests": 0,
+          "web_search_requests": 0
+        },
+        "service_tier": "standard",
+        "speed": "standard"
+      }
+    },
+    {
+      "num_turns": 2,
+      "total_cost_usd": 0.05973285,
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 981,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 981,
+        "cache_read_input_tokens": 46489,
+        "inference_geo": "not_available",
+        "input_tokens": 18,
+        "iterations": [
+          {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 352,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "cache_creation_input_tokens": 352,
+            "cache_read_input_tokens": 23559,
+            "input_tokens": 8,
+            "output_tokens": 34,
+            "type": "message"
+          }
+        ],
+        "output_tokens": 261,
+        "output_tokens_details": {
+          "thinking_tokens": 121
+        },
+        "server_tool_use": {
+          "web_fetch_requests": 0,
+          "web_search_requests": 0
+        },
+        "service_tier": "standard",
+        "speed": "standard"
+      }
+    },
+    {
+      "rate_limits": {
+        "claude_rate_limit": {
+          "isUsingOverage": false,
+          "overageDisabledReason": "org_level_disabled",
+          "overageStatus": "rejected",
+          "rateLimitType": "five_hour",
+          "resetsAt": 1790536200,
+          "status": "allowed",
+          "unifiedWindows": {
+            "five_hour": {
+              "resetsAt": 1790536200,
+              "utilization": 0.08
             },
             "seven_day": {
               "resetsAt": 1790884800,
@@ -170,7 +277,7 @@
           "unifiedWindows": {
             "five_hour": {
               "resetsAt": 1790536200,
-              "utilization": 0.04
+              "utilization": 0.09
             },
             "seven_day": {
               "resetsAt": 1790884800,
@@ -182,32 +289,91 @@
     },
     {
       "num_turns": 2,
-      "total_cost_usd": 0.0561311,
+      "total_cost_usd": 0.0269829,
       "usage": {
         "cache_creation": {
-          "ephemeral_1h_input_tokens": 8988,
+          "ephemeral_1h_input_tokens": 10721,
           "ephemeral_5m_input_tokens": 0
         },
-        "cache_creation_input_tokens": 8988,
-        "cache_read_input_tokens": 35987,
+        "cache_creation_input_tokens": 10721,
+        "cache_read_input_tokens": 37779,
         "inference_geo": "not_available",
-        "input_tokens": 20,
+        "input_tokens": 18,
         "iterations": [
           {
             "cache_creation": {
-              "ephemeral_1h_input_tokens": 527,
+              "ephemeral_1h_input_tokens": 468,
               "ephemeral_5m_input_tokens": 0
             },
-            "cache_creation_input_tokens": 527,
-            "cache_read_input_tokens": 22224,
-            "input_tokens": 10,
-            "output_tokens": 978,
+            "cache_creation_input_tokens": 468,
+            "cache_read_input_tokens": 24016,
+            "input_tokens": 8,
+            "output_tokens": 27,
             "type": "message"
           }
         ],
-        "output_tokens": 1343,
+        "output_tokens": 349,
         "output_tokens_details": {
-          "thinking_tokens": 1119
+          "thinking_tokens": 175
+        },
+        "server_tool_use": {
+          "web_fetch_requests": 0,
+          "web_search_requests": 0
+        },
+        "service_tier": "standard",
+        "speed": "standard"
+      }
+    },
+    {
+      "rate_limits": {
+        "claude_rate_limit": {
+          "isUsingOverage": false,
+          "overageDisabledReason": "org_level_disabled",
+          "overageStatus": "rejected",
+          "rateLimitType": "five_hour",
+          "resetsAt": 1790536200,
+          "status": "allowed",
+          "unifiedWindows": {
+            "five_hour": {
+              "resetsAt": 1790536200,
+              "utilization": 0.09
+            },
+            "seven_day": {
+              "resetsAt": 1790884800,
+              "utilization": 0.01
+            }
+          }
+        }
+      }
+    },
+    {
+      "num_turns": 3,
+      "total_cost_usd": 0.0040014,
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 124,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 124,
+        "cache_read_input_tokens": 24484,
+        "inference_geo": "not_available",
+        "input_tokens": 10,
+        "iterations": [
+          {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 124,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "cache_creation_input_tokens": 124,
+            "cache_read_input_tokens": 24484,
+            "input_tokens": 10,
+            "output_tokens": 259,
+            "type": "message"
+          }
+        ],
+        "output_tokens": 259,
+        "output_tokens_details": {
+          "thinking_tokens": 135
         },
         "server_tool_use": {
           "web_fetch_requests": 0,
@@ -218,6 +384,6 @@
       }
     }
   ],
-  "run": "r-2e516f1269f1",
-  "workspace": "/private/tmp/ovs-ui-G2K51L/overseer-home/worktrees/claude-demo-55407b30/use-the-agent-tool-to-launch-one-general"
+  "run": "r-10d000c42df3",
+  "workspace": "/private/tmp/ovs-ui-0fNc1J/overseer-home/worktrees/claude-demo-68f0b400/use-the-agent-tool-to-launch-one-general"
 }

@@ -60,12 +60,16 @@
       setChip(modelChip, 'sparkle', form.model || 'Default model', form.model ? `Model: ${form.model}` : 'The harness default model');
       setChip(modeChip, form.mode === 'current' ? 'repo' : 'git-branch', form.mode === 'current' ? 'Current checkout' : 'New worktree', form.mode === 'current' ? 'Works directly in your checkout' : `A new branch and worktree${form.ref ? ' from ' + form.ref : ''}; your checkout is untouched`);
       generic.hidden = form.harness !== 'generic';
+      // Continuity (Gate L): a local agent's chips, and the offline line above the field.
+      if (window.OverseerContinuity) window.OverseerContinuity.chips({ data, form, agentChip, modelChip, setChip });
       tools.refresh();
       task.placeholder = form.harness === 'generic' ? 'Optional first line for the program' : 'Send off a task';
       validate();
     }
     function problem() {
       if (!data) return {};
+      const continuity = window.OverseerContinuity && window.OverseerContinuity.problem({ data, form, save, task: task.value });
+      if (continuity) return continuity;
       if (!data.trusted) return { text: 'Trust this workspace to start agents.', fix: 'Trust', command: 'workbench.trust.manage' };
       if (!form.repo) return { text: 'Choose a repository.', fix: 'Choose…', action: () => post({ type: 'composerBrowse' }) };
       const hx = harness();
@@ -112,9 +116,11 @@
         for (const a of accts) items.push({ label: a.name, logo: ui.harnessMark(hx.harness, 14), hint: a.signedIn ? (ui.usageText(a.usage) || a.plan || '') : 'signed out', checked: form.harness === hx.harness && form.account === a.id,
           title: `${a.name}: ${a.signedIn ? 'signed in' : 'not signed in'}${a.kind === 'follows-app' ? ' · follows the desktop app' : ''}`, run: () => { form.harness = hx.harness; form.account = a.id; if (!MODELS[hx.harness]?.includes(form.model)) form.model = ''; save(); } });
       }
+      if (window.OverseerContinuity) window.OverseerContinuity.agentMenu(items, { data, form, save });
       ui.menu(agentChip, items, { label: 'Agent' });
     }
     function menuModel() {
+      if (window.OverseerContinuity && window.OverseerContinuity.modelMenu(modelChip, { data, form, save })) return;
       const models = MODELS[form.harness] || [];
       ui.menu(modelChip, [{ label: 'Default model', icon: 'sparkle', checked: !form.model, run: () => { form.model = ''; save(); } }, ...models.map(m => ({ label: m, icon: 'sparkle', checked: form.model === m, run: () => { form.model = m; save(); } })),
         'sep', { label: 'Other model…', icon: 'edit', run: () => post({ type: 'composerModel', harness: form.harness, current: form.model }) }], { label: 'Model' });
@@ -172,6 +178,7 @@
         const compatible = d.accounts.filter(a => (a.harnesses || []).includes(form.harness));
         if (!compatible.some(a => a.id === form.account)) form.account = (compatible.find(a => a.signedIn) || compatible[0] || {}).id;
         if (d.branches) data.branches = d.branches;
+        if (window.OverseerContinuity) window.OverseerContinuity.defaults({ data: d, form });
         render(); grow();
       },
       notice(m) {

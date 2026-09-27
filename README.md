@@ -21,7 +21,10 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 - Work an hour using only Overseer [AC-64].
 - Pick the animation for the mark in Voice Mode on the [preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr): one, or a mix [AC-177].
 - Answer the nine questions at the end of the [Voice Mode RFC](docs/rfcs/voice-mode.md#open-questions-for-the-owner); its defaults stand until then [Gate R, AC-162 to AC-177].
-- Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed sessions of Continuity and the phone app when their agents finish [AC-97, AC-133].
+- Turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-83].
+- Work a short session offline: `node test/local/owner-session.js start` opens an isolated VS Code and prints the steps; `node test/local/owner-session.js report` records it [AC-97].
+- Run *Overseer: Test Notification* in VS Code, allow notifications when macOS asks, and screenshot the banner and the helper (Overseer Notifier) in Finder [AC-179].
+- Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed session of the phone app when its agent finishes [AC-133].
 
 ## Acceptance criteria
 

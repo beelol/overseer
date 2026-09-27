@@ -31,6 +31,10 @@ impl Daemon {
                 env.push((key.to_string(), "/nonexistent/harness-disabled-in-tests".to_string()));
             }
         }
+        // Nor the network: Continuity's probes stay off unless a test brings its own network fixture.
+        if !env.iter().any(|(k, _)| k == "OVERSEER_TEST_NET" || k == "OVERSEER_CONTINUITY_PROBES") {
+            env.push(("OVERSEER_CONTINUITY_PROBES".to_string(), "off".to_string()));
+        }
         let mut d = Daemon { home, child: None, env };
         d.spawn();
         d

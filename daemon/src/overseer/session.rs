@@ -329,7 +329,7 @@ impl Daemon {
             self.ensure_overseer_run(session, harness, model, &prompt)?
         } else {
             let run_id = session["run_id"].as_str().unwrap().to_string();
-            self.start_turn(&run_id, &prompt, true, &TurnOpts { model: model.filter(|m| !m.is_empty()).map(str::to_string), effort: None, mode: None, images: Vec::new() })?;
+            self.start_turn(&run_id, &prompt, true, &TurnOpts { model: model.filter(|m| !m.is_empty()).map(str::to_string), effort: None, mode: None, images: Vec::new(), ..Default::default() })?;
             run_id
         };
         let cursor = self.store.lock().unwrap().max_seq()?;
@@ -352,7 +352,7 @@ impl Daemon {
             self.ensure_overseer_run(session, harness, model, &prompt)?
         } else {
             let run_id = session["run_id"].as_str().unwrap().to_string();
-            let opts = TurnOpts { model: model.filter(|m| !m.is_empty()).map(str::to_string), effort: None, mode: None, images: Vec::new() };
+            let opts = TurnOpts { model: model.filter(|m| !m.is_empty()).map(str::to_string), effort: None, mode: None, images: Vec::new(), ..Default::default() };
             self.start_turn(&run_id, &prompt, true, &opts)?;
             run_id
         };
@@ -831,7 +831,7 @@ impl Daemon {
         let held = self.hold_of(run_id).is_some();
         let idle = !held && (!ACTIVE.contains(&run.status.as_str()) || crate::adapters::follow_up_via_stdin(&run.harness, text).is_some());
         if idle {
-            let turn = self.start_turn(run_id, &prompt, true, &TurnOpts { model: None, effort: None, mode: None, images: Vec::new() })?;
+            let turn = self.start_turn(run_id, &prompt, true, &TurnOpts { model: None, effort: None, mode: None, images: Vec::new(), ..Default::default() })?;
             self.store.lock().unwrap().conn.execute("INSERT OR REPLACE INTO turn_sources(turn_id, source, detail) VALUES(?1, ?2, ?3)", rusqlite::params![turn.id, source, detail.to_string()])?;
             return Ok("sent".into());
         }
@@ -858,7 +858,7 @@ impl Daemon {
             return Ok(());
         }
         let text = pending.iter().map(|(_, _, t, _)| t.clone()).collect::<Vec<_>>().join("\n\n");
-        let turn = self.start_turn(run_id, &text, true, &TurnOpts { model: None, effort: None, mode: None, images: Vec::new() })?;
+        let turn = self.start_turn(run_id, &text, true, &TurnOpts { model: None, effort: None, mode: None, images: Vec::new(), ..Default::default() })?;
         let store = self.store.lock().unwrap();
         let source = pending[0].1.clone();
         store.conn.execute("INSERT OR REPLACE INTO turn_sources(turn_id, source, detail) VALUES(?1, ?2, ?3)", rusqlite::params![turn.id, source, pending[0].3])?;
@@ -1014,6 +1014,8 @@ pub fn start(daemon: Arc<Daemon>) {
                         ("guardrail_crossed", _) => d.free_check_tripped(&run, "wrote across a guardrail")?,
                         ("conflict", _) if payload["needs_decision"] == true && payload["changed"] != true => d.free_check_tripped(&run, "collides with another agent")?,
                         ("conflict_closed", _) => d.release_due_holds("conflict_closed", Some(&run), &payload)?,
+                        // Continuity: the successor of a handed-off agent is the same agent to Overseer.
+                        ("handoff", _) if payload["successor"].as_str() == Some(run.as_str()) => d.adopt_successor(payload["predecessor"].as_str().unwrap_or(""), &run)?,
                         _ => {}
                     }
                     Ok(())

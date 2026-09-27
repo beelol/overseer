@@ -330,7 +330,7 @@ impl Daemon {
             self.interrupt(run_id)?;
             return Ok(json!({"run_id": run_id, "snapshot": snap.id, "delivery": if waits { "queued until the turn ends" } else { "stopping, then the direction" }}));
         }
-        let turn = self.start_turn(run_id, &prompt, true, &TurnOpts { model: None, effort: None, mode: None, images: Vec::new() })?;
+        let turn = self.start_turn(run_id, &prompt, true, &TurnOpts { model: None, effort: None, mode: None, images: Vec::new(), ..Default::default() })?;
         self.store.lock().unwrap().conn.execute("INSERT OR REPLACE INTO turn_sources(turn_id, source, detail) VALUES(?1, ?2, ?3)", rusqlite::params![turn.id, source, detail.to_string()])?;
         Ok(json!({"run_id": run_id, "snapshot": snap.id, "delivery": "sent", "turn": turn.id}))
     }
