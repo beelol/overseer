@@ -8,7 +8,10 @@
   const ui = window.OverseerUI;
   const el = ui.el;
   const SPAWN_TOOLS = /^(Agent|Task|task|collab:spawn_agent|spawn_agent)$/;
-  const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage']);
+  // `push` is the daemon's record of what it told the phones: it stays in the event log.
+  const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'push']);
+  // What was done from a phone, in the owner's words (the event names the phone as its source).
+  const FROM_PHONE = { 'run.follow_up': 'Message', 'run.permission': 'Answered', 'run.interrupt': 'Stopped', 'task.create': 'Started' };
 
   function parseInput(v) {
     if (v && typeof v === 'object') return v;
@@ -385,6 +388,12 @@
           break;
         }
         case 'retention': this.truncated('Older history was trimmed. Raw output keeps everything.'); break;
+        case 'remote_command': {
+          const who = String(ev.source || '').replace(/^phone:/, '').trim() || 'a phone';
+          const what = FROM_PHONE[p.method];
+          this.container(ev).append(el('div', 'sys', what ? `${what} from ${who}` : `From ${who}`));
+          break;
+        }
         // Lines the parser does not understand stay in the event log and raw output, not the chat.
         case 'raw_unparsed': break;
         default: break;
@@ -458,7 +467,7 @@
       card.el.replaceChildren(...kids);
     }
   }
-  Conversation.KNOWN = new Set(['turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed']);
+  Conversation.KNOWN = new Set(['turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'remote_command']);
   Conversation.describe = describe;
 
   window.OverseerConversation = Conversation;

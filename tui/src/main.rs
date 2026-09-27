@@ -39,6 +39,7 @@ KEYS:
     X               stop all agents and the daemon (r starts it again)
     v               changes (files, diffs)     M     merge back (asks each step)
     /               search agents              A     accounts and sign-in
+    O               phone access on / off      D     devices: pair a phone, revoke, scope
     e               in zoom: expand tool calls
     f               filter all/active/needs you ?     all keys
     q               quit (agents keep running)

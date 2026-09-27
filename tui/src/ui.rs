@@ -2,7 +2,8 @@
 //! form. Terminal default colors for text (works on dark and light terminals) plus a purple
 //! accent and status colors; truecolor when the terminal says so, 256 colors otherwise.
 
-use crate::app::{shape, short, App, Confirm, Mode, NewAgentForm, PAGE};
+use crate::app::{code_groups, shape, short, App, Confirm, Mode, NewAgentForm, PairingState, PAGE};
+use crate::qr;
 use crate::feed::{compact, Feed, Item, Kind, ToolStatus};
 use crate::model::Run;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
@@ -97,14 +98,23 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             Confirm::Interrupt(id) => format!(" Interrupt {}? y / n", short(&app.state.run(id).map(|r| r.title.clone()).unwrap_or_default(), 50)),
             Confirm::Quit => " Unsent drafts will be lost. Quit? y / n".to_string(),
             Confirm::MergePrepare { text, .. } | Confirm::MergeComplete { text, .. } | Confirm::Cleanup { text, .. } | Confirm::StopAll { text } | Confirm::OpenPr { text, .. } => format!(" {text} y / n"),
+            Confirm::PhoneOff { text } | Confirm::Revoke { text, .. } | Confirm::Pair { text, .. } => format!(" {text} y / n"),
+            Confirm::PhoneOnAndPair => " Phone access is off. Turn it on and pair a phone? y / n".to_string(),
         };
         f.render_widget(Paragraph::new(Line::from(Span::styled(text, Style::new().fg(waiting()).add_modifier(Modifier::BOLD)))).wrap(Wrap { trim: false }), comp);
     }
     footer(f, app, foot);
-    match app.mode {
+    // A phone question keeps its panel in view above it.
+    let shown = match (&app.mode, &app.confirm_back) {
+        (Mode::Confirm(Confirm::PhoneOff { .. } | Confirm::PhoneOnAndPair | Confirm::Revoke { .. } | Confirm::Pair { .. }), Some(back)) => back.clone(),
+        (mode, _) => mode.clone(),
+    };
+    match shown {
         Mode::Help => help(f, area),
         Mode::NewAgent => new_agent(f, &app.form, area),
         Mode::Accounts => accounts(f, app, area),
+        Mode::Devices => devices(f, app, Rect { y: head.y, height: head.height + body.height, ..area }),
+        Mode::Pairing => pairing(f, app, Rect { y: head.y, height: head.height + body.height, ..area }),
         _ => {}
     }
 }
@@ -141,15 +151,25 @@ fn header(f: &mut Frame, app: &App, area: Rect) {
         spans.push(Span::styled(format!("filter: {}", app.filter.label()), Style::new().fg(accent())));
     }
     let left = Line::from(spans);
-    let right = if app.connected {
-        Line::from(Span::styled("● connected ", Style::new().fg(Color::Green)))
+    let mut right = Vec::new();
+    // Phone access, at a glance: the long form when it fits beside the counts, else the short one.
+    if let Some((long, brief, on)) = app.phone.line().filter(|_| app.connected) {
+        let room = (area.width as usize).saturating_sub(left.width() + "● connected ".width() + 4);
+        let text = if long.width() <= room { Some(long) } else if brief.width() <= room { Some(brief) } else { None };
+        if let Some(text) = text {
+            right.push(Span::styled(text, if on { Style::new().fg(accent()) } else { Style::new().fg(MUTED) }));
+            right.push(Span::styled(" · ", dot));
+        }
+    }
+    right.push(if app.connected {
+        Span::styled("● connected ", Style::new().fg(Color::Green))
     } else if app.stopped {
-        Line::from(Span::styled("○ stopped · r starts ", Style::new().fg(MUTED)))
+        Span::styled("○ stopped · r starts ", Style::new().fg(MUTED))
     } else {
-        Line::from(Span::styled("○ reconnecting ", Style::new().fg(Color::Red)))
-    };
+        Span::styled("○ reconnecting ", Style::new().fg(Color::Red))
+    });
     f.render_widget(Paragraph::new(left), area);
-    f.render_widget(Paragraph::new(right).alignment(Alignment::Right), area);
+    f.render_widget(Paragraph::new(Line::from(right)).alignment(Alignment::Right), area);
 }
 
 fn footer(f: &mut Frame, app: &App, area: Rect) {
@@ -163,6 +183,9 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("g/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
         Mode::Accounts => &[("j/k", "select"), ("s", "sign in"), ("S", "device code (ChatGPT)"), ("r", "refresh"), ("esc", "close")],
+        Mode::Devices => &[("p", "pair a phone"), ("j/k", "select"), ("s", "scope"), ("x", "revoke"), ("N", "notifications"), ("O", "on/off"), ("esc", "close")],
+        Mode::Pairing if app.pairing.as_ref().is_some_and(|p| p.live()) => &[("esc", "cancel pairing")],
+        Mode::Pairing => &[("p", "new code"), ("esc", "close")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
         Mode::Changes => &[("j/k", "file"), ("J/K", "scroll diff"), ("c", "comparison"), ("r", "refresh"), ("v/esc", "back")],
         _ if area.width < 110 => &[("i", "message"), ("z", "zoom"), ("a/d", "answer"), ("n", "new"), ("?", "keys"), ("q", "quit")],
@@ -428,6 +451,8 @@ fn help(f: &mut Frame, area: Rect) {
         ("f", "filter: all → active → needs you"),
         ("/", "search agents (esc clears)"),
         ("A", "accounts and sign-in"),
+        ("O", "phone access on / off"),
+        ("D", "devices: pair a phone, revoke, scope"),
         ("r", "reload (after X: start the daemon)"),
         ("X", "stop all agents and the daemon"),
         ("q", "quit (agents keep running)"),
@@ -488,6 +513,172 @@ fn accounts(f: &mut Frame, app: &App, area: Rect) {
         .title_bottom(Line::from(Span::styled(" account login only · never API keys · s signs in · esc closes ", Style::new().fg(MUTED))).right_aligned());
     f.render_widget(Clear, r);
     f.render_widget(Paragraph::new(lines).block(block), r);
+}
+
+/// The colours of a drawn QR code: black on white whatever the terminal's own colours are
+/// (fixed entries of the 256-colour cube), because a phone reads dark on light best.
+pub const QR_INK: Color = Color::Indexed(16);
+pub const QR_PAPER: Color = Color::Indexed(231);
+
+/// Devices panel: paired phones with where they are and what they may do.
+fn devices(f: &mut Frame, app: &App, area: Rect) {
+    let p = &app.phone;
+    let w = 100.min(area.width.saturating_sub(4));
+    let h = (p.devices.len() as u16 + 7).clamp(9, area.height.saturating_sub(2).max(9)).min(area.height);
+    let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
+    let muted = Style::new().fg(MUTED);
+    let mut summary = vec![Span::raw("  ")];
+    summary.push(if p.enabled { Span::styled("phone access on", Style::new().fg(accent()).add_modifier(Modifier::BOLD)) } else { Span::styled("phone access off", muted.add_modifier(Modifier::BOLD)) });
+    if let Some(port) = p.port.filter(|_| p.enabled) {
+        summary.push(Span::styled(format!(" · port {port}"), muted));
+    }
+    summary.push(Span::styled(if p.notifications { " · notifications on" } else { " · notifications off" }, muted));
+    if p.awake {
+        summary.push(Span::styled(" · keeping this Mac awake", muted));
+    }
+    let mut lines = vec![Line::raw(""), Line::from(summary), Line::raw("")];
+    let now = now_ms();
+    let inner = w.saturating_sub(2) as usize;
+    // Name, phone, presence, scope, address: the name takes what the others leave.
+    let name_w = inner.saturating_sub(4 + 10 + 22 + 14 + 16).clamp(12, 34);
+    for (i, d) in p.devices.iter().enumerate() {
+        let sel = i == p.sel;
+        let presence = d.presence(now);
+        lines.push(Line::from(vec![
+            Span::styled(if sel { "  › " } else { "    " }, Style::new().fg(accent())),
+            Span::styled(format!("{:<name_w$}", fit(&d.name, name_w.saturating_sub(1))), if sel { Style::new().fg(accent()).add_modifier(Modifier::BOLD) } else { Style::new() }),
+            Span::styled(format!("{:<10}", d.platform_name()), muted),
+            Span::styled(if d.connected { "● " } else { "○ " }, if d.connected { Style::new().fg(Color::Green) } else { muted }),
+            Span::styled(format!("{:<20}", fit(&presence, 19)), if d.connected { Style::new() } else { muted }),
+            Span::styled(format!("{:<14}", d.scope_name()), if d.scope == "watch" { Style::new().fg(waiting()) } else { Style::new() }),
+            Span::styled(fit(d.address.as_deref().unwrap_or(""), 15), muted),
+        ]));
+    }
+    if p.devices.is_empty() {
+        lines.push(Line::from(Span::styled("  No phone is paired. Press p to pair one.", muted)));
+    }
+    if !p.waiting.is_empty() {
+        lines.push(Line::raw(""));
+        lines.push(Line::from(Span::styled(format!("  ◆ \"{}\" asks to pair", short(&p.waiting[0].name, 40)), Style::new().fg(waiting()).add_modifier(Modifier::BOLD))));
+    }
+    let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent()))
+        .title(Span::styled(" devices ", Style::new().add_modifier(Modifier::BOLD)))
+        .title_bottom(Line::from(Span::styled(" switched on this Mac only · p pairs a phone · esc closes ", muted)).right_aligned());
+    f.render_widget(Clear, r);
+    f.render_widget(Paragraph::new(lines).block(block), r);
+}
+
+/// The QR code that fits `cols` by `lines`: level M with a full quiet zone when there is room,
+/// then a narrower quiet zone, then level L (a smaller code).
+fn fitting_qr(code: &str, cols: usize, lines: usize) -> Option<(qr::Qr, usize)> {
+    for (level, quiet) in [(qr::Level::M, 4), (qr::Level::M, 2), (qr::Level::L, 4), (qr::Level::L, 2)] {
+        let Some(size) = qr::size_for(code.len(), level) else { continue };
+        let (w, h) = qr::drawn_size(size, quiet);
+        if w <= cols && h <= lines {
+            return qr::encode(code.as_bytes(), level).map(|q| (q, quiet));
+        }
+    }
+    None
+}
+
+/// Words wrapped to `width` columns.
+fn wrap_words(words: &[String], width: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for word in words {
+        match out.last_mut() {
+            Some(line) if line.width() + 1 + word.width() <= width => {
+                line.push(' ');
+                line.push_str(word);
+            }
+            _ => out.push(word.clone()),
+        }
+    }
+    out
+}
+
+/// Pair a phone: the code as a QR code and as text, the time it still works, and what to do.
+fn pairing(f: &mut Frame, app: &App, area: Rect) {
+    let Some(p) = &app.pairing else { return };
+    let muted = Style::new().fg(MUTED);
+    let bold = Style::new().add_modifier(Modifier::BOLD);
+    let w = 116.min(area.width.saturating_sub(2));
+    let inner_w = w.saturating_sub(4) as usize;
+    let max_h = area.height.saturating_sub(1).max(8);
+    let inner_h = max_h.saturating_sub(2) as usize;
+    let open = p.state == PairingState::Open;
+    let text_w = inner_w.min(46);
+
+    // The words beside (or under) the code.
+    let mut words: Vec<Line> = vec![Line::from(Span::styled(format!("With {}", short(&p.mac, 40)), muted)), Line::raw("")];
+    match &p.state {
+        PairingState::Open => {
+            for (n, step) in ["Open Overseer on your phone.", "Scan this code, or type it.", "Confirm the phone here, on this Mac."].iter().enumerate() {
+                words.push(Line::from(vec![Span::styled(format!("{} ", n + 1), Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::raw(*step)]));
+            }
+            words.push(Line::raw(""));
+            words.push(Line::from(Span::styled(format!("Works once, for {} more.", p.left(std::time::Instant::now())), Style::new().fg(accent()))));
+            words.push(Line::raw(""));
+            words.push(Line::from(Span::styled("Code to type", muted)));
+            for line in wrap_words(&code_groups(&p.code), text_w) {
+                words.push(Line::from(Span::styled(line, bold)));
+            }
+        }
+        PairingState::Waiting(name) => {
+            words.push(Line::from(Span::styled(format!("\"{}\" is asking to pair.", short(name, 40)), Style::new().fg(waiting()).add_modifier(Modifier::BOLD))));
+            words.push(Line::from(Span::styled("Answer below: y pairs it, n does not.", muted)));
+        }
+        PairingState::Paired(name) => {
+            words.push(Line::from(Span::styled(format!("Paired with \"{}\".", short(name, 40)), Style::new().fg(Color::Green).add_modifier(Modifier::BOLD))));
+            words.push(Line::from(Span::styled("p pairs another phone · esc closes", muted)));
+        }
+        PairingState::Over(text) => {
+            for line in wrap_words(&text.split(' ').map(str::to_string).collect::<Vec<_>>(), text_w) {
+                words.push(Line::from(Span::styled(line, bold)));
+            }
+            words.push(Line::from(Span::styled("p makes a new code · esc closes", muted)));
+        }
+    }
+
+    // Side by side when the window is wide enough for the code and the words; else stacked.
+    let beside = if open { fitting_qr(&p.code, inner_w.saturating_sub(text_w + 3), inner_h.saturating_sub(1)) } else { None };
+    let under = if open && beside.is_none() { fitting_qr(&p.code, inner_w, inner_h.saturating_sub(words.len() + 2)) } else { None };
+    let (code, stacked) = match (beside, under) {
+        (Some(c), _) => (Some(c), false),
+        (None, Some(c)) => (Some(c), true),
+        _ => (None, true),
+    };
+    if open && code.is_none() {
+        words.push(Line::raw(""));
+        words.push(Line::from(Span::styled("Make this window larger to see the QR code.", muted)));
+    }
+    let drawn: Vec<String> = code.as_ref().map(|(q, quiet)| q.half_blocks(*quiet)).unwrap_or_default();
+    let code_w = drawn.first().map(|l| l.chars().count()).unwrap_or(0);
+    let content_h = if stacked { drawn.len() + usize::from(!drawn.is_empty()) + words.len() } else { drawn.len().max(words.len()) };
+    let content_w = if stacked { code_w.max(text_w) } else { code_w + 3 + text_w };
+    let h = ((content_h + 3) as u16).min(max_h);
+    let w = ((content_w + 4) as u16).clamp(40.min(w), w);
+    let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
+    let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent()))
+        .title(Span::styled(" pair a phone ", bold))
+        .title_bottom(Line::from(Span::styled(if p.live() { " esc cancels pairing " } else { " p new code · esc closes " }, muted)).right_aligned());
+    let inner = block.inner(r);
+    f.render_widget(Clear, r);
+    f.render_widget(block, r);
+    let body = Rect { x: inner.x + 1, y: inner.y + 1, width: inner.width.saturating_sub(2), height: inner.height.saturating_sub(1) };
+    let paper = Style::new().fg(QR_INK).bg(QR_PAPER);
+    let code_lines: Vec<Line> = drawn.iter().map(|l| Line::from(Span::styled(l.clone(), paper))).collect();
+    if stacked {
+        let code_h = code_lines.len() as u16;
+        if code_h > 0 {
+            f.render_widget(Paragraph::new(code_lines), Rect { width: (code_w as u16).min(body.width), height: code_h.min(body.height), ..body });
+        }
+        let top = if code_h > 0 { code_h + 1 } else { 0 };
+        f.render_widget(Paragraph::new(words), Rect { y: body.y + top.min(body.height), height: body.height.saturating_sub(top), ..body });
+    } else {
+        f.render_widget(Paragraph::new(code_lines), Rect { width: (code_w as u16).min(body.width), height: (drawn.len() as u16).min(body.height), ..body });
+        let x = body.x + code_w as u16 + 3;
+        f.render_widget(Paragraph::new(words), Rect { x, width: body.width.saturating_sub(code_w as u16 + 3), ..body });
+    }
 }
 
 fn new_agent(f: &mut Frame, form: &NewAgentForm, area: Rect) {
