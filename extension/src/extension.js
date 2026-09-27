@@ -149,6 +149,14 @@ async function activate(context) {
     }, 0);
     return true;
   };
+  let needsQueue = Promise.resolve();
+  const nextNeedsYou = async () => {
+    const list = attention();
+    if (!list.length) { vscode.window.setStatusBarMessage('$(check) Nothing needs you', 2500); return; }
+    // The most urgent item that is not already open (approvals first, then failures, then reviews).
+    const next = list.find(a => a.run_id !== selectedRun) || list[0];
+    await selectRun(next.run_id); center.focus('chat');
+  };
   // AC-106: "Where am I": every Overseer view open in this window (the Overseer view as chat, grid
   // or composer, the review, chats taken out into editor groups, New Task, run output), in editor
   // group order, and a jump to the one picked.
@@ -725,13 +733,9 @@ async function activate(context) {
           description: [path.basename(t?.repo_root || ''), p?.name].filter(Boolean).join(' · '), detail: undefined, run: r }; }), { title: 'Switch to agent', matchOnDescription: true, placeHolder: 'Search agents' });
       if (pick) { await selectRun(pick.run.id); center.focus('chat'); }
     })),
-    vscode.commands.registerCommand('overseer.nextNeedsYou', guard(async () => {
-      const list = attention();
-      if (!list.length) { vscode.window.setStatusBarMessage('$(check) Nothing needs you', 2500); return; }
-      // The most urgent item that is not already open (approvals first, then failures, then reviews).
-      const next = list.find(a => a.run_id !== selectedRun) || list[0];
-      await selectRun(next.run_id); center.focus('chat');
-    })),
+    // Presses queue up (AC-149): each one picks after the previous one has opened its agent, so two
+    // quick presses never land on the same agent.
+    vscode.commands.registerCommand('overseer.nextNeedsYou', guard(() => (needsQueue = needsQueue.then(nextNeedsYou, nextNeedsYou)))),
     vscode.commands.registerCommand('overseer.allowPermission', guard(async () => answerPermission(true))),
     vscode.commands.registerCommand('overseer.denyPermission', guard(async () => answerPermission(false))),
     vscode.commands.registerCommand('overseer.cleanupArchived', guard(cleanupArchived)),

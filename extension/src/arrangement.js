@@ -177,8 +177,12 @@ class Arrangement {
     const run = this.model.run(event.run_id);
     const root = run && this.model.rootRun(run);
     if (!root || root.id !== this.runId) return;
-    // The agent's first edit brings the review forward (AC-73).
-    if (await this.changes(root) > 0 && this.current === 'chat' && this.runId === root.id) await this.split(root.id, { follow: true });
+    // The agent's first edit brings the review forward (AC-73). A file_activity event is an edit by
+    // itself (the harness reports its Write/Edit, sometimes a moment before the file is on disk), so
+    // it does not wait for the workspace to show the change; the review's content follows the write.
+    const edited = event.kind === 'file_activity' || await this.changes(root) > 0;
+    if (edited && event.kind === 'file_activity') this.changed.set(root.id, Math.max(1, this.changed.get(root.id) || 0));
+    if (edited && this.current === 'chat' && this.runId === root.id) await this.split(root.id, { follow: true });
   }
 
   persist() {
