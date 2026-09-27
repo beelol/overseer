@@ -814,7 +814,10 @@ own worktree and lands through a pull request.
 
 ## Implementation goal
 
-Written on 2026-09-26 at the owner's request, ready to start. Not started by this RFC revision.
+Written on 2026-09-26 at the owner's request. Built on 2026-09-26 and 2026-09-27 in pull request
+[#9](https://github.com/beelol/overseer/pull/9), marked ready for review once every criterion that does not
+wait for the owner was verified; what waits for the owner is the Wi-Fi step of AC-83, the live
+failover check of AC-84 (Claude Code's login) and the offline session of AC-97.
 
 > Implement Continuity (Gate L) in `beelol/overseer`: AC-139 first, then AC-83 to AC-98, AC-138 and
 > AC-140, as written in `docs/overseer-rfc.md` (Gate L) and designed in `docs/rfcs/offline-mode.md`.
