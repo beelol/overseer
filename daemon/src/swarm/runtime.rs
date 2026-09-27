@@ -438,6 +438,23 @@ pub fn retry_targeted_interrupts(d: &Arc<Daemon>) -> Result<Value> {
     Ok(json!({"interrupt_requested":requested,"unconfirmed":unconfirmed}))
 }
 
+/// Known native descendants lacking a confirmed terminal receipt, and confirmed
+/// failures among them. This walks grandchildren as well as direct children.
+pub(super) fn descendant_receipts(conn: &rusqlite::Connection, root: &str) -> Result<(i64,i64)> {
+    Ok(conn.query_row(
+        "WITH RECURSIVE descendants(id) AS (
+             SELECT id FROM runs WHERE parent_run_id=?1
+             UNION SELECT child.id FROM runs child JOIN descendants d ON child.parent_run_id=d.id
+         )
+         SELECT COALESCE(SUM(CASE WHEN child.ended_ms IS NULL
+                   OR child.status NOT IN ('completed','failed','interrupted')
+                   THEN 1 ELSE 0 END),0),
+                COALESCE(SUM(CASE WHEN child.status='failed' THEN 1 ELSE 0 END),0)
+         FROM runs child JOIN descendants d ON child.id=d.id",
+        params![root], |row| Ok((row.get(0)?,row.get(1)?)),
+    )?)
+}
+
 /// Copy a supervised worker's terminal state into the durable director inbox.
 /// A process exit is only lifecycle evidence; the director still has to assess
 /// a separate result/artifact before the job can be accepted.
@@ -493,8 +510,17 @@ pub fn reconcile_worker(d: &Arc<Daemon>, p: &Value) -> Result<Value> {
     if crate::daemon::ACTIVE.contains(&worker_status.as_str()) || ended.is_none() {
         return Ok(json!({"status":"active","overseer_run_id":overseer_run_id}));
     }
+    // A harness may report its parent process as exited before its native children
+    // finish. Overseer changes children without a terminal receipt to `unknown`;
+    // that inferred state cannot close the logical Swarm attempt or its reservation.
+    let (unconfirmed_descendants, failed_descendants) = descendant_receipts(&store.conn, &overseer_run_id)?;
+    if unconfirmed_descendants > 0 {
+        return Ok(json!({"status":"descendants_unconfirmed",
+            "overseer_run_id":overseer_run_id,"unconfirmed_descendants":unconfirmed_descendants}));
+    }
     let message_id = format!("terminal-{attempt}");
-    let payload = json!({"overseer_run_id":overseer_run_id,"run_status":worker_status});
+    let payload = json!({"overseer_run_id":overseer_run_id,"run_status":worker_status,
+        "native_descendant_failures":failed_descendants});
     let previous: Option<String> = store
         .conn
         .query_row(
@@ -534,6 +560,16 @@ pub fn reconcile_terminal_workers(d: &Arc<Daemon>) -> Result<usize> {
              JOIN swarm_runs s ON s.id=l.run_id
              JOIN runs r ON r.id=l.overseer_run_id AND r.ended_ms IS NOT NULL
                 AND r.status!='disconnected'
+             AND NOT EXISTS (
+                 WITH RECURSIVE descendants(id) AS (
+                     SELECT id FROM runs WHERE parent_run_id=r.id
+                     UNION SELECT child.id FROM runs child
+                         JOIN descendants d ON child.parent_run_id=d.id
+                 )
+                 SELECT 1 FROM runs child JOIN descendants d ON child.id=d.id
+                 WHERE child.ended_ms IS NULL
+                    OR child.status NOT IN ('completed','failed','interrupted')
+             )
              ORDER BY r.ended_ms LIMIT 100",
         )?;
         let rows = stmt

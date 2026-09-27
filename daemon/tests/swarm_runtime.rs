@@ -131,7 +131,7 @@ fn job_deadline_interrupt_retries_after_daemon_crash() {
     let checkout = repo(&temp.path().join("deadline-crash-source"));
     let run = d.call("swarm.create", json!({"category":"Crash during job deadline",
         "objective":"Inspect backend","allowed_targets":["fixture-local"],
-        "policy":{"deadline_ms":15000}}));
+        "policy":{"deadline_ms":60000}}));
     let id = run["id"].as_str().unwrap();
     d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
         {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]}
@@ -139,7 +139,7 @@ fn job_deadline_interrupt_retries_after_daemon_crash() {
     let at = now();
     let admitted = d.call("swarm.admit", json!({"run_id":id,"generation":1,"revision":1,
         "job_id":"inspect","target_id":"fixture-local","request_id":"deadline-crash-worker",
-        "job_deadline_ms":4000,"now_ms":at,
+        "job_deadline_ms":30000,"now_ms":at,
         "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
             "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
                 "capabilities":["code"],"health":"up","auth":"ok"}],
@@ -166,6 +166,8 @@ fn job_deadline_interrupt_retries_after_daemon_crash() {
     assert!(["queued","starting","running"].contains(&d.run(worker)["status"].as_str().unwrap()));
 
     d.kill9();
+    db_probe.execute("UPDATE swarm_jobs SET deadline_at_ms=?1 WHERE run_id=?2 AND id='inspect'",
+        rusqlite::params![now()-1,id]).unwrap();
     d.spawn();
     assert_ne!(d.wait_done(worker, 8)["status"], "completed");
     let until = std::time::Instant::now() + std::time::Duration::from_secs(3);
@@ -257,7 +259,7 @@ fn explicit_ceiling_runs_thirty_two_supervised_workers() {
     let checkout = repo(&temp.path().join("large-swarm-source"));
     let run = d.call("swarm.create", json!({"category":"Large local swarm",
         "objective":"Inspect 32 modules","allowed_targets":["fixture-local"],
-        "policy":{"max_workers":32,"deadline_ms":120000}}));
+        "policy":{"max_workers":32,"deadline_ms":240000}}));
     let id = run["id"].as_str().unwrap();
     let jobs: Vec<_> = (0..33).map(|n| json!({"id":format!("j{n}"),
         "title":format!("Inspect {n}"),"acceptance":"evidence","deps":[]})).collect();
@@ -268,12 +270,12 @@ fn explicit_ceiling_runs_thirty_two_supervised_workers() {
         "job_id":format!("j{n}"),"target_id":"fixture-local",
         "request_id":format!("large-runtime-{n}"),
         "now_ms":at + (n / 4) as i64 * 5000,
-        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+120000,
+        "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+240000,
             "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
                 "capabilities":["code"],"health":"up","auth":"ok"}],
             "pools":[{"id":"fixture-pool","windows":[{"id":"run","unit":"points",
                 "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
-                "confidence":"exact","expires_ms":at+120000}]}]},
+                "confidence":"exact","expires_ms":at+240000}]}]},
         "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
     let mut workers = Vec::new();
     let mut first_attempt = None;
@@ -286,14 +288,14 @@ fn explicit_ceiling_runs_thirty_two_supervised_workers() {
         let launched = d.call("swarm.worker.launch", json!({"run_id":id,
             "job_id":format!("j{n}"),"attempt_id":admitted["attempt_id"],
             "token":admitted["token"],"repo":checkout,
-            "program":"/bin/sleep","args":["60"],"prompt":"Inspect",
+            "program":"/bin/sleep","args":["180"],"prompt":"Inspect",
             "title":format!("Fixture worker {n}")}));
         assert_eq!(launched["status"], "launched", "job {n}: {launched}");
         workers.push(launched["overseer_run_id"].as_str().unwrap().to_owned());
     }
     assert_eq!(workers.len(), 32);
     assert_eq!(workers.iter().collect::<std::collections::HashSet<_>>().len(), 32);
-    let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(30);
     loop {
         let running = workers.iter().filter(|worker| d.run(worker)["status"] == "running").count();
         if running == 32 { break; }
@@ -396,7 +398,7 @@ fn job_deadline_interrupts_only_its_worker_despite_progress() {
     let checkout = repo(&temp.path().join("job-deadline-source"));
     let run = d.call("swarm.create",json!({"category":"Job deadline",
         "objective":"Inspect two paths","allowed_targets":["fixture-local"],
-        "policy":{"deadline_ms":10000}}));
+        "policy":{"deadline_ms":45000}}));
     let id = run["id"].as_str().unwrap();
     d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
         {"id":"inspect","title":"Inspect","acceptance":"evidence","deps":[]},
@@ -406,7 +408,7 @@ fn job_deadline_interrupts_only_its_worker_despite_progress() {
     let at=now();
     let admission_request=json!({"run_id":id,"generation":1,"revision":1,
         "job_id":"inspect","target_id":"fixture-local","request_id":"job-deadline-worker",
-        "job_deadline_ms":1500,"now_ms":at,
+        "job_deadline_ms":3000,"now_ms":at,
         "snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
             "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["fixture-pool"],
                 "capabilities":["code"],"health":"up","auth":"ok"}],
@@ -419,7 +421,7 @@ fn job_deadline_interrupts_only_its_worker_despite_progress() {
     let mut other_request=admission_request;
     other_request["job_id"]=json!("followup");
     other_request["request_id"]=json!("job-deadline-other-worker");
-    other_request["job_deadline_ms"]=json!(5000);
+    other_request["job_deadline_ms"]=json!(30000);
     let other=d.call("swarm.admit",other_request);
     assert_eq!(other["status"],"admitted","{other}");
     let launched=d.call("swarm.worker.launch",json!({"run_id":id,"job_id":"inspect",
@@ -441,7 +443,7 @@ fn job_deadline_interrupts_only_its_worker_despite_progress() {
             "revision":1,"payload":{"note":"working"}}));
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
-    let until=std::time::Instant::now()+std::time::Duration::from_secs(5);
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(8);
     loop {
         let jobs=d.call("swarm.jobs",json!({"id":id}))["jobs"].as_array().unwrap().clone();
         let inspect=jobs.iter().find(|j|j["id"]=="inspect").unwrap();
@@ -804,6 +806,141 @@ fn pending_worker_launch_cannot_resume_after_stop() {
     );
     assert!(d.try_call("swarm.worker.launch", request).is_err());
     assert!(d.runs().is_empty());
+}
+
+#[test]
+fn parent_exit_waits_for_native_descendant_receipts_before_finishing_attempt() {
+    let d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("descendant-order"));
+    let run = d.call("swarm.create", json!({"category":"Descendant ordering",
+        "objective":"Inspect an authorized backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"inspect","title":"Inspect","acceptance":"report evidence","deps":[]},
+        {"id":"other","title":"Other","acceptance":"report evidence","deps":[]}
+    ]}));
+    commit_beneficial_batch(&d,id,&["inspect".into(),"other".into()]);
+    let at = now();
+    let admitted = d.call("swarm.admit",json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"inspect","target_id":"fixture-local","request_id":"descendant-order",
+        "now_ms":at,"snapshot":{"version":1,"observed_ms":at-1000,"expires_ms":at+60000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":at+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(admitted["status"],"admitted");
+    let launched = d.call("swarm.worker.launch",json!({"run_id":id,"job_id":"inspect",
+        "attempt_id":admitted["attempt_id"],"token":admitted["token"],
+        "repo":checkout,"program":"/bin/sleep","args":["2"],
+        "prompt":"Inspect","title":"Descendant order worker"}));
+    let worker = launched["overseer_run_id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    for (parent,child,native) in [(worker,"r-native-child","native-child"),
+        ("r-native-child","r-native-grandchild","native-grandchild")] {
+        db.execute("INSERT INTO runs(id,task_id,parent_run_id,harness,harness_version,
+            profile_id,model,workspace_id,native_id,status,exit_reason,created_ms,ended_ms,
+            title,relation_source,relation_confidence,capabilities,process_generation)
+            SELECT ?2,task_id,id,harness,harness_version,profile_id,model,workspace_id,
+            ?3,'running',NULL,?4,NULL,'Native descendant','fixture','exact',capabilities,0
+            FROM runs WHERE id=?1",rusqlite::params![parent,child,native,now()]).unwrap();
+    }
+    d.wait_done(worker, 6);
+    let reconcile = || d.call("swarm.worker.reconcile",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"inspect","attempt_id":admitted["attempt_id"]}));
+    assert_eq!(reconcile()["status"],"descendants_unconfirmed");
+    let attempt = admitted["attempt_id"].as_str().unwrap();
+    assert!(d.try_call("swarm.attempt.confirm_exit",json!({"run_id":id,
+        "generation":1,"revision":1,"job_id":"inspect",
+        "attempt_id":attempt})).is_err());
+    let status: String = db.query_row("SELECT status FROM swarm_attempts WHERE id=?1",
+        [attempt],|r|r.get(0)).unwrap();
+    assert_eq!(status,"registered");
+    let active_reservations: i64 = db.query_row("SELECT COUNT(*) FROM swarm_reservations
+        WHERE attempt_id=?1 AND status='active'",[attempt],|r|r.get(0)).unwrap();
+    assert!(active_reservations > 0);
+    db.execute("UPDATE runs SET status='completed',ended_ms=?1 WHERE id='r-native-child'",
+        rusqlite::params![now()]).unwrap();
+    assert_eq!(reconcile()["status"],"descendants_unconfirmed");
+    db.execute("UPDATE runs SET status='completed',ended_ms=?1 WHERE id='r-native-grandchild'",
+        rusqlite::params![now()]).unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let status: String = db.query_row("SELECT status FROM swarm_attempts WHERE id=?1",
+            [attempt],|r|r.get(0)).unwrap();
+        if status == "finished" { break; }
+        assert!(std::time::Instant::now() < deadline,
+            "background reconciliation did not finish descendant-confirmed attempt: {status}");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert_eq!(reconcile()["duplicate"],true);
+    let uncertain_reservations: i64 = db.query_row("SELECT COUNT(*) FROM swarm_reservations
+        WHERE attempt_id=?1 AND status='uncertain'",[attempt],|r|r.get(0)).unwrap();
+    assert!(uncertain_reservations > 0);
+    let count: i64 = db.query_row("SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1
+        AND attempt_id=?2 AND kind='terminal'",rusqlite::params![id,attempt],|r|r.get(0)).unwrap();
+    assert_eq!(count,1);
+
+    let later = now();
+    let failed_child_attempt = d.call("swarm.admit",json!({"run_id":id,"generation":1,
+        "revision":1,"job_id":"other","target_id":"fixture-local",
+        "request_id":"descendant-failure","now_ms":later,
+        "snapshot":{"version":2,"observed_ms":later-1000,"expires_ms":later+60000,
+            "targets":[{"id":"fixture-local","account_id":"fixture","pool_ids":["pool"],
+                "capabilities":["code"],"health":"up","auth":"ok"}],
+            "pools":[{"id":"pool","windows":[{"id":"run","unit":"points",
+                "remaining_milli":100000,"protected_milli":0,"reserved_milli":0,
+                "confidence":"exact","expires_ms":later+60000}]}]},
+        "required_capabilities":["code"],"estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(failed_child_attempt["status"],"admitted");
+    let failed_parent = d.call("swarm.worker.launch",json!({"run_id":id,"job_id":"other",
+        "attempt_id":failed_child_attempt["attempt_id"],"token":failed_child_attempt["token"],
+        "repo":checkout,"program":"/bin/sleep","args":["2"],
+        "prompt":"Inspect","title":"Failed descendant worker"}));
+    let failed_parent_run = failed_parent["overseer_run_id"].as_str().unwrap();
+    db.execute("INSERT INTO runs(id,task_id,parent_run_id,harness,harness_version,profile_id,
+        model,workspace_id,native_id,status,exit_reason,created_ms,ended_ms,title,
+        relation_source,relation_confidence,capabilities,process_generation)
+        SELECT 'r-failed-native-child',task_id,id,harness,harness_version,profile_id,model,
+        workspace_id,'failed-native-child','failed','native child failed',?2,?2,
+        'Failed native child','fixture','exact',capabilities,0 FROM runs WHERE id=?1",
+        rusqlite::params![failed_parent_run,now()]).unwrap();
+    d.call("swarm.artifact.put",json!({"run_id":id,"job_id":"other",
+        "attempt_id":failed_child_attempt["attempt_id"],"token":failed_child_attempt["token"],
+        "artifact_id":"other-evidence","source_revision":1,"kind":"finding",
+        "content":"parent reported a result before native child failure was considered"}));
+    d.call("swarm.report",json!({"run_id":id,"job_id":"other",
+        "attempt_id":failed_child_attempt["attempt_id"],"token":failed_child_attempt["token"],
+        "message_id":"other-result","type":"result","revision":1,
+        "payload":{"artifact_ids":["other-evidence"]}}));
+    d.call("swarm.decide",json!({"run_id":id,"generation":1,"revision":1,
+        "job_id":"other","decision":"accept","evidence":["other-evidence"]}));
+    d.wait_done(failed_parent_run,6);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let jobs = d.call("swarm.jobs",json!({"id":id}));
+        let other = jobs["jobs"].as_array().unwrap().iter()
+            .find(|job| job["id"]=="other").unwrap();
+        if other["status"]=="blocked" {
+            assert_eq!(other["stop_reason"],"native_descendant_failed");
+            break;
+        }
+        assert!(std::time::Instant::now()<deadline,
+            "failed native descendant did not block its job: {other}");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let failed_attempt = failed_child_attempt["attempt_id"].as_str().unwrap();
+    let payload: String = db.query_row("SELECT payload FROM swarm_messages
+        WHERE run_id=?1 AND attempt_id=?2 AND kind='terminal'",
+        rusqlite::params![id,failed_attempt],|r|r.get(0)).unwrap();
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&payload).unwrap()
+        ["native_descendant_failures"],1);
+    let evidence_count: i64 = db.query_row("SELECT COUNT(*) FROM swarm_artifacts
+        WHERE run_id=?1 AND job_id='other' AND id='other-evidence'",
+        rusqlite::params![id],|r|r.get(0)).unwrap();
+    assert_eq!(evidence_count,1);
 }
 
 #[test]

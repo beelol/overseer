@@ -324,12 +324,19 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
         params![attempt,run], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
     ).optional()?;
     let linked_status = linked.as_ref().and_then(|(_, status, _)| status.clone());
+    let mut failed_descendants = 0;
     if let Some((linked_run,status,ended)) = linked {
         if linked_run.is_none()
             || status.as_deref().is_none_or(|s| crate::daemon::ACTIVE.contains(&s) || s == "disconnected")
             || ended.is_none() {
             bail!("linked worker exit is not confirmed");
         }
+        let (unconfirmed, failed) = super::runtime::descendant_receipts(
+            &store.conn, linked_run.as_deref().unwrap())?;
+        if unconfirmed > 0 {
+            bail!("linked worker has unconfirmed native descendants");
+        }
+        failed_descendants = failed;
     }
     let now = crate::daemon::now();
     let tx = store.conn.transaction()?;
@@ -349,7 +356,14 @@ pub fn confirm_exit(store: &mut Store, p: &Value) -> Result<Value> {
         params![run, job],
         |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
     )?;
-    if job_status == "accepted" {
+    if failed_descendants > 0 && current["status"] != "stopping"
+        && ["accepted","submitted","reserved","launching","running"].contains(&job_status.as_str()) {
+        // A successful parent exit cannot turn a failed native child into accepted
+        // work. Keep its artifacts and uncertain usage for the director to inspect.
+        tx.execute("UPDATE swarm_jobs SET status='blocked',
+            stop_reason='native_descendant_failed',updated_ms=?3
+            WHERE run_id=?1 AND id=?2",params![run,job,now])?;
+    } else if job_status == "accepted" {
         release_and_unlock(&tx, run, job, now)?;
     } else if current["status"] == "stopping" {
         let unsafe_effects: i64 = tx.query_row(
