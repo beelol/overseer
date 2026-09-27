@@ -14,6 +14,7 @@ export class FakeConnection implements Connection {
   lastContact: number | null = null;
   gateway: GatewayInfo | null = null;
   hello: Record<string, unknown> | null = null;
+  cursor = 0;
   entries: OutboxEntry[] = [];
   /** Every request made, in order. */
   readonly asked: { method: string; params: unknown; options?: unknown }[] = [];

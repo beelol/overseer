@@ -50,7 +50,15 @@ const useStyles = makeStyles((theme) => ({
  * Pair with your Mac: scan the code or type it, name the phone, confirm on the Mac. It is
  * shown the first time, and again only after the Mac removed this phone.
  */
-export function PairScreen() {
+export interface PairScreenProps {
+  /**
+   * Called when pairing and what follows it (the question about notifications) are over. The
+   * first screen keeps pairing on the display until then.
+   */
+  readonly onDone?: () => void;
+}
+
+export function PairScreen({ onDone }: PairScreenProps = {}) {
   const styles = useStyles();
   const router = useRouter();
   const session = useSession();
@@ -77,7 +85,10 @@ export function PairScreen() {
     };
   }, []);
 
-  const toAgents = useCallback(() => router.replace(routes.agents), [router]);
+  const toAgents = useCallback(() => {
+    onDone?.();
+    router.replace(routes.agents);
+  }, [router, onDone]);
 
   const pair = useCallback(
     async (given: string, to: Target) => {

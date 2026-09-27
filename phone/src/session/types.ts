@@ -8,6 +8,8 @@ export interface Connection {
   readonly lastContact: number | null;
   readonly gateway: GatewayInfo | null;
   readonly hello: Readonly<Record<string, unknown>> | null;
+  /** The sequence number of the last event the phone received, kept across launches. */
+  readonly cursor: number;
   outbox(): readonly OutboxEntry[];
   dismiss(requestId: string): void;
   on(event: 'state', listener: (state: ConnectionState, previous: ConnectionState) => void): () => void;

@@ -8,6 +8,8 @@
 //   node e2e/lab.mjs code <state file>                        a new pairing code
 //   node e2e/lab.mjs agent <state file> <mode> <title>        starts a fixture agent
 //   node e2e/lab.mjs mode <state file> <mode>                 what the next fixture agent does
+//   node e2e/lab.mjs down <state file>                        kills the daemon, telling nobody
+//   node e2e/lab.mjs up <state file>                          starts it again over the same data
 //   node e2e/lab.mjs stop <state file>
 //
 // The state file (JSON) says where the lab is: home, socket, port, repo, the pairing code.
@@ -194,6 +196,25 @@ try {
     state.code = (await call(state.socket, 'gateway.pair_start')).code;
     fs.writeFileSync(file, JSON.stringify(state, null, 2));
     console.log(state.code);
+  } else if (command === 'down') {
+    // The Mac is gone, as when it sleeps or the daemon is killed: nothing is told to anyone.
+    const state = readState(args._[0]);
+    try {
+      process.kill(state.pid, 'SIGKILL');
+    } catch {
+      /* gone already */
+    }
+  } else if (command === 'up') {
+    // The daemon again, over the same data: what was on is on, who was paired is paired.
+    const file = args._[0];
+    const state = readState(file);
+    const log = fs.openSync(path.join(state.home, 'lab.log'), 'a');
+    const child = spawn(BIN, ['serve'], { env: envFor(state.home), stdio: ['ignore', log, log], detached: true });
+    child.unref();
+    await until('the daemon', () => call(state.socket, 'hello'));
+    state.pid = child.pid;
+    fs.writeFileSync(file, JSON.stringify(state, null, 2));
+    console.log(JSON.stringify(await call(state.socket, 'gateway.status')).slice(0, 300));
   } else if (command === 'mode') {
     // What the next fixture agent does (showcase, echo, slow, showcase-permission, nested …).
     const state = readState(args._[0]);

@@ -1,6 +1,12 @@
 # A new agent, started from the phone.
 appId: ${APP}
 ---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
 - tapOn:
     id: "agents.new"
 - extendedWaitUntil:

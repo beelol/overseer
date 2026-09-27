@@ -27,6 +27,17 @@ function asSecrets(store: AsyncStore<Anything>): KeyValueStore {
 /** The library's names start with its namespace and a dot; the platform's scope is the namespace. */
 const clean = (key: string): string => key.replace(/^overseer\./, '');
 
+/**
+ * Addresses beside the ones the pairing code and the network give: the platform's own (the
+ * Mac's loopback as a simulator sees it), on the port the Mac was paired on, and the ones the
+ * owner typed, exactly as typed.
+ */
+function extrasOf(capabilities: Capabilities): { host: string; port?: number }[] {
+  const typed = capabilities.discovery.manual.get().map(({ host, port }) => ({ host, port }));
+  const own = capabilities.launch.info().hostAddresses.map((host) => ({ host }));
+  return [...typed, ...own];
+}
+
 export interface CreateSessionOptions {
   readonly capabilities: Capabilities;
   /** The app's version, sent in every handshake. */
@@ -36,7 +47,6 @@ export interface CreateSessionOptions {
 
 /** The app's session on a real device: the connection library wired to the platform layer. */
 export function createSession({ capabilities, app, log }: CreateSessionOptions): Session {
-  const launch = capabilities.launch.info();
   const client = new PhoneClient({
     socketFactory: webSocketFactory(WebSocket as never),
     store: asKeyValue(capabilities.keyValue.scope<Anything>('overseer')),
@@ -44,12 +54,25 @@ export function createSession({ capabilities, app, log }: CreateSessionOptions):
     random: (n) => capabilities.random.bytes(n),
     now: () => Date.now(),
     app,
-    extras: launch.hostAddresses.map((host) => ({ host })),
+    extras: extrasOf(capabilities),
     ...(log ? { log } : {}),
+  });
+  // An address the owner typed is tried from the moment it is typed.
+  capabilities.discovery.manual.subscribe(() => {
+    client.setExtras(extrasOf(capabilities));
+    client.wake();
   });
   return new Session({
     connection: client as unknown as Connection,
     cache: capabilities.keyValue.scope<SessionCache>('cache'),
+    // Read by the scenario run, which compares it with the Mac's own log.
+    onStream: (stream) => {
+      try {
+        capabilities.keyValue.scope<{ stream: string }>('perf').set('stream', JSON.stringify(stream));
+      } catch {
+        // Measuring never breaks the app.
+      }
+    },
     now: () => Date.now(),
     nextFrame: (callback) => {
       const id = requestAnimationFrame(callback);

@@ -1,0 +1,18 @@
+# The Mac is gone without a word: the app says so, with the time of the last contact, and
+# keeps what it has.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "connection.unreachable"
+    timeout: 90000
+- assertVisible: ".*last contact.*"
+- assertVisible:
+    id: "agents.row.${SHOWCASE}"
+- takeScreenshot: mac-unreachable

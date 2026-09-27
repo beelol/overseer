@@ -4,5 +4,5 @@
  */
 export { SessionProvider, useConversation, useSession, useSessionValue } from './context';
 export { createSession } from './create';
-export { Session, type SessionCache, type SessionDeps } from './session';
+export { Session, type SessionCache, type SessionDeps, type StreamStats } from './session';
 export type { Connection, ConversationSnapshot, NotificationSwitches, Scope, SessionSnapshot } from './types';

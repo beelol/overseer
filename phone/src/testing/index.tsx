@@ -61,7 +61,12 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   connection.answers['events.list'] = () => ({ events: [] });
   if (options.paired !== false) {
     connection.gateway = { ...FAKE_GATEWAY, scope: options.scope ?? 'full' };
-    connection.hello = { device: { id: 'd1', name: 'Phone', scope: options.scope ?? 'full', platform: 'ios' }, mac_notifications: true };
+    connection.hello = {
+      device: { id: 'd1', name: 'Phone', scope: options.scope ?? 'full', platform: 'ios' },
+      mac_notifications: true,
+      // The owner of the phone in a test said yes to notifications, unless the test says otherwise.
+      notifications: { enabled: true, show_text: false, kinds: { permission: true, question: true, failure: true, finished: true } },
+    };
     connection.lastContact = 1_000;
   }
   const frames: (() => void)[] = [];

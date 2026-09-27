@@ -190,7 +190,7 @@ export const scenarios = [
     criteria: ['AC-116', 'AC-121'],
     says: 'phone access turned off on the Mac and on again: the app says so and comes back by itself',
     async run(c) {
-      const port = c.lab.info().port;
+      const port = c.port;
       c.lab.call('gateway.disable');
       await c.flow('off', { SHOWCASE: c.runs.showcase });
       c.shot('phone-access-off');
@@ -198,6 +198,125 @@ export const scenarios = [
       c.lab.call('gateway.enable', { port });
       await c.flow('on', { SHOWCASE: c.runs.showcase });
       await c.until('the phone connected again', () => me(c).connected);
+    },
+  },
+  {
+    name: 'queued',
+    criteria: ['AC-122', 'AC-121'],
+    says: 'a message typed while phone access is off is kept, shown, and sent once when it is on again',
+    async run(c) {
+      const id = c.runs.showcase;
+      await c.until('the agent being idle', () => !ACTIVE.includes(run(c, id).status));
+      c.lab.mode('echo');
+      const message = `count the receipts ${Date.now() % 100000}`;
+      const sent = () => c.lab.call('run.turns', { run_id: id }).filter((t) => t.prompt === message).length;
+      c.lab.call('gateway.disable');
+      await c.flow('send-offline', { SHOWCASE: id, MESSAGE: message });
+      expect(sent() === 0, 'the message reached the agent while phone access was off');
+      c.lab.call('gateway.enable', { port: c.port });
+      await c.until('the message reaching the agent', () => sent() >= 1, 90_000);
+      await c.sleep(4000);
+      expect(sent() === 1, `the agent received the message ${sent()} times`);
+    },
+  },
+  {
+    name: 'unreachable',
+    criteria: ['AC-123', 'AC-116', 'AC-121'],
+    says: 'the Mac gone without a word: the app says unreachable with the last contact, and comes back by itself',
+    async run(c) {
+      c.lab.down();
+      await c.flow('unreachable', { SHOWCASE: c.runs.showcase });
+      c.lab.up();
+      await c.flow('reachable');
+      await c.until('the phone connected again', () => me(c).connected, 60_000);
+      expect(c.lab.call('gateway.status').enabled === true, 'phone access did not stay on across the restart of the daemon');
+    },
+  },
+  {
+    name: 'manual-address',
+    criteria: ['AC-120'],
+    says: 'the Mac answers somewhere else: an address typed by the owner connects, with no pairing again',
+    async run(c) {
+      const paired = me(c).paired_ms;
+      const moved = c.port + 10;
+      c.lab.call('gateway.disable');
+      c.lab.call('gateway.enable', { port: moved });
+      c.port = moved;
+      await c.sleep(1500);
+      expect(me(c).connected === false, 'the phone is connected although the Mac moved');
+      await c.flow('manual-address', { ADDRESS: `${c.dev.host}:${moved}` });
+      await c.until('the phone connected through the typed address', () => me(c).connected, 90_000);
+      expect(me(c).paired_ms === paired, 'the phone was paired again');
+    },
+  },
+  {
+    name: 'away',
+    criteria: ['AC-121'],
+    says: 'five minutes in the background while an agent writes numbered lines, the daemon restarted in the middle: every event once, in order',
+    async run(c) {
+      const minutes = Number(process.env.OVERSEER_AWAY_MINUTES || 5);
+      const lines = Math.round((minutes * 60 + 90) * 8);
+      const created = c.lab.call('task.create', {
+        repo: c.lab.info().repo, harness: 'generic', workspace_mode: 'worktree', program: '/bin/sh', prompt: '', title: 'Numbered lines',
+        args: ['-c', `i=0; while [ $i -lt ${lines} ]; do echo line$i; i=$((i+1)); sleep 0.125; done`],
+      });
+      const id = created.run.id;
+      await c.flow('away-start', { RUN: id });
+      const half = (minutes * 60_000) / 2;
+      c.log.say(`  the app is in the background for ${minutes} minutes; the daemon restarts half way`);
+      await c.sleep(half);
+      c.lab.down();
+      await c.sleep(3000);
+      c.lab.up();
+      await c.sleep(half);
+      await c.flow('away-return');
+      const newest = () => c.lab.call('state').cursor;
+      const stream = await c.until('the phone catching up with the Mac', () => {
+        const raw = c.dev.read('perf.stream');
+        const stats = raw ? JSON.parse(JSON.parse(raw)) : null;
+        return stats && stats.last >= newest() - 40 ? stats : null;
+      }, 120_000);
+      c.lab.call('run.interrupt', { run_id: id });
+      const final = await c.until('the phone at the end of the stream', () => {
+        const stats = JSON.parse(JSON.parse(c.dev.read('perf.stream')));
+        return !ACTIVE.includes(run(c, id).status) && stats.last >= newest() ? stats : null;
+      }, 60_000);
+      c.log.say(`  the Mac's newest event is ${newest()}; the phone received ${final.count} events up to ${final.last}, gaps ${final.gaps}, duplicates ${final.duplicates}, reloads ${final.truncated}`);
+      expect(stream.gaps === 0 && final.gaps === 0, `the phone missed events: ${final.gaps} gaps in the sequence`);
+      expect(final.duplicates === 0, `the phone received ${final.duplicates} events twice`);
+      const written = events(c, id).filter((e) => e.kind === 'output').length;
+      expect(written > minutes * 60 * 4, `the agent wrote only ${written} lines while the phone was away`);
+      c.shot('stream-caught-up');
+    },
+  },
+  {
+    name: 'tour',
+    criteria: ['AC-131'],
+    says: 'every screen in both themes, at the smallest and the largest text size; the theme changed with the app open',
+    async run(c) {
+      const state = c.lab.call('state');
+      let file = null;
+      for (const r of state.runs.filter((x) => x.id === c.runs.showcase)) file = c.lab.call('workspace.changes', { workspace_id: r.workspace_id }).names[0];
+      expect(file, 'the showcase agent has no changed file to show');
+      for (const theme of ['dark', 'light']) {
+        for (const size of ['small', 'large']) {
+          c.dev.appearance(theme);
+          c.dev.textSize(size);
+          await c.sleep(1500);
+          await c.flow('tour', { SHOWCASE: c.runs.showcase, FILE: file, SHOTS: `${c.out}/screens/${theme}-${size}` });
+        }
+      }
+      // The system's setting, changed while the app is open: the app follows at once.
+      c.dev.textSize('standard');
+      c.dev.appearance('dark');
+      await c.flow('opened');
+      c.shot('theme-dark-before-the-switch');
+      c.dev.appearance('light');
+      await c.sleep(2500);
+      c.shot('theme-light-after-the-switch-with-the-app-open');
+      c.dev.appearance('dark');
+      await c.sleep(2500);
+      c.shot('theme-dark-again');
     },
   },
   {

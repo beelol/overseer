@@ -1,0 +1,91 @@
+# Every screen, as it looks now: for the screenshots in both themes and at both text sizes.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- takeScreenshot: agents
+- tapOn:
+    id: "agents.row.${SHOWCASE}"
+- extendedWaitUntil:
+    visible:
+      id: "agent.list"
+    timeout: 30000
+- takeScreenshot: conversation
+- tapOn:
+    id: "agent.changes"
+- extendedWaitUntil:
+    visible:
+      id: "changes.row.${FILE}"
+    timeout: 30000
+- takeScreenshot: changes
+- tapOn:
+    id: "changes.row.${FILE}"
+- extendedWaitUntil:
+    visible:
+      id: "file.list"
+    timeout: 30000
+- takeScreenshot: file
+- tapOn:
+    id: "file.back"
+- tapOn:
+    id: "changes.back"
+- tapOn:
+    id: "agent.more"
+- tapOn:
+    id: "agent.more.merge"
+- extendedWaitUntil:
+    visible:
+      id: "merge.screen"
+    timeout: 30000
+- takeScreenshot: merge-back
+- tapOn:
+    id: "merge.back"
+- tapOn:
+    id: "agent.more"
+- tapOn:
+    id: "agent.more.pr"
+- extendedWaitUntil:
+    visible:
+      id: "pr.screen"
+    timeout: 30000
+- takeScreenshot: pull-request
+- tapOn:
+    id: "pr.back"
+- tapOn:
+    id: "agent.back"
+- tapOn:
+    id: "agents.new"
+- extendedWaitUntil:
+    visible:
+      id: "new.task"
+    timeout: 30000
+- takeScreenshot: new-agent
+- tapOn:
+    id: "new.back"
+- tapOn:
+    id: "agents.menu"
+- takeScreenshot: agents-menu
+- tapOn:
+    id: "agents.menu.accounts"
+- extendedWaitUntil:
+    visible:
+      id: "accounts.screen"
+    timeout: 30000
+- takeScreenshot: accounts
+- tapOn:
+    id: "accounts.back"
+- tapOn:
+    id: "agents.menu"
+- tapOn:
+    id: "agents.menu.settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings.screen"
+    timeout: 30000
+- takeScreenshot: settings
+- tapOn:
+    id: "settings.back"

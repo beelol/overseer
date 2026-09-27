@@ -1,6 +1,12 @@
 # The switch for all notifications, turned off on the phone.
 appId: ${APP}
 ---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
 - tapOn:
     id: "agents.menu"
 - tapOn:

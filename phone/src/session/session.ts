@@ -7,6 +7,8 @@ import type { Connection, ConversationSnapshot, NotificationSwitches, Scope, Ses
 
 /** What the session keeps on the phone between launches, besides what the connection keeps. */
 export type SessionCache = {
+  /** This phone's notification switches as the Mac last told them, as JSON. */
+  switches: string;
   /** The daemon's state as the phone last knew it, in the daemon's own shape, as JSON. */
   state: string;
   /** When that state was last confirmed by the Mac. */
@@ -25,7 +27,26 @@ export interface SessionDeps {
   readonly nextFrame: (callback: () => void) => () => void;
   /** The least time between two writes of the cache, in milliseconds. */
   readonly cacheEveryMs?: number;
+  /** Told, no more often than the cache is written, how the stream of events has arrived. */
+  readonly onStream?: (stream: StreamStats) => void;
   readonly log?: (message: string) => void;
+}
+
+/**
+ * How the Mac's events arrived at this phone: every event once and in order means no gaps and
+ * no duplicates, whatever happened to the connection in between (AC-121).
+ */
+export interface StreamStats {
+  /** Events received since the app started. */
+  readonly count: number;
+  /** The sequence number of the newest event received. */
+  readonly last: number;
+  /** Times an event did not follow the one before it. */
+  readonly gaps: number;
+  /** Events that arrived although the phone had them already. */
+  readonly duplicates: number;
+  /** Times the Mac no longer had what the phone missed, and the state was loaded again. */
+  readonly truncated: number;
 }
 
 type PhoneState = store.PhoneState;
@@ -61,10 +82,12 @@ export class Session {
   private loadGeneration = 0;
   private started = false;
   private readonly closing = new Set<ReturnType<typeof setTimeout>>();
-  private switches: NotificationSwitches = ALL_ON;
+  private stream: StreamStats = { count: 0, last: 0, gaps: 0, duplicates: 0, truncated: 0 };
+  private switches: NotificationSwitches = NOT_YET;
 
   constructor(private readonly deps: SessionDeps) {
     const cached = readCache(deps.cache);
+    this.switches = readSwitches(deps.cache);
     this.snapshot = {
       ready: false,
       connection: deps.connection.state,
@@ -78,7 +101,7 @@ export class Session {
       historyLost: false,
       outbox: [],
       macNotifications: true,
-      notifications: ALL_ON,
+      notifications: this.switches,
     };
   }
 
@@ -103,6 +126,8 @@ export class Session {
       c.on('forgotten', () => this.onForgotten()),
     );
     await c.start();
+    // What arrives next must follow what the phone had when it was last open.
+    this.stream = { ...this.stream, last: c.cursor };
     this.readConnection();
     this.update({ ready: true });
   }
@@ -178,6 +203,11 @@ export class Session {
   private setSwitches(next: NotificationSwitches): void {
     this.switches = next;
     this.update({ notifications: next });
+    try {
+      this.deps.cache.set('switches', JSON.stringify(next));
+    } catch {
+      // Shown from the Mac's answer at the next connection.
+    }
   }
 
   /** Loads the daemon's state again. The screens' pull to refresh. */
@@ -291,7 +321,7 @@ export class Session {
     const hello = c.hello;
     const device = hello && typeof hello['device'] === 'object' && hello['device'] !== null ? (hello['device'] as Record<string, unknown>) : null;
     const scope = device?.['scope'] === 'watch' ? 'watch' : device?.['scope'] === 'full' ? 'full' : (c.gateway?.scope as Scope | undefined) ?? null;
-    if (hello && hello['notifications'] !== undefined) this.switches = switchesOf(hello['notifications']);
+    if (hello && hello['notifications'] !== undefined) this.setSwitches(switchesOf(hello['notifications']));
     this.update({
       notifications: this.switches,
       connection: c.state,
@@ -315,10 +345,14 @@ export class Session {
     this.open.clear();
     this.deps.cache.delete('state');
     this.deps.cache.delete('stateAt');
-    this.update({ state: store.EMPTY, stateAt: null, fromCache: false, historyLost: false, paired: false, gateway: null, scope: null, outbox: [] });
+    this.deps.cache.delete('switches');
+    this.switches = NOT_YET;
+    this.update({ state: store.EMPTY, stateAt: null, fromCache: false, historyLost: false, paired: false, gateway: null, scope: null, outbox: [], notifications: NOT_YET });
   }
 
   private onTruncated(): void {
+    // The Mac said so itself: what follows starts anew and is no gap.
+    this.stream = { ...this.stream, last: 0, truncated: this.stream.truncated + 1 };
     this.update({ historyLost: true });
     void this.loadState();
     for (const [runId, entry] of this.open) void this.loadHistory(runId, entry);
@@ -341,7 +375,20 @@ export class Session {
     }
   }
 
+  /** How the stream of events has arrived since the app started. */
+  streamStats(): StreamStats {
+    return this.stream;
+  }
+
   private onEvent(event: DaemonEvent): void {
+    const { last } = this.stream;
+    this.stream = {
+      ...this.stream,
+      count: this.stream.count + 1,
+      last: Math.max(last, event.seq),
+      gaps: this.stream.gaps + (last !== 0 && event.seq > last + 1 ? 1 : 0),
+      duplicates: this.stream.duplicates + (last !== 0 && event.seq <= last ? 1 : 0),
+    };
     this.ownEvent(event);
     this.pending.push(event);
     if (this.cancelFrame === null) {
@@ -420,6 +467,7 @@ export class Session {
     const write = (): void => {
       this.cacheTimer = null;
       this.cacheWrittenAt = this.deps.now();
+      this.deps.onStream?.(this.stream);
       try {
         this.deps.cache.set('state', JSON.stringify(store.snapshot(this.snapshot.state)));
         this.deps.cache.set('stateAt', this.snapshot.stateAt ?? this.deps.now());
@@ -439,13 +487,17 @@ export class Session {
   }
 }
 
-const ALL_ON: NotificationSwitches = Object.freeze({ enabled: true, show_text: false, kinds: Object.freeze({ permission: true, question: true, failure: true, finished: true }) });
+/**
+ * Before the Mac said anything: off, with every kind ready. The Mac sends nothing to a phone
+ * whose owner has not said yes.
+ */
+const NOT_YET: NotificationSwitches = Object.freeze({ enabled: false, show_text: false, kinds: Object.freeze({ permission: true, question: true, failure: true, finished: true }) });
 
 function switchesOf(value: unknown): NotificationSwitches {
   const v = (value !== null && typeof value === 'object' ? value : {}) as Record<string, unknown>;
   const kinds = (v['kinds'] !== null && typeof v['kinds'] === 'object' ? v['kinds'] : {}) as Record<string, unknown>;
   return {
-    enabled: v['enabled'] !== false,
+    enabled: v['enabled'] === true,
     show_text: v['show_text'] === true,
     kinds: { permission: kinds['permission'] !== false, question: kinds['question'] !== false, failure: kinds['failure'] !== false, finished: kinds['finished'] !== false },
   };
@@ -461,6 +513,15 @@ function same(a: unknown, b: unknown): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
   } catch {
     return false;
+  }
+}
+
+function readSwitches(cache: SyncStore<SessionCache>): NotificationSwitches {
+  try {
+    const stored = cache.get('switches');
+    return typeof stored === 'string' ? switchesOf(JSON.parse(stored)) : NOT_YET;
+  } catch {
+    return NOT_YET;
   }
 }
 

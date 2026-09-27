@@ -12,6 +12,7 @@ class FakeConnection implements Connection {
   lastContact: number | null = null;
   gateway: GatewayInfo | null = null;
   hello: Record<string, unknown> | null = null;
+  cursor = 0;
   entries: OutboxEntry[] = [];
   readonly asked: { method: string; params: unknown }[] = [];
   readonly handlers = new Map<string, Set<Handler>>();
@@ -258,10 +259,11 @@ describe('the session', () => {
     connection.answers['device.notifications'] = () => {
       throw new Error('refused');
     };
-    const changing = session.setNotifications({ enabled: false });
     expect(session.getSnapshot().notifications.enabled).toBe(false);
-    await expect(changing).rejects.toThrow('refused');
+    const changing = session.setNotifications({ enabled: true });
     expect(session.getSnapshot().notifications.enabled).toBe(true);
+    await expect(changing).rejects.toThrow('refused');
+    expect(session.getSnapshot().notifications.enabled).toBe(false);
     connection.answers['device.notifications'] = () => ({ enabled: false, show_text: false, kinds: { permission: true, question: true, failure: false, finished: true }, environment: 'device' });
     await session.setNotifications({ enabled: false, kinds: { failure: false } });
     expect(session.getSnapshot().notifications).toEqual({ enabled: false, show_text: false, kinds: { permission: true, question: true, failure: false, finished: true } });
@@ -292,6 +294,23 @@ describe('the session', () => {
     connection.emit('event', { ...event(11, 'review_mark', { key: 'k2', path: 'b.txt', reviewed: true }), source: 'phone:Phone' }, { live: true });
     frame();
     expect(store.marksOf(session.getSnapshot().state, 'r1').map((m) => m.key).sort()).toEqual(['k1', 'k2']);
+  });
+
+  test('it counts how the stream arrived: a gap, a duplicate, and a start the Mac announced', async () => {
+    const { session, connection } = make();
+    connection.gateway = GATEWAY;
+    connection.cursor = 10;
+    await session.start();
+    connection.go('online');
+    await settle();
+    for (const seq of [11, 12, 13]) connection.emit('event', event(seq, 'output', {}), { live: true });
+    expect(session.streamStats()).toEqual({ count: 3, last: 13, gaps: 0, duplicates: 0, truncated: 0 });
+    connection.emit('event', event(15, 'output', {}), { live: true });
+    connection.emit('event', event(15, 'output', {}), { live: true });
+    expect(session.streamStats()).toMatchObject({ gaps: 1, duplicates: 1, last: 15 });
+    connection.emit('truncated', { cursor: 90 });
+    connection.emit('event', event(91, 'output', {}), { live: true });
+    expect(session.streamStats()).toMatchObject({ gaps: 1, duplicates: 1, truncated: 1, last: 91 });
   });
 
   test('coming to the front tries the Mac at once', async () => {

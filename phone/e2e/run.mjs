@@ -88,6 +88,8 @@ function labAt(state, stop) {
     code: () => lab('code', state),
     agent: (mode, title, prompt = 'go') => lab('agent', state, mode, title, prompt),
     mode: (mode) => lab('mode', state, mode),
+    down: () => lab('down', state),
+    up: () => lab('up', state),
     stop,
   };
 }
@@ -98,7 +100,7 @@ async function startLab(log, platform, out) {
   fs.rmSync(state, { force: true });
   // The daemon delivers notifications itself: to the iOS simulator through the simulator's own
   // tool, and nothing to Android, which shows its own while the app is open.
-  const child = spawn('node', [path.join(here, 'lab.mjs'), 'start', '--port', String(PORTS[platform]), '--state', state], { cwd: phone, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn('node', [path.join(here, 'lab.mjs'), 'start', '--port', String(PORTS[platform]), '--state', state, '--survive'], { cwd: phone, stdio: ['ignore', 'pipe', 'pipe'] });
   child.stdout.on('data', (chunk) => log.raw(`lab: ${String(chunk).slice(0, 400)}`));
   child.stderr.on('data', (chunk) => log.raw(`lab: ${chunk}`));
   const end = Date.now() + 60_000;
@@ -116,7 +118,8 @@ async function startLab(log, platform, out) {
 async function flow(log, dev, name, env, out) {
   const file = path.join(here, 'flows', `${name}.yaml`);
   const args = ['--udid', dev.id, 'test', '--debug-output', path.join(out, 'maestro', dev.platform, name), '--flatten-debug-output'];
-  for (const [key, value] of Object.entries({ APP: BUNDLE, ...env })) args.push('-e', `${key}=${value}`);
+  const { SHOTS: shots = path.join(out, dev.platform, 'screens'), ...given } = env;
+  for (const [key, value] of Object.entries({ APP: BUNDLE, ...given })) args.push('-e', `${key}=${value}`);
   args.push(file);
   log.say(`flow ${name}`);
   const child = maestro(args, { cwd: phone });
@@ -125,7 +128,18 @@ async function flow(log, dev, name, env, out) {
   child.stderr.on('data', (chunk) => (output += chunk));
   const status = await new Promise((resolve) => child.on('exit', resolve));
   log.raw(output.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '').split('\n').filter((line) => line.trim()).slice(-60).join('\n'));
+  collect(path.join(out, 'maestro', dev.platform, name), shots);
   if (status !== 0) throw new Error(`the flow ${name} failed`);
+}
+
+/** The screenshots a flow took by name are gathered where the scenario wants them. */
+function collect(from, to) {
+  if (!fs.existsSync(from)) return;
+  for (const entry of fs.readdirSync(from, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.png') || entry.name.startsWith('screenshot-')) continue;
+    fs.mkdirSync(to, { recursive: true });
+    fs.copyFileSync(path.join(entry.parentPath ?? entry.path, entry.name), path.join(to, entry.name));
+  }
 }
 
 async function until(what, ok, ms = 20_000) {
@@ -162,7 +176,7 @@ async function platformRun(args, platform, summary) {
     lab = await startLab(log, platform, args.out);
   }
   const results = [];
-  const context = { log, dev, lab, out, platform, until, sleep, flow: (name, env = {}) => flow(log, dev, name, env, args.out), shot: (name) => dev.screenshot(path.join(out, `${name}.png`)) };
+  const context = { log, dev, lab, out, platform, until, sleep, port: args.dev ? lab.info().port : PORTS[platform], flow: (name, env = {}) => flow(log, dev, name, env, args.out), shot: (name) => dev.screenshot(path.join(out, `${name}.png`)) };
   fs.mkdirSync(out, { recursive: true });
   try {
     for (const scenario of scenarios) {
@@ -235,7 +249,7 @@ async function main() {
       console.error(`${platform}: ${summary[platform][0].note}`);
     }
   }
-  fs.writeFileSync(path.join(args.out, 'result.json'), `${JSON.stringify({ at: new Date().toISOString(), seededSlow: args.slow, ok, platforms: summary }, null, 2)}\n`);
+  fs.writeFileSync(path.join(args.out, `result-${args.platforms.join('-')}.json`), `${JSON.stringify({ at: new Date().toISOString(), seededSlow: args.slow, ok, platforms: summary }, null, 2)}\n`);
   console.log('');
   for (const [platform, results] of Object.entries(summary)) {
     for (const r of results) console.log(`${platform.padEnd(8)} ${r.ok === null ? 'skip' : r.ok ? 'ok  ' : 'FAIL'} ${r.name}${r.note ? `: ${r.note}` : ''}`);

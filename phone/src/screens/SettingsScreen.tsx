@@ -6,6 +6,7 @@ import { useSession, useSessionValue } from '@/session';
 import { Confirm, makeStyles, Row, Screen, Section, useMinute } from '@/ui';
 
 import { dayOf, inGroupsOfFour } from './settings/format';
+import { MacAddress } from './settings/MacAddress';
 import { Note } from './settings/Note';
 import { NotificationsSection } from './settings/NotificationsSection';
 import { useSafety } from './settings/safety';
@@ -88,6 +89,8 @@ export function SettingsScreen() {
             divided
           />
         </Section>
+
+        <MacAddress />
 
         <Section title={SETTINGS.appearance.title}>
           <Row testID="settings.appearance" label={SETTINGS.appearance.follows} />
