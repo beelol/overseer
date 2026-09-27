@@ -227,9 +227,11 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_control.rs",
-        "docs/verification/swarm/SWARM-23.md"
+        "docs/verification/swarm/SWARM-23.md",
+        "daemon/tests/swarm_state.rs",
+        "docs/verification/swarm/SWARM-37.md"
       ],
-      "blocker": "Background notifications now group active workers under their category and show queued Swarms with zero workers. The extension still has no Swarm active/queued counts, targets/accounts, limiting constraint, usage state, finishing reserve or decision explanation."
+      "blocker": "Background notifications group active workers under their category and show queued Swarms with zero workers. The daemon now exposes per-status job counts separately from running supervised workers, but the extension still has no Swarm view for active/queued counts, targets/accounts, limiting constraint, usage state, finishing reserve or decision explanation."
     },
     "SWARM-24": {
       "status": "partial",
@@ -347,9 +349,12 @@
       "blocker": "A fixture-only central queue fairly admits a 100-job and two-job backlog through one durable admission transaction. It does not yet start directors/workers automatically, route per-job targets through Auto Mode, reserve an actual director process, or prove cross-category scope and handoff isolation in a live run."
     },
     "SWARM-37": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "No 100-job/32-worker Swarm UI fixture, aggregate view or measured Pause/Stop acknowledgement latency exists."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_state.rs",
+        "docs/verification/swarm/SWARM-37.md"
+      ],
+      "blocker": "A 100-job daemon fixture verifies aggregate state counts, filtered cursor pages, director owner readout and separate supervised-worker count across restart. It does not launch 32 supervised workers or render the required VS Code view, account usage, blockers and worker detail; Pause/Stop acknowledgement latency is unmeasured."
     },
     "SWARM-38": {
       "status": "partial",
