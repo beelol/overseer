@@ -20,3 +20,4 @@ Status: the owner's two images are to be added to `docs/design/brand/` (they wer
 - Full colour wherever a surface allows colour; the single-colour glyph only where a surface tints one colour.
 - Do not recolour, stretch, add effects or put the full-colour mark on a busy background; on light grounds use the transparent mark as is.
 - The old eye glyph (`extension/media/overseer.svg`) is retired once AC-142 lands.
+- One exception (owner, 2026-09-27, [AC-177](../overseer-rfc.md)): in Voice Mode the mark is animated and moves with the voice. Only there, only the animation the owner picks, and never stretched or recoloured. Design: [Voice Mode RFC](../rfcs/voice-mode.md#the-mark-in-the-middle).

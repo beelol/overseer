@@ -17,6 +17,7 @@ pub const PROTOCOL_VERSION: i64 = 1;
 pub const MAX_REQUEST_BYTES: u64 = 1024 * 1024;
 
 pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
+    crate::audio::start(daemon.clone())?;
     let path = paths::socket_path();
     if let Some(dir) = path.parent() {
         paths::ensure_private_dir(dir)?;
@@ -215,6 +216,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
         "state" => d.state()?,
+        "audio.get" => crate::audio::get(d)?,
+        "audio.set" => crate::audio::set(d, p)?,
+        "audio.preview" => crate::audio::preview(d, p)?,
+        "audio.import_commander" => crate::audio::import_commander(d, p)?,
+        "audio.voices" => crate::audio::voices()?,
         "harness.list" => {
             let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "generic"]
                 .iter()
