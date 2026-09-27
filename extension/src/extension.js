@@ -149,6 +149,14 @@ async function activate(context) {
     }, 0);
     return true;
   };
+  let needsQueue = Promise.resolve();
+  const nextNeedsYou = async () => {
+    const list = attention();
+    if (!list.length) { vscode.window.setStatusBarMessage('$(check) Nothing needs you', 2500); return; }
+    // The most urgent item that is not already open (approvals first, then failures, then reviews).
+    const next = list.find(a => a.run_id !== selectedRun) || list[0];
+    await selectRun(next.run_id); center.focus('chat');
+  };
   // AC-106: "Where am I": every Overseer view open in this window (the Overseer view as chat, grid
   // or composer, the review, chats taken out into editor groups, New Task, run output), in editor
   // group order, and a jump to the one picked.
@@ -684,6 +692,52 @@ async function activate(context) {
       await vscode.window.showTextDocument(doc, { preview: true });
     })),
     vscode.commands.registerCommand('overseer.stopAll', guard(stopAll)),
+    vscode.commands.registerCommand('overseer.audioMode', guard(async () => {
+      const audio = await client.request('audio.get');
+      const trackName = { reactor: 'Reactor signals', system: 'System voice', commander: 'Private Commander' }[audio.track] || audio.track;
+      const choice = await vscode.window.showQuickPick([
+        { label: audio.enabled ? 'Turn Audio Mode off' : 'Turn Audio Mode on', action: 'toggle' },
+        { label: 'Choose audio track…', action: 'track' },
+        { label: 'Choose system voice…', action: 'voice' },
+        { label: 'Import private Commander pack…', action: 'import' },
+        { label: 'Preview cue…', action: 'preview' },
+      ], { title: 'Overseer Audio Mode', placeHolder: `${trackName} · ${audio.enabled ? 'On' : 'Off'}` });
+      if (!choice) return;
+      async function importCommander() {
+        const folders = await vscode.window.showOpenDialog({ title: 'Select your private Commander pack folder', canSelectFolders: true, canSelectFiles: false, canSelectMany: false });
+        if (!folders?.length) return false;
+        await client.request('audio.import_commander', { path: folders[0].fsPath });
+        return true;
+      }
+      if (choice.action === 'toggle') {
+        const result = await client.request('audio.set', { enabled: !audio.enabled });
+        vscode.window.showInformationMessage(`Overseer Audio Mode ${result.enabled ? 'on' : 'off'}.`);
+      } else if (choice.action === 'track') {
+        const chosen = await vscode.window.showQuickPick([
+          { label: 'Reactor signals', detail: 'Twelve short original synth cues', track: 'reactor' },
+          { label: 'System voice', detail: 'Speech generated on this Mac', track: 'system' },
+          { label: 'Private Commander', detail: audio.commander_imported ? 'Uses your local imported folder' : 'Choose a private folder first', track: 'commander' },
+        ], { title: 'Choose audio track' });
+        if (!chosen) return;
+        if (chosen.track === 'commander' && !audio.commander_imported && !await importCommander()) return;
+        await client.request('audio.set', { track: chosen.track });
+        vscode.window.setStatusBarMessage(`Overseer audio: ${chosen.label}`, 3000);
+      } else if (choice.action === 'voice') {
+        const voices = await client.request('audio.voices');
+        const chosen = await vscode.window.showQuickPick([
+          { label: 'System default', voice: '' },
+          ...voices.map(item => ({ label: item.name, description: item.locale, voice: item.name })),
+        ], { title: 'Choose system voice', matchOnDescription: true });
+        if (chosen) await client.request('audio.set', { track: 'system', voice: chosen.voice });
+      } else if (choice.action === 'import') {
+        if (await importCommander()) vscode.window.showInformationMessage('Private Commander pack is ready. The files stay in your selected folder.');
+      } else {
+        const core = new Set(audio.default_keys);
+        const cues = audio.manifest.filter(item => audio.track === 'reactor' || core.has(item.key));
+        const cue = await vscode.window.showQuickPick(cues.map(item => ({ label: item.label, description: audio.track === 'reactor' ? `${item.duration.toFixed(2)}s` : undefined, detail: item.meaning, key: item.key })), { title: `Preview ${trackName} cue` });
+        if (cue) await client.request('audio.preview', { key: cue.key });
+      }
+    })),
     vscode.commands.registerCommand('overseer.testNotification', guard(async () => {
       const { delivered_via: via } = await client.request('daemon.test_notice');
       const native = /^overseer-notifier \(ok\)/.test(via);
@@ -725,13 +779,9 @@ async function activate(context) {
           description: [path.basename(t?.repo_root || ''), p?.name].filter(Boolean).join(' · '), detail: undefined, run: r }; }), { title: 'Switch to agent', matchOnDescription: true, placeHolder: 'Search agents' });
       if (pick) { await selectRun(pick.run.id); center.focus('chat'); }
     })),
-    vscode.commands.registerCommand('overseer.nextNeedsYou', guard(async () => {
-      const list = attention();
-      if (!list.length) { vscode.window.setStatusBarMessage('$(check) Nothing needs you', 2500); return; }
-      // The most urgent item that is not already open (approvals first, then failures, then reviews).
-      const next = list.find(a => a.run_id !== selectedRun) || list[0];
-      await selectRun(next.run_id); center.focus('chat');
-    })),
+    // Presses queue up (AC-149): each one picks after the previous one has opened its agent, so two
+    // quick presses never land on the same agent.
+    vscode.commands.registerCommand('overseer.nextNeedsYou', guard(() => (needsQueue = needsQueue.then(nextNeedsYou, nextNeedsYou)))),
     vscode.commands.registerCommand('overseer.allowPermission', guard(async () => answerPermission(true))),
     vscode.commands.registerCommand('overseer.denyPermission', guard(async () => answerPermission(false))),
     vscode.commands.registerCommand('overseer.cleanupArchived', guard(cleanupArchived)),

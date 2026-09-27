@@ -1,0 +1,20 @@
+$ git rev-parse --short HEAD
+106d3e8
+$ node docs/verification/evidence/audio-mode/live-playback.js
+overseerd: target/release/overseerd  sha256 f7dc26e779c89859…
+macOS 26.6.2 arm64; home <tmp>/overseer-home
+
+PASS  off: a finished agent starts no player and writes no cache  {"enabled":false,"available":true,"players":0}
+PASS  Reactor: start and completion each play once through afplay, one at a time  {"players":["/usr/bin/afplay <tmp>/overseer-home/audio/reactor-v1/agent_started.mp3","/usr/bin/afplay <tmp>/overseer-home/audio/reactor-v1/agent_complete.mp3"],"most":1,"failures":[]}
+PASS  Reactor: the cache holds only the cues played, identical to the bundled files and owner-only  {"cached":["agent_complete.mp3","agent_started.mp3"],"same":true,"modes":["600","600"],"dir":"700"}
+PASS  Reactor: a failed top-level agent plays the attention cue once  {"players":["/usr/bin/afplay <tmp>/overseer-home/audio/reactor-v1/agent_started.mp3","/usr/bin/afplay <tmp>/overseer-home/audio/reactor-v1/agent_needs_attention.mp3"],"most":1}
+PASS  a burst of 40 preview requests: at most 5 accepted (one playing, four queued), the rest refused, one player at a time  {"accepted":5,"refused":35,"players":5,"most":1}
+PASS  the daemon's memory stays level across the burst (resident size within 4 MB)  {"before_kb":8528,"after_kb":8528}
+PASS  System voice: "Daniel" speaks through say; a voice that is not installed is refused  {"installed":185,"player":["/usr/bin/say -v Daniel Agent started."],"refused":"system voice is not installed"}
+PASS  Commander: refused before a folder is chosen, then played in place from the private folder  {"refused":"import the private Commander pack first","player":["/usr/bin/afplay <tmp>/private-commander/agent_complete/transmission/commander.wav"]}
+PASS  Commander: nothing was copied into the daemon's folder or the repository, and the private files are unchanged  {"copies":"","inRepo":[]}
+PASS  a missing Commander folder fails quietly: the agent completes, the failure is logged, the track reports unavailable  {"status":"completed","available":false,"preview":"selected audio track is unavailable","logged":2}
+PASS  after a daemon kill and restart Audio Mode is still on and no old cue is replayed  {"enabled":true,"track":"reactor","players":0}
+
+PASS  11 of 11 checks
+exit=0

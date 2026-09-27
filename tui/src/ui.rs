@@ -105,6 +105,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::Help => help(f, area),
         Mode::NewAgent => new_agent(f, &app.form, area),
         Mode::Accounts => accounts(f, app, area),
+        Mode::Audio => audio_mode(f, app, area),
+        Mode::AudioImport => audio_import(f, app, area),
         _ => {}
     }
 }
@@ -163,6 +165,8 @@ fn footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Zoom { .. } => &[("e", if app.expand_tools { "fold tools" } else { "expand tools" }), ("j/k", "scroll"), ("g/G", "top/bottom"), ("i", "message"), ("a/d", "allow/deny"), ("x", "interrupt"), ("z", "grid"), ("?", "help")],
         Mode::NewAgent => &[("tab", "next field"), ("←/→", "choose"), ("enter", "start"), ("esc", "cancel")],
         Mode::Accounts => &[("j/k", "select"), ("s", "sign in"), ("S", "device code (ChatGPT)"), ("r", "refresh"), ("esc", "close")],
+        Mode::Audio => &[("space", "on/off"), ("1/2/3", "track"), ("tab", "cue"), ("p", "preview"), ("v", "voice"), ("i", "import"), ("esc", "close")],
+        Mode::AudioImport => &[("type", "private folder path"), ("enter", "import"), ("esc", "back")],
         Mode::Search => &[("type", "to search title, repo, harness, model, prompt"), ("enter", "keep"), ("esc", "clear")],
         Mode::Changes => &[("j/k", "file"), ("J/K", "scroll diff"), ("c", "comparison"), ("r", "refresh"), ("v/esc", "back")],
         _ if area.width < 110 => &[("i", "message"), ("z", "zoom"), ("a/d", "answer"), ("n", "new"), ("?", "keys"), ("q", "quit")],
@@ -428,6 +432,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("f", "filter: all → active → needs you"),
         ("/", "search agents (esc clears)"),
         ("A", "accounts and sign-in"),
+        ("S", "Audio Mode: settings and preview"),
         ("r", "reload (after X: start the daemon)"),
         ("X", "stop all agents and the daemon"),
         ("q", "quit (agents keep running)"),
@@ -488,6 +493,53 @@ fn accounts(f: &mut Frame, app: &App, area: Rect) {
         .title_bottom(Line::from(Span::styled(" account login only · never API keys · s signs in · esc closes ", Style::new().fg(MUTED))).right_aligned());
     f.render_widget(Clear, r);
     f.render_widget(Paragraph::new(lines).block(block), r);
+}
+
+fn audio_mode(f: &mut Frame, app: &App, area: Rect) {
+    let w = 76.min(area.width.saturating_sub(4));
+    let h = 14.min(area.height.saturating_sub(2));
+    let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
+    let a = &app.audio;
+    let mode = if !a.known { "unknown" } else if a.enabled { "ON" } else { "OFF" };
+    let signal = if a.available { "ready" } else { "unavailable" };
+    let commander = if a.commander_imported { "private folder ready" } else { "no private folder" };
+    let voice = if a.voice.is_empty() { "system default" } else { a.voice.as_str() };
+    let lines = vec![
+        Line::raw(""),
+        Line::from(vec![Span::styled("  Audio Mode  ", Style::new().fg(accent()).add_modifier(Modifier::BOLD)), Span::raw(format!("{mode} · {signal}"))]),
+        Line::raw("  Off by default. The daemon plays one shared cue."),
+        Line::raw(""),
+        Line::raw(format!("  Track: {}    1 Reactor    2 System voice    3 Commander", a.track)),
+        Line::raw(format!("  Voice: {voice}    v/V changes installed macOS voice")),
+        Line::raw(format!("  Commander: {commander}    i imports a private folder")),
+        Line::raw(""),
+        Line::raw(format!("  Preview: {}    tab changes cue · p plays it", a.preview_key())),
+        Line::raw(""),
+        Line::raw("  space enable/disable    r refresh    esc close"),
+    ];
+    let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent()))
+        .title(Span::styled(" Audio Mode ", Style::new().add_modifier(Modifier::BOLD)))
+        .title_bottom(Line::from(Span::styled(" selected for every UI · played by overseerd ", Style::new().fg(MUTED))).right_aligned());
+    f.render_widget(Clear, r);
+    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }).block(block), r);
+}
+
+fn audio_import(f: &mut Frame, app: &App, area: Rect) {
+    let w = 76.min(area.width.saturating_sub(4));
+    let h = 9.min(area.height.saturating_sub(2));
+    let r = Rect { x: area.x + (area.width.saturating_sub(w)) / 2, y: area.y + (area.height.saturating_sub(h)) / 2, width: w, height: h };
+    let lines = vec![
+        Line::raw(""),
+        Line::raw("  Enter the folder containing the three private Commander WAVs."),
+        Line::raw("  Files stay in that folder and play in place."),
+        Line::raw(""),
+        Line::from(vec![Span::styled("  Path: ", Style::new().fg(accent())), Span::raw(&app.audio.import_path), Span::styled("▌", Style::new().fg(accent()))]),
+        Line::raw(""),
+        Line::raw("  enter import    esc back"),
+    ];
+    let block = Block::bordered().border_type(BorderType::Rounded).border_style(Style::new().fg(accent())).title(" private Commander folder ");
+    f.render_widget(Clear, r);
+    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }).block(block), r);
 }
 
 fn new_agent(f: &mut Frame, form: &NewAgentForm, area: Rect) {

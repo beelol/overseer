@@ -43,3 +43,4 @@ Made from the sources with `sips -z N N <source> --out <export>`; the macOS icon
 - Do not recolour, stretch, add effects or put the full-colour mark on a busy background; on light grounds use the transparent mark as is.
 - Provider logos (Claude, Codex, OpenCode and the rest in `extension/media/logos/`) are other companies' marks and stay as they are.
 - The old eye glyph is retired: no Overseer surface uses the eye any more. The codicon `eye` still means "watch" or "read only" where it is not Overseer's logo (following an agent's edits, tracking an agent in the grid, the read-only workspace).
+- One exception (owner, 2026-09-27, [AC-177](../overseer-rfc.md)): in Voice Mode the mark is animated and moves with the voice. Only there, only the animation the owner picks, and never stretched or recoloured. Design: [Voice Mode RFC](../rfcs/voice-mode.md#the-mark-in-the-middle).

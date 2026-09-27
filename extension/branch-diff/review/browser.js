@@ -126,7 +126,9 @@ function jump(id) {
   const row = rows.get(id); if (!row) { pendingJump = id; return; }
   clicked = id; closedFiles.delete(id); row.nearby = true; fold(row); ensure(row);
   diffs.scrollTop = row.element.offsetTop;
-  select(id); row.header.focus({ preventScroll: true }); updateViewport(); persist();
+  // Overseer (AC-149): following an agent must not take keyboard focus from the chat; the header
+  // takes focus only when the review already has it (the user is navigating in it).
+  select(id); if (document.hasFocus()) row.header.focus({ preventScroll: true }); updateViewport(); persist();
 }
 function changedEntries() { return (snapshot?.entries || []).filter(e => !e.browsed); }
 function changesOnly() { return navMode ? navMode === 'changes' : changedEntries().length > 0; }

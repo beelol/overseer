@@ -1,6 +1,6 @@
 # Prepared goal: finish Audio Mode (terminal UI and the loose ends)
 
-Status: activated on 2026-09-26. T-23, T-24 and AC-144 are verified on the branches of pull requests #6 and #5; AC-145 waits for the owner's listening session.
+Status: done. Activated on 2026-09-26; T-23, T-24, AC-144 and AC-145 are verified, and pull requests #5 and #6 were merged by the owner on 2026-09-27.
 Scope: T-23 and T-24 in the [TUI RFC](tui.md), and AC-144 and AC-145 under
 [Gate O](../overseer-rfc.md#gate-o--audio-mode-added-by-the-owner-2026-09-26) in the main RFC,
 following the [Audio Mode RFC](audio-mode.md). AC-143 is done in pull request #5 and is not part
