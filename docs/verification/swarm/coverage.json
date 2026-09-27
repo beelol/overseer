@@ -83,13 +83,14 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
+        "daemon/tests/swarm_availability.rs",
         "docs/verification/swarm/milestone-4.md",
         "daemon/tests/swarm_admission.rs",
         "docs/verification/swarm/milestone-7.md",
         "docs/verification/swarm/milestone-14.md",
         "docs/verification/swarm/SWARM-09.md"
       ],
-      "blocker": "Fixture targets sharing a pool share reservations across categories, and targets labeled as one account with no common pool now fail closed; live account identity discovery and proof of independent accounts remain unavailable."
+      "blocker": "Fixture targets sharing a pool share reservations across categories, and targets labeled as one account with no common pool fail closed. An explicit revoked auth status now blocks every target alias with that account ID and cancels admitted jobs on both routes while an independent account stays eligible. Live account identity discovery, cross-mode shared quota authority, and proof of independent real accounts remain unavailable."
     },
     "SWARM-10": {
       "status": "partial",
@@ -623,6 +624,7 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_availability.rs",
+        "daemon/tests/swarm_policy.rs",
         "daemon/tests/swarm_admission.rs",
         "daemon/src/swarm/availability.rs",
         "docs/verification/swarm/SWARM-59.md",
@@ -631,7 +633,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. A joined Atlas replay blocks J4 after an injected external allowance reduction while preserving J2 backend evidence; a separate cross-category regression fences an older generous admission snapshot. An injected selected-account revocation now cancels and interrupts only its active worker, records one durable revoke operation across replay, preserves another account's evidence, and leaves usage uncertain. Director-wide availability messages remain readable with null job and attempt IDs. Live Auto Mode updates, account identity feeds, numeric allowance display, normal status UI, user-triggered target changes and live director behavior remain unverified."
+      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. A joined Atlas replay blocks J4 after an injected external allowance reduction while preserving J2 backend evidence; a separate cross-category regression fences an older generous admission snapshot. An injected explicit account revocation now cancels admitted jobs on every selected route with the same account ID, records one durable revoke operation across replay, preserves an independent account's eligibility, and leaves usage uncertain. Director-wide availability messages remain readable with null job and attempt IDs. Live Auto Mode updates, verified account identity feeds, numeric allowance display, normal status UI, user-triggered target changes and live director behavior remain unverified."
     },
     "SWARM-60": {
       "status": "partial",

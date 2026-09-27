@@ -156,6 +156,20 @@ fn one_account_without_a_common_verified_pool_cannot_double_its_allowance() {
 }
 
 #[test]
+fn revoked_account_blocks_all_of_its_target_aliases() {
+    let d=Daemon::start(&[]);
+    let mut input=snapshot(Some(60000),true);
+    input["targets"][0]["auth"]=json!("revoked");
+    let result=preview(&d,input.clone(),&["cheap","qualified","independent"],1000,0);
+    assert_eq!(result["targets"]["cheap"]["reason"],"auth_unavailable");
+    assert_eq!(result["targets"]["qualified"]["reason"],"auth_unavailable");
+    assert_eq!(result["targets"]["independent"]["eligible"],true);
+    let selected_alias=preview(&d,input,&["qualified","independent"],1000,0);
+    assert_eq!(selected_alias["targets"]["qualified"]["reason"],"auth_unavailable");
+    assert_eq!(selected_alias["targets"]["independent"]["eligible"],true);
+}
+
+#[test]
 fn preview_uses_explicit_percentage_bounds_instead_of_builtin_values() {
     let d=Daemon::start(&[]);
     let result=d.call("swarm.policy.preview",json!({

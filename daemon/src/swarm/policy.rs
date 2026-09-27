@@ -106,12 +106,16 @@ pub fn preview(p: &Value) -> Result<Value> {
     }
     let mut target_ids = HashSet::new();
     let mut account_pools: HashMap<&str, (usize, HashSet<&str>)> = HashMap::new();
+    let mut revoked_accounts = HashSet::new();
     for target in &snapshot.targets {
         if target.id.is_empty()
             || target.account_id.is_empty()
             || !target_ids.insert(target.id.as_str())
         {
             bail!("duplicate or missing target identity");
+        }
+        if target.auth == "revoked" {
+            revoked_accounts.insert(target.account_id.as_str());
         }
         let declared: HashSet<&str> = target.pool_ids.iter().map(String::as_str).collect();
         if let Some((count, common)) = account_pools.get_mut(target.account_id.as_str()) {
@@ -135,6 +139,8 @@ pub fn preview(p: &Value) -> Result<Value> {
             reason = Some("not_allowed");
         } else if snapshot.expires_ms <= request.now_ms {
             reason = Some("stale_snapshot");
+        } else if revoked_accounts.contains(target.account_id.as_str()) {
+            reason = Some("auth_unavailable");
         } else if target.health != "up" {
             reason = Some("target_unhealthy");
         } else if target.auth != "ok" {

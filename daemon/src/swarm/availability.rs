@@ -7,6 +7,7 @@ use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 
 pub fn get(store: &Store, run: &str) -> Result<Value> {
     let row: Option<(String, Option<String>, String, String, i64, i64, i64)> = store
@@ -112,10 +113,15 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
         }
     }
     eligible.sort();
+    let revoked_accounts: HashSet<&str> = p["snapshot"]["targets"].as_array()
+        .into_iter().flatten()
+        .filter(|target| target["auth"]=="revoked")
+        .filter_map(|target| target["account_id"].as_str()).collect();
     let revoked_targets: Vec<String> = allowed.iter().filter_map(|id| {
         let id=id.as_str()?;
         p["snapshot"]["targets"].as_array()?.iter()
-            .any(|target| target["id"]==id && target["auth"]=="revoked")
+            .any(|target| target["id"]==id && target["account_id"].as_str()
+                .is_some_and(|account| revoked_accounts.contains(account)))
             .then(|| id.to_string())
     }).collect();
     let reason = if !eligible.is_empty() {

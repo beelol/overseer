@@ -25,19 +25,22 @@ fn snapshot(at: i64, healthy: bool, remaining: i64) -> Value {
 fn revoked_selected_identity_cancels_only_its_active_attempt_and_keeps_usage_uncertain() {
     let mut d=Daemon::start(&[]);
     let created=d.call("swarm.create",json!({"category":"Revoked identity",
-        "objective":"Audit selected accounts","allowed_targets":["route-a","route-b"]}));
+        "objective":"Audit selected accounts","allowed_targets":["route-a","route-a-alt","route-b"]}));
     let run=created["id"].as_str().unwrap();
     d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
         {"id":"a","title":"Inspect A","acceptance":"A evidence","deps":[]},
-        {"id":"b","title":"Inspect B","acceptance":"B evidence","deps":[]}
+        {"id":"b","title":"Inspect B","acceptance":"B evidence","deps":[]},
+        {"id":"c","title":"Inspect A alias","acceptance":"A alias evidence","deps":[]}
     ]}));
-    commit_beneficial_batch(&d,run,&["a".into(),"b".into()]);
+    commit_beneficial_batch(&d,run,&["a".into(),"b".into(),"c".into()]);
     let at=now();
     let snap=|time:i64,revoked:bool|json!({"version":1,"observed_ms":time,
         "expires_ms":time+60000,"targets":[
             {"id":"route-a","account_id":"account-a","pool_ids":["pool-a"],
                 "capabilities":["code"],"health":"up",
                 "auth":if revoked {"revoked"} else {"ok"}},
+            {"id":"route-a-alt","account_id":"account-a","pool_ids":["pool-a"],
+                "capabilities":["code"],"health":"up","auth":"ok"},
             {"id":"route-b","account_id":"account-b","pool_ids":["pool-b"],
                 "capabilities":["code"],"health":"up","auth":"ok"}],
         "pools":[{"id":"pool-a","windows":[{"id":"week","unit":"points",
@@ -58,9 +61,11 @@ fn revoked_selected_identity_cancels_only_its_active_attempt_and_keeps_usage_unc
         "estimate_milli":{"points":100},"purpose":"worker"}));
     let a=admit("a","route-a",at,false);
     assert_eq!(a["status"],"admitted","{a}");
+    let c=admit("c","route-a-alt",at,false);
+    assert_eq!(c["status"],"admitted","{c}");
     let changed=observe(at+1000,true);
     assert_eq!(changed["state"],"eligible","{changed}");
-    assert_eq!(changed["revoked_jobs"],json!(["a"]));
+    assert_eq!(changed["revoked_jobs"],json!(["a","c"]));
     let replay=observe(at+1000,true);
     assert_eq!(replay["changed"],false);
     assert_eq!(replay["revoked_jobs"],json!([]));
@@ -68,7 +73,11 @@ fn revoked_selected_identity_cancels_only_its_active_attempt_and_keeps_usage_unc
     let a_job=jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="a").unwrap();
     assert_eq!(a_job["status"],"cancel_requested");
     assert_eq!(a_job["stop_reason"],"account_identity_revoked");
+    let c_job=jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="c").unwrap();
+    assert_eq!(c_job["status"],"cancel_requested");
+    assert_eq!(c_job["stop_reason"],"account_identity_revoked");
     assert_eq!(admit("b","route-a",at+1000,true)["reason"],"auth_unavailable");
+    assert_eq!(admit("b","route-a-alt",at+1000,true)["reason"],"auth_unavailable");
     let b=admit("b","route-b",at+1000,true);
     assert_eq!(b["status"],"admitted","{b}");
     d.kill9();
