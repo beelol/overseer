@@ -3,6 +3,7 @@
 //! agents) and the conversation with Overseer. The model never touches an agent, a worktree or a
 //! shell directly: it reads through `overseer.tool` and asks the daemon to act.
 
+pub mod checkin;
 pub mod conflicts;
 pub mod control;
 pub mod digest;
@@ -43,6 +44,11 @@ pub(crate) fn tool_list(role: &str) -> Vec<Value> {
         ] {
             tools.push(json!({"name": name, "description": description, "inputSchema": {"type": "object", "properties": props, "required": required, "additionalProperties": false}}));
         }
+        tools.push(json!({
+            "name": "check_in",
+            "description": "Your result of a check-in on one agent: on_task (nothing is sent to it), drifting (say why; then use propose for what to do), or done (what it did, and what it left out if anything).",
+            "inputSchema": {"type": "object", "properties": {"agent": {"type": "string"}, "result": {"type": "string", "enum": ["on_task", "drifting", "done"]}, "reason": {"type": "string"}, "left_out": {"type": "string"}}, "required": ["agent", "result", "reason"], "additionalProperties": false}
+        }));
         tools.push(json!({
             "name": "propose",
             "description": "Ask the daemon for actions on agents: message (agent, text), stop (agent), pin (agent), start (repo, title, prompt). The daemon checks each one and, at the owner's level, either records a proposal that waits for the owner's yes or carries it out. Returns what happened.",
@@ -93,6 +99,10 @@ impl Daemon {
                 let id = arguments["id"].as_str().unwrap_or_default();
                 self.digest_text(id)?
             }
+            "check_in" => match self.record_check_in(arguments["agent"].as_str().unwrap_or(""), arguments["result"].as_str().unwrap_or(""), arguments["reason"].as_str().unwrap_or(""), arguments["left_out"].as_str().unwrap_or("")) {
+                Ok(_) => "Recorded.".to_string(),
+                Err(e) => return Ok(json!({"text": format!("refused: {e}"), "is_error": true})),
+            },
             "propose" => match self.overseer_propose(&arguments["actions"], "tool") {
                 Ok(r) => format!("{} (proposal {})", r["result"].as_str().unwrap_or(""), r["proposal"].as_str().unwrap_or("")),
                 Err(e) => {

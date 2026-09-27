@@ -61,7 +61,7 @@ fn ac180_mcp_shim_serves_overseers_tools_from_the_daemon() {
     assert_eq!(replies[0]["result"]["serverInfo"]["name"], "overseer");
     assert_eq!(replies[0]["result"]["capabilities"]["tools"]["listChanged"], false);
     let tools: Vec<&str> = replies[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(tools, ["roster", "agent", "conflicts", "conversation", "changes", "diff", "file", "search", "usage", "propose"]);
+    assert_eq!(tools, ["roster", "agent", "conflicts", "conversation", "changes", "diff", "file", "search", "usage", "check_in", "propose"]);
     let roster = replies[2]["result"]["content"][0]["text"].as_str().unwrap();
     assert!(roster.contains(&run) && roster.contains("completed"), "roster names the run: {roster}");
     assert_eq!(replies[2]["result"]["isError"], false);
@@ -1056,4 +1056,200 @@ fn ac188_redirect_and_the_queue() {
     }
     std::thread::sleep(Duration::from_secs(1));
     assert_eq!(d.call("run.turns", json!({"run_id": gen})).as_array().unwrap().len(), 2, "one delivery");
+}
+
+/// Turns Overseer's own run has taken, and the reasons it started them.
+fn overseer_turn_causes(d: &Daemon) -> Vec<String> {
+    let db = d.home.path().join("overseer.sqlite");
+    let out = Command::new("sqlite3").arg(&db).arg("SELECT cause FROM overseer_turns ORDER BY ts;").output().unwrap();
+    String::from_utf8_lossy(&out.stdout).lines().map(str::to_string).collect()
+}
+
+fn check_ins(d: &Daemon, run: &str) -> Vec<Value> {
+    d.call("agent.check_ins", json!({"run_id": run}))["check_ins"].as_array().unwrap().clone()
+}
+
+fn wait_check_ins(d: &Daemon, run: &str, n: usize, secs: u64) -> Vec<Value> {
+    let started = std::time::Instant::now();
+    loop {
+        let c = check_ins(d, run);
+        if c.len() >= n {
+            return c;
+        }
+        assert!(started.elapsed() < Duration::from_secs(secs), "{} check-ins on {run}, wanted {n}: {c:?}", c.len());
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+/// AC-189: an agent on task gets check-ins after turns 3 and 6 and when it finishes, and never a
+/// message; the owner's direction changes the cadence; an agent that writes outside its area is
+/// found by the free check and by the check-in that follows, which acts at the level; an agent
+/// that finishes with part left out gets a done card naming it; the same failure three times
+/// trips a check-in; check-ins off leaves the free checks running; several agents finishing
+/// together are one Overseer turn; an agent that did nothing causes none.
+#[test]
+fn ac189_overseer_keeps_agents_on_task() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    std::fs::create_dir_all(repo.join("docs")).unwrap();
+    std::fs::write(repo.join("docs/notes.md"), "notes\n").unwrap();
+    std::fs::write(repo.join("README.md"), "# Demo\n").unwrap();
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-qm", "base"]);
+    let mode_file = r.path().join("mode");
+    let d = overseer_daemon(&mode_file);
+    d.call("overseer.session", json!({}));
+    // An agent is finished when it stays idle for the grace period; one second here.
+    sql(&d, "INSERT OR REPLACE INTO meta(key, value) VALUES('overseer.grace_ms', '1000');");
+    // Overseer's run must exist before check-ins, so the first turn is the owner's.
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    wait_overseer_idle(&d, 30);
+    // On task through seven turns: check-ins after turns 3 and 6 and at the end; no message.
+    let steady = claude_task(&d, &repo, &mode_file, "echo", "Steady", "keep the docs tidy");
+    d.wait_done(&steady, 30);
+    for i in 2..=7 {
+        d.call("run.follow_up", json!({"run_id": steady, "prompt": format!("turn {i}")}));
+        d.wait_done(&steady, 30);
+        std::thread::sleep(Duration::from_millis(300));
+    }
+    // Every completion queues a "finished" check-in too; cadence turns 3 and 6 add theirs. The
+    // batch window folds those due within 5 s, so wait for the queue to drain.
+    std::thread::sleep(Duration::from_secs(7));
+    wait_overseer_idle(&d, 60);
+    let c = check_ins(&d, &steady);
+    assert!(c.iter().all(|x| x["result"] == "on_task" || x["result"] == "done"), "{c:?}");
+    let ev = d.events(&steady);
+    let reasons: Vec<String> = ev.iter().filter(|e| e["kind"] == "check_in_started").flat_map(|e| e["payload"]["reasons"].as_array().unwrap().iter().map(|r| r.as_str().unwrap().to_string()).collect::<Vec<_>>()).collect();
+    assert!(reasons.contains(&"turn 3".to_string()) && reasons.contains(&"turn 6".to_string()) && reasons.contains(&"finished".to_string()), "{reasons:?}");
+    assert!(!reasons.iter().any(|r| r == "turn 2" || r == "turn 4" || r == "turn 5"), "{reasons:?}");
+    assert_eq!(reasons.iter().filter(|r| *r == "finished").count(), 1, "finished once, after the last turn: {reasons:?}");
+    let turns = d.call("run.turns", json!({"run_id": steady}));
+    assert!(turns.as_array().unwrap().iter().all(|t| !t["prompt"].as_str().unwrap().starts_with("From Overseer")), "an agent on task hears nothing");
+    // "Check on it every turn" and "leave it alone until it is done".
+    let close = claude_task(&d, &repo, &mode_file, "echo", "Close", "small task");
+    d.call("agent.cadence", json!({"run_id": close, "cadence": "every_turn", "by": "owner"}));
+    d.wait_done(&close, 30);
+    d.call("run.follow_up", json!({"run_id": close, "prompt": "turn 2"}));
+    d.wait_done(&close, 30);
+    std::thread::sleep(Duration::from_secs(6));
+    wait_overseer_idle(&d, 60);
+    let ev = d.events(&close);
+    let started: Vec<&Value> = ev.iter().filter(|e| e["kind"] == "check_in_started").collect();
+    assert!(started.iter().any(|e| e["payload"]["reasons"].as_array().unwrap().iter().any(|r| r == "turn 1")) && started.iter().any(|e| e["payload"]["reasons"].as_array().unwrap().iter().any(|r| r == "turn 2")), "{started:?}");
+    let alone = claude_task(&d, &repo, &mode_file, "echo", "Alone", "long task");
+    d.call("agent.cadence", json!({"run_id": alone, "cadence": "done", "by": "owner"}));
+    d.wait_done(&alone, 30);
+    for i in 2..=4 {
+        d.call("run.follow_up", json!({"run_id": alone, "prompt": format!("turn {i}")}));
+        d.wait_done(&alone, 30);
+    }
+    std::thread::sleep(Duration::from_secs(6));
+    wait_overseer_idle(&d, 60);
+    let ev = d.events(&alone);
+    let reasons: Vec<String> = ev.iter().filter(|e| e["kind"] == "check_in_started").flat_map(|e| e["payload"]["reasons"].as_array().unwrap().iter().map(|r| r.as_str().unwrap().to_string()).collect::<Vec<_>>()).collect();
+    assert!(reasons.iter().all(|r| r == "finished"), "only when done: {reasons:?}");
+    // An agent that writes outside its area: the free check within 2 s of its own file event,
+    // then the check-in that follows acts at the level: a proposal at Ask first.
+    std::fs::write(&mode_file, "slow").unwrap();
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": "tidy the docs", "title": "Drifter"}));
+    let drifter = run_id(&created);
+    d.wait_status(&drifter, |s| s == "running", 20);
+    sql(&d, &format!("INSERT INTO areas(run_id, path, set_by, created_ms) VALUES('{drifter}', 'docs', 'owner', 1);"));
+    d.wait_done(&drifter, 30);
+    std::fs::write(&mode_file, "showcase").unwrap();
+    d.call("run.follow_up", json!({"run_id": drifter, "prompt": "now do it"}));
+    d.wait_done(&drifter, 30);
+    let ev = d.events(&drifter);
+    let outside = ev.iter().find(|e| e["kind"] == "outside_area").expect("free check");
+    let activity = ev.iter().find(|e| e["kind"] == "file_activity" && e["payload"]["paths"].as_array().unwrap().iter().any(|p| p.as_str().unwrap().starts_with("src/"))).unwrap();
+    assert!(outside["ts"].as_i64().unwrap() - activity["ts"].as_i64().unwrap() <= 2000);
+    std::thread::sleep(Duration::from_secs(6));
+    let s = wait_overseer_idle(&d, 60);
+    let c = check_ins(&d, &drifter);
+    assert!(c.iter().any(|x| x["result"] == "drifting"), "{c:?}");
+    let open = s["proposals"].as_array().unwrap();
+    assert!(open.iter().any(|p| p["actions"][0]["action"] == "redirect" && p["actions"][0]["agent"] == drifter), "at Ask first a proposal: {open:?}");
+    assert!(d.call("agent.holds", json!({}))["holds"].as_array().unwrap().is_empty());
+    // At Steer the same check-in holds; at Auto it redirects.
+    for p in open {
+        d.call("overseer.answer", json!({"id": p["id"], "yes": false, "surface": "ctl", "by": "owner"}));
+    }
+    d.call("overseer.level", json!({"level": "steer"}));
+    sql(&d, "DELETE FROM free_checks;");
+    d.call("run.follow_up", json!({"run_id": drifter, "prompt": "and again"}));
+    d.wait_done(&drifter, 30);
+    std::thread::sleep(Duration::from_secs(6));
+    wait_overseer_idle(&d, 60);
+    assert!(d.call("agent.holds", json!({}))["holds"].as_array().unwrap().iter().any(|h| h["run_id"] == drifter), "held at Steer");
+    d.call("agent.release", json!({"run_id": drifter, "by": "owner"}));
+    d.call("overseer.level", json!({"level": "auto"}));
+    sql(&d, "DELETE FROM free_checks;");
+    d.call("run.follow_up", json!({"run_id": drifter, "prompt": "once more"}));
+    d.wait_done(&drifter, 30);
+    std::thread::sleep(Duration::from_secs(6));
+    wait_overseer_idle(&d, 60);
+    let ev = d.events(&drifter);
+    assert!(ev.iter().any(|e| e["kind"] == "redirect" && e["payload"]["detail"]["by"].as_str().unwrap_or("").contains("auto")), "redirected at Auto");
+    d.call("overseer.level", json!({"level": "ask_first"}));
+    // Finished with part left out: a done card that names it.
+    std::fs::write(&mode_file, "echo").unwrap();
+    let partial = claude_task(&d, &repo, &mode_file, "echo", "Partial", "write the API and the docs [leave out: the docs]");
+    d.wait_done(&partial, 30);
+    std::thread::sleep(Duration::from_secs(6));
+    let s = wait_overseer_idle(&d, 60);
+    let done = s["messages"].as_array().unwrap().iter().find(|m| m["source"] == "card" && m["card"]["kind"] == "done" && m["card"]["agent"] == partial).expect("done card");
+    assert_eq!(done["card"]["left_out"], "the docs");
+    // The same failure three times trips a check-in.
+    let circles = claude_task(&d, &repo, &mode_file, "circles", "Loops", "fix the tests");
+    d.wait_done(&circles, 30);
+    let ev = d.events(&circles);
+    assert!(ev.iter().any(|e| e["kind"] == "going_in_circles" && e["payload"]["times"] == 3), "{:?}", ev.iter().map(|e| e["kind"].clone()).collect::<Vec<_>>());
+    std::thread::sleep(Duration::from_secs(6));
+    wait_overseer_idle(&d, 60);
+    let reasons: Vec<String> = d.events(&circles).iter().filter(|e| e["kind"] == "check_in_started").flat_map(|e| e["payload"]["reasons"].as_array().unwrap().iter().map(|r| r.as_str().unwrap().to_string()).collect::<Vec<_>>()).collect();
+    assert!(reasons.iter().any(|r| r.contains("three times")), "{reasons:?}");
+    // Check-ins off: none runs; the free checks still do.
+    d.call("agent.cadence", json!({"cadence": "off", "by": "owner"}));
+    let quiet = claude_task(&d, &repo, &mode_file, "circles", "Quiet", "fix the tests");
+    d.wait_done(&quiet, 30);
+    std::thread::sleep(Duration::from_secs(6));
+    wait_overseer_idle(&d, 60);
+    assert!(d.events(&quiet).iter().any(|e| e["kind"] == "going_in_circles"));
+    assert!(check_ins(&d, &quiet).is_empty() && !d.events(&quiet).iter().any(|e| e["kind"] == "check_in_started"));
+    d.call("agent.cadence", json!({"cadence": "every:3", "by": "owner"}));
+    // Four agents finishing together: one Overseer turn; an agent that did nothing: none.
+    let before = overseer_turn_causes(&d).len();
+    let mut four = Vec::new();
+    for i in 0..4 {
+        four.push(claude_task(&d, &repo, &mode_file, "echo", &format!("Four {i}"), "hello"));
+    }
+    for id in &four {
+        d.wait_done(id, 30);
+    }
+    std::thread::sleep(Duration::from_secs(7));
+    wait_overseer_idle(&d, 60);
+    let causes = overseer_turn_causes(&d);
+    assert_eq!(causes.len(), before + 1, "one turn for four agents: {:?}", &causes[before..]);
+    assert_eq!(causes.last().unwrap(), "check_in");
+    for id in &four {
+        assert!(!check_ins(&d, id).is_empty(), "each of the four was checked");
+    }
+    let idle = d.generic(&repo, "worktree", "/bin/sh", &["-c", "sleep 120"]);
+    let idle = run_id(&idle);
+    d.wait_status(&idle, |s| s == "running", 20);
+    std::thread::sleep(Duration::from_secs(7));
+    assert!(check_ins(&d, &idle).is_empty(), "no turn, no check-in");
+    assert_eq!(overseer_turn_causes(&d).len(), before + 1);
+    // A question after agents finished meanwhile (however long ago) is answered from their
+    // current digests: the envelope is built when the owner asks, not from a check-in.
+    d.call("overseer.send", json!({"text": "What is everyone doing?", "surface": "ctl", "harness": "claude"}));
+    let s = wait_overseer_idle(&d, 30);
+    let turns = d.call("run.turns", json!({"run_id": s["run_id"]}));
+    let prompt = turns.as_array().unwrap().last().unwrap()["prompt"].as_str().unwrap().to_string();
+    let agents: Value = serde_json::from_str(prompt.split("Agents (JSON):\n").nth(1).unwrap().split("\n</overseer-state>").next().unwrap()).unwrap();
+    assert!(agents.as_array().unwrap().iter().any(|a| a["id"] == four[0] && a["status"] == "completed"), "{agents}");
+    // The cap: a turn that answers the owner is never counted; self-started turns are.
+    let cap = d.call("overseer.cap", json!({}));
+    assert!(cap["self_started_today"].as_i64().unwrap() >= 5 && cap["cap"] == 100, "{cap}");
+    assert_eq!(overseer_turn_causes(&d).iter().filter(|c| *c == "owner").count() as i64 + cap["self_started_today"].as_i64().unwrap(), overseer_turn_causes(&d).len() as i64);
 }

@@ -340,6 +340,15 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "agent.redirect" => d.agent_redirect(s(p, "run_id")?, s(p, "text")?, p["source"].as_str().unwrap_or("owner"), json!({}))?,
         "conflict.resolve" => d.conflict_resolve(s(p, "id")?, s(p, "how")?, p["keeper"].as_str(), p["by"].as_str().unwrap_or("owner"))?,
         "overseer.card" => d.card(s(p, "id")?)?,
+        "agent.cadence" => match p["cadence"].as_str() {
+            Some(c) => d.set_cadence(p["run_id"].as_str(), c, p["by"].as_str().unwrap_or("owner"))?,
+            None => json!({"run_id": p["run_id"], "cadence": d.cadence_of(p["run_id"].as_str().unwrap_or("")).text()}),
+        },
+        "agent.check_ins" => d.check_ins_of(s(p, "run_id")?)?,
+        "overseer.cap" => match p["cap"].as_i64() {
+            Some(c) => d.set_cap(c)?,
+            None => json!({"cap": d.cap_of(), "self_started_today": d.self_started_today()}),
+        },
         "run.queued" => d.queued_messages(s(p, "run_id")?)?,
         "run.unqueue" => d.unqueue_message(s(p, "run_id")?, p["id"].as_i64().unwrap_or(0))?,
         "overseer.tools" => d.overseer_tools(s(p, "token")?)?,

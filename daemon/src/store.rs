@@ -195,6 +195,13 @@ impl Store {
             CREATE TABLE IF NOT EXISTS dispatches(
               id TEXT PRIMARY KEY, card_id TEXT NOT NULL, run_id TEXT NOT NULL, action TEXT NOT NULL, delivery TEXT NOT NULL, message TEXT NOT NULL,
               why TEXT NOT NULL, state TEXT NOT NULL, held_ms INTEGER NOT NULL, sent_ms INTEGER, delivered_ms INTEGER, picked_ms INTEGER, answered_ms INTEGER, turn_id TEXT);
+            CREATE TABLE IF NOT EXISTS cadences(run_id TEXT PRIMARY KEY, cadence TEXT NOT NULL, set_by TEXT NOT NULL, set_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS check_in_queue(run_id TEXT NOT NULL, reason TEXT NOT NULL, ts INTEGER NOT NULL, not_before INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS check_ins(run_id TEXT NOT NULL, ts INTEGER NOT NULL, result TEXT NOT NULL, reason TEXT NOT NULL, left_out TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS free_checks(run_id TEXT NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL, ts INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS circles(run_id TEXT PRIMARY KEY, detail TEXT NOT NULL, count INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS tool_inputs(run_id TEXT NOT NULL, tool_id TEXT NOT NULL, input TEXT NOT NULL, PRIMARY KEY(run_id, tool_id));
+            CREATE TABLE IF NOT EXISTS overseer_turns(ts INTEGER NOT NULL, session_id TEXT NOT NULL, cause TEXT NOT NULL, turn_id TEXT);
             CREATE TABLE IF NOT EXISTS queued_messages(
               run_id TEXT NOT NULL, ts INTEGER NOT NULL, source TEXT NOT NULL, text TEXT NOT NULL, detail TEXT,
               delivered_ms INTEGER, turn_id TEXT);

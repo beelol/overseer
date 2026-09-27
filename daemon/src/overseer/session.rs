@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 pub const LEVELS: &[&str] = &["ask_first", "steer", "auto"];
 /// Actions Overseer may ask for today; share, report, area and watch arrive with their steps.
-pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "release", "guardrail", "redirect", "archive"];
+pub const ACTIONS: &[&str] = &["message", "stop", "start", "pin", "hold", "release", "guardrail", "redirect", "archive", "cadence"];
 /// The settle window in which what the owner asked for can still be cancelled (AC-170's).
 pub const SETTLE_MS: i64 = 2000;
 const TURN_BYTES: usize = 32 * 1024;
@@ -76,6 +76,10 @@ impl Daemon {
         let session = self.overseer_session()?;
         let store = self.store.lock().unwrap();
         Ok(json!({"messages": Self::messages_of(&store, session["id"].as_str().unwrap(), after, limit.clamp(1, 500))?}))
+    }
+
+    pub(crate) fn append_session_message(&self, session: &str, source: &str, surface: Option<&str>, text: &str, card: Option<&Value>) -> Result<Value> {
+        self.append_message(session, source, surface, text, card)
     }
 
     fn append_message(&self, session: &str, source: &str, surface: Option<&str>, text: &str, card: Option<&Value>) -> Result<Value> {
@@ -298,6 +302,29 @@ impl Daemon {
         Ok(json!({"message": msg, "queued": false, "run_id": turn["run_id"], "turn": turn["turn"]}))
     }
 
+    /// A turn Overseer starts by itself, with a prompt the daemon composed (a check-in, a
+    /// finding, a conflict). Counted against the cap.
+    pub(crate) fn overseer_turn_with_cause(self: &Arc<Self>, session: &Value, prompt: &str, harness: &str, model: Option<&str>, cause: &str) -> Result<Value> {
+        let sid = session["id"].as_str().unwrap().to_string();
+        let first = session["run_id"].is_null();
+        let prompt = if first { format!("{OPEN}\n{INSTRUCTIONS}\n{CLOSE}\n\n{prompt}") } else { prompt.to_string() };
+        let run_id = if first {
+            self.ensure_overseer_run(session, harness, model, &prompt)?
+        } else {
+            let run_id = session["run_id"].as_str().unwrap().to_string();
+            self.start_turn(&run_id, &prompt, true, &TurnOpts { model: model.filter(|m| !m.is_empty()).map(str::to_string), effort: None, mode: None, images: Vec::new() })?;
+            run_id
+        };
+        let cursor = self.store.lock().unwrap().max_seq()?;
+        let turn = self.store.lock().unwrap().turns(&run_id)?.last().map(|t| t.id.clone());
+        {
+            let store = self.store.lock().unwrap();
+            store.conn.execute("UPDATE overseer_sessions SET last_seq=?2, last_turn_ms=?3, last_cause=?4 WHERE id=?1", rusqlite::params![sid, cursor, crate::daemon::now(), cause])?;
+            store.conn.execute("INSERT INTO overseer_turns(ts, session_id, cause, turn_id) VALUES(?1, ?2, ?3, ?4)", rusqlite::params![crate::daemon::now(), sid, cause, turn])?;
+        }
+        Ok(json!({"run_id": run_id, "turn": turn, "cause": cause}))
+    }
+
     /// One turn of Overseer's run with the owner's words.
     fn overseer_turn(self: &Arc<Self>, session: &Value, texts: &[String], harness: &str, model: Option<&str>) -> Result<Value> {
         let sid = session["id"].as_str().unwrap().to_string();
@@ -313,9 +340,14 @@ impl Daemon {
             run_id
         };
         let cursor = self.store.lock().unwrap().max_seq()?;
-        self.store.lock().unwrap().conn.execute("UPDATE overseer_sessions SET last_seq=?2, last_turn_ms=?3, last_cause='owner' WHERE id=?1", rusqlite::params![sid, cursor, crate::daemon::now()])?;
         let turns = self.store.lock().unwrap().turns(&run_id)?;
-        Ok(json!({"run_id": run_id, "turn": turns.last().map(|t| t.id.clone())}))
+        let turn = turns.last().map(|t| t.id.clone());
+        {
+            let store = self.store.lock().unwrap();
+            store.conn.execute("UPDATE overseer_sessions SET last_seq=?2, last_turn_ms=?3, last_cause='owner' WHERE id=?1", rusqlite::params![sid, cursor, crate::daemon::now()])?;
+            store.conn.execute("INSERT INTO overseer_turns(ts, session_id, cause, turn_id) VALUES(?1, ?2, 'owner', ?3)", rusqlite::params![crate::daemon::now(), sid, turn])?;
+        }
+        Ok(json!({"run_id": run_id, "turn": turn}))
     }
 
     /// When Overseer's turn ends: the next queued owner messages become one turn.
@@ -353,6 +385,7 @@ impl Daemon {
             "stop" => format!("Stop {}", who(a["agent"].as_str().unwrap_or("?"))),
             "pin" => format!("Pin {} to the grid", who(a["agent"].as_str().unwrap_or("?"))),
             "start" => format!("Start “{}” in {}", a["title"].as_str().or(a["prompt"].as_str()).unwrap_or("an agent"), a["repo"].as_str().unwrap_or("?")),
+            "cadence" => format!("Check in on {} {}", a["agent"].as_str().map(who).unwrap_or_else(|| "every agent".into()), a["cadence"].as_str().or(a["text"].as_str()).unwrap_or("")),
             other => format!("{other} (not an action Overseer has)"),
         }
     }
@@ -381,6 +414,10 @@ impl Daemon {
             }
             if class == super::control::CONFIRM && !owner_asked {
                 bail!("{kind} happens only when the owner asks for it; this turn was started by {cause}");
+            }
+            if kind == "cadence" && a["agent"].as_str().unwrap_or("").is_empty() {
+                checked.push(a.clone());
+                continue;
             }
             if kind != "start" {
                 let id = a["agent"].as_str().ok_or_else(|| anyhow!("{kind} needs an agent id"))?;
@@ -585,6 +622,11 @@ impl Daemon {
                 self.dispatch_record(proposal, agent, "redirect", "redirect", &text, a["why"].as_str().unwrap_or("named"), if r["delivery"] == "sent" { "delivered" } else { "held" })?;
                 Ok(format!("redirected {title}: \"{text}\" ({})", r["delivery"].as_str().unwrap_or("")))
             }
+            "cadence" => {
+                let agent = a["agent"].as_str().filter(|s| !s.is_empty());
+                let r = self.set_cadence(agent, a["cadence"].as_str().or(a["text"].as_str()).unwrap_or(""), "overseer")?;
+                Ok(format!("check-ins on {} set to {}", if title.is_empty() { "every agent".to_string() } else { title.clone() }, r["cadence"].as_str().unwrap_or("")))
+            }
             "archive" => {
                 let agent = a["agent"].as_str().unwrap_or("");
                 let run = self.run(agent)?;
@@ -740,6 +782,9 @@ pub fn start(daemon: Arc<Daemon>) {
                 if let Err(e) = d.release_due_holds("tick", None, &Value::Null) {
                     crate::log(&format!("holds: {e:#}"));
                 }
+                if let Err(e) = d.run_due_check_ins() {
+                    crate::log(&format!("check-ins: {e:#}"));
+                }
             })
             .await;
         }
@@ -764,19 +809,32 @@ pub fn start(daemon: Arc<Daemon>) {
                         ("turn_done", "overseer") | ("status", "overseer") => d.overseer_turn_ended(&run)?,
                         ("turn_started", _) => {
                             d.dispatch_advance(&run, "delivered", payload["turn"]["id"].as_str())?;
+                            d.turn_started_for_check_in(&run)?;
                         }
                         ("turn_done", _) => {
                             d.dispatch_advance(&run, "answered", None)?;
                             d.deliver_queued(&run)?;
+                            d.turn_ended_for_check_in(&run)?;
                         }
                         ("status", _) => {
                             d.deliver_queued(&run)?;
                             d.release_due_holds("status", Some(&run), &payload)?;
+                            d.finished_for_check_in(&run, payload["status"].as_str().unwrap_or(""))?;
                         }
                         ("file_activity", _) => {
                             let paths: Vec<String> = payload["paths"].as_array().map(|a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()).unwrap_or_default();
                             d.check_guardrails(&run, &paths)?;
+                            d.check_area(&run, &paths)?;
                         }
+                        // Claude's adapter reports a tool twice: its input when it starts and its
+                        // outcome when it ends; only the outcome counts as a result.
+                        ("tool_result", _) => {
+                            let status = payload["status"].as_str().unwrap_or("");
+                            let is_result = status == "completed" || status == "failed" || (status != "started" && !payload["output"].is_null());
+                            d.check_circles(&run, payload["id"].as_str().unwrap_or(""), &payload["input"], payload["is_error"] == true, is_result)?
+                        }
+                        ("guardrail_crossed", _) => d.free_check_tripped(&run, "wrote across a guardrail")?,
+                        ("conflict", _) if payload["needs_decision"] == true && payload["changed"] != true => d.free_check_tripped(&run, "collides with another agent")?,
                         ("conflict_closed", _) => d.release_due_holds("conflict_closed", Some(&run), &payload)?,
                         _ => {}
                     }

@@ -24,6 +24,7 @@ pub const ACTION_CLASSES: &[(&str, &str)] = &[
     ("hold", STEER),
     ("release", STEER),
     ("guardrail", STEER),
+    ("cadence", STEER),
     ("redirect", STEER),
     ("stop", STEER),
     ("watch", STEER),
@@ -36,7 +37,7 @@ pub const ACTION_CLASSES: &[(&str, &str)] = &[
 ];
 
 /// Quiet Steer actions: at the Steer level Overseer takes them by itself.
-pub const QUIET: &[&str] = &["message", "share", "report", "area", "hold", "release", "guardrail", "pin"];
+pub const QUIET: &[&str] = &["message", "share", "report", "area", "hold", "release", "guardrail", "pin", "cadence"];
 
 /// Every daemon method and the class of what it does, so a table-driven test can check that no
 /// method is unclassified and that Overseer's actions reach only what their class allows.
@@ -49,12 +50,12 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("workspace.cleanup_plan", "read"), ("account.usage", "read"), ("search", "read"), ("repo.files", "read"), ("workspace.changes", "read"),
     ("workspace.tree", "read"), ("account.list", "read"), ("workspace.pr_plan", "read"), ("workspace.merge_plan", "read"),
     ("daemon.background_notice", "read"), ("daemon.last_notice", "read"), ("daemon.clients", "read"), ("audio.get", "read"), ("audio.voices", "read"),
-    ("agent.digest", "read"), ("agents.roster", "read"), ("conflicts.list", "read"), ("overseer.session", "read"), ("overseer.messages", "read"),
+    ("agent.digest", "read"), ("agents.roster", "read"), ("conflicts.list", "read"), ("overseer.session", "read"), ("overseer.messages", "read"), ("agent.check_ins", "read"),
     ("overseer.tools", "read"), ("overseer.tool", "read"), ("run.queued", "read"), ("overseer.card", "read"), ("agent.holds", "read"), ("agent.guardrails", "read"),
     // What Overseer's Steer actions reach.
     ("task.create", STEER), ("run.follow_up", STEER), ("run.queue", STEER), ("run.unqueue", STEER), ("run.redirect", STEER), ("run.interrupt", STEER),
     ("agent.hold", STEER), ("agent.release", STEER), ("agent.guardrail", STEER), ("agent.guardrail_remove", STEER), ("agent.redirect", STEER),
-    ("conflict.dismiss", STEER), ("conflict.resolve", STEER), ("overseer.scan", STEER), ("overseer.propose", STEER),
+    ("conflict.dismiss", STEER), ("conflict.resolve", STEER), ("overseer.scan", STEER), ("overseer.propose", STEER), ("agent.cadence", STEER),
     // Confirm: only when the owner asked, read back, then a yes.
     ("run.permission", CONFIRM), ("task.archive", CONFIRM), ("workspace.merge_prepare", CONFIRM), ("workspace.merge_resolved", CONFIRM),
     ("workspace.merge_complete", CONFIRM), ("workspace.merge_abort", CONFIRM), ("workspace.pr_prepare", CONFIRM), ("workspace.pr_opened", CONFIRM),
@@ -62,7 +63,7 @@ pub const METHOD_CLASSES: &[(&str, &str)] = &[
     ("profile.create", NEVER), ("profile.rename", NEVER), ("profile.login_command", NEVER), ("profile.logout", NEVER),
     ("account.create", NEVER), ("account.remove", NEVER), ("workspace.cleanup", NEVER), ("audio.set", NEVER), ("audio.preview", NEVER),
     ("audio.import_commander", NEVER), ("daemon.shutdown", NEVER), ("daemon.stop_all", NEVER), ("daemon.test_notice", NEVER),
-    ("overseer.token", NEVER), ("overseer.level", NEVER), ("overseer.fresh", NEVER), ("overseer.send", NEVER), ("overseer.answer", NEVER), ("overseer.cancel", NEVER),
+    ("overseer.token", NEVER), ("overseer.level", NEVER), ("overseer.cap", NEVER), ("overseer.fresh", NEVER), ("overseer.send", NEVER), ("overseer.answer", NEVER), ("overseer.cancel", NEVER),
 ];
 
 pub fn action_class(action: &str) -> Option<&'static str> {

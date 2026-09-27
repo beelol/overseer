@@ -18,7 +18,9 @@ if (process.argv.includes('auth') && process.argv.includes('status')) { console.
 if (!process.argv.includes('-p')) { console.log('claude-fixture 0.0.0 (synthetic)'); process.exit(0); }
 // CLAUDE_FIXTURE_MODE_FILE lets one test session give each task its own mode (read at start).
 const modeFile = process.env.CLAUDE_FIXTURE_MODE_FILE;
-const mode = (modeFile && fs.existsSync(modeFile) && fs.readFileSync(modeFile, 'utf8').trim()) || process.env.CLAUDE_FIXTURE_MODE || process.env.FIXTURE_MODE || 'nested';
+// Overseer's own run is the one given the daemon's tools (--mcp-config): it is always Overseer,
+// whatever mode the agents' processes run in.
+const mode = process.argv.includes('--mcp-config') ? 'overseer' : (modeFile && fs.existsSync(modeFile) && fs.readFileSync(modeFile, 'utf8').trim()) || process.env.CLAUDE_FIXTURE_MODE || process.env.FIXTURE_MODE || 'nested';
 const sid = 'fixture-session-1';
 const out = o => process.stdout.write(JSON.stringify(o) + '\n');
 const assistant = (content, parent = null) => out({ type: 'assistant', session_id: sid, parent_tool_use_id: parent, message: { role: 'assistant', content } });
@@ -240,6 +242,39 @@ async function mcpClient() {
     };
     let reply;
     const tell = /tell (.+?) to (.+)/i.exec(said);
+    // A check-in composed by the daemon: one check_in call per agent, from the JSON it sent; an
+    // agent whose files left its area (or whose task names a part it left out) is drifting or
+    // done-with-something-left-out; for drifting, propose what the prompt says the level allows.
+    const checkIn = /Check-in \(JSON\):\n([\s\S]*?)\n\nDigests:/.exec(text);
+    if (checkIn && mcp) {
+      const level = (/The level is (\w+)\./.exec(text) || [])[1] || 'ask_first';
+      const items = JSON.parse(checkIn[1]);
+      const lines = [];
+      for (const it of items) {
+        const outside = it.area && it.area.length ? it.changed.filter(p => !it.area.some(a => p === a || p.startsWith(a.replace(/\/$/, '') + '/'))) : [];
+        const leftOut = (it.asked.join(' ').match(/\[leave out: ([^\]]+)\]/) || [])[1];
+        const tripped = it.reasons.some(r => /guardrail|outside|circles|collides/.test(r));
+        let result, reason;
+        // Drifting first: an agent that left its area is drifting even when it has stopped.
+        if (outside.length || tripped) { result = 'drifting'; reason = outside.length ? `wrote outside its area: ${outside.join(', ')}` : it.reasons.join('; '); }
+        else if (it.status === 'completed' || it.status === 'failed') { result = 'done'; reason = `finished with ${it.changed.length} files changed`; }
+        else { result = 'on_task'; reason = 'its changes stay within its task'; }
+        await call('check_in', { agent: it.id, result, reason, left_out: result === 'done' && leftOut ? leftOut : '' });
+        lines.push(`${it.title}: ${result}`);
+        if (result === 'drifting') {
+          const action = level === 'auto' ? { action: 'redirect', agent: it.id, text: 'Back to your task; leave the other files alone.' }
+            : level === 'steer' ? { action: 'hold', agent: it.id, reason: 'drifting: ' + reason }
+            : { action: 'redirect', agent: it.id, text: 'Back to your task; leave the other files alone.' };
+          await call('propose', { actions: [action] });
+        }
+      }
+      reply = 'Check-in: ' + lines.join('; ');
+      assistant([{ type: 'text', text: reply }]);
+      result(false, reply);
+      mcp.close();
+      await sleep(100);
+      process.exit(0);
+    }
     if (mcp) {
       const roster = await call('roster', {});
       // One line per agent: "<id> · <title> · <status> · …".
@@ -262,6 +297,14 @@ async function mcpClient() {
     assistant([{ type: 'text', text: reply }]);
     result(false, reply);
     if (mcp) mcp.close();
+  } else if (mode === 'circles') {
+    // The same command failing three times in a row (a free check of AC-189).
+    for (let i = 1; i <= 3; i++) {
+      assistant([{ type: 'tool_use', id: `toolu_fail_${i}`, name: 'Bash', input: { command: 'npm test' } }]);
+      user([{ type: 'tool_result', tool_use_id: `toolu_fail_${i}`, content: 'Error: 1 failing', is_error: true }]);
+    }
+    assistant([{ type: 'text', text: 'the tests keep failing' }]);
+    result(false, 'the tests keep failing');
   } else if (mode === 'prose') {
     assistant([{ type: 'text', text: 'I delegated this to a sub-agent and it finished.' }]);
     result(false, 'I delegated this to a sub-agent and it finished.');
