@@ -22,7 +22,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
   cp.execFileSync(cli, ['login'], { env: { ...process.env, OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_LOGIN_ACCOUNT_FILE: next } });
   try {
     const repo = makeRepo(path.join(s.root, 'auto-repo'), { dirty: false });
-    s.settings({ 'workbench.colorTheme': 'Overseer Dark' });
+    s.settings({ 'workbench.colorTheme': 'Overseer Dark', 'files.simpleDialog.enable': true });
     s.install(latestVsix());
     s.launch(repo, { OVERSEER_CODEX_PATH: app, OVERSEER_CLAUDE_PATH: '/nonexistent/claude', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode',
       OVERSEER_TEST_SYSTEM_HOME: sys, FIXTURE_MODE: 'managed-models', FIXTURE_TRACE_FILE: trace, FIXTURE_QUOTA_MODE_FILE: quota,
@@ -125,9 +125,49 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     check('opening a local usage row shows its content-free report', usageReport);
     await s.screenshot('auto-local-usage-report');
     await cdp.key('w', { meta: true });
+    await cdp.command('Overseer: Auto Usage');
+    await cdp.pick('Auto usage', 'Export local usage');
+    await cdp.waitFor(`document.querySelector('input[aria-label="Folder path - Export local Auto usage"]')?.getClientRects().length`, 10000, 'local export folder dialog');
+    const exportPath = path.join(s.root, 'auto-usage.json');
+    await cdp.key('a', { meta: true }); await cdp.type(exportPath); await cdp.key('Enter');
+    for (let i = 0; i < 40 && !fs.existsSync(exportPath); i++) await delay(250);
+    if (!fs.existsSync(exportPath)) throw new Error('Auto usage export did not create the requested local file');
+    const exported = JSON.parse(fs.readFileSync(exportPath, 'utf8'));
+    const exportText = JSON.stringify(exported);
+    check('the packaged Auto Usage action exports redacted local JSON with owner-only permissions',
+      exported.schema_version === 3 && exported.work_units?.length >= 3 &&
+      !exportText.includes('seed context') && !exportText.includes('fixture: delegate browser then diagnose') &&
+      (fs.statSync(exportPath).mode & 0o777) === 0o600,
+      { work_units: exported.work_units?.length, mode: (fs.statSync(exportPath).mode & 0o777).toString(8) });
+    await cdp.command('Overseer: Auto Usage');
+    await cdp.pick('Auto usage', 'Clear local usage');
+    const clearButton = async label => cdp.waitFor(`(() => {
+      const box = document.querySelector('.monaco-dialog-box');
+      const button = box && [...box.querySelectorAll('.monaco-button')].find(b => b.textContent.trim() === ${JSON.stringify(label)});
+      if (!button) return null;
+      const r = button.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, message: box.innerText };
+    })()`, 10000, `Auto usage ${label} confirmation`);
+    const cancelClear = await clearButton('Cancel');
+    check('clearing local Auto learning asks for confirmation', /Clear local Auto usage/.test(cancelClear.message), cancelClear.message);
+    await s.screenshot('auto-local-usage-clear-confirmation');
+    await cdp.click(cancelClear.x, cancelClear.y);
+    const usageBeforeClear = s.ctl('auto.usage.work.list', { limit: 30 }).work_units;
+    check('cancelling Clear preserves the local work records', usageBeforeClear.length >= 3, { count: usageBeforeClear.length });
+    await cdp.command('Overseer: Auto Usage');
+    await cdp.pick('Auto usage', 'Clear local usage');
+    const confirmClear = await clearButton('Clear local Auto usage');
+    await cdp.click(confirmClear.x, confirmClear.y);
+    const usageAfterClear = s.ctl('auto.usage.work.list', { limit: 30 }).work_units;
+    const runsAfterClear = s.ctl('state').runs;
+    check('confirmed Clear removes learning but keeps active ownership and completed task history',
+      usageAfterClear.length === 0 && [root.id, parent.id, ...children.map(c => c.id)].every(id => runsAfterClear.some(r => r.id === id && r.status === 'completed')),
+      { work_units: usageAfterClear.length, runs: runsAfterClear.length });
     await cdp.command('Developer: Reload Window'); await delay(6000);
     cdp = await s.connect(); s.cdp = cdp;
     dash = await s.editorView();
+    const usageAfterReload = s.ctl('auto.usage.work.list', { limit: 30 }).work_units;
+    check('cleared local learning stays empty after window reload without reconstructing completed work',
+      usageAfterReload.length === 0, { work_units: usageAfterReload.length });
     await dash.waitFor(`document.querySelectorAll('.auto-decision').length >= ${childDecisionCards.length}`, 20000);
     const reloadedCards = await dash.eval(`[...document.querySelectorAll('.auto-decision')].map(e => e.textContent)`);
     check('window reload restores the same child decision history', reloadedCards.length === childDecisionCards.length &&

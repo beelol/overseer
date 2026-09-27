@@ -8,7 +8,7 @@
       "name": "the UI enabled Auto and the daemon chose one model and effort before the fixture turn",
       "ok": true,
       "detail": {
-        "run": "r-492f6562426e46769258c14e9b52d7a7",
+        "run": "r-ec5430b77c8f4eef9af343c72ad17a86",
         "status": "completed",
         "model": "gpt-6-sol",
         "effort": "medium",
@@ -29,17 +29,17 @@
       "name": "Auto parent receives a browser-labelled child result and assigns a stronger diagnosis unit while healthy",
       "ok": true,
       "detail": {
-        "parent": "r-bdbeb6f7cde846178de71d6e315f2700",
+        "parent": "r-61c03ae41c534e2cb729be96f2e89410",
         "status": "completed",
         "children": [
           {
-            "id": "r-a776e1296d15",
+            "id": "r-a63e3b82de9b",
             "model": "gpt-6-sol",
             "effort": "medium",
             "status": "completed"
           },
           {
-            "id": "r-6dd6a25bc9e8",
+            "id": "r-32dc01f3306d",
             "model": "gpt-6-astra",
             "effort": "high",
             "status": "completed"
@@ -67,12 +67,12 @@
       "ok": true,
       "detail": [
         {
-          "run": "r-a776e1296d15",
+          "run": "r-a63e3b82de9b",
           "text": "browser check49 reported tokens",
           "title": "browser check\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
         },
         {
-          "run": "r-6dd6a25bc9e8",
+          "run": "r-32dc01f3306d",
           "text": "diagnosis49 reported tokens",
           "title": "diagnosis\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
         }
@@ -84,10 +84,10 @@
       "detail": {
         "title": "Auto usage",
         "rows": [
-          "gpt-6-sol · medium, completed · 9/27/2026, 12:54:42 PM, Token activity unavailable · subscription draw unverified",
-          "gpt-6-astra · high, completed · 9/27/2026, 12:54:41 PM, 49 reported tokens · subscription draw unverified",
-          "gpt-6-sol · medium, completed · 9/27/2026, 12:54:40 PM, 49 reported tokens · subscription draw unverified",
-          "gpt-6-sol · medium, completed · 9/27/2026, 12:54:37 PM, 49 reported tokens · subscription draw unverified",
+          "gpt-6-sol · medium, completed · 9/27/2026, 1:04:47 PM, Token activity unavailable · subscription draw unverified",
+          "gpt-6-astra · high, completed · 9/27/2026, 1:04:47 PM, 49 reported tokens · subscription draw unverified",
+          "gpt-6-sol · medium, completed · 9/27/2026, 1:04:45 PM, 49 reported tokens · subscription draw unverified",
+          "gpt-6-sol · medium, completed · 9/27/2026, 1:04:41 PM, 49 reported tokens · subscription draw unverified",
           "Export local usage…, Save a redacted JSON file on this Mac; nothing is uploaded.",
           "Clear local usage…, Remove learning records and summaries; agents and task history stay."
         ],
@@ -97,6 +97,41 @@
     {
       "name": "opening a local usage row shows its content-free report",
       "ok": true
+    },
+    {
+      "name": "the packaged Auto Usage action exports redacted local JSON with owner-only permissions",
+      "ok": true,
+      "detail": {
+        "work_units": 4,
+        "mode": "600"
+      }
+    },
+    {
+      "name": "clearing local Auto learning asks for confirmation",
+      "ok": true,
+      "detail": "Cancel\nClear local Auto usage\nClear local Auto usage and learning? Agents and task history stay available."
+    },
+    {
+      "name": "cancelling Clear preserves the local work records",
+      "ok": true,
+      "detail": {
+        "count": 4
+      }
+    },
+    {
+      "name": "confirmed Clear removes learning but keeps active ownership and completed task history",
+      "ok": true,
+      "detail": {
+        "work_units": 0,
+        "runs": 4
+      }
+    },
+    {
+      "name": "cleared local learning stays empty after window reload without reconstructing completed work",
+      "ok": true,
+      "detail": {
+        "work_units": 0
+      }
     },
     {
       "name": "window reload restores the same child decision history",
@@ -112,12 +147,12 @@
       "ok": true,
       "detail": [
         {
-          "run": "r-a776e1296d15",
+          "run": "r-a63e3b82de9b",
           "text": "browser check49 reported tokens",
           "title": "browser check\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
         },
         {
-          "run": "r-6dd6a25bc9e8",
+          "run": "r-32dc01f3306d",
           "text": "diagnosis49 reported tokens",
           "title": "diagnosis\nDone\n42 input · 7 output · activity, not subscription allowance\nmanaged-delegation"
         }
@@ -128,7 +163,7 @@
       "ok": true,
       "detail": {
         "runs": [
-          "r-492f6562426e46769258c14e9b52d7a7"
+          "r-ec5430b77c8f4eef9af343c72ad17a86"
         ],
         "remembered": "Agent: Auto routing"
       }
