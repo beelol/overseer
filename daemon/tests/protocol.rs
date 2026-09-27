@@ -3527,6 +3527,44 @@ fn auto_bridge_binds_dispatch_and_result_to_the_issued_parent_run() {
 }
 
 #[test]
+fn auto_parent_harness_uses_its_injected_tools_for_two_healthy_work_units() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE"),
+        ("FIXTURE_MODE", "managed-models")]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high",
+        "prompt":"fixture: delegate browser then diagnose",
+        "approval_policy":"never","auto_routing":true})));
+    assert_eq!(d.wait_done(&parent, 20)["status"], "completed");
+    let children = d.runs().into_iter().filter(|run| run["parent_run_id"] == parent)
+        .collect::<Vec<_>>();
+    assert_eq!(children.len(), 2, "the parent harness should submit both units");
+    let browser = children.iter().find(|run| run["title"] == "browser check").unwrap();
+    let diagnosis = children.iter().find(|run| run["title"] == "diagnosis").unwrap();
+    assert_eq!((browser["model"].as_str(), browser["effort"].as_str()),
+        (Some("gpt-6-sol"), Some("medium")));
+    assert_eq!((diagnosis["model"].as_str(), diagnosis["effort"].as_str()),
+        (Some("gpt-6-astra"), Some("high")));
+    let browser_result = d.call("run.result", json!({"run_id":browser["id"]}));
+    assert_eq!(browser_result["state"], "ready");
+    assert!(browser_result["text"].as_str().unwrap_or_default()
+        .contains("browser result: parent context found"), "{browser_result}");
+    let state = d.call("state", json!({}));
+    let workspace = state["workspaces"].as_array().unwrap().iter()
+        .find(|workspace| workspace["id"] == browser["workspace_id"]).unwrap();
+    let artifact = std::path::Path::new(workspace["path"].as_str().unwrap()).join("browser-report.txt");
+    assert_eq!(std::fs::read_to_string(artifact).unwrap(),
+        "browser result: parent context found\n");
+    let parent_output = d.events(&parent).into_iter().filter(|event| event["kind"] == "output")
+        .filter_map(|event| event["payload"]["text"].as_str().map(str::to_string))
+        .collect::<Vec<_>>().join("\n");
+    assert!(parent_output.contains("browser result: parent context found"), "{parent_output}");
+    assert!(parent_output.contains("continued with browser result"), "{parent_output}");
+}
+
+#[test]
 fn auto_running_parent_can_delegate_to_suitable_model_on_its_own_profile() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));

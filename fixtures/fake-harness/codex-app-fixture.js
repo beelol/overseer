@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const { spawn } = require('child_process');
 if (process.argv[2] !== 'app-server') { console.log('codex-app-fixture 0.0.0 (synthetic)'); process.exit(0); }
 const out = o => process.stdout.write(JSON.stringify(o) + '\n');
 const mark = event => { if (process.env.FIXTURE_TRACE_FILE) fs.appendFileSync(process.env.FIXTURE_TRACE_FILE, event + '\n'); };
@@ -15,6 +16,90 @@ let thread = process.env.FIXTURE_MODE?.startsWith('managed') ? 'thr-fixture-' + 
 let turn = 'turn-1', approvalId = 7, sawUnsupportedError = false;
 let pendingTurnTimer = null;
 const supportsMetadata = () => process.env.FIXTURE_MODE?.startsWith('metadata') || process.env.FIXTURE_MODE?.startsWith('managed');
+
+// Exercise the real per-process MCP bridge from inside the parent harness
+// fixture. The fixture supplies decisions in place of a model; the daemon
+// still owns route choice, admission, child execution, and result delivery.
+async function delegateBrowserThenDiagnose() {
+  const overrides = new Map();
+  for (let i = 3; i + 1 < process.argv.length; i += 2) {
+    if (process.argv[i] !== '-c') continue;
+    const value = process.argv[i + 1];
+    const equal = value.indexOf('=');
+    if (equal > 0) overrides.set(value.slice(0, equal), JSON.parse(value.slice(equal + 1)));
+  }
+  const command = overrides.get('mcp_servers.overseer_auto.command');
+  const args = overrides.get('mcp_servers.overseer_auto.args');
+  if (typeof command !== 'string' || !Array.isArray(args) || args[0] !== 'auto-mcp') {
+    throw new Error('the Auto MCP server was not injected into the parent process');
+  }
+  const bridge = spawn(command, args, { stdio: ['pipe', 'pipe', 'ignore'] });
+  const pending = new Map();
+  let nextId = 1;
+  const failPending = error => {
+    for (const request of pending.values()) { clearTimeout(request.timer); request.reject(error); }
+    pending.clear();
+  };
+  const lines = readline.createInterface({ input: bridge.stdout });
+  lines.on('line', line => {
+    let message; try { message = JSON.parse(line); } catch { return; }
+    const request = pending.get(message.id);
+    if (!request) return;
+    pending.delete(message.id);
+    clearTimeout(request.timer);
+    message.error ? request.reject(new Error(message.error.message)) : request.resolve(message.result);
+  });
+  bridge.on('error', failPending);
+  bridge.on('exit', () => failPending(new Error('Auto MCP server exited before its response')));
+  const call = (method, params) => new Promise((resolve, reject) => {
+    const id = nextId++;
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error('Auto MCP response timed out')); }, 20000);
+    pending.set(id, { resolve, reject, timer });
+    bridge.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+  });
+  const tool = async (name, args) => {
+    const response = await call('tools/call', { name, arguments: args });
+    if (response.isError) throw new Error(response.content?.[0]?.text ?? 'Auto tool failed');
+    return JSON.parse(response.content[0].text);
+  };
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const submit = async args => {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const response = await tool('auto_submit', args);
+      if (response.state === 'dispatched') return response;
+      if (response.state !== 'launch_pending') throw new Error(`Auto child was not dispatched: ${response.state}`);
+      await sleep(50);
+    }
+    throw new Error('Auto child launch did not settle');
+  };
+  const result = async id => {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const response = await tool('auto_result', { child_run_id: id });
+      if (response.state === 'ready') return response;
+      if (response.state !== 'pending') throw new Error(`Auto child did not return text: ${response.state}`);
+      await sleep(50);
+    }
+    throw new Error('Auto child result did not settle');
+  };
+  try {
+    await call('initialize', { protocolVersion: '2025-03-26', capabilities: {},
+      clientInfo: { name: 'parent-fixture', version: '1' } });
+    fs.writeFileSync(path.join(process.cwd(), 'parent-context.txt'), 'from parent\n');
+    const browser = await submit({ work_unit_id: 'fixture-browser', title: 'browser check',
+      prompt: 'browser check', min_tier: 'general', required_tools: ['browser/navigate'],
+      task_class: 'browser_check' });
+    const browserResult = await result(browser.run.id);
+    const diagnosis = await submit({ work_unit_id: 'fixture-diagnosis', title: 'diagnosis',
+      prompt: `Diagnose ${browserResult.text}`, min_tier: 'frontier', required_tools: [],
+      task_class: 'difficult_diagnosis' });
+    const diagnosisResult = await result(diagnosis.run.id);
+    return `${browserResult.text}; ${diagnosisResult.text}`;
+  } finally {
+    bridge.stdin.end();
+    bridge.kill();
+  }
+}
+
 rl.on('line', line => {
   let m; try { m = JSON.parse(line); } catch { return; }
   if (m.method === 'initialize') out({ id: m.id, result: { userAgent: 'fixture' } });
@@ -132,6 +217,19 @@ rl.on('line', line => {
     out({ method: 'turn/started', params: { threadId: thread, turn: { id: turn } } });
     if (process.env.FIXTURE_MODE?.startsWith('managed')) {
       const prompt = m.params.input?.[0]?.text ?? '';
+      if (prompt === 'fixture: delegate browser then diagnose') {
+        const parentTurn = turn;
+        delegateBrowserThenDiagnose().then(text => {
+          out({ method: 'item/completed', params: { threadId: thread, turnId: parentTurn,
+            item: { type: 'agentMessage', id: 'auto-parent-result', text } } });
+          out({ method: 'turn/completed', params: { threadId: thread,
+            turn: { id: parentTurn, status: 'completed', error: null } } });
+        }).catch(error => {
+          out({ method: 'turn/completed', params: { threadId: thread,
+            turn: { id: parentTurn, status: 'failed', error: { message: error.message } } } });
+        });
+        return;
+      }
       if (prompt === 'edit then 503') {
         fs.writeFileSync(path.join(process.cwd(), 'partial-edit.txt'), 'written before failure\n');
       }
