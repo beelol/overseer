@@ -1,5 +1,5 @@
 /* New Task form (AC-47, AC-54): tokens only; one column, calm tiles, sticky start bar. */
-body { background: var(--ov-bg); }
+body { background: var(--ov-bg); background-image: var(--ov-backdrop); background-attachment: fixed; }
 .form { max-width: 820px; margin: 0 auto; padding: var(--ov-space-8) var(--ov-space-6) 0; }
 h1 { margin: 0 0 var(--ov-space-6); font-size: var(--ov-font-xxl); font-weight: var(--ov-weight-semibold); letter-spacing: -.01em; }
 section { margin: 0 0 var(--ov-space-6); }

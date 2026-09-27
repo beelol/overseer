@@ -152,7 +152,7 @@ const BUDGET = 238;
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}
   } finally {
-    try { for (const r of Object.values(runs)) s.ctl('run.interrupt', { run_id: r.run.id }); } catch {}
+    for (const r of Object.values(runs)) { try { s.ctl('run.interrupt', { run_id: r.run.id }); } catch {} }
     s.writeLog();
     fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
     if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }

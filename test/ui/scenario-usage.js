@@ -53,8 +53,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await delay(1000);
     // Gate K: accounts are in the side bar's Accounts view; usage and reset times are in each row's hover.
     await s.openOverseerView();
-    const hoverOf = async label => {
-      const pt = await cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(label)}).pop(); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 10000, label);
+    const hoverOf = async (label, group) => {
+      const pt = await cdp.waitFor(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent); let g = '', r = null; for (const x of rows) { const l = x.querySelector('.label-name')?.textContent.trim(); if (x.getAttribute('aria-level') === '1') g = l; else if (l === ${JSON.stringify(label)} && (!${JSON.stringify(group || '')} || g === ${JSON.stringify(group || '')})) r = x; } if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 10000, label);
       // Rest on the row (VS Code shows a tree hover only after the pointer settles); retry once.
       for (let attempt = 0; attempt < 2; attempt++) {
         await cdp.move(pt.x + 400, pt.y + 300); await delay(600);
@@ -64,8 +64,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
       }
       return '';
     };
-    const claudeHover = await hoverOf('claude (existing login)');
-    const codexHover = await hoverOf('codex (existing login)');
+    const claudeHover = await hoverOf('Your login', 'Claude');
+    const codexHover = await hoverOf('Your login', 'ChatGPT');
     await s.screenshot('accounts-usage');
     check('the Accounts view shows reported usage per account, with reset times, on hover',
       /5 hours 95%/.test(claudeHover) && /resets/.test(claudeHover) && /5 hours 20%/.test(codexHover), { claudeHover, codexHover });
@@ -80,7 +80,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await dash.waitFor(`!document.querySelector('[data-chip="agent"]').textContent.includes('Loading')`, 20000);
     await dash.eval(`document.querySelector('[data-chip="agent"]').click()`); await delay(300);
     const agentMenu = await dash.eval(`[...document.querySelectorAll('.menu .menu-item')].map(b => (b.querySelector('.menu-label')?.textContent || '') + ' | ' + (b.querySelector('.menu-hint')?.textContent || ''))`);
-    await dash.eval(`[...document.querySelectorAll('.menu .menu-item')].find(b => b.querySelector('.menu-label')?.textContent === 'claude (existing login)').click()`); await delay(400);
+    await dash.eval(`[...document.querySelectorAll('.menu .menu-item')].find(b => { let h = b.previousElementSibling; while (h && !h.classList.contains('menu-head')) h = h.previousElementSibling; return b.querySelector('.menu-label')?.textContent === 'Your login' && /Claude/.test(h?.textContent || ''); }).click()`); await delay(400);
     await dash.eval(`document.getElementById('task').focus()`); await cdp.type('a small task'); await delay(300);
     const warn = await dash.eval(`(() => { const n = document.querySelector('.view-composer .composer-note'); return { text: n.textContent, fix: n.querySelector('.fix')?.textContent, cls: n.className, startDisabled: document.getElementById('start').disabled }; })()`);
     await s.screenshot('near-limit-warning');
@@ -92,7 +92,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     // Accounts view: the near-limit account says so; others show nothing extra.
     await s.openOverseerView();
     const rows = await cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).map(r => (r.querySelector('.label-name')?.textContent || '') + ' | ' + (r.querySelector('.label-description')?.textContent || ''))`);
-    check('the Accounts view marks an account near its limit', rows.some(r => /claude \(existing login\).*95% of 5 hours/.test(r)), rows);
+    check('the Accounts view marks an account near its limit', rows.some(r => /^Your login \|.*95% of 5 hours/.test(r)), rows);
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

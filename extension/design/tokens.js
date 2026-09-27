@@ -48,6 +48,29 @@ const palettes = {
     ansi: { black: '#1C1A26', red: '#C92F45', green: '#1D7F4F', yellow: '#8A6100', blue: '#2F5FCC', magenta: '#7338D8', cyan: '#0E7384', white: '#9A96AC',
       brightBlack: '#5C576F', brightRed: '#B0243A', brightGreen: '#166B42', brightYellow: '#765300', brightBlue: '#2450B0', brightMagenta: '#5F2CB8', brightCyan: '#0B6470', brightWhite: '#C4C1D1' },
   },
+  // Overseer: the bold third theme (AC-103). Deep indigo-black led by gradients: violet light from
+  // the top left, navy below, an electric violet-to-blue accent. The workbench takes flat colors, so
+  // the gradients live in Overseer's own views (gradient below, read through contributed colors).
+  overseer: {
+    type: 'dark',
+    chrome: '#0A0915', bg: '#0E0C1C', raised: '#18152D', raised2: '#1F1B39', hover: '#1C1934', selected: '#2C2456', selectedInactive: '#231E44',
+    border: '#241F42', borderStrong: '#383063',
+    text: '#EEECFA', muted: '#AAA5CB', faint: '#6F6A94', lineNumber: '#8E89B2', silver: '#CDCAE6',
+    accent: '#AC8EFF', accentStrong: '#6D45F0', accentHover: '#5E36E0', onAccent: '#FFFFFF', accentSoft: '#2C2456',
+    link: '#BCA9FF', focus: '#8F6BFF',
+    green: '#4FD89B', amber: '#F2B24C', red: '#FF7C8C', blue: '#80A9FF', teal: '#4FD6E6', pink: '#FF96D0',
+    addedBg: '#4FD89B1F', removedBg: '#FF7C8C1F', addedLine: '#4FD89B33', removedLine: '#FF7C8C33',
+    shadow: '#00000066', scrollbar: '#CDCAE626', scrollbarHover: '#CDCAE640',
+    syntax: { comment: '#9590B8', keyword: '#C9A6FF', storage: '#C9A6FF', function: '#8FBAFF', type: '#72DCE6', string: '#A8E0A4', number: '#F5BC85', constant: '#F5BC85',
+      variable: '#EEECFA', property: '#CDCAE6', tag: '#FF96D0', attribute: '#C9A6FF', operator: '#BAB6D6', punctuation: '#AAA5CB', regexp: '#F5BC85', heading: '#C9A6FF', emphasis: '#EEECFA', invalid: '#FF7C8C' },
+    ansi: { black: '#241F42', red: '#FF7C8C', green: '#4FD89B', yellow: '#F0CD85', blue: '#80A9FF', magenta: '#BCA9FF', cyan: '#4FD6E6', white: '#DAD8EC',
+      brightBlack: '#6F6A94', brightRed: '#FF98A5', brightGreen: '#75E6B3', brightYellow: '#F6DCA3', brightBlue: '#A2C0FF', brightMagenta: '#D2C4FF', brightCyan: '#7EE4F0', brightWhite: '#FFFFFF' },
+    // Gradient stops, each [start, end]. Text is checked against every stop (test/unit/theme-contrast.js).
+    gradient: {
+      backdrop: ['#171236', '#090B1A'], chrome: ['#141030', '#0A0915'], surface: ['#1A1636', '#110F24'],
+      accent: ['#6D45F0', '#2F5FD8'], glow: '#7A4DFF2E',
+    },
+  },
 };
 
 module.exports = { scale, palettes };

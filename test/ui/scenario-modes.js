@@ -21,6 +21,9 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     const edits = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', "sed -i '' 's/^L9: original$/L9: agent edit/' a.txt"], prompt: '', title: 'With changes' });
     const quiet = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/echo', args: ['nothing to change'], prompt: '', title: 'No changes' });
     for (let i = 0; i < 30 && s.ctl('state').runs.some(r => ['queued', 'starting', 'running'].includes(r.status)); i++) await delay(300);
+    // Agents at work, so the grid and dashboard mode have something to show (the grid never opens empty, AC-113).
+    const workers = ['Split payments', 'Refresh sessions', 'Migrate users', 'Fix flaky test'].map(title => s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', 'i=0; while [ $i -lt 600 ]; do echo "step $i"; i=$((i+1)); sleep 0.5; done'], prompt: '', title }));
+    for (let i = 0; i < 30 && s.ctl('state').runs.filter(r => r.status === 'running').length < 4; i++) await delay(300);
     await cdp.command('View: Show Explorer'); await delay(500);
     const arrangement = () => cdp.evalWorkbench(`(() => {
       const vis = sel => { const e = document.querySelector(sel); return !!e && e.offsetWidth > 0 && e.offsetHeight > 0; };
@@ -73,6 +76,7 @@ const { Session, makeRepo, latestVsix, delay } = require('./harness');
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}
   } finally {
+    try { for (const r of s.ctl('state').runs.filter(r => r.status === 'running')) { try { s.ctl('run.interrupt', { run_id: r.id }); } catch {} } } catch {}
     s.writeLog();
     fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
     if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }

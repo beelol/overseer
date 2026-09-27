@@ -1,0 +1,20 @@
+[2026-09-27T04:50:58.460Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T04:51:23.413Z] screenshot docs/verification/evidence/ui/grid-drag/01-grid-4-overseer-dark.png
+[2026-09-27T04:51:25.341Z] screenshot docs/verification/evidence/ui/grid-drag/02-grid-4-overseer-light.png
+[2026-09-27T04:51:27.266Z] screenshot docs/verification/evidence/ui/grid-drag/03-grid-4-overseer.png
+[2026-09-27T04:51:35.351Z] screenshot docs/verification/evidence/ui/grid-drag/04-grid-9-overseer-dark.png
+[2026-09-27T04:51:37.274Z] screenshot docs/verification/evidence/ui/grid-drag/05-grid-9-overseer-light.png
+[2026-09-27T04:51:39.214Z] screenshot docs/verification/evidence/ui/grid-drag/06-grid-9-overseer.png
+[2026-09-27T04:51:49.085Z] screenshot docs/verification/evidence/ui/grid-drag/07-grid-16-overseer-dark.png
+[2026-09-27T04:51:51.010Z] screenshot docs/verification/evidence/ui/grid-drag/08-grid-16-overseer-light.png
+[2026-09-27T04:51:52.980Z] screenshot docs/verification/evidence/ui/grid-drag/09-grid-16-overseer.png
+[2026-09-27T04:51:54.783Z] PASS each agent dragged from the side bar lands in the grid (1 to 16 tiles, counted at each step) [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
+[2026-09-27T04:51:54.784Z] PASS the chosen edges built a 4×4 grid of 16 tiles {"cols":4,"rows":4}
+[2026-09-27T04:51:54.784Z] PASS each tile dragged to an edge of another tile ends up on that side of it (measured on screen at each step) ["2:right:true","3:right:true","4:right:true","5:bottom:true","6:bottom:true","7:bottom:true","8:bottom:true","9:bottom:true","10:bottom:true","11:bottom:true","12:bottom:true","13:bottom:true","14:bottom:true","15:bottom:true","16:bottom:true"]
+[2026-09-27T04:51:54.784Z] PASS during each drag the drop preview shows the edge and tile it will land on [{"shown":true,"edge":"right","target":"r-d167abd07505"},{"shown":true,"edge":"right","target":"r-25194f83c21f"},{"shown":true,"edge":"right","target":"r-55719113d5c5"},{"shown":true,"edge":"bottom","target":"r-d167abd07505"},{"shown":true,"edge":"bottom","target":"r-25194f83c21f"},{"shown":true,"edge":"bottom","target":"r-55719113d5c5"},{"shown":true,"edge":"bottom","target":"r-038e333447dc"},{"shown":true,"edge":"bottom","target":"r-fb817da3125d"},{"shown":true,"edge":"bottom","target":"r-a67842784d8f"},{"shown":true,"edge":"bottom","target":"r-ac842ff579d6"},{"shown":true,"edge":"bottom","target":"r-b635d928246a"},{"shown":true,"edge":"bottom","target":"r-63f3f465c23d"},{"shown":true,"edge":"bottom","target":"r-42fa00324873"},{"shown":true,"edge":"bottom","target":"r-58b01459b15a"},{"shown":true,"edge":"bottom","target":"r-2ca0a002c441"}]
+[2026-09-27T04:51:55.396Z] screenshot docs/verification/evidence/ui/grid-drag/10-grid-full.png
+[2026-09-27T04:51:56.201Z] PASS a 17th agent is refused with "The grid is full (16)" and the layout does not change (no chat editor opens either) {"fullShown":true,"count":16,"tabs":["Overseer"]}
+[2026-09-27T04:51:56.202Z] PASS at 16 no drop zone appears for another agent; the drag says the grid is full {"accepted":true,"preview":false,"full":true}
+[2026-09-27T04:51:57.378Z] PASS Alt+Left moves the focused tile to the left (a keyboard path to place tiles) {"before":{"l":814,"t":8,"r":1074,"b":198},"after":{"l":545,"t":8,"r":671,"b":198}}
+[2026-09-27T04:52:06.866Z] PASS a window reload keeps the grid layout exactly {"same":true}
+[2026-09-27T04:52:07.003Z] screenshot docs/verification/evidence/ui/grid-drag/11-after-reload.png

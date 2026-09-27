@@ -4,7 +4,7 @@
       "name": "UI sources use theme tokens only (no hard-coded colors)",
       "ok": true,
       "detail": {
-        "files": 23,
+        "files": 24,
         "hits": []
       }
     },
@@ -53,7 +53,31 @@
             "label": "Start task"
           }
         ],
-        "run": "r-cf65038575e1"
+        "run": "r-399f7941dfaa"
+      }
+    },
+    {
+      "name": "Default Dark Modern: the Overseer gradients resolve flat (the theme looks unchanged)",
+      "ok": true,
+      "detail": {
+        "center": {
+          "start": "#1f1f1f",
+          "end": "#1f1f1f",
+          "accent": [
+            "#0078d4",
+            "#0078d4"
+          ],
+          "image": "radial-gradient(120% 80% at 0% 0%, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0) 60%), linear-gradient(165deg, rgb(31, 31, 31), rgb(31, 31, 31))"
+        },
+        "review": {
+          "start": "#1f1f1f",
+          "end": "#1f1f1f",
+          "accent": [
+            "#0078d4",
+            "#0078d4"
+          ],
+          "image": "radial-gradient(120% 80% at 0% 0%, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0) 60%), linear-gradient(165deg, rgb(31, 31, 31), rgb(31, 31, 31))"
+        }
       }
     },
     {
@@ -75,17 +99,41 @@
             "bad": []
           },
           "center": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "conversation": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "review": {
-            "checked": 15,
+            "checked": 18,
             "bad": []
           }
+        }
+      }
+    },
+    {
+      "name": "Default Light Modern: the Overseer gradients resolve flat (the theme looks unchanged)",
+      "ok": true,
+      "detail": {
+        "center": {
+          "start": "#ffffff",
+          "end": "#ffffff",
+          "accent": [
+            "#005fb8",
+            "#005fb8"
+          ],
+          "image": "radial-gradient(120% 80% at 0% 0%, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0) 60%), linear-gradient(165deg, rgb(255, 255, 255), rgb(255, 255, 255))"
+        },
+        "review": {
+          "start": "#ffffff",
+          "end": "#ffffff",
+          "accent": [
+            "#005fb8",
+            "#005fb8"
+          ],
+          "image": "radial-gradient(120% 80% at 0% 0%, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0) 60%), linear-gradient(165deg, rgb(255, 255, 255), rgb(255, 255, 255))"
         }
       }
     },
@@ -100,17 +148,41 @@
             "bad": []
           },
           "center": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "conversation": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "review": {
-            "checked": 15,
+            "checked": 18,
             "bad": []
           }
+        }
+      }
+    },
+    {
+      "name": "Default High Contrast: the Overseer gradients resolve flat (the theme looks unchanged)",
+      "ok": true,
+      "detail": {
+        "center": {
+          "start": "#000000",
+          "end": "#000000",
+          "accent": [
+            "#000000",
+            "#000000"
+          ],
+          "image": "radial-gradient(120% 80% at 0% 0%, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0) 60%), linear-gradient(165deg, rgb(0, 0, 0), rgb(0, 0, 0))"
+        },
+        "review": {
+          "start": "#000000",
+          "end": "#000000",
+          "accent": [
+            "#000000",
+            "#000000"
+          ],
+          "image": "radial-gradient(120% 80% at 0% 0%, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0) 60%), linear-gradient(165deg, rgb(0, 0, 0), rgb(0, 0, 0))"
         }
       }
     },
@@ -125,17 +197,41 @@
             "bad": []
           },
           "center": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "conversation": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "review": {
-            "checked": 15,
+            "checked": 18,
             "bad": []
           }
+        }
+      }
+    },
+    {
+      "name": "Default High Contrast Light: the Overseer gradients resolve flat (the theme looks unchanged)",
+      "ok": true,
+      "detail": {
+        "center": {
+          "start": "#ffffff",
+          "end": "#ffffff",
+          "accent": [
+            "#0f4a85",
+            "#0f4a85"
+          ],
+          "image": "radial-gradient(120% 80% at 0% 0%, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0) 60%), linear-gradient(165deg, rgb(255, 255, 255), rgb(255, 255, 255))"
+        },
+        "review": {
+          "start": "#ffffff",
+          "end": "#ffffff",
+          "accent": [
+            "#0f4a85",
+            "#0f4a85"
+          ],
+          "image": "radial-gradient(120% 80% at 0% 0%, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0) 60%), linear-gradient(165deg, rgb(255, 255, 255), rgb(255, 255, 255))"
         }
       }
     },
@@ -150,15 +246,64 @@
             "bad": []
           },
           "center": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "conversation": {
-            "checked": 32,
+            "checked": 27,
             "bad": []
           },
           "review": {
-            "checked": 15,
+            "checked": 18,
+            "bad": []
+          }
+        }
+      }
+    },
+    {
+      "name": "Overseer theme: the backdrop gradient reaches the Overseer view and the review",
+      "ok": true,
+      "detail": {
+        "center": {
+          "start": "#171236",
+          "end": "#090b1a",
+          "accent": [
+            "#6d45f0",
+            "#2f5fd8"
+          ],
+          "image": "radial-gradient(120% 80% at 0% 0%, rgba(122, 77, 255, 0.18), rgba(0, 0, 0, 0) 60%), linear-gradient(165deg, rgb(23, 18, 54), rgb(9, 11, 26))"
+        },
+        "review": {
+          "start": "#171236",
+          "end": "#090b1a",
+          "accent": [
+            "#6d45f0",
+            "#2f5fd8"
+          ],
+          "image": "radial-gradient(120% 80% at 0% 0%, rgba(122, 77, 255, 0.18), rgba(0, 0, 0, 0) 60%), linear-gradient(165deg, rgb(23, 18, 54), rgb(9, 11, 26))"
+        }
+      }
+    },
+    {
+      "name": "Overseer: views render with the theme and every control has an accessible name",
+      "ok": true,
+      "detail": {
+        "bodyClass": "vscode-dark",
+        "audits": {
+          "form": {
+            "checked": 19,
+            "bad": []
+          },
+          "center": {
+            "checked": 27,
+            "bad": []
+          },
+          "conversation": {
+            "checked": 27,
+            "bad": []
+          },
+          "review": {
+            "checked": 18,
             "bad": []
           }
         }

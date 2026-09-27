@@ -1,0 +1,158 @@
+{
+  "checks": [
+    {
+      "name": "Overseer offers once to take Explorer's place; \"Use Overseer\" shows it in the side bar and remembers the choice",
+      "ok": true,
+      "detail": {
+        "chosen": true,
+        "sideBar": "Overseer",
+        "offer": "Source: Overseer\nUse Overseer\nKeep Explorer\nShow Overseer in the side bar instead of Explorer when VS Code opens? Explorer stays one click away in the activity bar."
+      }
+    },
+    {
+      "name": "after a reload the side bar opens on Overseer and the offer is not repeated (Explorer is still in the activity bar)",
+      "ok": true,
+      "detail": {
+        "reopened": {
+          "sideBar": "Overseer",
+          "agents": false,
+          "explorer": false,
+          "dirtyTabs": []
+        },
+        "askedAgain": false
+      }
+    },
+    {
+      "name": "chat alone: agents once (side bar); no files or changed files listed anywhere (no Files pane, no strip)",
+      "ok": true,
+      "detail": {
+        "agents": [
+          "side bar"
+        ],
+        "files": [],
+        "changedFiles": [],
+        "unsaved": []
+      }
+    },
+    {
+      "name": "review beside the chat: agents once, files once (review navigator), changed files once (not repeated under the conversation)",
+      "ok": true,
+      "detail": {
+        "agents": [
+          "side bar"
+        ],
+        "files": [
+          "review navigator"
+        ],
+        "changedFiles": [
+          "review navigator"
+        ],
+        "unsaved": []
+      }
+    },
+    {
+      "name": "an unsaved edit is marked once among Overseer's views (the review)",
+      "ok": true,
+      "detail": {
+        "agents": [
+          "side bar"
+        ],
+        "files": [
+          "review navigator"
+        ],
+        "changedFiles": [
+          "review navigator"
+        ],
+        "unsaved": [
+          "review",
+          "editor tab"
+        ]
+      }
+    },
+    {
+      "name": "grid: agents once (side bar); no file lists",
+      "ok": true,
+      "detail": {
+        "agents": [
+          "side bar"
+        ],
+        "files": [],
+        "changedFiles": [],
+        "unsaved": []
+      }
+    },
+    {
+      "name": "dashboard: agents once, files once, changed files once",
+      "ok": true,
+      "detail": {
+        "agents": [
+          "side bar"
+        ],
+        "files": [
+          "review navigator"
+        ],
+        "changedFiles": [
+          "review navigator"
+        ],
+        "unsaved": []
+      }
+    }
+  ],
+  "inventory": {
+    "chat-alone": {
+      "agents": [
+        "side bar"
+      ],
+      "files": [],
+      "changedFiles": [],
+      "unsaved": []
+    },
+    "review-and-chat": {
+      "agents": [
+        "side bar"
+      ],
+      "files": [
+        "review navigator"
+      ],
+      "changedFiles": [
+        "review navigator"
+      ],
+      "unsaved": []
+    },
+    "unsaved-edit": {
+      "agents": [
+        "side bar"
+      ],
+      "files": [
+        "review navigator"
+      ],
+      "changedFiles": [
+        "review navigator"
+      ],
+      "unsaved": [
+        "review",
+        "editor tab"
+      ]
+    },
+    "grid": {
+      "agents": [
+        "side bar"
+      ],
+      "files": [],
+      "changedFiles": [],
+      "unsaved": []
+    },
+    "dashboard": {
+      "agents": [
+        "side bar"
+      ],
+      "files": [
+        "review navigator"
+      ],
+      "changedFiles": [
+        "review navigator"
+      ],
+      "unsaved": []
+    }
+  }
+}
