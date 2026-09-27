@@ -1,8 +1,8 @@
 $ git rev-parse --short HEAD   # daemon, extension and fixtures are identical to d7be0a3
 d668d32
 $ python3 docs/verification/evidence/audio-mode/check-pack.py --approved <owner-approved folder>
-# <owner-approved folder>: the owner's own copy (cp -RL) of machines-voice-lab/output/reactor-selected-current,
-# made on 2026-09-26 because macOS denies the agent's app access to ~/Downloads.
+# <owner-approved folder>: a copy the owner made on 2026-09-26 of the voice lab's reactor-selected-current,
+# because the agent's tools cannot read the folder the voice lab is in.
 
 cue                           bytes  seconds  sha256
 agent_complete.mp3             2828    0.365  167d213ae6b976d9f4bb8ed233352c1bc5cc0eb090c9e6c37ae3808efd0eaa7d

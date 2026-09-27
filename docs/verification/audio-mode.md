@@ -1,6 +1,6 @@
 # Audio Mode verification (pull request #5)
 
-Criterion: [AC-143](AC-143.md), Gate O in [the RFC](../overseer-rfc.md); what remains is
+Criterion: AC-143, Gate O in [the RFC](../overseer-rfc.md); its ledger record is on main. What remains is
 AC-144, AC-145, T-23 and T-24 in the [prepared goal](../rfcs/audio-mode-goal.md). Design:
 [side RFC](../rfcs/audio-mode.md). Tested implementation commit: `d7be0a3`; later commits on
 the branch change documents, comments and evidence only. Date: 2026-09-26, macOS 26.6.2 arm64.
@@ -43,8 +43,8 @@ The full hashes are in the [pack's README](../../daemon/assets/reactor/README.md
 states the same sizes, lengths and hashes. Git tracks these 12 audio files and no other: no
 WAV, no Commander recording, no game sample, no generated voice file.
 
-The approved folder was read through the owner's own copy of it (`cp -RL`), because macOS
-denies the agent's app access to `~/Downloads`.
+The approved folder was read through a copy the owner made of it, because the agent's
+tools cannot read the folder the voice lab is in.
 
 ## Requirement by requirement
 

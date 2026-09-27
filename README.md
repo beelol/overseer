@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **77 / 145** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-81, AC-82, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97, AC-98, AC-99, AC-100, AC-101, AC-102, AC-103, AC-104, AC-105, AC-106, AC-107, AC-108, AC-109, AC-110, AC-111, AC-112, AC-113, AC-114, AC-115, AC-116, AC-117, AC-118, AC-119, AC-120, AC-121, AC-122, AC-123, AC-124, AC-125, AC-126, AC-127, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-134, AC-135, AC-136, AC-137, AC-138, AC-139, AC-140, AC-141, AC-142, AC-144, AC-145. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **76 / 161** · **4** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-81, AC-82, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97, AC-98, AC-99, AC-100, AC-101, AC-102, AC-103, AC-104, AC-105, AC-106, AC-107, AC-108, AC-109, AC-110, AC-111, AC-112, AC-113, AC-114, AC-115, AC-116, AC-117, AC-118, AC-119, AC-120, AC-121, AC-122, AC-123, AC-124, AC-125, AC-126, AC-127, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-134, AC-135, AC-136, AC-137, AC-138, AC-139, AC-140, AC-141, AC-142, AC-143, AC-144, AC-145, AC-146, AC-147, AC-148, AC-149, AC-150, AC-151, AC-152, AC-153, AC-154, AC-155, AC-156, AC-157, AC-158, AC-159, AC-160, AC-161. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -161,9 +161,25 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-140** Memory safety guard — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-140.md)
 - [ ] **AC-141** Pair once — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-141.md)
 - [ ] **AC-142** One Overseer mark everywhere — not started: waits for the owner's logo files — [evidence](docs/verification/AC-142.md)
-- [x] **AC-143** Opt-in audio cues owned by the daemon — [evidence](docs/verification/AC-143.md)
+- [ ] **AC-143** Opt-in audio cues owned by the daemon — in progress: built and verified in pull request #5, not merged — [evidence](docs/verification/AC-143.md)
 - [ ] **AC-144** A lost session asks for attention — not started (Gate O, the owner's decision of 2026-09-26) — [evidence](docs/verification/AC-144.md)
 - [ ] **AC-145** Audio Mode by ear (owner-confirmed) — not started: the owner's listening session — [evidence](docs/verification/AC-145.md)
+- [ ] **AC-146** Reconcile and merge the work in flight — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-146.md)
+- [ ] **AC-147** One command runs every test — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-147.md)
+- [ ] **AC-148** Checks on every pull request — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-148.md)
+- [ ] **AC-149** A steady UI suite — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-149.md)
+- [ ] **AC-150** The first click always lands — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-150.md)
+- [ ] **AC-151** Every live scenario rerun on the current build — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-151.md)
+- [ ] **AC-152** Performance re-measured — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-152.md)
+- [ ] **AC-153** A ledger that stays true — not started (Gate P, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-153.md)
+- [ ] **AC-154** Composer choices fill the row — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-154.md)
+- [ ] **AC-155** One-line search with a filter menu — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-155.md)
+- [ ] **AC-156** Every agent works from the same rules — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-156.md)
+- [ ] **AC-157** Oversee the other agents — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-157.md)
+- [ ] **AC-158** Gate M's theme and immersive look are back in scope — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-158.md)
+- [ ] **AC-159** The toolchain works without Xcode's license — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-159.md)
+- [ ] **AC-160** Owner actions in one place — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-160.md)
+- [ ] **AC-161** Everything merged into one main — not started (Gate Q, added by the owner on 2026-09-27) — [evidence](docs/verification/AC-161.md)
 <!-- ac-list:end -->
 
 ## What works today (macOS, VS Code 1.139)
@@ -386,8 +402,25 @@ the owner action or decision each one needs.
 - [ ] [AC-140](docs/verification/AC-140.md) (Memory safety guard): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
 - [ ] [AC-141](docs/verification/AC-141.md) (Pair once): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
 - [ ] [AC-142](docs/verification/AC-142.md) (One Overseer mark everywhere): Not started: the owner's two images need to be added to docs/design/brand/ as files; then the single-colour glyph is drawn for VS Code and approved.
+- [ ] [AC-143](docs/verification/AC-143.md) (Opt-in audio cues owned by the daemon): Waits for pull request #5 to merge; its branch carries the evidence and the verified record.
 - [ ] [AC-144](docs/verification/AC-144.md) (A lost session asks for attention): Not started (Gate O, the owner's decision of 2026-09-26; the tests belong to pull request #5; see docs/rfcs/audio-mode-goal.md).
 - [ ] [AC-145](docs/verification/AC-145.md) (Audio Mode by ear (owner-confirmed)): Not started: needs the owner's listening session on the build of pull request #5 (see docs/rfcs/audio-mode-goal.md).
+- [ ] [AC-146](docs/verification/AC-146.md) (Reconcile and merge the work in flight): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-147](docs/verification/AC-147.md) (One command runs every test): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-148](docs/verification/AC-148.md) (Checks on every pull request): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-149](docs/verification/AC-149.md) (A steady UI suite): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-150](docs/verification/AC-150.md) (The first click always lands): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-151](docs/verification/AC-151.md) (Every live scenario rerun on the current build): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-152](docs/verification/AC-152.md) (Performance re-measured): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-153](docs/verification/AC-153.md) (A ledger that stays true): Not started (Gate P, added by the owner on 2026-09-27).
+- [ ] [AC-154](docs/verification/AC-154.md) (Composer choices fill the row): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-155](docs/verification/AC-155.md) (One-line search with a filter menu): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-156](docs/verification/AC-156.md) (Every agent works from the same rules): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-157](docs/verification/AC-157.md) (Oversee the other agents): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-158](docs/verification/AC-158.md) (Gate M's theme and immersive look are back in scope): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-159](docs/verification/AC-159.md) (The toolchain works without Xcode's license): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-160](docs/verification/AC-160.md) (Owner actions in one place): Not started (Gate Q, added by the owner on 2026-09-27).
+- [ ] [AC-161](docs/verification/AC-161.md) (Everything merged into one main): Not started (Gate Q, added by the owner on 2026-09-27).
 - [ ] Decide a retention policy for snapshot refs under `refs/overseer/snapshots/*` (they accumulate per turn; harmless but unbounded). Clearly labeled follow-up; no AC covers it.
 - [ ] Decide whether the *existing login* Codex profile should be discouraged: on this machine `~/.codex` is shared with the ChatGPT desktop app and switched accounts during the session (see [AC-02](docs/verification/AC-02.md)). Clearly labeled follow-up.
 - [ ] Remove or update the stale `~/Library/pnpm/codex` (0.1.x) on PATH; Overseer ignores it in favour of the ChatGPT.app bundle. Owner environment note.
