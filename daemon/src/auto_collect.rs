@@ -180,12 +180,32 @@ pub fn opencode_local_catalog(
         return Err(anyhow!("OpenCode project has no explicit provider map"));
     }
     let deadline = Instant::now() + timeout;
-    let resolved_bytes = opencode_cli_output(program, env, cwd,
-        &["debug", "config", "--pure"], deadline)?;
+    // These independent CLI reads each pay OpenCode startup cost. Running them
+    // sequentially can consume the whole metadata deadline before either
+    // result is checked. A newly created profile may race its one-time local
+    // database migration, so retry only a failed command once within the same
+    // deadline after its peer has exited.
+    let (resolved_read, model_read) = std::thread::scope(|scope| {
+        let resolved = scope.spawn(|| opencode_cli_output(program, env, cwd,
+            &["debug", "config", "--pure"], deadline));
+        let models = scope.spawn(|| opencode_cli_output(program, env, cwd,
+            &["models", "--pure", "--verbose"], deadline));
+        (resolved.join(), models.join())
+    });
+    let resolved_read = resolved_read.map_err(|_| anyhow!("OpenCode config worker failed"))?;
+    let model_read = model_read.map_err(|_| anyhow!("OpenCode model worker failed"))?;
+    let resolved_bytes = match resolved_read {
+        Err(error) if error.to_string() == "OpenCode metadata command failed" =>
+            opencode_cli_output(program, env, cwd, &["debug", "config", "--pure"], deadline)?,
+        other => other?,
+    };
     let resolved: Value = serde_json::from_slice(&resolved_bytes)
         .map_err(|_| anyhow!("invalid OpenCode resolved configuration"))?;
-    let model_bytes = opencode_cli_output(program, env, cwd,
-        &["models", "--pure", "--verbose"], deadline)?;
+    let model_bytes = match model_read {
+        Err(error) if error.to_string() == "OpenCode metadata command failed" =>
+            opencode_cli_output(program, env, cwd, &["models", "--pure", "--verbose"], deadline)?,
+        other => other?,
+    };
     let models = parse_opencode_models_verbose(&model_bytes)?;
     crate::auto_opencode::parse_local_cli_catalog(&config, &resolved, &models, observed_ms)
 }
@@ -248,6 +268,38 @@ pub fn public_status_json(program: &Path, provider: &str, timeout: Duration) -> 
 mod opencode_metadata_tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn independent_cli_metadata_reads_share_the_deadline() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        std::fs::create_dir(&project).unwrap();
+        let config = json!({"provider":{"local":{"npm":"@ai-sdk/openai-compatible",
+            "options":{"baseURL":"http://127.0.0.1:47811/v1"},
+            "models":{"fixture":{"name":"Fixture","tool_call":true}}}},
+            "model":"local/fixture"});
+        std::fs::write(project.join("opencode.json"), serde_json::to_vec(&config).unwrap()).unwrap();
+        let resolved = dir.path().join("resolved.json");
+        std::fs::write(&resolved, serde_json::to_vec(&config).unwrap()).unwrap();
+        let models = dir.path().join("models.txt");
+        std::fs::write(&models, b"local/fixture\n{\"id\":\"fixture\",\"providerID\":\"local\",\"status\":\"active\",\"limit\":{\"context\":32000},\"capabilities\":{\"toolcall\":true},\"variants\":{}}\n").unwrap();
+        let program = dir.path().join("fixture-opencode");
+        std::fs::write(&program, "#!/bin/sh\ncase \"$1\" in\n  debug) touch \"$META_DEBUG_MARKER\"; while [ ! -e \"$META_MODELS_MARKER\" ]; do sleep 0.01; done; cat \"$META_RESOLVED_FILE\" ;;\n  models) touch \"$META_MODELS_MARKER\"; while [ ! -e \"$META_DEBUG_MARKER\" ]; do sleep 0.01; done; if [ ! -e \"$META_RETRY_MARKER\" ]; then touch \"$META_RETRY_MARKER\"; exit 1; fi; cat \"$META_MODELS_FILE\" ;;\n  *) exit 2 ;;\nesac\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let env = BTreeMap::from([
+            ("PATH".into(), "/usr/bin:/bin".into()),
+            ("META_DEBUG_MARKER".into(), dir.path().join("debug.started").display().to_string()),
+            ("META_MODELS_MARKER".into(), dir.path().join("models.started").display().to_string()),
+            ("META_RESOLVED_FILE".into(), resolved.display().to_string()),
+            ("META_MODELS_FILE".into(), models.display().to_string()),
+            ("META_RETRY_MARKER".into(), dir.path().join("models.retried").display().to_string()),
+        ]);
+        let catalog = opencode_local_catalog(&program, &env, &project,
+            Duration::from_secs(3), 1000).unwrap();
+        assert_eq!(catalog.models.len(), 1);
+        assert_eq!(catalog.models[0].model, "local/fixture");
+        assert!(dir.path().join("models.retried").exists());
+    }
 
     #[test]
     fn verbose_model_listing_is_structured_and_fail_closed() {
