@@ -19,7 +19,27 @@ class Cdp {
       } else if (message.method === 'Runtime.executionContextDestroyed') {
         this.contexts.delete(message.sessionId + ':' + message.params.executionContextId);
       } else if (message.method === 'Runtime.exceptionThrown') this.errors.push(message.params.exceptionDetails);
+      else if (message.method === 'Input.dragIntercepted') this.dragData = message.params.data;
     });
+  }
+
+  /** Drags from one point to another with real HTML drag events (Input.setInterceptDrags). */
+  async drag(from, to) {
+    this.dragData = undefined;
+    await this.call('Input.setInterceptDrags', { enabled: true }, this.workbench);
+    await this.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x, y: from.y, button: 'none' }, this.workbench);
+    await this.call('Input.dispatchMouseEvent', { type: 'mousePressed', x: from.x, y: from.y, button: 'left', clickCount: 1 }, this.workbench);
+    for (let i = 1; i <= 6 && !this.dragData; i++) {
+      await this.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x + (to.x - from.x) * i / 6, y: from.y + (to.y - from.y) * i / 6, button: 'left', buttons: 1 }, this.workbench);
+      await delay(60);
+    }
+    const data = this.dragData;
+    if (data) {
+      for (const type of ['dragEnter', 'dragOver', 'drop']) { await this.call('Input.dispatchDragEvent', { type, x: to.x, y: to.y, data }, this.workbench); await delay(120); }
+    }
+    await this.call('Input.dispatchMouseEvent', { type: 'mouseReleased', x: to.x, y: to.y, button: 'left', clickCount: 1 }, this.workbench);
+    await this.call('Input.setInterceptDrags', { enabled: false }, this.workbench);
+    return data;
   }
 
   call(method, params = {}, sessionId) {
@@ -87,7 +107,7 @@ class Cdp {
 
   async key(key, { meta = false, shift = false, ctrl = false, alt = false } = {}) {
     const modifiers = (alt ? 1 : 0) | (ctrl ? 2 : 0) | (meta ? 4 : 0) | (shift ? 8 : 0);
-    const codes = { Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], Tab: [9, 'Tab'], ArrowDown: [40, 'ArrowDown'], ArrowUp: [38, 'ArrowUp'], Backspace: [8, 'Backspace'], PageDown: [34, 'PageDown'], End: [35, 'End'], Home: [36, 'Home'], F10: [121, 'F10'], ContextMenu: [93, 'ContextMenu'] };
+    const codes = { Enter: [13, 'Enter', '\r'], Escape: [27, 'Escape'], Tab: [9, 'Tab'], ArrowDown: [40, 'ArrowDown'], ArrowUp: [38, 'ArrowUp'], Backspace: [8, 'Backspace'], PageDown: [34, 'PageDown'], End: [35, 'End'], Home: [36, 'Home'], F10: [121, 'F10'], ContextMenu: [93, 'ContextMenu'], '.': [190, 'Period', '.'], ArrowRight: [39, 'ArrowRight'], ArrowLeft: [37, 'ArrowLeft'], Delete: [46, 'Delete'] };
     const [keyCode, code, text] = codes[key] || [key.toUpperCase().charCodeAt(0), 'Key' + key.toUpperCase()];
     const base = { modifiers, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode, key: codes[key] ? key : (shift ? key.toUpperCase() : key), code };
     await this.call('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...base }, this.workbench);
@@ -101,10 +121,15 @@ class Cdp {
     await delay(80);
   }
 
-  async click(x, y) {
+  async click(x, y, { button = 'left' } = {}) {
     for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
-      await this.call('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }, this.workbench);
+      await this.call('Input.dispatchMouseEvent', { type, x, y, button, clickCount: 1 }, this.workbench);
     }
+    await delay(80);
+  }
+
+  async move(x, y) {
+    await this.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'none' }, this.workbench);
     await delay(80);
   }
 

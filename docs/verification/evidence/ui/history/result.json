@@ -1,0 +1,64 @@
+{
+  "checks": [
+    {
+      "name": "with 300 runs, search answers in under 200 ms, by title and by text only in the agent output",
+      "ok": true,
+      "detail": {
+        "shownAtStart": 16,
+        "byTitle": {
+          "ms": 37,
+          "titles": [
+            "History task 123"
+          ]
+        },
+        "byOutput": {
+          "ms": 34,
+          "titles": [
+            "History task 237"
+          ]
+        }
+      }
+    },
+    {
+      "name": "a finished agent is archived from the side bar by keyboard (hidden, listed under Show Archived) and restored",
+      "ok": true,
+      "detail": {
+        "archived": 1790463523314,
+        "hidden": true,
+        "inArchive": [
+          "History task 005"
+        ],
+        "restored": true
+      }
+    },
+    {
+      "name": "bulk cleanup removes only the clean archived worktrees; uncommitted work is kept unless confirmed; branches stay",
+      "ok": true,
+      "detail": {
+        "cleaned": {
+          "a": true,
+          "b": true,
+          "c": false,
+          "cFile": true,
+          "branchesKept": true
+        },
+        "dialog": "Remove All, Discarding Uncommitted Work\nCancel\nRemove 2 Clean\nClean up worktrees of 3 archived agents?\nBranches are kept, so committed work stays in Git.\n\nClean (2):\n• History task 010\n• History task 011\n\nWith uncommitted work (1), kept unless you choose to discard it:\n• History task 012 (1 file)"
+      }
+    },
+    {
+      "name": "discarding uncommitted work needs an explicit second confirmation, then the worktree is removed (branch kept)",
+      "ok": true,
+      "detail": {
+        "removed": true
+      }
+    },
+    {
+      "name": "finished runs older than overseer.history.autoArchiveDays are archived automatically; the side bar shows active and recent agents only",
+      "ok": true,
+      "detail": {
+        "archivedCount": 300,
+        "shown": 0
+      }
+    }
+  ]
+}

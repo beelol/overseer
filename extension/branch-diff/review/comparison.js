@@ -33,8 +33,10 @@ class Comparison {
     this.onDidChange = this.emitter.event;
     this.progressEmitter = new vscode.EventEmitter();
     this.onDidProgress = this.progressEmitter.event;
+    // A Git state change (staging, commit, checkout) also refreshes status: the Staged and Unstaged
+    // scopes come from it (Overseer). Our own status refresh is guarded, so this does not loop.
     this.subscriptions = [this.emitter, this.progressEmitter, repo.state.onDidChange(() => {
-      if (!this.refreshingStatus) this.invalidate(false);
+      if (!this.refreshingStatus) this.invalidate(true);
     })];
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(repo.rootUri, '**/*'));
     this.subscriptions.push(watcher, watcher.onDidChange(uri => this.invalidate(true, uri)),

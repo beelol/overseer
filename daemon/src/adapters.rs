@@ -54,6 +54,12 @@ pub struct LaunchReq<'a> {
     pub args_override: Option<&'a [String]>,
     /// Extra harness arguments chosen for the task (e.g. `-c agents.max_depth=2`).
     pub extra_args: &'a [String],
+    /// Reasoning effort for this turn (AC-60), validated by `check_turn_options`.
+    pub effort: Option<&'a str>,
+    /// Permission / sandbox mode for this turn (AC-60).
+    pub permission_mode: Option<&'a str>,
+    /// Images attached to this turn's prompt (private files in the run folder).
+    pub images: &'a [(String, PathBuf)],
 }
 
 pub struct Launch {
@@ -128,7 +134,9 @@ pub fn resolve_program(harness: &str) -> Option<PathBuf> {
     let family = if harness == "codex-app" { "codex" } else { harness };
     let env_key = format!("OVERSEER_{}_PATH", family.to_ascii_uppercase());
     if let Ok(p) = std::env::var(&env_key) {
-        return Some(PathBuf::from(p));
+        // An explicit path wins, and never falls back to PATH; a missing file is "not installed".
+        let p = PathBuf::from(p);
+        return p.is_file().then_some(p);
     }
     match harness {
         "codex" | "codex-app" => {
@@ -166,6 +174,7 @@ pub fn capabilities(harness: &str) -> Value {
             "approvals": "unsupported in exec transport (sandbox policy decides); use the codex-app transport for approvals",
             "file_activity": "supported (file_change items)", "children": "supported (collab_tool_call spawn_agent/wait; child output limited to final message)",
             "usage": "supported (turn.completed usage)", "quota": "unknown (error text classification only)",
+            "model": "supported (-m, per turn)", "effort": "supported (model_reasoning_effort, per turn)", "permission_mode": "supported (sandbox: read-only or workspace-write)", "images": "supported (-i)",
             "account_login": "ChatGPT account via codex login (CODEX_HOME per profile)",
             "verification": "live-verified on macOS with one ChatGPT account (codex 0.155); two simultaneous accounts not yet verified"
         }),
@@ -176,6 +185,7 @@ pub fn capabilities(harness: &str) -> Value {
             "approvals": "supported (command/file-change approval requests answered Allow/Deny in Overseer; never auto-approved)",
             "file_activity": "supported (fileChange items)", "children": "supported (collabAgentToolCall spawnAgent/wait)",
             "usage": "supported (thread/tokenUsage/updated)", "quota": "partial (account/rateLimits/updated when the server sends it)",
+            "model": "supported (at start)", "effort": "unsupported in Overseer's app-server transport", "permission_mode": "supported (approval policy at start)", "images": "unsupported in Overseer's app-server transport",
             "account_login": "ChatGPT account via codex login (CODEX_HOME per profile)",
             "verification": "live-verified on macOS: approvals Allow/Deny/Interrupt with one ChatGPT account (codex 0.155)"
         }),
@@ -186,6 +196,7 @@ pub fn capabilities(harness: &str) -> Value {
             "approvals": "supported (--permission-prompt-tool stdio)", "file_activity": "supported (Write/Edit tool inputs)",
             "children": "supported (Agent/Task tool_use ids, parent_tool_use_id nesting, system task_* events)",
             "usage": "supported (result usage)", "quota": "unknown (error text classification only)",
+            "model": "supported (--model, per turn)", "effort": "supported (--effort, per turn)", "permission_mode": "supported (--permission-mode: acceptEdits, plan, auto, manual)", "images": "supported (stream-json image blocks)",
             "account_login": "Claude.ai account via claude auth login (CLAUDE_CONFIG_DIR per profile)",
             "verification": "live-verified on macOS with a claude.ai account (Claude Code 2.1.246): edit, permissions, nested subagents, follow-up, interrupt"
         }),
@@ -195,6 +206,7 @@ pub fn capabilities(harness: &str) -> Value {
             "interrupt": "supported (SIGINT)", "resume": "supported",
             "approvals": "unknown", "file_activity": "supported (edit/write tool parts)",
             "children": "partial (task tool parts expose child session ids when present)", "usage": "supported (step_finish tokens)",
+            "model": "supported (-m, per turn)", "effort": "unsupported", "permission_mode": "unsupported", "images": "unsupported",
             "quota": "unknown", "account_login": "opencode auth login (XDG_DATA_HOME per profile); login itself untested",
             "verification": "verified through the real OpenCode runtime with a mock provider and with local Ollama models; no account login verified"
         }),
@@ -202,6 +214,7 @@ pub fn capabilities(harness: &str) -> Value {
             "transport": "generic process (stdin/stdout)", "launch": "supported", "output": "supported (raw lines)",
             "follow_up": "supported (writes a line to stdin)", "interrupt": "supported (SIGINT)", "resume": "unsupported",
             "approvals": "unknown", "file_activity": "unknown (filesystem only)", "children": "unknown", "usage": "unknown", "quota": "unknown",
+            "model": "not applicable", "effort": "not applicable", "permission_mode": "not applicable", "images": "not applicable",
             "account_login": "not applicable",
             "verification": "protocol tests with fixture executables"
         }),
@@ -244,6 +257,17 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             if let Some(m) = model {
                 args.extend(["-m".into(), m.into()]);
             }
+            if let Some(e) = req.effort {
+                args.extend(["-c".into(), format!("model_reasoning_effort=\"{e}\"")]);
+            }
+            if req.permission_mode == Some("read-only") {
+                // Read-only sandbox: the agent can look and plan but not write.
+                if let Some(i) = args.iter().position(|a| a == "workspace-write") { args[i] = "read-only".into(); }
+                if let Some(i) = args.iter().position(|a| a == "sandbox_mode=\"workspace-write\"") { args[i] = "sandbox_mode=\"read-only\"".into(); }
+            }
+            for (_, image) in req.images {
+                args.extend(["-i".into(), image.display().to_string()]);
+            }
             args.push("--".into());
             args.push(req.prompt.to_string());
             (args, None, true)
@@ -264,7 +288,24 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
             if let Some(session) = req.resume_session {
                 args.extend(["--resume".into(), session.into()]);
             }
-            let msg = json!({"type": "user", "message": {"role": "user", "content": req.prompt}});
+            if let Some(e) = req.effort {
+                args.extend(["--effort".into(), e.into()]);
+            }
+            if let Some(mode) = req.permission_mode {
+                args.extend(["--permission-mode".into(), mode.into()]);
+            }
+            let content = if req.images.is_empty() {
+                json!(req.prompt)
+            } else {
+                use base64::Engine;
+                let mut parts = vec![json!({"type": "text", "text": req.prompt})];
+                for (mime, path) in req.images {
+                    let data = base64::engine::general_purpose::STANDARD.encode(std::fs::read(path)?);
+                    parts.push(json!({"type": "image", "source": {"type": "base64", "media_type": mime, "data": data}}));
+                }
+                json!(parts)
+            };
+            let msg = json!({"type": "user", "message": {"role": "user", "content": content}});
             (args, Some(format!("{msg}\n")), false)
         }
         "opencode" => {
@@ -293,6 +334,29 @@ pub fn launch(harness: &str, req: &LaunchReq) -> Result<Launch> {
         args.splice(at..at, extra);
     }
     Ok(Launch { program: program_str, args, env, initial_stdin, close_stdin })
+}
+
+/// Which turn options a harness accepts (AC-60); anything else is refused with a clear reason.
+pub fn check_turn_options(harness: &str, effort: Option<&str>, mode: Option<&str>, images: usize) -> Result<()> {
+    let (efforts, modes, can_images): (&[&str], &[&str], bool) = match harness {
+        "claude" => (&["low", "medium", "high", "xhigh", "max"], &["acceptEdits", "plan", "auto", "manual"], true),
+        "codex" => (&["minimal", "low", "medium", "high", "xhigh"], &["read-only", "workspace-write"], true),
+        _ => (&[], &[], false),
+    };
+    if let Some(e) = effort {
+        if !efforts.contains(&e) {
+            bail!("{harness} does not take reasoning effort {e:?}{}", if efforts.is_empty() { String::new() } else { format!(" (choose {})", efforts.join(", ")) });
+        }
+    }
+    if let Some(m) = mode {
+        if !modes.contains(&m) {
+            bail!("{harness} does not take permission mode {m:?}{}", if modes.is_empty() { String::new() } else { format!(" (choose {})", modes.join(", ")) });
+        }
+    }
+    if images > 0 && !can_images {
+        bail!("{harness} does not take image attachments");
+    }
+    Ok(())
 }
 
 pub fn interrupt_plan(harness: &str) -> InterruptPlan {
@@ -708,7 +772,9 @@ pub fn parse_claude(v: &Value) -> Vec<Norm> {
                 vec![Norm::Unparsed(truncate(&v.to_string(), 2000))]
             }
         }
-        "control_response" | "stream_event" | "rate_limit_event" => vec![Norm::Ignored],
+        // Usage limits as Claude reports them (AC-62): the account's windows and reset times.
+        "rate_limit_event" => match v.get("rate_limit_info") { Some(info) => vec![Norm::Usage(json!({"rate_limits": {"claude_rate_limit": info}}))], None => vec![Norm::Ignored] },
+        "control_response" | "stream_event" => vec![Norm::Ignored],
         _ => vec![Norm::Unparsed(truncate(&v.to_string(), 4000))],
     }
 }
@@ -849,5 +915,37 @@ mod tests {
         assert!(!env.contains_key("OPENAI_API_KEY"));
         assert!(!env.contains_key("CLAUDECODE"));
         assert!(env["PATH"].starts_with("/x:"));
+    }
+}
+
+#[cfg(test)]
+mod turn_option_tests {
+    use super::*;
+
+    fn req<'a>(resume: Option<&'a str>, images: &'a [(String, PathBuf)]) -> LaunchReq<'a> {
+        LaunchReq { cwd: Path::new("/tmp/w"), prompt: "do it", model: Some("gpt-5.6-luna"), profile_env: BTreeMap::new(), resume_session: resume, program_override: Some("/bin/echo"),
+            args_override: None, extra_args: &[], effort: Some("high"), permission_mode: Some("read-only"), images }
+    }
+
+    #[test]
+    fn codex_turn_options_become_cli_arguments() {
+        let images = vec![("image/png".to_string(), PathBuf::from("/tmp/a.png"))];
+        let a = launch("codex", &req(None, &images)).unwrap().args;
+        let j = a.join(" ");
+        assert!(j.contains("-s read-only -C /tmp/w"), "{j}");
+        assert!(j.contains("-m gpt-5.6-luna -c model_reasoning_effort=\"high\""), "{j}");
+        assert!(j.contains("-i /tmp/a.png -- do it"), "{j}");
+        let r = launch("codex", &req(Some("thread-1"), &images)).unwrap().args.join(" ");
+        assert!(r.starts_with("exec resume thread-1") && r.contains("sandbox_mode=\"read-only\"") && r.contains("-i /tmp/a.png"), "{r}");
+    }
+
+    #[test]
+    fn turn_options_are_checked_per_harness() {
+        assert!(check_turn_options("claude", Some("max"), Some("acceptEdits"), 1).is_ok());
+        assert!(check_turn_options("codex", Some("high"), Some("read-only"), 2).is_ok());
+        assert!(check_turn_options("claude", Some("ludicrous"), None, 0).is_err());
+        assert!(check_turn_options("claude", None, Some("bypassPermissions"), 0).is_err(), "never bypass permissions");
+        assert!(check_turn_options("opencode", Some("high"), None, 0).is_err());
+        assert!(check_turn_options("generic", None, None, 1).is_err());
     }
 }

@@ -1,36 +1,36 @@
 {
   "checks": [
     {
-      "name": "Overseer view works with the native sidebar closed and lists repositories not open in the window",
+      "name": "the Overseer side bar replaces Explorer and lists repositories not open in the window",
       "ok": true,
       "detail": {
-        "sidebarHidden": true,
+        "explorerShown": false,
         "repos": [
+          "Needs you",
           "repo-y",
           "repo-x"
         ]
       }
     },
     {
-      "name": "opens as three columns (agents | review | conversation)",
-      "ok": true,
-      "detail": 3
-    },
-    {
-      "name": "agents column shows task → run → native child → grandchild",
+      "name": "agents list shows repository → task → native child → grandchild",
       "ok": true,
       "detail": [
+        [
+          "repo-x",
+          1
+        ],
         [
           "X nested agents",
           2
         ],
         [
           "child task",
-          4
+          3
         ],
         [
           "grandchild task",
-          5
+          4
         ]
       ]
     },
@@ -45,87 +45,109 @@
       }
     },
     {
-      "name": "selecting a run in another repository switches the review column and the conversation column",
+      "name": "selecting a run in another repository switches the review and the conversation",
       "ok": true,
       "detail": {
         "tabsX": [
-          "Overseer, Editor Group 1",
-          "Review: X edits (1), Editor Group 2",
-          "generic: X edits, Editor Group 3"
+          "Review: X edits (1), Editor Group 1",
+          "Overseer, Editor Group 2"
         ],
         "tabsY": [
-          "Overseer, Editor Group 1",
-          "Review: Y live (1), Editor Group 2",
-          "generic: Y live, Editor Group 3"
+          "Review: Y live (1), Editor Group 1",
+          "Overseer, Editor Group 2"
         ],
         "reviewX": true,
         "reviewY": true,
-        "convY": true
+        "chatX": true,
+        "chatY": true
       }
     },
     {
-      "name": "live status shown in the agents column",
+      "name": "live status shown in the agents list",
       "ok": true,
-      "detail": "dot status-running"
+      "detail": {
+        "label": "Y live",
+        "description": "",
+        "level": 2,
+        "expanded": null,
+        "selected": true,
+        "focused": true,
+        "aria": "Y live, working, generic"
+      }
+    },
+    {
+      "name": "with the side bar closed, Switch Agent switches the review and the conversation across repositories",
+      "ok": true
     },
     {
       "name": "keyboard navigation: arrows move between labelled treeitems, Left collapses then goes to the parent, Right expands",
       "ok": true,
       "detail": {
         "start": {
-          "label": "generic",
-          "role": "treeitem",
-          "aria": "generic, running",
-          "level": "3"
+          "label": "X nested agents",
+          "description": "now",
+          "level": 2,
+          "expanded": "true",
+          "selected": true,
+          "focused": true,
+          "aria": "X nested agents, done, claude, claude (existing login)"
         },
-        "up": {
-          "label": "Y live",
-          "role": "treeitem",
-          "aria": "Y live, overseer/y-live, running",
-          "level": "2"
+        "down": {
+          "label": "child task",
+          "description": "now",
+          "level": 3,
+          "expanded": "true",
+          "selected": false,
+          "focused": true,
+          "aria": "child task, done, native child"
         },
         "collapsedTask": "false",
         "parent": {
-          "label": "repo-y",
-          "role": "treeitem",
-          "aria": "repo-y, /private/tmp/ovs-ui-VuBHu9/repo-y, 1 active",
-          "level": "1"
+          "label": "repo-x",
+          "description": "",
+          "level": 1,
+          "expanded": "true",
+          "selected": false,
+          "focused": true,
+          "aria": "repo-x, 2 agents"
         },
         "reopened": "true"
       }
     },
     {
-      "name": "Overseer view restored after a window reload",
+      "name": "Overseer restored after a window reload (same agent, its chat and review)",
       "ok": true,
-      "detail": [
-        "generic"
-      ]
+      "detail": {
+        "restoredChat": true,
+        "restoredReview": true,
+        "selectedRows": [
+          "Y live"
+        ]
+      }
     },
     {
-      "name": "narrow window: three columns remain usable and the agents column does not overflow",
+      "name": "narrow window: review and chat columns remain usable and the chat does not overflow",
       "ok": true,
       "detail": {
         "dims": {
           "w": 1024,
           "groups": [
-            220,
-            463,
-            283
+            439,
+            227
           ]
         },
         "fits": true
       }
     },
     {
-      "name": "wide window: three columns remain usable and the agents column does not overflow",
+      "name": "wide window: review and chat columns remain usable and the chat does not overflow",
       "ok": true,
       "detail": {
         "dims": {
           "w": 1900,
           "groups": [
-            405,
-            884,
-            553
+            1018,
+            524
           ]
         },
         "fits": true

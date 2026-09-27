@@ -33,12 +33,12 @@ const PROMPT = 'Edit files one at a time, one patch per step, in exactly this or
     await cdp.input('Task prompt', PROMPT);
     const review = await cdp.webview('!!document.getElementById("diffs") && !!document.getElementById("follow")', 60000);
     const run = s.ctl('state').runs.find(r => r.harness === 'codex-app');
-    check('follow on for launched run', await review.waitFor(`document.getElementById('follow').checked`, 15000));
+    check('follow on for launched run', await review.waitFor(`(document.getElementById('follow').dataset.state !== 'off')`, 15000));
     const seen = [];
     let pausedAt, pausedTop, paused = false, resumed = false, afterResume = [];
     const end = Date.now() + 360000;
     while (Date.now() < end) {
-      const st = await review.eval(`({ text: document.getElementById('follow-state').textContent, top: document.getElementById('diffs').scrollTop, resume: !document.getElementById('resume').hidden })`);
+      const st = await review.eval(`({ text: document.getElementById('follow-state').textContent, top: document.getElementById('diffs').scrollTop, resume: (document.getElementById('follow').dataset.state === 'paused') })`);
       if (st.text.startsWith('Following:') && seen[seen.length - 1] !== st.text) {
         seen.push(st.text); s.note('follow', st.text);
         if (resumed) afterResume.push(st.text);
@@ -48,7 +48,7 @@ const PROMPT = 'Edit files one at a time, one patch per step, in exactly this or
         const pt = await s.webviewPoint(review, '#diffs');
         await cdp.wheel(pt.x, pt.y + 100, 500);
         await delay(400);
-        const p = await review.eval(`({ text: document.getElementById('follow-state').textContent, top: document.getElementById('diffs').scrollTop, resume: !document.getElementById('resume').hidden })`);
+        const p = await review.eval(`({ text: document.getElementById('follow-state').textContent, top: document.getElementById('diffs').scrollTop, resume: (document.getElementById('follow').dataset.state === 'paused') })`);
         check('scroll pauses Follow during live edits', p.resume && /paused/i.test(p.text), p);
         paused = true; pausedAt = Date.now(); pausedTop = p.top;
         result.editsAtPause = s.ctl('events.list', { run_id: run.id, limit: 5000 }).events.filter(e => e.kind === 'file_activity').length;
@@ -60,7 +60,7 @@ const PROMPT = 'Edit files one at a time, one patch per step, in exactly this or
         const top = await review.eval(`document.getElementById('diffs').scrollTop`);
         const edits = s.ctl('events.list', { run_id: run.id, limit: 5000 }).events.filter(e => e.kind === 'file_activity').length;
         check('paused view stays put while the agent keeps editing', Math.abs(top - pausedTop) < 2 && edits > result.editsAtPause, { pausedTop, top, editsAtPause: result.editsAtPause, editsNow: edits });
-        const r = await s.webviewPoint(review, '#resume');
+        const r = await s.webviewPoint(review, '#follow');
         await cdp.click(r.x, r.y);
         await delay(1200);
         const after = await review.eval(`({ text: document.getElementById('follow-state').textContent, top: document.getElementById('diffs').scrollTop })`);

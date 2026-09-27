@@ -1,0 +1,19 @@
+{
+  "limited": false,
+  "observed_ms": 1790456013080,
+  "plan": "team",
+  "reported": true,
+  "source": "Codex session log",
+  "windows": [
+    {
+      "label": "5 hours",
+      "resets_at_ms": 1790474011000,
+      "used": 0
+    },
+    {
+      "label": "week",
+      "resets_at_ms": 1791022451000,
+      "used": 0
+    }
+  ]
+}

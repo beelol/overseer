@@ -19,6 +19,26 @@ Verified on macOS 26.6.2 (arm64), VS Code 1.139.0. Evidence index: [verification
 | **Gemini CLI** | Google sign-in (doc-only) | ❌ no adapter | — | — | — | — | subagents cannot nest (doc-only) | — | Not installed; documentation survey only (AC-01). Use the generic harness meanwhile. |
 | **Devin** | `devin auth login` is Enterprise-only (doc-only) | ❌ skipped | — | — | — | — | — | — | Skipped per owner decision: no account-login path without API keys / personal access tokens (AC-01, AC-17). |
 
+## Everyday parity (AC-60)
+
+What people do in Claude Code or Codex directly, from Overseer's chat. "Live" means checked with a
+real harness on 2026-09-26 (Claude Code with the existing login and haiku; Codex gpt-5.6-luna on
+ChatGPT A); see [AC-60](verification/AC-60.md).
+
+| Capability | Claude Code | Codex (exec) | Codex (app-server) | OpenCode | Generic |
+| --- | --- | --- | --- | --- | --- |
+| Model per turn | ✅ `--model` (live) | ✅ `-m` (live) | ✅ thread model | ✅ `-m` | — |
+| Reasoning effort per turn | ✅ `--effort` low…max (live) | ✅ `-c model_reasoning_effort` minimal…xhigh (live) | unsupported (shown so) | unsupported (shown so) | — |
+| Permission mode per turn | ✅ `--permission-mode` Ask first / Accept edits / Plan only / Auto (live) | ✅ sandbox Read only / Can edit (`-s`, or `sandbox_mode` on resume) (live) | approval policy at start | unsupported (shown so) | — |
+| Attach or paste images | ✅ image blocks in the stream-json message | ✅ `-i <file>` | unsupported (shown so) | unsupported (shown so) | — |
+| @-mention worktree files | ✅ named in the message; the agent reads them (live) | ✅ same (live) | ✅ same | ✅ same | ✅ same |
+| Steer: queue a message | ✅ sent when the turn ends (Overseer) | ✅ | ✅ | ✅ | ✅ |
+| Steer: stop and send (⌥Enter) | ✅ control_request interrupt, then resume (live) | ✅ SIGINT, then `exec resume` (live) | ✅ `turn/interrupt` | ✅ SIGINT, then `--session` | ✅ SIGINT |
+| Continue after VS Code or the daemon restarts | ✅ `--resume <session>` (live) | ✅ `exec resume <thread>` (live) | ✅ `thread/resume` | ✅ `--session` | — (new process) |
+
+Unsupported options are refused by the daemon with the reason, and the composer hides them for
+that harness. Images are stored in the run's folder (mode 0600), at most 4 per message, 5 MB each.
+
 ## Environment and account rules enforced by the daemon
 
 - Harness processes get an allow-listed environment (HOME, USER, PATH, locale, TMPDIR, XDG

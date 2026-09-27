@@ -3,19 +3,23 @@
     {
       "name": "selecting run A opens A worktree review (outside the open folder)",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-OpTkmL/overseer-home/worktrees/repoA-8df7da03/a-seq"
+      "detail": "/private/tmp/ovs-ui-VlRI5I/overseer-home/worktrees/repoA-c12897f6/a-seq"
     },
     {
       "name": "selecting an existing run does not turn Follow on",
-      "ok": true
+      "ok": true,
+      "detail": "off"
     },
     {
       "name": "follow ignores unattributed user file",
       "ok": true,
       "detail": [
-        "Following agent edits",
         "Following agent edits (agent tool input (tool-input))",
-        "Following: a.txt:60 (agent tool input (tool-input))"
+        "Following: a.txt:60 (agent tool input (tool-input))",
+        "Following agent edits (agent tool input (tool-input))",
+        "Following: b.txt:240 (agent tool input (tool-input))",
+        "Following agent edits (agent tool input (tool-input))",
+        "Following: a.txt:150 (agent tool input (tool-input))"
       ]
     },
     {
@@ -26,7 +30,7 @@
     {
       "name": "selecting run B shows B worktree",
       "ok": true,
-      "detail": "Worktree: /private/tmp/ovs-ui-OpTkmL/overseer-home/worktrees/repoB-f9c2c5a6/b-seq"
+      "detail": "/private/tmp/ovs-ui-VlRI5I/overseer-home/worktrees/repoB-6a5cf2eb/b-seq"
     },
     {
       "name": "agent switch does not inherit Follow",
@@ -49,19 +53,19 @@
       "name": "ordinary changes refresh within 2 s",
       "ok": true,
       "detail": {
-        "write new file": 316,
-        "atomic replace": 479,
-        "staging (dirty view)": 240,
-        "rename": 396,
-        "delete": 423,
-        "branch change": 450,
-        "missed watcher event (excluded folder)": 419
+        "write new file": 414,
+        "atomic replace": 520,
+        "staging (review Staged scope)": 228,
+        "rename": 444,
+        "delete": 516,
+        "branch change": 542,
+        "missed watcher event (excluded folder)": 879
       }
     },
     {
       "name": "missed watcher event reconciled within 5 s",
       "ok": true,
-      "detail": 419
+      "detail": 879
     },
     {
       "name": "navigator selection preserved across live refreshes",
@@ -127,12 +131,12 @@
     {
       "name": "draft survives a rename during edit (kept as a dirty buffer)",
       "ok": true,
-      "detail": "Review: A seq (3), Editor Group 1 | Review: B seq (11), Editor Group 1 | a.txt, Editor Group 1 | opencode: A seq, Editor Group 2 | opencode: B seq, Editor Group 2"
+      "detail": "Review: B seq (11), Editor Group 1 | a.txt, Editor Group 1 | Overseer, Editor Group 2"
     },
     {
       "name": "current checkout review is the repository itself",
       "ok": true,
-      "detail": "Current checkout: /private/tmp/ovs-ui-OpTkmL/repoA"
+      "detail": "/private/tmp/ovs-ui-VlRI5I/repoA"
     },
     {
       "name": "filesystem-only harness shows the Follow limitation",
@@ -161,7 +165,7 @@
       }
     },
     {
-      "name": "unsaved draft labeled in Workspace Dirty",
+      "name": "unsaved draft marked in the review file list (AC-75 replaced Workspace Dirty)",
       "ok": true
     },
     {
@@ -174,17 +178,21 @@
       "detail": "tab restored"
     },
     {
-      "name": "selected run and Workspace Dirty restored after reload",
-      "ok": true
+      "name": "selected agent and the unsaved marker restored after reload",
+      "ok": true,
+      "detail": {
+        "chatRestored": true,
+        "markerRestored": true
+      }
     }
   ],
   "timings": {
-    "write new file": 316,
-    "atomic replace": 479,
-    "staging (dirty view)": 240,
-    "rename": 396,
-    "delete": 423,
-    "branch change": 450,
-    "missed watcher event (excluded folder)": 419
+    "write new file": 414,
+    "atomic replace": 520,
+    "staging (review Staged scope)": 228,
+    "rename": 444,
+    "delete": 516,
+    "branch change": 542,
+    "missed watcher event (excluded folder)": 879
   }
 }

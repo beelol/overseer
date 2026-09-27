@@ -1,0 +1,4 @@
+/* Run panel: the chat fills the tab. */
+html, body { height: 100%; }
+body { overflow: hidden; }
+#app { height: 100vh; }

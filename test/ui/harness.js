@@ -41,10 +41,11 @@ function snapshotTree(dir) {
 }
 
 class Session {
-  constructor(name) {
+  /** ownerDaemon: use the owner's own daemon and data (no OVERSEER_HOME) — live sessions only. */
+  constructor(name, { ownerDaemon = false } = {}) {
     this.name = name;
     this.root = fs.realpathSync(fs.mkdtempSync('/tmp/ovs-ui-'));
-    this.home = path.join(this.root, 'overseer-home');
+    this.home = ownerDaemon ? null : path.join(this.root, 'overseer-home');
     this.profile = path.join(this.root, 'profile');
     this.extensions = path.join(this.root, 'extensions');
     this.evidence = path.join(repoRoot, 'docs/verification/evidence/ui', name);
@@ -52,6 +53,12 @@ class Session {
     fs.mkdirSync(this.evidence, { recursive: true });
     this.log = [];
     this.shot = 0;
+  }
+
+  baseEnv() {
+    const env = { ...process.env };
+    if (this.home) env.OVERSEER_HOME = this.home; else delete env.OVERSEER_HOME;
+    return env;
   }
 
   note(msg, data) {
@@ -66,7 +73,7 @@ class Session {
       'git.autofetch': false, 'git.openRepositoryInParentFolders': 'always', 'workbench.startupEditor': 'none',
       'security.workspace.trust.enabled': false, 'files.autoSave': 'off', 'update.mode': 'none',
       'workbench.tips.enabled': false, 'chat.disableAIFeatures': true, 'window.restoreWindows': 'none',
-      'editor.minimap.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden', ...extra,
+      'editor.minimap.enabled': false, 'workbench.secondarySideBar.defaultVisibility': 'hidden', 'window.dialogStyle': 'custom', ...extra,
     }, null, 2));
   }
 
@@ -80,8 +87,8 @@ class Session {
   launch(folder, env = {}) {
     fs.rmSync(path.join(this.profile, 'DevToolsActivePort'), { force: true });
     this.child = cp.spawn(CODE, ['--remote-debugging-port=0', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
-      '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', ...(env.OVERSEER_TEST_TRUST ? [] : ['--disable-workspace-trust']), folder],
-    { env: { ...process.env, OVERSEER_HOME: this.home, ...env }, stdio: ['ignore', fs.openSync(path.join(this.root, 'code-' + Date.now() + '.log'), 'a'), fs.openSync(path.join(this.root, 'code-err-' + Date.now() + '.log'), 'a')], detached: false });
+      '--new-window', '--user-data-dir', this.profile, '--extensions-dir', this.extensions, '--skip-welcome', '--skip-release-notes', ...(env.OVERSEER_TEST_TRUST ? [] : ['--disable-workspace-trust']), ...(folder ? [folder] : [])],
+    { env: { ...this.baseEnv(), ...env }, stdio: ['ignore', fs.openSync(path.join(this.root, 'code-' + Date.now() + '.log'), 'a'), fs.openSync(path.join(this.root, 'code-err-' + Date.now() + '.log'), 'a')], detached: false });
   }
 
   async connect() {
@@ -99,7 +106,7 @@ class Session {
 
   ctl(method, params = {}) {
     const bin = path.join(this.extensions, fs.readdirSync(this.extensions).find(d => d.startsWith('beelol.overseer')), 'bin', `overseerd-${process.platform}-${process.arch}`);
-    const out = cp.execFileSync(bin, ['ctl', method, JSON.stringify(params)], { env: { ...process.env, OVERSEER_HOME: this.home }, encoding: 'utf8' });
+    const out = cp.execFileSync(bin, ['ctl', method, JSON.stringify(params)], { env: this.baseEnv(), encoding: 'utf8' });
     const msg = JSON.parse(out.split('\n')[0]);
     if (msg.error) throw new Error(msg.error.message);
     return msg.result;
@@ -141,6 +148,50 @@ class Session {
     const icon = await this.cdp.waitFor(`(() => { const a = [...document.querySelectorAll('.activitybar .action-item a, .activitybar .action-label')].find(a => /^Overseer/.test(a.getAttribute('aria-label') || '')); if (!a) return null; const b = a.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`, 20000);
     await this.cdp.click(icon.x, icon.y);
     await delay(800);
+  }
+
+  /** Selects an agent by clicking its row in the side bar's agents list (Gate K). */
+  async selectAgent(title, { settle = 1500 } = {}) {
+    await this.openOverseerView();
+    const pt = await this.cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(title)}).pop(); if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 80, y: b.top + b.height / 2 }; })()`, 30000, 'agent ' + title);
+    await this.cdp.click(pt.x, pt.y);
+    // A first click coming from a focused webview can be taken by focus alone: click again if the row is not selected.
+    const selected = () => this.cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-list-row.selected')].some(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(title)})`);
+    for (let i = 0; i < 10 && !(await selected()); i++) await delay(100);
+    if (!(await selected())) { this.note('selectAgent: row not selected after the first click; clicking again', title); await this.cdp.click(pt.x, pt.y); }
+    await delay(settle);
+  }
+
+  /** Visible rows of the side bar's Agents view, in order: label, description, level, expanded, selected, focused. */
+  agentRows() {
+    return this.cdp.evalWorkbench(`(() => {
+      const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || ''));
+      if (!pane) return [];
+      return [...pane.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).map(r => ({ label: r.querySelector('.label-name')?.textContent.trim(), description: r.querySelector('.label-description')?.textContent.trim() || '',
+        level: Number(r.getAttribute('aria-level')), expanded: r.getAttribute('aria-expanded'), selected: r.classList.contains('selected'), focused: r.classList.contains('focused'), aria: r.getAttribute('aria-label') }));
+    })()`);
+  }
+
+  /** Clicks a side-bar Agents row by label (the last match, so agents win over their Needs-you rows); twisty clicks the expander. */
+  async clickAgentRow(label, { twisty = false, settle = 700 } = {}) {
+    const pt = await this.cdp.waitFor(`(() => { const r = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent && r.querySelector('.label-name')?.textContent.trim() === ${JSON.stringify(label)}).pop(); if (!r) return null;
+      const t = r.querySelector('.monaco-tl-twistie'); const b = (${twisty} && t ? t : r).getBoundingClientRect(); return ${twisty} ? { x: b.left + b.width / 2, y: b.top + b.height / 2 } : { x: b.left + 80, y: b.top + b.height / 2 }; })()`, 20000, 'row ' + label);
+    await this.cdp.click(pt.x, pt.y);
+    await delay(settle);
+  }
+
+  /** Selects an agent by run id (its task's title) in the side bar. */
+  async selectRun(runId, opts) {
+    const st = this.ctl('state');
+    const run = st.runs.find(r => r.id === runId);
+    const task = run && st.tasks.find(t => t.id === run.task_id);
+    if (!task) throw new Error('unknown run ' + runId);
+    return this.selectAgent(task.title, opts);
+  }
+
+  /** The Overseer editor view (chat, composer or grid) once it is ready. */
+  editorView(extra = 'true', ms = 30000) {
+    return this.cdp.webview(`document.body.dataset.ready === '1' && !!document.querySelector('.view-chat') && (${extra})`, ms);
   }
 
   /** Absolute page coordinates of an element inside a webview frame. */

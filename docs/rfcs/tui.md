@@ -167,7 +167,7 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   **Verify:** `M` on a running agent explains; on a finished one, nothing reaches the target
   before the second yes, and after it the change is on the target branch.
 - [x] **T-19 — Attention from another window.** When an agent starts waiting for you, the TUI rings
-  the terminal bell (unless `--no-bell`) and says who, with `w` to jump there; the terminal's window
+  the terminal bell (unless `--no-bell`, or the daemon's Audio Mode plays the cue instead: T-24) and says who, with `w` to jump there; the terminal's window
   title always carries the counts ("Overseer · 1 needs you · 2 active"). **Verify:** a new waiting
   agent sets the bell, the notice and the title through the app loop; the real binary in a
   terminal writes the title escape and a bell.
@@ -191,3 +191,33 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   push and `gh` run off the event loop. **Verify:** against a local stand-in for github.com and a
   recording `gh`: the branch on the remote equals the worktree HEAD, `gh` got the repository,
   head, base, title and body, the run has a `pull_request` event, and the target is unchanged.
+- [ ] **T-23 — Audio Mode from the terminal.** `S` opens Audio Mode (Gate O in the main RFC). It
+  shows what the daemon reports: on or off, whether playback is available, the track, the system
+  voice and whether a private Commander folder is set. From there the user turns Audio Mode on or
+  off, chooses Reactor, System voice or Commander, chooses an installed voice, enters a private
+  Commander folder, and previews the three core cues. Every change goes through the daemon and
+  is what VS Code then shows; a change made in VS Code shows in the terminal within 2 s. The TUI
+  never plays a sound and keeps no audio setting of its own. The folder's files stay where they
+  are; a folder that is not a Commander pack is refused with the daemon's reason. With a daemon
+  that has no audio methods `S` says that Audio Mode is unavailable and changes nothing. `?` and
+  `--help` list `S`. **Verify:** against a real daemon with its cue log: turning on from the TUI
+  makes `audio.get` report on; a preview adds exactly that cue to the log; each track and the
+  voice reach the daemon; a folder that is not a pack is refused with the reason on screen and a
+  synthetic pack is accepted with no file copied under the daemon's folder; a setting changed
+  through `ctl` shows in the open panel within 2 s; with a client that answers `audio.get` with an
+  error the panel says unavailable; snapshots of the panel at 80×24 and 140×40, dark and light.
+- [ ] **T-24 — One signal when an agent needs you.** When a top-level agent starts waiting, one
+  signal reaches the user: the daemon's cue, or else the terminal bell of T-19, never both and
+  never neither. The bell is withheld only while the daemon's latest answer says that Audio Mode
+  is on and playback is available. In every other case it rings in the same pass as the state:
+  Audio Mode off, playback unavailable, no answer yet, an answer with an error, or a daemon
+  without `audio.get`. The window title, the notice and Needs you change in that same pass and
+  never wait for audio. A change made in another client counts for every need that arrives 2 s or
+  more after it. `--no-bell` silences the bell in every case. **Verify:** T-19's test passes as it
+  is on main. Against a real daemon with its cue log: off gives one bell and no cue; on gives one
+  cue and no bell, with the title and the notice already changed; turned on through `ctl` while
+  the TUI runs, a need 2 s later gives a cue and no bell; on with the Commander folder removed
+  gives the bell. With a client that answers `audio.get` with an error, and with one that never
+  answers, the bell rings in the same pass. The real binary in a terminal writes a bell with Audio
+  Mode off and none beyond the title's terminators with it on. The daemon and TUI suites pass on
+  main with pull requests #5 and #6 together.

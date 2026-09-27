@@ -1,6 +1,6 @@
 # Side RFC: daily-driver orchestrator UI
 
-Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-54 to AC-66 (Gate J in the
+Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-54 to AC-66 (Gate J), AC-67 to AC-82 (Gate K) and AC-99 to AC-108 (Gate M) in the
 [main RFC](../overseer-rfc.md)).
 
 ## Why
@@ -40,6 +40,32 @@ Study these and record what Overseer adopts from each, never their assets:
 | Vercel / Geist | Typography, neutral grays, spacing scale |
 | Codex app, Claude Code desktop, Conductor | Multi-agent lists, status at a glance, how runs are started |
 | Apple HIG, GitHub Primer | Accessibility, contrast, focus states |
+
+## What Overseer adopts (research, 2026-09-26)
+
+These rules come from studying the products above: official docs, design posts and changelogs,
+plus a few third-party measurements marked "approx.". The notes and sources are in
+[docs/design/references.md](../design/references.md). Ideas only; no assets were taken.
+
+1. **Chat column:** about 720 px (≈70 characters), centered, 24 px gutters (16 px when narrow). Sources: ChatGPT (40–48 rem), Claude.ai.
+2. **Messages:** the user's in a right-aligned raised bubble (max 80% wide, 12 px radius, 10×14 px padding); the agent's as plain full-width text with no bubble and no avatar column, line height 1.6. Sources: Claude.ai, ChatGPT.
+3. **Rhythm:** 24 px between turns, 8 px between blocks within a turn. Copy and other message actions fade in on hover (150 ms).
+4. **Tool calls:** one muted row (icon + verb + target + result: `+12 −3`, `✓`, `exit 1`). Consecutive calls fold into "Ran 6 tools", collapsed by default. Sources: Zed, Warp, Claude Code desktop.
+5. **Code blocks:** 13 px monospace, 8 px radius, a quiet header with the language; long blocks collapse. Copy appears on hover. Source: Zed.
+6. **Composer:** a rounded card (12 px radius) with a hairline border and no shadow. Chips inside it for agent, account and model. Enter sends, Shift+Enter adds a new line, Stop replaces Send while running. Sources: Claude.ai, Zed, Claude Code desktop.
+7. **Changes bar:** a quiet bar above the composer ("2 files +12 −1") that opens the review. Sources: Zed, Claude Code desktop.
+8. **Agent rows:** one line, 28–32 px high: status icon, title, then muted meta on the right (provider logo, relative time). Sources: Raycast, Zed, Codex app.
+9. **Status:** running = accent with gentle motion; waiting for you = amber; done = green check; failed = red. Rows that need the user sort first and are never dimmed. Sources: Codex app, Linear.
+10. **Grouping:** runs grouped under a quiet repository header; finished runs archive out of sight. Source: Zed.
+11. **Actions:** one primary action; the rest in a `…` / ⌘K menu with shortcuts shown. Sources: Raycast, Linear.
+12. **Grid:** one tile per agent: status stripe, last lines of output, one-line reply. Sources: Cursor Agent Tabs, Zed parallel agents.
+13. **Color:** Overseer Dark and Light are generated from three inputs (graphite base, purple accent, contrast) into a stepped scale. Steps 1–3 are backgrounds, 4–6 borders, 9–10 text. Sources: Linear (LCH), Vercel Geist (10-step scale).
+14. **Radii:** 6 px for controls and rows, 12 px for cards, menus and the composer, full pills for chips. Borders are hairlines; shadows only on floating layers. Sources: Geist, Claude.
+15. **Type:** 12/13/14/16/20 px, weights 400/500/600, one monospace size. Hierarchy comes from weight and color, not size jumps. Sources: Geist, Linear.
+16. **Spacing:** a 4 px grid; 16–24 px section padding. A surface change replaces a separator line. Sources: Geist, Linear.
+17. **Empty states:** icon + one line + one action ("Start an agent"). Source: Raycast.
+18. **Motion:** 120–200 ms ease-out; no spinners on content. Source: Geist.
+19. **Avoid:** colored icon backgrounds and decorative badges (Linear); repeating a fact in several places (Raycast); dimming rows that need the user (Codex app); code dumps that push prose apart (Zed).
 
 ## Layout
 
@@ -151,7 +177,44 @@ What still sends people back to the native CLIs:
 - **A tidy history (AC-63):** archive and search.
 - **The real test (AC-64):** an hour of real work without leaving Overseer, after the owner's design review (AC-66).
 
+## Gate K layout
+
+Owner direction (2026-09-26): one agents list in VS Code's own side bar, and an editor area that
+shows what matters for the selected agent.
+
+| Area | Content |
+| --- | --- |
+| Side bar (Overseer view container) | **Needs you** first, then agents by repository with native children nested; provider logos as tree icons; search; hover actions (stop, archive, pin to grid); Accounts below. Replaces the dashboard's agent rail (AC-67 to AC-71). |
+| Editor area, nothing to review | The chat, or the new-agent composer, alone in the middle (AC-72). |
+| Editor area, agent has changes | The editable review on the left (about two thirds) and the chat on the right (about one third). Closing the review puts the chat back in the middle (AC-73). |
+| Review | One scope picker (All changes, Staged, Unstaged, Untracked) beside the comparison base; follow or manual mode (AC-74, AC-75). The Workspace Dirty view goes away. |
+| Grid | Opens in the editor area and closes back to the previous arrangement (AC-79). |
+
+- Built with editor groups, which Overseer already manages. The secondary side bar was considered for the chat; extensions cannot reliably place views there, so it is not used.
+- The side bar is a native tree: it cannot show chips or custom layouts, which a list does not need. Rich surfaces (chat, composer, grid, review) stay in the editor area.
+- Dragging an agent out of the tree depends on what VS Code accepts as a drop; the fallback is **Open to the Side** and **Pin to Grid** (AC-71).
+
 ## Limits
 
 - VS Code does not let an extension remove the title bar or activity bar outright. The dashboard hides what the workbench commands allow and leaves the rest.
 - Themes cannot restyle native widgets beyond the color tokens VS Code exposes.
+
+## Gate M: Overseer as the whole surface
+
+Owner review of Gate K (2026-09-26), in the owner's words where it matters:
+
+- Approved: the side bar hierarchy ("looks amazing"; no changes), the layout after a restart, the review inside the grid, and the overall direction ("really good progress").
+- The review: "I should be able to go into the folders and still see the same changes, and I must be able to edit it", and clicking files should "open in the same thing", not the standard VS Code view. The reviewer should be Overseer's own.
+- Duplication: the changed-files strip under the chat repeats the review; the Explorer should not be repeated inside Overseer ("just use the Overseer one that goes on the side instead of the Explorer"); the dirty checkout stays inside the review.
+- The look: "I want the middle to look less like it's just VS Code… a full VS Code overhaul", and a third theme named **Overseer**: "darkish, but mostly focused on gradients… like it's a future app."
+- The grid: drag agents onto the top, bottom or sides of a tile to grow it, up to a hard cap of 16 ("you just can't drag more in"); click one agent to track it with its review and follow mode; "I just want to make sure you can't easily get lost", meaning losing track of windows.
+- A chat with Overseer itself at the bottom, on the default account, to nudge agents in a different direction (a separate criterion).
+
+Design direction:
+
+1. **Files live in the review.** The navigator becomes the worktree tree with changes marked and a *Changes only* filter; the right pane shows one file at a time in Overseer's editor (Monaco, already in the fork): a diff when the file changed, plain editable text when it did not. The chat keeps its per-turn edit chips (they jump to the hunk) and loses the Files pane and the changed-files strip.
+2. **One frame.** Overseer's views share one header style (agent, what the view is, the few controls it needs) so VS Code's tab strip and breadcrumbs can be hidden while Overseer holds the editor area; the settings involved are applied in Overseer's mode only and restored exactly, as dashboard mode already does for the panel and side bars.
+3. **The Overseer theme.** VS Code's workbench colors are flat, so the gradients (a slow aurora on the editor backdrop, lit edges on active tiles and the tracked agent, glass-like chat and review surfaces) are drawn by Overseer's webviews; the workbench colors of the theme are picked to sit under them. Overseer Dark and Light stay as they are.
+4. **Grid by drag.** The grid becomes a split layout (like editor groups): dropping on a tile's edge splits that tile; the tree of splits is kept per window; 16 is the cap. Clicking a tile tracks it: the review for that agent opens beside the grid, following.
+5. **Where am I.** One of each view per window, every header names its agent, and a small map lists what is open and jumps to it.
+6. **Talk to Overseer.** A docked chat that runs an orchestrator turn on the default account with read access to the daemon's state and a small set of actions it may propose; every action waits for the owner's yes.
