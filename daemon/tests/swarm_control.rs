@@ -265,6 +265,10 @@ fn deadline_expires_without_another_admission_while_active_or_blocked() {
     assert_eq!(jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="working").unwrap()["status"],"cancel_requested");
     assert_eq!(jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="queued").unwrap()["status"],"cancelled");
     assert_eq!(d.call("swarm.jobs",json!({"id":blocked_id}))["jobs"][0]["status"],"cancelled");
-    assert!(d.call("swarm.messages",json!({"run_id":active_id,"recipient":attempt["id"]}))["messages"]
-        .as_array().unwrap().iter().any(|m|m["type"]=="stop"));
+    let control_messages=d.call("swarm.messages",json!({"run_id":active_id,
+        "recipient":attempt["id"]}));
+    let messages=control_messages["messages"].as_array().unwrap();
+    assert!(messages.iter().any(|m|m["type"]=="checkpoint"
+        && m["payload"]["reason"]=="run_deadline"));
+    assert!(messages.iter().any(|m|m["type"]=="stop"));
 }

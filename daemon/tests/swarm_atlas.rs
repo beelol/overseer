@@ -1222,3 +1222,93 @@ fn atlas_s5_external_allowance_drop_holds_new_work_without_losing_evidence() {
         "summary":"Audit complete","verification":"Atlas PostgreSQL probe",
         "checks":[{"job_id":"j2","outcome":"passed","evidence":[artifact]}]})).is_err());
 }
+
+// S5: the original run clock keeps advancing while all allowed accounts are
+// unavailable. Deadline control checkpoints and interrupts the active probe.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_run_deadline_expires_while_all_targets_are_blocked() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    let d=Daemon::start(&[]);
+    let temp=tmp();
+    let checkout=repo(&temp.path().join("atlas-blocked-deadline"));
+    let script=repo_root().join("fixtures/swarm/atlas-v1/swarm-j4-long-worker.mjs");
+    let database_url_file=temp.path().join("disposable-database-url");
+    let probe_marker=temp.path().join("j4-probe-active");
+    std::fs::write(&database_url_file,std::env::var("ATLAS_DATABASE_URL").unwrap()).unwrap();
+    let created=d.call("swarm.create",json!({"category":"Atlas blocked deadline fault",
+        "objective":"Audit foreign attachment and task access","allowed_targets":["fixture"],
+        "policy":{"deadline_ms":8000}}));
+    let run=created["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j4","title":"Attachments","acceptance":"foreign object response",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j4","mode":"write"}]},
+        {"id":"j2","title":"Tasks","acceptance":"foreign task before-after rows",
+            "deps":[],"resource_claims":[{"resource":"atlas-db-j2","mode":"write"}]}
+    ]}));
+    let at=now();
+    let snapshot=|observed:i64,available:bool|json!({"version":1,
+        "observed_ms":observed,"expires_ms":observed+120000,
+        "targets":if available {json!([{"id":"fixture","account_id":"account",
+            "pool_ids":["pool"],"capabilities":["audit"],"health":"up","auth":"ok"}])}
+            else {json!([])},
+        "pools":[{"id":"pool","windows":[{"id":"week","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":observed+120000}]}]});
+    let observe=|when:i64,available:bool|d.call("swarm.availability.observe",json!({
+        "run_id":run,"snapshot":snapshot(when-1000,available),"now_ms":when,
+        "required_capabilities":["audit"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(observe(at,true)["state"],"eligible");
+    let attempt=admit(&d,run,1,"j4","fixture",&snapshot(at-1000,true),at);
+    assert_eq!(attempt["status"],"admitted","{attempt}");
+    let launched=d.call("swarm.worker.launch",json!({"run_id":run,"job_id":"j4",
+        "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+        "repo":checkout,"program":"/usr/bin/env",
+        "args":["node",script,database_url_file,probe_marker],
+        "prompt":"Audit Atlas attachment authorization","title":"Atlas J4 blocked deadline"}));
+    let worker=launched["overseer_run_id"].as_str().unwrap();
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(6);
+    while !probe_marker.exists() {
+        assert!(std::time::Instant::now()<until,"Atlas backend probe did not start");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let probe:Value=serde_json::from_slice(&std::fs::read(&probe_marker).unwrap()).unwrap();
+    assert_eq!(probe["attachmentStatus"],200);
+    let blocked=observe(now(),false);
+    assert_eq!(blocked["state"],"blocked","{blocked}");
+    assert_eq!(blocked["reason"],"allowed_target_missing");
+    let held=admit(&d,run,1,"j2","fixture",&snapshot(at-1000,true),now());
+    assert_eq!(held["status"],"blocked","{held}");
+    assert_eq!(held["reason"],"run_availability_blocked");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let run_dir:String=db.query_row("SELECT run_dir FROM runs WHERE id=?1",[worker],|r|r.get(0)).unwrap();
+    let interrupt=std::path::Path::new(&run_dir).join("interrupt.requested");
+    let until=std::time::Instant::now()+std::time::Duration::from_secs(12);
+    while !interrupt.exists() {
+        assert!(std::time::Instant::now()<until,"blocked run was not interrupted at deadline");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let state=d.call("swarm.get",json!({"id":run}));
+    assert_eq!(state["stop_reason"],"deadline","{state}");
+    assert!(state["status"]=="stopping" || state["status"]=="stopped","{state}");
+    assert_eq!(state["availability"]["state"],"blocked");
+    let messages=d.call("swarm.messages",json!({"run_id":run,
+        "recipient":attempt["attempt_id"]}));
+    let messages=messages["messages"].as_array().unwrap();
+    assert!(messages.iter().any(|m|m["type"]=="checkpoint"
+        && m["payload"]["reason"]=="run_deadline"));
+    assert!(messages.iter().any(|m|m["type"]=="stop"));
+    let jobs=d.call("swarm.jobs",json!({"id":run}));
+    assert_eq!(jobs["jobs"].as_array().unwrap().iter().find(|j|j["id"]=="j2").unwrap()["status"],"cancelled");
+    let counts:(i64,i64,i64)=db.query_row("SELECT
+        (SELECT COUNT(*) FROM swarm_admissions WHERE run_id=?1 AND job_id='j2'),
+        (SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND job_id='j4' AND kind='result'),
+        (SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1 AND decision='accept')",
+        [run],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+    assert_eq!(counts,(0,0,0));
+    assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+        "revision":1,"request_id":"atlas-blocked-deadline-complete",
+        "summary":"Audit complete","verification":"Atlas attachment probe",
+        "checks":[]})).is_err());
+}

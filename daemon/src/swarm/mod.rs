@@ -494,6 +494,18 @@ fn stop_with_reason(store: &mut Store, p: &Value, reason: &str, require_version:
     )?;
     tx.execute("UPDATE swarm_jobs SET status='cancelled',updated_ms=?2 WHERE run_id=?1 AND status IN ('planned','ready')", params![id,now])?;
     tx.execute("UPDATE swarm_jobs SET status='cancel_requested',updated_ms=?2 WHERE run_id=?1 AND status IN ('reserved','launching','running')", params![id,now])?;
+    if reason == "deadline" {
+        // Keep the checkpoint request and Stop in the same durable control
+        // transition. A worker may be interrupted before it can answer, but
+        // the request and any resulting partial evidence remain reviewable.
+        tx.execute(
+            "INSERT OR IGNORE INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms)
+             SELECT a.run_id,'deadline-checkpoint-'||a.id,a.job_id,a.id,'control',a.id,
+                    'checkpoint',a.revision,'{\"reason\":\"run_deadline\"}','queued',?2,?2
+             FROM swarm_attempts a WHERE a.run_id=?1 AND a.status='registered'",
+            params![id,now],
+        )?;
+    }
     tx.execute(
         "INSERT OR IGNORE INTO swarm_messages(run_id,message_id,job_id,attempt_id,sender,recipient,kind,revision,payload,phase,created_ms,updated_ms) SELECT a.run_id,'stop-'||a.id,a.job_id,a.id,'control',a.id,'stop',a.revision,'{}','queued',?2,?2 FROM swarm_attempts a WHERE a.run_id=?1 AND a.status='registered'",
         params![id,now],
