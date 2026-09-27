@@ -1156,6 +1156,18 @@ rec(132, "Regression coverage for the phone", "not started", date="—", commit=
 rec(133, "Phone session (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
     actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(134, "Platform behaviour behind generic interfaces", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(135, "Hyper fast", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(136, "The door", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(137, "Motion throughout", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
 
 SHORT_BLOCKERS = {
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
@@ -1233,6 +1245,10 @@ SHORT_BLOCKERS = {
     131: "not started (Gate N, added by the owner on 2026-09-26)",
     132: "not started (Gate N, added by the owner on 2026-09-26)",
     133: "not started (Gate N, added by the owner on 2026-09-26)",
+    134: "not started (Gate N, added by the owner on 2026-09-26)",
+    135: "not started (Gate N, added by the owner on 2026-09-26)",
+    136: "not started (Gate N, added by the owner on 2026-09-26)",
+    137: "not started (Gate N, added by the owner on 2026-09-26)",
 }
 TOTAL = 53
 

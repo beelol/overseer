@@ -1,6 +1,6 @@
 # Side RFC: phone remote on the same network
 
-Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-115 to AC-133 (Gate N) in the
+Status: proposed by the owner on 2026-09-26. Acceptance criteria: AC-115 to AC-137 (Gate N) in the
 [main RFC](../overseer-rfc.md#gate-n--phone-remote-on-the-same-network-added-by-the-owner-2026-09-26).
 Prepared goal: [phone-remote-goal.md](phone-remote-goal.md) (not activated).
 Builds on the daemon's event replay ([AC-10](../verification/AC-10.md)), the local access boundary
@@ -32,14 +32,22 @@ already replays its event log from a cursor.
 | Sessions | No lost sessions ("no disconnect"). |
 | Platforms | An iOS app, tested on the owner's iPhone. Android tested on the emulator only for now. |
 | Apple Developer Program | The owner has a membership: device installs, TestFlight and push notifications are available. |
+| App stack | The best option that is not slow. Expo is acceptable. Rust is not forced: it is used only where it is needed. |
+| Platform behaviour | Separated per platform behind generic interfaces. Cross-platform libraries are used where they fit. |
+| Speed | The app is hyper fast. |
+| Motion | Cool animations, with a signature launch: a sci-fi gradient door carrying a grayscale logo that splits open diagonally when the app is ready. |
 
 ## Proposed defaults, distinguished from the decisions above
 
 These are the implementing agent's proposals. The owner can change any of them; a change is a
 recorded revision of this RFC.
 
-- **One app for both platforms**, built with Expo (React Native), in `phone/`. Confirmed or
-  replaced by the feasibility criterion (AC-115) before anything is built on it.
+- **Flutter for the app**, in `phone/`, because it is compiled ahead of time and draws every
+  frame itself. Expo with React Native, which the owner accepted, is the second candidate. AC-115
+  measures both on the owner's iPhone and the numbers decide (see [The app stack](#the-app-stack)).
+- **Rust on the phone only for the encrypted session**, and only if the spike shows a clean
+  binding. Everything else is written in the app's own language.
+- **The door shows on a cold start only**, never when returning from the background.
 - **Message-layer encryption** with an established handshake (Noise IK proposed), so the same
   session can later cross a relay that sees only ciphertext. Chosen in AC-115.
 - **Full control is the default scope** of a paired phone; *Watch only* exists as a choice.
@@ -237,8 +245,118 @@ line by line.
 | Encrypted blob layout | Reference only | Useful when the relay stores messages; a live session uses a handshake instead. |
 | Voice, in-app purchases, analytics | Not used | Out of scope. |
 
+Happy is written for React Native. If AC-115 chooses Flutter, its approaches can inform the
+design but its code cannot be adopted.
+
 AC-115 inspects the candidate code at a recorded revision and writes the decision in
 [source-assessment.md](../source-assessment.md). Anything adopted keeps its license and notice.
+
+## The app stack
+
+The owner's rule is the best option that is not slow. The candidates differ in what actually runs
+on the phone.
+
+| | Flutter | Expo (React Native) | SwiftUI and Jetpack Compose |
+| --- | --- | --- | --- |
+| What runs on the phone | Dart, compiled ahead of time to machine code | JavaScript, shipped inside the app as precompiled bytecode and run by the Hermes engine | Swift and Kotlin, compiled |
+| What draws the screens | Flutter's own GPU renderer | The platform's native views | The platform's native views |
+| Animation | Every frame comes from one engine; custom shapes and shaders are ordinary work | Smooth when the animation runs outside JavaScript; busy JavaScript can still delay what it drives | The reference |
+| Codebases | One | One | Two |
+| Reuse from Overseer | None directly | The extension's JavaScript conversation and Markdown code | None |
+| Platform features | Plugins, with native code where none fits | Expo's modules | First party |
+| Tests without a device | Screen and screenshot tests run on the Mac | Logic tests on the Mac; screens need a simulator | Simulator |
+
+React Native is not a web page in an app: its screens are real native views, and it is fast enough
+for many well-known apps. It is still JavaScript at run time, and the owner asked for hyper fast
+with heavy custom animation, which is where a compiled stack with its own renderer has the
+advantage. Two native apps would be fastest and would double every screen. The proposal is
+Flutter, with the choice made by AC-115's measurements rather than by opinion.
+
+## App architecture
+
+```
+  screens ── state ── protocol client ── encrypted session ── transport
+     │                      │
+     └── platform layer ────┘        generated protocol types
+         (one generic interface per capability;
+          an implementation per platform; a fake for tests)
+```
+
+- **Screens and shared code never ask which platform they run on.** They use the platform layer's
+  interfaces. A build check fails on a platform test anywhere else.
+- **One generic interface per capability**, for example a store typed by what it holds and a
+  capability typed by its configuration and result. Each has an iOS implementation, an Android
+  implementation and a fake.
+- **Libraries first.** A maintained cross-platform library sits behind the interface wherever one
+  covers the capability well. Own native code is written only where none does.
+- **Honest gaps.** A capability a platform lacks reports unsupported with the reason.
+- **Typed protocol.** Requests, results and events are generated from one protocol description,
+  which is also the source of the gateway's method classes. A method cannot change on one side only.
+
+| Capability | iOS | Android | Shared |
+| --- | --- | --- | --- |
+| Key storage | Keychain | Keystore | One library |
+| Discovery | Bonjour, with the local network permission | Network service discovery; none on the emulator | A manual address |
+| Push | Apple's push service | In-app only in this gate (reports unsupported) | — |
+| Device unlock | Face ID, Touch ID, passcode | Fingerprint, face, PIN | One library |
+| Camera for pairing | Camera | Camera | A typed code on simulators |
+| Launch screen | The full closed door | A centered logo on the door's base color | The app's door takes over from both |
+| Back | Swipe from the edge | The system back gesture | — |
+| Haptics | The system's feedback styles | Vibration effects | One set of moments |
+| Notification actions | Allow and Deny after unlock | In-app only in this gate | — |
+
+Android 12 and later allow only a centered icon on one color as a launch screen, so the two
+platforms start differently and meet at the same door.
+
+## Speed
+
+| Budget | The owner's iPhone | Android emulator |
+| --- | --- | --- |
+| The closed door on screen | First frame | First frame |
+| Cached agents list ready to use after launch | 1 s at p95 | 2 s at p95 |
+| A visible response to a tap | 100 ms | Its own baseline |
+| A sent message visible in the chat | 50 ms | Its own baseline |
+| Dropped frames in a 5,000-item conversation during a stream | At most 1% at the display's rate | Its own baseline |
+| Animation while the app's logic is busy for 500 ms | No dropped frame | Its own baseline |
+| A streamed line from the Mac to the screen (AC-124) | 500 ms at p95 | 500 ms at p95 |
+
+The emulator's frame rates say little about a real phone, so it records a baseline and later runs
+must stay within 10% of it. How the app meets the budget:
+
+- **Open on the cache.** The first screen is drawn from stored state, before the connection exists.
+- **Show before confirming.** A sent message appears at once, marked as sending.
+- **Apply events in batches**, once per frame, so a fast stream never redraws more than the screen
+  can show.
+- **Build only what is visible** in lists, conversations and diffs.
+- **Keep motion independent of logic**, so a busy moment cannot stutter an animation.
+- **Measure on every run.** The budgets are part of the regression run; a slow change fails.
+
+## The door and motion
+
+```
+   closed                      opening                     open
+  ┌───────────────┐          ┌───────────────┐          ┌───────────────┐
+  │░░░░░░░░░░░╱▓▓▓│          │░░░░░░░╱     ╱▓▓│          │               │
+  │░░░░░░(◐╱◑)▓▓▓▓│    ──►   │░░░(◐╱     ╱◑)▓▓│    ──►   │    the app    │
+  │░░░╱▓▓▓▓▓▓▓▓▓▓▓│          │╱     ╱▓▓▓▓▓▓▓▓▓│          │               │
+  └───────────────┘          └───────────────┘          └───────────────┘
+```
+
+- **Closed.** A dark, sci-fi gradient in the Overseer theme's colors fills the screen. A grayscale
+  Overseer logo (from `extension/media/overseer.svg`) sits across a diagonal seam.
+- **Waiting.** A slow light travels along the seam, so the door is clearly alive.
+- **Opening.** When the first screen is drawn, the door splits along the seam. The halves slide
+  apart and the logo splits with them. The app is already in place underneath.
+- **No jump.** The system's launch screen shows the same closed door in the same place.
+- **Never slower.** The door opens as soon as the first screen is ready from the cache. It does
+  not wait for the connection and has no minimum time on screen. Launch to a usable list is the
+  same with the door turned off.
+- **Cold start only**, about 600 ms, interruptible by a touch. With Reduce Motion on it fades.
+
+The rest of the app moves with the same care. One motion system, with durations, easing and
+springs as tokens, drives every transition. Motion explains where a thing came from or what
+changed. It can be interrupted, follows the finger, and is replaced by fades under Reduce Motion.
+The owner marks the door and each transition on a review page until they look right.
 
 ## Testing
 
@@ -248,6 +366,8 @@ AC-115 inspects the candidate code at a recorded revision and writes the decisio
 - **The owner's iPhone:** Bonjour, the local network permission, the camera, push notifications,
   Face ID, and performance. Only a real device can verify these.
 - **Phone scenarios** run against a real daemon with fixture harnesses, from one command.
+- **Speed** is measured on release builds, on the owner's iPhone and the emulator, by the same
+  run that checks everything else.
 - **Live turns** follow the owner's paid-turn rules: tiny prompts, one attempt per step.
 
 ## Limits and out of scope
@@ -266,7 +386,11 @@ AC-115 inspects the candidate code at a recorded revision and writes the decisio
 
 | Question | Recommendation |
 | --- | --- |
-| App technology | Expo (React Native): one codebase for iOS and Android, and the extension is already JavaScript. Native SwiftUI if AC-115 finds a blocker. |
+| App stack | Flutter, confirmed by AC-115's measurement against Expo on the owner's iPhone. The owner can name the stack instead and skip the comparison. |
+| Where Rust is used on the phone | Only the encrypted session, if the binding is clean. Otherwise a vetted library with shared test vectors. |
+| When the door shows | On a cold start only. |
+| The door in the light theme | A light variant. The dark door is the default. |
+| Sound with the door | None. |
 | Default scope of a new device | Full control, as the owner asked. |
 | Which addresses may connect | Private and link-local ranges only. A setting can add the VPN range. |
 | App lock | On, after five minutes in the background. |
@@ -282,19 +406,21 @@ Each phase is independently useful and verifiable; the criteria are in the main 
 
 | Phase | Criteria | Outcome |
 | --- | --- | --- |
-| 1. Prove | AC-115 | The app stack, the encryption libraries on both sides, Bonjour on a real iPhone, and the reuse decision. Nothing is locked in before this. |
-| 2. Connect | AC-116, AC-117, AC-118, AC-119, AC-120 | The gateway, pairing, encryption, devices and discovery, with a minimal app that pairs and says hello. |
+| 1. Prove | AC-115 | The app stack chosen by measurement, the encryption on both sides, Bonjour and push on a real iPhone, and the reuse decision. Nothing is locked in before this. |
+| 2. Connect | AC-116, AC-117, AC-118, AC-119, AC-120, AC-134 | The gateway, pairing, encryption, devices and discovery, with a minimal app built on the platform layer and the generated protocol types. |
 | 3. Hold | AC-121, AC-122, AC-123 | Resume from the cursor, exactly-once requests, an awake Mac. |
 | 4. See and control | AC-124, AC-125, AC-126, AC-127, AC-131 | Agents, conversations, control, review and the rest of Overseer, in one app for iOS and Android. |
-| 5. Needs you, safely | AC-129, AC-130 | Push notifications and the safety rules. |
-| 6. Overseer itself | AC-128 | The chat with Overseer on the phone. Waits for AC-107. |
-| 7. Confirm | AC-132, AC-133 | Regression coverage; the owner's session on their iPhone. |
+| 5. Feel | AC-135, AC-136, AC-137 | The speed budget, the door, and motion throughout. |
+| 6. Needs you, safely | AC-129, AC-130 | Push notifications and the safety rules. |
+| 7. Overseer itself | AC-128 | The chat with Overseer on the phone. Waits for AC-107. |
+| 8. Confirm | AC-132, AC-133 | Regression coverage; the owner's session on their iPhone. |
 
 ## Acceptance
 
-AC-115 to AC-133 in the main RFC are the acceptance criteria. Their Verify clauses cover, in short:
+AC-115 to AC-137 in the main RFC are the acceptance criteria. Their Verify clauses cover, in short:
 
-- spikes that prove the stack before it is built on, and a written reuse decision;
+- spikes that prove the parts, and an app stack chosen by measuring both candidates on the
+  owner's iPhone;
 - a gateway that is closed by default, answers nothing before authentication, and leaves the local
   socket boundary untouched;
 - pairing that needs the Mac, with expiry, single use and lockout;
@@ -310,5 +436,9 @@ AC-115 to AC-133 in the main RFC are the acceptance criteria. Their Verify claus
 - no credential in any traffic, and every daemon method listed with its phone status;
 - a notification on a locked iPhone within five seconds, answered from the notification;
 - a security review, a fuzz test, and confirmations for everything destructive;
-- both platforms in both themes, accessible, and fast on the owner's iPhone;
+- both platforms in both themes, accessible, each with its own conventions;
+- no platform test outside the platform layer, and protocol types that cannot drift;
+- every speed budget met on the owner's iPhone, and a slow change failing the run;
+- the door matching the launch screen frame for frame, never adding to the launch time;
+- every transition recorded, on tokens, and marked right by the owner;
 - the owner's dated confirmation after a real session on their iPhone.
