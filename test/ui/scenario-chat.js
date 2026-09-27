@@ -62,9 +62,9 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const rows = await dash.eval(`[...document.querySelectorAll('#conv .steps-fold .tool > summary')].map(s => s.textContent.trim())`);
     check('expanded tool rows read like "Read README.md", "Ran npm test …" (no raw JSON)', rows.some(r => /^Read\s*README\.md/.test(r)) && rows.some(r => /^Ran\s*npm test/.test(r)) && rows.every(r => !/[{}]|"file_path"/.test(r)), rows);
 
-    for (const theme of ['Overseer Dark', 'Overseer Light']) {
+    for (const theme of ['Overseer Dark', 'Overseer Light', 'Overseer']) {
       await setTheme(theme);
-      for (const w of [1600, 900]) { await setWidth(w); await s.screenshot(`chat-${theme.split(' ')[1].toLowerCase()}-${w}`); }
+      for (const w of [1600, 900]) { await setWidth(w); await s.screenshot(`chat-${(theme.split(' ')[1] || 'overseer').toLowerCase()}-${w}`); }
     }
     await setTheme('Overseer Dark'); await setWidth(1280);
 

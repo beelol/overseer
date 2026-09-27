@@ -15,7 +15,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 const { auditExpression } = require('./audit');
 
 const UI = process.env.AUDIT_UI || 'gatek';
-const THEMES = UI === 'baseline' ? ['Default Dark Modern', 'Default Light Modern'] : ['Overseer Dark', 'Overseer Light', 'Default Dark Modern'];
+const THEMES = UI === 'baseline' ? ['Default Dark Modern', 'Default Light Modern'] : ['Overseer Dark', 'Overseer Light', 'Default Dark Modern', 'Overseer'];
 const WIDTHS = [1280, 900];
 const HEIGHT = 860;
 
@@ -86,8 +86,7 @@ const HEIGHT = 860;
       // Gate K: the showcase agent has changes, so the review opens left and the chat right.
       await s.selectRun(runs.showcase.run.id, { settle: 3000 });
       const dash = await s.editorView(`!!document.querySelector('[data-audit-view="chat"] .msg')`);
-      await dash.eval(`document.getElementById('files-toggle').click()`);
-      await dash.waitFor(`document.body.dataset.filesReady === '1'`, 20000);
+      // Gate M (AC-100): the chat has no Files pane; the review's navigator lists the files.
       const tagged = await cdp.evalWorkbench(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || '')); if (!pane) return false; pane.dataset.audit = 'agents'; return true; })()`);
       views.dashboard = { frame: dash, opts: { root: 'body' } };
       views.agents = tagged ? { frame: null, opts: { root: '[data-audit="agents"]', nativeHover: true } } : undefined;
@@ -98,7 +97,6 @@ const HEIGHT = 860;
       if (act) await cdp.move(act.x + 300, act.y + 300);
       check('agents: side-bar title actions show their name in VS Code\'s hover', !!hoverText, hoverText);
       views.chat = { frame: dash, opts: { root: '[data-audit-view="chat"]' } };
-      views.files = { frame: dash, opts: { root: '[data-audit-view="files"]' } };
       views.review = { frame: await cdp.webview(`!!document.getElementById('diffs') && document.body.dataset.runId === ${JSON.stringify(runs.showcase.run.id)}`, 30000), opts: { root: 'body' } };
       if (!views.agents) delete views.agents;
     } else {

@@ -1,0 +1,98 @@
+{
+  "checks": [
+    {
+      "name": "clicking a tile opens that agent's review beside the grid in follow mode, and the tile shows it is tracked",
+      "ok": true,
+      "detail": {
+        "g": {
+          "layout": "{\"dir\":\"row\",\"parts\":[{\"run\":\"r-08c4000b361d\"},{\"run\":\"r-19d63997fea0\"}]}",
+          "tracked": "r-19d63997fea0",
+          "marked": [
+            "r-19d63997fea0"
+          ],
+          "bar": true
+        },
+        "wb": {
+          "groups": 2,
+          "tabs": [
+            "Overseer",
+            "Review: Alpha writer (1), Editor Group 2"
+          ],
+          "windows": 1
+        },
+        "followA": true
+      }
+    },
+    {
+      "name": "the tracked review follows the agent's edits (alpha.txt)",
+      "ok": true,
+      "detail": {
+        "follow": "Filesystem evidence only: this harness does not report its edits, so Follow cannot attribute or jump to them. The file list still refreshes live.",
+        "files": [
+          "alpha.txt"
+        ]
+      }
+    },
+    {
+      "name": "clicking another tile switches tracking to that agent (one review, two groups, no chat editor or window opened)",
+      "ok": true,
+      "detail": {
+        "g": {
+          "layout": "{\"dir\":\"row\",\"parts\":[{\"run\":\"r-08c4000b361d\"},{\"run\":\"r-19d63997fea0\"}]}",
+          "tracked": "r-08c4000b361d",
+          "marked": [
+            "r-08c4000b361d"
+          ],
+          "bar": true
+        },
+        "wb": {
+          "groups": 2,
+          "tabs": [
+            "Overseer",
+            "Review: Bravo writer (1), Editor Group 2"
+          ],
+          "windows": 1
+        }
+      }
+    },
+    {
+      "name": "Escape closes the review and restores the grid alone with the exact layout",
+      "ok": true,
+      "detail": {
+        "g": {
+          "layout": "{\"dir\":\"row\",\"parts\":[{\"run\":\"r-08c4000b361d\"},{\"run\":\"r-19d63997fea0\"}]}",
+          "tracked": "",
+          "marked": [],
+          "bar": false
+        },
+        "wb": {
+          "groups": 1,
+          "tabs": [
+            "Overseer"
+          ],
+          "windows": 1
+        },
+        "before": "{\"dir\":\"row\",\"parts\":[{\"run\":\"r-08c4000b361d\"},{\"run\":\"r-19d63997fea0\"}]}"
+      }
+    },
+    {
+      "name": "the grid's \"Grid alone\" control does the same",
+      "ok": true,
+      "detail": {
+        "g": {
+          "layout": "{\"dir\":\"row\",\"parts\":[{\"run\":\"r-08c4000b361d\"},{\"run\":\"r-19d63997fea0\"}]}",
+          "tracked": "",
+          "marked": [],
+          "bar": false
+        },
+        "wb": {
+          "groups": 1,
+          "tabs": [
+            "Overseer"
+          ],
+          "windows": 1
+        }
+      }
+    }
+  ]
+}

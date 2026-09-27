@@ -30,8 +30,8 @@
       "name": "⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request",
       "ok": true,
       "detail": {
-        "first": "r-20f3ceba2981",
-        "second": "r-204653c438ae",
+        "first": "r-94a3f97bb692",
+        "second": "r-c35636fe9023",
         "firstDone": "completed",
         "secondDone": "completed",
         "denied": true
@@ -42,9 +42,9 @@
       "ok": true,
       "detail": {
         "visited": [
-          "r-eccda3e28762",
-          "r-20f3ceba2981",
-          "r-2e11bd52ec2d"
+          "r-96674ffa13c4",
+          "r-94a3f97bb692",
+          "r-35e5677b02d8"
         ],
         "left": []
       }
@@ -53,7 +53,7 @@
       "name": "⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent",
       "ok": true,
       "detail": {
-        "switched": "r-e141115ebe16",
+        "switched": "r-70e2f82af047",
         "stopped": "interrupted"
       }
     },
@@ -61,8 +61,8 @@
       "name": "⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent",
       "ok": true,
       "detail": {
-        "created": "r-aa237e3d3003",
-        "nowSelected": "r-aa237e3d3003"
+        "created": "r-cae06a22aca2",
+        "nowSelected": "r-cae06a22aca2"
       }
     },
     {

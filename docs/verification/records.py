@@ -1205,53 +1205,89 @@ rec(98, "On by default, explained once", "partial", commit="e16bdaf", date="2026
     blocker="Next: the notice card and the switch in the extension after beelol/overseer#8 merges.")
 
 # Gate M, Overseer as the whole surface (added by the owner on 2026-09-26; docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface). Not started; built in its own pull request.
-rec(99, "The review is where files live", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
-    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
-rec(100, "Nothing shown twice", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
-    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
-rec(101, "Overseer's own reviewer", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
-    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
-rec(102, "An immersive editor area", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
-    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
-rec(103, "The Overseer theme", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
-    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
-rec(104, "Build the grid by dragging", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
-    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
-rec(105, "Track an agent from the grid", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
-    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
-rec(106, "Never lose track of windows", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
-    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
-rec(107, "Talk to Overseer", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
-    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
-rec(108, "Gate M design review (owner-confirmed)", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
-    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(99, "The review is where files live", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-review-files.js`: Changes only by default; All files; a nested unchanged file and a changed file opened, edited and saved in the review; no editor tab; a 10,000-file worktree.",
+    expected="See the RFC criterion (Gate M).",
+    actual="""- Changes only while the agent has changes, with status and counts; All files lists the worktree one folder at a time (.git left out).
+- A nested unchanged file opens as its whole text, is edited and saved (disk checked), then counts as changed; a changed file too.
+- No editor tab stays open (a background tab VS Code opens for a dirty file closes on Save).
+- 10,000-file worktree: the first level shows in well under 500 ms.""",
+    evidence="[review-files scenario](evidence/ui/review-files/)", live="—")
+rec(100, "Nothing shown twice", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-inventory.js`: the one-time offer to take Explorer's place; an inventory of agents, files, changed files and unsaved edits in each arrangement (chat alone, review beside the chat, grid, dashboard).",
+    expected="See the RFC criterion (Gate M).",
+    actual="Each kind of information appears once among Overseer's views and the side bar in every arrangement; the chat has no Files pane and no changed-files strip; the offer shows once and the choice sticks across a reload. An unsaved edit also shows VS Code's own dirty tab while it is unsaved (VS Code's chrome, not an Overseer view).",
+    evidence="[inventory scenario](evidence/ui/inventory/)", live="—")
+rec(101, "Overseer's own reviewer", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="The review restyled with Overseer's tokens; `review`, `hunks`, `follow`, `scopes` and `review-files` scenarios; Gate K and Gate M side by side on the Gate M design review page.",
+    expected="See the RFC criterion (Gate M).",
+    actual="Header led by the agent's name, the side-bar style navigator, file cards with pinned headers and a pill Save, hunk actions as a pill, Overseer-styled empty and loading states; Monaco's diff colours taken from the theme (rgba values were dropped before, showing an olive). The AC-42, AC-74, AC-75 and AC-76 scenarios pass.",
+    evidence="[review scenario](evidence/ui/review/), [gallery](evidence/ui/gallery/), [Gate M design review](https://claude.ai/artifact/Ec1XJy74iyKfMPFoiVRiiX)", live="—")
+rec(102, "An immersive editor area", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-dashboard.js`: the immersive settings in and out of the dashboard; tab strips and breadcrumbs for chat, review and grid; the review names its agent; the audit scenario's visible-text budget.",
+    expected="See the RFC criterion (Gate M).",
+    actual="In the dashboard workbench.editor.showTabs none, breadcrumbs.enabled false and workbench.editor.editorActionsLocation hidden are applied (user settings, listed in overseer.dashboard.immersive) and put back exactly on exit; no group shows tabs or breadcrumbs; the review keeps its agent's name at every width.",
+    evidence="[dashboard scenario](evidence/ui/dashboard/), [audit](evidence/ui/audit-gatek/)", live="—", limits="VS Code has no per-window settings: while one window is in the dashboard, the three settings apply to every window.")
+rec(103, "The Overseer theme", "partial", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    proven="the third theme Overseer with gradients in Overseer's views (contributed overseer.* colours, flat defaults elsewhere); 284 text pairs meet WCAG AA including every gradient stop; screenshots of every view in the theme",
+    deferred="the owner's mark in the Gate M design review (AC-108)",
+    expected="See the RFC criterion (Gate M).",
+    actual="Theme scenario 13 of 13 (the gradients reach the views in Overseer and resolve flat in other themes); gallery of every view in the three Overseer themes.",
+    evidence="[theme scenario](evidence/ui/theme/), [gallery](evidence/ui/gallery/)", live="—", blocker="Waits for the owner's marks on the Gate M design review.")
+rec(104, "Build the grid by dragging", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-grid-drag.js`: 1 to 16 tiles, each dragged from the side bar onto the grid and then by its header to a chosen edge (building a 4x4), the layout measured at each step; a 17th refused; Alt+arrow; a reload.",
+    expected="See the RFC criterion (Gate M).",
+    actual="16 agents placed at their chosen edges (each beside its target on screen) with the drop preview on the right edge; the 17th refused with The grid is full (16) and no change; Alt+Left moves a tile; the layout survives a reload; screenshots at 4, 9 and 16 in the three themes.",
+    evidence="[grid-drag scenario](evidence/ui/grid-drag/)", live="—", limits="Drags inside the grid are dispatched as DOM drag events in the webview (CDP cannot intercept a drag that starts inside a webview); drags from the side bar are real drags onto the grid's editor group.")
+rec(105, "Track an agent from the grid", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-grid-track.js`: two agents editing files; click a tile, switch, Escape, the Grid alone control.",
+    expected="See the RFC criterion (Gate M).",
+    actual="Clicking a tile opens its review beside the grid in follow mode and marks the tile; the review follows the agent's edits; clicking the other tile switches (one review, two groups); Escape and Grid alone restore the exact grid layout.",
+    evidence="[grid-track scenario](evidence/ui/grid-track/)", live="—")
+rec(106, "Never lose track of windows", "verified", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-windows.js`: every view opened twice from commands, the side bar and a drag; Where am I by shortcut and command; closing views.",
+    expected="See the RFC criterion (Gate M).",
+    actual="One Overseer view, one review, one chat taken out and one New Task remain; ⌥⌘M lists each (and where you are) and picking one goes there; the chat, review and grid headers have the control; closing views leaves no empty group.",
+    evidence="[windows scenario](evidence/ui/windows/)", live="—")
+rec(107, "Talk to Overseer", "partial", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="Claude Code fixture (overseer mode); no paid tokens",
+    proven="the chat in the panel runs as Overseer's own hidden task; What is everyone doing? matches the daemon's state; a proposal on Yes sends the follow-up, shown in the agent's chat as From Overseer; a declined proposal changes nothing",
+    deferred="the one tiny live run on the Claude account (waits for the owner's Claude sign-in)",
+    expected="See the RFC criterion (Gate M).",
+    actual="Talk scenario 7 of 7.",
+    evidence="[talk scenario](evidence/ui/talk/)", live="Pending: the owner's Claude sign-in.", blocker="The live run waits for the owner to sign in to Claude Code (the new personal plan).")
+rec(108, "Gate M design review (owner-confirmed)", "partial", commit="10b8f73 (merge of pull request #11, Gate M)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    proven="the review page shows every Gate M view in the three Overseer themes beside Gate K",
+    deferred="the owner's marks and dated confirmation (the owner asked to merge first)",
+    expected="See the RFC criterion (Gate M).",
+    actual="Published review page with a place to mark each view.",
+    evidence="[Gate M design review](https://claude.ai/artifact/Ec1XJy74iyKfMPFoiVRiiX), [gallery](evidence/ui/gallery/)", live="—", blocker="Waits for the owner's marks.")
 
 # Gate K follow-ups from the owner's marks (2026-09-26). Not started; land after the merged Gate K pull request (#7).
-rec(109, "A composer that does not wrap", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
-    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
-rec(110, "Account names read once", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
-    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
-rec(111, "The composer says what's next", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
-    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
-rec(112, "Search you can see", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
-    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
-rec(113, "No empty grid", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
-    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+rec(109, "A composer that does not wrap", "verified", commit="8d239cb (merge of pull request #8)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-followups.js` and `node test/ui/scenario-composer.js` on the packaged VSIX: the composer at 360, 480, 640 and 900 px and in High Contrast.",
+    expected="The composer's choices sit in a row under the field and never wrap inside it.",
+    actual="The choices sit under the field at every width; nothing wraps inside the field (followups scenario checks and screenshots).",
+    evidence="[followups scenario](evidence/ui/followups/), [composer scenario](evidence/ui/composer/)", live="—")
+rec(110, "Account names read once", "verified", commit="8d239cb (merge of pull request #8)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-followups.js`: the side bar's accounts and the composer's account menu with system logins.",
+    expected="Each account is named once; a system login reads Your login.",
+    actual="System logins read Your login in the side bar and the composer; no provider name repeats (followups scenario).",
+    evidence="[followups scenario](evidence/ui/followups/)", live="—")
+rec(111, "The composer says what's next", "verified", commit="8d239cb (merge of pull request #8)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-followups.js`: the composer's heading and placeholder.",
+    expected="The composer asks What's next? beside Overseer's mark, with the placeholder Send off a task.",
+    actual="Heading What's next? with Overseer's mark (the owner's logo since pull request #12); placeholder Send off a task.",
+    evidence="[followups scenario](evidence/ui/followups/)", live="—")
+rec(112, "Search you can see", "verified", commit="8d239cb (merge of pull request #8)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-sidebar-search.js` and `node test/ui/scenario-followups.js`: the search field at the top of the Overseer side bar, typing, the count, clearing.",
+    expected="A visible search field at the top of the side bar filters the agents as you type and shows the count.",
+    actual="The one-line field filters agents live, shows the count, and clears with Escape or its button.",
+    evidence="[sidebar-search scenario](evidence/ui/sidebar-search/), [followups scenario](evidence/ui/followups/)", live="—")
+rec(113, "No empty grid", "verified", commit="8d239cb (merge of pull request #8)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-followups.js`: open the grid with nothing running or pinned.",
+    expected="An empty grid is never shown; the composer opens with a note instead.",
+    actual="With no agent working or pinned, the grid sends you to the composer with the note The grid is empty.",
+    evidence="[followups scenario](evidence/ui/followups/)", live="—")
 rec(114, "Gate K in the owner's VS Code (owner-confirmed)", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
     actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
@@ -1478,9 +1514,11 @@ rec(145, "Audio Mode by ear (owner-confirmed)", "verified", date="2026-09-27 UTC
 rec(146, "Reconcile and merge the work in flight", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate P).",
     actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
-rec(147, "One command runs every test", "not started", date="—", commit="—",
+rec(147, "One command runs every test", "verified", commit="fb43c9b (merge of pull request #13)", date="2026-09-27", harness="all fixture tests; no paid tokens",
+    steps="`scripts/test-all` on a clean checkout; a deliberate failure; `npm test --prefix extension`.",
     expected="See the RFC criterion (Gate P).",
-    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+    actual="Each part reported with its counts and one summary; a deliberate failure reported as FAILED by name with exit 1; `npm test --prefix extension` runs the unit tests. `--jobs=N` runs UI scenarios N at a time.",
+    evidence="[AC-147 runs](evidence/ac-147/)", live="—")
 rec(148, "Checks on every pull request", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate P).",
     actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
@@ -1501,12 +1539,16 @@ rec(153, "A ledger that stays true", "not started", date="—", commit="—",
     actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
 
 # Gate Q, cover everything and oversee the agents (added by the owner on 2026-09-27). Not started.
-rec(154, "Composer choices fill the row", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate Q).",
-    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
-rec(155, "One-line search with a filter menu", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate Q).",
-    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(154, "Composer choices fill the row", "verified", commit="8d239cb (merge of pull request #8)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-followups.js`: the four composer choices at several widths.",
+    expected="The composer's four choices share the row's width equally.",
+    actual="The four choices fill the row in equal parts at every width tested.",
+    evidence="[followups scenario](evidence/ui/followups/)", live="—")
+rec(155, "One-line search with a filter menu", "verified", commit="8d239cb (merge of pull request #8)", date="2026-09-27", harness="fixture harnesses (generic programs, the Claude Code fixture); no paid tokens",
+    steps="`node test/ui/scenario-followups.js` and `node test/ui/scenario-sidebar-search.js`: the search field's filter icon and its menu; the pane's height.",
+    expected="Search is one line with a filter icon that opens the status filter; the pane is no taller than VS Code allows (its 120 px minimum body).",
+    actual="One-line field with a filter icon (filled while a filter is on) opening Show agents; the pane sits at VS Code's minimum height. The owner asked to merge without waiting for the round 4 marks.",
+    evidence="[followups scenario](evidence/ui/followups/), [sidebar-search scenario](evidence/ui/sidebar-search/)", live="—")
 rec(156, "Every agent works from the same rules", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate Q).",
     actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
@@ -1577,8 +1619,8 @@ rec(177, "The mark shows it is hearing you", "not started", date="—", commit="
     actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
 
 SHORT_BLOCKERS = {
-    154: "not started (Gate Q, added by the owner on 2026-09-27)",
-    155: "not started (Gate Q, added by the owner on 2026-09-27)",
+    154: "verified",
+    155: "verified",
     156: "not started (Gate Q, added by the owner on 2026-09-27)",
     157: "not started (Gate Q, added by the owner on 2026-09-27)",
     158: "not started (Gate Q, added by the owner on 2026-09-27)",
@@ -1586,14 +1628,14 @@ SHORT_BLOCKERS = {
     160: "not started (Gate Q, added by the owner on 2026-09-27)",
     161: "not started (Gate Q, added by the owner on 2026-09-27)",
     146: "not started (Gate P, added by the owner on 2026-09-27)",
-    147: "partial: scripts/test-all on branch claude/gate-p-follow-through, with its evidence; merges after PR #8",
+    147: "verified",
     148: "not started (Gate P, added by the owner on 2026-09-27)",
     149: "not started (Gate P, added by the owner on 2026-09-27)",
     150: "not started (Gate P, added by the owner on 2026-09-27)",
     151: "not started (Gate P, added by the owner on 2026-09-27)",
     152: "not started (Gate P, added by the owner on 2026-09-27)",
     153: "not started (Gate P, added by the owner on 2026-09-27)",
-    142: "partial: built on branch claude/brand-mark; waits for the owner to approve the single-colour mark",
+    142: "partial: merged (pull request #12); waits for the owner to approve the single-colour mark",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
     41: "deferred: no Linux environment",
@@ -1629,21 +1671,21 @@ SHORT_BLOCKERS = {
     95: "not started (Gate L, added by the owner on 2026-09-26)",
     96: "not started (Gate L, added by the owner on 2026-09-26)",
     97: "not started (Gate L, added by the owner on 2026-09-26)",
-    99: "not started (Gate M, added by the owner on 2026-09-26)",
-    100: "not started (Gate M, added by the owner on 2026-09-26)",
-    101: "not started (Gate M, added by the owner on 2026-09-26)",
-    102: "not started (Gate M, added by the owner on 2026-09-26)",
-    103: "not started (Gate M, added by the owner on 2026-09-26)",
-    104: "not started (Gate M, added by the owner on 2026-09-26)",
-    105: "not started (Gate M, added by the owner on 2026-09-26)",
-    106: "not started (Gate M, added by the owner on 2026-09-26)",
-    107: "not started (Gate M, added by the owner on 2026-09-26)",
-    108: "not started (Gate M, added by the owner on 2026-09-26)",
-    109: "not started (Gate K follow-up from the owner's marks)",
-    110: "not started (Gate K follow-up from the owner's marks)",
-    111: "not started (Gate K follow-up from the owner's marks)",
-    112: "not started (Gate K follow-up from the owner's marks)",
-    113: "not started (Gate K follow-up from the owner's marks)",
+    99: "verified",
+    100: "verified",
+    101: "verified",
+    102: "verified",
+    103: "partial: waits for the owner's marks in the Gate M review",
+    104: "verified",
+    105: "verified",
+    106: "verified",
+    107: "partial: the live Claude run waits for the owner's sign-in",
+    108: "partial: the review page is published; waits for the owner's marks",
+    109: "verified",
+    110: "verified",
+    111: "verified",
+    112: "verified",
+    113: "verified",
     114: "not started (Gate K follow-up from the owner's marks)",
     115: "not started (Gate N, added by the owner on 2026-09-26)",
     116: "not started (Gate N, added by the owner on 2026-09-26)",

@@ -1,28 +1,41 @@
 {
   "checks": [
     {
-      "name": "after-reload: review and run panels reopened",
+      "name": "after-reload: the review and the two side chats reopened",
       "ok": true,
       "detail": [
-        "Review: R3 removed later (1), Editor Group 1",
-        "Review: R2 other repo (1), Editor Group 1",
         "Review: R1 long review (2), Editor Group 1",
-        "R3 removed later, Editor Group 2",
+        "Overseer, Editor Group 2",
         "R2 other repo, Editor Group 2",
-        "R1 long review, Editor Group 2"
+        "R3 removed later, Editor Group 2"
       ]
     },
     {
-      "name": "after-reload: selected run and collapsed task restored in the Agents view",
+      "name": "after-reload: one Overseer view (no second copy)",
+      "ok": true,
+      "detail": [
+        "Review: R1 long review (2), Editor Group 1",
+        "Overseer, Editor Group 2",
+        "R2 other repo, Editor Group 2",
+        "R3 removed later, Editor Group 2"
+      ]
+    },
+    {
+      "name": "after-reload: the selected agent and the collapsed repository restored in the side bar",
       "ok": true,
       "detail": {
-        "r1Selected": true,
-        "r2Collapsed": true,
-        "r2RunHidden": true
+        "r1": {
+          "selected": true,
+          "expanded": null
+        },
+        "repoB": {
+          "selected": false,
+          "expanded": "false"
+        }
       }
     },
     {
-      "name": "after-reload: review comparison mode restored",
+      "name": "after-reload: review comparison restored",
       "ok": true,
       "detail": "Since task start"
     },
@@ -31,52 +44,16 @@
       "ok": true,
       "detail": {
         "before": 1200,
-        "after": 1200,
-        "restore": "reached",
-        "rows": [
-          [
-            "a.txt",
-            0,
-            6013,
-            "rendered"
-          ],
-          [
-            "b.txt",
-            6013,
-            263,
-            "reading"
-          ]
-        ]
+        "after": 1200
       }
     },
     {
       "name": "after-reload: Follow restored paused, not auto-resumed",
       "ok": true,
-      "detail": {
-        "rows": [
-          [
-            "a.txt",
-            0,
-            6013,
-            "rendered"
-          ],
-          [
-            "b.txt",
-            6013,
-            263,
-            "reading"
-          ]
-        ],
-        "restore": "reached",
-        "top": 1200,
-        "comparison": "Since task start",
-        "follow": true,
-        "resume": true,
-        "followState": "Follow was on before VS Code reloaded. It stays paused until you resume it."
-      }
+      "detail": "paused"
     },
     {
-      "name": "after-reload: run panel scroll position and unsent draft restored",
+      "name": "after-reload: chat scroll position and unsent draft restored",
       "ok": true,
       "detail": {
         "before": 400,
@@ -87,9 +64,8 @@
       }
     },
     {
-      "name": "after-reload: review for a run in another repository (not open in the window) restored",
-      "ok": true,
-      "detail": "/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoB-039fe8ac/r2-other-repo"
+      "name": "after-reload: a side chat for a run in another repository (not open in the window) restored",
+      "ok": true
     },
     {
       "name": "after-reload: active run kept running",
@@ -99,31 +75,44 @@
     {
       "name": "R3 worktree removed before restart",
       "ok": true,
-      "detail": "/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoA-fd0fc365/r3-removed-later"
+      "detail": "/private/tmp/ovs-ui-KWvxSY/overseer-home/worktrees/repoA-d23a655d/r3-removed-later"
     },
     {
-      "name": "after-restart: review and run panels reopened",
+      "name": "after-restart: the review and the two side chats reopened",
       "ok": true,
       "detail": [
-        "Review: R3 removed later (1), Editor Group 1",
-        "Review: R2 other repo (1), Editor Group 1",
         "Review: R1 long review (2), Editor Group 1",
-        "R3 removed later, Editor Group 2",
+        "Overseer, Editor Group 2",
         "R2 other repo, Editor Group 2",
-        "R1 long review, Editor Group 2"
+        "R3 removed later, Editor Group 2"
       ]
     },
     {
-      "name": "after-restart: selected run and collapsed task restored in the Agents view",
+      "name": "after-restart: one Overseer view (no second copy)",
+      "ok": true,
+      "detail": [
+        "Review: R1 long review (2), Editor Group 1",
+        "Overseer, Editor Group 2",
+        "R2 other repo, Editor Group 2",
+        "R3 removed later, Editor Group 2"
+      ]
+    },
+    {
+      "name": "after-restart: the selected agent and the collapsed repository restored in the side bar",
       "ok": true,
       "detail": {
-        "r1Selected": true,
-        "r2Collapsed": true,
-        "r2RunHidden": true
+        "r1": {
+          "selected": true,
+          "expanded": null
+        },
+        "repoB": {
+          "selected": false,
+          "expanded": "false"
+        }
       }
     },
     {
-      "name": "after-restart: review comparison mode restored",
+      "name": "after-restart: review comparison restored",
       "ok": true,
       "detail": "Since task start"
     },
@@ -132,52 +121,16 @@
       "ok": true,
       "detail": {
         "before": 1200,
-        "after": 1200,
-        "restore": "reached",
-        "rows": [
-          [
-            "a.txt",
-            0,
-            6013,
-            "rendered"
-          ],
-          [
-            "b.txt",
-            6013,
-            263,
-            "reading"
-          ]
-        ]
+        "after": 1200
       }
     },
     {
       "name": "after-restart: Follow restored paused, not auto-resumed",
       "ok": true,
-      "detail": {
-        "rows": [
-          [
-            "a.txt",
-            0,
-            6013,
-            "rendered"
-          ],
-          [
-            "b.txt",
-            6013,
-            263,
-            "reading"
-          ]
-        ],
-        "restore": "reached",
-        "top": 1200,
-        "comparison": "Since task start",
-        "follow": true,
-        "resume": true,
-        "followState": "Follow was on before VS Code reloaded. It stays paused until you resume it."
-      }
+      "detail": "paused"
     },
     {
-      "name": "after-restart: run panel scroll position and unsent draft restored",
+      "name": "after-restart: chat scroll position and unsent draft restored",
       "ok": true,
       "detail": {
         "before": 400,
@@ -188,9 +141,8 @@
       }
     },
     {
-      "name": "after-restart: review for a run in another repository (not open in the window) restored",
-      "ok": true,
-      "detail": "/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoB-039fe8ac/r2-other-repo"
+      "name": "after-restart: a side chat for a run in another repository (not open in the window) restored",
+      "ok": true
     },
     {
       "name": "after-restart: active run kept running",
@@ -198,11 +150,11 @@
       "detail": "running"
     },
     {
-      "name": "removed worktree is explained instead of failing",
+      "name": "removed worktree is explained instead of failing (its chat keeps its history)",
       "ok": true,
       "detail": {
-        "tab": "Review: R3 removed later (1), Editor Group 1",
-        "text": "The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-lg0PPS/overseer-home/worktrees/repoA-fd0fc365/r3-removed-later) was removed on 9/26/2026, 3:02:38 AM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."
+        "side3": 1,
+        "text": "Overseer: The worktree for \"R3 removed later\" (/private/tmp/ovs-ui-KWvxSY/overseer-home/worktrees/repoA-d23a655d/r3-removed-later) was removed on 9/26/2026, 5:42:17 PM. Its branch overseer/r3-removed-later was kept, so the commits are still in the repository. The run panel still has its history."
       }
     }
   ]
