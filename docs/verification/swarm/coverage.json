@@ -253,9 +253,13 @@
       "blocker": "No authorized version-pinned live two-worker, fallback, cancel and recovery matrix has been run."
     },
     "SWARM-26": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "No fixed end-to-end serial-versus-swarm evaluation suite or native usage/elapsed-time comparison exists."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_evaluation.rs",
+        "fixtures/swarm/evaluation-v1/",
+        "docs/verification/swarm/SWARM-26.md"
+      ],
+      "blocker": "Evaluation v1 fixes dependency, independent, exclusive-write and constrained-budget cases; the independent pair completes serial and parallel with 2/2 acceptance and 200 scripted fixture work units, with a recorded local parallel elapsed-time improvement. The other cases are policy decisions rather than full paired runs. Native provider usage, supported-harness qualification, and repeated quality/time comparison remain unverified."
     },
     "SWARM-27": {
       "status": "partial",

@@ -1,0 +1,15 @@
+# SWARM-26 — serial versus Swarm evaluation
+
+Status: partial. Fixture revision: `a0cf0d8` (`evaluation-v1`, manifest version 1). Local scripted workers and disposable worktrees; no provider calls.
+
+Input: the fixed suite contains a dependency chain, two independent jobs, two jobs with the same exclusive `db:shared` write claim, and an allocation of 225 fixture milli-work-units. Both compared execution modes run the same two 1,500 ms local workers, each of which stores one artifact and reports 100 fixture milli-work-units before exit. The serial run has a one-worker ceiling; the parallel run has a two-worker ceiling. Both receive the same evidence checks.
+
+Expected: dependency and exclusive-write cases choose serial; the constrained allocation rejects a parallel plan costing 230 while permitting the serial plan costing 220. The independent affordable case selects parallel. Both measured runs must accept 2/2 artifacts and complete; at least one parallel case should finish sooner without increasing the fixture work-unit count or exceeding its approved allocation.
+
+Actual: policy decisions were `dependent_jobs`, `resource_conflict`, `allocation_exceeded`, and `beneficial` respectively. The local execution fixture completed both runs with 2/2 accepted checks and 200 reported fixture milli-work-units each. One recorded run on this machine measured **4,812 ms serial** versus **3,012 ms parallel**, including admission, supervisor launch, worker execution, review and completion. Relative to ideal worker delay, the measured orchestration overhead was **1,812 ms serial** and **1,512 ms parallel**. The first local run exposed that the serial worker's confirmed exit needed reconciliation before its slot could be reused; the fixture now performs that reconciliation. A director batch initially returned `waiting` before its five-second wake point; the fixture advances its injected claim clock instead of sleeping. The final two evaluation tests and 43 affected benefit, broker, evaluation and runtime tests passed.
+
+Replay: `cargo test --offline -p overseerd --test swarm_evaluation -- --nocapture`; `cargo test --offline -p overseerd --test swarm_benefit --test swarm_evaluation --test swarm_runtime --test swarm_broker --quiet -- --test-threads=1`.
+
+Evidence: `fixtures/swarm/evaluation-v1/manifest.json`, `fixtures/swarm/evaluation-v1/worker.py`, `fixtures/swarm/evaluation-v1/README.md`, `daemon/tests/swarm_evaluation.rs`, plus [SWARM-05](SWARM-05.md) for retained estimates and outcomes.
+
+Remaining: the three safety/constraint cases are policy and admission decisions, not paired end-to-end elapsed-time comparisons. `work_units` are scripted fixture receipts, not metered provider tokens; `actual_usage_milli` correctly remains unknown in the daemon outcome. The one recorded wall-time improvement is machine-specific and does not establish universal speed or usage savings. A version-pinned supported-harness comparison with native usage and repeatable acceptance-quality measurements is still required. SWARM-26 stays unchecked.
