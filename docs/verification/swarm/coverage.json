@@ -538,7 +538,7 @@
         "daemon/src/swarm/conflicts.rs",
         "docs/verification/swarm/SWARM-47.md"
       ],
-      "blocker": "A durable J2/J7 conflict now preserves both chains, blocks acceptance and completion, and resolves only after one independent accepted J8 reproduction and confirmed exit; explicit unresolved state stays visible and blocked. This is a scripted fixture path. Post-acceptance contradiction registration, autonomous semantic judgment, unresolved partial reporting and qualified live director review remain unverified."
+      "blocker": "A durable J2/J7 conflict preserves both chains, blocks acceptance and completion, and resolves only after one independent accepted J8 reproduction and confirmed exit; explicit unresolved state stays visible and blocked. A separate fixture now registers a conflict after both findings were accepted, survives restart, and refuses to resolve against an accepted contradicted job until that job is revised and its old review no longer counts. Autonomous semantic judgment, full dependent-job re-review, unresolved partial reporting and qualified live director review remain unverified."
     },
     "SWARM-48": {
       "status": "partial",
