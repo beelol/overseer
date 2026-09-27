@@ -176,7 +176,6 @@
       // Narrow (beside a diff): the header's Review and Files buttons are in this menu instead.
       if (window.innerWidth <= 480) {
         items.push({ id: 'review-menu', label: 'Review changes', icon: 'diff-multiple', run: () => this.post({ type: 'openReview' }) });
-        if (this.opts.mode === 'dashboard') items.push({ id: 'files-menu', label: 'Files', icon: 'list-tree', run: () => this.opts.onFiles?.() });
         items.push('sep');
       }
       if (!this.child) {
