@@ -165,6 +165,8 @@ impl Store {
               seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, task_id TEXT, run_id TEXT, kind TEXT NOT NULL,
               source TEXT NOT NULL, confidence TEXT NOT NULL, payload TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS events_run ON events(run_id, seq);
+            CREATE TABLE IF NOT EXISTS overseer_tokens(
+              sha TEXT PRIMARY KEY, run_id TEXT NOT NULL, role TEXT NOT NULL, created_ms INTEGER NOT NULL);
             "#,
         )?;
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;
