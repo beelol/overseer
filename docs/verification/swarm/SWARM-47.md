@@ -274,3 +274,11 @@ This is a durable structured partial readout, not a director-authored final
 analysis or an automatic Stop decision. The exhausted integrated-patch case
 still needs a joined closing replay, and live director judgment remains
 unqualified. SWARM-47 stays partial.
+
+Scale guard after that readout: a fixture inserts 1,001 unresolved historical
+conflicts and first reproduces `swarm.coverage` failing because the old full
+conflict-list endpoint rejects that size. Coverage now carries a bounded
+100-conflict preview, the exact unresolved count and an explicit truncation
+flag; it still returns `incomplete` and job rows. The state (20) and conflict
+(9) suites passed. This preserves the terminal readout under a long history;
+full conflict-history pagination is still a separate open requirement.

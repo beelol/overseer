@@ -128,8 +128,10 @@ pub fn report(store: &Store, p: &Value) -> Result<Value> {
         _ if current["availability"]["state"] == "blocked" => "blocked",
         _ => "in_progress",
     };
-    let conflicts = super::conflicts::list(store, &json!({"run_id":run}))?["conflicts"].clone();
+    let (unresolved_conflict_count,conflicts)=super::conflicts::unresolved_preview(store,run)?;
+    let conflicts_truncated=unresolved_conflict_count>conflicts.len() as i64;
     Ok(json!({"run_id":run,"run_status":status,"outcome":outcome,
         "stop_reason":current["stop_reason"],"completion":current["completion"],
-        "conflicts":conflicts,"rows":rows}))
+        "unresolved_conflict_count":unresolved_conflict_count,
+        "conflicts_truncated":conflicts_truncated,"conflicts":conflicts,"rows":rows}))
 }

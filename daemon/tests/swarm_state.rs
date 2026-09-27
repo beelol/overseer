@@ -162,6 +162,31 @@ fn stopped_empty_swarm_is_terminal_and_releases_category() {
 }
 
 #[test]
+fn large_conflict_history_does_not_hide_terminal_coverage() {
+    let d=Daemon::start(&[]);
+    let made=d.call("swarm.create",json!({"category":"Long conflict history",
+        "objective":"Preserve partial coverage","allowed_targets":[]}));
+    let run=made["id"].as_str().unwrap();
+    d.call("swarm.stop",json!({"run_id":run}));
+    let mut db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let tx=db.transaction().unwrap();
+    for n in 0..1001 {
+        tx.execute("INSERT INTO swarm_conflicts(run_id,conflict_id,generation,revision,
+            left_job_id,left_artifact_id,right_job_id,right_artifact_id,reason,status,
+            outcome,created_ms,updated_ms)
+            VALUES(?1,?2,1,0,'left','left-proof','right','right-proof',
+                'different fixture responses','unresolved','unresolved',?3,?3)",
+            rusqlite::params![run,format!("conflict-{n:04}"),n]).unwrap();
+    }
+    tx.commit().unwrap();
+    let report=d.call("swarm.coverage",json!({"run_id":run}));
+    assert_eq!(report["outcome"],"incomplete","{report}");
+    assert_eq!(report["unresolved_conflict_count"],1001,"{report}");
+    assert_eq!(report["conflicts_truncated"],true,"{report}");
+    assert_eq!(report["conflicts"].as_array().unwrap().len(),100);
+}
+
+#[test]
 fn user_stop_needs_only_the_run_id_even_after_a_plan_revision() {
     let d = Daemon::start(&[]);
     let made = d.call("swarm.create", json!({"category":"Stop from stale view",

@@ -266,3 +266,26 @@ pub fn list(store: &Store, p: &Value) -> Result<Value> {
     if rows.len()>1000 { bail!("conflict list exceeds bounded readout"); }
     Ok(json!({"run_id":run,"conflicts":rows}))
 }
+
+/// Keep the terminal coverage report available even when a long-running
+/// category has more conflict history than the full conflict-list endpoint
+/// can return in one response. The count makes a truncated preview explicit.
+pub(super) fn unresolved_preview(store: &Store, run: &str) -> Result<(i64, Vec<Value>)> {
+    let count: i64=store.conn.query_row(
+        "SELECT COUNT(*) FROM swarm_conflicts WHERE run_id=?1 AND status!='resolved'",
+        [run],|r|r.get(0))?;
+    let mut stmt=store.conn.prepare(
+        "SELECT conflict_id,left_job_id,left_artifact_id,right_job_id,right_artifact_id,
+                reason,status,outcome,reproduction_job_id,reproduction_artifact_id
+         FROM swarm_conflicts WHERE run_id=?1 AND status!='resolved'
+         ORDER BY created_ms,conflict_id LIMIT 100")?;
+    let rows=stmt.query_map([run],|r|Ok(json!({"conflict_id":r.get::<_,String>(0)?,
+        "left_job_id":r.get::<_,String>(1)?,"left_artifact_id":r.get::<_,String>(2)?,
+        "right_job_id":r.get::<_,String>(3)?,"right_artifact_id":r.get::<_,String>(4)?,
+        "reason":r.get::<_,String>(5)?,"status":r.get::<_,String>(6)?,
+        "outcome":r.get::<_,Option<String>>(7)?,
+        "reproduction_job_id":r.get::<_,Option<String>>(8)?,
+        "reproduction_artifact_id":r.get::<_,Option<String>>(9)?})))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok((count,rows))
+}

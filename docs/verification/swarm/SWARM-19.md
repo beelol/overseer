@@ -52,3 +52,9 @@ integration (25) and state (19) suites passed. This improves the truthful
 partial-result path, but it does not resolve stopped integration intents,
 qualify live verification, or prove the combined-failure scenario through
 a normal launch. SWARM-19 remains partial.
+
+The readout is also bounded when a fixture records 1,001 unresolved
+conflicts: it returns an exact count and a 100-item preview with a truncation
+flag instead of losing the incomplete coverage report. The focused state
+and conflict suites passed (20 + 9 tests). Full conflict-history paging is
+not yet qualified.
