@@ -415,9 +415,11 @@
         "docs/verification/swarm/milestone-1.md",
         "docs/verification/swarm/milestone-3.md",
         "daemon/tests/swarm_dispatch.rs",
-        "daemon/tests/swarm_atlas.rs"
+        "daemon/tests/swarm_atlas.rs",
+        "daemon/tests/swarm_runtime.rs",
+        "docs/verification/swarm/SWARM-43.md"
       ],
-      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect; a separate supervised scripted worker acknowledges a targeted advisory. The specified revision-2 assignment, redirect during a long tool call, the 30-second applied-ack timeout and qualified live delivery remain unimplemented."
+      "blocker": "The joined S1 replay records delivered/applied advisories and J4 overlap redirect. Daemon fixtures now keep duplicate delivered receipts from extending the 30-second deadline, hold the job and dependent work at expiry, persist one checkpoint request, and interrupt a linked long-running worker after restart. The complete J4 revision-2 assignment and stale-output trace, qualified live delivery/acknowledgement during a tool call, and exclusion of unsupported harness paths remain unverified."
     },
     "SWARM-44": {
       "status": "partial",
@@ -729,7 +731,7 @@
         "daemon/tests/swarm_runtime.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Atlas v1 J2 replays lost-result-receipt and director death after dispatch admission: restart deduplicates the result retry, while startup recovers one supervised worker, retains its database-backed result and rejects old-generation commands. Separate daemon fixtures cover SQLite-full replay and synthetic late shared-database contamination with targeted interrupts, bounded retries, historical observation over restart, and completed-run verdict invalidation. Both one-job Atlas audits complete with accepted evidence; the other named S5 faults, Atlas-backed contamination/full storage, and full S1-sized ordered replay remain unverified. Live harness communication is absent."
+      "blocker": "Atlas v1 J2 replays lost-result-receipt and director death after dispatch admission: restart deduplicates the result retry, while startup recovers one supervised worker, retains its database-backed result and rejects old-generation commands. Separate daemon fixtures cover SQLite-full replay, late shared-database contamination and durable unapplied-redirect timeout with a targeted worker interrupt. Both one-job Atlas audits complete with accepted evidence; the other named S5 faults, Atlas-backed redirect/contamination/full storage, and full S1-sized ordered replay remain unverified. Live harness communication is absent."
     }
   }
 }
