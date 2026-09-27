@@ -1,0 +1,41 @@
+# An agent's file at the comparison since its task started. Used by scenarios that go on from it.
+appId: ${APP}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "agents.screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "agents.row.${RUN}"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "agents.row.${RUN}"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: "agent.changes"
+    timeout: 30000
+- tapOn:
+    id: "agent.changes"
+- extendedWaitUntil:
+    visible:
+      id: "changes.comparison"
+    timeout: 30000
+- tapOn:
+    id: "changes.comparison"
+- tapOn:
+    id: "changes.comparison.menu.task_start"
+- extendedWaitUntil:
+    visible:
+      id: "changes.row.${FILE}"
+    timeout: 30000
+- tapOn:
+    id: "changes.row.${FILE}"
+- extendedWaitUntil:
+    visible:
+      id: "file.hunk.accept"
+    timeout: 30000

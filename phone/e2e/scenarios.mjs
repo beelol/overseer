@@ -1,6 +1,7 @@
 // The phone's scenarios, in the order they run. Each drives the app with a flow (e2e/flows) and
 // then asks the daemon what happened, as the Mac sees it: a scenario passes only when both agree.
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
@@ -33,6 +34,39 @@ const freePort = () =>
 const expect = (ok, what) => {
   if (!ok) throw new Error(what);
 };
+
+
+/** A regular expression that matches `text` exactly, as Maestro reads it. */
+const exactly = (text) => text.replace(/[\\^$.|?*+()[\]{}]/g, '\\$&');
+
+/** The lines `git diff` removes and adds for `file` in `dir` against `base`, in order. */
+function gitDiff(dir, base, file) {
+  const tracked = (() => {
+    try {
+      execFileSync('git', ['-C', dir, 'cat-file', '-e', `${base}:${file}`], { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  let text;
+  try {
+    text = tracked
+      ? execFileSync('git', ['-C', dir, 'diff', '--no-color', '--no-ext-diff', '-U0', base, '--', file], { encoding: 'utf8' })
+      : execFileSync('git', ['-C', dir, 'diff', '--no-color', '--no-index', '-U0', '/dev/null', file], { encoding: 'utf8' });
+  } catch (error) {
+    // `git diff --no-index` answers 1 when the files differ.
+    text = error.stdout ?? '';
+  }
+  const removed = [];
+  const added = [];
+  for (const line of text.split('\n')) {
+    if (/^(diff |index |--- |\+\+\+ |@@ |new file|deleted file|similarity|rename |old mode|new mode|\\ )/.test(line)) continue;
+    if (line.startsWith('-')) removed.push(line.slice(1));
+    else if (line.startsWith('+')) added.push(line.slice(1));
+  }
+  return { removed, added };
+}
 
 export const scenarios = [
   {
@@ -166,6 +200,53 @@ export const scenarios = [
       const mark = c.lab.call('review.marks', { run_id: found.run }).marks.at(-1);
       expect(String(mark.by).includes(c.name), `the mark was made by ${mark.by}`);
       c.review = found;
+    },
+  },
+  {
+    name: 'diff',
+    criteria: ['AC-126'],
+    says: "a file's diff on the phone is git diff for the comparison, line for line; a mark made on the Mac shows on the phone",
+    async run(c) {
+      expect(c.review, 'the review scenario found no changed file');
+      const { run: runId, file } = c.review;
+      const agent = run(c, runId);
+      const base = c.lab.call('comparison.options', { run_id: runId }).options.find((o) => o.mode === 'task_start' && o.available)?.base;
+      expect(base, 'the Mac offers no comparison since the task started');
+      const workspace = c.lab.call('state').workspaces.find((w) => w.id === agent.workspace_id);
+      const answered = c.lab.call('workspace.hunks', { workspace_id: agent.workspace_id, path: file, base, run_id: runId });
+      // The rows the phone draws, from the phone's own review model.
+      const { review } = await import('../model/src/index.ts');
+      const drawn = review.fileDiff(answered);
+      const rows = drawn.hunks.flatMap((h) => h.rows);
+      const git = gitDiff(workspace.path, base, file);
+      const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+      expect(same(rows.filter((r) => r.kind === 'removed').map((r) => r.text), git.removed), `the removed lines differ from git diff: ${JSON.stringify(git.removed).slice(0, 200)}`);
+      expect(same(rows.filter((r) => r.kind === 'added').map((r) => r.text), git.added), `the added lines differ from git diff: ${JSON.stringify(git.added).slice(0, 200)}`);
+      // A mark made on the Mac: the second hunk marked reviewed, or with one hunk, the phone's mark taken away.
+      const hunks = answered.hunks;
+      const second = hunks[1];
+      if (second) c.lab.call('review.accept', { run_id: runId, ...review.acceptParams(file, second) });
+      else c.lab.call('review.unaccept', { run_id: runId, key: hunks[0].key });
+      const expectations = second
+        ? [[hunks[0].key, 'Reviewed'], [second.key, 'Reviewed']]
+        : [[hunks[0].key, 'Accept']];
+      // Every line on the screen, as the phone says it: its number and its text.
+      const shown = (line) => line.replace(/\t/g, '  ').slice(0, 2000);
+      const steps = rows.flatMap((row) => {
+        const label = row.kind === 'removed' ? `Removed, line ${row.baseLine ?? ''}: ${shown(row.text)}` : `Added, line ${row.modifiedLine ?? ''}: ${shown(row.text)}`;
+        return [
+          `- scrollUntilVisible:\n    element:\n      id: "file.line.${row.key}"\n    direction: DOWN\n    timeout: 15000`,
+          `- assertVisible:\n    id: "file.line.${row.key}"\n    text: ${JSON.stringify(exactly(label))}`,
+        ];
+      });
+      const marks = expectations.map(([key, words]) => `- scrollUntilVisible:\n    element:\n      text: "${words}"\n      childOf:\n        id: "file.hunk.${key}"\n    direction: UP\n    timeout: 15000`);
+      const open = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), 'flows', 'open-file.yaml'), 'utf8');
+      const file_ = path.join(path.dirname(c.out), 'maestro', c.platform, 'generated', 'diff-lines.yaml');
+      fs.mkdirSync(path.dirname(file_), { recursive: true });
+      fs.writeFileSync(file_, `${open.trimEnd()}\n${steps.join('\n')}\n${marks.join('\n')}\n- takeScreenshot: diff-lines\n`);
+      await c.flow(file_, { RUN: runId, FILE: file });
+      c.log.say(`  ${rows.length} lines in ${hunks.length} hunks equal git diff and are on the screen; the Mac's mark shows on the phone`);
+      return { lines: rows.length, hunks: hunks.length };
     },
   },
   {
