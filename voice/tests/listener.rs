@@ -348,23 +348,10 @@ fn a_suppressed_moment_is_not_heard() {
 
 #[test]
 fn real_speech_from_say_is_heard_as_one_utterance() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("s.wav");
-    let ok = std::process::Command::new("say")
-        .args(["-v", "Samantha", "-o"])
-        .arg(&path)
-        .args([
-            "--data-format=LEI16@16000",
-            "Stop the phone agent, and tell Continuity to wait.",
-        ])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
-    if !ok {
+    let Ok(speech) = overseer_listener::speak::say("Stop the phone agent, and tell Continuity to wait.", Some("Samantha"), None) else {
         eprintln!("skipped: no `say`");
         return;
-    }
-    let speech = pcm::read_wav(&std::fs::read(&path).unwrap()).unwrap();
+    };
     let mut audio = synth::room(0.8, 0.002, 6);
     let dur = speech.len() as u64 * 1000 / 16_000;
     audio.extend(speech);

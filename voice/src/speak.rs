@@ -14,27 +14,44 @@ pub const LOWERED: f32 = 0.3;
 /// Speaks `text` into samples, in memory: `say` writes a WAV file in a private temporary folder,
 /// which is read and removed at once. This is Overseer's own voice, never the owner's.
 pub fn synthesize(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f32>> {
+    say(text, voice, rate)
+}
+
+/// Runs `say` into a temporary WAV file and returns its samples. macOS's speech service sometimes
+/// never answers, so `say` gets a time limit that grows with the text (3 s and 50 ms a character),
+/// is killed when it passes it, and is tried once more.
+pub fn say(text: &str, voice: Option<&str>, rate: Option<u32>) -> Result<Vec<f32>> {
     let dir = tempfile::Builder::new().prefix("ovs-voice-").tempdir()?;
     let path = dir.path().join("line.wav");
-    let mut cmd = Command::new("say");
-    if let Some(v) = voice {
-        cmd.args(["-v", v]);
+    let limit = std::time::Duration::from_millis(3000 + 50 * text.chars().count() as u64);
+    for _ in 0..2 {
+        let mut cmd = Command::new("say");
+        if let Some(v) = voice {
+            cmd.args(["-v", v]);
+        }
+        if let Some(r) = rate {
+            cmd.args(["-r", &r.to_string()]);
+        }
+        cmd.arg("-o").arg(&path).arg("--data-format=LEI16@16000").arg("--").arg(text);
+        cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+        let mut child = cmd.spawn()?;
+        let started = std::time::Instant::now();
+        loop {
+            if let Some(status) = child.try_wait()? {
+                if !status.success() {
+                    bail!("say could not speak the line");
+                }
+                return pcm::read_wav(&std::fs::read(&path)?);
+            }
+            if started.elapsed() > limit {
+                let _ = child.kill();
+                let _ = child.wait();
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
     }
-    if let Some(r) = rate {
-        cmd.args(["-r", &r.to_string()]);
-    }
-    let status = cmd
-        .arg("-o")
-        .arg(&path)
-        .arg("--data-format=LEI16@16000")
-        .arg("--")
-        .arg(text)
-        .status()?;
-    if !status.success() {
-        bail!("say could not speak the line");
-    }
-    let samples = pcm::read_wav(&std::fs::read(&path)?)?;
-    Ok(samples)
+    bail!("say did not finish twice in a row")
 }
 
 /// Splits a line into phrases at sentence and clause ends; a fragment of one or two words joins

@@ -9,19 +9,7 @@ use overseer_listener::synth::{self, NOISES};
 use std::process::Command;
 
 fn say(text: &str, voice: &str) -> Option<Vec<f32>> {
-    let dir = tempfile::tempdir().ok()?;
-    let path = dir.path().join("s.wav");
-    let ok = Command::new("say")
-        .args(["-v", voice, "-o"])
-        .arg(&path)
-        .args(["--data-format=LEI16@16000", text])
-        .status()
-        .ok()?
-        .success();
-    if !ok {
-        return None;
-    }
-    pcm::read_wav(&std::fs::read(&path).ok()?).ok()
+    overseer_listener::speak::say(text, Some(voice), None).ok()
 }
 
 #[test]

@@ -9,7 +9,6 @@
 
 use overseer_listener::pcm;
 use std::path::Path;
-use std::process::Command;
 use std::time::Instant;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
@@ -77,24 +76,11 @@ fn main() -> anyhow::Result<()> {
         .expect("usage: spike_recognizer <model.bin> [hint]");
     let hint = std::env::args().nth(2).is_some();
     whisper_rs::install_logging_hooks();
-    let tmp = tempfile::tempdir()?;
     let mut clips = Vec::new();
     for (vi, voice) in VOICES.iter().enumerate() {
         for (si, text) in SENTENCES.iter().enumerate() {
-            let path = tmp.path().join(format!("{vi}-{si}.wav"));
-            let ok = Command::new("say")
-                .args(["-v", voice, "-o"])
-                .arg(&path)
-                .args(["--data-format=LEI16@16000", text])
-                .status()?
-                .success();
-            anyhow::ensure!(ok, "say failed for voice {voice}");
-            clips.push((
-                voice.to_string(),
-                text.to_string(),
-                pcm::read_wav(&std::fs::read(&path)?)?,
-            ));
-            std::fs::remove_file(&path)?;
+            let _ = (vi, si);
+            clips.push((voice.to_string(), text.to_string(), overseer_listener::speak::say(text, Some(voice), None)?));
         }
     }
     let before = peak_rss_mib();
