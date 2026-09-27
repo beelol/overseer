@@ -18,6 +18,7 @@ pub const MAX_REQUEST_BYTES: u64 = 1024 * 1024;
 
 pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
     crate::audio::start(daemon.clone())?;
+    crate::overseer::conflicts::start(daemon.clone());
     let path = paths::socket_path();
     if let Some(dir) = path.parent() {
         paths::ensure_private_dir(dir)?;
@@ -297,6 +298,14 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "workspace.merge_complete" => d.merge_complete(s(p, "workspace_id")?)?,
         "workspace.merge_abort" => d.merge_abort(s(p, "workspace_id")?)?,
         "overseer.token" => d.overseer_token(s(p, "run_id")?, p["role"].as_str().unwrap_or("agent"))?,
+        "agent.digest" => {
+            let id = s(p, "run_id")?;
+            json!({"digest": d.digest(id)?, "text": d.digest_text(id)?})
+        }
+        "agents.roster" => json!({"roster": d.roster()?, "text": d.roster_text()?}),
+        "conflicts.list" => d.conflicts_list(p["run_id"].as_str(), p["include_closed"].as_bool().unwrap_or(false))?,
+        "conflict.dismiss" => d.conflict_dismiss(s(p, "id")?, p["by"].as_str().unwrap_or("user"))?,
+        "overseer.scan" => d.scan_conflicts(s(p, "run_id")?)?,
         "overseer.tools" => d.overseer_tools(s(p, "token")?)?,
         "overseer.tool" => d.overseer_tool(s(p, "token")?, s(p, "name")?, &p["arguments"])?,
         "daemon.shutdown" => json!({"ok": true}),

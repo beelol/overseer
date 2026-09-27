@@ -75,6 +75,8 @@ pub struct Daemon {
     /// When VS Code windows went from none to some, and the runs the last background notice named:
     /// a brief reconnect after a notice (a probe, a crash-restart) does not repeat it.
     pub ui_session: Mutex<(Option<std::time::Instant>, Option<Vec<String>>)>,
+    /// What Overseer coordinates with no model: pending conflict scans and their caches.
+    pub coord: crate::overseer::conflicts::Coordination,
 }
 
 fn pid_alive(pid: u32) -> bool {
@@ -98,7 +100,8 @@ impl Daemon {
         let (tx, _) = broadcast::channel(4096);
         let exe = std::env::current_exe()?;
         let daemon = Arc::new(Self { store: Mutex::new(store), events: tx, tails: Mutex::new(HashSet::new()), exe, started_ms: now(),
-            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)) });
+            ui_clients: std::sync::atomic::AtomicUsize::new(0), ui_epoch: std::sync::atomic::AtomicU64::new(0), ui_session: Mutex::new((None, None)),
+            coord: crate::overseer::conflicts::Coordination::default() });
         daemon.ensure_system_profiles()?;
         Ok(daemon)
     }

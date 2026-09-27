@@ -167,6 +167,15 @@ impl Store {
             CREATE INDEX IF NOT EXISTS events_run ON events(run_id, seq);
             CREATE TABLE IF NOT EXISTS overseer_tokens(
               sha TEXT PRIMARY KEY, run_id TEXT NOT NULL, role TEXT NOT NULL, created_ms INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS conflicts(
+              id TEXT PRIMARY KEY, key TEXT NOT NULL, kind TEXT NOT NULL, repo TEXT NOT NULL, run_a TEXT NOT NULL,
+              run_b TEXT, target TEXT, paths TEXT NOT NULL, first_ms INTEGER NOT NULL, last_ms INTEGER NOT NULL,
+              state TEXT NOT NULL, resolution TEXT, closed_ms INTEGER);
+            CREATE INDEX IF NOT EXISTS conflicts_key ON conflicts(key, state);
+            CREATE TABLE IF NOT EXISTS areas(
+              run_id TEXT NOT NULL, path TEXT NOT NULL, set_by TEXT NOT NULL, created_ms INTEGER NOT NULL, PRIMARY KEY(run_id, path));
+            CREATE TABLE IF NOT EXISTS run_roles(run_id TEXT PRIMARY KEY, role TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS turn_sources(turn_id TEXT PRIMARY KEY, source TEXT NOT NULL, detail TEXT);
             "#,
         )?;
         let has_pending: bool = self.conn.prepare("SELECT 1 FROM pragma_table_info('runs') WHERE name='pending_parent_native'")?.exists([])?;

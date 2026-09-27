@@ -3,7 +3,9 @@ mod common;
 use common::*;
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::Duration;
 
 /// Runs `overseerd mcp` as a harness would (an MCP server over stdio) and replays a recorded
 /// JSON-RPC exchange, returning one reply per request.
@@ -59,7 +61,7 @@ fn ac180_mcp_shim_serves_overseers_tools_from_the_daemon() {
     assert_eq!(replies[0]["result"]["serverInfo"]["name"], "overseer");
     assert_eq!(replies[0]["result"]["capabilities"]["tools"]["listChanged"], false);
     let tools: Vec<&str> = replies[1]["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(tools, ["roster", "agent"]);
+    assert_eq!(tools, ["roster", "agent", "conflicts"]);
     let roster = replies[2]["result"]["content"][0]["text"].as_str().unwrap();
     assert!(roster.contains(&run) && roster.contains("completed"), "roster names the run: {roster}");
     assert_eq!(replies[2]["result"]["isError"], false);
@@ -91,4 +93,270 @@ fn ac180_tokens_decide_who_may_call_what() {
     let err = d.try_call("overseer.tool", json!({"token": agent, "name": "agent", "arguments": {"id": "x"}})).unwrap_err();
     assert!(err.contains("no tool agent"), "{err}");
     assert!(d.try_call("overseer.token", json!({"run_id": "r", "role": "king"})).is_err());
+}
+
+fn claude_fixture() -> String {
+    repo_root().join("fixtures/fake-harness/claude-fixture.js").display().to_string()
+}
+
+/// A daemon whose Claude is the fixture, with the mode chosen per task through a mode file.
+fn claude_daemon(mode_file: &Path) -> Daemon {
+    Daemon::start(&[("OVERSEER_CLAUDE_PATH", &claude_fixture()), ("CLAUDE_FIXTURE_MODE_FILE", &mode_file.display().to_string()), ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "CLAUDE_FIXTURE_MODE_FILE")])
+}
+
+fn claude_task(d: &Daemon, repo: &Path, mode_file: &Path, mode: &str, title: &str, prompt: &str) -> String {
+    std::fs::write(mode_file, mode).unwrap();
+    let created = d.call("task.create", json!({"repo": repo, "harness": "claude", "prompt": prompt, "title": title}));
+    run_id(&created)
+}
+
+/// AC-183: the digest of an agent comes from the daemon's own records and events, with no model
+/// and no git in the path, and says what the agent was asked, did, changed and waits for.
+#[test]
+fn ac183_digest_says_what_an_agent_was_asked_did_and_changed() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    std::fs::write(repo.join("README.md"), "# Demo\n\nSign-in notes.\n").unwrap();
+    git(&repo, &["add", "README.md"]);
+    git(&repo, &["commit", "-qm", "readme"]);
+    let d = claude_daemon(&mode_file);
+    let run = claude_task(&d, &repo, &mode_file, "showcase", "Sessions", "Make expired sessions refresh once");
+    d.wait_done(&run, 30);
+    let started = std::time::Instant::now();
+    let reply = d.call("agent.digest", json!({"run_id": run}));
+    let took = started.elapsed();
+    let digest = &reply["digest"];
+    assert_eq!(digest["title"], "Sessions");
+    assert_eq!(digest["role"], "agent");
+    assert_eq!(digest["status"], "completed");
+    assert_eq!(digest["harness"], "claude");
+    assert_eq!(digest["asked"][0]["text"], "Make expired sessions refresh once");
+    assert_eq!(digest["asked"][0]["source"], "task");
+    assert_eq!(digest["repository"], repo.display().to_string());
+    let changed: Vec<&str> = digest["changed"].as_array().unwrap().iter().map(|c| c["path"].as_str().unwrap()).collect();
+    assert!(changed.contains(&"README.md") && changed.contains(&"src/auth/session-refresh-coordinator.ts"), "changed files from the harness's own events: {changed:?}");
+    // What git sees in the worktree agrees.
+    let ws = PathBuf::from(d.call("state", json!({}))["workspaces"].as_array().unwrap().iter().find(|w| w["id"] == d.run(&run)["workspace_id"]).unwrap()["path"].as_str().unwrap());
+    let porcelain = git(&ws, &["status", "--porcelain"]);
+    assert!(porcelain.contains("README.md") && porcelain.contains("src/"), "{porcelain}");
+    let last = digest["last_messages"].as_array().unwrap();
+    assert!(last.last().unwrap().as_str().unwrap().starts_with("## Done: sessions refresh once"), "{last:?}");
+    assert!(last.len() <= 3);
+    assert_eq!(digest["usage"]["usage"]["input_tokens"], 18423, "{}", digest["usage"]);
+    assert!(digest["waiting"].is_null());
+    assert!(digest["children"].as_array().unwrap().is_empty());
+    let text = reply["text"].as_str().unwrap();
+    assert!(text.len() <= 4096 && text.contains("status: completed") && text.contains("- edit README.md") || text.contains("README.md"), "{text}");
+    assert!(took < Duration::from_secs(2), "digest took {took:?}");
+    // Building digests caused no turn on any run.
+    let turns_before = d.call("run.turns", json!({"run_id": run})).as_array().unwrap().len();
+    for _ in 0..5 {
+        d.call("agent.digest", json!({"run_id": run}));
+        d.call("agents.roster", json!({}));
+    }
+    assert_eq!(d.call("run.turns", json!({"run_id": run})).as_array().unwrap().len(), turns_before);
+    assert_eq!(d.runs().len(), 1, "no run was started to build a digest");
+}
+
+/// AC-183: native children sit under their parent; nine agents and a nested child give a roster
+/// equal to the daemon's state; a credential in an agent's output never reaches the digest; a
+/// burst of events leaves the digest within its size and current within 2 s.
+#[test]
+fn ac183_roster_equals_state_and_digests_stay_bounded_and_clean() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let mode_file = r.path().join("mode");
+    let d = claude_daemon(&mode_file);
+    let nested = claude_task(&d, &repo, &mode_file, "nested", "Nested", "delegate");
+    d.wait_done(&nested, 30);
+    for i in 0..7 {
+        let id = claude_task(&d, &repo, &mode_file, "echo", &format!("Agent {i}"), "hello");
+        d.wait_done(&id, 30);
+    }
+    let secret = d.generic(&repo, "worktree", "/bin/sh", &["-c", "echo token sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789"]);
+    let secret = run_id(&secret);
+    d.wait_done(&secret, 20);
+    let digest = d.call("agent.digest", json!({"run_id": nested}))["digest"].clone();
+    let children = digest["children"].as_array().unwrap();
+    assert_eq!(children.len(), 2, "child and grandchild: {children:?}");
+    let child_digest = d.call("agent.digest", json!({"run_id": children[0]["id"].as_str().unwrap()}))["digest"].clone();
+    assert_eq!(child_digest["role"], "child");
+    let state = d.call("state", json!({}));
+    let top: std::collections::BTreeSet<String> = state["runs"].as_array().unwrap().iter().filter(|r| r["parent_run_id"].is_null()).map(|r| r["id"].as_str().unwrap().to_string()).collect();
+    let roster = d.call("agents.roster", json!({}));
+    let listed: std::collections::BTreeSet<String> = roster["roster"].as_array().unwrap().iter().map(|l| l["id"].as_str().unwrap().to_string()).collect();
+    assert_eq!(listed, top, "the roster lists every top-level run and nothing else");
+    assert_eq!(listed.len(), 9);
+    assert_eq!(roster["roster"].as_array().unwrap().iter().find(|l| l["id"] == nested).unwrap()["children"], 2);
+    let text = roster["text"].as_str().unwrap();
+    assert!(text.len() <= 16 * 1024 && text.lines().count() == 9, "{text}");
+    let clean = d.call("agent.digest", json!({"run_id": secret}));
+    let all = format!("{} {}", clean["text"].as_str().unwrap(), clean["digest"]);
+    assert!(!all.contains("sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789"), "the credential is not in the digest: {all}");
+    assert!(all.contains("token"), "the message itself is there");
+    // A burst: 2,000 lines of output, then the digest is still small and immediately current.
+    let burst = d.generic(&repo, "worktree", "/bin/sh", &["-c", "i=0; while [ $i -lt 2000 ]; do echo line $i; i=$((i+1)); done"]);
+    let burst = run_id(&burst);
+    d.wait_done(&burst, 60);
+    let started = std::time::Instant::now();
+    let reply = d.call("agent.digest", json!({"run_id": burst}));
+    assert!(started.elapsed() < Duration::from_secs(2));
+    assert!(reply["text"].as_str().unwrap().len() <= 4096);
+    assert_eq!(reply["digest"]["status"], "completed");
+    assert!(reply["digest"]["last_messages"].as_array().unwrap().len() <= 3);
+}
+
+fn write_lines(path: &Path, lines: &[&str]) {
+    std::fs::write(path, lines.join("\n") + "\n").unwrap();
+}
+
+/// A long-lived agent in its own worktree that edits files as told through a command file.
+fn sleeper(d: &Daemon, repo: &Path, title: &str) -> (String, PathBuf) {
+    let created = d.call("task.create", json!({"repo": repo, "harness": "generic", "workspace_mode": "worktree", "program": "/bin/sh", "args": ["-c", "sleep 120"], "prompt": "", "title": title}));
+    let id = run_id(&created);
+    let ws = ws_path(d, &created);
+    d.wait_status(&id, |s| s == "running", 20);
+    (id, ws)
+}
+
+fn refs(repo: &Path) -> String {
+    git(repo, &["for-each-ref", "--format=%(refname) %(objectname)"])
+}
+
+/// AC-192: same lines, same file, gone when the overlap goes, dismissed by the owner, and the
+/// target branch moving under an agent; found with no model and touching no worktree, index or
+/// branch.
+#[test]
+fn ac192_conflicts_between_agents_in_flight() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let twenty: Vec<String> = (1..=20).map(|i| format!("line {i}")).collect();
+    let twenty: Vec<&str> = twenty.iter().map(String::as_str).collect();
+    write_lines(&repo.join("a.txt"), &twenty);
+    write_lines(&repo.join("b.txt"), &twenty);
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-q", "-m", "twenty lines"]);
+    let d = Daemon::start(&[]);
+    let (a, ws_a) = sleeper(&d, &repo, "Agent A");
+    let (b, ws_b) = sleeper(&d, &repo, "Agent B");
+    let (_c, ws_c) = sleeper(&d, &repo, "Agent C");
+    // A and B change line 1 of a.txt differently; both change b.txt on lines far apart; C touches c.txt.
+    let mut a_lines = twenty.clone();
+    a_lines[0] = "line 1 by A";
+    write_lines(&ws_a.join("a.txt"), &a_lines);
+    let mut ab = twenty.clone();
+    ab[0] = "b.txt line 1 by A";
+    write_lines(&ws_a.join("b.txt"), &ab);
+    let mut b_lines = twenty.clone();
+    b_lines[0] = "line 1 by B";
+    write_lines(&ws_b.join("a.txt"), &b_lines);
+    let mut bb = twenty.clone();
+    bb[10] = "b.txt line 11 by B";
+    write_lines(&ws_b.join("b.txt"), &bb);
+    std::fs::write(ws_c.join("c.txt"), "c\n").unwrap();
+    let before = (fingerprint(&ws_a), fingerprint(&ws_b), fingerprint(&repo), refs(&repo));
+    // Found by the sweep (no harness reported these edits), within the bound.
+    let started = std::time::Instant::now();
+    let found = loop {
+        let list = d.call("conflicts.list", json!({"run_id": a}));
+        let items = list["conflicts"].as_array().unwrap().clone();
+        if items.iter().any(|c| c["kind"] == "same_lines") && items.iter().any(|c| c["kind"] == "same_file") {
+            break items;
+        }
+        assert!(started.elapsed() < Duration::from_secs(12), "conflicts not found in time: {items:?}");
+        std::thread::sleep(Duration::from_millis(200));
+    };
+    let same_lines = found.iter().find(|c| c["kind"] == "same_lines").unwrap();
+    assert_eq!(same_lines["paths"], json!(["a.txt"]));
+    assert_eq!(same_lines["needs_decision"], true);
+    let same_file = found.iter().find(|c| c["kind"] == "same_file").unwrap();
+    assert_eq!(same_file["paths"], json!(["b.txt"]));
+    assert_eq!(same_file["needs_decision"], false);
+    let pair: std::collections::BTreeSet<&str> = [same_lines["run_a"].as_str().unwrap(), same_lines["run_b"].as_str().unwrap()].into();
+    assert_eq!(pair, [a.as_str(), b.as_str()].into());
+    assert_eq!(found.len(), 2, "C collides with nobody: {found:?}");
+    let after = (fingerprint(&ws_a), fingerprint(&ws_b), fingerprint(&repo), refs(&repo));
+    assert_eq!(before, after, "detection touched no worktree, index or branch");
+    // Both agents were told, and the roster and digest carry it.
+    let ev = d.events(&b);
+    assert!(ev.iter().any(|e| e["kind"] == "conflict" && e["payload"]["kind"] == "same_lines" && e["payload"]["title_a"] == "Agent A"), "{ev:?}");
+    let roster = d.call("agents.roster", json!({}));
+    assert_eq!(roster["roster"].as_array().unwrap().iter().find(|l| l["id"] == a).unwrap()["open_conflicts"], 2);
+    let digest = d.call("agent.digest", json!({"run_id": b}))["digest"].clone();
+    assert_eq!(digest["conflicts"].as_array().unwrap().len(), 2);
+    assert_eq!(digest["conflicts"][0]["other_title"], "Agent A");
+    // B reverts its a.txt change: the same-lines conflict goes away by itself.
+    write_lines(&ws_b.join("a.txt"), &twenty);
+    d.call("overseer.scan", json!({"run_id": b}));
+    let list = d.call("conflicts.list", json!({"run_id": a, "include_closed": true}));
+    let gone = list["conflicts"].as_array().unwrap().iter().find(|c| c["kind"] == "same_lines").unwrap();
+    assert_eq!(gone["state"], "gone");
+    assert!(d.events(&a).iter().any(|e| e["kind"] == "conflict_closed" && e["payload"]["state"] == "gone"));
+    // The owner dismisses the same-file one.
+    let id = same_file["id"].as_str().unwrap();
+    d.call("conflict.dismiss", json!({"id": id, "by": "user"}));
+    assert!(d.try_call("conflict.dismiss", json!({"id": id})).is_err());
+    assert!(d.call("conflicts.list", json!({"run_id": a}))["conflicts"].as_array().unwrap().is_empty());
+    // main moves under A with a change to the line A changed: target moved.
+    let mut main_lines = twenty.clone();
+    main_lines[0] = "line 1 on main";
+    write_lines(&repo.join("a.txt"), &main_lines);
+    git(&repo, &["commit", "-qam", "main moves"]);
+    let scan = d.call("overseer.scan", json!({"run_id": a}));
+    assert!(scan["ms"].as_u64().unwrap() < 10_000);
+    let list = d.call("conflicts.list", json!({"run_id": a}));
+    let moved = list["conflicts"].as_array().unwrap().iter().find(|c| c["kind"] == "target_moved").expect("target moved");
+    assert_eq!(moved["paths"], json!(["a.txt"]));
+    assert_eq!(moved["target"], "main");
+    assert_eq!(moved["needs_decision"], false);
+    // Detection caused no turn and started no run.
+    assert_eq!(d.call("run.turns", json!({"run_id": a})).as_array().unwrap().len(), 1);
+    assert_eq!(d.runs().len(), 3);
+}
+
+/// AC-192: sixteen agents in a 10,000-file repository: one scan stays within the bound and the
+/// daemon keeps answering meanwhile.
+#[test]
+fn ac192_sixteen_agents_in_a_large_repository() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    for dnum in 0..100 {
+        let dir = repo.join(format!("src/m{dnum:03}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        for f in 0..100 {
+            std::fs::write(dir.join(format!("f{f:03}.txt")), format!("file {dnum} {f}\nline 2\nline 3\n")).unwrap();
+        }
+    }
+    git(&repo, &["add", "."]);
+    git(&repo, &["commit", "-q", "-m", "ten thousand files"]);
+    let d = Daemon::start(&[]);
+    let mut agents = Vec::new();
+    for i in 0..16 {
+        let (id, ws) = sleeper(&d, &repo, &format!("Agent {i}"));
+        // Each edits its own module, and every second one also the shared file.
+        std::fs::write(ws.join(format!("src/m{i:03}/f000.txt")), format!("agent {i}\nline 2\nline 3\n")).unwrap();
+        if i % 2 == 0 {
+            std::fs::write(ws.join("src/m099/f099.txt"), format!("shared by agent {i}\nline 2\nline 3\n")).unwrap();
+        }
+        agents.push(id);
+    }
+    let started = std::time::Instant::now();
+    let scan = d.call("overseer.scan", json!({"run_id": agents[0]}));
+    let took = started.elapsed();
+    assert_eq!(scan["compared_with"], 15);
+    assert!(took < Duration::from_secs(10), "scan of 16 agents took {took:?}");
+    let list = d.call("conflicts.list", json!({"run_id": agents[0]}));
+    let same_lines: Vec<&Value> = list["conflicts"].as_array().unwrap().iter().filter(|c| c["kind"] == "same_lines").collect();
+    assert_eq!(same_lines.len(), 7, "agent 0 collides with the other seven even agents on the shared file: {list}");
+    // The daemon answers while a scan runs.
+    let d2 = std::sync::Arc::new(d);
+    let d3 = d2.clone();
+    let id = agents[2].clone();
+    let scanner = std::thread::spawn(move || d3.call("overseer.scan", json!({"run_id": id})));
+    let t = std::time::Instant::now();
+    d2.call("state", json!({}));
+    assert!(t.elapsed() < Duration::from_secs(2), "state answered during a scan");
+    scanner.join().unwrap();
+    std::sync::Arc::try_unwrap(d2).ok().expect("daemon still shared");
 }

@@ -32,7 +32,7 @@ fn merging(ws: &Path) -> bool {
 impl Daemon {
     /// The local branch a task merges back into: its target ref if that is a local branch, else
     /// the repository's default branch (local name), else the source checkout's current branch.
-    fn merge_target(&self, repo: &Path, target_ref: Option<&str>) -> Option<String> {
+    pub(crate) fn merge_target(&self, repo: &Path, target_ref: Option<&str>) -> Option<String> {
         let local = |b: &str| git::git(repo, &["show-ref", "--verify", "--quiet", &format!("refs/heads/{b}")]).is_ok();
         if let Some(t) = target_ref.filter(|t| local(t)) {
             return Some(t.to_string());

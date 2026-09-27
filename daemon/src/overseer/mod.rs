@@ -3,6 +3,8 @@
 //! agents) and the conversation with Overseer. The model never touches an agent, a worktree or a
 //! shell directly: it reads through `overseer.tool` and asks the daemon to act.
 
+pub mod conflicts;
+pub mod digest;
 pub mod mcp;
 
 use crate::daemon::Daemon;
@@ -23,6 +25,11 @@ fn tool_list(role: &str) -> Vec<Value> {
             "name": "agent",
             "description": "One agent's digest by id: what was asked, status, changed files, last messages, what it waits for.",
             "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"], "additionalProperties": false}
+        }));
+        tools.push(json!({
+            "name": "conflicts",
+            "description": "Open conflicts between agents in flight: same lines, same file, area crossed, target moved; each with the agents and the files.",
+            "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false}
         }));
     }
     tools
@@ -69,45 +76,23 @@ impl Daemon {
                 let id = arguments["id"].as_str().unwrap_or_default();
                 self.digest_text(id)?
             }
+            "conflicts" => {
+                let list = self.conflicts_list(None, false)?;
+                let items = list["conflicts"].as_array().cloned().unwrap_or_default();
+                if items.is_empty() {
+                    "No open conflicts.".to_string()
+                } else {
+                    items.iter().map(|c| format!("{} · {} · {} with {} · {}", c["id"].as_str().unwrap_or(""), c["kind"].as_str().unwrap_or(""), c["title_a"].as_str().unwrap_or("?"), c["title_b"].as_str().or(c["target"].as_str()).unwrap_or("?"), c["paths"].as_array().map(|p| p.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default())).collect::<Vec<_>>().join("\n")
+                }
+            }
             _ => bail!("no tool {name}"),
         };
         self.emit(None, Some(&run_id), "overseer_tool_call", "daemon", "exact", json!({"role": role, "name": name, "bytes": text.len()}))?;
         Ok(json!({"text": bound(&crate::redact::redact(&text), 32 * 1024), "is_error": false}))
     }
-
-    fn roster_text(&self) -> Result<String> {
-        let state = self.state()?;
-        let tasks = state["tasks"].as_array().cloned().unwrap_or_default();
-        let workspaces = state["workspaces"].as_array().cloned().unwrap_or_default();
-        let mut lines = Vec::new();
-        for r in state["runs"].as_array().cloned().unwrap_or_default().iter().filter(|r| r["parent_run_id"].is_null()) {
-            let task = tasks.iter().find(|t| t["id"] == r["task_id"]);
-            let ws = workspaces.iter().find(|w| w["id"] == r["workspace_id"]);
-            let repo = task.and_then(|t| t["repo_root"].as_str()).map(|p| p.rsplit('/').next().unwrap_or(p).to_string()).unwrap_or_default();
-            let changed = ws.and_then(|w| w["id"].as_str()).and_then(|id| self.workspace_changes(id).ok()).and_then(|c| c["changes"].as_array().map(Vec::len)).unwrap_or(0);
-            lines.push(format!("{} · {} · {} · {} · {} · {} · {} files changed", r["id"].as_str().unwrap_or_default(), r["title"].as_str().unwrap_or_default(), r["status"].as_str().unwrap_or_default(), r["harness"].as_str().unwrap_or_default(), repo, ws.and_then(|w| w["path"].as_str()).unwrap_or_default(), changed));
-        }
-        if lines.is_empty() {
-            return Ok("No agents.".into());
-        }
-        Ok(lines.join("\n"))
-    }
-
-    fn digest_text(&self, id: &str) -> Result<String> {
-        let run = self.run(id)?;
-        let task = self.task(&run.task_id)?;
-        let turns = self.store.lock().unwrap().turns(id)?;
-        let asked: Vec<String> = turns.iter().map(|t| t.prompt.chars().take(400).collect()).collect();
-        let changes = self.workspace_changes(&run.workspace_id).ok().and_then(|c| c["changes"].as_array().cloned()).unwrap_or_default();
-        let files: Vec<String> = changes.iter().take(50).map(|c| format!("{} {}", c["status"].as_str().unwrap_or("?"), c["path"].as_str().unwrap_or(""))).collect();
-        Ok(format!(
-            "id: {}\ntitle: {}\nstatus: {}\nharness: {}\nrepository: {}\nasked:\n{}\nchanged files ({}):\n{}",
-            run.id, run.title, run.status, run.harness, task.repo_root, asked.iter().map(|a| format!("- {a}")).collect::<Vec<_>>().join("\n"), changes.len(), files.join("\n")
-        ))
-    }
 }
 
-fn bound(s: &str, max: usize) -> String {
+pub(crate) fn bound(s: &str, max: usize) -> String {
     if s.len() <= max {
         return s.to_string();
     }
