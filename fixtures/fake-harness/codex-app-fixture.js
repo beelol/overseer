@@ -244,6 +244,15 @@ rl.on('line', line => {
       if (prompt === 'edit then 503') {
         fs.writeFileSync(path.join(process.cwd(), 'partial-edit.txt'), 'written before failure\n');
       }
+      if (prompt === 'fixture: external effect then wait') {
+        const effectFile = process.env.FIXTURE_EXTERNAL_EFFECT_FILE;
+        if (!effectFile) throw new Error('external-effect fixture path missing');
+        fs.appendFileSync(effectFile, 'effect\n');
+        // Leave the model turn unresolved until the test loses both process
+        // and supervisor; replay must never execute this branch again.
+        pendingTurnTimer = setTimeout(() => {}, 60_000);
+        return;
+      }
       if (prompt === 'simulate direct 429' || prompt === 'simulate direct 503' || prompt === 'edit then 503') {
         out({ method: 'turn/completed', params: { threadId: thread,
           turn: { id: turn, status: 'failed', error: { message: prompt === 'simulate direct 429'

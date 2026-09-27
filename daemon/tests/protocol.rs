@@ -2690,6 +2690,57 @@ fn handoff_refuses_a_failed_or_unresolved_source_without_starting_another_run() 
 }
 
 #[test]
+fn auto_lost_child_after_external_effect_never_replays_or_hands_off() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let external_effect = r.path().join("external-effect.txt");
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_EXTERNAL_EFFECT_FILE"),
+        ("FIXTURE_MODE", "managed-models"),
+        ("FIXTURE_EXTERNAL_EFFECT_FILE", external_effect.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let request = json!({"work_unit_id":"external-effect-lost-child",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "allowed_profiles":["system-codex"],"prompt":"fixture: external effect then wait"});
+    let selected = d.call("auto.dispatch", request.clone());
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    let child = run_id(&selected);
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while !external_effect.exists() {
+        assert!(std::time::Instant::now() < deadline,
+            "fixture did not make the external effect before disconnection");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(std::fs::read_to_string(&external_effect).unwrap(), "effect\n");
+    let active_replay = d.call("auto.dispatch", request.clone());
+    assert_eq!(run_id(&active_replay), child,
+        "a still-running child must keep ownership of its work unit");
+    assert_eq!(d.runs().len(), 2);
+    assert_eq!(std::fs::read_to_string(&external_effect).unwrap(), "effect\n");
+    let (process, _) = launch_info(&d, &child);
+    d.kill9();
+    signal(process["child_pid"].as_i64().unwrap(), 9);
+    signal(process["shim_pid"].as_i64().unwrap(), 9);
+    std::thread::sleep(Duration::from_millis(300));
+    d.spawn();
+    let lost = d.run(&child);
+    assert_eq!(lost["status"], "disconnected", "{lost}");
+    let replay = d.call("auto.dispatch", request);
+    assert_eq!(replay["state"], "paused", "{replay}");
+    assert_eq!(replay["run"]["id"], child);
+    assert_eq!(d.runs().len(), 2, "unknown effects cannot create another child");
+    assert_eq!(std::fs::read_to_string(&external_effect).unwrap(), "effect\n",
+        "the mock external effect must occur exactly once");
+    assert!(d.try_call("run.handoff", json!({"source_run_id":child,
+        "harness":"codex-app","model":"gpt-6-sol","effort":"medium",
+        "handoff":{"corrections":[],"completed":[],"remaining":["retry"],
+            "tests":[],"limitations":[],"unresolved_actions":[]}})).is_err(),
+        "a disconnected source cannot authorize a new writer");
+}
+
+#[test]
 fn completed_read_only_codex_handoff_keeps_sandbox_and_account_boundary() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
@@ -4067,7 +4118,7 @@ fn auto_permission_denial_does_not_select_an_alternate_or_continue_when_disabled
     let repo = repo(&r.path().join("repo"));
     let claude_mode = r.path().join("claude-mode.txt");
     std::fs::write(&claude_mode, "prose").unwrap();
-    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
         ("OVERSEER_CLAUDE_PATH", &fixture("fake-harness/claude-fixture.js")),
         ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,CLAUDE_FIXTURE_MODE_FILE"),
         ("FIXTURE_MODE", "managed-models"),
@@ -4089,6 +4140,16 @@ fn auto_permission_denial_does_not_select_an_alternate_or_continue_when_disabled
     let child = run_id(&selected);
     let waiting = d.wait_status(&child, |status| status == "waiting_for_user", 15);
     let permission = waiting["attention"]["request_id"].as_str().unwrap();
+    let pending_replay = d.call("auto.dispatch", request.clone());
+    assert_eq!(run_id(&pending_replay), child,
+        "a pending approval cannot trigger alternate execution");
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.run(&child)["status"], "waiting_for_user");
+    let restarted_replay = d.call("auto.dispatch", request.clone());
+    assert_eq!(run_id(&restarted_replay), child,
+        "reconnect during approval cannot create a second child");
+    assert_eq!(d.runs().len(), 3);
     d.call("run.permission", json!({"run_id":child,"request_id":permission,"allow":false}));
     assert_eq!(d.wait_done(&child, 15)["status"], "completed");
     assert!(!ws_path(&d, &selected).join("perm.txt").exists());
