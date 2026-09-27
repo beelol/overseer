@@ -163,9 +163,13 @@
       "blocker": "A worker-authored checkpoint survives failure and daemon restart, is granted to another selected account and is revoked during replacement. Automatic recovery of accepted artifacts, a live account failure/harness handoff and joined side-effect reconciliation remain unverified."
     },
     "SWARM-17": {
-      "status": "unverified",
-      "evidence": [],
-      "blocker": "Native descendant admission/control or disablement has not been qualified per harness; observed children are not enforced limits."
+      "status": "partial",
+      "evidence": [
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/src/adapters.rs",
+        "docs/verification/swarm/SWARM-17.md"
+      ],
+      "blocker": "Fixture admission now rejects worker transports without a daemon-owned native-delegation restriction, and synthetic Claude launches carry Agent/Task denial. No version-pinned live attempted-spawn proof, qualified Auto target identity, or normal launch path exists; the fake Claude stream can ignore the flag."
     },
     "SWARM-18": {
       "status": "partial",
