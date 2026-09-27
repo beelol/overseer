@@ -29,9 +29,10 @@
         "docs/verification/swarm/milestone-2.md",
         "docs/verification/swarm/SWARM-03.md",
         "daemon/tests/swarm_atlas.rs",
-        "docs/verification/swarm/S5.md"
+        "docs/verification/swarm/S5.md",
+        "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Exact planned resource claims survive restart, constrain parallel benefit and cannot be omitted or downgraded at admission. A joined local replay now admits a benefit-approved root plus three independent jobs, holds a conflicting writer before attempt reservation, and advances a separate root→child→leaf chain only after accepted evidence and confirmed exit. Blocked dependents name their unsatisfied job IDs, including an accepted parent still active or awaiting patch integration. Supervised simultaneous execution of that exact fixture, real worktree writer enforcement, undeclared-resource discovery and a live path remain incomplete."
+      "blocker": "Supervised fixture processes now execute five jobs concurrently across two growth waves while holding a conflicting database writer without an attempt. A separate supervised root→child→leaf replay holds each dependent before accepted evidence and after acceptance until the parent process exits, then admits it. Real worktree writer enforcement, undeclared-resource discovery and a qualified live route remain incomplete."
     },
     "SWARM-04": {
       "status": "partial",

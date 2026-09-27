@@ -207,3 +207,15 @@ checks. Worker/director handoff refusal is fixture-proven; joined failover,
 real outage classification, local model suitability and live account usage
 remain partial under SWARM-08/14/15/16/17/20/22/24/51/59/61/62. No default
 worker count, budget or acceptance criterion was relaxed.
+
+## Subsequent published main: `43450d1`
+
+Main adds ledger evidence for Gate S AC-190/191, including its proposed agent
+channel, Rally and context sharing on separate pull request #14. This merge
+changes documentation and UI fixture evidence, not the daemon authority on
+main. The Swarm director still owns job admission, revision and broker messages;
+Gate S's future channel cannot become a second route to workers or a second
+account reservation path. SWARM-24/60 and joined AC-195 remain partial until
+both implementations run against one shared daemon authority. The current
+Swarm fixture tests and the 34 admission, 9 benefit and 24 runtime regressions
+pass after the merge. No Swarm default or acceptance criterion changes.

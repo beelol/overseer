@@ -1,6 +1,6 @@
 # SWARM-03 — dependency and resource-aware concurrency
 
-Status: partial. Revision: `0d2074c`. Support level: daemon fixture paths only.
+Status: partial. Revision: `2c9b1c5`. Support level: daemon fixture paths only.
 
 Input: a version-1 Swarm plan contains two ready audit jobs that both declare an exclusive `db:shared` write claim. The director supplies paired serial/parallel estimates and marks them independent. A second fixture creates two categories whose ready jobs each declare an exclusive `db:tenant-fixture` write claim, but submits admission requests without any claim. Both use the built-in Swarm policy and synthetic exact quota snapshots. The benefit fixture restarts the daemon after planning.
 
@@ -37,3 +37,32 @@ This is a deterministic fixture replay of admissions and accepted evidence,
 not a supervised simultaneous execution of these exact jobs. Actual
 undeclared-resource discovery, tool-level worktree writer enforcement and a
 joined live path remain open. SWARM-03 stays partial.
+
+Follow-up at `3a21e93`: a real daemon and five supervised `/bin/sleep` workers
+replay the root, three independent jobs and first database writer against the
+same plan claims. The first four start in the default growth wave; an early
+fifth admission returns `growth_wave_full`, then the next wave admits it.
+All five run concurrently as distinct daemon-tracked processes. While the
+first exclusive database writer remains active, a second writer receives
+`resource_conflict` and no sixth attempt. Stop interrupts and confirms all
+five worker exits, leaving no fixture process running. Expected and observed
+statuses match. Reproduce with `cargo test -p overseerd --test swarm_runtime
+independent_jobs_execute_together_while_conflicting_writer_waits --offline`;
+the affected admission (34), benefit (9) and runtime (23) suites pass together.
+At this revision, the earlier root→child→leaf fixture still proves serial
+dependency ordering without supervised processes. The follow-up below adds
+that process-level replay.
+
+Follow-up at `2c9b1c5`: each root→child→leaf job launches a daemon-supervised
+worker that waits for a fixture release file. A dependent admission names its
+parent before result acceptance and still names it after acceptance while the
+process is live. The fixture then releases the parent, observes its completed
+process receipt and confirms exit; only then is the dependent admitted. Each
+worker supplies a distinct artifact, result and director acceptance, and all
+three jobs finish accepted. Reproduce with `cargo test -p overseerd --test
+swarm_runtime supervised_dependency_chain_waits_for_accepted_result_and_exit
+--offline`. The complete runtime suite passes 24 tests. The two supervised
+replays cover declared dependency and resource coordination without touching
+the owner's editor or a live provider. Real worktree writer enforcement,
+undeclared resource discovery and a qualified live route leave SWARM-03
+partial.
