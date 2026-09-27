@@ -22,3 +22,18 @@ half of the table have been heard.
 Since then the script asks only about the steps a session did, records the settings and the
 window's state with every event, and writes each session's record to its own file
 (`marks-<date>-<time>.json`) beside the earlier ones.
+
+## The second session: three steps played for the owner
+
+`marks-20260927-050914.json` is a session the agent ran at the owner's request on 2026-09-27
+(05:09 UTC), with `--play once,system,closed`, on the same build. Each step was said aloud
+before it was played.
+
+| Step | What the session did |
+| --- | --- |
+| Two agents at the same moment | two Claude fixture agents asked for permission together; Audio Mode on, Reactor, VS Code open |
+| System voice | track System voice (Daniel): an agent that completed, then one that asked for permission |
+| VS Code closed | the window was quit; then an agent that completed and one that asked for permission; Reactor |
+
+The record says what was played. What was heard is the owner's to say, and is not in it.
+The owner's Commander folder was not played: the session was not given a folder.
