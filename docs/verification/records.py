@@ -1060,14 +1060,13 @@ rec(86, "Memory budget and fit", "verified", commit="e16bdaf", date="2026-09-26"
     evidence="daemon/src/local.rs (tests), daemon/tests/continuity.rs, [live.txt](evidence/ac-85/live.txt)",
     live="Live on this machine for the budget, the pick, the load and the measurement; unit and protocol tests for other machines.",
     limits="macOS verified. The budget counts system memory only. OpenCode's own instructions take about 10,600 tokens, so the 16k floor leaves little room; the ranking prefers models that fit at 32k.")
-rec(87, "Verified local catalogue, Qwen coders first", "partial", commit="8639ebb", date="2026-09-26",
-    proven="every Qwen coder of the catalogue went through the real OpenCode and Ollama path, and through Codex's own local mode, on this machine, inside the memory budget, one model at a time and smallest first; the results and the versions are in the catalogue file; `qwen3-coder:30b` passed three of three with both; every `qwen2.5-coder` size failed with both and is excluded from automatic picks, with its reason given wherever a pick is explained; automatic picks use only models that Ollama reports with `tools` and the catalogue marks passed, or any `tools` model when `allowUnverifiedModels` is on",
-    deferred="a failed model shown as unverified in the packaged UI (the daemon gives the mark and the reason in `local.pick` and `local.catalogue`); it arrives with the local models in the composer (AC-94)",
+rec(87, "Verified local catalogue, Qwen coders first", "verified", commit="62b00a8", date="2026-09-27",
     harness="OpenCode 1.15.13 through the `opencode-serve` harness, and Codex 0.155.0-alpha.16.4 with `--oss --local-provider ollama` and an empty `CODEX_HOME` of its own; Ollama 0.34.2; macOS 26 on arm64, 128 GiB. No account and no paid tokens",
     fixture="An isolated OVERSEER_HOME and a new disposable repository for every attempt. Every model was loaded by the daemon, through the guard and under the watchdog",
     steps="""1. `node test/local/catalogue-verify.js`: [opencode-serve.txt](evidence/ac-87/opencode-serve.txt), [opencode-serve.json](evidence/ac-87/opencode-serve.json).
 2. `node test/local/codex-oss-eval.js`: [codex-oss.txt](evidence/ac-87/codex-oss.txt) (14b, 30b, 32b) and [codex-oss-small.txt](evidence/ac-87/codex-oss-small.txt) (1.5b, 3b, 7b); the run that stopped itself is [codex-oss-stopped.txt](evidence/ac-87/codex-oss-stopped.txt).
-3. The catalogue: [daemon/src/local_catalogue.json](../../daemon/src/local_catalogue.json). Unit tests: `local::tests::only_verified_models_with_tools_are_picked_on_their_own`; protocol test `ac86_the_pick_follows_the_machines_memory`.""",
+3. The catalogue: [daemon/src/local_catalogue.json](../../daemon/src/local_catalogue.json). Unit tests: `local::tests::only_verified_models_with_tools_are_picked_on_their_own`; protocol tests `ac86_the_pick_follows_the_machines_memory`, `ac94_every_local_model_has_a_fit_that_the_guard_would_give`.
+4. Packaged UI: `node test/ui/scenario-continuity.js` ([02-agent-menu-local-dark.png](evidence/ui/continuity/02-agent-menu-local-dark.png): a failed model reads *fits at 32k · failed its check*, an unknown one *unverified*).""",
     expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#model-catalogue).",
     actual="""| Model | OpenCode (`opencode serve`) | Codex (`--oss`) |
 | --- | --- | --- |
@@ -1081,11 +1080,11 @@ rec(87, "Verified local catalogue, Qwen coders first", "partial", commit="8639eb
 - **How the family fails:** the model writes the call into its reply (`{"name": "write", "arguments": …}`, or `exec_command` with Codex) instead of calling the tool, so nothing runs; the smaller sizes often reply "done" with nothing written. Overseer's one nudge did not change it. The same happened on 2026-09-25 with the 14B.
 - **What follows:** on its own Overseer picks `qwen3-coder:30b` or nothing. A machine whose budget is under about 20 GiB has no eligible model today; a run there waits and says why. A family that calls tools at 8 to 16 GiB is the next thing to look for.
 - **Codex as a second local harness:** it works with the model that passed, and is faster per turn. It has no permission requests in this transport, so it could only take runs in Auto or in Codex's own sandbox modes. OpenCode stays the local harness.
-- **Memory:** see [AC-140](AC-140.md). In the verification through OpenCode the pressure stayed normal throughout (lowest free level 44%).""",
+- **Memory:** see [AC-140](AC-140.md). In the verification through OpenCode the pressure stayed normal throughout (lowest free level 44%).
+- **In the interface:** automatic picks take only models the catalogue marks passed (`qwen3-coder:30b`); the Agent menu, the model menu and the New Task tiles show a failed model with *failed its check* and a model outside the catalogue with *unverified*, and the reason in the tooltip; the user may still name one.""",
     evidence="[evidence/ac-87/](evidence/ac-87/), daemon/src/local_catalogue.json, test/local/catalogue-verify.js, test/local/codex-oss-eval.js",
     live="Real harnesses and real local models.",
     limits="One machine, one quantisation (Q4_K_M), Ollama 0.34.2. The check is one small task, three times.",
-    blocker="Next: the unverified mark in the packaged UI (AC-94).")
 rec(88, "Settings the daemon enforces", "verified", commit="15108e4", date="2026-09-27",
     harness="Real `overseerd` binary for the protocol tests (the network, the memory and Ollama are fixtures). The packaged extension in an isolated VS Code profile, driven over the debugging protocol; a real `overseerd`; everything else synthetic: the network and the memory are files, Ollama is fixtures/fake-harness/ollama-fixture.js with four models (no model runs), Codex and Claude Code are fixtures/fake-harness/continuity-harness.js, OpenCode is fixtures/fake-harness/opencode-serve-fixture.js. No account and no paid tokens",
     fixture="An isolated OVERSEER_HOME per test. An isolated OVERSEER_HOME, VS Code profile and extensions folder per scenario; evidence in docs/verification/evidence/ui/continuity-settings/ (screenshots, scenario.log, result.json)",
