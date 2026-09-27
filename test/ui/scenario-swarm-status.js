@@ -1,0 +1,55 @@
+// Isolated packaged-UI check for a 100-job Swarm backlog. This is not a live harness
+// qualification: no workers are launched, and the fixture-only plan API stays on the test daemon.
+const fs = require('fs');
+const path = require('path');
+const { Session, makeRepo, latestVsix, delay } = require('./harness');
+
+(async () => {
+  const s = new Session('swarm-status');
+  const result = { checks: [] };
+  const check = (name, ok, detail) => {
+    result.checks.push({ name, ok: !!ok, detail });
+    s.note(`${ok ? 'PASS' : 'FAIL'} ${name}`, detail);
+  };
+  try {
+    const repo = makeRepo(path.join(s.root, 'backend'), { dirty: false });
+    s.settings();
+    s.install(latestVsix());
+    s.launch(repo, { OVERSEER_SWARM_FIXTURE_API: '1', OVERSEER_CODEX_PATH: '/nonexistent/codex',
+      OVERSEER_CLAUDE_PATH: '/nonexistent/claude', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode' });
+    const cdp = await s.connect();
+    await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer/.test(e.textContent))`, 60000, 'status bar');
+    const made = s.ctl('swarm.create', { category: 'Backend audit', objective: 'Audit Atlas routes', allowed_targets: [] });
+    const jobs = Array.from({ length: 100 }, (_, n) => ({ id: `j${String(n).padStart(3, '0')}`,
+      title: `Check route ${n}`, acceptance: `Record route ${n} evidence`, deps: [] }));
+    s.ctl('swarm.plan', { id: made.id, generation: 1, revision: 0, jobs });
+    await cdp.command('Overseer: Refresh');
+    await s.openOverseerView();
+    const rows = await cdp.waitFor(`(() => {
+      const pane = [...document.querySelectorAll('.pane')].find(p => /^Agents/.test(p.querySelector('.pane-header')?.textContent.trim() || ''));
+      const rows = [...(pane?.querySelectorAll('.monaco-list-row') || [])].filter(r => r.offsetParent);
+      if (!rows.some(r => r.querySelector('.label-name')?.textContent.trim() === 'Backend audit')) return null;
+      return rows.map(r => ({ label: r.querySelector('.label-name')?.textContent.trim(), description: r.querySelector('.label-description')?.textContent.trim() || '', level: Number(r.getAttribute('aria-level')) }));
+    })()`, 20000, 'Swarm category row');
+    check('Agents sidebar shows one Swarms section and a 100-job category summary',
+      rows.some(r => r.label === 'Swarms' && r.level === 1) &&
+      rows.some(r => r.label === 'Backend audit' && /0 working/.test(r.description) && /100 ready/.test(r.description)), rows);
+    await s.screenshot('swarm-compact');
+    if (!rows.some(r => r.label === 'Director')) await s.clickAgentRow('Backend audit', { twisty: true });
+    const expanded = await s.agentRows();
+    check('expanding the category shows its director and first job without opening transcripts',
+      expanded.some(r => r.label === 'Director') && expanded.some(r => r.label === 'Check route 0'),
+      expanded.slice(0, 8));
+    await s.screenshot('swarm-expanded');
+  } catch (error) {
+    s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
+    try { await s.screenshot('error'); } catch {}
+  } finally {
+    s.writeLog();
+    fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
+    if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }
+    const failed = result.error || result.checks.some(c => !c.ok);
+    console.log(failed ? 'SCENARIO FAILED' : 'SCENARIO PASSED', s.root);
+    process.exit(failed ? 1 : 0);
+  }
+})();

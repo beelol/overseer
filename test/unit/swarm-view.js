@@ -52,9 +52,13 @@ Module._load = originalLoad;
     'opening the sidebar must not load any job rows');
   const [swarm] = provider.getChildren(section);
   assert.equal(swarm.item.label, 'Backend audit');
+  assert.equal(swarm.item.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed,
+    'a large category should show its aggregate first');
   assert.match(swarm.item.description, /32 working/);
   assert.match(swarm.item.description, /56 ready/);
   assert.match(swarm.item.description, /4 blocked/);
+  assert.match(swarm.item.tooltip, /4 blocked/,
+    'narrow sidebars must still expose the full aggregate on hover');
   const firstPage = await provider.getChildren(swarm);
   assert.equal(firstPage.length, 52, 'director, 50 job rows and one next-page control');
   assert.equal(firstPage[0].item.label, 'Director');

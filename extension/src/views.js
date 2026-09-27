@@ -102,6 +102,7 @@ class AgentsProvider {
     this.model = model; this.memento = memento; this.extensionUri = extensionUri; this.handlers = handlers;
     // Expansion is remembered per workspace (item ids are stable), so reloads keep the tree shape.
     this.collapsed = new Set(memento?.get('overseer.collapsed', []) || []);
+    this.expandedSwarms = new Set(memento?.get('overseer.expandedSwarms', []) || []);
     this.filter = undefined; // { query, taskIds: Set }
     this.showArchived = false;
     this.statusFilter = 'all'; // 'all' | 'working' | 'needs' | 'done' | 'failed' (the search field's filters)
@@ -139,6 +140,11 @@ class AgentsProvider {
   setSwarmStatusFilter(status) { this.swarmStatusFilter = status; this.refresh(); }
   setCollapsed(node, collapsed) {
     const id = node?.item?.id; if (!id) return;
+    if (id.startsWith('swarm:')) {
+      if (collapsed) this.expandedSwarms.delete(id); else this.expandedSwarms.add(id);
+      this.memento?.update('overseer.expandedSwarms', [...this.expandedSwarms].slice(-500));
+      return;
+    }
     if (collapsed) this.collapsed.add(id); else this.collapsed.delete(id);
     this.memento?.update('overseer.collapsed', [...this.collapsed].slice(-500));
   }
@@ -234,11 +240,12 @@ class AgentsProvider {
   swarmNode(run, parent) {
     const counts = run.job_counts?.by_status || {};
     const working = run.active_worker_processes || 0;
-    const item = new vscode.TreeItem(run.category, this.expansion('swarm:' + run.id));
+    const item = new vscode.TreeItem(run.category, this.expandedSwarms.has('swarm:' + run.id)
+      ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
     item.id = 'swarm:' + run.id;
     item.iconPath = new vscode.ThemeIcon('organization');
     item.description = `${working} working · ${counts.ready || 0} ready · ${counts.blocked || 0} blocked`;
-    item.tooltip = `${run.objective}\n${run.status} · ${run.job_counts?.total || 0} jobs`;
+    item.tooltip = `${run.objective}\n${run.status} · ${run.job_counts?.total || 0} jobs\n${item.description}`;
     item.accessibilityInformation = { label: `${run.category} swarm, ${run.status}, ${item.description}` };
     item.contextValue = 'swarm-run';
     return { item, swarm: run, parent };
