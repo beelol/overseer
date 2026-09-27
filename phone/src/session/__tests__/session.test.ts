@@ -221,6 +221,23 @@ describe('the session', () => {
     expect(handle.getSnapshot().error).toBe('the Mac is unreachable');
   });
 
+  test('a history that failed is asked for again when the owner tries again', async () => {
+    const { session, connection } = make();
+    connection.gateway = GATEWAY;
+    connection.answers['events.list'] = () => {
+      throw new Error('the Mac is unreachable');
+    };
+    await session.start();
+    const handle = session.conversation('r1');
+    handle.subscribe(() => undefined);
+    await settle();
+    expect(handle.getSnapshot().error).toBe('the Mac is unreachable');
+    connection.answers['events.list'] = () => ({ events: [event(3, 'user_message', { text: 'hello' })] });
+    await session.reloadConversation('r1');
+    expect(handle.getSnapshot().error).toBeNull();
+    expect(handle.getSnapshot().loading).toBe(false);
+  });
+
   test('forgetting the Mac removes what was stored about it', async () => {
     const { session, connection, cache } = make();
     connection.gateway = GATEWAY;

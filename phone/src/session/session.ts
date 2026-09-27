@@ -202,6 +202,14 @@ export class Session {
     };
   }
 
+  /** Asks the Mac for a conversation's history again: after it could not be loaded. */
+  async reloadConversation(runId: string): Promise<void> {
+    const entry = this.open.get(runId);
+    if (!entry) return;
+    this.setConversation(entry, { loading: true, error: null });
+    await this.loadHistory(runId, entry);
+  }
+
   private closeLater(runId: string, entry: OpenConversation): void {
     const timer = setTimeout(() => {
       this.closing.delete(timer);

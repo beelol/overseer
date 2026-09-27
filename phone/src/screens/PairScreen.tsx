@@ -13,7 +13,7 @@ import { Field } from './pair/Field';
 import { targetOf, useMacName, type Target } from './pair/target';
 import { useCamera } from './pair/useCamera';
 import { PAIR } from './pair/words';
-import { ALLOW_NOTIFICATIONS, allowNotifications, NOTIFICATIONS_REASON } from './settings/push';
+import { ALLOW_NOTIFICATIONS, allowNotifications, delivers, NOTIFICATIONS_REASON, tellTheMac } from './settings/push';
 
 type Step = 'code' | 'waiting' | 'notifications';
 
@@ -105,16 +105,21 @@ export function PairScreen() {
       haptics.play('confirm');
       setCode('');
       // Asked once, after pairing, with the reason first. Where the system delivers nothing, or
-      // was answered before, nothing is asked.
-      const ask = await push
+      // was answered before, nothing is asked: an owner who said yes before (this phone was
+      // paired earlier) has notifications on again, and one who said no is left alone.
+      const permission = await push
         .support()
-        .then(async (support) => support.supported && (await push.permission()) === 'undetermined')
-        .catch(() => false);
+        .then(async (support) => (support.supported ? await push.permission() : null))
+        .catch(() => null);
       if (!shown.current) return;
-      if (ask) setStep('notifications');
-      else toAgents();
+      if (permission === 'undetermined') {
+        setStep('notifications');
+        return;
+      }
+      if (delivers(permission)) tellTheMac({ push, launch }, session).catch(() => undefined);
+      toAgents();
     },
-    [session, name, device, haptics, push, toAgents],
+    [session, name, device, haptics, push, launch, toAgents],
   );
 
   const take = useCallback(

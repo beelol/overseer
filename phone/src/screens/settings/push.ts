@@ -14,7 +14,7 @@ export function delivers(permission: PushPermission | null): boolean {
  * Tells the Mac where to send. A simulator has no address at Apple's service: the Mac reaches
  * it by its own tool. The token is handed on and never kept by a screen.
  */
-async function tellTheMac(
+export async function tellTheMac(
   { push, launch }: Pick<Capabilities, 'push' | 'launch'>,
   session: Session,
 ): Promise<void> {
