@@ -261,6 +261,12 @@ and Verify clauses. Both lists are generated from the records by
   VS Code with agents running posts a macOS notification naming them (from the bundled
   Overseer notifier app; clicking it opens the Overseer view; **Test Notification** checks it);
   **Stop Agents and Daemon** stops everything on request.
+- **Audio Mode** — off until you turn it on. The daemon plays one short cue when a top-level
+  agent starts, completes or needs you, also with VS Code closed and never twice because
+  several windows are open; children, tool calls and progress stay silent, and needs that
+  arrive together play one cue. Tracks: twelve bundled Reactor synth cues (31,488 bytes), a
+  macOS system voice, or your own private Commander folder, played where it is. Playback is
+  macOS only for now. See the [design](docs/rfcs/audio-mode.md).
 
 ## Build and install (macOS)
 
@@ -317,6 +323,9 @@ node test/ui/scenario-main.js
    **Open PR…** to push the branch and open a GitHub pull request instead.
 6. Agents keep running when VS Code closes (you get a notification). **Stop Agents and
    Daemon** (Agents view menu) stops them all after confirmation.
+7. **Audio Mode and Reactor Cues…** (Agents view menu or the command palette) turns the cues
+   on or off, picks the track and the system voice, imports a private Commander folder and
+   previews a cue.
 
 ### In a terminal: `overseer-tui`
 
