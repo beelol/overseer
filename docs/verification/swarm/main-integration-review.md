@@ -1,32 +1,30 @@
-# Main integration review — 2026-09-26, refreshed for Gate S
+# Main integration review — 2026-09-27
 
-Compared Swarm draft PR #3 with `origin/main` at `7bccc3a` after merging that revision
-into `codex/swarm-mode`. This is a compatibility assessment, not acceptance evidence.
-No SWARM or CONTRACT box changes status because of this review.
+Compared Swarm draft PR #3 with published `origin/main` at `b84f9984` after fetching and
+checking the remote directly. The Swarm branch already contains that commit through
+`0a71eb52`; there is no newer main revision to merge. The owner's older local `main`
+checkout and its untracked files were left untouched. This is a compatibility assessment,
+not acceptance evidence; no SWARM or CONTRACT box changes status because of the review.
 
-Re-fetched `origin/main` on 2026-09-27 after the owner's later update; it still resolves
-to `7bccc3a`, which is an ancestor of the Swarm branch. The main checkout's older local
-`main` was left untouched. A later read-only check of the separate local Auto branch at
-`925b3f4` found its run-bound managed-child bridge and Auto-only pool claims. They retain
-the route/admission division but do not yet provide the shared allowance transaction.
-No further merge or change to the Swarm defaults or worker-count policy is needed. The
-joined Gate S and Auto checks below remain
-open implementation dependencies, not new standalone Swarm criteria.
-
-The next fetch on 2026-09-27 again resolved to `7bccc3a`; no new main changes needed
-another merge. Subsequent S3 fixture work clarified SWARM-21's already required
-scope-narrowing check: the shared contract must keep excluded routes functional while
-the selected routes migrate. This clarification comes from the Catalog replay, not a
-new Gate S or Auto behavior.
+Since the earlier `7bccc3a` review, main has merged Gate L Continuity, the combined
+test/link checks, and documentation tracking Gate N, Gate R, and Gate S. Gate S's
+implementation is still being built in its own pull request; main's ledger records
+progress but does not supply the joined Swarm broker or admission proof. The current
+Swarm RFC already names Gate L's one-job handoff and memory constraints, Gate S's
+one-director boundary and confirmation rule, Gate N's device-scoped controls, and
+the common Auto transaction. No change to Swarm's defaults, worker-count policy, or
+acceptance wording follows from this main revision. Those joined tests remain open.
+The separate Auto branch at `925b3f4` was inspected earlier for its managed-child
+bridge and Auto-only pool claims; neither constitutes the shared allowance transaction.
 
 | Main addition | Current state on main | Swarm decision and required joined check |
 | --- | --- | --- |
 | Gate K/M agent sidebar, composer, chat, review and grid (AC-99–113) | Merged UI; some owner-review criteria remain partial | Put category/Swarm initiation in the existing launch flow and show director, jobs and workers through existing agent views. The grid's 16 visible tiles do not cap the 32-worker qualification. Exercise S0 and SWARM-01/23/27/28/39/56/63 through the packaged UI. |
 | Audio Mode (AC-143–145) | Merged daemon and TUI cue paths | Derive cues from durable Swarm state. A cue cannot serve as a worker result or exit receipt. Check a stop/failure/needs-attention transition with multiple workers; do not create one alert per progress message. |
 | Gate P/Q rules and test runner (AC-146–161) | `AGENTS.md` and `scripts/test-all` merged; several monitor and review criteria remain open | Keep draft PR #3 in flight, push criterion work promptly, and use the combined checks before marking it ready. Swarm evidence remains in the separate SWARM ledger; main's AC records do not verify it. |
-| Continuity (AC-83–98, AC-138–140) | RFC/criteria on main, separate implementation in flight | Consume the daemon's network and local-memory authority when available. A handoff stays within the approved Swarm pool, permission mode, two-attempt job cap, allocation and deadline. Distinguish waiting from exit/settlement; test provider failure, offline, memory pressure and restart with one intent. Never add a second connectivity or quota collector. |
+| Continuity (AC-83–98, AC-138–140) | Gate L implementation merged in `658a9f06` | Consume the daemon's network and local-memory authority through a joined route when available. A handoff stays within the approved Swarm pool, permission mode, two-attempt job cap, allocation and deadline. Distinguish waiting from exit/settlement; test provider failure, offline, memory pressure and restart with one intent. Never add a second connectivity or quota collector. |
 | Overseer chat, phone and voice controls (AC-107, Gate N/R) | Control-surface requirements on main; Gate N's latest commit changes phone presentation and pairing/notification defaults, not Swarm admission | Route confirmed user actions through the same daemon Swarm control/revision checks. An unsent voice proposal cannot replay itself, and no surface may bypass Stop, permissions, or the account pool. Qualify each surface only when its own gate is implemented. |
-| Gate S: Overseer above agents (AC-180–202, especially AC-195/196/198/200) | New RFC and criteria on main; no Gate S implementation yet | Keep one Swarm director as the only job decision-maker. Overseer sees the director summary, uses Swarm controls or a sourced director advisory, and never directly steers a worker. One daemon broker and claims/conflicts ledger must cover Swarm workers and ordinary agents. Starting a swarm or raising its limit needs one owner confirmation even at Overseer's Auto level; S0 still needs no settings form. Gate S agents/watchers share the slot and account admission limits; Overseer's own coordinating run remains reachable and metered. Joined AC-195 and SWARM-07/20/24/27/39/44/60 checks remain partial until both features are integrated. |
+| Gate S: Overseer above agents (AC-180–202, especially AC-195/196/198/200) | RFC and evidence ledger on main; implementation in separate PR #14, with AC-195 still partial | Keep one Swarm director as the only job decision-maker. Overseer sees the director summary, uses Swarm controls or a sourced director advisory, and never directly steers a worker. One daemon broker and claims/conflicts ledger must cover Swarm workers and ordinary agents. Starting a swarm or raising its limit needs one owner confirmation even at Overseer's Auto level; S0 still needs no settings form. Gate S agents/watchers share the slot and account admission limits; Overseer's own coordinating run remains reachable and metered. Joined AC-195 and SWARM-07/20/24/27/39/44/60 checks remain partial until both features are integrated. |
 | Gate S chat model setting and activation fix (AC-107) | `b46b512` adds the setting and scenario; `ff9349c` fixes activation; `163140d` records a verified live AC-107 answer | The Swarm director is a distinct run. Do not reuse the extension-local chat session as a director or depend on it for Stop, deadline or admission. When Gate S moves the conversation into the daemon, surface the same Swarm state there. The live AC-107 record proves the existing chat path, not a Swarm control path. |
 
 The resulting RFC/contract clarification is in `docs/rfcs/swarm-mode.md` and

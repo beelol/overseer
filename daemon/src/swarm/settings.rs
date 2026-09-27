@@ -80,6 +80,74 @@ fn validate_targets(v: &Value) -> Result<Vec<String>> {
     Ok(result)
 }
 
+/// Remove an active run's explicit estimate permission. Existing reservations
+/// remain accounted for; all future admissions wait for a fresh assessment.
+pub fn revoke_estimated_quota(store: &mut Store, p: &Value) -> Result<Value> {
+    let run=required(p,"run_id")?;
+    let request_id=required(p,"request_id")?;
+    if request_id.is_empty() || request_id.len()>128 || request_id.chars().any(char::is_control)
+        || crate::redact::redact(request_id)!=request_id {
+        bail!("invalid estimate revocation request id");
+    }
+    let expected=p["expected_control_revision"].as_i64()
+        .ok_or_else(||anyhow!("missing expected control revision"))?;
+    if expected<0 { bail!("invalid expected control revision"); }
+    let request_sha256=format!("{:x}",Sha256::digest(json!({
+        "expected_control_revision":expected}).to_string().as_bytes()));
+    let tx=store.conn.transaction()?;
+    let replay:Option<(String,String)>=tx.query_row(
+        "SELECT request_sha256,result_json FROM swarm_estimate_revocations
+         WHERE run_id=?1 AND request_id=?2",params![run,request_id],
+        |row|Ok((row.get(0)?,row.get(1)?))).optional()?;
+    if let Some((prior_sha,result))=replay {
+        if prior_sha!=request_sha256 {
+            bail!("estimate revocation request id reused with different input");
+        }
+        let mut result:Value=serde_json::from_str(&result)?;
+        result["duplicate"]=json!(true);
+        return Ok(result);
+    }
+    let (status,control_revision,policy_json):(String,i64,String)=tx.query_row(
+        "SELECT status,control_revision,policy FROM swarm_runs WHERE id=?1",[run],
+        |row|Ok((row.get(0)?,row.get(1)?,row.get(2)?)))
+        .optional()?.ok_or_else(||anyhow!("unknown swarm run"))?;
+    if !["planning","running","paused","stalled","draining"].contains(&status.as_str()) {
+        bail!("swarm run cannot revoke estimated quota permission in this state");
+    }
+    if control_revision!=expected { bail!("stale control revision"); }
+    let mut policy:Value=serde_json::from_str(&policy_json)?;
+    let changed=policy["effective"]["allow_estimated_quota"]==true;
+    let next=control_revision+i64::from(changed);
+    let now=crate::daemon::now();
+    if changed {
+        policy["effective"]["allow_estimated_quota"]=json!(false);
+        policy["sources"]["allow_estimated_quota"]=json!("run_revocation");
+        tx.execute("UPDATE swarm_runs SET policy=?2,control_revision=?3,updated_ms=?4
+            WHERE id=?1",params![run,policy.to_string(),next,now])?;
+        let prior:Option<(String,i64)>=tx.query_row(
+            "SELECT purpose,wake_count FROM swarm_availability WHERE run_id=?1",[run],
+            |row|Ok((row.get(0)?,row.get(1)?))).optional()?;
+        let (purpose,wakes)=prior.unwrap_or(("worker".to_string(),0));
+        tx.execute("INSERT INTO swarm_availability(run_id,state,reason,eligible_targets,purpose,
+            request_sha256,snapshot_sha256,allowance_windows,allowance_window_count,
+            observed_ms,expires_ms,wake_count,updated_ms)
+            VALUES(?1,'blocked','estimated_permission_revoked','[]',?2,'','','[]',0,?3,?3,?4,?3)
+            ON CONFLICT(run_id) DO UPDATE SET state='blocked',reason='estimated_permission_revoked',
+            eligible_targets='[]',purpose=excluded.purpose,request_sha256='',snapshot_sha256='',
+            allowance_windows='[]',allowance_window_count=0,observed_ms=excluded.observed_ms,
+            expires_ms=excluded.expires_ms,wake_count=excluded.wake_count,
+            updated_ms=excluded.updated_ms",params![run,purpose,now,wakes])?;
+        super::record_operation(&tx,run,"revoke")?;
+    }
+    let result=json!({"run_id":run,"control_revision":next,"changed":changed,
+        "allow_estimated_quota":false,"duplicate":false});
+    tx.execute("INSERT INTO swarm_estimate_revocations(run_id,request_id,request_sha256,
+        result_json,created_ms) VALUES(?1,?2,?3,?4,?5)",
+        params![run,request_id,request_sha256,result.to_string(),now])?;
+    tx.commit()?;
+    Ok(result)
+}
+
 /// Change only future target eligibility. Existing attempts retain their
 /// reservations; explicit account revocation is a separate interrupt path.
 pub fn set_run_targets(store: &mut Store, p: &Value) -> Result<Value> {

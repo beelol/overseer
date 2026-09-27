@@ -529,6 +529,9 @@ With unknown/stale quota, default to no automatic fan-out from that pool. An alr
 single-agent run may continue under its existing limits. A user can explicitly permit a
 bounded estimate-based allowance; display the uncertainty and retain time/attempt/concurrency
 bounds. This permission cannot be inferred merely from turning Swarm on.
+The owner may revoke an active run's estimate permission. The daemon records that change,
+holds new admissions until eligibility is reassessed, and then permits only targets whose
+fresh exact quota still qualifies; existing reservations remain accounted for.
 
 Reservations are upper estimates, not provider billing enforcement. A strict token/spend cap
 is offered only where the adapter can enforce it, including descendants and in-flight work.
@@ -606,7 +609,7 @@ fixture proves policy behavior, not live provider compatibility.
 | SWARM-09 | [ ] Two harnesses using the same account share capacity; verified independent accounts retain separate capacity. Uncertain identity cannot produce a doubled allowance. |
 | SWARM-10 | [x] With 100 compatible units allocated, a 20-unit reserve and 10 already reserved, admit a 60-unit worker and reject a further 11-unit worker. With finishing estimate=35, reject that 60-unit worker. Allow finishing work to draw on the reserve. |
 | SWARM-11 | [x] Test conflicting short/long quota windows, unlike units, and a reset. The most restrictive applicable limit binds, percentages are not added or converted without evidence, and reset does not enlarge approved task allocation. |
-| SWARM-12 | [ ] Unknown, stale, and inferred quota never appears as zero or unlimited and cannot enable default fan-out. Explicit bounded estimate permission changes eligibility with uncertainty visible; revocation stops new admissions. |
+| SWARM-12 | [x] Unknown, stale, and inferred quota never appears as zero or unlimited and cannot enable default fan-out. Explicit bounded estimate permission changes eligibility with uncertainty visible; revocation stops new admissions. |
 | SWARM-13 | [ ] Demonstrate actual adapter enforcement before labeling a limit strict. For delayed usage/overshoot fixtures, show estimate-based labeling, stop admissions on overrun, retain uncertain reservations, and reconcile without double-counting parent/child totals. |
 | SWARM-14 | [ ] Inject provider outage, account auth failure, quota exhaustion, rate limit, and local harness failure independently. Only affected targets are excluded; unrelated healthy jobs continue. OpenCode with a second healthy provider remains eligible if qualified and allowed. |
 | SWARM-15 | [ ] Repeated routing failures across multiple targets produce no more than two execution attempts per logical job. Replanning cannot reset the attempt budget; an unchanged waiting state produces no repeated model-planning calls. |

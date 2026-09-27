@@ -382,13 +382,16 @@ class AgentsProvider {
       item.iconPath = new vscode.ThemeIcon(expired || window.remaining_milli == null ? 'question' : 'graph');
       const amount = Number.isSafeInteger(window.remaining_milli) ?
         nativeAmount(window.remaining_milli, window.unit) : 'unknown';
+      const confidence = window.confidence || 'unknown';
       const change = Number.isSafeInteger(window.change_milli) ?
         window.change_milli < 0 ? `down ${nativeAmount(-window.change_milli, window.unit)}` :
           window.change_milli > 0 ? `up ${nativeAmount(window.change_milli, window.unit)}` : 'unchanged' : null;
-      item.description = [amount, change].filter(Boolean).join(' · ');
+      const labeledAmount = confidence === 'unknown' ? 'unknown allowance' :
+        confidence === 'estimated' && amount !== 'unknown' ? `estimated ${amount}` : amount;
+      item.description = [labeledAmount, change].filter(Boolean).join(' · ');
       const usable = Number.isSafeInteger(window.observed_usable_milli) ?
         nativeAmount(window.observed_usable_milli, window.unit) : 'unknown';
-      item.tooltip = `${window.pool_id} / ${window.window_id} · ${window.confidence || 'unknown'} observation\n` +
+      item.tooltip = `${window.pool_id} / ${window.window_id} · ${confidence} observation\n` +
         `Remaining ${amount}; unreserved and unprotected ${usable}. ` +
         `Recorded ${new Date(run.availability.observed_ms).toLocaleString()}. ` +
         (expired ? 'Expired; refresh before admitting work.' :

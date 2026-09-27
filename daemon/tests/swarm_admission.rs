@@ -304,6 +304,88 @@ fn short_window_and_unlike_unit_each_bind_admission_without_conversion() {
 }
 
 #[test]
+fn estimated_quota_requires_run_permission_and_revocation_blocks_future_jobs() {
+    let mut d=Daemon::start(&[]);
+    let at=now();
+    let mut estimated=snapshot(at,100000);
+    estimated["pools"][0]["windows"][0]["confidence"]=json!("estimated");
+    let create=|d:&Daemon, category:&str, policy:Value| {
+        let run=d.call("swarm.create",json!({"category":category,"objective":"Audit",
+            "allowed_targets":["codex-a"],"policy":policy}));
+        let id=run["id"].as_str().unwrap().to_string();
+        d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+            {"id":"j0","title":"Inspect A","acceptance":"evidence","deps":[]},
+            {"id":"j1","title":"Inspect B","acceptance":"evidence","deps":[]}]}));
+        id
+    };
+    let request=|run:&str, job:&str, key:&str, snap:Value| json!({
+        "run_id":run,"generation":1,"revision":1,"job_id":job,"target_id":"codex-a",
+        "request_id":key,"snapshot":snap,"now_ms":at,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"});
+
+    let default=create(&d,"Estimated quota denied",json!({}));
+    let missing={let mut s=estimated.clone();s["pools"][0]["windows"][0]["remaining_milli"]=Value::Null;s};
+    let unknown=d.call("swarm.admit",request(&default,"j0","unknown",missing));
+    assert_eq!(unknown["reason"],"unknown_quota","{unknown}");
+    let stale={let mut s=estimated.clone();s["expires_ms"]=json!(at-1);s};
+    let expired=d.call("swarm.admit",request(&default,"j0","stale",stale));
+    assert_eq!(expired["reason"],"stale_snapshot","{expired}");
+    let inferred=d.call("swarm.admit",request(&default,"j0","inferred",estimated.clone()));
+    assert_eq!(inferred["reason"],"estimated_quota_requires_permission","{inferred}");
+    let unknown_readout=d.call("swarm.get",json!({"id":default}));
+    assert_eq!(unknown_readout["capacity"]["provider_usage_state"],"unknown");
+    assert!(unknown_readout["capacity"]["windows"].as_array().unwrap().is_empty());
+
+    let permitted=create(&d,"Estimated quota allowed",json!({"allow_estimated_quota":true}));
+    commit_beneficial_batch(&d,&permitted,&["j0".into(),"j1".into()]);
+    let observed=d.call("swarm.availability.observe",json!({"run_id":permitted,
+        "snapshot":estimated,"now_ms":at,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(observed["state"],"eligible","{observed}");
+    assert_eq!(observed["allowance_windows"][0]["confidence"],"estimated");
+    let first=d.call("swarm.admit",request(&permitted,"j0","estimated-first",estimated.clone()));
+    assert_eq!(first["status"],"admitted","{first}");
+    assert_eq!(first["allocation_milli"],10000);
+    let revoked=d.call("swarm.estimate.revoke",json!({"run_id":permitted,
+        "request_id":"revoke-estimate","expected_control_revision":0}));
+    assert_eq!(revoked["changed"],true,"{revoked}");
+    d.kill9();d.spawn();
+    assert_eq!(d.call("swarm.estimate.revoke",json!({"run_id":permitted,
+        "request_id":"revoke-estimate","expected_control_revision":0}))["duplicate"],true);
+    let after=d.call("swarm.get",json!({"id":permitted}));
+    assert_eq!(after["policy"]["effective"]["allow_estimated_quota"],false);
+    assert_eq!(after["availability"]["reason"],"estimated_permission_revoked");
+    let held=d.call("swarm.admit",request(&permitted,"j1","after-revoke",estimated));
+    assert_eq!(held["status"],"blocked","{held}");
+    assert_eq!(held["reason"],"run_availability_blocked","{held}");
+    let mut still_estimated=snapshot(at+2000,100000);
+    still_estimated["version"]=json!(2);
+    still_estimated["pools"][0]["windows"][0]["confidence"]=json!("estimated");
+    let reassessed=d.call("swarm.availability.observe",json!({"run_id":permitted,
+        "snapshot":still_estimated,"now_ms":at+2000,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(reassessed["reason"],"estimated_quota_requires_permission","{reassessed}");
+    let mut exact=snapshot(at+4000,100000);
+    exact["version"]=json!(3);
+    let recovered=d.call("swarm.availability.observe",json!({"run_id":permitted,
+        "snapshot":exact,"now_ms":at+4000,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(recovered["state"],"eligible","{recovered}");
+    let next=d.call("swarm.admit",json!({"run_id":permitted,"generation":1,
+        "revision":1,"job_id":"j1","target_id":"codex-a",
+        "request_id":"exact-after-revoke","snapshot":exact,"now_ms":at+4000,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(next["status"],"admitted","{next}");
+    let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let attempts:i64=db.query_row("SELECT COUNT(*) FROM swarm_attempts WHERE run_id=?1",
+        [&permitted],|row|row.get(0)).unwrap();
+    assert_eq!(attempts,2);
+}
+
+#[test]
 fn newly_selected_account_cannot_create_allocation_after_first_admission() {
     let d=Daemon::start(&[]);
     let run=setup(&d,"New account after work starts",2);

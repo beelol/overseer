@@ -92,6 +92,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           PRIMARY KEY(run_id,request_id)
         );
+        CREATE TABLE IF NOT EXISTS swarm_estimate_revocations(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          request_id TEXT NOT NULL,
+          request_sha256 TEXT NOT NULL,
+          result_json TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,request_id)
+        );
         CREATE TABLE IF NOT EXISTS swarm_availability(
           run_id TEXT PRIMARY KEY REFERENCES swarm_runs(id) ON DELETE CASCADE,
           state TEXT NOT NULL CHECK(state IN ('eligible','blocked')),

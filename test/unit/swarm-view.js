@@ -101,6 +101,13 @@ Module._load = originalLoad;
     'show the durable held admission as a past observation with its job and reason');
   assert(!capacity.some(row => /current limit/i.test(row.item.label)),
     'a past admission result cannot be mislabeled as the current constraint');
+  run.availability.allowance_windows[0].confidence = 'estimated';
+  const estimatedCapacity = provider.getChildren(firstPage[1]);
+  assert(estimatedCapacity.some(row => /fixture-pool.*week/i.test(row.item.label) &&
+    /estimated 0\.5 points/i.test(row.item.description) &&
+    /estimated/.test(row.item.accessibilityInformation.label)),
+    'estimate uncertainty must be visible without hovering and available to a screen reader');
+  run.availability.allowance_windows[0].confidence = 'exact';
   run.availability.expires_ms = Date.now() - 1;
   const staleCapacity = provider.getChildren(firstPage[1]);
   assert(staleCapacity.some(row => /eligibility.*expired/i.test(row.item.label) &&

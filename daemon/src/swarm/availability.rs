@@ -157,7 +157,8 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
             |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .optional()?;
-    let target_selection_pending = old["reason"] == "target_selection_changed"
+    let target_selection_pending = (old["reason"] == "target_selection_changed"
+        || old["reason"] == "estimated_permission_revoked")
         && prior_hashes.as_ref().is_some_and(|(hash, snapshot)| hash.is_empty() && snapshot.is_empty());
     if prior_hashes
         .as_ref()

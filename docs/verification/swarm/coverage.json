@@ -1,7 +1,7 @@
 {
   "base_commit": "19edf57ca4c30b0b4788b5416bb5d949a2cdff6c",
   "rfc_sha256": {
-    "swarm-mode.md": "1bbeb254d646754e6d92920405228352ea9aa3be8d6309bf65d01eebaa2cf064",
+    "swarm-mode.md": "49e5a32ee27b776c8309be698bc0d12e9b212c975da7c285cda111ab8c9415ad",
     "swarm-mode-scenarios.md": "857ee07916d6d60b57435125dfc3547ecd37024a3948e6343a95a63cb972bbdf",
     "swarm-mode-goal.md": "fb1bcf183e39e2edeb27b6d5f641eb8daf639bbaf271f5a4afbc15bcb01de08a"
   },
@@ -9,7 +9,7 @@
     "SWARM-01": {
       "status": "unverified",
       "evidence": [],
-      "blocker": "Normal Auto/Manual × Swarm launch paths and an opt-in UI are not wired; fixture planning cannot verify off-mode or one-agent fallback."
+      "blocker": "Normal Auto/Manual \u00d7 Swarm launch paths and an opt-in UI are not wired; fixture planning cannot verify off-mode or one-agent fallback."
     },
     "SWARM-02": {
       "status": "partial",
@@ -32,7 +32,7 @@
         "docs/verification/swarm/S5.md",
         "daemon/tests/swarm_runtime.rs"
       ],
-      "blocker": "Supervised fixture processes now execute five jobs concurrently across two growth waves while holding a conflicting database writer without an attempt. A separate supervised root→child→leaf replay holds each dependent before accepted evidence and after acceptance until the parent process exits, then admits it. Real worktree writer enforcement, undeclared-resource discovery and a qualified live route remain incomplete."
+      "blocker": "Supervised fixture processes now execute five jobs concurrently across two growth waves while holding a conflicting database writer without an attempt. A separate supervised root\u2192child\u2192leaf replay holds each dependent before accepted evidence and after acceptance until the parent process exits, then admits it. Real worktree writer enforcement, undeclared-resource discovery and a qualified live route remain incomplete."
     },
     "SWARM-04": {
       "status": "partial",
@@ -122,12 +122,15 @@
       "blocker": null
     },
     "SWARM-12": {
-      "status": "partial",
+      "status": "verified",
       "evidence": [
         "daemon/tests/swarm_policy.rs",
-        "docs/verification/swarm/milestone-4.md"
+        "daemon/tests/swarm_admission.rs",
+        "daemon/tests/swarm_settings.rs",
+        "test/unit/swarm-view.js",
+        "docs/verification/swarm/SWARM-12.md"
       ],
-      "blocker": "Unknown, stale and estimated quota get explicit preview reasons; live telemetry, permission revocation and actual admission are not implemented."
+      "blocker": null
     },
     "SWARM-13": {
       "status": "unverified",
