@@ -1,0 +1,50 @@
+ ◆ Overseer  page 1/1 · 2 agents · ● 1 active                                                                                                                           ● connected 
+┏ 1 ● Sleeper ━━━━━━━━━━━━━━━━━━━━━╭ ◆ Overseer · Ask first ────────────────────────────────────────────────────────────────────────────────────╮───────────────────── claude · 0s ╮
+┃ working…                         │ ▶ started: Started API tests (claude) in repo                                                              │                                  │
+┃                                  │ ▶ started: Started Sleeper (generic) in repo                                                               │                                  │
+┃                                  │ you › Tell API tests to add tests                                                                          │t-format","stream-json","--verbose│
+┃                                  │ Overseer will:                                                                                             │],"text":"write the API"}         │
+┃                                  │   • Send API tests: “Please add tests.”                                                                    │                                  │
+┃                                  │   ctrl+y yes · ctrl+n no                                                                                   │                                  │
+┃                                  │──────────────────────────────────────────────────────────────────────────────────────────────────────────  │                                  │
+┃                                  │ › type a message for Overseer                                                                              │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┃                                  │                                                                                                            │                                  │
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╰────────────────────────────────────────────── enter sends · ctrl+y / ctrl+n answer a proposal · esc closes ╯──────────────────────────────────╯
+ type to Overseer   enter send   ctrl+y/n yes/no to a proposal   j/k scroll   esc close                                                                                             
