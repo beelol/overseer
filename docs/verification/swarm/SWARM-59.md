@@ -25,3 +25,20 @@ Revocation follow-up at `656f3f6`: a selected target's injected `auth=revoked` o
 Ordering follow-up (this revision): the targeted revocation now records one durable `revoke` operation in its cancellation transaction, including after an identical observation replay and daemon restart. Three local orderings against result, review, and Stop preserve one result and a readable director inbox. The director-wide availability event intentionally has no job or attempt ID; `swarm.messages` now returns null fields for that event. This remains fixture-only evidence and does not resolve the live-feed or identity-alias gaps.
 
 Account-alias follow-up (this revision): the fixture now treats an explicit `auth=revoked` status as applying to its account ID. Two admitted jobs on different selected routes with the same account ID both receive durable cancellation, even though the second route's target record still says `auth=ok`; an independent account stays eligible and admits the third job. A revoked alias outside the selected pool also blocks the selected alias in the policy preview. The affected local suites pass. Missing target records, verified live account identity, and provider interruption remain open.
+
+Availability closeout at `34c59d52` (2026-09-27): the director may close an otherwise idle
+run with a partial report whose reason exactly matches a fresh, durable blocked eligibility
+assessment. The request still requires director ownership, plan/control revisions, a bounded
+summary and limitations, confirmed worker exits and a drained director inbox. The Stop
+transaction saves the report, cancels queued jobs and records an incomplete outcome; a replay
+after daemon restart returns the one saved effect. The focused fixture first failed because
+`allowed_target_missing` was unsupported, then passed. It also rejects a fabricated
+`finishing_reserve` reason, an expired assessment and a migrated assessment missing its
+snapshot fingerprint. A migration test preserves an older unresolved-conflict report while
+allowing the new reason. `cargo test -p overseerd --test swarm_availability --test
+swarm_conflict --test swarm_integration --test swarm_state --offline -- --test-threads=1`
+passed 8 + 10 + 25 + 21 tests; the focused migration test and full
+`cargo test --workspace --offline -q` passed. Evidence: `daemon/tests/swarm_availability.rs`,
+`daemon/src/swarm/mod.rs`, `daemon/src/swarm/schema.rs`. This is an explicit director choice
+under a fixture observation; it does not supply live Auto Mode updates, numeric allowance
+display, or normal UI, so SWARM-59 stays partial.
