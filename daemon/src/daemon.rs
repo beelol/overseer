@@ -1118,6 +1118,56 @@ impl Daemon {
         Ok(json!({"run":self.run(&run.id)?,"workspace":workspace,"snapshot_id":snapshot.id}))
     }
 
+    /// Called while the profile gate is held and the prior turn has settled.
+    /// This never opens a metadata session beside an active parent process.
+    fn refresh_parent_discovery_between_turns(&self, profile_id: &str,
+        workspace: &Workspace, expected_generation: i64) -> Result<Value> {
+        use std::time::{Duration, Instant};
+        let deadline = Instant::now() + Duration::from_secs(8);
+        let remaining = || -> Result<Duration> {
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left < Duration::from_millis(20) { bail!("parent Auto metadata deadline elapsed"); }
+            Ok(left)
+        };
+        let profile = self.profile(profile_id)?;
+        if profile.harness != "codex" { bail!("parent Auto profile is not Codex"); }
+        if self.store.lock().unwrap().runs()?.iter().any(|other|
+            other.profile_id.as_deref() == Some(profile_id)
+                && ACTIVE.contains(&other.status.as_str())) {
+            bail!("parent Auto profile has an active run");
+        }
+        let program = adapters::resolve_program("codex-app")
+            .ok_or_else(|| anyhow!("Codex is not installed"))?;
+        let mut env = adapters::base_env(&program.display().to_string());
+        env.extend(Self::profile_env(&profile));
+        let models = crate::auto_collect::codex_model_list(&program, &env,
+            &adapters::neutral_dir(), remaining()?)?;
+        let tools = crate::auto_collect::codex_tool_inventory(&program, &env,
+            Path::new(&workspace.path), remaining()?)?;
+        let model_identity = crate::auto_quota::account_fingerprint(&models.rate_limits)?;
+        let tool_identity = crate::auto_quota::account_fingerprint(&tools.rate_limits)?;
+        if model_identity != tool_identity {
+            bail!("parent Auto account changed during metadata refresh");
+        }
+        let observed_ms = now();
+        let catalog = crate::auto_route::parse_codex_catalog(&models.models, observed_ms)?;
+        let tool_catalog = crate::auto_route::parse_codex_tools(&tools.tools, observed_ms)?;
+        let snapshot = crate::auto_quota::parse_codex_rate_limits(&models.rate_limits,
+            profile_id, models.rate_limits_observed_ms)?;
+        let store = self.store.lock().unwrap();
+        store.record_auto_account_identity(profile_id, &model_identity)?;
+        if store.auto_account_generation(profile_id)? != Some(expected_generation) {
+            bail!("parent Auto account changed between turns");
+        }
+        let event = store.insert_event(models.rate_limits_observed_ms, None, None,
+            "quota", "codex-app/metadata-read", "reported",
+            &json!({"profile_id":profile_id,"snapshot":snapshot}))?;
+        store.insert_auto_quota(event.seq, profile_id, "codex-app/metadata-read", &snapshot)?;
+        store.put_auto_model_catalog(profile_id, &catalog)?;
+        Ok(json!({"workspace_id":workspace.id,"account_generation":expected_generation,
+            "model_catalog":catalog,"tool_catalog":tool_catalog}))
+    }
+
     /// Start a work turn: fresh run-start snapshot, then launch (or stdin for live generic processes).
     pub fn start_turn(self: &Arc<Self>, run_id: &str, prompt: &str, follow_up: bool, opts: &TurnOpts) -> Result<Turn> {
         let initial = self.run(run_id)?;
@@ -1203,6 +1253,16 @@ impl Daemon {
         if generic_meta["auto_routing"] == true {
             if !self.store.lock().unwrap().auto_mode_enabled()? {
                 bail!("Auto Mode was disabled before the parent turn started");
+            }
+            if follow_up && run.harness == "codex-app" {
+                if let Some(profile_id) = run.profile_id.as_deref().filter(|profile_id|
+                    generic_meta["auto_allowed_profiles"].as_array().is_some_and(|allowed|
+                        allowed.iter().any(|id| id.as_str() == Some(profile_id)))) {
+                    let expected = generic_meta["auto_parent_discovery"]["account_generation"].as_i64()
+                        .ok_or_else(|| anyhow!("parent Auto account preflight is unavailable"))?;
+                    generic_meta["auto_parent_discovery"] = self
+                        .refresh_parent_discovery_between_turns(profile_id, &ws, expected)?;
+                }
             }
         }
         // Turn options: this turn's choices, else the run's last ones (a model change sticks).

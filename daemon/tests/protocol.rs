@@ -3601,6 +3601,73 @@ fn auto_running_parent_can_delegate_to_suitable_model_on_its_own_profile() {
 }
 
 #[test]
+fn auto_parent_follow_up_refreshes_expired_same_profile_discovery_before_its_turn() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("parent-refresh-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TURN_DELAY_MS,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "6000"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"hold parent",
+        "approval_policy":"never","auto_routing":true})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let initial_trace = std::fs::read_to_string(&trace).unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let saved: String = db.query_row("SELECT launch FROM runs WHERE id=?1", [&parent],
+        |row| row.get(0)).unwrap();
+    let mut launch: serde_json::Value = serde_json::from_str(&saved).unwrap();
+    for catalog in ["model_catalog", "tool_catalog"] {
+        launch["generic"]["auto_parent_discovery"][catalog]["expires_ms"] = json!(1);
+    }
+    db.execute("UPDATE runs SET launch=?2 WHERE id=?1", rusqlite::params![parent, launch.to_string()]).unwrap();
+    d.call("run.follow_up", json!({"run_id":parent,"prompt":"hold parent"}));
+    assert_eq!(d.wait_status(&parent, |status| status == "running", 10)["status"], "running");
+    let before_child = std::fs::read_to_string(&trace).unwrap();
+    assert!(before_child.matches("model_read").count() > initial_trace.matches("model_read").count(),
+        "the second parent process needs a fresh model catalog before its turn");
+    assert!(before_child.matches("tool_preflight:available").count()
+        > initial_trace.matches("tool_preflight:available").count(),
+        "the second parent process needs a fresh workspace tool catalog");
+    let capability = std::fs::read_to_string(d.home.path().join("runs").join(&parent)
+        .join("p2").join("auto-bridge.cap")).unwrap();
+    let selected = d.call("auto.bridge.submit", json!({"run_id":parent,
+        "capability":capability.trim(),"work_unit_id":"refreshed-parent-browser",
+        "min_tier":"general","required_tools":["browser/navigate"],
+        "prompt":"bounded browser audit","title":"browser audit"}));
+    assert_eq!(selected["state"], "dispatched", "{selected}");
+    assert_eq!(selected["run"]["profile_id"], "system-codex");
+    assert_eq!(selected["run"]["model"], "gpt-6-sol");
+    assert_eq!(d.wait_done(&run_id(&selected), 15)["status"], "completed");
+}
+
+#[test]
+fn auto_parent_follow_up_refuses_a_changed_account_before_starting_a_turn() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let account = r.path().join("account-id.txt");
+    let trace = r.path().join("account-switch-trace.txt");
+    std::fs::write(&account, "account-A").unwrap();
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_ACCOUNT_ID_FILE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_ACCOUNT_ID_FILE", account.to_str().unwrap()),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed parent",
+        "approval_policy":"never","auto_routing":true})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    std::fs::write(&account, "account-B").unwrap();
+    assert!(d.try_call("run.follow_up", json!({"run_id":parent,"prompt":"continue parent"})).is_err());
+    assert_eq!(d.call("run.turns", json!({"run_id":parent})).as_array().unwrap().len(), 1,
+        "the changed account must be rejected before a second turn starts");
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("thread_started").count(), 1);
+    assert!(!d.home.path().join("runs").join(&parent).join("p2").join("auto-bridge.cap").exists());
+    let events = serde_json::to_string(&d.events(&parent)).unwrap();
+    assert!(!events.contains("account-A") && !events.contains("account-B"));
+}
+
+#[test]
 fn auto_bridge_rejects_a_child_that_widens_a_read_only_parent_before_admission() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
