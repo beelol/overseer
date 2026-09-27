@@ -196,3 +196,130 @@ fn uncertain_spawn_remains_reserved_without_a_process_record() {
         "generation":1,"revision":0,"termination":"confirmed_no_spawn"})).is_err(),
         "a child may exist even when the run directory update was lost");
 }
+
+#[test]
+fn orphaned_supervisor_is_reattached_by_verified_director_identity() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("reattach-director-source"));
+    let run = d.call("swarm.create", json!({"category":"Reattach director",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER abort_orphan_record BEFORE UPDATE OF run_dir ON runs
+        WHEN NEW.title='Reattach director' BEGIN
+        SELECT RAISE(ABORT, 'fixture orphaned director supervisor'); END;").unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":id,"generation":1,
+        "repo":checkout,"program":"/bin/sleep","args":["30"],
+        "prompt":"Audit backend","title":"Reattach director"}));
+    assert_eq!(launched["status"],"launch_uncertain");
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    let run_dir = d.home.path().join("runs").join(process).join("p1");
+    let deadline = Instant::now()+Duration::from_secs(3);
+    while !run_dir.join("shim.json").exists() {
+        assert!(Instant::now()<deadline,"orphan supervisor did not start");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    db.execute_batch("DROP TRIGGER abort_orphan_record;").unwrap();
+    d.kill9();
+    d.spawn();
+    let linked_dir: String = db.query_row("SELECT run_dir FROM runs WHERE id=?1",
+        [process],|row|row.get(0)).unwrap();
+    assert_eq!(linked_dir,run_dir.to_string_lossy());
+    assert_eq!(d.run(process)["status"],"running");
+    assert_ne!(d.call("swarm.get",json!({"id":id}))["stall_reason"],
+        "director_termination_unknown");
+    d.call("run.interrupt",json!({"run_id":process}));
+    let stopped=d.wait_done(process,8);
+    assert_ne!(stopped["status"],"disconnected","{stopped}");
+    assert!(run_dir.join("exit.json").exists());
+    let recovered=d.call("swarm.director.recover",json!({"run_id":id,
+        "generation":1,"revision":0,"termination":"confirmed_dead"}));
+    assert_eq!(recovered["generation"],2);
+}
+
+#[test]
+fn orphaned_supervisor_with_mismatched_credential_stays_uncertain() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("untrusted-orphan-source"));
+    let run = d.call("swarm.create", json!({"category":"Untrusted orphan",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER abort_untrusted_orphan BEFORE UPDATE OF run_dir ON runs
+        WHEN NEW.title='Untrusted director' BEGIN
+        SELECT RAISE(ABORT, 'fixture untrusted orphan'); END;").unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":id,"generation":1,
+        "repo":checkout,"program":"/bin/sleep","args":["30"],
+        "prompt":"Audit backend","title":"Untrusted director"}));
+    assert_eq!(launched["status"],"launch_uncertain");
+    let process = launched["overseer_run_id"].as_str().unwrap();
+    let dir = d.home.path().join("runs").join(process).join("p1");
+    let deadline = Instant::now()+Duration::from_secs(3);
+    while !dir.join("shim.json").exists() {
+        assert!(Instant::now()<deadline,"orphan supervisor did not start");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let launch_path=dir.join("launch.json");
+    let original=std::fs::read(&launch_path).unwrap();
+    let mut altered: serde_json::Value=serde_json::from_slice(&original).unwrap();
+    altered["env"]["OVERSEER_SWARM_DIRECTOR_TOKEN"]=json!("wrong-owner-token");
+    std::fs::write(&launch_path,serde_json::to_vec(&altered).unwrap()).unwrap();
+    db.execute_batch("DROP TRIGGER abort_untrusted_orphan;").unwrap();
+    d.kill9();
+    d.spawn();
+    let linked: Option<String>=db.query_row("SELECT run_dir FROM runs WHERE id=?1",
+        [process],|row|row.get(0)).unwrap();
+    assert!(linked.is_none());
+    assert_eq!(d.run(process)["status"],"queued");
+    assert_eq!(d.call("swarm.get",json!({"id":id}))["stall_reason"],
+        "director_termination_unknown");
+    assert!(d.try_call("swarm.director.recover",json!({"run_id":id,
+        "generation":1,"revision":0,"termination":"confirmed_no_spawn"})).is_err());
+    std::fs::write(&launch_path,original).unwrap();
+    d.kill9();
+    d.spawn();
+    d.call("run.interrupt",json!({"run_id":process}));
+    d.wait_done(process,8);
+}
+
+#[test]
+fn exited_orphan_supervisor_replays_its_exit_once_after_restart() {
+    let mut d = Daemon::start(&[]);
+    let temp = tmp();
+    let checkout = repo(&temp.path().join("exited-orphan-source"));
+    let run = d.call("swarm.create", json!({"category":"Exited orphan",
+        "objective":"Audit backend","allowed_targets":["fixture-local"]}));
+    let id = run["id"].as_str().unwrap();
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER abort_exited_orphan BEFORE UPDATE OF run_dir ON runs
+        WHEN NEW.title='Exited director' BEGIN
+        SELECT RAISE(ABORT, 'fixture exited orphan'); END;").unwrap();
+    let launched = d.call("swarm.director.launch",json!({"run_id":id,"generation":1,
+        "repo":checkout,"program":"/usr/bin/true","args":[],
+        "prompt":"Audit backend","title":"Exited director"}));
+    assert_eq!(launched["status"],"launch_uncertain");
+    let process=launched["overseer_run_id"].as_str().unwrap();
+    let dir=d.home.path().join("runs").join(process).join("p1");
+    let deadline=Instant::now()+Duration::from_secs(3);
+    while !dir.join("exit.json").exists() {
+        assert!(Instant::now()<deadline,"orphan supervisor did not exit");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    db.execute_batch("DROP TRIGGER abort_exited_orphan;").unwrap();
+    d.kill9();
+    d.spawn();
+    let finished=d.wait_done(process,8);
+    assert_eq!(finished["status"],"completed","{finished}");
+    let recovered=d.call("swarm.director.recover",json!({"run_id":id,
+        "generation":1,"revision":0,"termination":"confirmed_dead"}));
+    assert_eq!(recovered["generation"],2);
+    let events=d.events(process);
+    assert_eq!(events.iter().filter(|e|e["kind"]=="status"
+        && e["payload"]["status"]=="completed").count(),1);
+    d.kill9();
+    d.spawn();
+    assert_eq!(d.events(process).iter().filter(|e|e["kind"]=="status"
+        && e["payload"]["status"]=="completed").count(),1);
+}

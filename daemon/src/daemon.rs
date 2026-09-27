@@ -7,6 +7,7 @@ use crate::redact::redact;
 use crate::shim::{self, ExitInfo, LaunchFile, ShimInfo};
 use crate::store::{self, DirectorOwnerLink, Event, Profile, Run, Snapshot, Store, Task, Turn, Workspace};
 use anyhow::{anyhow, bail, Context, Result};
+use rusqlite::OptionalExtension;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::io::{Read, Seek, SeekFrom};
@@ -1393,11 +1394,82 @@ impl Daemon {
 
     /// Called once at startup: reattach to surviving supervisors, finalize exited
     /// ones, and report lost sessions. Never relaunches work.
+    fn reattach_unrecorded_director(&self, run: &Run) -> Result<bool> {
+        let owner: Option<(String, i64, String, i64)> = self.store.lock().unwrap().conn.query_row(
+            "SELECT run_id,generation,token_sha256,lease_expires_ms FROM swarm_director_owners
+             WHERE overseer_run_id=?1 AND status='active' AND supervised_launch=1
+             AND launch_phase='spawn_requested'",
+            [&run.id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
+        ).optional()?;
+        let Some((swarm_run, generation, digest, lease_expires)) = owner else {
+            return Ok(false);
+        };
+        let dir = paths::runs_dir().join(&run.id).join(format!("p{}",run.process_generation+1));
+        if !std::fs::symlink_metadata(&dir).is_ok_and(|m| m.file_type().is_dir()) {
+            return Ok(false);
+        }
+        let launch_path = dir.join("launch.json");
+        use std::os::unix::fs::PermissionsExt;
+        let Ok(metadata) = std::fs::symlink_metadata(&launch_path) else { return Ok(false) };
+        if !metadata.file_type().is_file() || metadata.len() > 1_000_000
+            || metadata.permissions().mode() & 0o077 != 0 {
+            return Ok(false);
+        }
+        let Ok(raw) = std::fs::read(&launch_path) else { return Ok(false) };
+        let Ok(launch) = serde_json::from_slice::<LaunchFile>(&raw) else { return Ok(false) };
+        let Some(token) = launch.env.get("OVERSEER_SWARM_DIRECTOR_TOKEN") else { return Ok(false) };
+        let generation_text = generation.to_string();
+        use sha2::{Digest, Sha256};
+        if format!("{:x}",Sha256::digest(token.as_bytes())) != digest
+            || launch.env.get("OVERSEER_SWARM_RUN_ID").map(String::as_str) != Some(swarm_run.as_str())
+            || launch.env.get("OVERSEER_SWARM_GENERATION").map(String::as_str) != Some(generation_text.as_str())
+            || launch.cwd != self.workspace(&run.workspace_id)?.path {
+            return Ok(false);
+        }
+        let exited = std::fs::read(dir.join("exit.json")).ok()
+            .and_then(|raw| serde_json::from_slice::<ExitInfo>(&raw).ok()).is_some();
+        let live = std::fs::read(dir.join("shim.json")).ok()
+            .and_then(|raw| serde_json::from_slice::<ShimInfo>(&raw).ok())
+            .is_some_and(|info| pid_alive(info.shim_pid));
+        if !exited && !live {
+            return Ok(false);
+        }
+        let store = self.store.lock().unwrap();
+        let prior: Option<String> = store.conn.query_row(
+            "SELECT launch FROM runs WHERE id=?1", [&run.id], |r| r.get(0))?;
+        let generic: Value = prior.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(Value::Null);
+        let meta = json!({"generic":generic,"program":launch.program,
+            "args":launch.args.iter().map(|arg|redact(arg)).collect::<Vec<_>>(),
+            "env_keys":launch.env.keys().collect::<Vec<_>>(),"orphan_reconciled":true});
+        if let Err(error) = store.set_run_process(
+            &run.id,&dir.display().to_string(),run.process_generation+1,&meta) {
+            crate::log(&format!("director orphan reattachment deferred: {}",redact(&error.to_string())));
+            return Ok(false);
+        }
+        store.set_run_attention(&run.id,None)?;
+        if live && !exited {
+            store.update_run_status(&run.id,"running",None,None)?;
+            if lease_expires > now() {
+                store.conn.execute(
+                    "UPDATE swarm_runs SET status=stalled_from,stalled_from=NULL,
+                     stall_reason=NULL,updated_ms=?2 WHERE id=?1 AND status='stalled'
+                     AND stall_reason='director_termination_unknown'
+                     AND stalled_from IN ('planning','running','paused','draining')",
+                    rusqlite::params![swarm_run,now()],
+                )?;
+            }
+        }
+        Ok(true)
+    }
+
     pub fn reconcile(self: &Arc<Self>) -> Result<Value> {
         let runs = self.store.lock().unwrap().runs()?;
         let mut report = Vec::new();
         for run in runs.iter().filter(|r| r.parent_run_id.is_none() && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {
-            let process = self.store.lock().unwrap().run_process(&run.id)?;
+            let mut process = self.store.lock().unwrap().run_process(&run.id)?;
+            if process.is_none() && self.reattach_unrecorded_director(run)? {
+                process = self.store.lock().unwrap().run_process(&run.id)?;
+            }
             let Some((dir, _, _)) = process else {
                 if ACTIVE.contains(&run.status.as_str()) {
                     if crate::swarm::mark_uncertain_director_spawn(
