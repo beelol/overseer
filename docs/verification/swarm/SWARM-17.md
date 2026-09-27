@@ -24,6 +24,11 @@ launch-file test confirms this and verifies that its private broker token was
 not given to the synthetic provider. The adapter's initial/resume tests keep
 the flag and reject extra arguments. Ordinary agent launches are unchanged.
 
+At `8d9f328`, audit-only runs additionally hold the Claude candidate before
+reservation because native-delegation denial does not enforce read-only source
+access. The route-binding and synthetic-child fixtures use an explicit
+isolated-write grant. This does not qualify Claude for live Swarm use.
+
 Checks: `cargo test --offline -p overseerd --bin overseerd swarm_worker_ --quiet`
 (3 passed); `cargo test --offline -p overseerd --test swarm_admission
 --test swarm_runtime -- --test-threads=1` (32 + 19 passed). Daemon integration

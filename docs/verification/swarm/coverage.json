@@ -169,7 +169,7 @@
         "daemon/src/adapters.rs",
         "docs/verification/swarm/SWARM-17.md"
       ],
-      "blocker": "Fixture admission now rejects worker transports without a daemon-owned native-delegation restriction, and synthetic Claude launches carry Agent/Task denial. No version-pinned live attempted-spawn proof, qualified Auto target identity, or normal launch path exists; the fake Claude stream can ignore the flag."
+      "blocker": "Fixture admission rejects worker transports without a daemon-owned native-delegation restriction, and synthetic Claude launches carry Agent/Task denial. Claude is additionally held for audit-only runs because that denial supplies no source-write boundary. No version-pinned live attempted-spawn proof, qualified Auto target identity, or normal launch path exists; the fake Claude stream can ignore the flag."
     },
     "SWARM-18": {
       "status": "partial",
@@ -577,11 +577,15 @@
     "SWARM-52": {
       "status": "partial",
       "evidence": [
+        "daemon/tests/swarm_admission.rs",
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/src/swarm/admission.rs",
+        "daemon/src/swarm/runtime.rs",
         "daemon/tests/swarm_integration.rs",
         "daemon/src/swarm/integration.rs",
         "docs/verification/swarm/SWARM-52.md"
       ],
-      "blocker": "The fixture integration API now defaults runs to no source-change permission, retains it over restart, and requires an explicit isolated-write grant. Generic workers still have writable worktrees; no qualified audit-only harness sandbox, live-service mutation boundary or S1/S2/S4 replay exists."
+      "blocker": "The fixture integration API defaults runs to no source-change permission, retains it over restart, and requires an explicit isolated-write grant. Native targets without a qualified audit source-write boundary are now held before quota reservation and rechecked at process launch, including an old pending admission. Generic fixture workers still have writable worktrees; no qualified audit-only native harness sandbox, live-service mutation boundary, joined S1/S2/S4 audit replay or normal-launch permission path exists."
     },
     "SWARM-53": {
       "status": "partial",
