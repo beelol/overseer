@@ -54,7 +54,7 @@
         "reason": "beneficial",
         "replay": false,
         "revision": 1,
-        "run_id": "sw-bf0f189fb283",
+        "run_id": "sw-90da9dcbb3eb",
         "serial": {
           "affordable": true,
           "elapsed_ms": 3240,
@@ -295,8 +295,121 @@
       ]
     },
     {
-      "name": "selecting one Swarm worker opens its run view",
+      "name": "selecting one live Swarm worker opens its run view without an ordinary-row error",
       "ok": true
+    },
+    {
+      "name": "Pause from the sidebar acknowledges within 2 seconds with 32 active workers",
+      "ok": true,
+      "detail": {
+        "status": "paused",
+        "active_worker_processes": 32,
+        "pause_ms": 98
+      }
+    },
+    {
+      "name": "Resume preserves the same 32 supervised workers",
+      "ok": true,
+      "detail": {
+        "status": "running",
+        "active_worker_processes": 32
+      }
+    },
+    {
+      "name": "Stop waits for owner confirmation while workers remain active",
+      "ok": true
+    },
+    {
+      "name": "confirmed Stop acknowledges within 2 seconds with 32 active workers",
+      "ok": true,
+      "detail": {
+        "status": "stopping",
+        "unconfirmed_exit_count": 8,
+        "stop_ms": 76
+      }
+    },
+    {
+      "name": "the SIGINT-resistant fixture worker remains unconfirmed with its estimate reserved",
+      "ok": true,
+      "detail": {
+        "unconfirmed_exit_count": 8,
+        "capacity": {
+          "provider_usage_state": "unknown",
+          "selected_targets": [
+            {
+              "attempts": 32,
+              "effort": null,
+              "harness": "generic",
+              "id": "fixture-local",
+              "model": null,
+              "profile_id": null
+            }
+          ],
+          "selected_targets_truncated": false,
+          "source": "fixture_admission",
+          "windows": [
+            {
+              "allocation_milli": 100000,
+              "finishing_reserve_milli": 20000,
+              "outstanding_estimate_milli": 3200,
+              "pool_id": "fixture-pool",
+              "unit": "points",
+              "window_id": "run"
+            }
+          ],
+          "windows_truncated": false
+        }
+      }
+    },
+    {
+      "name": "sidebar shows unconfirmed exits separately while Stop is pending",
+      "ok": true,
+      "detail": [
+        {
+          "label": "Swarms",
+          "description": "1"
+        },
+        {
+          "label": "Large backend audit",
+          "description": "1 working · 0 ready · 0 blocked · 1 exit unconfirmed"
+        },
+        {
+          "label": "Director",
+          "description": "not started"
+        },
+        {
+          "label": "Capacity",
+          "description": "1 selected · usage unknown"
+        },
+        {
+          "label": "Target: fixture-local",
+          "description": "generic · account unknown · 32 attempts"
+        },
+        {
+          "label": "Allocation: fixture-pool / run",
+          "description": "100 points · finishing reserve 20 points"
+        },
+        {
+          "label": "Planning: parallel",
+          "description": "beneficial"
+        },
+        {
+          "label": "Current limit unknown",
+          "description": "last rejected admission is not recorded"
+        },
+        {
+          "label": "Provider usage unknown",
+          "description": "current allowance not reported"
+        }
+      ]
+    },
+    {
+      "name": "Stop escalation confirms the final worker exit and clears uncertainty",
+      "ok": true,
+      "detail": {
+        "status": "stopped",
+        "unconfirmed_exit_count": 0
+      }
     },
     {
       "name": "all fixture worker processes exit after Stop and teardown",

@@ -37,12 +37,41 @@ print(json.dumps([json.loads((pathlib.Path(row[0]) / 'shim.json').read_text())['
   let runId;
   try {
     const repo = makeRepo(path.join(s.root, 'backend'), { dirty: false });
-    s.settings();
+    s.settings({ 'window.menuStyle': 'custom' });
     s.install(latestVsix());
     s.launch(repo, { OVERSEER_SWARM_FIXTURE_API: '1', OVERSEER_CODEX_PATH: '/nonexistent/codex',
       OVERSEER_CLAUDE_PATH: '/nonexistent/claude', OVERSEER_OPENCODE_PATH: '/nonexistent/opencode' });
     const cdp = await s.connect();
     await cdp.waitFor(`[...document.querySelectorAll('.statusbar-item')].some(e => /Overseer/.test(e.textContent))`, 60000, 'status bar');
+    const chooseControl = async title => {
+      const pt = await cdp.waitFor(`(() => {
+        const row = [...document.querySelectorAll('.monaco-list-row')].find(r => r.offsetParent &&
+          r.querySelector('.label-name')?.textContent.trim() === 'Large backend audit');
+        if (!row) return null;
+        const b = row.getBoundingClientRect(); return { x: b.left + 130, y: b.top + b.height / 2 };
+      })()`, 10000, 'Swarm row');
+      await cdp.click(pt.x, pt.y, { button: 'right' });
+      await delay(400);
+      s.note('Swarm context menu', await cdp.evalWorkbench(`[...document.querySelectorAll('.monaco-menu .action-item .action-label')]
+        .map(a => a.getAttribute('aria-label') || a.textContent.trim()).filter(Boolean)`));
+      const action = await cdp.waitFor(`(() => {
+        const label = [...document.querySelectorAll('.monaco-menu .action-item .action-label')]
+          .find(a => (a.getAttribute('aria-label') || a.textContent.trim()) === ${JSON.stringify(title)});
+        if (!label) return null;
+        const b = label.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+      })()`, 10000, title);
+      const started = Date.now();
+      await cdp.click(action.x, action.y);
+      return started;
+    };
+    const waitStatus = async states => {
+      for (let n = 0; n < 40; n++) {
+        const state = s.ctl('swarm.get', { id: runId });
+        if (states.includes(state.status)) return state;
+        await delay(50);
+      }
+      return s.ctl('swarm.get', { id: runId });
+    };
 
     s.ctl('agents.limit.set', { max_active: 33 });
     const made = s.ctl('swarm.create', { category: 'Large backend audit', objective: 'Inspect 100 independent routes',
@@ -71,7 +100,9 @@ print(json.dumps([json.loads((pathlib.Path(row[0]) / 'shim.json').read_text())['
       if (admitted.status !== 'admitted') throw new Error(`worker ${n} not admitted: ${JSON.stringify(admitted)}`);
       const launched = s.ctl('swarm.worker.launch', { run_id: runId, job_id: jobId,
         attempt_id: admitted.attempt_id, token: admitted.token, repo,
-        program: '/bin/sleep', args: ['180'], prompt: 'Inspect', title: `Fixture worker ${n}` });
+        program: n === 0 ? process.execPath : '/bin/sleep',
+        args: n === 0 ? ['-e', 'process.on("SIGINT", () => {}); setTimeout(() => {}, 120000);'] : ['180'],
+        prompt: 'Inspect', title: `Fixture worker ${n}` });
       if (launched.status !== 'launched') throw new Error(`worker ${n} not launched: ${JSON.stringify(launched)}`);
     }
     let run;
@@ -140,8 +171,58 @@ print(json.dumps([json.loads((pathlib.Path(row[0]) / 'shim.json').read_text())['
     await s.screenshot('one-worker-open');
     await s.clickAgentRow('Worker');
     const editor = await s.editorView();
-    check('selecting one Swarm worker opens its run view',
+    check('selecting one live Swarm worker opens its run view without an ordinary-row error',
       await editor.eval(`document.body.textContent.includes('Fixture worker 0')`));
+    let controlStarted = await chooseControl('Pause Swarm');
+    const paused = await waitStatus(['paused']);
+    check('Pause from the sidebar acknowledges within 2 seconds with 32 active workers',
+      paused.status === 'paused' && Date.now() - controlStarted < 2000 &&
+      paused.active_worker_processes === 32,
+      { status: paused.status, active_worker_processes: paused.active_worker_processes,
+        pause_ms: Date.now() - controlStarted });
+    await chooseControl('Resume Swarm');
+    const resumed = await waitStatus(['running']);
+    check('Resume preserves the same 32 supervised workers',
+      resumed.status === 'running' && resumed.active_worker_processes === 32,
+      { status: resumed.status, active_worker_processes: resumed.active_worker_processes });
+    await chooseControl('Stop Swarm…');
+    await cdp.waitFor(`document.body.innerText.includes('Stop Large backend audit swarm?')`, 10000,
+      'Stop confirmation');
+    check('Stop waits for owner confirmation while workers remain active',
+      s.ctl('swarm.get', { id: runId }).active_worker_processes === 32);
+    controlStarted = Date.now();
+    await cdp.key('Enter');
+    const stopping = await waitStatus(['stopping', 'stopped']);
+    check('confirmed Stop acknowledges within 2 seconds with 32 active workers',
+      ['stopping', 'stopped'].includes(stopping.status) && Date.now() - controlStarted < 2000,
+      { status: stopping.status, unconfirmed_exit_count: stopping.unconfirmed_exit_count,
+        stop_ms: Date.now() - controlStarted });
+    check('the SIGINT-resistant fixture worker remains unconfirmed with its estimate reserved',
+      stopping.status === 'stopping' && stopping.unconfirmed_exit_count > 0 &&
+      stopping.capacity?.windows?.[0]?.outstanding_estimate_milli >= 100,
+      { unconfirmed_exit_count: stopping.unconfirmed_exit_count, capacity: stopping.capacity });
+    await cdp.command('Overseer: Refresh');
+    const unconfirmedRows = await cdp.waitFor(`(() => {
+      const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent);
+      const found = rows.find(r => /\\d+ exits? unconfirmed/.test(r.querySelector('.label-name')?.textContent.trim() || ''));
+      return found && rows.map(r => ({ label: r.querySelector('.label-name')?.textContent.trim(),
+        description: r.querySelector('.label-description')?.textContent.trim() || '' }));
+    })()`, 5000, 'unconfirmed exits row');
+    check('sidebar shows unconfirmed exits separately while Stop is pending',
+      unconfirmedRows.some(row => /\d+ exits? unconfirmed/.test(row.label)),
+      unconfirmedRows.slice(0, 9));
+    await s.screenshot('stopping-unconfirmed');
+    let exited;
+    for (let n = 0; n < 150; n++) {
+      exited = s.ctl('swarm.get', { id: runId });
+      if (exited.status === 'stopped' && exited.unconfirmed_exit_count === 0 &&
+          liveWorkerPids(s.home, runId).live === 0) break;
+      await delay(100);
+    }
+    check('Stop escalation confirms the final worker exit and clears uncertainty',
+      exited.status === 'stopped' && exited.unconfirmed_exit_count === 0 &&
+      liveWorkerPids(s.home, runId).live === 0,
+      { status: exited.status, unconfirmed_exit_count: exited.unconfirmed_exit_count });
   } catch (error) {
     s.note('ERROR ' + (error.stack || error.message)); result.error = error.message;
     try { await s.screenshot('error'); } catch {}

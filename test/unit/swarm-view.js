@@ -102,6 +102,16 @@ Module._load = originalLoad;
   assert.equal(blocked.length, 6, 'director, capacity and four blocked jobs');
   assert(blocked.slice(2).every(row => row.job.status === 'blocked'));
   assert.equal(calls.findLast(([method]) => method === 'swarm.jobs')[1].status, 'blocked');
+  run.status = 'stopping';
+  run.unconfirmed_exit_count = 3;
+  await model.refresh(true);
+  const stoppingSection = provider.getChildren().find(node => node.section === 'swarms');
+  const [stoppingSwarm] = provider.getChildren(stoppingSection);
+  assert.match(stoppingSwarm.item.description, /3 exits unconfirmed/,
+    'unconfirmed exits must not be conflated with active worker processes');
+  const stoppingRows = await provider.getChildren(stoppingSwarm);
+  assert(stoppingRows.some(row => row.item.label === '3 exits unconfirmed'),
+    'the run details should show exit uncertainty separately');
   swarmRuns = [];
   await model.refresh(true);
   assert(!provider.getChildren().some(node => node.section === 'swarms'),
@@ -125,6 +135,8 @@ Module._load = originalLoad;
   assert.deepEqual(ordinary.visibleTasks().map(task => task.id), ['ordinary-task'],
     'Swarm workers should appear under their category, not as duplicate ordinary agents');
   assert.equal(isolated.run('worker-0').id, 'worker-0', 'drilldown still needs the worker run');
+  assert.equal(ordinary.nodeFor('worker-0'), undefined,
+    'selecting a nested Swarm worker must not try to reveal a hidden ordinary-agent row');
   assert.equal(isolated.workspace('worker-ws').path, '/repo/workers/0',
     'drilldown still needs the worker workspace');
   console.log('Swarm summaries stay compact; jobs load only when a run expands');

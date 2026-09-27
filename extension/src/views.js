@@ -103,6 +103,8 @@ function nativeAmount(milli, unit) {
   return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 }).format((milli || 0) / 1000)} ${unit}`;
 }
 
+function unconfirmedExitLabel(count) { return `${count} exit${count === 1 ? '' : 's'} unconfirmed`; }
+
 /** The side bar's agents list (AC-67 to AC-71): Needs you, then agents by repository. */
 class AgentsProvider {
   constructor(model, memento, extensionUri, handlers = {}) {
@@ -140,7 +142,7 @@ class AgentsProvider {
       (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
       (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [],
       this.model.swarms.map(s => [s.id, s.status, s.revision, s.active_worker_processes,
-        s.job_counts, s.benefit?.decision, s.benefit?.reason, s.capacity])]);
+        s.job_counts, s.unconfirmed_exit_count, s.benefit?.decision, s.benefit?.reason, s.capacity])]);
   }
   getTreeItem(node) { return node.item; }
   getParent(node) { return node.parent; }
@@ -212,7 +214,10 @@ class AgentsProvider {
     const chain = [];
     for (let r = this.model.run(runId), seen = new Set(); r && !seen.has(r.id); r = r.parent_run_id && this.model.run(r.parent_run_id)) { seen.add(r.id); chain.unshift(r); }
     const task = chain.length && this.model.task(chain[0].task_id);
-    if (!task) return undefined;
+    // A Swarm worker can be opened from its job, but its task is deliberately
+    // absent from the ordinary Agents tree. Never construct a node for a row
+    // that the tree cannot actually reveal.
+    if (!task || !this.visibleTasks().some(visible => visible.id === task.id)) return undefined;
     let node = this.agentNode(task, this.repoNode(task.repo_root));
     for (const run of chain.slice(1)) node = this.childNode(run, node);
     return node;
@@ -254,7 +259,8 @@ class AgentsProvider {
       ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
     item.id = 'swarm:' + run.id;
     item.iconPath = new vscode.ThemeIcon('organization');
-    item.description = `${working} working · ${counts.ready || 0} ready · ${counts.blocked || 0} blocked`;
+    item.description = `${working} working · ${counts.ready || 0} ready · ${counts.blocked || 0} blocked` +
+      (run.unconfirmed_exit_count ? ` · ${unconfirmedExitLabel(run.unconfirmed_exit_count)}` : '');
     item.tooltip = `${run.objective}\n${run.status} · ${run.job_counts?.total || 0} jobs\n${item.description}\nProvider usage ${run.capacity?.provider_usage_state || 'unknown'}`;
     item.accessibilityInformation = { label: `${run.category} swarm, ${run.status}, ${item.description}` };
     item.contextValue = 'swarm-run-' + run.status;
@@ -279,6 +285,14 @@ class AgentsProvider {
       capacity.tooltip = 'Selected targets and frozen fixture commitments. Provider usage is not reported.';
       capacity.accessibilityInformation = { label: `Swarm capacity, ${capacity.description}` };
       rows.push({ item: capacity, swarmCapacity: run, parent });
+      if (run.unconfirmed_exit_count) {
+        const exits = new vscode.TreeItem(unconfirmedExitLabel(run.unconfirmed_exit_count));
+        exits.id = 'swarm-unconfirmed:' + run.id;
+        exits.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('charts.orange'));
+        exits.description = 'Stop requested · reservations held';
+        exits.tooltip = 'These worker processes have not confirmed exit. Their reservations remain held.';
+        rows.push({ item: exits, parent });
+      }
     }
     for (const job of page.jobs || []) {
       const workerRuns = job.worker_runs || [];
