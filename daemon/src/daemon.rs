@@ -727,7 +727,12 @@ impl Daemon {
             return Err(error);
         }
         if let Err(error) = self.start_turn(&run.id, prompt, false) {
-            self.mark_ended(&run, "failed", &format!("delegated launch failed: {error}"))?;
+            // A supervisor recorded during start_turn may still be running
+            // even though a later database/event write failed. Recovery must
+            // inspect it before settling the child or releasing its pool.
+            if self.store.lock().unwrap().run_process(&run.id)?.is_none() {
+                self.mark_ended(&run, "failed", &format!("delegated launch failed: {error}"))?;
+            }
             return Ok(json!({"work_unit_id":work_unit_id,"run":self.run(&run.id)?,"workspace":ws,"launch_error":error.to_string()}));
         }
         Ok(json!({"work_unit_id":work_unit_id,"run":self.run(&run.id)?,"workspace":ws,"snapshot_id":snapshot.id}))
@@ -1071,15 +1076,39 @@ impl Daemon {
                 Ok(())
             });
         }
-        let mut child = cmd.spawn().context("starting run supervisor")?;
+        let mut recorded_meta = meta;
+        recorded_meta["program"] = json!(launch.program);
+        recorded_meta["args"] = json!(launch.args.iter().map(|a| redact(a)).collect::<Vec<_>>());
+        recorded_meta["env_keys"] = json!(launch.env.keys().collect::<Vec<_>>());
+        let auto_child = recorded_meta["generic"]["auto_selected"] == true
+            && run.relation_source.as_deref() == Some("managed-delegation");
+        if auto_child {
+            // A crash or write failure after cmd.spawn must not leave a live
+            // Auto supervisor with no durable identity to reconcile.
+            self.store.lock().unwrap().set_run_process(&run.id,
+                &run_dir.display().to_string(), generation, &recorded_meta)?;
+        }
+        let mut child = match cmd.spawn().context("starting run supervisor") {
+            Ok(child) => child,
+            Err(error) => {
+                if auto_child {
+                    let store = self.store.lock().unwrap();
+                    let cleared = store.conn.execute(
+                        "UPDATE runs SET run_dir=NULL WHERE id=?1 AND run_dir=?2 AND process_generation=?3",
+                        rusqlite::params![run.id, run_dir.display().to_string(), generation],
+                    )?;
+                    if cleared != 1 { bail!("pre-spawn supervisor identity changed"); }
+                }
+                return Err(error);
+            }
+        };
         std::thread::spawn(move || {
             let _ = child.wait();
         });
-        let mut meta = meta;
-        meta["program"] = json!(launch.program);
-        meta["args"] = json!(launch.args.iter().map(|a| redact(a)).collect::<Vec<_>>());
-        meta["env_keys"] = json!(launch.env.keys().collect::<Vec<_>>());
-        self.store.lock().unwrap().set_run_process(&run.id, &run_dir.display().to_string(), generation, &meta)?;
+        if !auto_child {
+            self.store.lock().unwrap().set_run_process(&run.id,
+                &run_dir.display().to_string(), generation, &recorded_meta)?;
+        }
         self.store.lock().unwrap().update_run_status(&run.id, "starting", None, None)?;
         {
             let store = self.store.lock().unwrap();

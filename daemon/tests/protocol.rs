@@ -3854,6 +3854,72 @@ fn auto_running_child_survives_lost_dispatch_response_and_two_client_reconnect()
 }
 
 #[test]
+fn auto_post_spawn_write_failure_keeps_unknown_draw_claim_until_supervisor_settles() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("post-spawn-write-trace.txt");
+    let mut d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE,FIXTURE_TURN_DELAY_MS"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TURN_DELAY_MS", "6000"),
+        ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER reject_child_start_status BEFORE UPDATE OF status ON runs
+        WHEN NEW.status='starting' AND NEW.parent_run_id IS NOT NULL
+        BEGIN SELECT RAISE(FAIL, 'injected post-spawn status failure'); END;").unwrap();
+    let first = d.call("auto.dispatch", json!({"work_unit_id":"post-spawn-write-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "prompt":"browser check"}));
+    assert_eq!(first["state"], "paused", "{first}");
+    let child = d.runs().into_iter().find(|run| run["parent_run_id"] == parent).unwrap();
+    assert_eq!(child["process_generation"], 1, "failure occurred after a supervisor was spawned");
+    let claim: String = db.query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id='post-spawn-write-1'",
+        [], |row| row.get(0)).unwrap();
+    assert_ne!(claim, "released", "the supervisor may still consume allowance after a status-write failure");
+    db.execute_batch("DROP TRIGGER reject_child_start_status;").unwrap();
+    d.kill9();
+    d.spawn();
+    let child_id = child["id"].as_str().unwrap();
+    assert_eq!(d.wait_done(child_id, 15)["status"], "completed");
+    let settled_claim: String = db.query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id='post-spawn-write-1'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(settled_claim, "released");
+}
+
+#[test]
+fn auto_supervisor_is_not_spawned_before_its_durable_identity_is_written() {
+    let r = tmp();
+    let repo = repo(&r.path().join("repo"));
+    let trace = r.path().join("supervisor-order-trace.txt");
+    let d = Daemon::start(&[("OVERSEER_CODEX_PATH", &fixture("fake-harness/codex-app-fixture.js")),
+        ("OVERSEER_HARNESS_ENV_PASSTHROUGH", "FIXTURE_MODE,FIXTURE_TRACE_FILE"),
+        ("FIXTURE_MODE", "managed-models"), ("FIXTURE_TRACE_FILE", trace.to_str().unwrap())]);
+    let parent = run_id(&d.call("task.create", json!({"repo":repo,"harness":"codex-app",
+        "model":"gpt-6-astra","effort":"high","prompt":"seed context"})));
+    assert_eq!(d.wait_done(&parent, 15)["status"], "completed");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    db.execute_batch("CREATE TRIGGER reject_child_process_identity BEFORE UPDATE OF run_dir ON runs
+        WHEN NEW.parent_run_id IS NOT NULL AND NEW.run_dir IS NOT NULL
+        BEGIN SELECT RAISE(FAIL, 'injected supervisor identity failure'); END;").unwrap();
+    let response = d.call("auto.dispatch", json!({"work_unit_id":"supervisor-order-1",
+        "parent_run_id":parent,"min_tier":"general","required_tools":[],
+        "prompt":"browser check"}));
+    assert_eq!(response["state"], "paused", "{response}");
+    let child = d.runs().into_iter().find(|run| run["parent_run_id"] == parent).unwrap();
+    let child_id = child["id"].as_str().unwrap();
+    std::thread::sleep(Duration::from_millis(1200));
+    assert!(!d.home.path().join("runs").join(child_id).join("p1/shim.json").exists(),
+        "the actual supervisor must not start before its identity can be committed");
+    assert_eq!(std::fs::read_to_string(&trace).unwrap().matches("turn_model:gpt-6-sol").count(), 0,
+        "no harness turn may start without a durable supervisor identity");
+    let claim: String = db.query_row("SELECT state FROM auto_pool_claims WHERE work_unit_id='supervisor-order-1'",
+        [], |row| row.get(0)).unwrap();
+    assert_eq!(claim, "released", "a rejected pre-spawn identity write consumed no allowance");
+}
+
+#[test]
 fn auto_replay_does_not_claim_a_committed_but_unstarted_child_was_dispatched() {
     let r = tmp();
     let repo = repo(&r.path().join("repo"));
