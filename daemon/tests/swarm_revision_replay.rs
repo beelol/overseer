@@ -122,3 +122,30 @@ fn rejected_repair_request_replays_without_consuming_a_second_turn() {
     assert_eq!(state["failed_planning_turns"], 2);
     assert_eq!(state["status"], "stalled");
 }
+
+#[test]
+fn invalid_dependency_repair_request_replays_without_consuming_a_second_turn() {
+    let mut d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Invalid dependency replay",
+        "objective":"Audit","allowed_targets":["fixture"]}))["id"]
+        .as_str().unwrap().to_string();
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,
+        "jobs":jobs("Inspect route")}));
+    let request = json!({"id":run,"generation":1,"expected_revision":1,
+        "request_id":"invalid-dependency-1","reason":"Repair dependencies",
+        "jobs":[{"id":"route","title":"Inspect route","acceptance":"proof",
+            "deps":["missing"]}]});
+    assert!(d.try_call("swarm.revise", request.clone()).unwrap_err()
+        .contains("unknown dependency"));
+    assert_eq!(d.call("swarm.get", json!({"id":run}))["failed_planning_turns"], 1);
+    d.kill9();
+    d.spawn();
+    assert!(d.try_call("swarm.revise", request.clone()).unwrap_err()
+        .contains("unknown dependency"));
+    assert_eq!(d.call("swarm.get", json!({"id":run}))["failed_planning_turns"], 1);
+    let mut second = request;
+    second["request_id"] = json!("invalid-dependency-2");
+    assert!(d.try_call("swarm.revise", second).unwrap_err()
+        .contains("unknown dependency"));
+    assert_eq!(d.call("swarm.get", json!({"id":run}))["status"], "stalled");
+}

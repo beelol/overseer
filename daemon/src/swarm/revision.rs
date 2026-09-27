@@ -94,6 +94,13 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     let jobs = match parsed {
         Ok(jobs) => jobs,
         Err(error) => {
+            if let Some(request_id) = request_id {
+                let safe_error: String = crate::redact::redact(&error.to_string())
+                    .chars().take(256).collect();
+                record_planning_failure_request(store, id,
+                    Some((request_id, request_sha256.as_str(), &safe_error)))?;
+                bail!("{safe_error}");
+            }
             record_planning_failure(store, id)?;
             return Err(error);
         }
