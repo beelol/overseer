@@ -173,11 +173,25 @@ fn admit_inner(
             return Ok(blocked("snapshot_superseded"));
         }
     }
+    let job_info: Option<(String, i64, i64, Option<i64>, String)> = tx
+        .query_row(
+            "SELECT status,plan_revision,attempt_count,deadline_at_ms,required_capabilities FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            params![run, job],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+        )
+        .optional()?;
+    let Some((job_status, job_revision, attempts, old_job_deadline, planned_capabilities)) = job_info else {
+        return Ok(blocked("unknown_job"));
+    };
+    let mut required_capabilities: Vec<String> = serde_json::from_value(p["required_capabilities"].clone())?;
+    required_capabilities.extend(serde_json::from_str::<Vec<String>>(&planned_capabilities)?);
+    required_capabilities.sort();
+    required_capabilities.dedup();
     let effective = &current["policy"]["effective"];
     let request = json!({
         "now_ms":now,
         "allowed_targets":current["allowed_targets"],
-        "required_capabilities":p["required_capabilities"],
+        "required_capabilities":required_capabilities,
         "purpose":p["purpose"],
         "estimate_milli":p["estimate_milli"],
         "finishing_estimate_milli":p.get("finishing_estimate_milli").cloned().unwrap_or(json!({})),
@@ -195,16 +209,6 @@ fn admit_inner(
             candidate["reason"].as_str().unwrap_or("ineligible_target"),
         ));
     }
-    let job_info: Option<(String, i64, i64, Option<i64>)> = tx
-        .query_row(
-            "SELECT status,plan_revision,attempt_count,deadline_at_ms FROM swarm_jobs WHERE run_id=?1 AND id=?2",
-            params![run, job],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-        )
-        .optional()?;
-    let Some((job_status, job_revision, attempts, old_job_deadline)) = job_info else {
-        return Ok(blocked("unknown_job"));
-    };
     if super::context::revoked_dependency(&tx, run, job, target)? {
         return Ok(blocked("artifact_permission_revoked"));
     }

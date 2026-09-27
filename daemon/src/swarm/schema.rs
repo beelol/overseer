@@ -106,6 +106,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           acceptance TEXT NOT NULL,
           deps TEXT NOT NULL,
           resource_claims TEXT NOT NULL DEFAULT '[]',
+          required_capabilities TEXT NOT NULL DEFAULT '[]',
           status TEXT NOT NULL,
           attempt_count INTEGER NOT NULL DEFAULT 0,
           deadline_at_ms INTEGER,
@@ -617,6 +618,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
             "ALTER TABLE swarm_jobs ADD COLUMN resource_claims TEXT NOT NULL DEFAULT '[]';",
         )?;
     }
+    let has_job_required_capabilities = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_jobs') WHERE name='required_capabilities'")?
+        .exists([])?;
+    if !has_job_required_capabilities {
+        conn.execute_batch(
+            "ALTER TABLE swarm_jobs ADD COLUMN required_capabilities TEXT NOT NULL DEFAULT '[]';",
+        )?;
+    }
     let has_admitted_harness = conn
         .prepare("SELECT 1 FROM pragma_table_info('swarm_admissions') WHERE name='target_harness'")?
         .exists([])?;
@@ -850,6 +859,31 @@ mod tests {
             [], |row| Ok((row.get(0)?,row.get(1)?)),
         ).unwrap();
         assert_eq!(counts,(2,0));
+        migrate(&conn).unwrap();
+    }
+
+    #[test]
+    fn existing_jobs_gain_empty_capability_requirements_without_losing_the_plan() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE swarm_jobs(
+                run_id TEXT NOT NULL,id TEXT NOT NULL,plan_revision INTEGER NOT NULL,
+                title TEXT NOT NULL,acceptance TEXT NOT NULL,deps TEXT NOT NULL,
+                resource_claims TEXT NOT NULL DEFAULT '[]',status TEXT NOT NULL,
+                attempt_count INTEGER NOT NULL DEFAULT 0,deadline_at_ms INTEGER,
+                stop_reason TEXT,created_ms INTEGER NOT NULL,updated_ms INTEGER NOT NULL,
+                PRIMARY KEY(run_id,id));
+             INSERT INTO swarm_jobs(run_id,id,plan_revision,title,acceptance,deps,
+                resource_claims,status,created_ms,updated_ms)
+             VALUES('old-run','job',2,'Inspect','Evidence','[]','[]','ready',1,1);",
+        ).unwrap();
+        migrate(&conn).unwrap();
+        let row: (String, String, i64) = conn.query_row(
+            "SELECT required_capabilities,status,plan_revision FROM swarm_jobs
+             WHERE run_id='old-run' AND id='job'", [],
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+        ).unwrap();
+        assert_eq!(row, ("[]".into(),"ready".into(),2));
         migrate(&conn).unwrap();
     }
 }

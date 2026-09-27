@@ -129,3 +129,73 @@ fn blocked_first_job_does_not_skip_an_eligible_job_in_the_same_category() {
     assert_eq!(attempts, 2, "the conflicting job must not consume an attempt");
     assert_eq!(blocked_job_status, "ready");
 }
+
+#[test]
+fn planned_job_capabilities_survive_restart_and_constrain_every_admission_path() {
+    let mut d = Daemon::start(&[]);
+    let run = make_run_with_jobs(&d, "Capability-specific work", vec![
+        json!({"id":"j000","title":"Inspect browser flow","acceptance":"Evidence",
+            "deps":[],"required_capabilities":["browser"]}),
+        json!({"id":"j001","title":"Inspect source","acceptance":"Evidence",
+            "deps":[],"required_capabilities":["code"]}),
+    ]);
+    commit_beneficial_batch(&d, &run, &["j000".into(), "j001".into()]);
+    d.kill9();
+    d.spawn();
+    let at = now();
+    let direct = d.call("swarm.admit", json!({
+        "run_id":run,"generation":1,"revision":1,"job_id":"j000",
+        "target_id":"fixture","request_id":"browser-on-code",
+        "snapshot":snapshot(at),"now_ms":at,"required_capabilities":["code"],
+        "estimate_milli":{"points":100},"purpose":"worker"}));
+    assert_eq!(direct["status"], "blocked", "{direct}");
+    assert_eq!(direct["reason"], "missing_capability");
+    let scheduled = next(&d, "matching-job", at);
+    assert_eq!(scheduled["status"], "admitted", "{scheduled}");
+    assert_eq!(scheduled["job_id"], "j001");
+    let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+    let saved: String = db.query_row(
+        "SELECT required_capabilities FROM swarm_jobs WHERE run_id=?1 AND id='j000'",
+        [&run], |r| r.get(0),
+    ).unwrap();
+    assert_eq!(saved, r#"["browser"]"#);
+}
+
+#[test]
+fn distinct_allowed_targets_admit_only_the_jobs_they_can_perform() {
+    let d = Daemon::start(&[]);
+    let created = d.call("swarm.create", json!({"category":"Mixed capabilities",
+        "objective":"Check source and browser","allowed_targets":["fixture","browser-profile"]}));
+    let run = created["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":run,"generation":1,"revision":0,"jobs":[
+        {"id":"j000","title":"Browser flow","acceptance":"Evidence","deps":[],
+            "required_capabilities":["browser"]},
+        {"id":"j001","title":"Source path","acceptance":"Evidence","deps":[],
+            "required_capabilities":["code"]}
+    ]}));
+    commit_beneficial_batch(&d, run, &["j000".into(), "j001".into()]);
+    let at = now();
+    let mut routes = snapshot(at);
+    routes["targets"].as_array_mut().unwrap().push(json!({
+        "id":"browser-profile","account_id":"browser-account",
+        "pool_ids":["browser-pool"],"capabilities":["browser","code"],
+        "health":"up","auth":"ok"
+    }));
+    routes["pools"].as_array_mut().unwrap().push(json!({
+        "id":"browser-pool","windows":[{"id":"run","unit":"points",
+            "remaining_milli":1000000,"protected_milli":0,"reserved_milli":0,
+            "confidence":"exact","expires_ms":at+60000}]
+    }));
+    let schedule = |request_id: &str, target_id: &str| d.call("swarm.schedule.next", json!({
+        "request_id":request_id,"target_id":target_id,"now_ms":at,"snapshot":routes,
+        "required_capabilities":[],"estimate_milli":{"points":100},"purpose":"worker"
+    }));
+    let code = schedule("code-route", "fixture");
+    assert_eq!(code["status"], "admitted", "{code}");
+    assert_eq!(code["job_id"], "j001");
+    assert_eq!(code["target_id"], "fixture");
+    let browser = schedule("browser-route", "browser-profile");
+    assert_eq!(browser["status"], "admitted", "{browser}");
+    assert_eq!(browser["job_id"], "j000");
+    assert_eq!(browser["target_id"], "browser-profile");
+}

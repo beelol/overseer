@@ -11,6 +11,7 @@ struct OldJob {
     acceptance: String,
     deps: Vec<String>,
     resource_claims: Vec<plan::ResourceClaim>,
+    required_capabilities: Vec<String>,
     attempts: i64,
     status: String,
     stop_reason: Option<String>,
@@ -85,7 +86,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         bail!("swarm run cannot be revised in this state");
     }
     let mut stmt = tx.prepare(
-        "SELECT id,title,acceptance,deps,resource_claims,attempt_count,status,stop_reason FROM swarm_jobs WHERE run_id=?1",
+        "SELECT id,title,acceptance,deps,resource_claims,required_capabilities,attempt_count,status,stop_reason FROM swarm_jobs WHERE run_id=?1",
     )?;
     let rows = stmt
         .query_map(params![id], |r| {
@@ -95,15 +96,16 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
                 r.get::<_, String>(2)?,
                 r.get::<_, String>(3)?,
                 r.get::<_, String>(4)?,
-                r.get::<_, i64>(5)?,
-                r.get::<_, String>(6)?,
-                r.get::<_, Option<String>>(7)?,
+                r.get::<_, String>(5)?,
+                r.get::<_, i64>(6)?,
+                r.get::<_, String>(7)?,
+                r.get::<_, Option<String>>(8)?,
             ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
     let mut old = HashMap::new();
-    for (job_id, title, acceptance, raw_deps, raw_claims, attempts, status, stop_reason) in rows {
+    for (job_id, title, acceptance, raw_deps, raw_claims, raw_capabilities, attempts, status, stop_reason) in rows {
         old.insert(
             job_id,
             OldJob {
@@ -111,6 +113,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
                 acceptance,
                 deps: serde_json::from_str(&raw_deps)?,
                 resource_claims: serde_json::from_str(&raw_claims)?,
+                required_capabilities: serde_json::from_str(&raw_capabilities)?,
                 attempts,
                 status,
                 stop_reason,
@@ -138,6 +141,7 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
                     || o.acceptance != j.acceptance
                     || o.deps != j.deps
                     || o.resource_claims != j.resource_claims
+                    || o.required_capabilities != j.required_capabilities
             })
         })
         .map(|j| j.id.clone())
@@ -200,8 +204,8 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         let Some(previous) = old.get(&job.id) else {
             let ready = deps_satisfied(&tx, id, &job.deps, &affected)?;
             let state = if ready { "ready" } else { "planned" };
-            tx.execute("INSERT INTO swarm_jobs(run_id,id,plan_revision,title,acceptance,deps,resource_claims,status,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?9)",
-                params![id,job.id,revision,job.title,job.acceptance,serde_json::to_string(&job.deps)?,serde_json::to_string(&job.resource_claims)?,state,now])?;
+            tx.execute("INSERT INTO swarm_jobs(run_id,id,plan_revision,title,acceptance,deps,resource_claims,required_capabilities,status,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?10)",
+                params![id,job.id,revision,job.title,job.acceptance,serde_json::to_string(&job.deps)?,serde_json::to_string(&job.resource_claims)?,serde_json::to_string(&job.required_capabilities)?,state,now])?;
             continue;
         };
         if !affected.contains(&job.id) {
@@ -230,11 +234,11 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         } else {
             "planned"
         };
-        tx.execute("UPDATE swarm_jobs SET plan_revision=?3,title=?4,acceptance=?5,deps=?6,resource_claims=?7,status=?8,
-            deadline_at_ms=CASE WHEN ?10=1 THEN NULL ELSE deadline_at_ms END,
-            stop_reason=CASE WHEN ?10=1 THEN NULL ELSE stop_reason END,updated_ms=?9
+        tx.execute("UPDATE swarm_jobs SET plan_revision=?3,title=?4,acceptance=?5,deps=?6,resource_claims=?7,required_capabilities=?8,status=?9,
+            deadline_at_ms=CASE WHEN ?11=1 THEN NULL ELSE deadline_at_ms END,
+            stop_reason=CASE WHEN ?11=1 THEN NULL ELSE stop_reason END,updated_ms=?10
             WHERE run_id=?1 AND id=?2",
-            params![id,job.id,revision,job.title,job.acceptance,serde_json::to_string(&job.deps)?,serde_json::to_string(&job.resource_claims)?,state,now,i64::from(live.is_empty())])?;
+            params![id,job.id,revision,job.title,job.acceptance,serde_json::to_string(&job.deps)?,serde_json::to_string(&job.resource_claims)?,serde_json::to_string(&job.required_capabilities)?,state,now,i64::from(live.is_empty())])?;
         if live.is_empty() && unsafe_effects == 0 {
             tx.execute("UPDATE swarm_claims SET status='released',updated_ms=?3 WHERE run_id=?1 AND job_id=?2 AND status='active'",params![id,job.id,now])?;
         }

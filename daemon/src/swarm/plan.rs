@@ -12,6 +12,8 @@ pub struct JobSpec {
     pub deps: Vec<String>,
     #[serde(default)]
     pub resource_claims: Vec<ResourceClaim>,
+    #[serde(default)]
+    pub required_capabilities: Vec<String>,
 }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -143,6 +145,7 @@ fn basic_error(job: &JobSpec) -> Option<String> {
     if [job.id.as_str(), job.title.as_str(), job.acceptance.as_str()]
         .into_iter()
         .chain(job.resource_claims.iter().map(|claim| claim.resource.as_str()))
+        .chain(job.required_capabilities.iter().map(String::as_str))
         .any(|text| crate::redact::redact(text) != text)
     {
         return Some("job contains sensitive text".to_string());
@@ -167,6 +170,17 @@ fn basic_error(job: &JobSpec) -> Option<String> {
     }
     if job.resource_claims.len() > 32 {
         return Some(format!("job {} has too many resource claims", job.id));
+    }
+    if job.required_capabilities.len() > 32 {
+        return Some(format!("job {} has too many required capabilities", job.id));
+    }
+    let mut capabilities = HashSet::new();
+    for capability in &job.required_capabilities {
+        if capability.is_empty() || capability.trim() != capability
+            || capability.len() > 128 || capability.chars().any(char::is_control)
+            || !capabilities.insert(capability.as_str()) {
+            return Some(format!("job {} has an invalid required capability", job.id));
+        }
     }
     let mut resources = HashSet::new();
     for claim in &job.resource_claims {

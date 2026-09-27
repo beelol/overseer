@@ -309,3 +309,44 @@ fn planned_resource_ownership_is_visible_in_job_ledger() {
     assert_eq!(d.call("swarm.jobs",json!({"id":id}))["jobs"][0]["resource_claims"],
         json!([{"resource":"db:tenant-fixture","mode":"write"}]));
 }
+
+#[test]
+fn changing_a_job_capability_revises_only_affected_work() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Qualified work",
+        "objective":"Check two paths","allowed_targets":["fixture"]}));
+    let id = run["id"].as_str().unwrap();
+    d.call("swarm.plan", json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"a","title":"Browser flow","acceptance":"Evidence","deps":[],
+            "required_capabilities":["code"]},
+        {"id":"b","title":"Other flow","acceptance":"Evidence","deps":[],
+            "required_capabilities":["code"]}
+    ]}));
+    let revised = d.call("swarm.revise", json!({"id":id,"generation":1,
+        "expected_revision":1,"reason":"A needs a browser","jobs":[
+        {"id":"a","title":"Browser flow","acceptance":"Evidence","deps":[],
+            "required_capabilities":["browser"]},
+        {"id":"b","title":"Other flow","acceptance":"Evidence","deps":[],
+            "required_capabilities":["code"]}
+    ]}));
+    assert_eq!(revised["affected"], 1);
+    let jobs = d.call("swarm.jobs", json!({"id":id}));
+    let rows = jobs["jobs"].as_array().unwrap();
+    assert_eq!(rows[0]["required_capabilities"], json!(["browser"]));
+    assert_eq!(rows[0]["plan_revision"], 2);
+    assert_eq!(rows[1]["required_capabilities"], json!(["code"]));
+    assert_eq!(rows[1]["plan_revision"], 1);
+}
+
+#[test]
+fn malformed_job_capability_requirement_is_rejected_before_dispatch() {
+    let d = Daemon::start(&[]);
+    let run = d.call("swarm.create", json!({"category":"Bad capability",
+        "objective":"Audit","allowed_targets":["fixture"]}));
+    let id = run["id"].as_str().unwrap();
+    let error = d.try_call("swarm.plan", json!({"id":id,"generation":1,
+        "revision":0,"jobs":[{"id":"a","title":"A","acceptance":"Evidence",
+            "deps":[],"required_capabilities":["browser","browser"]}]})).unwrap_err();
+    assert!(error.contains("invalid required capability"), "{error}");
+    assert!(d.call("swarm.jobs",json!({"id":id}))["jobs"].as_array().unwrap().is_empty());
+}

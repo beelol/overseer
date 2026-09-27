@@ -117,6 +117,18 @@ fn director_replacement_waits_for_native_descendant_receipts() {
         "generation":1,"repo":checkout,"program":"/bin/sleep",
         "args":["30"],"prompt":"Audit backend","title":"Director with child receipt"}));
     let process = launched["overseer_run_id"].as_str().unwrap();
+    // Launch records the run before the supervisor binds its control socket.
+    // This test exercises descendant receipts, so wait for that setup before
+    // using a direct run interrupt to arrange the parent exit.
+    let (_, launch_dir) = launch_info(&d, process);
+    let launch: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(launch_dir.join("launch.json")).unwrap()).unwrap();
+    let socket = launch["control_socket"].as_str().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while std::os::unix::net::UnixStream::connect(socket).is_err() {
+        assert!(Instant::now() < deadline, "director control socket did not become ready");
+        std::thread::sleep(Duration::from_millis(20));
+    }
     d.call("run.interrupt",json!({"run_id":process}));
     d.wait_done(process,8);
     let db = rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
