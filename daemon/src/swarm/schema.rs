@@ -147,6 +147,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           deps TEXT NOT NULL,
           resource_claims TEXT NOT NULL DEFAULT '[]',
           required_capabilities TEXT NOT NULL DEFAULT '[]',
+          budget_role TEXT NOT NULL DEFAULT 'worker' CHECK(budget_role IN ('worker','finishing')),
           status TEXT NOT NULL,
           attempt_count INTEGER NOT NULL DEFAULT 0,
           deadline_at_ms INTEGER,
@@ -761,6 +762,13 @@ pub fn migrate(conn: &Connection) -> Result<()> {
         conn.execute_batch(
             "ALTER TABLE swarm_jobs ADD COLUMN required_capabilities TEXT NOT NULL DEFAULT '[]';",
         )?;
+    }
+    let has_job_budget_role = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_jobs') WHERE name='budget_role'")?
+        .exists([])?;
+    if !has_job_budget_role {
+        conn.execute_batch("ALTER TABLE swarm_jobs ADD COLUMN budget_role TEXT NOT NULL
+            DEFAULT 'worker' CHECK(budget_role IN ('worker','finishing'));")?;
     }
     let has_admitted_harness = conn
         .prepare("SELECT 1 FROM pragma_table_info('swarm_admissions') WHERE name='target_harness'")?

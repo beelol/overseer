@@ -14,7 +14,11 @@ pub struct JobSpec {
     pub resource_claims: Vec<ResourceClaim>,
     #[serde(default)]
     pub required_capabilities: Vec<String>,
+    #[serde(default = "worker_budget_role")]
+    pub budget_role: String,
 }
+
+fn worker_budget_role() -> String { "worker".to_string() }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ResourceClaim {
@@ -142,6 +146,9 @@ pub fn select_valid(raw: &Value, limit: usize) -> Result<(Vec<JobSpec>, Vec<Valu
 }
 
 fn basic_error(job: &JobSpec) -> Option<String> {
+    if !["worker", "finishing"].contains(&job.budget_role.as_str()) {
+        return Some(format!("job {} has an invalid budget role", job.id));
+    }
     if [job.id.as_str(), job.title.as_str(), job.acceptance.as_str()]
         .into_iter()
         .chain(job.resource_claims.iter().map(|claim| claim.resource.as_str()))

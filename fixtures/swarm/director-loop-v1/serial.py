@@ -8,6 +8,13 @@ import time
 from protocol import call
 
 
+def signal_ready(path, attempt_id):
+    ready = Path(path)
+    pending = ready.with_name(ready.name + ".pending")
+    pending.write_text(attempt_id)
+    os.replace(pending, ready)
+
+
 run = os.environ["OVERSEER_SWARM_RUN_ID"]
 generation = int(os.environ["OVERSEER_SWARM_GENERATION"])
 owner_token = os.environ["OVERSEER_SWARM_DIRECTOR_TOKEN"]
@@ -52,16 +59,16 @@ if len(sys.argv) > 3 and sys.argv[3] == "after_effect_begin":
         "effect_id": "inspect-effect", "operation_id": "fixture:inspect:effect",
         "revision": 1})
     assert effect["outcome"] == "unknown", effect
-    Path(sys.argv[2]).write_text(admission["attempt_id"])
+    signal_ready(sys.argv[2], admission["attempt_id"])
     time.sleep(30)
 if len(sys.argv) > 3 and sys.argv[3] == "after_scope_narrowed":
     revised = call("swarm.revise", {**auth, "id": run, "expected_revision": 1,
         "reason": "Owner removed the inspect job", "jobs": []})
     assert revised["revision"] == 2, revised
-    Path(sys.argv[2]).write_text(admission["attempt_id"])
+    signal_ready(sys.argv[2], admission["attempt_id"])
     time.sleep(30)
 if len(sys.argv) > 2 and (len(sys.argv) < 4 or sys.argv[3] == "after_admit"):
-    Path(sys.argv[2]).write_text(admission["attempt_id"])
+    signal_ready(sys.argv[2], admission["attempt_id"])
     time.sleep(30)
 
 try:
@@ -93,7 +100,7 @@ call("swarm.report", {"run_id": run, "job_id": "inspect",
     "message_id": "serial-result", "type": "result", "revision": 1,
     "payload": {"artifact_ids": ["serial-proof"], "audit_outcome": "negative"}})
 if len(sys.argv) > 3 and sys.argv[3] == "after_report":
-    Path(sys.argv[2]).write_text(admission["attempt_id"])
+    signal_ready(sys.argv[2], admission["attempt_id"])
     time.sleep(30)
 decision = call("swarm.decide", {**auth, "revision": 1, "job_id": "inspect",
     "decision": "accept", "evidence": ["serial-proof"]})

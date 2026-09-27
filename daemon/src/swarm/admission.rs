@@ -242,16 +242,21 @@ fn admit_inner(
             return Ok(blocked("snapshot_superseded"));
         }
     }
-    let job_info: Option<(String, i64, i64, Option<i64>, String)> = tx
+    let job_info: Option<(String, i64, i64, Option<i64>, String, String)> = tx
         .query_row(
-            "SELECT status,plan_revision,attempt_count,deadline_at_ms,required_capabilities FROM swarm_jobs WHERE run_id=?1 AND id=?2",
+            "SELECT status,plan_revision,attempt_count,deadline_at_ms,required_capabilities,budget_role FROM swarm_jobs WHERE run_id=?1 AND id=?2",
             params![run, job],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
         )
         .optional()?;
-    let Some((job_status, job_revision, attempts, old_job_deadline, planned_capabilities)) = job_info else {
+    let Some((job_status, job_revision, attempts, old_job_deadline, planned_capabilities, budget_role)) = job_info else {
         return Ok(blocked("unknown_job"));
     };
+    if p["purpose"] == "finishing" && budget_role != "finishing" {
+        return Ok(blocked("finishing_purpose_not_authorized"));
+    }
+    let budget_purpose = if budget_role == "finishing" { "finishing" }
+        else if director_self { "director_self" } else { "worker" };
     let mut required_capabilities: Vec<String> = serde_json::from_value(p["required_capabilities"].clone())?;
     required_capabilities.extend(serde_json::from_str::<Vec<String>>(&planned_capabilities)?);
     required_capabilities.sort();
@@ -261,7 +266,7 @@ fn admit_inner(
         "now_ms":now,
         "allowed_targets":current["allowed_targets"],
         "required_capabilities":required_capabilities,
-        "purpose":p["purpose"],
+        "purpose":budget_purpose,
         "estimate_milli":p["estimate_milli"],
         "finishing_estimate_milli":p.get("finishing_estimate_milli").cloned().unwrap_or(json!({})),
         "allow_estimated":effective["allow_estimated_quota"].as_bool().unwrap_or(false),
@@ -566,7 +571,7 @@ fn admit_inner(
             params![run, pool, unit],
             |r| r.get(0),
         )?;
-        let available = if p["purpose"] == "finishing" {
+        let available = if budget_role == "finishing" {
             allocation.saturating_sub(own_reserved)
         } else {
             allocation

@@ -1089,6 +1089,58 @@ fn run_percentage_overrides_change_frozen_allocation_and_finishing_reserve() {
 }
 
 #[test]
+fn worker_cannot_claim_finishing_purpose_to_spend_the_completion_reserve() {
+    let mut d=Daemon::start(&[]);
+    let run=d.call("swarm.create",json!({"category":"Protected synthesis budget",
+        "objective":"Audit and synthesize","allowed_targets":["codex-a"]}));
+    let id=run["id"].as_str().unwrap();
+    d.call("swarm.plan",json!({"id":id,"generation":1,"revision":0,"jobs":[
+        {"id":"seed","title":"Initial inspection","acceptance":"evidence","deps":[]},
+        {"id":"probe","title":"Probe routes","acceptance":"evidence","deps":[]},
+        {"id":"extra","title":"Extra probe","acceptance":"evidence","deps":[]},
+        {"id":"synthesis","title":"Synthesize findings","acceptance":"report",
+            "budget_role":"finishing","deps":[]}
+    ]}));
+    commit_beneficial_batch(&d,id,&["seed".into(),"probe".into(),"extra".into(),"synthesis".into()]);
+    let at=now();
+    let request=|job:&str,purpose:&str,estimate:i64|json!({"run_id":id,
+        "generation":1,"revision":1,"job_id":job,"target_id":"codex-a",
+        "request_id":format!("{job}-{purpose}"),"snapshot":snapshot(at,1000000),
+        "now_ms":at,"required_capabilities":["code"],
+        "estimate_milli":{"points":estimate},"purpose":purpose});
+    let seed=d.call("swarm.admit",request("seed","worker",10000));
+    assert_eq!(seed["status"],"admitted","{seed}");
+    let probe=d.call("swarm.admit",request("probe","worker",60000));
+    assert_eq!(probe["status"],"admitted","{probe}");
+    let normal=d.call("swarm.admit",request("extra","worker",11000));
+    assert_eq!(normal["reason"],"finishing_reserve","{normal}");
+    let forged=d.call("swarm.admit",request("extra","finishing",20000));
+    assert_eq!(forged["reason"],"finishing_purpose_not_authorized","{forged}");
+    d.kill9(); d.spawn();
+    let synthesis=d.call("swarm.admit",request("synthesis","finishing",20000));
+    assert_eq!(synthesis["status"],"admitted","{synthesis}");
+    assert_eq!(synthesis["allocation_milli"],100000);
+
+    let other_d=Daemon::start(&[]);
+    let other=setup(&other_d,"Larger finishing estimate",2);
+    commit_beneficial_batch(&other_d,&other,&["j0".into(),"j1".into()]);
+    let mut first=request("seed","worker",10000);
+    first["run_id"]=json!(other);
+    first["job_id"]=json!("j0");
+    first["request_id"]=json!("estimate-35-seed");
+    first["finishing_estimate_milli"]=json!({"points":35000});
+    let admitted=other_d.call("swarm.admit",first);
+    assert_eq!(admitted["status"],"admitted","{admitted}");
+    assert_eq!(admitted["allocation_milli"],100000);
+    let mut second=request("probe","worker",60000);
+    second["run_id"]=json!(other);
+    second["job_id"]=json!("j1");
+    second["request_id"]=json!("estimate-35-worker");
+    let held=other_d.call("swarm.admit",second);
+    assert_eq!(held["reason"],"finishing_reserve","{held}");
+}
+
+#[test]
 fn explicit_run_deadline_extension_survives_restart_without_new_account_allocation() {
     let mut d = Daemon::start(&[]);
     let run = d.call("swarm.create",json!({"category":"Extended audit","objective":"Audit",

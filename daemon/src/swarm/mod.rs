@@ -596,16 +596,16 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
     if progressed {
         bail!("cannot replace a plan with active or completed jobs; use a revision transition");
     }
-    let mut stmt = tx.prepare("SELECT id,title,acceptance,deps,resource_claims,required_capabilities FROM swarm_jobs WHERE run_id=?1 ORDER BY id")?;
+    let mut stmt = tx.prepare("SELECT id,title,acceptance,deps,resource_claims,required_capabilities,budget_role FROM swarm_jobs WHERE run_id=?1 ORDER BY id")?;
     let rows = stmt.query_map(params![id], |r| {
         Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,
-            r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?))
+            r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?,r.get::<_,String>(6)?))
     })?.collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
-    let existing = rows.into_iter().map(|(id,title,acceptance,deps,resource_claims,required_capabilities)| {
+    let existing = rows.into_iter().map(|(id,title,acceptance,deps,resource_claims,required_capabilities,budget_role)| {
         Ok(JobSpec { id,title,acceptance,deps:serde_json::from_str(&deps)?,
             resource_claims:serde_json::from_str(&resource_claims)?,
-            required_capabilities:serde_json::from_str(&required_capabilities)? })
+            required_capabilities:serde_json::from_str(&required_capabilities)?,budget_role })
     }).collect::<Result<Vec<_>>>()?;
     let mut proposed = jobs.clone();
     proposed.sort_by(|a,b| a.id.cmp(&b.id));
@@ -618,8 +618,8 @@ pub fn plan(store: &mut Store, p: &Value) -> Result<Value> {
     for job in &jobs {
         let status = "planned";
         tx.execute(
-            "INSERT INTO swarm_jobs(run_id,id,plan_revision,title,acceptance,deps,resource_claims,required_capabilities,status,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?10)",
-            params![id,job.id,revision+1,job.title,job.acceptance,serde_json::to_string(&job.deps)?,serde_json::to_string(&job.resource_claims)?,serde_json::to_string(&job.required_capabilities)?,status,now],
+            "INSERT INTO swarm_jobs(run_id,id,plan_revision,title,acceptance,deps,resource_claims,required_capabilities,budget_role,status,created_ms,updated_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?11)",
+            params![id,job.id,revision+1,job.title,job.acceptance,serde_json::to_string(&job.deps)?,serde_json::to_string(&job.resource_claims)?,serde_json::to_string(&job.required_capabilities)?,job.budget_role,status,now],
         )?;
     }
     tx.execute(
@@ -683,6 +683,7 @@ pub fn jobs(store: &Store, p: &Value) -> Result<Value> {
             "deps":serde_json::from_str::<Value>(&deps).unwrap_or(Value::Null),
             "resource_claims":serde_json::from_str::<Value>(&resource_claims).unwrap_or(Value::Null),
             "required_capabilities":serde_json::from_str::<Value>(&required_capabilities).unwrap_or(Value::Null),
+            "budget_role":r.get::<_,String>("budget_role")?,
             "status":r.get::<_,String>("status")?,"attempt_count":r.get::<_,i64>("attempt_count")?,
             "deadline_at_ms":r.get::<_,Option<i64>>("deadline_at_ms")?,
             "stop_reason":r.get::<_,Option<String>>("stop_reason")?,
