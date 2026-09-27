@@ -1084,7 +1084,7 @@ rec(87, "Verified local catalogue, Qwen coders first", "verified", commit="62b00
 - **In the interface:** automatic picks take only models the catalogue marks passed (`qwen3-coder:30b`); the Agent menu, the model menu and the New Task tiles show a failed model with *failed its check* and a model outside the catalogue with *unverified*, and the reason in the tooltip; the user may still name one.""",
     evidence="[evidence/ac-87/](evidence/ac-87/), daemon/src/local_catalogue.json, test/local/catalogue-verify.js, test/local/codex-oss-eval.js",
     live="Real harnesses and real local models.",
-    limits="One machine, one quantisation (Q4_K_M), Ollama 0.34.2. The check is one small task, three times.",
+    limits="One machine, one quantisation (Q4_K_M), Ollama 0.34.2. The check is one small task, three times.",)
 rec(88, "Settings the daemon enforces", "verified", commit="15108e4", date="2026-09-27",
     harness="Real `overseerd` binary for the protocol tests (the network, the memory and Ollama are fixtures). The packaged extension in an isolated VS Code profile, driven over the debugging protocol; a real `overseerd`; everything else synthetic: the network and the memory are files, Ollama is fixtures/fake-harness/ollama-fixture.js with four models (no model runs), Codex and Claude Code are fixtures/fake-harness/continuity-harness.js, OpenCode is fixtures/fake-harness/opencode-serve-fixture.js. No account and no paid tokens",
     fixture="An isolated OVERSEER_HOME per test. An isolated OVERSEER_HOME, VS Code profile and extensions folder per scenario; evidence in docs/verification/evidence/ui/continuity-settings/ (screenshots, scenario.log, result.json)",
