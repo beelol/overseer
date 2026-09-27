@@ -146,11 +146,23 @@ fn admit_inner(
     if current["status"] != "planning" && current["status"] != "running" {
         return Ok(blocked("run_not_admitting"));
     }
-    if tx
-        .prepare("SELECT 1 FROM swarm_availability WHERE run_id=?1 AND state='blocked'")?
-        .exists(params![run])?
-    {
-        return Ok(blocked("run_availability_blocked"));
+    let observed_availability: Option<(String, String)> = tx
+        .query_row(
+            "SELECT state,snapshot_sha256 FROM swarm_availability WHERE run_id=?1",
+            params![run],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?;
+    if let Some((state, snapshot_sha256)) = observed_availability {
+        if state == "blocked" {
+            return Ok(blocked("run_availability_blocked"));
+        }
+        if snapshot_sha256.is_empty() {
+            return Ok(blocked("snapshot_unknown"));
+        }
+        if snapshot_sha256 != hash(&p["snapshot"].to_string()) {
+            return Ok(blocked("snapshot_superseded"));
+        }
     }
     let effective = &current["policy"]["effective"];
     let request = json!({

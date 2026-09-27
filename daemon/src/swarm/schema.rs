@@ -35,6 +35,7 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           eligible_targets TEXT NOT NULL,
           purpose TEXT NOT NULL,
           request_sha256 TEXT NOT NULL,
+          snapshot_sha256 TEXT NOT NULL,
           observed_ms INTEGER NOT NULL,
           expires_ms INTEGER NOT NULL,
           wake_count INTEGER NOT NULL DEFAULT 0,
@@ -481,6 +482,18 @@ pub fn migrate(conn: &Connection) -> Result<()> {
              UPDATE swarm_availability SET state='blocked',reason='assessment_unknown',eligible_targets='[]';",
         )?;
     }
+    let has_availability_snapshot_sha256 = conn
+        .prepare("SELECT 1 FROM pragma_table_info('swarm_availability') WHERE name='snapshot_sha256'")?
+        .exists([])?;
+    if !has_availability_snapshot_sha256 {
+        // A saved observation without its source snapshot cannot authorize a
+        // later admission. A fresh observation restores eligibility.
+        conn.execute_batch(
+            "ALTER TABLE swarm_availability ADD COLUMN snapshot_sha256 TEXT NOT NULL DEFAULT '';
+             UPDATE swarm_availability SET state='blocked',reason='snapshot_unknown',eligible_targets='[]'
+             WHERE state='eligible';",
+        )?;
+    }
     let has_failed_planning_turns = conn
         .prepare(
             "SELECT 1 FROM pragma_table_info('swarm_runs') WHERE name='failed_planning_turns'",
@@ -636,6 +649,41 @@ mod tests {
             (
                 "blocked".into(),
                 "assessment_unknown".into(),
+                "[]".into(),
+                "".into()
+            )
+        );
+        migrate(&conn).unwrap();
+    }
+
+    #[test]
+    fn availability_without_snapshot_identity_fails_closed_during_migration() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE swarm_availability(
+                run_id TEXT PRIMARY KEY,state TEXT NOT NULL,reason TEXT,
+                eligible_targets TEXT NOT NULL,purpose TEXT NOT NULL,
+                request_sha256 TEXT NOT NULL,observed_ms INTEGER NOT NULL,
+                expires_ms INTEGER NOT NULL,wake_count INTEGER NOT NULL,
+                updated_ms INTEGER NOT NULL);
+             INSERT INTO swarm_availability VALUES(
+                'old-run','eligible',NULL,'[\"route-a\"]','worker','assessment',1,2,0,1);",
+        )
+        .unwrap();
+        migrate(&conn).unwrap();
+        let row: (String, String, String, String) = conn
+            .query_row(
+                "SELECT state,reason,eligible_targets,snapshot_sha256
+                 FROM swarm_availability WHERE run_id='old-run'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            row,
+            (
+                "blocked".into(),
+                "snapshot_unknown".into(),
                 "[]".into(),
                 "".into()
             )

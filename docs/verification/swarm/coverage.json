@@ -241,7 +241,7 @@
         "docs/rfcs/swarm-auto-contract.md",
         "docs/verification/swarm/SWARM-24.md"
       ],
-      "blocker": "The fixture admission revalidates a target snapshot and shares the app agent-slot lock; the proposed contract now specifies job identity, attempts, category allocation and common proofs. The actual Auto Mode producer and shared account-quota authority are not integrated."
+      "blocker": "The fixture admission revalidates a target snapshot, fences admissions against the latest persisted availability observation, and shares the app agent-slot lock; the proposed contract specifies job identity, attempts, category allocation and common proofs. The actual Auto Mode producer and shared account-quota authority are not integrated."
     },
     "SWARM-25": {
       "status": "unverified",
@@ -614,6 +614,7 @@
       "status": "partial",
       "evidence": [
         "daemon/tests/swarm_availability.rs",
+        "daemon/tests/swarm_admission.rs",
         "daemon/src/swarm/availability.rs",
         "docs/verification/swarm/SWARM-59.md",
         "daemon/tests/swarm_dispatch_incident.rs",
@@ -621,7 +622,7 @@
         "daemon/tests/swarm_atlas.rs",
         "docs/verification/swarm/S5.md"
       ],
-      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. A joined Atlas replay now blocks J4 after an injected external allowance reduction while preserving and accepting J2 backend evidence; an older generous admission snapshot cannot bypass the block. Live Auto Mode updates, numeric before/after allowance display, a normal status UI, user-triggered target changes and live director behavior remain unverified."
+      "blocker": "Fixture observations persist eligibility blocks and suppress unchanged-state wakes, including S4 after all qualified selected accounts disappear. A joined Atlas replay blocks J4 after an injected external allowance reduction while preserving J2 backend evidence; a separate cross-category regression fences an older generous admission snapshot even when the newer observation remains eligible. Live Auto Mode updates, numeric before/after allowance display, a normal status UI, user-triggered target changes and live director behavior remain unverified."
     },
     "SWARM-60": {
       "status": "partial",

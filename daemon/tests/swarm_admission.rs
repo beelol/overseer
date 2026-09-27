@@ -140,6 +140,47 @@ fn shared_pool_reservation_blocks_stale_capacity_across_categories() {
 }
 
 #[test]
+fn newer_allowance_observation_fences_stale_admission_snapshot() {
+    let d=Daemon::start(&[]);
+    let owner=setup(&d,"Observed capacity owner",1);
+    let candidate=setup(&d,"Observed capacity candidate",1);
+    let at=now();
+    let held=admit(&d,&owner,"j0","codex-a","owner-reservation",at,100000,1200).unwrap();
+    assert_eq!(held["status"],"admitted","{held}");
+    let reduced=snapshot(at+2000,1250);
+    let observed=d.call("swarm.availability.observe",json!({"run_id":candidate,
+        "snapshot":reduced.clone(),"now_ms":at+2000,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(observed["state"],"eligible","{observed}");
+    assert_eq!(observed["changed"],true);
+    assert!(d.try_call("swarm.availability.observe",json!({"run_id":candidate,
+        "snapshot":snapshot(at+2000,1260),"now_ms":at+2000,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"})).unwrap_err().contains("conflicting availability observation"));
+    let request=|id:&str,snapshot:Value,when:i64|json!({"run_id":candidate,
+        "generation":1,"revision":1,"job_id":"j0","target_id":"opencode-a",
+        "request_id":id,"snapshot":snapshot,"now_ms":when,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"});
+    let stale=d.call("swarm.admit",request("stale-larger",snapshot(at,100000),at+2000));
+    assert_eq!(stale["status"],"blocked","{stale}");
+    assert_eq!(stale["reason"],"snapshot_superseded");
+    let fresh=d.call("swarm.admit",request("current-smaller",reduced,at+2000));
+    assert_eq!(fresh["status"],"blocked","{fresh}");
+    assert_eq!(fresh["reason"],"shared_pool_headroom");
+    let newer=snapshot(at+3000,3000);
+    let recovered=d.call("swarm.availability.observe",json!({"run_id":candidate,
+        "snapshot":newer.clone(),"now_ms":at+3000,
+        "required_capabilities":["code"],"estimate_milli":{"points":100},
+        "purpose":"worker"}));
+    assert_eq!(recovered["changed"],true);
+    assert_eq!(recovered["woken"],false);
+    let resumed=d.call("swarm.admit",request("recovered",newer,at+3000));
+    assert_eq!(resumed["status"],"admitted","{resumed}");
+}
+
+#[test]
 fn ordinary_run_occupies_global_slot_until_confirmed_exit() {
     let d = Daemon::start(&[]);
     d.call("agents.limit.set",json!({"max_active":2}));

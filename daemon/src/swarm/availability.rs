@@ -80,6 +80,7 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
         "{:x}",
         Sha256::digest(stable_request.to_string().as_bytes())
     );
+    let snapshot_sha256 = format!("{:x}", Sha256::digest(p["snapshot"].to_string().as_bytes()));
     let preview = policy::preview(&json!({"snapshot":p["snapshot"],"request":request}))?;
     let observed = p["snapshot"]["observed_ms"]
         .as_i64()
@@ -128,17 +129,17 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
         "eligible"
     };
     let old = get(store, run)?;
-    let prior_request_sha256: Option<String> = store
+    let prior_hashes: Option<(String, String)> = store
         .conn
         .query_row(
-            "SELECT request_sha256 FROM swarm_availability WHERE run_id=?1",
+            "SELECT request_sha256,snapshot_sha256 FROM swarm_availability WHERE run_id=?1",
             params![run],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .optional()?;
-    if prior_request_sha256
-        .as_deref()
-        .is_some_and(|hash| hash != request_sha256)
+    if prior_hashes
+        .as_ref()
+        .is_some_and(|(hash, _)| hash != &request_sha256)
     {
         bail!("availability assessment changed");
     }
@@ -149,7 +150,10 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
         || old["state"] != state
         || old["reason"] != reason.as_deref().map(Value::from).unwrap_or(Value::Null)
         || old["eligible_targets"] != json!(eligible)
-        || old["purpose"] != purpose;
+        || old["purpose"] != purpose
+        || prior_hashes
+            .as_ref()
+            .is_some_and(|(_, hash)| hash != &snapshot_sha256);
     if !old.is_null() && observed == old["observed_ms"].as_i64().unwrap_or(-1) && changed {
         bail!("conflicting availability observation at the same time");
     }
@@ -157,13 +161,14 @@ pub fn observe(store: &mut Store, p: &Value) -> Result<Value> {
     let wakes = old["wake_count"].as_i64().unwrap_or(0) + i64::from(woken);
     let tx = store.conn.transaction()?;
     tx.execute(
-        "INSERT INTO swarm_availability(run_id,state,reason,eligible_targets,purpose,request_sha256,observed_ms,expires_ms,wake_count,updated_ms)
-         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
+        "INSERT INTO swarm_availability(run_id,state,reason,eligible_targets,purpose,request_sha256,snapshot_sha256,observed_ms,expires_ms,wake_count,updated_ms)
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)
          ON CONFLICT(run_id) DO UPDATE SET state=excluded.state,reason=excluded.reason,
          eligible_targets=excluded.eligible_targets,purpose=excluded.purpose,
+         snapshot_sha256=excluded.snapshot_sha256,
          observed_ms=excluded.observed_ms,expires_ms=excluded.expires_ms,
          wake_count=excluded.wake_count,updated_ms=excluded.updated_ms",
-        params![run,state,reason,json!(eligible).to_string(),purpose,request_sha256,observed,expires,wakes,now],
+        params![run,state,reason,json!(eligible).to_string(),purpose,request_sha256,snapshot_sha256,observed,expires,wakes,now],
     )?;
     if woken {
         let message_id = format!("availability-wake-{wakes}");
