@@ -92,3 +92,33 @@ evidence; this branch corrected them, and the link check found zero broken
 links. Accepted dependent work still needs automatic invalidation/re-review;
 autonomous semantic judgment, unresolved partial reporting, and a qualified
 live director remain unverified. SWARM-47 stays partial.
+
+Accepted-dependent follow-up at `07817d7` (2026-09-27): a focused fixture
+accepts a route finding, a consumer of that finding, its dependent summary,
+and an unrelated check before a late contradictory result arrives. Before the
+change the consumer and summary still read `accepted`. Conflict registration
+now walks the downstream graph and marks already finished submitted/accepted
+dependents `blocked` with `evidence_conflict`, preserving their decisions,
+attempt counts and artifacts as history. A dependent whose attempt is still
+registered instead gets the durable checkpoint/interrupt path. Coverage reads
+`dependency_conflict` rather than a current checked conclusion. Restart and
+duplicate conflict registration leave one effect, and the unrelated accepted
+job remains accepted.
+
+An independent reproduction supporting the original route result resolves the
+ancestor conflict but does not silently restore the consumer or summary. The
+director explicitly revises the consumer acceptance check; the revision
+propagates to the summary. An old artifact is refused for the new revision.
+The transitive fixture then executes and accepts a second middle attempt with
+fresh evidence before its leaf becomes ready. The new focused fixture failed
+first with the consumer still accepted and passed after the change. An older
+fixture initially failed because it expected resolution alone to release the
+leaf; it now checks the safer re-review sequence. The eight-test conflict suite,
+broker (18), context (5), plan (11), runtime (24), and state (19) suites passed.
+The disposable PostgreSQL Atlas replay passed all 17 tests, including the J7/J8
+contradiction. `git diff --check`, JSON validation, and the link check passed.
+
+This evidence is fixture-only. A real director's semantic choice, a complete
+unresolved partial report, an integrated-patch dependent under late
+contradiction, and qualified live director behavior remain unverified. The
+criterion and RFC box remain partial/unchecked.
