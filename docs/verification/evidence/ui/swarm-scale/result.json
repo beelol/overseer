@@ -54,7 +54,7 @@
         "reason": "beneficial",
         "replay": false,
         "revision": 1,
-        "run_id": "sw-90da9dcbb3eb",
+        "run_id": "sw-0a17d4039ba3",
         "serial": {
           "affordable": true,
           "elapsed_ms": 3240,
@@ -304,7 +304,7 @@
       "detail": {
         "status": "paused",
         "active_worker_processes": 32,
-        "pause_ms": 98
+        "pause_ms": 100
       }
     },
     {
@@ -324,15 +324,15 @@
       "ok": true,
       "detail": {
         "status": "stopping",
-        "unconfirmed_exit_count": 8,
-        "stop_ms": 76
+        "unconfirmed_exit_count": 11,
+        "stop_ms": 73
       }
     },
     {
       "name": "the SIGINT-resistant fixture worker remains unconfirmed with its estimate reserved",
       "ok": true,
       "detail": {
-        "unconfirmed_exit_count": 8,
+        "unconfirmed_exit_count": 11,
         "capacity": {
           "provider_usage_state": "unknown",
           "selected_targets": [
@@ -416,7 +416,8 @@
       "ok": true,
       "detail": {
         "count": 32,
-        "live": 0
+        "live": 0,
+        "forced_cleanup": false
       }
     }
   ]

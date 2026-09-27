@@ -17,13 +17,17 @@ function benefitEstimate(ids) {
     serial: costs(10), parallel: costs(20) };
 }
 
-function liveWorkerPids(home, runId) {
+function workerPids(home, runId) {
   const code = `import json, sqlite3, pathlib, sys
 db = sqlite3.connect(sys.argv[1])
 rows = db.execute("SELECT r.run_dir FROM swarm_worker_launches l JOIN runs r ON r.id=l.overseer_run_id WHERE l.run_id=?", (sys.argv[2],)).fetchall()
 print(json.dumps([json.loads((pathlib.Path(row[0]) / 'shim.json').read_text())['child_pid'] for row in rows]))`;
   const out = cp.execFileSync('python3', ['-c', code, path.join(home, 'overseer.sqlite'), runId], { encoding: 'utf8' });
-  const pids = JSON.parse(out);
+  return JSON.parse(out);
+}
+
+function liveWorkerPids(home, runId) {
+  const pids = workerPids(home, runId);
   return { count: pids.length, live: pids.filter(pid => { try { process.kill(pid, 0); return true; } catch { return false; } }).length };
 }
 
@@ -228,6 +232,20 @@ print(json.dumps([json.loads((pathlib.Path(row[0]) / 'shim.json').read_text())['
     try { await s.screenshot('error'); } catch {}
   } finally {
     if (runId) { try { s.ctl('swarm.stop', { run_id: runId }); } catch (error) { s.note('cleanup Stop failed', error.message); } }
+    let forcedCleanup = false;
+    if (runId && !process.env.KEEP_OPEN) {
+      try {
+        for (let n = 0; n < 130 && liveWorkerPids(s.home, runId).live > 0; n++) await delay(100);
+        const survivors = workerPids(s.home, runId).filter(pid => { try { process.kill(pid, 0); return true; } catch { return false; } });
+        if (survivors.length) {
+          forcedCleanup = true;
+          s.note('Fixture workers needed forced cleanup', survivors);
+          for (const pid of survivors) { try { process.kill(pid, 'SIGTERM'); } catch {} }
+          await delay(300);
+          for (const pid of survivors) { try { process.kill(pid, 0); process.kill(pid, 'SIGKILL'); } catch {} }
+        }
+      } catch (error) { forcedCleanup = true; s.note('Fixture cleanup inspection failed', error.message); }
+    }
     if (!process.env.KEEP_OPEN) { await s.quit(); s.stopDaemon(); }
     if (runId && !process.env.KEEP_OPEN) {
       let processes;
@@ -237,7 +255,8 @@ print(json.dumps([json.loads((pathlib.Path(row[0]) / 'shim.json').read_text())['
         await delay(100);
       }
       check('all fixture worker processes exit after Stop and teardown',
-        processes.count === 32 && processes.live === 0, processes);
+        processes.count === 32 && processes.live === 0 && !forcedCleanup,
+        { ...processes, forced_cleanup: forcedCleanup });
     }
     s.writeLog();
     fs.writeFileSync(path.join(s.evidence, 'result.json'), JSON.stringify(result, null, 2));
