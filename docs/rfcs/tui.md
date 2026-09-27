@@ -223,7 +223,7 @@ T-01 to T-13 were the first draft; T-14 onward extend it toward a full TUI. Veri
   Mode off and none beyond the title's terminators with it on. The daemon and TUI suites pass on
   main with pull requests #5 and #6 together.
 
-T-23 and T-24 are built in pull request #6 (branch `codex/audio-tui-controls`, code at 47312f3), which is not merged yet.
-Until it is, their evidence is on that branch: [the evidence index](https://github.com/beelol/overseer/blob/fcde999/docs/verification/evidence/tui/README.md),
-[both suites on main with pull requests #5 and #6](https://github.com/beelol/overseer/blob/fcde999/docs/verification/evidence/tui/t23-t24-suites.txt) and
-[the run against a daemon without Audio Mode](https://github.com/beelol/overseer/blob/fcde999/docs/verification/evidence/tui/t24-old-daemon.txt).
+T-23 and T-24 came with pull request #6 (code at 47312f3, merged into main as ea6a6c2 on 2026-09-27). Their evidence is in
+[the evidence index](../verification/evidence/tui/README.md):
+[both suites on main with pull requests #5 and #6](../verification/evidence/tui/t23-t24-suites.txt) and
+[the run against a daemon without Audio Mode](../verification/evidence/tui/t24-old-daemon.txt).

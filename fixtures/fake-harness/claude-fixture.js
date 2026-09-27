@@ -47,6 +47,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     const file = path.join(process.cwd(), 'perm.txt');
     // Like the live CLI: the tool_use is reported first, then the permission request.
     assistant([{ type: 'tool_use', id: 'toolu_write', name: 'Write', input: { file_path: file, content: 'allowed\n' } }]);
+    if (process.env.FIXTURE_PERMISSION_BARRIER) {
+      const deadline = Date.now() + 30000;
+      while (!fs.existsSync(process.env.FIXTURE_PERMISSION_BARRIER) && Date.now() < deadline) await sleep(10);
+      if (!fs.existsSync(process.env.FIXTURE_PERMISSION_BARRIER)) throw new Error('permission fixture barrier timed out');
+    }
     out({ type: 'control_request', request_id: 'req-1', request: { subtype: 'can_use_tool', tool_name: 'Write', input: { file_path: file, content: 'allowed\n' } } });
     const reply = await next(m => m.type === 'control_response' || (m.type === 'control_request' && m.request?.subtype === 'interrupt'));
     if (reply.type === 'control_request') { result(true, 'interrupted'); await sleep(50); process.exit(130); }

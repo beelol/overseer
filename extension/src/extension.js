@@ -580,6 +580,52 @@ async function activate(context) {
       await vscode.window.showTextDocument(doc, { preview: true });
     })),
     vscode.commands.registerCommand('overseer.stopAll', guard(stopAll)),
+    vscode.commands.registerCommand('overseer.audioMode', guard(async () => {
+      const audio = await client.request('audio.get');
+      const trackName = { reactor: 'Reactor signals', system: 'System voice', commander: 'Private Commander' }[audio.track] || audio.track;
+      const choice = await vscode.window.showQuickPick([
+        { label: audio.enabled ? 'Turn Audio Mode off' : 'Turn Audio Mode on', action: 'toggle' },
+        { label: 'Choose audio track…', action: 'track' },
+        { label: 'Choose system voice…', action: 'voice' },
+        { label: 'Import private Commander pack…', action: 'import' },
+        { label: 'Preview cue…', action: 'preview' },
+      ], { title: 'Overseer Audio Mode', placeHolder: `${trackName} · ${audio.enabled ? 'On' : 'Off'}` });
+      if (!choice) return;
+      async function importCommander() {
+        const folders = await vscode.window.showOpenDialog({ title: 'Select your private Commander pack folder', canSelectFolders: true, canSelectFiles: false, canSelectMany: false });
+        if (!folders?.length) return false;
+        await client.request('audio.import_commander', { path: folders[0].fsPath });
+        return true;
+      }
+      if (choice.action === 'toggle') {
+        const result = await client.request('audio.set', { enabled: !audio.enabled });
+        vscode.window.showInformationMessage(`Overseer Audio Mode ${result.enabled ? 'on' : 'off'}.`);
+      } else if (choice.action === 'track') {
+        const chosen = await vscode.window.showQuickPick([
+          { label: 'Reactor signals', detail: 'Twelve short original synth cues', track: 'reactor' },
+          { label: 'System voice', detail: 'Speech generated on this Mac', track: 'system' },
+          { label: 'Private Commander', detail: audio.commander_imported ? 'Uses your local imported folder' : 'Choose a private folder first', track: 'commander' },
+        ], { title: 'Choose audio track' });
+        if (!chosen) return;
+        if (chosen.track === 'commander' && !audio.commander_imported && !await importCommander()) return;
+        await client.request('audio.set', { track: chosen.track });
+        vscode.window.setStatusBarMessage(`Overseer audio: ${chosen.label}`, 3000);
+      } else if (choice.action === 'voice') {
+        const voices = await client.request('audio.voices');
+        const chosen = await vscode.window.showQuickPick([
+          { label: 'System default', voice: '' },
+          ...voices.map(item => ({ label: item.name, description: item.locale, voice: item.name })),
+        ], { title: 'Choose system voice', matchOnDescription: true });
+        if (chosen) await client.request('audio.set', { track: 'system', voice: chosen.voice });
+      } else if (choice.action === 'import') {
+        if (await importCommander()) vscode.window.showInformationMessage('Private Commander pack is ready. The files stay in your selected folder.');
+      } else {
+        const core = new Set(audio.default_keys);
+        const cues = audio.manifest.filter(item => audio.track === 'reactor' || core.has(item.key));
+        const cue = await vscode.window.showQuickPick(cues.map(item => ({ label: item.label, description: audio.track === 'reactor' ? `${item.duration.toFixed(2)}s` : undefined, detail: item.meaning, key: item.key })), { title: `Preview ${trackName} cue` });
+        if (cue) await client.request('audio.preview', { key: cue.key });
+      }
+    })),
     vscode.commands.registerCommand('overseer.testNotification', guard(async () => {
       const { delivered_via: via } = await client.request('daemon.test_notice');
       const native = /^overseer-notifier \(ok\)/.test(via);
