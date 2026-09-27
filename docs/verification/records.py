@@ -837,7 +837,8 @@ def guard_against_a_stale_copy():
         n, status = int(m.group(1)), m.group(2)
         mine = R.get(n, {}).get("status", "not started")
         if rank(status) > rank(mine) and n not in allowed:
-            lower.append(f"AC-{n:02d}: {status.split(' ')[0]} on origin/main, {mine.split(' ')[0]} here")
+            name = lambda st: ("verified", "partial")[2 - rank(st)] if rank(st) else st.split(" (")[0].split(":")[0]
+            lower.append(f"AC-{n:02d}: {name(status)} on origin/main, {name(mine)} here")
     if lower:
         sys.exit("records.py is older than origin/main (AC-153): it would lower\n  " + "\n  ".join(lower)
                  + "\nPull or merge origin/main, make your change again, and regenerate. To lower a record on purpose: LEDGER_ALLOW_DOWNGRADE=AC-NN.")
