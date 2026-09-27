@@ -42,3 +42,17 @@ passed 8 + 10 + 25 + 21 tests; the focused migration test and full
 `daemon/src/swarm/mod.rs`, `daemon/src/swarm/schema.rs`. This is an explicit director choice
 under a fixture observation; it does not supply live Auto Mode updates, numeric allowance
 display, or normal UI, so SWARM-59 stays partial.
+
+Numeric observation follow-up (`491f6cff`, `90cc8619`): a focused daemon replay
+records one selected `points` window falling from 100 to 0.5 points, preserving
+its previous balance and signed change through restart. Duplicate observations
+do not erase that comparison. A later unknown balance stays null and does not
+invent a change; 101 observed windows produce a bounded 100-row readout with
+an explicit truncated count. The packaged VS Code fixture shows the observed
+drop under Capacity and then updates to `unknown` without a job-state change.
+See `daemon/tests/swarm_availability.rs` and
+`docs/verification/evidence/ui/swarm-allowance/` for checks and screenshots.
+The Atlas J2/J4 allowance-drop replay was not rerun with this display, so this
+is complementary fixture evidence, not one joined S5 trace. Live Auto updates,
+verified account identity, user-triggered target changes and a qualified live
+director remain open. SWARM-59 stays partial.

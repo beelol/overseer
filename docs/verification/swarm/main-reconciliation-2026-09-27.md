@@ -317,3 +317,21 @@ proof that the present tables are already shared. The partial AC-195 record
 and SWARM-24/27/30/36/60 remain open until a joined fixture exercises both
 implementations. No worker-count default, allocation policy, RFC criterion or
 verified box changes from this latest main commit.
+
+## Refresh against published main: `dfe0ebc`
+
+`git fetch origin main` resolves to `dfe0ebc`, already the merge base and an
+ancestor of this draft branch, so no merge is needed. Since the prior `639dfcb`
+review, the published commits change the verification ledger, README owner
+actions, and Gate N/R documentation. They add no daemon or extension runtime
+implementation. Gate N now has verified fixture records for some phone protocol
+criteria, but its watch/control surfaces do not authorize direct commands to a
+Swarm worker. Gate R's owner-selected voice mark changes presentation, not
+admission or authority. Gate S AC-195 remains partial pending its joint Swarm
+contract tests; AC-196 still awaits one shared Auto account transaction.
+
+Decision: retain the opt-in toggle, one director per category, adaptive worker
+limit, frozen allocation and existing SWARM-01–64 criteria. When the Gate S and
+Auto implementations land, the joined path must use the same agent slots,
+account allowance, claims and broker while routing Overseer advisories through
+the director. No new acceptance box is verified by this reconciliation.

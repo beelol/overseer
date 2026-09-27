@@ -81,3 +81,20 @@ Remaining: Auto integration must provide selected live account labels and
 measured/estimated/stale usage with a fresh limiting constraint. The combined
 status/log surface needs credential-redaction evidence. SWARM-23 remains
 partial and its RFC box stays unchecked.
+
+Observed-allowance follow-up (`491f6cff`, `90cc8619`): the daemon now preserves
+the latest native-unit allowance observation and its change from the preceding
+observation for selected pool windows. `swarm.get` and bounded `swarm.list`
+expose up to 100 rows, the total row count, and whether rows were truncated.
+An unknown balance remains null, rather than becoming zero. A focused daemon
+fixture observes 100 to 0.5 points, survives restart and duplicate observation,
+then observes an unknown balance; it also checks the 100-row bound. The Agents
+sidebar's Capacity section shows the last observation, its increase or decrease,
+and an expired marker. A signature regression ensures a new observation redraws
+the tree even if no job count changes. The packaged VS Code scenario checks the
+0.5-point drop and the later unknown state; screenshots and ordered checks are
+in `docs/verification/evidence/ui/swarm-allowance/`. The affected daemon suites,
+sidebar unit suite (5/5), extension check, VSIX build and packaged scenario pass.
+These values are injected fixture observations; current provider usage remains
+labelled unknown. Live Auto account identity and usage, a joined redaction check,
+and the remaining full UI matrix are still required. SWARM-23 remains partial.
