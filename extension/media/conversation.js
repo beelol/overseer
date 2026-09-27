@@ -8,7 +8,7 @@
   const ui = window.OverseerUI;
   const el = ui.el;
   const SPAWN_TOOLS = /^(Agent|Task|task|collab:spawn_agent|spawn_agent)$/;
-  const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage']);
+  const QUIET = new Set(['session', 'task_created', 'reattached', 'interrupt_requested', 'workspace_removed', 'background_notice', 'daemon_stopping', 'status', 'usage', 'overseer_tool_call', 'overseer_action', 'overseer_message']);
 
   function parseInput(v) {
     if (v && typeof v === 'object') return v;
@@ -393,6 +393,10 @@
           for (const c of this.tools.values()) if (c.run === this.rootId) this.renderResult(c);
           break;
         }
+        // Overseer itself (Gate S): a proposal is a card from the daemon; nothing happens without a yes.
+        case 'proposal': this.proposal(ev, p); break;
+        case 'proposal_answered': { const card = this.proposals.get(p.id); if (card) this.settleProposal(card, p.result || p.state); break; }
+        case 'queued': { const q = el('div', 'sys'); q.append(ui.icon('history', 'xs'), el('span', null, `Queued by ${p.detail && p.detail.by ? 'Overseer' : ev.source === 'overseer' ? 'Overseer' : 'you'}: ${ui.firstLine(p.text || '', 80)}`)); this.container(ev).append(q); break; }
         case 'retention': this.truncated('Older history was trimmed. Raw output keeps everything.'); break;
         // Lines the parser does not understand stay in the event log and raw output, not the chat.
         case 'raw_unparsed': break;
@@ -402,6 +406,28 @@
       if (ev.kind === 'usage') this.usage_(ev, p, child);
       if (!QUIET.has(ev.kind) && !Conversation.KNOWN.has(ev.kind)) this.container(ev).append(el('div', 'sys', ev.kind.replace(/_/g, ' ')));
     }
+
+    proposal(ev, p) {
+      if (!this.proposals) this.proposals = new Map();
+      const card = ui.el('div', 'proposal'); card.setAttribute('role', 'group'); card.setAttribute('aria-label', 'Overseer proposes'); card.dataset.id = p.id;
+      const head = ui.el('div', 'proposal-head'); head.append(ui.mark('sm'), ui.el('span', null, 'Overseer will'));
+      const list = ui.el('ul', 'proposal-list');
+      for (const line of p.lines || []) list.append(ui.el('li', null, line));
+      const status = ui.el('div', 'proposal-status'); status.setAttribute('role', 'status');
+      const yes = ui.el('button', 'btn primary sm', 'Yes'); yes.type = 'button'; yes.dataset.proposal = 'yes';
+      const no = ui.el('button', 'btn sm', 'No'); no.type = 'button'; no.dataset.proposal = 'no';
+      const row = ui.el('div', 'proposal-actions'); row.append(yes, no);
+      card.append(head, list, row, status);
+      const entry = { el: card, row, status, yes, no };
+      this.proposals.set(p.id, entry);
+      const decide = ok => { yes.disabled = no.disabled = true; status.textContent = ok ? 'Working…' : 'Declining…'; this.opts.post({ type: 'overseerAnswer', id: p.id, yes: ok }); };
+      yes.addEventListener('click', () => decide(true));
+      no.addEventListener('click', () => decide(false));
+      if (p.state && p.state !== 'open') this.settleProposal(entry, p.result || p.state);
+      this.container(ev).append(card);
+    }
+
+    settleProposal(card, text) { card.status.textContent = text; card.row.hidden = true; card.el.classList.add('answered'); }
 
     status_(ev, p, child) {
       if (child) {
@@ -467,7 +493,7 @@
       card.el.replaceChildren(...kids);
     }
   }
-  Conversation.KNOWN = new Set(['turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed']);
+  Conversation.KNOWN = new Set(['turn_started', 'output', 'tool', 'tool_result', 'file_activity', 'permission', 'permission_answered', 'error', 'child', 'child_reparented', 'turn_done', 'retention', 'raw_unparsed', 'proposal', 'proposal_answered', 'queued']);
   Conversation.describe = describe;
 
   window.OverseerConversation = Conversation;

@@ -65,7 +65,7 @@ pub struct Daemon {
     pub store: Mutex<Store>,
     pub events: broadcast::Sender<Event>,
     tails: Mutex<HashSet<String>>,
-    exe: PathBuf,
+    pub(crate) exe: PathBuf,
     pub started_ms: i64,
     /// Connected VS Code windows (connections that said hello as `client: "vscode"`).
     pub ui_clients: std::sync::atomic::AtomicUsize,
@@ -1024,6 +1024,17 @@ impl Daemon {
             }
             Norm::Usage(u) => ev("usage", "harness", "exact", u, None)?,
             Norm::Permission { request_id, tool, input } => {
+                let own_tool = tool.starts_with("mcp__overseer__") && {
+                    use rusqlite::OptionalExtension;
+                    store.conn.query_row("SELECT role FROM run_roles WHERE run_id=?1", [&run.id], |r| r.get::<_, String>(0)).optional()?.as_deref() == Some("overseer")
+                };
+                if own_tool {
+                    if let Some(reply) = adapters::permission_reply(&run.harness, &request_id, true, &input, "") {
+                        state.sends.push(reply);
+                    }
+                    ev("permission", "daemon", "exact", json!({"kind": "permission", "request_id": request_id, "tool": tool, "auto_allowed": "Overseer's own tool"}), None)?;
+                    return Ok(());
+                }
                 let attention = json!({"kind": "permission", "request_id": request_id, "tool": tool, "input": input});
                 store.set_run_attention(&run.id, Some(&attention))?;
                 store.update_run_status(&run.id, "waiting_for_user", None, None)?;
@@ -1220,6 +1231,7 @@ impl Daemon {
     /// Called once at startup: reattach to surviving supervisors, finalize exited
     /// ones, and report lost sessions. Never relaunches work.
     pub fn reconcile(self: &Arc<Self>) -> Result<Value> {
+        self.reconcile_overseer()?;
         let runs = self.store.lock().unwrap().runs()?;
         let mut report = Vec::new();
         for run in runs.iter().filter(|r| r.parent_run_id.is_none() && (ACTIVE.contains(&r.status.as_str()) || r.status == "disconnected")) {
@@ -1397,13 +1409,31 @@ impl Daemon {
     }
 
     pub fn state(&self) -> Result<Value> {
+        self.state_for(false)
+    }
+
+    /// Overseer's own run (role `overseer`), its task and its workspace are listed in no agents
+    /// list: a client that shows the conversation asks for them with `include_hidden`.
+    pub fn state_for(&self, include_hidden: bool) -> Result<Value> {
         let store = self.store.lock().unwrap();
-        let runs = store.runs()?;
+        let hidden: std::collections::HashSet<String> = if include_hidden {
+            Default::default()
+        } else {
+            let mut stmt = store.conn.prepare("SELECT run_id FROM run_roles WHERE role='overseer'")?;
+            let ids: std::collections::HashSet<String> = stmt.query_map([], |r| r.get::<_, String>(0))?.flatten().collect();
+            ids
+        };
+        let all_runs = store.runs()?;
+        let hidden_tasks: std::collections::HashSet<String> = all_runs.iter().filter(|r| hidden.contains(&r.id)).map(|r| r.task_id.clone()).collect();
+        let hidden_ws: std::collections::HashSet<String> = all_runs.iter().filter(|r| hidden.contains(&r.id)).map(|r| r.workspace_id.clone()).collect();
+        let runs: Vec<_> = all_runs.into_iter().filter(|r| !hidden_tasks.contains(&r.task_id)).collect();
+        let tasks: Vec<_> = store.tasks()?.into_iter().filter(|t| !hidden_tasks.contains(&t.id)).collect();
+        let workspaces: Vec<_> = store.workspaces()?.into_iter().filter(|w| !hidden_ws.contains(&w.id)).collect();
         let mut turns = serde_json::Map::new();
         for r in runs.iter().filter(|r| r.parent_run_id.is_none()) {
             turns.insert(r.id.clone(), serde_json::to_value(store.turns(&r.id)?)?);
         }
-        Ok(json!({"cursor": store.max_seq()?, "tasks": store.tasks()?, "runs": runs, "workspaces": store.workspaces()?, "profiles": store.profiles()?, "turns": turns,
+        Ok(json!({"cursor": store.max_seq()?, "tasks": tasks, "runs": runs, "workspaces": workspaces, "profiles": store.profiles()?, "turns": turns,
             "daemon": {"pid": std::process::id(), "started_ms": self.started_ms, "version": env!("CARGO_PKG_VERSION"), "parser_version": adapters::PARSER_VERSION}}))
     }
 

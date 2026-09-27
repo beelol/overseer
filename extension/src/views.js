@@ -31,7 +31,7 @@ class Model {
   }
   async refresh() {
     try {
-      this.all = await this.client.request('state'); for (const p of this.all.profiles || []) p.name = accountName(p);
+      this.all = await this.client.request('state', { include_hidden: true }); for (const p of this.all.profiles || []) p.name = accountName(p);
       this.state = this.visible(this.all); this.error = undefined;
     }
     catch (error) { this.error = error.message; }

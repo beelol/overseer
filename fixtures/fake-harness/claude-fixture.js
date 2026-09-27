@@ -31,6 +31,26 @@ rl.on('line', l => { let m; try { m = JSON.parse(l); } catch { return; } lines.p
 const next = pred => new Promise(resolve => { const check = () => { const i = lines.findIndex(pred); if (i >= 0) { const [m] = lines.splice(i, 1); waiting = undefined; resolve(m); } }; waiting = check; check(); });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+/** The MCP server named in --mcp-config (Gate S), spoken to over stdio like the live harness does; null without one. */
+async function mcpClient() {
+  const at = process.argv.indexOf('--mcp-config');
+  if (at < 0) return null;
+  const config = JSON.parse(fs.readFileSync(process.argv[at + 1], 'utf8'));
+  const [name, server] = Object.entries(config.mcpServers || {})[0] || [];
+  if (!server) return null;
+  const cp = require('child_process');
+  const child = cp.spawn(server.command, server.args || [], { env: { ...process.env, ...(server.env || {}) }, stdio: ['pipe', 'pipe', 'ignore'] });
+  const pending = new Map();
+  let id = 0;
+  require('readline').createInterface({ input: child.stdout }).on('line', l => { let m; try { m = JSON.parse(l); } catch { return; } const p = pending.get(m.id); if (p) { pending.delete(m.id); p(m); } });
+  const request = (method, params) => new Promise((resolve, reject) => { const rid = ++id; pending.set(rid, m => m.error ? reject(new Error(m.error.message)) : resolve(m.result)); child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: rid, method, params }) + '\n'); });
+  await request('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'claude-fixture', version: '0' } });
+  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
+  const tools = (await request('tools/list', {})).tools.map(t => t.name);
+  out({ type: 'system', subtype: 'mcp_ready', mcp_servers: [{ name, status: 'connected' }], tools: tools.map(t => `mcp__${name}__${t}`) });
+  return { tools, call: (tool, args) => request('tools/call', { name: tool, arguments: args }), close: () => child.kill() };
+}
+
 (async () => {
   const first = await next(m => m.type === 'user');
   out({ type: 'system', subtype: 'init', session_id: sid, model: 'fixture', cwd: process.cwd(), tools: ['Agent', 'Write'] });
@@ -197,21 +217,51 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     assistant([{ type: 'text', text: 'Trying the migration…' }]);
     result(true, 'Migration failed: relation users_v2 does not exist');
   } else if (mode === 'overseer') {
+    // Talk to Overseer. With an MCP server configured (Gate S: --mcp-config), the fixture speaks
+    // MCP like the live harness: it calls the daemon's roster tool and proposes through the
+    // propose tool, reporting each call as a tool_use. Without one, it answers from the state
+    // sent with the message and proposes in a fenced overseer-actions block (AC-107's fallback).
     const content = first.message.content;
     const text = Array.isArray(content) ? content.filter(c => c.type === 'text').map(c => c.text).join('\n') : String(content);
     const state = /Agents \(JSON\):\n([\s\S]*?)\n<\/overseer-state>/.exec(text);
-    const agents = state ? JSON.parse(state[1]) : [];
+    let agents = state ? JSON.parse(state[1]) : [];
     const said = text.replace(/^<overseer-state>[\s\S]*?<\/overseer-state>\s*/, '').trim();
+    const mcp = process.env.CLAUDE_FIXTURE_NO_MCP ? null : await mcpClient();
+    let n = 0;
+    const call = async (name, args) => {
+      const id = `toolu_mcp_${++n}`;
+      assistant([{ type: 'tool_use', id, name: `mcp__overseer__${name}`, input: args }]);
+      out({ type: 'control_request', request_id: `req-mcp-${n}`, request: { subtype: 'can_use_tool', tool_name: `mcp__overseer__${name}`, input: args } });
+      const reply = await next(m => m.type === 'control_response' && m.response?.request_id === `req-mcp-${n}`);
+      if (reply.response.response.behavior !== 'allow') throw new Error('tool refused');
+      const r = await mcp.call(name, args);
+      user([{ type: 'tool_result', tool_use_id: id, content: r.content, is_error: !!r.isError }]);
+      return r.content.map(c => c.text || '').join('');
+    };
     let reply;
     const tell = /tell (.+?) to (.+)/i.exec(said);
+    if (mcp) {
+      const roster = await call('roster', {});
+      // One line per agent: "<id> · <title> · <status> · …".
+      agents = roster.split('\n').map(l => l.split(' · ')).filter(p => p.length >= 3).map(p => ({ id: p[0], title: p[1], status: p[2] }));
+    }
+    const changed = /what did (.+?) change in (\S+)/i.exec(said);
     if (/what is everyone doing/i.test(said)) reply = agents.length ? 'Here is what everyone is doing:\n\n' + agents.map(a => `- **${a.title}**: ${a.status}`).join('\n') : 'No agents are running.';
-    else if (tell) {
+    else if (changed && mcp) {
+      // "What did <agent> change in <file>?": the diff, read through the daemon's tool, quoted.
+      const who = agents.find(a => a.title.toLowerCase().includes(changed[1].toLowerCase()));
+      const diff = who ? await call('diff', { id: who.id, path: changed[2].replace(/[?.!]+$/, '') }) : '';
+      reply = who ? `Here is what ${who.title} changed in ${changed[2]}:\n\n\`\`\`diff\n${diff}\n\`\`\`` : `I could not find an agent called ${changed[1]}.`;
+    } else if (tell) {
       const who = agents.find(a => a.title.toLowerCase().includes(tell[1].toLowerCase()));
       const task = tell[2].replace(/[.!?]+$/, '');
-      reply = who ? `I will send ${who.title} this follow-up: "Please ${task}."\n\n\`\`\`overseer-actions\n${JSON.stringify([{ action: 'follow_up', agent: who.id, title: who.title, text: `Please ${task}.` }])}\n\`\`\`` : `I could not find an agent called ${tell[1]}.`;
+      if (!who) reply = `I could not find an agent called ${tell[1]}.`;
+      else if (mcp) { const outcome = await call('propose', { actions: [{ action: 'message', agent: who.id, text: `Please ${task}.` }] }); reply = `I proposed sending ${who.title} this message: "Please ${task}." ${outcome}`; }
+      else reply = `I will send ${who.title} this follow-up: "Please ${task}."\n\n\`\`\`overseer-actions\n${JSON.stringify([{ action: 'message', agent: who.id, title: who.title, text: `Please ${task}.` }])}\n\`\`\``;
     } else reply = 'I can tell you what your agents are doing, or pass a message to one of them.';
     assistant([{ type: 'text', text: reply }]);
     result(false, reply);
+    if (mcp) mcp.close();
   } else if (mode === 'prose') {
     assistant([{ type: 'text', text: 'I delegated this to a sub-agent and it finished.' }]);
     result(false, 'I delegated this to a sub-agent and it finished.');

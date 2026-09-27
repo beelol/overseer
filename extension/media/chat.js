@@ -235,6 +235,12 @@
       const t0 = performance.now();
       for (const x of events) this.add(x.event, x.label);
       if (truncated) this.conversation.truncated('Older history was trimmed. Raw output keeps everything.');
+    }
+
+    /** A proposal's answer could not be given (already answered elsewhere, or refused): say so on its card. */
+    proposalStatus(id, text) {
+      const card = this.conversation.proposals && this.conversation.proposals.get(id);
+      if (card) this.conversation.settleProposal(card, text);
       this.root.dataset.historyMs = String(Math.round(performance.now() - t0)); this.root.dataset.historyEvents = String(events.length);
       document.body.dataset.historyMs = this.root.dataset.historyMs; document.body.dataset.historyEvents = this.root.dataset.historyEvents;
       this.restored = true;

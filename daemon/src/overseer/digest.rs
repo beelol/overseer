@@ -263,7 +263,7 @@ impl Daemon {
             (store.runs()?, store.tasks()?, store.workspaces()?)
         };
         let mut out = Vec::new();
-        for r in runs.iter().filter(|r| r.parent_run_id.is_none()) {
+        for r in runs.iter().filter(|r| r.parent_run_id.is_none() && self.run_role(&r.id) != "overseer") {
             let task = tasks.iter().find(|t| t.id == r.task_id);
             let ws = workspaces.iter().find(|w| w.id == r.workspace_id);
             let changed_total = self.changed_total(&r.id);

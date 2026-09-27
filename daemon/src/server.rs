@@ -19,6 +19,7 @@ pub const MAX_REQUEST_BYTES: u64 = 1024 * 1024;
 pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
     crate::audio::start(daemon.clone())?;
     crate::overseer::conflicts::start(daemon.clone());
+    crate::overseer::session::start(daemon.clone());
     let path = paths::socket_path();
     if let Some(dir) = path.parent() {
         paths::ensure_private_dir(dir)?;
@@ -216,7 +217,7 @@ fn s<'a>(p: &'a Value, key: &str) -> Result<&'a str> {
 pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
-        "state" => d.state()?,
+        "state" => d.state_for(p["include_hidden"].as_bool().unwrap_or(false))?,
         "audio.get" => crate::audio::get(d)?,
         "audio.set" => crate::audio::set(d, p)?,
         "audio.preview" => crate::audio::preview(d, p)?,
@@ -259,7 +260,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "run.turns" => json!(d.store.lock().unwrap().turns(s(p, "run_id")?)?),
         "run.active" => {
             let runs = d.store.lock().unwrap().runs()?;
-            json!(runs.into_iter().filter(|r| ACTIVE.contains(&r.status.as_str())).collect::<Vec<_>>())
+            json!(runs.into_iter().filter(|r| ACTIVE.contains(&r.status.as_str()) && d.run_role(&r.id) != "overseer").collect::<Vec<_>>())
         }
         "events.list" => {
             let store = d.store.lock().unwrap();
@@ -306,6 +307,16 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "conflicts.list" => d.conflicts_list(p["run_id"].as_str(), p["include_closed"].as_bool().unwrap_or(false))?,
         "conflict.dismiss" => d.conflict_dismiss(s(p, "id")?, p["by"].as_str().unwrap_or("user"))?,
         "overseer.scan" => d.scan_conflicts(s(p, "run_id")?)?,
+        "overseer.session" => d.overseer_session()?,
+        "overseer.messages" => d.overseer_messages(p["after"].as_i64().unwrap_or(0), p["limit"].as_i64().unwrap_or(100))?,
+        "overseer.send" => d.overseer_send(s(p, "text")?, p["surface"].as_str().unwrap_or("vscode"), p["harness"].as_str(), p["model"].as_str())?,
+        "overseer.propose" => d.overseer_propose(&p["actions"], p["source"].as_str().unwrap_or("api"))?,
+        "overseer.answer" => d.overseer_answer(s(p, "id")?, p["yes"].as_bool().unwrap_or(false), p["surface"].as_str().unwrap_or("vscode"), p["by"].as_str().unwrap_or("owner"))?,
+        "overseer.level" => d.overseer_level(p["level"].as_str())?,
+        "overseer.fresh" => d.overseer_fresh()?,
+        "run.queue" => json!({"delivery": d.queue_message(s(p, "run_id")?, s(p, "text")?, p["source"].as_str().unwrap_or("owner"), json!({}))?}),
+        "run.queued" => d.queued_messages(s(p, "run_id")?)?,
+        "run.unqueue" => d.unqueue_message(s(p, "run_id")?, p["id"].as_i64().unwrap_or(0))?,
         "overseer.tools" => d.overseer_tools(s(p, "token")?)?,
         "overseer.tool" => d.overseer_tool(s(p, "token")?, s(p, "name")?, &p["arguments"])?,
         "daemon.shutdown" => json!({"ok": true}),
