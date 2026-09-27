@@ -185,6 +185,11 @@ module.exports = defineConfig([
     languageOptions: { globals: { console: 'readonly', process: 'readonly' } },
   },
   {
+    name: 'overseer/jest-setup',
+    files: ['jest.setup.js'],
+    languageOptions: { globals: { jest: 'readonly' } },
+  },
+  {
     name: 'overseer/tests',
     files: ['**/__tests__/**/*.{ts,tsx}'],
     rules: {
@@ -197,7 +202,8 @@ module.exports = defineConfig([
   {
     name: 'overseer/platform-rule',
     files: SOURCE,
-    ignores: [PLATFORM_LAYER, ...SCREENS_AND_SHARED],
+    // e2e/ drives the simulators from the Mac and never ends up in the app.
+    ignores: [PLATFORM_LAYER, ...SCREENS_AND_SHARED, 'e2e/**'],
     rules: {
       'no-restricted-imports': ['error', platformImports],
       'no-restricted-syntax': ['error', ...platformSyntax],

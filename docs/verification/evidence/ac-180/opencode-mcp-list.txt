@@ -1,0 +1,4 @@
+$ opencode mcp list   (XDG_CONFIG_HOME = the profile's own config dir)
+  MCP Servers
+  ✓ overseer connected
+      <overseerd> mcp --socket <socket>

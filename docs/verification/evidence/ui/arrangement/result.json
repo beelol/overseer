@@ -30,8 +30,8 @@
       "name": "the first file edit brings the review forward within 500 ms: review on the left (about two thirds) on the changed file, chat on the right",
       "ok": true,
       "detail": {
-        "lag": 488,
-        "waitedMs": 130,
+        "lag": 361,
+        "waitedMs": 2,
         "layout": [
           {
             "share": 0.66,

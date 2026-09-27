@@ -72,6 +72,7 @@ pub fn actor() -> Option<String> {
 }
 
 pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
+    crate::audio::start(daemon.clone())?;
     let path = paths::socket_path();
     if let Some(dir) = path.parent() {
         paths::ensure_private_dir(dir)?;
@@ -297,8 +298,13 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
         "state" => d.state()?,
+        "audio.get" => crate::audio::get(d)?,
+        "audio.set" => crate::audio::set(d, p)?,
+        "audio.preview" => crate::audio::preview(d, p)?,
+        "audio.import_commander" => crate::audio::import_commander(d, p)?,
+        "audio.voices" => crate::audio::voices()?,
         "harness.list" => {
-            let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "generic"]
+            let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "opencode-serve", "generic"]
                 .iter()
                 .map(|h| {
                     let program = crate::adapters::resolve_program(h);
@@ -408,6 +414,8 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         "repo.known" => d.known_repos()?,
         "runs.stop_all" => d.stop_all_runs()?,
         m if m.starts_with("gateway.") => crate::gateway::local::dispatch(d, m, p)?,
+        // Continuity (Gate L): connection state, settings, local inventory, pick and guard.
+        m if crate::continuity::handles(m) => crate::continuity::dispatch(d, m, p)?,
         other => return Err(ProtoError::new("unknown_method", format!("unknown method {other}")).into()),
     })
 }

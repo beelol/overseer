@@ -20,7 +20,8 @@ const CHATGPT_A = process.env.CHATGPT_A || 'p-f262c1bc4958';
 const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
 
 (async () => {
-  const s = new Session('live-gatej', { ownerDaemon: true });
+  // EVIDENCE names the evidence folder (reruns on a later build keep the Gate J folder intact).
+  const s = new Session(process.env.EVIDENCE || 'live-gatej', { ownerDaemon: true });
   const result = { checks: [], runs: {}, usage: {} };
   const check = (name, ok, detail) => { result.checks.push({ name, ok: !!ok, detail }); s.note(`${ok ? 'PASS' : 'FAIL'} ${name}`, detail); };
   let cdp;
@@ -78,11 +79,12 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
 
     // Turns go through the daemon API the composer uses (run.follow_up with the same options and
     // image payload), so this live check does not depend on composer keyboard focus.
-    const follow = (id, prompt, extra = {}) => s.ctl('run.follow_up', { run_id: id, prompt, ...extra });
+    // Light spend: every turn at low reasoning effort unless a step sets its own.
+    const follow = (id, prompt, extra = {}) => s.ctl('run.follow_up', { run_id: id, prompt, effort: 'low', ...extra });
     for (const spec of SPECS) {
       const r = {};
       result.runs[spec.key] = r;
-      const t = s.ctl('task.create', { repo, harness: spec.harness, profile_id: spec.profile, model: spec.model, prompt: 'Reply with exactly: ready', title: `Live ${spec.key}` });
+      const t = s.ctl('task.create', { repo, harness: spec.harness, profile_id: spec.profile, model: spec.model, effort: 'low', prompt: 'Reply with exactly: ready', title: `Live ${spec.key}` });
       r.id = t.run.id;
       const first = await waitDone(r.id);
       r.first = { status: first.status, reply: replies(r.id).pop() };
@@ -97,7 +99,7 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
       const effortOk = spec.harness === 'claude' ? flag(argv, '--effort') === 'low' : (argv || []).some(a => /model_reasoning_effort="?low"?/.test(a));
       const modeOk = (argv || []).some((a, i) => (a === spec.modeFlag[0] && argv[i + 1] === spec.modeFlag[1]) || (spec.harness === 'codex' && a === 'sandbox_mode="read-only"'));
       const imageOk = spec.harness === 'claude' ? true : (argv || []).includes('-i');
-      check(`${spec.key}: an attached image and a mentioned worktree file reach the agent (reply names red and "# fixture")`, /red/i.test(r.rich.reply || '') && /fixture/i.test(r.rich.reply || '') && imageOk, { reply: r.rich.reply });
+      check(`${spec.key}: an attached image and a mentioned worktree file reach the agent (reply names red and "# fixture")`, /\bred\b/i.test(r.rich.reply || '') && /fixture/i.test(r.rich.reply || '') && imageOk, { reply: r.rich.reply });
       check(`${spec.key}: per-turn model, effort and permission mode reach the harness`, flag(argv, spec.harness === 'claude' ? '--model' : '-m') === spec.model && effortOk && modeOk, { argv: r.rich.argv });
 
       // Stop and send: interrupt a longer turn, then send the new message (what ⌥Enter does).
@@ -134,7 +136,7 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
 
     // One tiny turn on ChatGPT B, so both ChatGPT accounts report usage.
     if (!process.env.ONLY || process.env.ONLY.includes('codex')) {
-      const b = s.ctl('task.create', { repo, harness: 'codex', profile_id: CHATGPT_B, model: 'gpt-5.6-luna', prompt: 'Reply with exactly: ok', title: 'Live ChatGPT B' });
+      const b = s.ctl('task.create', { repo, harness: 'codex', profile_id: CHATGPT_B, model: 'gpt-5.6-luna', effort: 'low', prompt: 'Reply with exactly: ok', title: 'Live ChatGPT B' });
       result.runs.chatgptB = { id: b.run.id, status: (await waitDone(b.run.id)).status };
     }
 
@@ -160,7 +162,7 @@ const CHATGPT_B = process.env.CHATGPT_B || 'p-52fb6421edd2';
     const cu = result.usage['system-claude'];
     const win = raw.claude?.rate_limit_info?.unifiedWindows || {};
     const same = (label, key) => { const w = (cu?.windows || []).find(x => x.label === label); return !win[key] || (w && Math.abs(w.used - win[key].utilization) < 1e-9 && w.resets_at_ms === win[key].resetsAt * 1000); };
-    check('Claude usage matches its own rate_limit_event (utilization and reset time per window)', cu && cu.reported && !!raw.claude && same('5 hours', 'five_hour') && same('week', 'seven_day'), { usage: cu, raw: raw.claude?.rate_limit_info });
+    if (result.runs.claude) check('Claude usage matches its own rate_limit_event (utilization and reset time per window)', cu && cu.reported && !!raw.claude && same('5 hours', 'five_hour') && same('week', 'seven_day'), { usage: cu, raw: raw.claude?.rate_limit_info });
     for (const id of [CHATGPT_A, CHATGPT_B]) {
       const u = result.usage[id];
       check(`Codex ${id === CHATGPT_A ? 'ChatGPT A' : 'ChatGPT B'} usage comes from its session log (or says not reported)`, u && (u.reported ? (u.windows || []).length > 0 && /session/.test(u.source || '') : true), u);

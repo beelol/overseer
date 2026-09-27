@@ -12,7 +12,7 @@
           "History task 123"
         ],
         "count": 1,
-        "message": "1 match for “History task 123”"
+        "message": "1 match"
       }
     },
     {
@@ -22,12 +22,12 @@
         "label": "by prompt",
         "expect": "History task 201",
         "q": "pw201",
-        "ms": 34,
+        "ms": 40,
         "labels": [
           "History task 201"
         ],
         "count": 1,
-        "message": "1 match for “pw201”"
+        "message": "1 match"
       }
     },
     {
@@ -37,12 +37,12 @@
         "label": "by message text (agent output)",
         "expect": "History task 237",
         "q": "needle-237",
-        "ms": 34,
+        "ms": 32,
         "labels": [
           "History task 237"
         ],
         "count": 1,
-        "message": "1 match for “needle-237”"
+        "message": "1 match"
       }
     },
     {
@@ -52,12 +52,12 @@
         "label": "by file the agent edited",
         "expect": "Refresh sessions once",
         "q": "coordinator",
-        "ms": 34,
+        "ms": 32,
         "labels": [
           "Refresh sessions once"
         ],
         "count": 1,
-        "message": "1 match for “coordinator”"
+        "message": "1 match"
       }
     },
     {
@@ -67,13 +67,13 @@
         "label": "by repository",
         "expect": "Broken migration",
         "q": "billing-service",
-        "ms": 35,
+        "ms": 36,
         "labels": [
           "Broken migration",
           "Refresh sessions once"
         ],
         "count": 2,
-        "message": "2 matches for “billing-service”"
+        "message": "2 matches"
       }
     },
     {
@@ -83,12 +83,12 @@
         "label": "by account",
         "expect": "Refresh sessions once",
         "q": "existing login",
-        "ms": 34,
+        "ms": 36,
         "labels": [
           "Refresh sessions once"
         ],
         "count": 1,
-        "message": "1 match for “existing login”"
+        "message": "1 match"
       }
     },
     {
@@ -98,28 +98,28 @@
         "label": "by status",
         "expect": "Broken migration",
         "q": "failed",
-        "ms": 33,
+        "ms": 34,
         "labels": [
           "Broken migration"
         ],
         "count": 1,
-        "message": "1 match for “failed”"
+        "message": "1 match"
       }
     },
     {
-      "name": "the filtered tree says what it shows (\"N matches for …\") and hides the rest",
+      "name": "the search field says what the filtered list shows (\"N matches\") and the list hides the rest",
       "ok": true,
       "detail": {
         "count": 1,
-        "message": "1 match for “needle-237”"
+        "message": "1 match"
       }
     },
     {
       "name": "Clear Search restores the tree and the selected agent",
       "ok": true,
       "detail": {
-        "before": 14,
-        "after": 14,
+        "before": 16,
+        "after": 16,
         "selBefore": "Refresh sessions once",
         "selAfter": "Refresh sessions once"
       }

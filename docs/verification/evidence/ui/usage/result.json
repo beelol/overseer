@@ -6,57 +6,57 @@
       "detail": {
         "claude": {
           "limited": false,
-          "observed_ms": 1790462990124,
+          "observed_ms": 1790467594403,
           "reported": true,
           "source": "Claude rate_limit_event",
           "status": "allowed",
           "windows": [
             {
               "label": "5 hours",
-              "resets_at_ms": 1790466590000,
+              "resets_at_ms": 1790471194000,
               "used": 0.95
             },
             {
               "label": "week",
-              "resets_at_ms": 1790725790000,
+              "resets_at_ms": 1790730394000,
               "used": 0.4
             }
           ]
         },
         "second": {
           "limited": false,
-          "observed_ms": 1790462990922,
+          "observed_ms": 1790467595272,
           "reported": true,
           "source": "Claude rate_limit_event",
           "status": "allowed",
           "windows": [
             {
               "label": "5 hours",
-              "resets_at_ms": 1790466590000,
+              "resets_at_ms": 1790471195000,
               "used": 0.12
             },
             {
               "label": "week",
-              "resets_at_ms": 1790725790000,
+              "resets_at_ms": 1790730395000,
               "used": 0.4
             }
           ]
         },
         "codex": {
           "limited": false,
-          "observed_ms": 1790462992717,
+          "observed_ms": 1790467597125,
           "plan": "plus",
           "reported": true,
           "source": "Codex session log",
           "windows": [
             {
               "label": "5 hours",
-              "resets_at_ms": 1790466592000,
+              "resets_at_ms": 1790471197000,
               "used": 0.2
             },
             {
               "label": "week",
-              "resets_at_ms": 1790725792000,
+              "resets_at_ms": 1790730397000,
               "used": 0.4
             }
           ]
@@ -70,8 +70,8 @@
       "name": "the Accounts view shows reported usage per account, with reset times, on hover",
       "ok": true,
       "detail": {
-        "claudeHover": "claude (existing login) — Anthropic / Claude\n\nFollows the Claude app login (~/.claude). It changes when that app switches accounts; Overseer never signs it out.\n\nUsable by: claude\n\nLast used 9/26/2026, 3:49:51 PM\n\nUsage (Claude rate_limit_event): 5 hours 95%, resets 9/26/2026, 4:49:50 PM; week 40%, resets 9/29/2026, 4:49:50 PM",
-        "codexHover": "codex (existing login) — OpenAI / ChatGPT\n\nFollows the ChatGPT / Codex app login (~/.codex). It changes when that app switches accounts; Overseer never signs it out.\n\nUsable by: codex, codex-app\n\nLast used 9/26/2026, 3:49:52 PM\n\nUsage (Codex session log): 5 hours 20%, resets 9/26/2026, 4:49:52 PM; week 40%, resets 9/29/2026, 4:49:52 PM\n\nLogged in using ChatGPT"
+        "claudeHover": "Your login — Anthropic / Claude\n\nFollows the Claude app login (~/.claude). It changes when that app switches accounts; Overseer never signs it out.\n\nUsable by: claude\n\nLast used 9/26/2026, 5:06:35 PM\n\nUsage (Claude rate_limit_event): 5 hours 95%, resets 9/26/2026, 6:06:34 PM; week 40%, resets 9/29/2026, 6:06:34 PM",
+        "codexHover": "Your login — OpenAI / ChatGPT\n\nFollows the ChatGPT / Codex app login (~/.codex). It changes when that app switches accounts; Overseer never signs it out.\n\nUsable by: codex, codex-app\n\nLast used 9/26/2026, 5:06:36 PM\n\nUsage (Codex session log): 5 hours 20%, resets 9/26/2026, 6:06:37 PM; week 40%, resets 9/29/2026, 6:06:37 PM\n\nLogged in using ChatGPT"
       }
     },
     {
@@ -87,17 +87,17 @@
       "ok": true,
       "detail": {
         "warn": {
-          "text": "claude (existing login) is at 95% of its 5 hours limit (resets 4:49 PM).Use Claude Second",
+          "text": "Your login is at 95% of its 5 hours limit (resets 6:06 PM).Use Claude Second",
           "fix": "Use Claude Second",
           "cls": "composer-note warn",
           "startDisabled": false
         },
         "switched": "Agent: Claude Code · Claude Second",
         "agentMenu": [
-          "codex (existing login) | 5 hours 20% · week 40%",
-          "claude (existing login) | 5 hours 95% · week 40%",
+          "Your login | 5 hours 20% · week 40%",
+          "Your login | 5 hours 95% · week 40%",
           "Claude Second | 5 hours 12% · week 40%",
-          "opencode (existing login) | signed out",
+          "Your login | signed out",
           "Run a program | "
         ]
       }
@@ -112,12 +112,12 @@
         "Plenty left | now",
         "Near the limit | now",
         "ChatGPT | ",
-        "codex (existing login) | pro · 55b9da0f · desktop",
+        "Your login | pro · 55b9da0f · desktop",
         "Claude | ",
-        "claude (existing login) | max · cc6d9661 · desktop · 95% of 5 hours",
+        "Your login | max · cc6d9661 · desktop · 95% of 5 hours",
         "Claude Second | max · cc6d9661",
         "OpenCode | ",
-        "opencode (existing login) | signed out · desktop"
+        "Your login | signed out · desktop"
       ]
     }
   ]

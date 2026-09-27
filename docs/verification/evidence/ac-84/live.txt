@@ -1,0 +1,19 @@
+overseerd 0.1.0; Codex codex-cli 0.155.0-alpha.16.4 (real, every connection of its process sent to 127.0.0.1:64992, where nothing listens); Claude Code 2.1.246 (Claude Code) (real, existing login); probe answers: fixture
+
+== A first Claude Code turn, so that its last model is the smallest one
+PASS  Claude Code works  — completed: ok
+
+== Codex cannot reach its provider
+connection: degraded (OpenAI unreachable)
+    Codex: no progress while OpenAI could not be reached; the turn was interrupted by Overseer
+PASS  the successor started within 30 s of the failed turn  — 6451 ms
+PASS  Codex never reached its provider: its turn failed on the connection or was interrupted while it only reconnected  — no progress while OpenAI could not be reached; the turn was interrupted by Overseer; no usage was reported for the Codex turn
+PASS  the successor is Claude Code on its smallest model, in the same task and worktree  — claude 2.1.246 (Claude Code), model haiku, account system-claude
+PASS  it finishes the task in that worktree  — completed; failover.txt: "hello from the other provider"; asked: nothing
+PASS  the predecessor reads handed off, not failed  — handed off to r-fa82e654ec63 (provider_unreachable:openai)
+PASS  the announcement names the reason  — OpenAI is unreachable; continuing with **Claude Code** (account "claude (existing login)") because it is the best working option.
+PASS  the review shows the work in the same worktree  — /private/OVERSEER_HOME/worktrees/repo-failover-e88808b5/live-failover
+PASS  nothing local was used while a provider worked
+PASS  the permission mode was carried and not loosened  — Codex in its sandbox → Claude Code in acceptEdits
+
+10 passed, 0 failed

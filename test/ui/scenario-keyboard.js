@@ -55,21 +55,23 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
 
     const selected = () => dash.eval(`window.__overseer.selected()`);
     const key = async (k, o = {}) => { await cdp.focusWorkbench(); await cdp.key(k, o); await delay(900); };
+    // ⌥⌘J, then the selection it made (the dashboard learns it a moment after the key).
+    const nextAgent = async () => { const prev = await selected(); await key('j', { meta: true, alt: true }); await dash.waitFor(`window.__overseer.selected() !== ${JSON.stringify(prev ?? null)} && !!window.__overseer.selected()`, 6000).catch(() => {}); return selected(); };
     // Next waiting agent, allow.
-    await key('j', { meta: true, alt: true });
-    const first = await selected();
+    const first = await nextAgent();
+    s.note('after first ⌥⌘J', await dash.eval(`({ mode: document.body.dataset.mode, selected: window.__overseer.selected(), visible: document.visibilityState, chatRun: document.querySelector('#title')?.textContent })`).catch(e => 'eval failed: ' + e.message));
+    s.note('frames', await cdp.webviews(`!!document.querySelector('.view-chat')`).then(fs => Promise.all(fs.map(f => f.eval(`({ mode: document.body.dataset.mode, selected: window.__overseer?.selected(), visible: document.visibilityState })`)))).catch(e => e.message));
     await key('y', { meta: true, alt: true });
     const firstDone = await waitFor(first, /completed/);
     // Next, deny.
-    await key('j', { meta: true, alt: true });
-    const second = await selected();
+    const second = await nextAgent();
     await key('Backspace', { meta: true, alt: true });
     const secondDone = await waitFor(second, /completed/);
     const denied = s.ctl('events.list', { run_id: second, limit: 500 }).events.some(e => e.kind === 'permission_answered' && e.payload.allow === false);
     check('⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request', [permA.run.id, permB.run.id].includes(first) && [permA.run.id, permB.run.id].includes(second) && first !== second && firstDone === 'completed' && secondDone === 'completed' && denied, { first, second, firstDone, secondDone, denied });
     // The rest (the failure, the finished runs with changes): ⌥⌘J visits each; visiting clears it.
     const visited = []; let left = await needs();
-    for (let i = 0; i < 6 && left.length; i++) { await key('j', { meta: true, alt: true }); visited.push(await selected()); await delay(600); left = await needs(); }
+    for (let i = 0; i < 6 && left.length; i++) { visited.push(await nextAgent()); await delay(600); left = await needs(); }
     check('⌥⌘J walks the rest of Needs you (the failure and finished runs with changes); visiting clears each', visited.includes(failed.run.id) && visited.includes(changed.run.id) && left.length === 0, { visited, left });
 
     // Switch agents with the searchable quick pick, then stop it.
@@ -97,7 +99,11 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
     // The agent's edits brought the review in beside the chat: click into the chat, then its prompt.
     await dash.eval(`(() => { if (!document.getElementById('focus-spot')) { const c = document.createElement('div'); c.id = 'focus-spot'; c.style.cssText = 'position:fixed;right:2px;top:60px;width:3px;height:3px;z-index:9'; document.body.append(c); } return true; })()`);
     { const f = await s.webviewPoint(dash, '#focus-spot'); await cdp.click(f.x, f.y); await delay(200); }
-    { const at = await s.webviewPoint(dash, '#prompt'); await cdp.click(at.x, at.y); await delay(200); }
+    // Click into the prompt until it has focus (the chat may still be settling after the review came in).
+    for (let i = 0; i < 3; i++) {
+      const at = await s.webviewPoint(dash, '#prompt'); await cdp.click(at.x, at.y);
+      if (await dash.waitFor(`document.activeElement?.id === 'prompt'`, 2000).then(() => true, () => false)) break;
+    }
     await cdp.type('And add a test'); await delay(200);
     s.note('prompt before Enter', await dash.eval(`({ value: document.getElementById('prompt').value, focused: document.activeElement?.id })`));
     await cdp.key('Enter');

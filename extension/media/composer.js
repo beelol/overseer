@@ -10,29 +10,31 @@
     let data, form = {}, starting = false, requested = false;
     const wrap = el('div', 'composer-view');
     const hero = el('div', 'composer-hero');
-    const mark = el('div', 'hero-mark'); mark.append(ui.icon('eye'));
-    const h = el('h1', 'hero-title', 'What should an agent do?');
+    // Overseer's mark in full colour (AC-142) and a short question.
+    const mark = ui.mark('xl hero-mark', 'Overseer');
+    const h = el('h1', 'hero-title', "What's next?");
     const box = el('div', 'composer big');
-    const task = el('textarea'); task.id = 'task'; task.rows = 3; task.placeholder = 'Describe the task'; task.setAttribute('aria-label', 'Task for the new agent');
+    const task = el('textarea'); task.id = 'task'; task.rows = 3; task.placeholder = 'Send off a task'; task.setAttribute('aria-label', 'Task for the new agent');
     const generic = el('div', 'generic-fields'); generic.hidden = true;
     const program = el('input'); program.id = 'program'; program.placeholder = '/absolute/path/to/program'; program.setAttribute('aria-label', 'Program to run');
     const args = el('input'); args.id = 'args'; args.placeholder = '["--flag", "value"]'; args.setAttribute('aria-label', 'Arguments as a JSON array');
     generic.append(program, args);
-    const row = el('div', 'composer-row'); const chips = el('div', 'chips');
+    // The field holds only the text (with attach, options and Start); the choices sit in a row under it.
+    const row = el('div', 'composer-row'); const chips = el('div', 'chips composer-choices'); chips.setAttribute('aria-label', 'Choices for the new agent');
     const repoChip = chip('repo', 'Repository'), agentChip = chip('agent', 'Agent'), modelChip = chip('model', 'Model'), modeChip = chip('mode', 'Workspace');
     chips.append(repoChip, agentChip, modelChip, modeChip);
     const toolsBar = el('div', 'composer-tools');
     const tray = el('div', 'composer-tray'); tray.hidden = true;
     const more = ui.iconButton('ellipsis', 'More options', { cls: 'sm', action: 'composer-more' }); more.setAttribute('aria-haspopup', 'menu');
     const start = ui.iconButton('arrow-up', 'Start agent', { cls: 'primary send', shortcut: 'Enter' }); start.id = 'start';
-    row.append(toolsBar, chips, more, start);
+    row.append(toolsBar, el('span', 'spacer'), more, start);
     box.append(tray, task, generic, row);
     const tools = window.OverseerPromptTools.create(task, toolsBar, tray, { post, noModel: true, harness: () => form.harness, target: () => form.repo ? { repo: form.repo } : null, notice: t => { note.className = 'composer-note error'; note.replaceChildren(ui.icon('warning', 'sm'), el('span', null, t)); }, onChange: () => {} });
     const note = el('div', 'composer-note'); note.setAttribute('role', 'status');
     const foot = el('div', 'composer-foot');
     const full = el('button', 'link', 'Full form'); full.type = 'button'; full.title = 'Open the New Task form with every option';
     foot.append(el('span', 'kbd-hint', '⏎ start · ⇧⏎ new line'), full);
-    hero.append(mark, h, box, note, foot);
+    hero.append(mark, h, box, chips, note, foot);
     wrap.append(hero);
     host.append(wrap);
 
@@ -58,12 +60,16 @@
       setChip(modelChip, 'sparkle', form.model || 'Default model', form.model ? `Model: ${form.model}` : 'The harness default model');
       setChip(modeChip, form.mode === 'current' ? 'repo' : 'git-branch', form.mode === 'current' ? 'Current checkout' : 'New worktree', form.mode === 'current' ? 'Works directly in your checkout' : `A new branch and worktree${form.ref ? ' from ' + form.ref : ''}; your checkout is untouched`);
       generic.hidden = form.harness !== 'generic';
+      // Continuity (Gate L): a local agent's chips, and the offline line above the field.
+      if (window.OverseerContinuity) window.OverseerContinuity.chips({ data, form, agentChip, modelChip, setChip });
       tools.refresh();
-      task.placeholder = form.harness === 'generic' ? 'Optional first line for the program' : 'Describe the task';
+      task.placeholder = form.harness === 'generic' ? 'Optional first line for the program' : 'Send off a task';
       validate();
     }
     function problem() {
       if (!data) return {};
+      const continuity = window.OverseerContinuity && window.OverseerContinuity.problem({ data, form, save, task: task.value });
+      if (continuity) return continuity;
       if (!data.trusted) return { text: 'Trust this workspace to start agents.', fix: 'Trust', command: 'workbench.trust.manage' };
       if (!form.repo) return { text: 'Choose a repository.', fix: 'Choose…', action: () => post({ type: 'composerBrowse' }) };
       const hx = harness();
@@ -110,9 +116,11 @@
         for (const a of accts) items.push({ label: a.name, logo: ui.harnessMark(hx.harness, 14), hint: a.signedIn ? (ui.usageText(a.usage) || a.plan || '') : 'signed out', checked: form.harness === hx.harness && form.account === a.id,
           title: `${a.name}: ${a.signedIn ? 'signed in' : 'not signed in'}${a.kind === 'follows-app' ? ' · follows the desktop app' : ''}`, run: () => { form.harness = hx.harness; form.account = a.id; if (!MODELS[hx.harness]?.includes(form.model)) form.model = ''; save(); } });
       }
+      if (window.OverseerContinuity) window.OverseerContinuity.agentMenu(items, { data, form, save });
       ui.menu(agentChip, items, { label: 'Agent' });
     }
     function menuModel() {
+      if (window.OverseerContinuity && window.OverseerContinuity.modelMenu(modelChip, { data, form, save })) return;
       const models = MODELS[form.harness] || [];
       ui.menu(modelChip, [{ label: 'Default model', icon: 'sparkle', checked: !form.model, run: () => { form.model = ''; save(); } }, ...models.map(m => ({ label: m, icon: 'sparkle', checked: form.model === m, run: () => { form.model = m; save(); } })),
         'sep', { label: 'Other model…', icon: 'edit', run: () => post({ type: 'composerModel', harness: form.harness, current: form.model }) }], { label: 'Model' });
@@ -170,6 +178,7 @@
         const compatible = d.accounts.filter(a => (a.harnesses || []).includes(form.harness));
         if (!compatible.some(a => a.id === form.account)) form.account = (compatible.find(a => a.signedIn) || compatible[0] || {}).id;
         if (d.branches) data.branches = d.branches;
+        if (window.OverseerContinuity) window.OverseerContinuity.defaults({ data: d, form });
         render(); grow();
       },
       notice(m) {
@@ -178,6 +187,7 @@
         if (m.kind === 'branches') { data.branches = m.branches; menuMode(); return; }
         if (m.kind === 'model') { form.model = m.model; save(); return; }
         starting = false; validate();
+        if (m.kind === 'info') { note.className = 'composer-note'; note.replaceChildren(ui.icon('info', 'sm'), el('span', null, m.message)); return; }
         note.className = 'composer-note error'; note.replaceChildren(ui.icon('error', 'sm'), el('span', null, m.message));
       },
       onState(s) { if (data && s.accounts) { data.accounts = s.accounts; render(); } },

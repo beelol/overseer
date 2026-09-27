@@ -4,6 +4,8 @@
 // the chosen harness (docs/rfcs/account-governance.md). Theme tokens only.
 (function () {
   const vscode = acquireVsCodeApi();
+  window.overseerApi = vscode; // shared with continuity.js
+  const C = window.OverseerContinuity; // Gate L: local models, and what cannot be reached
   const saved = vscode.getState() || {};
   let data = { repos: [], harnesses: [], accounts: [], branches: {}, trusted: true };
   const form = { repo: saved.repo, harness: saved.harness, account: saved.account, mode: saved.mode || 'worktree', ref: saved.ref || '', model: saved.model || '', approval: saved.approval || 'on-request', prompt: saved.prompt || '', program: saved.program || '', args: saved.args || '[]' };
@@ -63,10 +65,11 @@
     repoItems.push({ value: '__browse__', title: 'Choose…', sub: 'Any Git repository', icon: ICON.folder });
     tiles($('repos'), 'Repository', repoItems, form.repo, (v, moving) => { if (v === '__browse__') { if (!moving) vscode.postMessage({ type: 'browse' }); return; } form.repo = v; persist(); vscode.postMessage({ type: 'branches', repo: v }); render(); });
     tiles($('harnesses'), 'Harness', data.harnesses.map(h => ({ value: h.harness, title: h.label, logo: ui.harnessMark(h.harness, 16), sub: h.installed ? String(h.version || 'installed').split(' ')[0] : 'not installed', tip: [h.label, h.version, ...(h.hints || [])].filter(Boolean).join(' · '),
-      status: h.installed ? { cls: 'ok', text: 'ready' } : { cls: 'off', text: 'missing' }, hints: h.hints, disabled: !h.installed, why: h.installed ? '' : 'Not installed' })), form.harness,
-      v => { form.harness = v; const ok = compatible().some(a => a.id === form.account); if (!ok) form.account = (compatible().find(a => a.signedIn) || {}).id; persist(); render(); });
+      status: !h.installed ? { cls: 'off', text: 'missing' } : blocked(h.harness) ? { cls: 'warn', text: 'offline' } : { cls: 'ok', text: 'ready' }, hints: h.hints, disabled: !h.installed || !!blocked(h.harness), why: h.installed ? blocked(h.harness) || '' : 'Not installed' })), form.harness,
+      v => { form.harness = v; if (local()) { form.account = C.LOCAL_ACCOUNT; if (!/^ollama\//.test(form.model)) form.model = ''; } else if (/^ollama\//.test(form.model)) form.model = ''; const ok = compatible().some(a => a.id === form.account); if (!ok) form.account = (compatible().find(a => a.signedIn) || {}).id; persist(); render(); });
     const accounts = compatible();
-    $('account-section').hidden = !form.harness || form.harness === 'generic';
+    $('account-section').hidden = !form.harness || form.harness === 'generic' || local();
+    renderLocal();
     $('generic-section').hidden = form.harness !== 'generic';
     $('approval-section').hidden = form.harness !== 'codex-app';
     tiles($('accounts'), 'Account', accounts.map(a => ({ value: a.id, title: a.name, logo: ui.providerMark(a.provider, 16), sub: [a.plan, a.kind === 'follows-app' ? 'desktop login' : ''].filter(Boolean).join(' · ') || (a.signedIn ? 'signed in' : ''),
@@ -89,12 +92,42 @@
       { value: 'untrusted', title: 'Untrusted', icon: ICON.untrusted, sub: 'Ask more often', tip: 'Ask before anything that is not a known read-only command' },
       { value: 'never', title: 'Never ask', icon: ICON.never, sub: 'Sandbox only', tip: 'Sandbox limits apply; no approval requests' },
     ], form.approval, v => { form.approval = v; persist(); render(); });
-    const ready = !!form.repo && !!form.harness && (form.harness === 'generic' ? !!form.program : !!form.account && !!form.prompt.trim()) && data.trusted;
+    const ready = !!form.repo && !!form.harness && (form.harness === 'generic' ? !!form.program : local() ? !localProblem() && !!form.prompt.trim() : !!form.account && !!form.prompt.trim()) && data.trusted && !blocked(form.harness);
     $('start').disabled = !ready;
-    $('start-why').textContent = !data.trusted ? 'Trust this workspace to start agents' : !form.repo ? 'Choose a repository' : !form.harness ? 'Choose an agent' : form.harness !== 'generic' && !form.account ? 'Choose a signed-in account' : form.harness === 'generic' ? (form.program ? '' : 'Enter the program path') : !form.prompt.trim() ? 'Describe the task' : '';
+    $('start-why').textContent = !data.trusted ? 'Trust this workspace to start agents' : !form.repo ? 'Choose a repository' : !form.harness ? 'Choose an agent' : blocked(form.harness) ? blocked(form.harness) : local() && localProblem() ? localProblem() : form.harness !== 'generic' && !local() && !form.account ? 'Choose a signed-in account' : form.harness === 'generic' ? (form.program ? '' : 'Enter the program path') : !form.prompt.trim() ? 'Describe the task' : '';
     document.body.dataset.ready = '1';
   }
   function compatible() { return data.accounts.filter(a => (a.harnesses || []).includes(form.harness)); }
+
+  // ---- Continuity (Gate L) ----
+  const local = () => !!C && form.harness === C.LOCAL;
+  const blocked = harness => (C ? C.blocked(harness, data) : undefined);
+  /** Why a local agent cannot start now, or ''. */
+  function localProblem() {
+    const c = C.choices(data);
+    if (!c.running) return c.ollama;
+    const chosen = form.model && c.models.find(m => `ollama/${m.tag}` === form.model);
+    if (form.model && !chosen) return `${form.model.replace(/^ollama\//, '')} is not installed in Ollama`;
+    if (chosen && !chosen.badge.usable) return chosen.badge.detail;
+    if (!form.model && !c.pick) return `No local model can run now${c.why_no_pick ? ` (${c.why_no_pick})` : ''}`;
+    return '';
+  }
+  /** Local models as tiles, each with its fit badge; what cannot run says why. */
+  function renderLocal() {
+    const section = $('local-section');
+    if (!section) return;
+    section.hidden = !local();
+    $('model').closest('div').hidden = local();
+    if (!local()) return;
+    const c = C.choices(data);
+    const items = [{ value: '', title: 'Best fit', icon: 'sparkle', sub: c.pick ? `${c.pick.tag} · ${Math.round(c.pick.context / 1024)}k` : 'none fits now', tip: c.pick ? 'The best verified model that fits the memory free now' : c.why_no_pick, disabled: !c.pick, why: c.pick ? '' : (c.why_no_pick || 'No model fits'),
+      status: c.pick ? { cls: 'ok', text: 'fits' } : { cls: 'off', text: 'none fits' } },
+      ...c.models.map(m => ({ value: `ollama/${m.tag}`, title: m.tag, icon: 'server', sub: [m.badge.badge, m.badge.mark].filter(Boolean).join(' · '), tip: m.badge.detail, disabled: !m.badge.usable, why: m.badge.usable ? '' : m.badge.detail,
+        status: m.badge.usable ? { cls: m.badge.tone === 'ok' ? 'ok' : 'warn', text: m.badge.badge } : { cls: 'off', text: m.badge.badge }, hints: [m.badge.badge, m.badge.mark].filter(Boolean) }))];
+    tiles($('local-models'), 'Local model', items, form.model || '', v => { form.model = v; persist(); render(); });
+    const why = $('local-why'); why.hidden = c.running; why.textContent = c.running ? '' : `${c.ollama}.`;
+  }
+  if (C) C.watch(() => { if (data.continuity !== undefined || C.data()) render(); });
 
   for (const [id, key] of [['model', 'model'], ['prompt', 'prompt'], ['program', 'program'], ['args', 'args']]) {
     $(id).value = form[key];

@@ -1,0 +1,17 @@
+overseerd 0.1.0; Codex codex-cli 0.155.0-alpha.16.4 with --oss --local-provider ollama (no account: its own empty CODEX_HOME); Ollama 0.34.2; Darwin 25.6.0 arm64
+memory: 128 GiB installed; budget now 17.6 GiB
+order (smallest first): qwen2.5-coder:14b 8.4 GiB, qwen3-coder:30b 17.3 GiB, qwen2.5-coder:32b 18.5 GiB
+
+== qwen2.5-coder:14b
+    memory before: 30.5 GiB available, pressure normal, level 47%, loaded: qwen3-coder:30b-64k (23.7 GiB at 64k)
+    the guard allowed overseer/qwen2.5-coder-14b:32k at a 32k context: 14.2 GiB of a 17.7 GiB budget; loaded by the daemon under the watchdog
+    attempt 1: FAIL  exit null in 2.4 s; file: missing; items: none; reply: ""; Reading additional input from stdin...
+    loaded while Codex worked: overseer/qwen2.5-coder-14b:32k (14.2 GiB at 32k), qwen3-coder:30b-64k (23.7 GiB at 64k)
+    memory while it worked: lowest 16.4 GiB available, lowest level 26%, pressure warn
+    memory after: 23.4 GiB available, pressure warn, level 37%, loaded: qwen3-coder:30b-64k (23.7 GiB at 64k)
+    RESULT qwen2.5-coder:14b: failed (0 of 3 write checks: no file was written)
+
+STOPPED: memory pressure became warn during qwen2.5-coder:14b
+
+at the end: 24.7 GiB available, pressure warn, level 38%, loaded: qwen3-coder:30b-64k (23.7 GiB at 64k)
+summary: qwen2.5-coder:14b failed

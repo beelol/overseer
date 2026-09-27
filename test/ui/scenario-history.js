@@ -35,7 +35,7 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     await cdp.command('View: Show Overseer'); await delay(2500);
     const labels = () => s.agentRows().then(rows => rows.filter(r => r.level === 2).map(r => r.label));
     const timeSearch = async (q, expectTitle) => {
-      await cdp.command('Overseer: Search Agents'); await cdp.waitQuickTitle('Search agents');
+      await cdp.command('Overseer: Search Agents'); await s.searchFocused();
       await cdp.key('a', { meta: true }); await cdp.key('Backspace');
       await cdp.call('Input.insertText', { text: q }, cdp.workbench);
       const t0 = Date.now(); let titles = [];
@@ -54,7 +54,7 @@ const { Session, makeRepo, latestVsix, delay, git } = require('./harness');
     // Archive and restore from the side bar with the keyboard (Delete / ⌘⌫ on a finished agent's row).
     // The tree draws only the rows in view, so the old agent is found by search first.
     const target = tasks[5];
-    const filterTo = async q => { await cdp.command('Overseer: Search Agents'); await cdp.waitQuickTitle('Search agents'); await cdp.key('a', { meta: true }); await cdp.key('Backspace'); await cdp.call('Input.insertText', { text: q }, cdp.workbench); await delay(400); await cdp.key('Enter'); await delay(600); };
+    const filterTo = async q => { await cdp.command('Overseer: Search Agents'); await s.searchFocused(); await cdp.key('a', { meta: true }); await cdp.key('Backspace'); await cdp.call('Input.insertText', { text: q }, cdp.workbench); await delay(400); await cdp.key('Enter'); await delay(600); };
     await filterTo('History task 005');
     // Clicking an agent opens its chat (focus goes there); keyboard focus returns to the list for ⌘⌫.
     await s.clickAgentRow('History task 005', { settle: 1500 });

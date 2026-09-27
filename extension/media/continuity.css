@@ -1,0 +1,61 @@
+/* Continuity (Gate L): waiting and back-online cards, transition notes, the first-use notice and
+   the local models' badges. Theme tokens only. */
+.status.st-waiting_for_connection, .status.st-waiting_for_memory { color: var(--ov-waiting); }
+.status.st-handed_off { color: var(--ov-muted); }
+
+.cont-note { display: flex; align-items: baseline; gap: 6px; font-size: var(--ov-font-sm); color: var(--ov-muted); overflow-wrap: anywhere; }
+.cont-note .codicon { flex: none; font-size: 14px; position: relative; top: 2px; }
+.cont-note strong { color: var(--ov-text); font-weight: var(--ov-weight-medium); }
+.cont-note .link { margin-left: 2px; }
+
+.cont-card { display: flex; flex-direction: column; gap: var(--ov-space-2); padding: var(--ov-space-3) var(--ov-space-4); border-radius: var(--ov-radius-card); border: 1px solid var(--ov-border-strong); background: var(--ov-raised); margin-top: var(--ov-space-2); }
+.cont-card[hidden] { display: none; }
+.cont-head { display: flex; align-items: center; gap: var(--ov-space-2); font-weight: var(--ov-weight-medium); min-width: 0; }
+.cont-head .codicon { flex: none; color: var(--ov-waiting); }
+.cont-card.back .cont-head .codicon { color: var(--ov-done); }
+.cont-line { color: var(--ov-text); overflow-wrap: anywhere; }
+.cont-why { color: var(--ov-muted); font-size: var(--ov-font-sm); overflow-wrap: anywhere; }
+.cont-foot { color: var(--ov-muted); font-size: var(--ov-font-sm); }
+.cont-actions { display: flex; flex-wrap: wrap; gap: var(--ov-space-2); }
+.cont-progress { height: 3px; border-radius: 2px; background: var(--ov-border); overflow: hidden; }
+.cont-progress > span { display: block; height: 100%; background: var(--ov-running); transition: width var(--ov-motion-slow) var(--ov-ease); }
+
+/* The grid's tiles have less room: one line and the actions. */
+.tile .cont-card { padding: var(--ov-space-2) var(--ov-space-3); gap: 6px; }
+.tile .cont-card .cont-why, .tile .cont-card .cont-foot { display: none; }
+
+/* First-use notice, above the composer and at the top of New Task: one line until opened. */
+.cont-notice { display: flex; align-items: flex-start; gap: var(--ov-space-3); width: 100%; box-sizing: border-box; padding: var(--ov-space-3) var(--ov-space-4); border-radius: var(--ov-radius-card); border: 1px solid var(--ov-border-strong); background: var(--ov-raised); text-align: left; margin-bottom: var(--ov-space-3); }
+.cont-notice .cont-details { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--ov-space-2); }
+.cont-notice summary.cont-head { display: flex; align-items: center; gap: var(--ov-space-2); cursor: pointer; list-style: none; user-select: none; }
+.cont-notice summary.cont-head::-webkit-details-marker { display: none; }
+.cont-notice .cont-head .codicon { color: var(--ov-accent); }
+.cont-notice .cont-head .cont-chevron { color: var(--ov-muted); margin-left: auto; transition: transform var(--ov-motion-slow) var(--ov-ease); }
+.cont-notice .cont-details[open] .cont-chevron { transform: rotate(180deg); }
+.cont-notice > .cont-actions { flex: none; }
+.cont-switches { display: flex; flex-direction: column; gap: 6px; }
+.cont-switch { display: flex; align-items: center; gap: var(--ov-space-2); font-size: var(--ov-font-sm); min-width: 0; }
+.cont-switch .name { font-weight: var(--ov-weight-medium); }
+.cont-switch .state { color: var(--ov-muted); }
+.cont-switch .state.on { color: var(--ov-done); }
+.cont-switch .detail { color: var(--ov-muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Offline line above the composer. */
+.cont-banner { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; font-size: var(--ov-font-sm); color: var(--ov-waiting); margin-bottom: var(--ov-space-2); text-align: left; }
+.cont-banner[hidden] { display: none; }
+
+/* Fit badges: in menus, tiles and chips. */
+.cont-badge { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--ov-radius-pill); border: 1px solid var(--ov-border); font-size: var(--ov-font-xs); color: var(--ov-muted); white-space: nowrap; }
+.cont-badge.ok { color: var(--ov-done); border-color: var(--ov-done); }
+.cont-badge.tight { color: var(--ov-waiting); border-color: var(--ov-waiting); }
+.cont-badge.no { color: var(--ov-failed); border-color: var(--ov-failed); }
+.cont-badge.mark { border-style: dashed; }
+.menu-item .cont-badge { margin-left: 6px; }
+.tile .cont-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+/* The handoff prompt, folded behind one line in the successor's chat. */
+.msg.user .cont-fold { font-size: var(--ov-font-sm); }
+.msg.user .cont-fold > summary { color: var(--ov-muted); cursor: pointer; list-style: revert; }
+.msg.user .cont-fold > .text { margin-top: var(--ov-space-2); white-space: pre-wrap; }
+.cont-banner > span { display: inline-flex; align-items: center; gap: 6px; }
+.cont-banner .cont-download { color: var(--ov-muted); }

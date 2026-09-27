@@ -1,0 +1,3 @@
+{"type":"thread.started","thread_id":"fixture-thread-quota"}
+{"type":"turn.started"}
+{"type":"turn.failed","error":{"message":"You've hit your usage limit. Upgrade to Pro or try again later."}}

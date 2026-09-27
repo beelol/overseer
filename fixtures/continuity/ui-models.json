@@ -1,0 +1,6 @@
+[
+  { "tag": "qwen3-coder:30b", "size": 18556700761, "arch": "qwen3moe", "blocks": 48, "kv": 4, "key": 128, "parameters": 30532122624, "max_context": 262144, "capabilities": ["completion", "tools"] },
+  { "tag": "qwen3-coder:30b-64k", "parent": "qwen3-coder:30b", "size": 18556700444, "arch": "qwen3moe", "blocks": 48, "kv": 4, "key": 128, "parameters": 30532122624, "max_context": 262144, "num_ctx": 65536, "capabilities": ["completion", "tools"], "loaded_size": 25411736042 },
+  { "tag": "qwen2.5-coder:14b", "size": 8988124298, "arch": "qwen2", "blocks": 48, "kv": 8, "key": 128, "parameters": 14770033664, "max_context": 32768, "capabilities": ["completion", "tools", "insert"] },
+  { "tag": "qwen3.5:122b", "size": 81400000000, "arch": "qwen35moe", "blocks": 48, "kv": 2, "key": 256, "parameters": 125086497008, "max_context": 262144, "capabilities": ["completion", "vision", "tools", "thinking"] }
+]

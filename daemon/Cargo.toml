@@ -25,6 +25,8 @@ snow = "0.10"
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 getrandom = "0.3"
+# Continuity: credential-free reachability probes (TLS) and loopback HTTP to Ollama and OpenCode.
+ureq = { version = "2", default-features = false, features = ["tls"] }
 
 [dev-dependencies]
 tempfile = "3"

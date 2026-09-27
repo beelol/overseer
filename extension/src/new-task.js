@@ -3,7 +3,7 @@
 const vscode = require('vscode');
 const { page, localRoots } = require('./webview-html');
 
-const LABELS = { codex: 'Codex', 'codex-app': 'Codex app-server', claude: 'Claude Code', opencode: 'OpenCode', generic: 'Program' };
+const LABELS = { codex: 'Codex', 'codex-app': 'Codex app-server', claude: 'Claude Code', opencode: 'OpenCode', 'opencode-serve': 'Local model', generic: 'Program' };
 
 class NewTaskPanel {
   constructor(context, client, model, { selectRun, launcher, column }) {
@@ -15,8 +15,8 @@ class NewTaskPanel {
     if (this.panel) { this.panel.reveal(); return; }
     const panel = vscode.window.createWebviewPanel('overseer.newTask', 'New Task', { viewColumn: this.column() || vscode.ViewColumn.Active, preserveFocus: false }, { enableScripts: true, localResourceRoots: localRoots(this.context.extensionUri), retainContextWhenHidden: true });
     this.panel = panel;
-    panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer.svg');
-    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'New Task', css: ['new-task.css'], js: ['new-task.js'], body: `
+    panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'overseer-logo.png');
+    panel.webview.html = page(panel.webview, this.context.extensionUri, { title: 'New Task', css: ['new-task.css', 'continuity.css'], js: ['continuity-text.js', 'continuity.js', 'new-task.js'], body: `
 <main class="form" data-audit-view="new-task">
 <h1>New task</h1>
 <div id="error" class="error" role="alert" hidden></div>
@@ -25,6 +25,8 @@ class NewTaskPanel {
 <section><h2 id="harnesses-h" class="sec">Agent</h2><div id="harnesses" class="tiles" aria-labelledby="harnesses-h"></div></section>
 <section id="account-section"><h2 id="accounts-h" class="sec">Account</h2><div id="accounts" class="tiles" aria-labelledby="accounts-h"></div>
 <p id="no-accounts" class="empty" hidden>No account for this agent yet. Add one from Accounts.</p></section>
+<section id="local-section" hidden><h2 id="local-h" class="sec">Local model</h2><div id="local-models" class="tiles" aria-labelledby="local-h"></div>
+<p id="local-why" class="empty" hidden></p></section>
 <section id="generic-section" hidden><h2 class="sec">Program</h2><div class="row"><div><label for="program">Executable</label><input id="program" placeholder="/absolute/path/to/program"></div>
 <div><label for="args">Arguments (JSON)</label><input id="args" value="[]"></div></div></section>
 <section><h2 id="modes-h" class="sec">Workspace</h2><div id="modes" class="tiles" aria-labelledby="modes-h"></div>

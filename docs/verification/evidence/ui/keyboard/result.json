@@ -23,15 +23,15 @@
           }
         ],
         "badge": "4",
-        "status": "eye  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."
+        "status": "overseer-mark  Overseer 3 active   bell-dot  4, 3 agents running · 4 need you\nAgents keep running when VS Code closes.\nClick to open the dashboard."
       }
     },
     {
       "name": "⌥⌘J goes to the next agent that needs you; ⌥⌘Y allows and ⌥⌘⌫ denies its request",
       "ok": true,
       "detail": {
-        "first": "r-20f3ceba2981",
-        "second": "r-204653c438ae",
+        "first": "r-cb25d1fd4da4",
+        "second": "r-e22a5fef2f2e",
         "firstDone": "completed",
         "secondDone": "completed",
         "denied": true
@@ -42,9 +42,9 @@
       "ok": true,
       "detail": {
         "visited": [
-          "r-eccda3e28762",
-          "r-20f3ceba2981",
-          "r-2e11bd52ec2d"
+          "r-a5455e71104b",
+          "r-cb25d1fd4da4",
+          "r-64a2550a603f"
         ],
         "left": []
       }
@@ -53,7 +53,7 @@
       "name": "⌥⌘A switches agents from a searchable quick pick and ⌥⌘. stops the selected agent",
       "ok": true,
       "detail": {
-        "switched": "r-e141115ebe16",
+        "switched": "r-b464b5ed6227",
         "stopped": "interrupted"
       }
     },
@@ -61,8 +61,8 @@
       "name": "⌥⌘N starts a new agent from the composer without the mouse; it becomes the selected agent",
       "ok": true,
       "detail": {
-        "created": "r-aa237e3d3003",
-        "nowSelected": "r-aa237e3d3003"
+        "created": "r-020b6ee1abce",
+        "nowSelected": "r-020b6ee1abce"
       }
     },
     {

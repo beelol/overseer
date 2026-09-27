@@ -4,6 +4,7 @@
   "description": "Launch and supervise account-authenticated agent harnesses, follow their native children, and review/edit their worktrees live (review built on Branch Diff).",
   "version": "0.1.0",
   "publisher": "beelol",
+  "icon": "media/overseer-app-icon.png",
   "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/beelol/overseer.git" },
   "engines": { "vscode": "^1.136.0" },
@@ -20,19 +21,39 @@
   "contributes": {
     "themes": [
       { "label": "Overseer Dark", "uiTheme": "vs-dark", "path": "./themes/overseer-dark-color-theme.json" },
-      { "label": "Overseer Light", "uiTheme": "vs", "path": "./themes/overseer-light-color-theme.json" }
+      { "label": "Overseer Light", "uiTheme": "vs", "path": "./themes/overseer-light-color-theme.json" },
+      { "label": "Overseer", "uiTheme": "vs-dark", "path": "./themes/overseer-color-theme.json" }
+    ],
+    "colors": [
+      { "id": "overseer.backdropStart", "description": "Overseer views: top of the backdrop gradient.", "defaults": { "dark": "editor.background", "light": "editor.background", "highContrast": "editor.background", "highContrastLight": "editor.background" } },
+      { "id": "overseer.backdropEnd", "description": "Overseer views: bottom of the backdrop gradient.", "defaults": { "dark": "editor.background", "light": "editor.background", "highContrast": "editor.background", "highContrastLight": "editor.background" } },
+      { "id": "overseer.glow", "description": "Overseer views: the soft light in the backdrop's top corner.", "defaults": { "dark": "#00000000", "light": "#00000000", "highContrast": "#00000000", "highContrastLight": "#00000000" } },
+      { "id": "overseer.chromeStart", "description": "Overseer side bar header: top of its gradient.", "defaults": { "dark": "sideBar.background", "light": "sideBar.background", "highContrast": "sideBar.background", "highContrastLight": "sideBar.background" } },
+      { "id": "overseer.chromeEnd", "description": "Overseer side bar header: bottom of its gradient.", "defaults": { "dark": "sideBar.background", "light": "sideBar.background", "highContrast": "sideBar.background", "highContrastLight": "sideBar.background" } },
+      { "id": "overseer.surfaceStart", "description": "Overseer grid tiles and cards: top of their gradient.", "defaults": { "dark": "editor.background", "light": "editor.background", "highContrast": "editor.background", "highContrastLight": "editor.background" } },
+      { "id": "overseer.surfaceEnd", "description": "Overseer grid tiles and cards: bottom of their gradient.", "defaults": { "dark": "editor.background", "light": "editor.background", "highContrast": "editor.background", "highContrastLight": "editor.background" } },
+      { "id": "overseer.accentStart", "description": "Overseer primary buttons: start of the accent gradient.", "defaults": { "dark": "button.background", "light": "button.background", "highContrast": "button.background", "highContrastLight": "button.background" } },
+      { "id": "overseer.accentEnd", "description": "Overseer primary buttons: end of the accent gradient.", "defaults": { "dark": "button.background", "light": "button.background", "highContrast": "button.background", "highContrastLight": "button.background" } }
     ],
     "customEditors": [
       { "viewType": "overseer.chatEditor", "displayName": "Overseer Agent Chat", "selector": [{ "filenamePattern": "*.overseer-chat" }], "priority": "default" }
     ],
+    "icons": {
+      "overseer-mark": { "description": "Overseer mark", "default": { "fontPath": "media/overseer-mark.woff", "fontCharacter": "\\E001" } }
+    },
     "viewsContainers": {
-      "activitybar": [{ "id": "overseer", "title": "Overseer", "icon": "media/overseer.svg" }]
+      "activitybar": [{ "id": "overseer", "title": "Overseer", "icon": "media/overseer.svg" }],
+      "panel": [{ "id": "overseer-talk", "title": "Overseer", "icon": "media/overseer.svg" }]
     },
     "views": {
       "overseer": [
-        { "id": "overseer.agents", "name": "Agents" },
-        { "id": "overseer.accounts", "name": "Accounts" },
-        { "id": "overseer.devices", "name": "Devices", "visibility": "collapsed" }
+        { "type": "webview", "id": "overseer.search", "name": "Search", "initialSize": 1 },
+        { "id": "overseer.agents", "name": "Agents", "initialSize": 14 },
+        { "id": "overseer.accounts", "name": "Accounts", "initialSize": 5 },
+        { "id": "overseer.devices", "name": "Devices", "visibility": "collapsed", "initialSize": 3 }
+      ],
+      "overseer-talk": [
+        { "type": "webview", "id": "overseer.talk", "name": "Talk to Overseer" }
       ]
     },
     "viewsWelcome": [
@@ -50,6 +71,9 @@
       { "command": "overseer.openDashboardWindow", "title": "Open Dashboard in New Window", "category": "Overseer", "icon": "$(empty-window)" },
       { "command": "overseer.newAgent", "title": "New Agent", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.toggleGrid", "title": "Toggle Agent Grid", "category": "Overseer", "icon": "$(layout)" },
+      { "command": "overseer.resetGridLayout", "title": "Reset Grid Layout", "category": "Overseer" },
+      { "command": "overseer.whereAmI", "title": "Where Am I", "category": "Overseer", "icon": "$(location)" },
+      { "command": "overseer.talk", "title": "Talk to Overseer", "category": "Overseer", "icon": "$(comment-discussion)" },
       { "command": "overseer.switchAgent", "title": "Switch Agent…", "category": "Overseer", "icon": "$(list-selection)" },
       { "command": "overseer.nextNeedsYou", "title": "Go to Next Agent That Needs You", "category": "Overseer", "icon": "$(bell-dot)" },
       { "command": "overseer.allowPermission", "title": "Allow Pending Request", "category": "Overseer", "icon": "$(check)", "enablement": "isWorkspaceTrusted" },
@@ -59,6 +83,10 @@
       { "command": "overseer.newTask", "title": "New Task…", "category": "Overseer", "icon": "$(add)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.newTaskQuick", "title": "Start Task with Quick Picks…", "category": "Overseer", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.refresh", "title": "Refresh", "category": "Overseer", "icon": "$(refresh)" },
+      { "command": "overseer.continuity.show", "title": "Connection and Continuity…", "category": "Overseer", "icon": "$(cloud)" },
+      { "command": "overseer.continuity.checkNow", "title": "Check the Connection Now", "category": "Overseer", "icon": "$(sync)" },
+      { "command": "overseer.continuity.toggle", "title": "Turn Continuity On or Off", "category": "Overseer", "icon": "$(cloud)", "enablement": "isWorkspaceTrusted" },
+      { "command": "overseer.continuity.localModels", "title": "Local Models…", "category": "Overseer", "icon": "$(server)" },
       { "command": "overseer.openReview", "title": "Open Review", "category": "Overseer", "icon": "$(diff-multiple)" },
       { "command": "overseer.showOutput", "title": "Show Output", "category": "Overseer", "icon": "$(output)" },
       { "command": "overseer.followUp", "title": "Send Follow-up…", "category": "Overseer", "icon": "$(comment)", "enablement": "isWorkspaceTrusted" },
@@ -86,6 +114,7 @@
       { "command": "overseer.mergeBack", "title": "Merge Back…", "category": "Overseer", "icon": "$(git-merge)", "enablement": "isWorkspaceTrusted" },
       { "command": "overseer.stopAll", "title": "Stop Agents and Daemon…", "category": "Overseer", "icon": "$(debug-stop)" },
       { "command": "overseer.startDaemon", "title": "Start Daemon", "category": "Overseer" },
+      { "command": "overseer.audioMode", "title": "Audio Mode and Reactor Cues…", "category": "Overseer", "icon": "$(unmute)" },
       { "command": "overseer.testNotification", "title": "Test Notification", "category": "Overseer", "icon": "$(bell)" },
       { "command": "overseer.showLog", "title": "Show Daemon Log", "category": "Overseer" },
       { "command": "overseer.restartDaemonConnection", "title": "Reconnect to Daemon", "category": "Overseer" },
@@ -103,9 +132,12 @@
     ],
     "keybindings": [
       { "command": "overseer.archiveAgent", "key": "delete", "mac": "cmd+backspace", "when": "focusedView == overseer.agents" },
+      { "command": "overseer.searchAgents", "key": "ctrl+alt+f", "mac": "cmd+alt+f", "when": "!editorTextFocus" },
+      { "command": "overseer.clearAgentSearch", "key": "escape", "when": "focusedView == overseer.agents && overseer.agentsFiltered" },
       { "command": "overseer.toggleDashboard", "key": "ctrl+alt+o", "mac": "cmd+alt+o" },
       { "command": "overseer.newAgent", "key": "ctrl+alt+n", "mac": "cmd+alt+n" },
       { "command": "overseer.toggleGrid", "key": "ctrl+alt+g", "mac": "cmd+alt+g" },
+      { "command": "overseer.whereAmI", "key": "ctrl+alt+m", "mac": "cmd+alt+m" },
       { "command": "overseer.switchAgent", "key": "ctrl+alt+a", "mac": "cmd+alt+a" },
       { "command": "overseer.nextNeedsYou", "key": "ctrl+alt+j", "mac": "cmd+alt+j" },
       { "command": "overseer.allowPermission", "key": "ctrl+alt+y", "mac": "cmd+alt+y", "when": "overseer.connected" },
@@ -126,6 +158,7 @@
         { "command": "overseer.cleanupArchived", "when": "view == overseer.agents", "group": "3_tidy@1" },
         { "command": "overseer.refresh", "when": "view == overseer.agents", "group": "3_tidy@2" },
         { "command": "overseer.showCapabilities", "when": "view == overseer.agents", "group": "4_info@1" },
+        { "command": "overseer.audioMode", "when": "view == overseer.agents", "group": "5_audio@1" },
         { "command": "overseer.stopAll", "when": "view == overseer.agents", "group": "9_stop@1" },
         { "command": "overseer.addProfile", "when": "view == overseer.accounts", "group": "navigation@1" },
         { "command": "overseer.refreshAccounts", "when": "view == overseer.accounts", "group": "navigation@2" },
@@ -181,10 +214,33 @@
     "configuration": {
       "title": "Overseer",
       "properties": {
-        "overseer.grid.maxTiles": { "type": "integer", "minimum": 1, "maximum": 9, "default": 6, "markdownDescription": "Most agents shown at once in the agent grid (1–9)." },
+        "overseer.grid.maxTiles": { "type": "integer", "minimum": 1, "maximum": 16, "default": 6, "markdownDescription": "How many running or pinned agents fill the agent grid on their own (1–16). Agents you drag in can fill it up to 16." },
         "overseer.dashboard.openOnStartup": { "type": "boolean", "default": false, "markdownDescription": "Open the Overseer dashboard when VS Code starts." },
+        "overseer.chat.model": { "type": "string", "default": "", "markdownDescription": "The model Talk to Overseer asks for (for example `haiku`); empty uses the harness's default." },
+        "overseer.chat.harness": { "type": "string", "enum": ["claude", "codex", "opencode"], "default": "claude", "markdownDescription": "The harness Talk to Overseer runs on (its default account)." },
+        "overseer.sideBar.openOnStartup": { "type": ["boolean", "null"], "default": null, "markdownDescription": "Show Overseer in the side bar instead of Explorer when VS Code opens (Explorer stays one click away in the activity bar). Overseer asks once while this is not set." },
+        "overseer.dashboard.immersive": { "type": "boolean", "default": true, "markdownDescription": "In the dashboard, hide VS Code's chrome above Overseer's views. While the dashboard is open Overseer sets these user settings, and puts back exactly what was there when you leave it: `workbench.editor.showTabs` = `none`, `breadcrumbs.enabled` = `false`, `workbench.editor.editorActionsLocation` = `hidden`." },
         "overseer.history.autoArchiveDays": { "type": "number", "minimum": 0, "default": 14, "markdownDescription": "Archive finished agents automatically after this many days (0 turns it off). Archived agents stay searchable and can be restored." },
         "overseer.showCodexAppServer": { "type": "boolean", "default": false, "markdownDescription": "Offer the Codex app-server harness in the new-agent composer (the New Task form always lists it)." },
+        "overseer.continuity.enabled": { "type": "boolean", "default": true, "markdownDescription": "Continuity: when an agent loses its connection, continue on another provider that can be reached or on a local model. Off: agents wait and retry. Overseer's daemon keeps and enforces this, also with VS Code closed.", "order": 0 },
+        "overseer.continuity.providerOrder": { "type": "array", "items": {"type": "string", "enum": ["openai", "anthropic"]}, "default": ["openai", "anthropic"], "markdownDescription": "Preference among providers that can be reached. Local models always come last. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.allowModelDownloads": { "type": "boolean", "default": false, "markdownDescription": "Let Overseer download local models from the Ollama registry when one is needed. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.allowOllamaInstall": { "type": "boolean", "default": false, "markdownDescription": "Let Overseer install Ollama (Homebrew, or the official archive after its signature verifies) and start it when nothing is running. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.prefetch": { "type": "boolean", "default": false, "markdownDescription": "While online and downloads are allowed, keep the best-fitting local model downloaded. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.ramCeilingPercent": { "type": "integer", "minimum": 10, "maximum": 50, "default": 40, "markdownDescription": "Share of total memory one local model may take. Never over 50. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.ramHeadroomGiB": { "type": ["number", "null"], "minimum": 1, "maximum": 1024, "default": null, "markdownDescription": "Free memory that must remain after a model loads, in GiB. Empty: 4 GiB or 10% of total, whichever is more. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.contextTarget": { "type": "integer", "minimum": 8192, "maximum": 1048576, "default": 65536, "markdownDescription": "Preferred context length for local models, in tokens. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.contextFloor": { "type": "integer", "minimum": 8192, "maximum": 262144, "default": 16384, "markdownDescription": "Shortest context Overseer runs a coding agent at, in tokens. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.preferredModels": { "type": "array", "items": {"type": "string"}, "default": [], "markdownDescription": "Local models tried first, in this order (Ollama tags). Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.allowUnverifiedModels": { "type": "boolean", "default": false, "markdownDescription": "Let automatic picks use installed models that call tools but have not passed Overseer's check. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.localHarness": { "type": "string", "enum": ["opencode", "codex"], "default": "opencode", "markdownDescription": "The harness local models run in. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.returnOnline": { "type": "string", "enum": ["offer", "auto", "stay"], "default": "offer", "markdownDescription": "When the connection is back: offer to switch back, switch at the next message, or stay. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.retryCapSeconds": { "type": "integer", "minimum": 5, "maximum": 3600, "default": 120, "markdownDescription": "Longest wait between two retries, in seconds. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.retryForHours": { "type": "integer", "minimum": 1, "maximum": 36, "default": 36, "markdownDescription": "Stop waiting after this many hours. Never over 36. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.stallSeconds": { "type": "integer", "minimum": 30, "maximum": 3600, "default": 90, "markdownDescription": "Silence while offline before Overseer interrupts a turn, in seconds. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.probes": { "type": "boolean", "default": true, "markdownDescription": "Check reachability with small requests that carry no credentials. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.ollamaIdleMinutes": { "type": "integer", "minimum": 1, "maximum": 1440, "default": 30, "markdownDescription": "Stop an Ollama that Overseer started after this many idle minutes. Overseer's daemon keeps and enforces this, also with VS Code closed." },
+        "overseer.continuity.registry": { "type": "string", "default": "", "markdownDescription": "Mirror for model downloads. Empty: Ollama's own registry. Overseer's daemon keeps and enforces this, also with VS Code closed." },
         "overseer.github.apiUrl": { "type": "string", "default": "https://api.github.com", "description": "GitHub API base URL used by Open Pull Request (GitHub Enterprise: https://HOST/api/v3). Pull requests use the GitHub account VS Code is signed in to." },
         "overseer.daemonPath": { "type": "string", "default": "", "markdownDescription": "Path to the `overseerd` binary. Empty uses the binary bundled with the extension.", "scope": "machine" },
         "overseer.review.enableEditing": { "type": "boolean", "default": true, "markdownDescription": "Edit working-tree text directly in the review. Undo/redo is available through Open in Native Diff." },
@@ -197,6 +253,6 @@
     "check": "node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/review.js && node --check src/output-panel.js && node --check src/phone-access.js && node --check src/phone-text.js && node --check media/pairing.js && node --check branch-diff/review/panel.js",
     "build:review": "node branch-diff/scripts/build-review.js",
     "package": "node scripts/package.js",
-    "test": "node test/run.js"
+    "test": "node ../test/unit/run.js"
   }
 }

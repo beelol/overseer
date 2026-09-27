@@ -9,32 +9,52 @@ const STATUS_ICON = {
 };
 const ACTIVE = new Set(['queued', 'starting', 'running', 'waiting_for_user']);
 const STATUS_LABEL = { waiting_for_user: 'waiting for you' };
+// Continuity's states (Gate L): waiting for a connection or for memory (still the agent's work), and handed off.
+const CONTINUITY = require('../media/continuity-text.js').STATES;
+for (const [s, x] of Object.entries(CONTINUITY)) { STATUS_ICON[s] = [x.icon, x.active ? 'charts.orange' : 'descriptionForeground']; if (x.active) ACTIVE.add(s); }
 
 function statusIcon(status) {
   const [icon, color] = STATUS_ICON[status] || STATUS_ICON.unknown;
   return new vscode.ThemeIcon(icon, new vscode.ThemeColor(color));
 }
 
+/** The machine's own login reads "Your login" (the harness is named beside it), not "codex (existing login)". */
+function accountName(a) { return a && (a.is_system || a.kind === 'follows-app' || / \(existing login\)$/.test(a.name || '')) ? 'Your login' : a?.name; }
+
 class Model {
   constructor(client) {
     this.client = client;
     this.state = { tasks: [], runs: [], workspaces: [], profiles: [], turns: {} };
+    this.all = this.state;
+    // Tasks Overseer runs for itself (the Talk to Overseer chat, AC-107): kept out of every list.
+    this.hidden = new Set();
     this.emitter = new vscode.EventEmitter();
     this.onDidChange = this.emitter.event;
     this.profileStatus = new Map();
   }
   async refresh() {
-    try { this.state = await this.client.request('state'); this.error = undefined; }
+    try {
+      this.all = await this.client.request('state'); for (const p of this.all.profiles || []) p.name = accountName(p);
+      this.state = this.visible(this.all); this.error = undefined;
+    }
     catch (error) { this.error = error.message; }
     this.emitter.fire();
   }
   // Coalesces bursts without starving: a steady stream of events still refreshes every 120 ms.
   scheduleRefresh() { if (!this.timer) this.timer = setTimeout(() => { this.timer = undefined; this.refresh(); }, 120); }
-  run(id) { return this.state.runs.find(r => r.id === id); }
-  task(id) { return this.state.tasks.find(t => t.id === id); }
-  workspace(id) { return this.state.workspaces.find(w => w.id === id); }
+  hide(taskId) { if (taskId && !this.hidden.has(taskId)) { this.hidden.add(taskId); this.state = this.visible(this.all); this.emitter.fire(); } }
+  visible(all) {
+    if (!this.hidden.size) return all;
+    const runs = (all.runs || []).filter(r => !this.hidden.has(r.task_id));
+    const used = new Set(runs.map(r => r.workspace_id));
+    return { ...all, tasks: (all.tasks || []).filter(t => !this.hidden.has(t.id)), runs, workspaces: (all.workspaces || []).filter(w => used.has(w.id) || !(all.runs || []).some(r => r.workspace_id === w.id)) };
+  }
+  // Lookups see every run, hidden ones included (the Overseer chat shows its own run).
+  run(id) { return this.all.runs.find(r => r.id === id); }
+  task(id) { return this.all.tasks.find(t => t.id === id); }
+  workspace(id) { return this.all.workspaces.find(w => w.id === id); }
   profile(id) { return this.state.profiles.find(p => p.id === id); }
-  children(runId) { return this.state.runs.filter(r => r.parent_run_id === runId); }
+  children(runId) { return this.all.runs.filter(r => r.parent_run_id === runId); }
   rootRun(run) { let r = run; const seen = new Set(); while (r?.parent_run_id && !seen.has(r.id)) { seen.add(r.id); r = this.run(r.parent_run_id); } return r; }
   descendants(runId) {
     const out = [], queue = [runId], seen = new Set();
@@ -43,13 +63,15 @@ class Model {
   }
 }
 
-const LOGO_FOR_HARNESS = { claude: 'claudecode', codex: 'codex', 'codex-app': 'codex', opencode: 'opencode' };
+const LOGO_FOR_HARNESS = { claude: 'claudecode', codex: 'codex', 'codex-app': 'codex', opencode: 'opencode', 'opencode-serve': 'opencode' };
 const STATUS_TEXT = { queued: 'queued', starting: 'starting', running: 'working', waiting_for_user: 'needs you', completed: 'done', failed: 'failed', interrupted: 'stopped', disconnected: 'disconnected', unknown: 'unknown' };
 // Status as a row badge (the row icon is the provider's logo, AC-68).
 const STATUS_BADGE = {
   queued: ['○', 'charts.yellow'], starting: ['○', 'charts.blue'], running: ['●', 'charts.blue'], waiting_for_user: ['!', 'charts.orange'],
   completed: ['✓', 'charts.green'], failed: ['✕', 'charts.red'], interrupted: ['■', 'descriptionForeground'], disconnected: ['✕', 'charts.red'], unknown: ['?', 'charts.purple'],
 };
+
+for (const [s, x] of Object.entries(CONTINUITY)) { STATUS_TEXT[s] = x.text.toLowerCase(); STATUS_BADGE[s] = [x.active ? '☁' : '→', x.active ? 'charts.orange' : 'descriptionForeground']; }
 
 function ago(ms) {
   if (!ms) return '';
@@ -68,6 +90,7 @@ class AgentsProvider {
     this.collapsed = new Set(memento?.get('overseer.collapsed', []) || []);
     this.filter = undefined; // { query, taskIds: Set }
     this.showArchived = false;
+    this.statusFilter = 'all'; // 'all' | 'working' | 'needs' | 'done' | 'failed' (the search field's filters)
     this.emitter = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.emitter.event;
     // Redraw only when something the list shows changed: a redraw between a click's mouse-down and
@@ -92,7 +115,7 @@ class AgentsProvider {
     return JSON.stringify([Math.floor(Date.now() / 30000), (st.tasks || []).map(t => [t.id, t.title, t.repo_root, t.archived_ms ? 1 : 0]),
       (st.runs || []).map(r => [r.id, r.status, r.parent_run_id, r.attention?.kind, r.harness, r.model, r.profile_id, r.workspace_id, r.title, r.exit_reason, r.ended_ms ? 1 : 0]),
       (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
-      (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || []]);
+      (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [], (this.continuity?.data?.handoffs || []).length]);
   }
   getTreeItem(node) { return node.item; }
   getParent(node) { return node.parent; }
@@ -129,15 +152,25 @@ class AgentsProvider {
   kidsOf(runId) { return this.index().kids.get(runId) || []; }
   visibleTasks() {
     const ix = this.index();
-    const key = `${this.showArchived}|${this.filter ? this.filter.query + ':' + this.filter.taskIds.size : ''}`;
+    const key = `${this.showArchived}|${this.statusFilter}|${this.filter ? this.filter.query + ':' + this.filter.taskIds.size : ''}`;
     if (ix.visible.has(key)) return ix.visible.get(key);
     const archived = t => !!t.archived_ms;
     const list = this.model.state.tasks.filter(t => ix.roots.has(t.id))
       // Search looks within the list shown: active agents, or archived ones under Show Archived.
-      .filter(t => (!this.filter || this.filter.taskIds.has(t.id)) && (this.showArchived ? archived(t) : !archived(t)))
+      .filter(t => (!this.filter || this.filter.taskIds.has(t.id)) && (this.showArchived ? archived(t) : !archived(t)) && this.statusMatches(t))
       .map(t => ({ t, at: this.lastActivity(t) })).sort((a, b) => b.at - a.at).map(x => x.t);
     ix.visible.set(key, list);
     return list;
+  }
+  /** The search field's status filter, on the task's root run. */
+  statusMatches(task) {
+    if (this.statusFilter === 'all') return true;
+    const r = this.rootOf(task); if (!r) return false;
+    if (this.statusFilter === 'needs') return (this.handlers.attention?.() || []).some(a => a.run_id === r.id);
+    if (this.statusFilter === 'working') return ACTIVE.has(r.status) && r.status !== 'waiting_for_user';
+    if (this.statusFilter === 'done') return r.status === 'completed' || r.status === 'interrupted';
+    if (this.statusFilter === 'failed') return r.status === 'failed' || r.status === 'disconnected';
+    return true;
   }
   lastActivity(task) {
     const r = this.rootOf(task);
@@ -158,7 +191,7 @@ class AgentsProvider {
     if (!node) {
       if (m.error) return [{ item: Object.assign(new vscode.TreeItem(`Daemon unavailable: ${m.error}`), { iconPath: new vscode.ThemeIcon('warning') }) }];
       const out = [];
-      const needs = this.filter || this.showArchived ? [] : (this.handlers.attention?.() || []);
+      const needs = this.filter || this.showArchived || this.statusFilter !== 'all' ? [] : (this.handlers.attention?.() || []);
       if (needs.length) out.push(this.needsSection(needs));
       const repos = [...new Set(this.visibleTasks().map(t => t.repo_root))];
       for (const repo of repos) out.push(this.repoNode(repo));
@@ -166,7 +199,8 @@ class AgentsProvider {
     }
     if (node.section === 'needs') return node.list.map(a => this.needsRow(a, node)).filter(Boolean);
     if (node.repo) return this.visibleTasks().filter(t => t.repo_root === node.repo).map(t => this.agentNode(t, node));
-    if (node.run) return this.kidsOf(node.run.id).map(run => this.childNode(run, node));
+    if (node.earlier) return [];
+    if (node.run) return [...this.kidsOf(node.run.id).map(run => this.childNode(run, node)), ...this.earlier(node)];
     return [];
   }
   needsSection(list) {
@@ -181,7 +215,8 @@ class AgentsProvider {
   needsRow(a, parent) {
     const run = this.model.run(a.run_id); const task = run && this.model.task(run.task_id);
     if (!run) return undefined;
-    const item = new vscode.TreeItem(task?.title || run.title);
+    // One row may stand for several agents (Continuity's waiting agents): it brings its own title.
+    const item = new vscode.TreeItem(a.title || task?.title || run.title);
     item.id = 'needs:' + run.id;
     // The provider's mark (AC-68), the reason as text, and the same status badge as the agent's row.
     item.iconPath = this.logo(run.harness);
@@ -208,7 +243,7 @@ class AgentsProvider {
   agentNode(task, parent) {
     const run = this.rootOf(task);
     const m = this.model;
-    const kids = this.kidsOf(run.id).length;
+    const kids = this.kidsOf(run.id).length + (this.continuity?.predecessors(run).length || 0);
     const item = new vscode.TreeItem(task.title, this.expansion('agent:' + task.id, kids > 0));
     item.id = 'agent:' + task.id;
     item.iconPath = this.logo(run.harness);
@@ -225,6 +260,23 @@ class AgentsProvider {
     item.contextValue = `agent-${ACTIVE.has(run.status) ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${pinned ? '-pinned' : ''}`;
     item.command = { command: 'overseer.selectRun', title: 'Open', arguments: [run.id] };
     return { item, run, task, parent };
+  }
+  /** The agents whose work this one took over (Gate L), folded under it, newest first. */
+  earlier(node) {
+    if (!node.task || !this.continuity) return [];
+    return this.continuity.predecessors(node.run).map(({ run, reason }) => {
+      const why = { offline: 'the connection was lost', back_online: 'the connection came back', user: 'moved by you' }[reason] || String(reason).replace(/^provider_unreachable:(.*)$/, (m, p) => `${{ openai: 'OpenAI', anthropic: 'Claude' }[p] || p} could not be reached`);
+      const name = { claude: 'Claude Code', codex: 'Codex', 'codex-app': 'Codex', opencode: 'OpenCode', 'opencode-serve': 'Local model' }[run.harness] || run.harness;
+      const item = new vscode.TreeItem(`Earlier: ${name}`);
+      item.id = 'earlier:' + run.id;
+      item.iconPath = this.logo(run.harness === 'opencode-serve' ? 'opencode' : run.harness);
+      item.description = `handed off · ${why}`;
+      item.tooltip = new vscode.MarkdownString(`**${run.title}**\n\nHanded off: ${why}.\n\n${[name, run.model].filter(Boolean).join(' · ')}`);
+      item.accessibilityInformation = { label: `Earlier agent, ${name}, handed off, ${why}` };
+      item.contextValue = 'agent-earlier';
+      item.command = { command: 'overseer.selectRun', title: 'Open', arguments: [run.id] };
+      return { item, run, parent: node, earlier: true };
+    });
   }
   childNode(run, parent) {
     const kids = this.kidsOf(run.id).length;
@@ -301,4 +353,4 @@ class AccountsProvider {
   }
 }
 
-module.exports = { Model, AgentsProvider, AccountsProvider, ACTIVE, statusIcon, ago };
+module.exports = { Model, AgentsProvider, AccountsProvider, ACTIVE, statusIcon, ago, accountName };

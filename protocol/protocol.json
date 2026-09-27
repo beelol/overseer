@@ -1152,6 +1152,272 @@
       "reason": "It describes the Mac's own windows",
       "params": "json",
       "result": "json"
+    },
+    "audio.get": {
+      "class": "read",
+      "summary": "Audio Mode: on or off, the track and the cues",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "audio.voices": {
+      "class": "read",
+      "summary": "The Mac's installed voices for System voice",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "audio.set": {
+      "class": "mac_only",
+      "summary": "Change Audio Mode",
+      "phone": "mac_only",
+      "reason": "Audio Mode plays on the Mac; it is set there",
+      "params": "json",
+      "result": "json"
+    },
+    "audio.preview": {
+      "class": "mac_only",
+      "summary": "Play a cue on the Mac",
+      "phone": "mac_only",
+      "reason": "Audio Mode plays on the Mac; it is set there",
+      "params": "json",
+      "result": "json"
+    },
+    "audio.import_commander": {
+      "class": "mac_only",
+      "summary": "Use a private folder of cues in place",
+      "phone": "mac_only",
+      "reason": "It names a folder on the Mac",
+      "params": "json",
+      "result": "json"
+    },
+    "connection.status": {
+      "class": "read",
+      "summary": "Online or offline, and whether Continuity is on",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "continuity.status": {
+      "class": "read",
+      "summary": "Continuity's state: connection, local model, waits and handoffs",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "local.models": {
+      "class": "read",
+      "summary": "Local models and whether each fits this Mac's memory",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "local.inventory": {
+      "class": "read",
+      "summary": "What is installed locally: Ollama, OpenCode, models",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "local.catalogue": {
+      "class": "read",
+      "summary": "The local models Continuity may use",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "local.downloads": {
+      "class": "read",
+      "summary": "Local model downloads in progress",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "continuity.handoffs": {
+      "class": "read",
+      "summary": "Agents moved to another provider or to local, and back",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "continuity.waits": {
+      "class": "read",
+      "summary": "Agents waiting for a provider to come back",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "run.targets": {
+      "class": "read",
+      "summary": "Where an agent can be moved to (local, back, a provider)",
+      "phone": "available",
+      "params": {
+        "run_id": "string"
+      },
+      "result": "json"
+    },
+    "ollama.status": {
+      "class": "read",
+      "summary": "Whether Ollama is installed and running",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "connection.check": {
+      "class": "control",
+      "summary": "Check the connection now",
+      "phone": "available",
+      "params": {},
+      "result": "json"
+    },
+    "run.handoff": {
+      "class": "control",
+      "summary": "Move an agent to local, back, or another provider",
+      "phone": "available",
+      "params": {
+        "run_id": "string",
+        "to": "string",
+        "accept_mode": "string?"
+      },
+      "result": "json"
+    },
+    "run.retry_now": {
+      "class": "control",
+      "summary": "Retry a waiting agent now",
+      "phone": "available",
+      "params": {
+        "run_id": "string"
+      },
+      "result": "json"
+    },
+    "run.stay": {
+      "class": "control",
+      "summary": "Keep an agent where it is instead of moving it",
+      "phone": "available",
+      "params": {
+        "run_id": "string"
+      },
+      "result": "json"
+    },
+    "settings.get": {
+      "class": "mac_only",
+      "summary": "Continuity settings",
+      "phone": "mac_only",
+      "reason": "Continuity is set on the Mac",
+      "params": "json",
+      "result": "json"
+    },
+    "settings.set": {
+      "class": "mac_only",
+      "summary": "Change Continuity settings",
+      "phone": "mac_only",
+      "reason": "Continuity is set on the Mac",
+      "params": "json",
+      "result": "json"
+    },
+    "continuity.ui": {
+      "class": "mac_only",
+      "summary": "The first-use notice's state in VS Code",
+      "phone": "mac_only",
+      "reason": "It describes the Mac's own windows",
+      "params": "json",
+      "result": "json"
+    },
+    "continuity.notice": {
+      "class": "mac_only",
+      "summary": "Dismiss the first-use notice",
+      "phone": "mac_only",
+      "reason": "It describes the Mac's own windows",
+      "params": "json",
+      "result": "json"
+    },
+    "continuity.prefetch_offer": {
+      "class": "mac_only",
+      "summary": "Offer to download a local model ahead of time",
+      "phone": "mac_only",
+      "reason": "It changes what runs on the Mac and how much of its memory is used",
+      "params": "json",
+      "result": "json"
+    },
+    "local.pick": {
+      "class": "mac_only",
+      "summary": "Choose the local model",
+      "phone": "mac_only",
+      "reason": "It changes what runs on the Mac and how much of its memory is used",
+      "params": "json",
+      "result": "json"
+    },
+    "local.approve": {
+      "class": "mac_only",
+      "summary": "Approve a local model download",
+      "phone": "mac_only",
+      "reason": "It changes what runs on the Mac and how much of its memory is used",
+      "params": "json",
+      "result": "json"
+    },
+    "local.load": {
+      "class": "mac_only",
+      "summary": "Load a local model into memory",
+      "phone": "mac_only",
+      "reason": "It changes what runs on the Mac and how much of its memory is used",
+      "params": "json",
+      "result": "json"
+    },
+    "local.unload": {
+      "class": "mac_only",
+      "summary": "Unload a local model",
+      "phone": "mac_only",
+      "reason": "It changes what runs on the Mac and how much of its memory is used",
+      "params": "json",
+      "result": "json"
+    },
+    "local.pull": {
+      "class": "mac_only",
+      "summary": "Download a local model",
+      "phone": "mac_only",
+      "reason": "It changes what runs on the Mac and how much of its memory is used",
+      "params": "json",
+      "result": "json"
+    },
+    "local.pull_cancel": {
+      "class": "mac_only",
+      "summary": "Cancel a local model download",
+      "phone": "mac_only",
+      "reason": "It changes what runs on the Mac and how much of its memory is used",
+      "params": "json",
+      "result": "json"
+    },
+    "ollama.install": {
+      "class": "mac_only",
+      "summary": "Install Ollama",
+      "phone": "mac_only",
+      "reason": "It changes what runs on the Mac and how much of its memory is used",
+      "params": "json",
+      "result": "json"
+    },
+    "ollama.start": {
+      "class": "mac_only",
+      "summary": "Start Ollama",
+      "phone": "mac_only",
+      "reason": "It changes what runs on the Mac and how much of its memory is used",
+      "params": "json",
+      "result": "json"
+    },
+    "ollama.stop": {
+      "class": "mac_only",
+      "summary": "Stop Ollama",
+      "phone": "mac_only",
+      "reason": "It changes what runs on the Mac and how much of its memory is used",
+      "params": "json",
+      "result": "json"
+    },
+    "continuity.test_age": {
+      "class": "mac_only",
+      "summary": "Age a wait (tests only)",
+      "phone": "mac_only",
+      "reason": "A test hook",
+      "params": "json",
+      "result": "json"
     }
   }
 }

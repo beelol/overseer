@@ -1,0 +1,76 @@
+{
+  "checks": [
+    {
+      "name": "after opening each view twice, one of each remains (Overseer view, review, the chat taken out, New Task) and no editor group is empty",
+      "ok": true,
+      "detail": {
+        "k": {
+          "overseer": 1,
+          "review": 1,
+          "chatOut": 1,
+          "newTask": 1
+        },
+        "opened": {
+          "tabs": [
+            "Review: Alpha agent (1), Editor Group 1",
+            "Overseer, Editor Group 2",
+            "Alpha agent, Editor Group 2",
+            "New Task, Editor Group 3"
+          ],
+          "groups": 3,
+          "empty": 0
+        }
+      }
+    },
+    {
+      "name": "⌥⌘M opens Where am I, listing the Overseer view, the review and New Task, and where you are",
+      "ok": true,
+      "detail": {
+        "rows": [
+          "diff-multiple  Review, Alpha agent (1), Editor group 1",
+          "comment-discussion  Chat, Alpha agent, Editor group 2",
+          "comment  Chat, taken out, Alpha agent, Editor group 2",
+          "new-file  New task, the full form, Editor group 3 · you are here"
+        ]
+      }
+    },
+    {
+      "name": "picking a view in the map goes to it (review, New Task, the Overseer view)",
+      "ok": true,
+      "detail": [
+        {
+          "want": "Review",
+          "active": "Review: Alpha agent (1), Editor Group 1"
+        },
+        {
+          "want": "New task",
+          "active": "New Task, Editor Group 3"
+        },
+        {
+          "want": "Chat",
+          "active": "Overseer, Editor Group 2"
+        }
+      ]
+    },
+    {
+      "name": "the chat and the review each have a Where am I control in their own header",
+      "ok": true,
+      "detail": {
+        "chat": true,
+        "review": true
+      }
+    },
+    {
+      "name": "closing views leaves no empty editor group behind, and the other views stay open",
+      "ok": true,
+      "detail": {
+        "tabs": [
+          "Overseer, Editor Group 2",
+          "Alpha agent, Editor Group 2"
+        ],
+        "groups": 1,
+        "empty": 0
+      }
+    }
+  ]
+}
