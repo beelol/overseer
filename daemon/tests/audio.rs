@@ -323,6 +323,36 @@ fn system_and_private_commander_tracks_are_selectable_without_bundling_voice_fil
 }
 
 #[test]
+fn a_folder_that_is_not_a_commander_pack_is_refused_with_the_reason() {
+    let root = tmp();
+    let d = Daemon::start(&[]);
+    let import = |path: &std::path::Path| {
+        d.try_call("audio.import_commander", json!({"path": path}))
+            .unwrap_err()
+    };
+    let gone = import(&root.path().join("nowhere"));
+    assert!(gone.contains("that folder does not exist"), "{gone}");
+
+    let empty = root.path().join("empty");
+    std::fs::create_dir_all(&empty).unwrap();
+    let missing = import(&empty);
+    assert!(
+        missing.contains("not a Commander pack: agent_started/transmission/commander.wav is missing"),
+        "{missing}"
+    );
+
+    let text = root.path().join("text");
+    for key in ["agent_started", "agent_complete", "agent_needs_attention"] {
+        let file = text.join(key).join("transmission/commander.wav");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(file, b"this is not audio, only text").unwrap();
+    }
+    let other = import(&text);
+    assert!(other.contains("non-WAV"), "{other}");
+    assert_eq!(d.call("audio.get", json!({}))["commander_imported"], false);
+}
+
+#[test]
 fn missing_local_cache_does_not_interrupt_agents() {
     if !cfg!(target_os = "macos") {
         return;
