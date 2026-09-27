@@ -175,3 +175,35 @@ qualify a live director/worker communication path. SWARM-17/25/31 remain open.
 The audit-only native admission gate added at `8d9f328` continues to hold
 Claude before reservation; there is still no qualified read-only source/service
 boundary. No Swarm default or acceptance criterion wording changes.
+
+## Subsequent published main: `78befc0`
+
+The branch fetched and merged main through `78befc0`, which brings Gate L
+Continuity's daemon, offline/local-model controls, UI, fixtures and acceptance
+records onto main. The seven overlapping files were resolved with both Swarm
+and Continuity commands, modules, launch setup and view state retained. The
+packaged `continuity` and `swarm-scale` scenarios passed on the combined tree.
+The integrated Rust suite had one 2-second worktree-list timing assertion fail
+while 6,000 files were listed under concurrent test load; that exact test
+passed alone, as `AGENTS.md` prescribes for load-sensitive timing failures.
+The focused Continuity and Swarm daemon suites also passed after the merge.
+
+This merge changes a real Swarm boundary. Gate L's ordinary `run.handoff`
+creates a successor run in the same task, and its automatic retry can restart
+a waiting turn. Neither operation carries a Swarm job identity, approved
+destination, frozen allocation or attempt reservation. Letting either act on
+a linked Swarm process would bypass director admission and make the budget and
+completion receipts untrustworthy. The combined branch therefore refuses
+ordinary Continuity target/handoff/retry operations for linked Swarm workers
+and directors; it does not park their failed processes into the ordinary
+36-hour retry queue or interrupt them through Continuity's network-stall
+path. A pre-existing linked wait is finalized as failed on replay so the
+director can reconcile it. Ordinary agents retain Gate L behavior.
+
+The RFC now states this interim rule and preserves the stronger target:
+future failover must be a route change of the *same logical Swarm job* through
+approved pool, capability, context, attempt, reservation, memory and deadline
+checks. Worker/director handoff refusal is fixture-proven; joined failover,
+real outage classification, local model suitability and live account usage
+remain partial under SWARM-08/14/15/16/17/20/22/24/51/59/61/62. No default
+worker count, budget or acceptance criterion was relaxed.

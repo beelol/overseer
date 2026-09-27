@@ -18,6 +18,7 @@ const { Dashboard } = require('./dashboard-mode');
 const { Immersive } = require('./immersive');
 const { OverseerChat } = require('./overseer-chat');
 const { SwarmControls } = require('./swarm-controls');
+const { Continuity } = require('./continuity');
 
 let client;
 let centerRef;
@@ -84,6 +85,9 @@ async function activate(context) {
   const launcher = new TaskLauncher(context, client, model, () => refreshAccounts());
   const steering = new Steering(client, model);
   outputs.steering = steering;
+  // Continuity (Gate L): the connection, its settings, and the agents that wait for it.
+  const continuity = new Continuity(context, client, model, { say, views: () => { try { return { center: centerRef, outputs, agentsView, newTaskPanel }; } catch { return { center: centerRef, outputs, agentsView }; } } });
+  launcher.continuity = () => continuity.snapshot(); steering.continuity = continuity; agents.continuity = continuity;
   // Needs you (AC-61): waiting for a decision, failed, or finished with changes not yet reviewed.
   const reviewed = new Map(Object.entries(context.workspaceState.get('overseer.reviewed', {})));
   const markReviewed = runId => { if (!runId) return; reviewed.set(runId, Date.now()); context.workspaceState.update('overseer.reviewed', Object.fromEntries([...reviewed].slice(-800))); };
@@ -110,6 +114,7 @@ async function activate(context) {
         if (n) out.push({ run_id: r.id, rank: 2, label: 'Review', detail: `${n} file${n === 1 ? '' : 's'} changed` });
       }
     }
+    const waiting = continuity.attention(); if (waiting) out.push(waiting);
     return out.sort((a, b) => a.rank - b.rank);
   }
   const pinned = () => context.workspaceState.get('overseer.pinned', []).filter(id => model.run(id));

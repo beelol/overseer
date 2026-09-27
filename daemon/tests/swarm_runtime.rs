@@ -62,6 +62,12 @@ fn repository_scope_blocks_director_and_worker_launch_outside_approved_repo() {
         "repo":sibling,"harness":"generic","program":"/bin/sleep","args":["1"],
         "prompt":"Inspect","title":"Approved worker"}));
     assert_eq!(launched["status"],"launched","{launched}");
+    let worker = launched["overseer_run_id"].as_str().unwrap();
+    for method in ["run.targets", "run.handoff", "run.retry_now"] {
+        let refused=d.try_call(method,json!({"run_id":worker,"to":"local"})).unwrap_err();
+        assert!(refused.contains("Swarm owns this run"),"{method}: {refused}");
+    }
+    assert_eq!(d.call("swarm.jobs",json!({"id":id}))["jobs"][0]["attempt_count"],1);
     let fork_commit:String=db.query_row(
         "SELECT t.fork_commit FROM tasks t JOIN runs r ON r.task_id=t.id WHERE r.id=?1",
         [launched["overseer_run_id"].as_str().unwrap()],|r|r.get(0)).unwrap();

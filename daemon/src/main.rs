@@ -2,11 +2,18 @@ mod accounts;
 mod audio;
 mod adapters;
 mod background;
+mod continuity;
 mod daemon;
+mod downloads;
 mod files;
 mod usage;
 mod git;
+mod handoff;
+mod local;
 mod merge;
+mod net;
+mod ollama_install;
+mod opencode_bridge;
 mod paths;
 mod pr;
 mod redact;
@@ -14,6 +21,7 @@ mod server;
 mod shim;
 mod store;
 mod swarm;
+mod sys;
 
 use std::io::{BufRead, BufReader, Write};
 
@@ -54,6 +62,8 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        // The bridge between a run's supervisor and `opencode serve` (the opencode-serve harness).
+        Some("opencode-bridge") => std::process::exit(opencode_bridge::main(&args[2..])),
         Some("serve") => {
             if let Err(e) = paths::ensure_private_dir(&paths::data_dir()) {
                 eprintln!("cannot create data dir: {e}");
@@ -78,6 +88,9 @@ fn main() {
                 log(&format!("reconcile: {report}"));
                 let dispatches = swarm::recover_pending_dispatches(&d)?;
                 log(&format!("swarm dispatch recovery: {dispatches}"));
+                if let Err(e) = continuity::start(d.clone()) {
+                    log(&format!("continuity did not start: {e:#}"));
+                }
                 server::serve(d).await
             });
             if let Err(e) = result {

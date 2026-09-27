@@ -1,0 +1,44 @@
+overseerd 0.1.0; Codex codex-cli 0.155.0-alpha.16.4 with --oss --local-provider ollama (no account: its own empty CODEX_HOME); Ollama 0.34.2; Darwin 25.6.0 arm64
+memory: 128 GiB installed; budget now 13.1 GiB
+order (smallest first): qwen2.5-coder:1.5b 0.9 GiB, qwen2.5-coder:3b 1.8 GiB, qwen2.5-coder:7b 4.4 GiB, qwen2.5-coder:14b 8.4 GiB, qwen3-coder:30b 17.3 GiB, qwen2.5-coder:32b 18.5 GiB
+
+== qwen2.5-coder:1.5b
+    memory before: 25.9 GiB available, pressure normal, level 43%, loaded: qwen3-coder:30b-64k (23.7 GiB at 64k)
+    the guard allowed overseer/qwen2.5-coder-1.5b:32k at a 32k context: 2 GiB of a 13.1 GiB budget; loaded by the daemon under the watchdog
+    attempt 1: FAIL  exit 0 in 5.3 s; file: missing; items: error, agent_message; reply: "done"; Model metadata for `overseer/qwen2.5-coder-1.5b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
+    attempt 2: FAIL  exit 0 in 1.7 s; file: missing; items: error, agent_message; reply: "done"; Model metadata for `overseer/qwen2.5-coder-1.5b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
+    attempt 3: FAIL  exit 0 in 3.9 s; file: missing; items: error, agent_message; reply: "done"; Model metadata for `overseer/qwen2.5-coder-1.5b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
+    loaded while Codex worked: overseer/qwen2.5-coder-1.5b:32k (2 GiB at 32k), qwen3-coder:30b-64k (23.7 GiB at 64k)
+    memory while it worked: lowest 26 GiB available, lowest level 43%, pressure normal
+    memory after: 28.2 GiB available, pressure normal, level 45%, loaded: qwen3-coder:30b-64k (23.7 GiB at 64k)
+    RESULT qwen2.5-coder:1.5b: failed (0 of 3 write checks: Model metadata for `overseer/qwen2.5-coder-1.5b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.)
+
+== qwen2.5-coder:3b
+    memory before: 28.2 GiB available, pressure normal, level 45%, loaded: qwen3-coder:30b-64k (23.7 GiB at 64k)
+    the guard allowed overseer/qwen2.5-coder-3b:32k at a 32k context: 3.1 GiB of a 15.3 GiB budget; loaded by the daemon under the watchdog
+    attempt 1: FAIL  exit 0 in 9.5 s; file: missing; items: error, agent_message; reply: "done"; Model metadata for `overseer/qwen2.5-coder-3b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
+    attempt 2: FAIL  exit 0 in 1.7 s; file: missing; items: error, agent_message; reply: "done"; Model metadata for `overseer/qwen2.5-coder-3b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
+    attempt 3: FAIL  exit 0 in 1.5 s; file: missing; items: error, agent_message; reply: "done"; Model metadata for `overseer/qwen2.5-coder-3b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
+    loaded while Codex worked: overseer/qwen2.5-coder-3b:32k (3.1 GiB at 32k), qwen3-coder:30b-64k (23.7 GiB at 64k)
+    memory while it worked: lowest 23.5 GiB available, lowest level 37%, pressure normal
+    memory after: 26.3 GiB available, pressure normal, level 41%, loaded: qwen3-coder:30b-64k (23.7 GiB at 64k)
+    RESULT qwen2.5-coder:3b: failed (0 of 3 write checks: Model metadata for `overseer/qwen2.5-coder-3b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.)
+
+== qwen2.5-coder:7b
+    memory before: 26.3 GiB available, pressure normal, level 42%, loaded: qwen3-coder:30b-64k (23.7 GiB at 64k)
+    the guard allowed overseer/qwen2.5-coder-7b:32k at a 32k context: 6.1 GiB of a 13.7 GiB budget; loaded by the daemon under the watchdog
+    attempt 1: FAIL  exit 0 in 10.4 s; file: missing; items: error, agent_message; reply: "done"; Model metadata for `overseer/qwen2.5-coder-7b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
+    attempt 2: FAIL  exit 0 in 1.9 s; file: missing; items: error, agent_message; reply: "done"; Model metadata for `overseer/qwen2.5-coder-7b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
+    attempt 3: FAIL  exit 0 in 1.7 s; file: missing; items: error, agent_message; reply: "done"; Model metadata for `overseer/qwen2.5-coder-7b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
+    loaded while Codex worked: overseer/qwen2.5-coder-7b:32k (6.1 GiB at 32k), qwen3-coder:30b-64k (23.7 GiB at 64k)
+    memory while it worked: lowest 21.4 GiB available, lowest level 34%, pressure normal
+    memory after: 24.4 GiB available, pressure warn, level 38%, loaded: qwen3-coder:30b-64k (23.7 GiB at 64k)
+    RESULT qwen2.5-coder:7b: failed (0 of 3 write checks: Model metadata for `overseer/qwen2.5-coder-7b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.)
+
+== qwen2.5-coder:14b
+    memory before: 24.3 GiB available, pressure warn, level 38%, loaded: qwen3-coder:30b-64k (23.7 GiB at 64k)
+
+STOPPED: memory pressure is warn before qwen2.5-coder:14b
+
+at the end: 24 GiB available, pressure warn, level 38%, loaded: qwen3-coder:30b-64k (23.7 GiB at 64k)
+summary: qwen2.5-coder:1.5b failed; qwen2.5-coder:3b failed; qwen2.5-coder:7b failed; qwen2.5-coder:14b undefined

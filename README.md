@@ -5,8 +5,8 @@ account-based agent runs, recursive native-child visibility, and live editable w
 review built on [Branch Diff](https://github.com/beelol/branch-diff).
 
 **Status: usable macOS milestone — not the complete product.** Verified acceptance
-criteria: **110 / 202** · **13** partial (see [ledger](docs/verification/README.md)). Unverified:
-AC-41, AC-53, AC-64, AC-66, AC-83, AC-84, AC-85, AC-86, AC-87, AC-88, AC-89, AC-90, AC-91, AC-92, AC-93, AC-94, AC-95, AC-96, AC-97, AC-98, AC-114, AC-115, AC-116, AC-117, AC-118, AC-119, AC-120, AC-121, AC-122, AC-123, AC-124, AC-125, AC-126, AC-127, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-134, AC-135, AC-136, AC-137, AC-138, AC-139, AC-140, AC-141, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-165, AC-166, AC-167, AC-168, AC-169, AC-170, AC-171, AC-172, AC-173, AC-174, AC-175, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
+criteria: **127 / 202** · **14** partial (see [ledger](docs/verification/README.md)). Unverified:
+AC-41, AC-53, AC-64, AC-66, AC-83, AC-97, AC-114, AC-115, AC-116, AC-117, AC-118, AC-119, AC-120, AC-121, AC-122, AC-123, AC-124, AC-125, AC-126, AC-127, AC-128, AC-129, AC-130, AC-131, AC-132, AC-133, AC-134, AC-135, AC-136, AC-137, AC-141, AC-146, AC-148, AC-149, AC-151, AC-156, AC-161, AC-162, AC-163, AC-164, AC-165, AC-166, AC-167, AC-168, AC-169, AC-170, AC-171, AC-172, AC-173, AC-174, AC-175, AC-176, AC-177, AC-178, AC-179, AC-182, AC-183, AC-185, AC-186, AC-187, AC-188, AC-189, AC-190, AC-191, AC-192, AC-193, AC-194, AC-195, AC-196, AC-197, AC-198, AC-199, AC-200, AC-201, AC-202. The biggest gaps are the daily-driver UI (Gate J partials, and Gate K, AC-67 to AC-82: the native side bar
 with chat and diff side by side, added by the owner on 2026-09-26; [design](docs/rfcs/orchestrator-ui.md#gate-k-layout)), Continuity, the offline mode with local models (Gate L, AC-83 to AC-98 and AC-138 to AC-140, added by the owner on 2026-09-26; [design](docs/rfcs/offline-mode.md)), Overseer as the whole surface (Gate M, AC-99 to AC-108, added by the owner on 2026-09-26: the review as the home for files, nothing shown twice, a less VS Code-like editor area with a bold Overseer theme, a grid built by dragging, and a chat with Overseer itself; [design](docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface)), the phone remote on the same network (Gate N, AC-115 to AC-137 and AC-141, added by the owner on 2026-09-26: a hyper fast iOS and Android app that sees and controls every agent through a gateway in the daemon, paired once and built on the simulators first; [design](docs/rfcs/phone-remote.md)), Voice Mode (Gate R, AC-162 to AC-177, added by the owner on 2026-09-27: a voice to talk to constantly that redirects every agent from context, answers quickly and shows every word it sent, with audio collected on the Rust side and the animated mark in the middle moving with the voice; [design](docs/rfcs/voice-mode.md)), fixed Claude accounts (AC-53, partial;
 [design](docs/rfcs/claude-credentials.md)), which wait for a second Claude account, and Linux (AC-41),
 which is out of scope for now. The full list is under [Acceptance criteria](#acceptance-criteria); next actions are in [Follow-ups](#follow-ups).
@@ -21,7 +21,9 @@ Only the owner can do these (AC-160). Each is one step; the criterion it unblock
 - Work an hour using only Overseer [AC-64].
 - Pick the animation for the mark in Voice Mode on the [preview page](https://claude.ai/artifact/7YePXA48Ht7CoBAtYJuyWr): one, or a mix [AC-177].
 - Answer the nine questions at the end of the [Voice Mode RFC](docs/rfcs/voice-mode.md#open-questions-for-the-owner); its defaults stand until then [Gate R, AC-162 to AC-177].
-- Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed sessions of Continuity and the phone app when their agents finish [AC-97, AC-133].
+- Turn Wi-Fi off and on while `node test/local/wifi-live.js` runs; it tells you when [AC-83].
+- Work a short session offline: `node test/local/owner-session.js start` opens an isolated VS Code and prints the steps; `node test/local/owner-session.js report` records it [AC-97].
+- Later: a second Claude account [AC-53]; a Linux machine [AC-41]; the owner-confirmed session of the phone app when its agent finishes [AC-133].
 
 ## Acceptance criteria
 
@@ -113,22 +115,22 @@ and Verify clauses. Both lists are generated from the records by
 - [x] **AC-80** Remembered place — [evidence](docs/verification/AC-80.md)
 - [x] **AC-81** Gate J still holds — [evidence](docs/verification/AC-81.md)
 - [x] **AC-82** Gate K design review (owner-confirmed) — [evidence](docs/verification/AC-82.md)
-- [ ] **AC-83** Offline is not an outage — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-83.md)
-- [ ] **AC-84** Fail over to the best working provider — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-84.md)
-- [ ] **AC-85** Local inventory read from the machine — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-85.md)
-- [ ] **AC-86** Memory budget and fit — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-86.md)
-- [ ] **AC-87** Verified local catalogue, Qwen coders first — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-87.md)
-- [ ] **AC-88** Settings the daemon enforces — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-88.md)
-- [ ] **AC-89** Download models only when allowed — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-89.md)
-- [ ] **AC-90** Install and run Ollama only when allowed — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-90.md)
-- [ ] **AC-91** Transition to local when offline — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-91.md)
-- [ ] **AC-92** Wait and retry, never fail (for 36 hours) — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-92.md)
-- [ ] **AC-93** Back online — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-93.md)
-- [ ] **AC-94** Local models as a first-class choice — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-94.md)
-- [ ] **AC-95** Honest offline UI — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-95.md)
-- [ ] **AC-96** Several local agents — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-96.md)
+- [ ] **AC-83** Offline is not an outage — ◐ partial: the daemon keeps one connection state decided from the system's own answer, the probes and the agents' errors, with every change an event; a provider outage gives degraded naming the provider, a failing baseline or the system's no-network gives offline, and a 429 or a usage limit leaves it online; on this machine the system's answer, both baseline probes and both providers are read live; the status bar and the side bar show each state in the packaged extension / deferred: the owner turning Wi-Fi off and on while the daemon logs the change (offline within 10 s of the system signal, online after the checks agree): this session needs the network itself — [evidence](docs/verification/AC-83.md)
+- [x] **AC-84** Fail over to the best working provider — [evidence](docs/verification/AC-84.md)
+- [x] **AC-85** Local inventory read from the machine — [evidence](docs/verification/AC-85.md)
+- [x] **AC-86** Memory budget and fit — [evidence](docs/verification/AC-86.md)
+- [x] **AC-87** Verified local catalogue, Qwen coders first — [evidence](docs/verification/AC-87.md)
+- [x] **AC-88** Settings the daemon enforces — [evidence](docs/verification/AC-88.md)
+- [x] **AC-89** Download models only when allowed — [evidence](docs/verification/AC-89.md)
+- [x] **AC-90** Install and run Ollama only when allowed — [evidence](docs/verification/AC-90.md)
+- [x] **AC-91** Transition to local when offline — [evidence](docs/verification/AC-91.md)
+- [x] **AC-92** Wait and retry, never fail (for 36 hours) — [evidence](docs/verification/AC-92.md)
+- [x] **AC-93** Back online — [evidence](docs/verification/AC-93.md)
+- [x] **AC-94** Local models as a first-class choice — [evidence](docs/verification/AC-94.md)
+- [x] **AC-95** Honest offline UI — [evidence](docs/verification/AC-95.md)
+- [x] **AC-96** Several local agents — [evidence](docs/verification/AC-96.md)
 - [ ] **AC-97** Offline session (owner-confirmed) — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-97.md)
-- [ ] **AC-98** On by default, explained once — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-98.md)
+- [x] **AC-98** On by default, explained once — [evidence](docs/verification/AC-98.md)
 - [x] **AC-99** The review is where files live — [evidence](docs/verification/AC-99.md)
 - [x] **AC-100** Nothing shown twice — [evidence](docs/verification/AC-100.md)
 - [x] **AC-101** Overseer's own reviewer — [evidence](docs/verification/AC-101.md)
@@ -168,9 +170,9 @@ and Verify clauses. Both lists are generated from the records by
 - [ ] **AC-135** Hyper fast — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-135.md)
 - [ ] **AC-136** The door — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-136.md)
 - [ ] **AC-137** Motion throughout — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-137.md)
-- [ ] **AC-138** Permission modes carry over — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-138.md)
-- [ ] **AC-139** OpenCode session transport spike — not started (Gate L, added by the owner on 2026-09-26; the goal's first step) — [evidence](docs/verification/AC-139.md)
-- [ ] **AC-140** Memory safety guard — not started (Gate L, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-140.md)
+- [x] **AC-138** Permission modes carry over — [evidence](docs/verification/AC-138.md)
+- [x] **AC-139** OpenCode session transport spike — [evidence](docs/verification/AC-139.md)
+- [x] **AC-140** Memory safety guard — [evidence](docs/verification/AC-140.md)
 - [ ] **AC-141** Pair once — not started (Gate N, added by the owner on 2026-09-26) — [evidence](docs/verification/AC-141.md)
 - [x] **AC-142** One Overseer mark everywhere — [evidence](docs/verification/AC-142.md)
 - [x] **AC-143** Opt-in audio cues owned by the daemon — [evidence](docs/verification/AC-143.md)
@@ -394,22 +396,8 @@ the owner action or decision each one needs.
 - [ ] [AC-53](docs/verification/AC-53.md) (Fixed Claude accounts): Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.
 - [ ] [AC-64](docs/verification/AC-64.md) (Default-to-Overseer session (owner-confirmed)): Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.
 - [ ] [AC-66](docs/verification/AC-66.md) (Design review against references (owner-confirmed)): Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.
-- [ ] [AC-83](docs/verification/AC-83.md) (Offline is not an outage): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-84](docs/verification/AC-84.md) (Fail over to the best working provider): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-85](docs/verification/AC-85.md) (Local inventory read from the machine): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-86](docs/verification/AC-86.md) (Memory budget and fit): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-87](docs/verification/AC-87.md) (Verified local catalogue, Qwen coders first): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-88](docs/verification/AC-88.md) (Settings the daemon enforces): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-89](docs/verification/AC-89.md) (Download models only when allowed): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-90](docs/verification/AC-90.md) (Install and run Ollama only when allowed): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-91](docs/verification/AC-91.md) (Transition to local when offline): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-92](docs/verification/AC-92.md) (Wait and retry, never fail (for 36 hours)): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-93](docs/verification/AC-93.md) (Back online): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-94](docs/verification/AC-94.md) (Local models as a first-class choice): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-95](docs/verification/AC-95.md) (Honest offline UI): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-96](docs/verification/AC-96.md) (Several local agents): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-97](docs/verification/AC-97.md) (Offline session (owner-confirmed)): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-98](docs/verification/AC-98.md) (On by default, explained once): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
+- [ ] [AC-83](docs/verification/AC-83.md) (Offline is not an outage): Owner: run `node test/local/wifi-live.js` (a real daemon in its own home, real network) and turn Wi-Fi off when it asks, then on again when it says Overseer is offline. It measures the gap from Wi-Fi power going off to the offline event (must be 10 s or less), reads the reason and the return online, and writes `evidence/ac-83/wifi.txt` and `wifi-events.jsonl`. Its rehearsal against the network fixture (`node test/local/wifi-live.js rehearse`) passed 4 of 4 on 2026-09-27; the script only reads Wi-Fi power, it never changes the network.
+- [ ] [AC-97](docs/verification/AC-97.md) (Offline session (owner-confirmed)): Owner: `node test/local/owner-session.js start` opens an isolated VS Code (own profile, extensions folder and OVERSEER_HOME; your own VS Code, daemon, logins and settings untouched) with this branch's VSIX on a scratch repository and prints the steps: start a small agent, turn Wi-Fi off while it runs and screenshot the transition announcement, the run tree and the review, turn Wi-Fi on and take Switch back, screenshot that; quit, then `node test/local/owner-session.js report` writes the daemon's record to `evidence/ac-97/` and the screenshots go to `/private/tmp/ac-97/`. `node test/local/owner-session.js check` confirmed on 2026-09-27: the VSIX, VS Code, Ollama running and `qwen3-coder:30b` installed.
 - [ ] [AC-114](docs/verification/AC-114.md) (Gate K in the owner's VS Code (owner-confirmed)): Not started (Gate K follow-up from the owner's marks on 2026-09-26).
 - [ ] [AC-115](docs/verification/AC-115.md) (Feasibility and reuse before lock-in): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
 - [ ] [AC-116](docs/verification/AC-116.md) (A gateway switched on and off on the desktop): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
@@ -434,9 +422,6 @@ the owner action or decision each one needs.
 - [ ] [AC-135](docs/verification/AC-135.md) (Hyper fast): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
 - [ ] [AC-136](docs/verification/AC-136.md) (The door): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
 - [ ] [AC-137](docs/verification/AC-137.md) (Motion throughout): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
-- [ ] [AC-138](docs/verification/AC-138.md) (Permission modes carry over): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-139](docs/verification/AC-139.md) (OpenCode session transport spike): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
-- [ ] [AC-140](docs/verification/AC-140.md) (Memory safety guard): Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).
 - [ ] [AC-141](docs/verification/AC-141.md) (Pair once): Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).
 - [ ] [AC-146](docs/verification/AC-146.md) (Reconcile and merge the work in flight): The hourly schedule needs the owner's permission.
 - [ ] [AC-148](docs/verification/AC-148.md) (Checks on every pull request): Not started (Gate P, added by the owner on 2026-09-27).

@@ -201,19 +201,23 @@ worker pool cannot prevent the owner from addressing it. This exemption grants n
 account allowance. AC-195 and the joined Swarm checks stay partial until both gates run
 against the shared records and transaction.
 
-Gate L (Continuity) is specified on main but is not a Swarm target or quota collector.
-Swarm consumes its daemon-owned online/degraded/offline and `waiting_for_connection` states
-when that feature lands; it does not infer machine-wide offline state from one provider's
-failure. A Continuity handoff is a route change for the **same logical Swarm job**. It may
-use only the run's approved destination pool, capability floor, context permissions,
+Gate L (Continuity) is on main but is not a Swarm target or quota collector.
+Swarm may consume its daemon-owned online/degraded/offline observations; it does not infer
+machine-wide offline state from one provider's failure. Gate L's ordinary-run successor
+handoff and retry cannot be used for a linked Swarm director or worker: those runs retain
+director-owned attempt and reservation authority. Until a joined route exists, a linked
+process failure is reconciled as a Swarm attempt failure, with no automatic Continuity
+successor or 36-hour retry. A future Continuity route change for the **same logical Swarm
+job** may use only the run's approved destination pool, capability floor, context permissions,
 remaining attempt budget and frozen allocation. It must preserve workspace ownership and
 the predecessor's uncertain reservations until effects are reconciled. A local Ollama
 candidate additionally needs Gate L's fresh memory-fit admission and critical-pressure
 control (AC-140); an unapproved or unqualified local model is not an emergency escape.
-`waiting_for_connection` and `waiting_for_memory` are visible waiting states, not confirmed
-worker exits or accepted results. The Swarm run deadline still applies while waiting;
-Continuity's 36-hour ordinary-run retry policy cannot silently extend it. SWARM-08/14/15/16/
-17/20/22/24/51/59/61/62 need joined tests once Gate L's authority is available.
+If joined routing later uses `waiting_for_connection` or `waiting_for_memory`, those are
+visible waiting states, not confirmed worker exits or accepted results. The Swarm run
+deadline still applies while waiting; Continuity's 36-hour ordinary-run retry policy
+cannot silently extend it. SWARM-08/14/15/16/17/20/22/24/51/59/61/62 need joined
+tests once same-job route and reservation authority are implemented.
 
 Gate M's Overseer chat, Gate N's phone gateway and Gate R's voice requests are additional
 control surfaces, not schedulers. An authorized and, where that surface requires it,

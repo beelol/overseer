@@ -14,6 +14,9 @@ const STATUS_ICON = {
 };
 const ACTIVE = new Set(['queued', 'starting', 'running', 'waiting_for_user']);
 const STATUS_LABEL = { waiting_for_user: 'waiting for you' };
+// Continuity's states (Gate L): waiting for a connection or for memory (still the agent's work), and handed off.
+const CONTINUITY = require('../media/continuity-text.js').STATES;
+for (const [s, x] of Object.entries(CONTINUITY)) { STATUS_ICON[s] = [x.icon, x.active ? 'charts.orange' : 'descriptionForeground']; if (x.active) ACTIVE.add(s); }
 
 function statusIcon(status) {
   const [icon, color] = STATUS_ICON[status] || STATUS_ICON.unknown;
@@ -82,13 +85,15 @@ class Model {
   }
 }
 
-const LOGO_FOR_HARNESS = { claude: 'claudecode', codex: 'codex', 'codex-app': 'codex', opencode: 'opencode' };
+const LOGO_FOR_HARNESS = { claude: 'claudecode', codex: 'codex', 'codex-app': 'codex', opencode: 'opencode', 'opencode-serve': 'opencode' };
 const STATUS_TEXT = { queued: 'queued', starting: 'starting', running: 'working', waiting_for_user: 'needs you', completed: 'done', failed: 'failed', interrupted: 'stopped', disconnected: 'disconnected', unknown: 'unknown' };
 // Status as a row badge (the row icon is the provider's logo, AC-68).
 const STATUS_BADGE = {
   queued: ['○', 'charts.yellow'], starting: ['○', 'charts.blue'], running: ['●', 'charts.blue'], waiting_for_user: ['!', 'charts.orange'],
   completed: ['✓', 'charts.green'], failed: ['✕', 'charts.red'], interrupted: ['■', 'descriptionForeground'], disconnected: ['✕', 'charts.red'], unknown: ['?', 'charts.purple'],
 };
+
+for (const [s, x] of Object.entries(CONTINUITY)) { STATUS_TEXT[s] = x.text.toLowerCase(); STATUS_BADGE[s] = [x.active ? '☁' : '→', x.active ? 'charts.orange' : 'descriptionForeground']; }
 
 function ago(ms) {
   if (!ms) return '';
@@ -142,7 +147,8 @@ class AgentsProvider {
       (st.profiles || []).map(p => [p.id, p.name]), (st.workspaces || []).map(w => [w.id, w.branch, w.kind]),
       (this.handlers.attention?.() || []).map(a => [a.run_id, a.label, a.detail]), this.handlers.pinned?.() || [],
       this.model.swarms.map(s => [s.id, s.status, s.revision, s.active_worker_processes,
-        s.job_counts, s.unconfirmed_exit_count, s.benefit?.decision, s.benefit?.reason, s.capacity])]);
+        s.job_counts, s.unconfirmed_exit_count, s.benefit?.decision, s.benefit?.reason, s.capacity]),
+      (this.continuity?.data?.handoffs || []).length]);
   }
   getTreeItem(node) { return node.item; }
   getParent(node) { return node.parent; }
@@ -241,7 +247,8 @@ class AgentsProvider {
     if (node.swarmCapacity) return this.swarmCapacityRows(node.swarmCapacity, node);
     if (node.job) return (node.job.worker_runs || []).map(worker => this.swarmWorkerNode(worker, node));
     if (node.repo) return this.visibleTasks().filter(t => t.repo_root === node.repo).map(t => this.agentNode(t, node));
-    if (node.run) return this.kidsOf(node.run.id).map(run => this.childNode(run, node));
+    if (node.earlier) return [];
+    if (node.run) return [...this.kidsOf(node.run.id).map(run => this.childNode(run, node)), ...this.earlier(node)];
     return [];
   }
   swarmsSection() {
@@ -384,7 +391,8 @@ class AgentsProvider {
   needsRow(a, parent) {
     const run = this.model.run(a.run_id); const task = run && this.model.task(run.task_id);
     if (!run) return undefined;
-    const item = new vscode.TreeItem(task?.title || run.title);
+    // One row may stand for several agents (Continuity's waiting agents): it brings its own title.
+    const item = new vscode.TreeItem(a.title || task?.title || run.title);
     item.id = 'needs:' + run.id;
     // The provider's mark (AC-68), the reason as text, and the same status badge as the agent's row.
     item.iconPath = this.logo(run.harness);
@@ -411,7 +419,7 @@ class AgentsProvider {
   agentNode(task, parent) {
     const run = this.rootOf(task);
     const m = this.model;
-    const kids = this.kidsOf(run.id).length;
+    const kids = this.kidsOf(run.id).length + (this.continuity?.predecessors(run).length || 0);
     const item = new vscode.TreeItem(task.title, this.expansion('agent:' + task.id, kids > 0));
     item.id = 'agent:' + task.id;
     item.iconPath = this.logo(run.harness);
@@ -428,6 +436,23 @@ class AgentsProvider {
     item.contextValue = `agent-${ACTIVE.has(run.status) ? 'active' : 'done'}${task.archived_ms ? '-archived' : ''}${pinned ? '-pinned' : ''}`;
     item.command = { command: 'overseer.selectRun', title: 'Open', arguments: [run.id] };
     return { item, run, task, parent };
+  }
+  /** The agents whose work this one took over (Gate L), folded under it, newest first. */
+  earlier(node) {
+    if (!node.task || !this.continuity) return [];
+    return this.continuity.predecessors(node.run).map(({ run, reason }) => {
+      const why = { offline: 'the connection was lost', back_online: 'the connection came back', user: 'moved by you' }[reason] || String(reason).replace(/^provider_unreachable:(.*)$/, (m, p) => `${{ openai: 'OpenAI', anthropic: 'Claude' }[p] || p} could not be reached`);
+      const name = { claude: 'Claude Code', codex: 'Codex', 'codex-app': 'Codex', opencode: 'OpenCode', 'opencode-serve': 'Local model' }[run.harness] || run.harness;
+      const item = new vscode.TreeItem(`Earlier: ${name}`);
+      item.id = 'earlier:' + run.id;
+      item.iconPath = this.logo(run.harness === 'opencode-serve' ? 'opencode' : run.harness);
+      item.description = `handed off · ${why}`;
+      item.tooltip = new vscode.MarkdownString(`**${run.title}**\n\nHanded off: ${why}.\n\n${[name, run.model].filter(Boolean).join(' · ')}`);
+      item.accessibilityInformation = { label: `Earlier agent, ${name}, handed off, ${why}` };
+      item.contextValue = 'agent-earlier';
+      item.command = { command: 'overseer.selectRun', title: 'Open', arguments: [run.id] };
+      return { item, run, parent: node, earlier: true };
+    });
   }
   childNode(run, parent) {
     const kids = this.kidsOf(run.id).length;

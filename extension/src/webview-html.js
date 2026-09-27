@@ -6,13 +6,13 @@ const { randomBytes } = require('crypto');
 
 const SHARED_CSS = ['vendor/codicons/codicon.css', 'tokens.css', 'base.css'];
 const SHARED_JS = ['ui.js', 'logos.js'];
-const CHAT_JS = ['vendor/marked.umd.js', 'vendor/purify.min.js', 'vendor/highlight.min.js', 'markdown.js', 'conversation.js', 'prompt-tools.js', 'chat.js'];
+const CHAT_JS = ['vendor/marked.umd.js', 'vendor/purify.min.js', 'vendor/highlight.min.js', 'markdown.js', 'continuity-text.js', 'continuity.js', 'conversation.js', 'prompt-tools.js', 'chat.js'];
 
 function page(webview, extensionUri, { title, css = [], js = [], body = '', bodyAttrs = '', chat = false, script = '' }) {
   const media = vscode.Uri.joinPath(extensionUri, 'media');
   const nonce = randomBytes(18).toString('base64');
   const asset = name => webview.asWebviewUri(vscode.Uri.joinPath(media, ...name.split('/'))).toString();
-  const styles = [...SHARED_CSS, ...(chat ? ['chat.css'] : []), ...css].map(f => `<link rel="stylesheet" href="${asset(f)}">`).join('');
+  const styles = [...SHARED_CSS, ...(chat ? ['chat.css', 'continuity.css'] : []), ...css].map(f => `<link rel="stylesheet" href="${asset(f)}">`).join('');
   const scripts = [...SHARED_JS, ...(chat ? CHAT_JS : []), ...js].map(f => `<script nonce="${nonce}" src="${asset(f)}"></script>`).join('');
   const home = JSON.stringify(os.homedir());
   return `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">

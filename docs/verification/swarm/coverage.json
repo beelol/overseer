@@ -1,7 +1,7 @@
 {
   "base_commit": "19edf57ca4c30b0b4788b5416bb5d949a2cdff6c",
   "rfc_sha256": {
-    "swarm-mode.md": "5c3a4c328982491c4629f79487998fdf7f19fa799c3b98dc4f9d5c15f2591b22",
+    "swarm-mode.md": "8ac5b9600a4f09922422750a105d8e6baedf84ddd6cce5c7c82f78200436dea1",
     "swarm-mode-scenarios.md": "857ee07916d6d60b57435125dfc3547ecd37024a3948e6343a95a63cb972bbdf",
     "swarm-mode-goal.md": "fb1bcf183e39e2edeb27b6d5f641eb8daf639bbaf271f5a4afbc15bcb01de08a"
   },
@@ -9,7 +9,7 @@
     "SWARM-01": {
       "status": "unverified",
       "evidence": [],
-      "blocker": "Normal Auto/Manual \u00d7 Swarm launch paths and an opt-in UI are not wired; fixture planning cannot verify off-mode or one-agent fallback."
+      "blocker": "Normal Auto/Manual × Swarm launch paths and an opt-in UI are not wired; fixture planning cannot verify off-mode or one-agent fallback."
     },
     "SWARM-02": {
       "status": "partial",
@@ -148,9 +148,12 @@
       "evidence": [
         "daemon/tests/swarm_routing.rs",
         "daemon/src/swarm/artifacts.rs",
-        "docs/verification/swarm/SWARM-15.md"
+        "docs/verification/swarm/SWARM-15.md",
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_director_process.rs",
+        "docs/verification/swarm/main-reconciliation-2026-09-27.md"
       ],
-      "blocker": "Two fixture target routes now transition a failed supervised launch from ready to failed after the second attempt, retain the cap across revision, and block retry when an effect is unknown. Live routing and unchanged-state model-planning suppression remain unverified."
+      "blocker": "Two fixture target routes now transition a failed supervised launch from ready to failed after the second attempt, retain the cap across revision, and block retry when an effect is unknown. Live routing and unchanged-state model-planning suppression remain unverified. Gate L generic handoff/retry is now refused for linked Swarm runs; same-job Continuity routing remains unimplemented and unverified."
     },
     "SWARM-16": {
       "status": "partial",
@@ -158,9 +161,12 @@
         "daemon/tests/swarm_checkpoint.rs",
         "daemon/tests/swarm_dispatch_incident.rs",
         "docs/verification/swarm/SWARM-16.md",
-        "docs/verification/swarm/S4.md"
+        "docs/verification/swarm/S4.md",
+        "daemon/tests/swarm_runtime.rs",
+        "daemon/tests/swarm_director_process.rs",
+        "docs/verification/swarm/main-reconciliation-2026-09-27.md"
       ],
-      "blocker": "A worker-authored checkpoint survives failure and daemon restart, is granted to another selected account and is revoked during replacement. Automatic recovery of accepted artifacts, a live account failure/harness handoff and joined side-effect reconciliation remain unverified."
+      "blocker": "A worker-authored checkpoint survives failure and daemon restart, is granted to another selected account and is revoked during replacement. Automatic recovery of accepted artifacts, a live account failure/harness handoff and joined side-effect reconciliation remain unverified. Gate L generic successor recovery is barred for linked Swarm runs until checkpoint and reservation continuity can be proved."
     },
     "SWARM-17": {
       "status": "partial",

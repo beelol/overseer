@@ -21,5 +21,7 @@ regex = "1"
 base64 = "0.22"
 sha2 = "0.10"
 tempfile = "3"
+# Continuity: credential-free reachability probes (TLS) and loopback HTTP to Ollama and OpenCode.
+ureq = { version = "2", default-features = false, features = ["tls"] }
 
 [dev-dependencies]

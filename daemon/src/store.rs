@@ -128,6 +128,15 @@ fn json_col(row: &Row, idx: &str) -> rusqlite::Result<Value> {
 }
 
 impl Store {
+    /// A linked Swarm director or worker remains under its director's admission,
+    /// attempt and reservation authority even after its process has ended.
+    pub fn is_swarm_linked_run(&self, run_id: &str) -> Result<bool> {
+        Ok(self.conn.prepare(
+            "SELECT 1 WHERE EXISTS(SELECT 1 FROM swarm_worker_launches WHERE overseer_run_id=?1)
+             OR EXISTS(SELECT 1 FROM swarm_director_owners WHERE overseer_run_id=?1)",
+        )?.exists([run_id])?)
+    }
+
     pub fn agent_limit(&self) -> Result<i64> {
         let value: Option<String> = self.conn.query_row(
             "SELECT value FROM meta WHERE key='agents.max_active'", [], |row| row.get(0)

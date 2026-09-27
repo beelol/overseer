@@ -1,0 +1,340 @@
+{
+  "on": "2026-09-27",
+  "stopped": "memory pressure is warn before qwen2.5-coder:14b",
+  "results": [
+    {
+      "tag": "qwen2.5-coder:1.5b",
+      "harness": "codex --oss",
+      "harness_version": "codex-cli 0.155.0-alpha.16.4",
+      "ollama": "0.34.2",
+      "attempts": [
+        {
+          "n": 1,
+          "exit": 0,
+          "seconds": 5.3,
+          "file": null,
+          "items": [
+            "error",
+            "agent_message"
+          ],
+          "reply": "done",
+          "errors": [
+            "Model metadata for `overseer/qwen2.5-coder-1.5b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+          ],
+          "stderr": "Reading additional input from stdin...",
+          "ok": false
+        },
+        {
+          "n": 2,
+          "exit": 0,
+          "seconds": 1.7,
+          "file": null,
+          "items": [
+            "error",
+            "agent_message"
+          ],
+          "reply": "done",
+          "errors": [
+            "Model metadata for `overseer/qwen2.5-coder-1.5b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+          ],
+          "stderr": "Reading additional input from stdin...",
+          "ok": false
+        },
+        {
+          "n": 3,
+          "exit": 0,
+          "seconds": 3.9,
+          "file": null,
+          "items": [
+            "error",
+            "agent_message"
+          ],
+          "reply": "done",
+          "errors": [
+            "Model metadata for `overseer/qwen2.5-coder-1.5b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+          ],
+          "stderr": "Reading additional input from stdin...",
+          "ok": false
+        }
+      ],
+      "memory_before": {
+        "available": 27804778496,
+        "pressure": "normal",
+        "level": 43,
+        "loaded": [
+          {
+            "tag": "qwen3-coder:30b-64k",
+            "gib": 23.7,
+            "context": 65536
+          }
+        ]
+      },
+      "context": 32768,
+      "run_tag": "overseer/qwen2.5-coder-1.5b:32k",
+      "bytes": 2109430824,
+      "budget": 14060883149,
+      "command": "codex exec --json --oss --local-provider ollama -m overseer/qwen2.5-coder-1.5b:32k -s workspace-write --skip-git-repo-check -C /ISOLATED/repo-qwen2-5-coder-1-5b-1 -- <prompt>",
+      "loaded_during": [
+        {
+          "tag": "overseer/qwen2.5-coder-1.5b:32k",
+          "gib": 2,
+          "context": 32768
+        },
+        {
+          "tag": "qwen3-coder:30b-64k",
+          "gib": 23.7,
+          "context": 65536
+        }
+      ],
+      "memory_after": {
+        "available": 30315036672,
+        "pressure": "normal",
+        "level": 45,
+        "loaded": [
+          {
+            "tag": "qwen3-coder:30b-64k",
+            "gib": 23.7,
+            "context": 65536
+          }
+        ]
+      },
+      "lowest_available": 27969372160,
+      "lowest_level": 43,
+      "pressure_seen": [
+        "normal"
+      ],
+      "largest_loaded": 23.7,
+      "status": "failed",
+      "note": "0 of 3 write checks: Model metadata for `overseer/qwen2.5-coder-1.5b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+    },
+    {
+      "tag": "qwen2.5-coder:3b",
+      "harness": "codex --oss",
+      "harness_version": "codex-cli 0.155.0-alpha.16.4",
+      "ollama": "0.34.2",
+      "attempts": [
+        {
+          "n": 1,
+          "exit": 0,
+          "seconds": 9.5,
+          "file": null,
+          "items": [
+            "error",
+            "agent_message"
+          ],
+          "reply": "done",
+          "errors": [
+            "Model metadata for `overseer/qwen2.5-coder-3b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+          ],
+          "stderr": "Reading additional input from stdin...",
+          "ok": false
+        },
+        {
+          "n": 2,
+          "exit": 0,
+          "seconds": 1.7,
+          "file": null,
+          "items": [
+            "error",
+            "agent_message"
+          ],
+          "reply": "done",
+          "errors": [
+            "Model metadata for `overseer/qwen2.5-coder-3b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+          ],
+          "stderr": "Reading additional input from stdin...",
+          "ok": false
+        },
+        {
+          "n": 3,
+          "exit": 0,
+          "seconds": 1.5,
+          "file": null,
+          "items": [
+            "error",
+            "agent_message"
+          ],
+          "reply": "done",
+          "errors": [
+            "Model metadata for `overseer/qwen2.5-coder-3b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+          ],
+          "stderr": "Reading additional input from stdin...",
+          "ok": false
+        }
+      ],
+      "memory_before": {
+        "available": 30266916864,
+        "pressure": "normal",
+        "level": 45,
+        "loaded": [
+          {
+            "tag": "qwen3-coder:30b-64k",
+            "gib": 23.7,
+            "context": 65536
+          }
+        ]
+      },
+      "context": 32768,
+      "run_tag": "overseer/qwen2.5-coder-3b:32k",
+      "bytes": 3351081123,
+      "budget": 16418589901,
+      "command": "codex exec --json --oss --local-provider ollama -m overseer/qwen2.5-coder-3b:32k -s workspace-write --skip-git-repo-check -C /ISOLATED/repo-qwen2-5-coder-3b-1 -- <prompt>",
+      "loaded_during": [
+        {
+          "tag": "overseer/qwen2.5-coder-3b:32k",
+          "gib": 3.1,
+          "context": 32768
+        },
+        {
+          "tag": "qwen3-coder:30b-64k",
+          "gib": 23.7,
+          "context": 65536
+        }
+      ],
+      "memory_after": {
+        "available": 28248883200,
+        "pressure": "normal",
+        "level": 41,
+        "loaded": [
+          {
+            "tag": "qwen3-coder:30b-64k",
+            "gib": 23.7,
+            "context": 65536
+          }
+        ]
+      },
+      "lowest_available": 25266913280,
+      "lowest_level": 37,
+      "pressure_seen": [
+        "normal"
+      ],
+      "largest_loaded": 23.7,
+      "status": "failed",
+      "note": "0 of 3 write checks: Model metadata for `overseer/qwen2.5-coder-3b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+    },
+    {
+      "tag": "qwen2.5-coder:7b",
+      "harness": "codex --oss",
+      "harness_version": "codex-cli 0.155.0-alpha.16.4",
+      "ollama": "0.34.2",
+      "attempts": [
+        {
+          "n": 1,
+          "exit": 0,
+          "seconds": 10.4,
+          "file": null,
+          "items": [
+            "error",
+            "agent_message"
+          ],
+          "reply": "done",
+          "errors": [
+            "Model metadata for `overseer/qwen2.5-coder-7b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+          ],
+          "stderr": "Reading additional input from stdin...",
+          "ok": false
+        },
+        {
+          "n": 2,
+          "exit": 0,
+          "seconds": 1.9,
+          "file": null,
+          "items": [
+            "error",
+            "agent_message"
+          ],
+          "reply": "done",
+          "errors": [
+            "Model metadata for `overseer/qwen2.5-coder-7b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+          ],
+          "stderr": "Reading additional input from stdin...",
+          "ok": false
+        },
+        {
+          "n": 3,
+          "exit": 0,
+          "seconds": 1.7,
+          "file": null,
+          "items": [
+            "error",
+            "agent_message"
+          ],
+          "reply": "done",
+          "errors": [
+            "Model metadata for `overseer/qwen2.5-coder-7b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+          ],
+          "stderr": "Reading additional input from stdin...",
+          "ok": false
+        }
+      ],
+      "memory_before": {
+        "available": 28196192256,
+        "pressure": "normal",
+        "level": 42,
+        "loaded": [
+          {
+            "tag": "qwen3-coder:30b-64k",
+            "gib": 23.7,
+            "context": 65536
+          }
+        ]
+      },
+      "context": 32768,
+      "run_tag": "overseer/qwen2.5-coder-7b:32k",
+      "bytes": 6578881166,
+      "budget": 14666484941,
+      "command": "codex exec --json --oss --local-provider ollama -m overseer/qwen2.5-coder-7b:32k -s workspace-write --skip-git-repo-check -C /ISOLATED/repo-qwen2-5-coder-7b-1 -- <prompt>",
+      "loaded_during": [
+        {
+          "tag": "overseer/qwen2.5-coder-7b:32k",
+          "gib": 6.1,
+          "context": 32768
+        },
+        {
+          "tag": "qwen3-coder:30b-64k",
+          "gib": 23.7,
+          "context": 65536
+        }
+      ],
+      "memory_after": {
+        "available": 26149060608,
+        "pressure": "warn",
+        "level": 38,
+        "loaded": [
+          {
+            "tag": "qwen3-coder:30b-64k",
+            "gib": 23.7,
+            "context": 65536
+          }
+        ]
+      },
+      "lowest_available": 22961192960,
+      "lowest_level": 34,
+      "pressure_seen": [
+        "normal"
+      ],
+      "largest_loaded": 23.7,
+      "status": "failed",
+      "note": "0 of 3 write checks: Model metadata for `overseer/qwen2.5-coder-7b:32k` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+    },
+    {
+      "tag": "qwen2.5-coder:14b",
+      "harness": "codex --oss",
+      "harness_version": "codex-cli 0.155.0-alpha.16.4",
+      "ollama": "0.34.2",
+      "attempts": [],
+      "memory_before": {
+        "available": 26058784768,
+        "pressure": "warn",
+        "level": 38,
+        "loaded": [
+          {
+            "tag": "qwen3-coder:30b-64k",
+            "gib": 23.7,
+            "context": 65536
+          }
+        ]
+      }
+    }
+  ]
+}

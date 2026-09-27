@@ -1,0 +1,673 @@
+{
+  "on": "2026-09-27",
+  "stopped": null,
+  "results": [
+    {
+      "tag": "qwen2.5-coder:1.5b",
+      "tier": 4,
+      "disk_bytes": 986062089,
+      "attempts": [
+        {
+          "n": 1,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 5.6,
+          "file": null,
+          "tools": [],
+          "replies": [],
+          "notes": [],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 0,
+              "write": 0
+            },
+            "input": 9764,
+            "output": 7,
+            "reasoning": 0,
+            "total": 9771
+          },
+          "ok": false
+        },
+        {
+          "n": 2,
+          "status": "failed",
+          "reason": "turn reported failure; last error [tool_call_as_text]: overseer/qwen2.5-coder-1.5b:32k wrote its tool call as text twice; nothing ran",
+          "seconds": 7.9,
+          "file": null,
+          "tools": [],
+          "replies": [
+            "{\"name\": \"write\", \"arguments\": {\"content\": \"verified 2\", \"filePath\": \"check-2.txt\"}}"
+          ],
+          "notes": [
+            "The model wrote a tool call as text, so nothing ran. Asking it once more to call the tool."
+          ],
+          "errors": [
+            "tool_call_as_text: overseer/qwen2.5-coder-1.5b:32k wrote its tool call as text twice; nothing ran"
+          ],
+          "tokens": {
+            "cache": {
+              "read": 9790,
+              "write": 0
+            },
+            "input": 31,
+            "output": 27,
+            "reasoning": 0,
+            "total": 9848
+          },
+          "ok": false
+        },
+        {
+          "n": 3,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 6.5,
+          "file": null,
+          "tools": [],
+          "replies": [],
+          "notes": [],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 1911,
+              "write": 0
+            },
+            "input": 7856,
+            "output": 47,
+            "reasoning": 0,
+            "total": 9814
+          },
+          "ok": false
+        }
+      ],
+      "harness": "opencode-serve",
+      "harness_version": "1.15.13",
+      "ollama": "0.34.2",
+      "memory_before": {
+        "available": 66926460928,
+        "pressure": "normal",
+        "level": 75,
+        "loaded": []
+      },
+      "run_tag": "overseer/qwen2.5-coder-1.5b:32k",
+      "context": 32768,
+      "loaded_bytes": 2109430824,
+      "budget": 52682123509,
+      "memory_after": {
+        "available": 65131069440,
+        "pressure": "normal",
+        "level": 75,
+        "loaded": []
+      },
+      "unloaded": true,
+      "lowest_available": 62890901504,
+      "lowest_level": 73,
+      "pressure_seen": [
+        "normal"
+      ],
+      "one_at_a_time": true,
+      "status": "failed",
+      "note": "0 of 3 write checks: turn completed; exit 0; tool_call_as_text: overseer/qwen2.5-coder-1.5b:32k wrote its tool call as text twice; nothing ran"
+    },
+    {
+      "tag": "qwen2.5-coder:3b",
+      "tier": 4,
+      "disk_bytes": 1929912626,
+      "attempts": [
+        {
+          "n": 1,
+          "status": "failed",
+          "reason": "turn reported failure; last error [tool_call_as_text]: overseer/qwen2.5-coder-3b:32k wrote its tool call as text twice; nothing ran",
+          "seconds": 11.7,
+          "file": null,
+          "tools": [],
+          "replies": [
+            "```json\n{\"name\": \"write\", \"arguments\": {\"content\": \"verified 1\", \"filePath\": \"./check-1.txt\"}}\n```"
+          ],
+          "notes": [
+            "The model wrote a tool call as text, so nothing ran. Asking it once more to call the tool."
+          ],
+          "errors": [
+            "tool_call_as_text: overseer/qwen2.5-coder-3b:32k wrote its tool call as text twice; nothing ran"
+          ],
+          "tokens": {
+            "cache": {
+              "read": 9784,
+              "write": 0
+            },
+            "input": 31,
+            "output": 31,
+            "reasoning": 0,
+            "total": 9846
+          },
+          "ok": false
+        },
+        {
+          "n": 2,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 9.6,
+          "file": null,
+          "tools": [],
+          "replies": [
+            "{\"name\": \"write\", \"arguments\": {\"content\": \"verified 2\", \"filePath\": \"./check-2.txt\"}}"
+          ],
+          "notes": [
+            "The model wrote a tool call as text, so nothing ran. Asking it once more to call the tool."
+          ],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 9780,
+              "write": 0
+            },
+            "input": 31,
+            "output": 2,
+            "reasoning": 0,
+            "total": 9813
+          },
+          "ok": false
+        },
+        {
+          "n": 3,
+          "status": "failed",
+          "reason": "turn reported failure; last error [tool_call_as_text]: overseer/qwen2.5-coder-3b:32k wrote its tool call as text twice; nothing ran",
+          "seconds": 10.2,
+          "file": null,
+          "tools": [],
+          "replies": [
+            "{\"name\": \"write\", \"arguments\": {\"content\": \"verified 3\", \"filePath\": \"/TMP/opencode/check-3.txt\"}}"
+          ],
+          "notes": [
+            "The model wrote a tool call as text, so nothing ran. Asking it once more to call the tool."
+          ],
+          "errors": [
+            "tool_call_as_text: overseer/qwen2.5-coder-3b:32k wrote its tool call as text twice; nothing ran"
+          ],
+          "tokens": {
+            "cache": {
+              "read": 9806,
+              "write": 0
+            },
+            "input": 31,
+            "output": 59,
+            "reasoning": 0,
+            "total": 9896
+          },
+          "ok": false
+        }
+      ],
+      "harness": "opencode-serve",
+      "harness_version": "1.15.13",
+      "ollama": "0.34.2",
+      "memory_before": {
+        "available": 65156907008,
+        "pressure": "normal",
+        "level": 75,
+        "loaded": []
+      },
+      "run_tag": "overseer/qwen2.5-coder-3b:32k",
+      "context": 32768,
+      "loaded_bytes": 3351081123,
+      "budget": 50995592560,
+      "memory_after": {
+        "available": 62811652096,
+        "pressure": "normal",
+        "level": 75,
+        "loaded": []
+      },
+      "unloaded": true,
+      "lowest_available": 60017229824,
+      "lowest_level": 72,
+      "pressure_seen": [
+        "normal"
+      ],
+      "one_at_a_time": true,
+      "status": "failed",
+      "note": "0 of 3 write checks: tool_call_as_text: overseer/qwen2.5-coder-3b:32k wrote its tool call as text twice; nothing ran; turn completed; exit 0"
+    },
+    {
+      "tag": "qwen2.5-coder:7b",
+      "tier": 3,
+      "disk_bytes": 4683087561,
+      "attempts": [
+        {
+          "n": 1,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 17.5,
+          "file": null,
+          "tools": [],
+          "replies": [
+            "{\"name\": \"write\", \"arguments\": {\"content\": \"verified 1\", \"filePath\": \"./check-1.txt\"}}"
+          ],
+          "notes": [
+            "The model wrote a tool call as text, so nothing ran. Asking it once more to call the tool."
+          ],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 9774,
+              "write": 0
+            },
+            "input": 31,
+            "output": 2,
+            "reasoning": 0,
+            "total": 9807
+          },
+          "ok": false
+        },
+        {
+          "n": 2,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 16.8,
+          "file": null,
+          "tools": [],
+          "replies": [
+            "{\"name\": \"write\", \"arguments\": {\"content\": \"verified 2\", \"filePath\": \"/OVERSEER_HOME/worktrees/repo-qwen2-5-coder-7b-2-73f4fae2/qwen2-5-coder-7b-check-2/check-2.txt\"}}"
+          ],
+          "notes": [
+            "The model wrote a tool call as text, so nothing ran. Asking it once more to call the tool."
+          ],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 9855,
+              "write": 0
+            },
+            "input": 31,
+            "output": 2,
+            "reasoning": 0,
+            "total": 9888
+          },
+          "ok": false
+        },
+        {
+          "n": 3,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 16.3,
+          "file": null,
+          "tools": [],
+          "replies": [
+            "{\"name\": \"write\", \"arguments\": {\"content\": \"verified 3\\n\", \"filePath\": \"/OVERSEER_HOME/worktrees/repo-qwen2-5-coder-7b-3-d70e468d/qwen2-5-coder-7b-check-3/check-3.txt\"}}"
+          ],
+          "notes": [
+            "The model wrote a tool call as text, so nothing ran. Asking it once more to call the tool."
+          ],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 9856,
+              "write": 0
+            },
+            "input": 31,
+            "output": 2,
+            "reasoning": 0,
+            "total": 9889
+          },
+          "ok": false
+        }
+      ],
+      "harness": "opencode-serve",
+      "harness_version": "1.15.13",
+      "ollama": "0.34.2",
+      "memory_before": {
+        "available": 62797512704,
+        "pressure": "normal",
+        "level": 75,
+        "loaded": []
+      },
+      "run_tag": "overseer/qwen2.5-coder-7b:32k",
+      "context": 32768,
+      "loaded_bytes": 6578881166,
+      "budget": 51076140891,
+      "memory_after": {
+        "available": 63308431360,
+        "pressure": "normal",
+        "level": 75,
+        "loaded": []
+      },
+      "unloaded": true,
+      "lowest_available": 52848017408,
+      "lowest_level": 69,
+      "pressure_seen": [
+        "normal"
+      ],
+      "one_at_a_time": true,
+      "status": "failed",
+      "note": "0 of 3 write checks: turn completed; exit 0"
+    },
+    {
+      "tag": "qwen2.5-coder:14b",
+      "tier": 2,
+      "disk_bytes": 8988124298,
+      "attempts": [
+        {
+          "n": 1,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 34.5,
+          "file": null,
+          "tools": [],
+          "replies": [],
+          "notes": [],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 0,
+              "write": 0
+            },
+            "input": 9753,
+            "output": 50,
+            "reasoning": 0,
+            "total": 9803
+          },
+          "ok": false
+        },
+        {
+          "n": 2,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 27.2,
+          "file": null,
+          "tools": [],
+          "replies": [],
+          "notes": [],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 1908,
+              "write": 0
+            },
+            "input": 7854,
+            "output": 2,
+            "reasoning": 0,
+            "total": 9764
+          },
+          "ok": false
+        },
+        {
+          "n": 3,
+          "status": "failed",
+          "reason": "turn reported failure; last error [tool_call_as_text]: overseer/qwen2.5-coder-14b:32k wrote its tool call as text twice; nothing ran",
+          "seconds": 39.7,
+          "file": null,
+          "tools": [],
+          "replies": [
+            "{\n  \"name\": \"write\",\n  \"arguments\": {\n    \"content\": \"verified 3\",\n    \"filePath\": \"/OVERSEER_HOME/worktrees/repo-qwen2-5-coder-14b-3-57bee4ca/qwen2-5-coder-14b-check-3/check-3.txt\"\n  }\n}"
+          ],
+          "notes": [
+            "The model wrote a tool call as text, so nothing ran. Asking it once more to call the tool."
+          ],
+          "errors": [
+            "tool_call_as_text: overseer/qwen2.5-coder-14b:32k wrote its tool call as text twice; nothing ran"
+          ],
+          "tokens": {
+            "cache": {
+              "read": 9866,
+              "write": 0
+            },
+            "input": 31,
+            "output": 114,
+            "reasoning": 0,
+            "total": 10011
+          },
+          "ok": false
+        }
+      ],
+      "harness": "opencode-serve",
+      "harness_version": "1.15.13",
+      "ollama": "0.34.2",
+      "memory_before": {
+        "available": 63322914816,
+        "pressure": "normal",
+        "level": 75,
+        "loaded": []
+      },
+      "run_tag": "overseer/qwen2.5-coder-14b:32k",
+      "context": 32768,
+      "loaded_bytes": 15274501733,
+      "budget": 51975811890,
+      "memory_after": {
+        "available": 56731533312,
+        "pressure": "normal",
+        "level": 75,
+        "loaded": []
+      },
+      "unloaded": true,
+      "lowest_available": 45823770624,
+      "lowest_level": 63,
+      "pressure_seen": [
+        "normal"
+      ],
+      "one_at_a_time": true,
+      "status": "failed",
+      "note": "0 of 3 write checks: turn completed; exit 0; tool_call_as_text: overseer/qwen2.5-coder-14b:32k wrote its tool call as text twice; nothing ran"
+    },
+    {
+      "tag": "qwen3-coder:30b",
+      "tier": 1,
+      "disk_bytes": 18556700761,
+      "attempts": [
+        {
+          "n": 1,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 28,
+          "file": "verified 1",
+          "tools": [
+            "{\"content\":\"verified 1\",\"filePath\":\"/OVERSEER_HOME/worktrees/repo-qwen3-coder-30b-1-bd536aac/qwen3-coder-30b-check-1/check-1.txt\"} [running]",
+            "{\"content\":\"verified 1\",\"filePath\":\"/OVERSEER_HOME/worktrees/repo-qwen3-coder-30b-1-bd536aac/qwen3-coder-30b-check-1/check-1.txt\"} [completed]",
+            "{\"command\":\"ls -la\",\"description\":\"List files in current directory to verify check-1.txt was created\"} [running]",
+            "{\"command\":\"ls -la\",\"description\":\"List files in current directory to verify check-1.txt was created\"} [completed]"
+          ],
+          "replies": [],
+          "notes": [],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 10355,
+              "write": 0
+            },
+            "input": 334,
+            "output": 2,
+            "reasoning": 0,
+            "total": 10691
+          },
+          "ok": true
+        },
+        {
+          "n": 2,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 22,
+          "file": "verified 2",
+          "tools": [
+            "{\"content\":\"verified 2\",\"filePath\":\"/OVERSEER_HOME/worktrees/repo-qwen3-coder-30b-2-94fec22a/qwen3-coder-30b-check-2/check-2.txt\"} [running]",
+            "{\"content\":\"verified 2\",\"filePath\":\"/OVERSEER_HOME/worktrees/repo-qwen3-coder-30b-2-94fec22a/qwen3-coder-30b-check-2/check-2.txt\"} [completed]",
+            "{\"command\":\"ls -la\",\"description\":\"List files in current directory to verify check-2.txt was created\"} [running]",
+            "{\"command\":\"ls -la\",\"description\":\"List files in current directory to verify check-2.txt was created\"} [completed]"
+          ],
+          "replies": [],
+          "notes": [],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 10358,
+              "write": 0
+            },
+            "input": 335,
+            "output": 2,
+            "reasoning": 0,
+            "total": 10695
+          },
+          "ok": true
+        },
+        {
+          "n": 3,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 23,
+          "file": "verified 3",
+          "tools": [
+            "{\"content\":\"verified 3\",\"filePath\":\"/OVERSEER_HOME/worktrees/repo-qwen3-coder-30b-3-37561878/qwen3-coder-30b-check-3/check-3.txt\"} [running]",
+            "{\"content\":\"verified 3\",\"filePath\":\"/OVERSEER_HOME/worktrees/repo-qwen3-coder-30b-3-37561878/qwen3-coder-30b-check-3/check-3.txt\"} [completed]",
+            "{\"command\":\"ls -la\",\"description\":\"List files in current directory to verify check-3.txt was created\"} [running]",
+            "{\"command\":\"ls -la\",\"description\":\"List files in current directory to verify check-3.txt was created\"} [completed]"
+          ],
+          "replies": [],
+          "notes": [],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 10364,
+              "write": 0
+            },
+            "input": 337,
+            "output": 2,
+            "reasoning": 0,
+            "total": 10703
+          },
+          "ok": true
+        }
+      ],
+      "harness": "opencode-serve",
+      "harness_version": "1.15.13",
+      "ollama": "0.34.2",
+      "memory_before": {
+        "available": 56707170304,
+        "pressure": "normal",
+        "level": 75,
+        "loaded": []
+      },
+      "run_tag": "qwen3-coder:30b-64k",
+      "context": 65536,
+      "loaded_bytes": 25411736042,
+      "budget": 52933320375,
+      "memory_after": {
+        "available": 55136436224,
+        "pressure": "normal",
+        "level": 73,
+        "loaded": []
+      },
+      "unloaded": true,
+      "lowest_available": 36040720384,
+      "lowest_level": 54,
+      "pressure_seen": [
+        "normal"
+      ],
+      "one_at_a_time": true,
+      "status": "passed",
+      "note": "3 of 3 write checks"
+    },
+    {
+      "tag": "qwen2.5-coder:32b",
+      "tier": 1,
+      "disk_bytes": 19851349898,
+      "attempts": [
+        {
+          "n": 1,
+          "status": "failed",
+          "reason": "turn reported failure; last error [tool_call_as_text]: overseer/qwen2.5-coder-32b:32k wrote its tool call as text twice; nothing ran",
+          "seconds": 79,
+          "file": null,
+          "tools": [],
+          "replies": [
+            "{\"name\": \"task\", \"arguments\": {\"prompt\": \"Use the read tool to verify the current directory exists before writing the file. Then use the write tool to create a file named check-1.txt in the current directory containing exactly: verified 1.\", \"subagent_type\": \"explore\", \"description\": \"create check-1"
+          ],
+          "notes": [
+            "The model wrote a tool call as text, so nothing ran. Asking it once more to call the tool."
+          ],
+          "errors": [
+            "tool_call_as_text: overseer/qwen2.5-coder-32b:32k wrote its tool call as text twice; nothing ran"
+          ],
+          "tokens": {
+            "cache": {
+              "read": 9831,
+              "write": 0
+            },
+            "input": 31,
+            "output": 55,
+            "reasoning": 0,
+            "total": 9917
+          },
+          "ok": false
+        },
+        {
+          "n": 2,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 68,
+          "file": null,
+          "tools": [],
+          "replies": [],
+          "notes": [],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 1908,
+              "write": 0
+            },
+            "input": 7854,
+            "output": 177,
+            "reasoning": 0,
+            "total": 9939
+          },
+          "ok": false
+        },
+        {
+          "n": 3,
+          "status": "completed",
+          "reason": "turn completed; exit 0",
+          "seconds": 62.3,
+          "file": null,
+          "tools": [],
+          "replies": [],
+          "notes": [],
+          "errors": [],
+          "tokens": {
+            "cache": {
+              "read": 1908,
+              "write": 0
+            },
+            "input": 7848,
+            "output": 107,
+            "reasoning": 0,
+            "total": 9863
+          },
+          "ok": false
+        }
+      ],
+      "harness": "opencode-serve",
+      "harness_version": "1.15.13",
+      "ollama": "0.34.2",
+      "memory_before": {
+        "available": 55120740352,
+        "pressure": "normal",
+        "level": 73,
+        "loaded": []
+      },
+      "run_tag": "overseer/qwen2.5-coder-32b:32k",
+      "context": 32768,
+      "loaded_bytes": 28446157700,
+      "budget": 47009609809,
+      "memory_after": {
+        "available": 51150946304,
+        "pressure": "normal",
+        "level": 67,
+        "loaded": []
+      },
+      "unloaded": true,
+      "lowest_available": 30637735936,
+      "lowest_level": 44,
+      "pressure_seen": [
+        "normal"
+      ],
+      "one_at_a_time": true,
+      "status": "failed",
+      "note": "0 of 3 write checks: tool_call_as_text: overseer/qwen2.5-coder-32b:32k wrote its tool call as text twice; nothing ran; turn completed; exit 0"
+    }
+  ]
+}

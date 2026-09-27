@@ -23,6 +23,10 @@ fn active_category_director_uses_its_reserved_app_slot() {
         "args":["30"],"prompt":"Audit backend","title":"Reserved director process"}));
     let process = launched["overseer_run_id"].as_str().unwrap();
     assert_eq!(launched["status"],"launched");
+    for method in ["run.targets", "run.handoff", "run.retry_now"] {
+        let refused=d.try_call(method,json!({"run_id":process,"to":"local"})).unwrap_err();
+        assert!(refused.contains("Swarm owns this run"),"{method}: {refused}");
+    }
     let current = d.call("swarm.get",json!({"id":id}));
     assert_eq!(current["director"]["overseer_run_id"],process);
     assert_eq!(d.call("agents.limit.get",json!({}))["active"],1,

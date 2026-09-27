@@ -13,3 +13,12 @@ Commands: `cargo test --offline -p overseerd --test swarm_routing -- --nocapture
 Evidence: `daemon/tests/swarm_routing.rs`, `daemon/src/swarm/artifacts.rs`, `docs/verification/swarm/SWARM-58.md`.
 
 Remaining: target identities are fixture snapshots, and only a generic supervised process launch was exercised. Live routing and other failure classes remain unqualified. No deterministic proof yet shows that an unchanged blocked/waiting state prevents repeated model-planning calls. The RFC criterion stays unchecked.
+
+Gate L reconciliation at `78befc0`: Continuity's ordinary successor handoff and
+retry lack Swarm job/attempt authority. A linked worker or director now refuses
+`run.targets` and `run.handoff`, and a linked failed process is not parked for
+Continuity's 36-hour retry. The director must perform any later attempt through
+Swarm admission. The fixture tests in `swarm_runtime.rs` and
+`swarm_director_process.rs` prove the command boundary; they do not prove a
+joined live provider outage or same-job failover. See
+`main-reconciliation-2026-09-27.md`.
