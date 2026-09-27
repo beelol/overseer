@@ -1,5 +1,6 @@
-// Packaged-UI scenario for AC-47 (no paid tokens): the tile-based New Task form, run panel,
-// review and Overseer view in Dark, Light, High Contrast and High Contrast Light themes;
+// Packaged-UI scenario for AC-47 and AC-103 (no paid tokens): the tile-based New Task form, run
+// panel, review and Overseer view in Dark, Light, High Contrast, High Contrast Light and the bold
+// Overseer theme (whose gradients must reach the views, while other themes stay flat);
 // keyboard-only task creation; accessible names on every control in each webview; and a lint
 // that UI sources use VS Code theme tokens instead of hard-coded colors.
 const fs = require('fs');
@@ -7,7 +8,7 @@ const path = require('path');
 const cp = require('child_process');
 const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 
-const THEMES = ['Default Dark Modern', 'Default Light Modern', 'Default High Contrast', 'Default High Contrast Light'];
+const THEMES = (process.env.THEMES || 'Default Dark Modern,Default Light Modern,Default High Contrast,Default High Contrast Light,Overseer').split(',');
 // Accessible-name audit run inside a webview.
 const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAll('button, [role=radio], [role=treeitem], [role=tab], input, select, textarea, a[href]')) {
   if (e.closest('[hidden], [aria-hidden="true"]') || e.offsetParent === null) continue;
@@ -15,7 +16,7 @@ const AUDIT = `(() => { const bad = []; for (const e of document.querySelectorAl
   if (!label) bad.push(e.outerHTML.slice(0, 80)); } return { checked: document.querySelectorAll('button, [role=radio], [role=treeitem], input, select, textarea').length, bad }; })()`;
 
 function lint() {
-  const files = ['tokens.css', 'base.css', 'chat.css', 'dashboard.css', 'new-task.css', 'run-panel.css', 'ui.js', 'chat.js', 'conversation.js', 'dashboard.js', 'composer.js', 'grid.js',
+  const files = ['tokens.css', 'base.css', 'chat.css', 'dashboard.css', 'new-task.css', 'run-panel.css', 'search-view.css', 'search-view.js', 'ui.js', 'chat.js', 'conversation.js', 'dashboard.js', 'composer.js', 'grid.js',
     'prompt-tools.js', 'markdown.js', 'files.js', 'new-task.js', 'run-panel.js'].map(f => 'extension/media/' + f)
     .concat(['extension/src/output-panel.js', 'extension/src/command-center.js', 'extension/src/new-task.js', 'extension/src/webview-html.js', 'extension/branch-diff/review/browser.css', 'extension/branch-diff/review/panel.js']);
   const hits = [];
@@ -108,6 +109,13 @@ function lint() {
       const review = await cdp.webview(`!!document.getElementById('diffs') && document.querySelectorAll('.diff-file').length > 0`, 20000).catch(() => null);
       const audits = { form: formAudit, center: await center.eval(AUDIT), conversation: await conv.eval(AUDIT), review: review ? await review.eval(AUDIT) : null };
       await s.screenshot(`views-${slug}`);
+      // AC-103: the Overseer theme's gradients reach the views; every other theme resolves them flat.
+      const GRAD = `(() => { const cs = getComputedStyle(document.documentElement); const v = n => cs.getPropertyValue('--vscode-overseer-' + n).trim().toLowerCase();
+        return { start: v('backdropStart'), end: v('backdropEnd'), accent: [v('accentStart'), v('accentEnd')], image: getComputedStyle(document.body).backgroundImage.slice(0, 160) }; })()`;
+      const grad = { center: await center.eval(GRAD), review: review ? await review.eval(GRAD) : null };
+      const gradient = g => !!g && g.start && g.end && g.start !== g.end && /gradient/.test(g.image);
+      if (theme === 'Overseer') check('Overseer theme: the backdrop gradient reaches the Overseer view and the review', gradient(grad.center) && gradient(grad.review) && grad.center.accent[0] !== grad.center.accent[1], grad);
+      else check(`${theme}: the Overseer gradients resolve flat (the theme looks unchanged)`, grad.center.start === grad.center.end && grad.center.accent[0] === grad.center.accent[1], grad);
       await s.selectRun(rootOf('claude'));
       await delay(2000);
       await s.screenshot(`conversation-${slug}`);

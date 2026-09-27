@@ -20,7 +20,19 @@
   "contributes": {
     "themes": [
       { "label": "Overseer Dark", "uiTheme": "vs-dark", "path": "./themes/overseer-dark-color-theme.json" },
-      { "label": "Overseer Light", "uiTheme": "vs", "path": "./themes/overseer-light-color-theme.json" }
+      { "label": "Overseer Light", "uiTheme": "vs", "path": "./themes/overseer-light-color-theme.json" },
+      { "label": "Overseer", "uiTheme": "vs-dark", "path": "./themes/overseer-color-theme.json" }
+    ],
+    "colors": [
+      { "id": "overseer.backdropStart", "description": "Overseer views: top of the backdrop gradient.", "defaults": { "dark": "editor.background", "light": "editor.background", "highContrast": "editor.background", "highContrastLight": "editor.background" } },
+      { "id": "overseer.backdropEnd", "description": "Overseer views: bottom of the backdrop gradient.", "defaults": { "dark": "editor.background", "light": "editor.background", "highContrast": "editor.background", "highContrastLight": "editor.background" } },
+      { "id": "overseer.glow", "description": "Overseer views: the soft light in the backdrop's top corner.", "defaults": { "dark": "#00000000", "light": "#00000000", "highContrast": "#00000000", "highContrastLight": "#00000000" } },
+      { "id": "overseer.chromeStart", "description": "Overseer side bar header: top of its gradient.", "defaults": { "dark": "sideBar.background", "light": "sideBar.background", "highContrast": "sideBar.background", "highContrastLight": "sideBar.background" } },
+      { "id": "overseer.chromeEnd", "description": "Overseer side bar header: bottom of its gradient.", "defaults": { "dark": "sideBar.background", "light": "sideBar.background", "highContrast": "sideBar.background", "highContrastLight": "sideBar.background" } },
+      { "id": "overseer.surfaceStart", "description": "Overseer grid tiles and cards: top of their gradient.", "defaults": { "dark": "editor.background", "light": "editor.background", "highContrast": "editor.background", "highContrastLight": "editor.background" } },
+      { "id": "overseer.surfaceEnd", "description": "Overseer grid tiles and cards: bottom of their gradient.", "defaults": { "dark": "editor.background", "light": "editor.background", "highContrast": "editor.background", "highContrastLight": "editor.background" } },
+      { "id": "overseer.accentStart", "description": "Overseer primary buttons: start of the accent gradient.", "defaults": { "dark": "button.background", "light": "button.background", "highContrast": "button.background", "highContrastLight": "button.background" } },
+      { "id": "overseer.accentEnd", "description": "Overseer primary buttons: end of the accent gradient.", "defaults": { "dark": "button.background", "light": "button.background", "highContrast": "button.background", "highContrastLight": "button.background" } }
     ],
     "customEditors": [
       { "viewType": "overseer.chatEditor", "displayName": "Overseer Agent Chat", "selector": [{ "filenamePattern": "*.overseer-chat" }], "priority": "default" }

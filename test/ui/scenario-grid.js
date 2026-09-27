@@ -95,6 +95,8 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const four = await dash.eval(`({ tiles: document.querySelectorAll('.grid .tile').length, cols: document.querySelector('.grid').style.getPropertyValue('--cols') })`);
     check('with a maximum of 4, the grid shows 2×2', four.tiles === 4 && four.cols === '2', four);
     await s.screenshot('grid-4-light');
+    await setSetting('workbench.colorTheme', 'Overseer');
+    await s.screenshot('grid-4-overseer');
     await setSetting('workbench.colorTheme', 'Overseer Dark');
     await s.screenshot('grid-4-dark');
 

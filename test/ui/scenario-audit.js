@@ -15,7 +15,7 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
 const { auditExpression } = require('./audit');
 
 const UI = process.env.AUDIT_UI || 'gatek';
-const THEMES = UI === 'baseline' ? ['Default Dark Modern', 'Default Light Modern'] : ['Overseer Dark', 'Overseer Light', 'Default Dark Modern'];
+const THEMES = UI === 'baseline' ? ['Default Dark Modern', 'Default Light Modern'] : ['Overseer Dark', 'Overseer Light', 'Default Dark Modern', 'Overseer'];
 const WIDTHS = [1280, 900];
 const HEIGHT = 860;
 
