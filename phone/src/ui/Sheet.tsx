@@ -50,7 +50,7 @@ export function Sheet({ testID, open, onClose, title, message, children }: Sheet
     <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent supportedOrientations={['portrait', 'landscape']}>
       <View style={styles.fill} accessibilityViewIsModal>
         <Animated.View style={[styles.scrim, scrim]}>
-          <Pressable testID={`${testID}.close`} accessibilityLabel="Close" accessibilityRole="button" style={styles.fill} onPress={onClose} />
+          <Pressable testID={`${testID}.close`} accessibilityLabel="Dismiss" accessibilityRole="button" style={styles.fill} onPress={onClose} />
         </Animated.View>
         <Animated.View testID={testID} style={[styles.sheet, sheet]}>
           <SafeAreaView edges={['bottom', 'left', 'right']}>
