@@ -1485,9 +1485,12 @@ rec(188, "Change direction", "partial", commit="48b3214 (branch claude/orchestra
     steps="""`cargo test -p overseerd --test overseer ac188_redirect_and_the_queue`; `node test/ui/scenario-parity.js` ([evidence](evidence/ui/parity/)).""",
     expected="See the RFC criterion (Gate S).", actual="The test and the scenario pass.",
     evidence="`daemon/tests/overseer.rs`; [parity scenario](evidence/ui/parity/result.json)", live="Fixtures; the live redirects are still to run.", blocker="Picked up comes with AC-190; the live redirects are one tiny paid turn each.")
-rec(189, "Overseer keeps agents on task", "not started", date="—", commit="—",
-    expected="See the RFC criterion (Gate S).",
-    actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
+rec(189, "Overseer keeps agents on task", "partial", commit="97fecce (branch claude/orchestrator-agent-control-rfc-8e2009, pull request #14)", date="2026-09-27", harness="Claude fixture (echo, slow, showcase, circles), a generic program; no paid tokens",
+    proven="a fixture agent on task through seven turns gets check-ins after turns 3 and 6 and one at the end, its check-ins read on task or done, and no turn of its own carries a word from Overseer; told every turn, it gets one after each turn; told only when done, only the one at the end; one that writes outside its area is found by the free check within 2 s of its own file event (`outside_area`) and the check-in that follows reads drifting, with a proposal to redirect at Ask first, a hold at Steer and a redirect at Auto with its cause; one that finishes with part of the task left out gets a done card that names it; the same command failing three times in a row (`going_in_circles`) trips a check-in; with check-ins off none runs and the free checks still do; four agents finishing together cause one Overseer turn that checks all four; an agent that started no turn causes none; a question after agents finished is answered from their current digests (the envelope is built when the owner asks); turns that answer the owner are not counted and self-started turns are (`overseer.cap`)",
+    deferred="the hour of no request is not literally waited (the envelope is composed at request time, which is what the clause checks); one tiny live check-in on Claude Code; a swarm's director without its workers (Swarm is on its own branch, AC-195); the check-in and done cards in the packaged UI (AC-199)",
+    steps="""`cargo test -p overseerd --test overseer ac189_overseer_keeps_agents_on_task`.""",
+    expected="See the RFC criterion (Gate S).", actual="The test passes (about 90 s: it waits out the 5-second batch windows). The daemon queues each check-in with its reason, folds those due within 5 s or twenty of them into one turn, starts none while Overseer is busy, and drops them all with one message at the daily cap; an agent is finished when it stays idle for 30 s after completing (`overseer.grace_ms`).",
+    evidence="`daemon/tests/overseer.rs`", live="Fixtures only; the live check-in is one tiny paid turn, still to run.", blocker="The live check-in, the swarm case (AC-195) and the cards in the UI (AC-199).")
 rec(190, "Agents that know about each other", "not started", date="—", commit="—",
     expected="See the RFC criterion (Gate S).",
     actual="Not started.", live="—", blocker="Not started (Gate S, added by the owner on 2026-09-27).")
@@ -1661,7 +1664,7 @@ SHORT_BLOCKERS = {
     186: "partial: built on pull request #14; the UI parts come with AC-199",
     187: "partial: built on pull request #14; the UI parts come with AC-199",
     188: "partial: the queue and redirect are in the daemon (pull request #14); picked up comes with AC-190, the live redirects are still to run",
-    189: "not started (Gate S, added by the owner on 2026-09-27)",
+    189: "partial: check-ins on cadence, when done and on the free checks are in the daemon (pull request #14); the live check-in, the swarm case and the UI cards remain",
     190: "not started (Gate S, added by the owner on 2026-09-27)",
     191: "not started (Gate S, added by the owner on 2026-09-27)",
     192: "partial: the daemon half is built on pull request #14; the rest comes with its later steps",
