@@ -87,6 +87,15 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     const g = await start('hello', 'generic');
     check('generic program started keyboard-only', g.run && g.shown, { run: g.run?.id, shown: g.shown, note: g.note, chip: g.chip, program: g.program });
 
+    // Auto is an explicit route choice; selecting it must not require a manual account or model.
+    await cdp.command('Overseer: New Agent'); await delay(800);
+    await dash.waitFor(`document.body.dataset.mode === 'composer'`, 5000);
+    await pickAgent('Auto routing · any eligible agent');
+    const autoChoice = { agent: await chip('agent'), modelHidden: await dash.eval(`document.querySelector('[data-chip="model"]').hidden`),
+      enabled: await dash.eval(`!document.getElementById('start').disabled`) };
+    check('composer offers Auto routing with agent and model selection delegated to the daemon', /Auto routing/.test(autoChoice.agent) && autoChoice.modelHidden, autoChoice);
+    await pickAgent('Run a program');
+
     // Problems inline with their fix.
     await cdp.command('Overseer: New Agent'); await delay(800);
     await dash.waitFor(`document.body.dataset.mode === 'composer'`, 5000);
@@ -113,6 +122,12 @@ const { Session, makeRepo, latestVsix, delay, repoRoot } = require('./harness');
     await dash.eval(`[...document.querySelectorAll('.view-composer .link')].find(b => b.textContent === 'Full form').click()`);
     const form = await cdp.webview(`!!document.getElementById('harnesses') && document.body.dataset.ready === '1'`, 20000).then(() => true, () => false);
     check('the full New Task form stays one click away', form);
+    if (form) {
+      const autoForm = await cdp.webview(`document.getElementById('harnesses')?.querySelector('[data-value="__auto__"]') && document.body.dataset.ready === '1'`, 5000);
+      await autoForm.eval(`document.querySelector('#harnesses [data-value="__auto__"]').click()`);
+      const autoFields = await autoForm.eval(`({ selected: document.querySelector('#harnesses [data-value="__auto__"]').getAttribute('aria-checked'), accountHidden: document.getElementById('account-section').hidden, modelHidden: document.getElementById('model-wrap').hidden, preferenceVisible: !document.getElementById('auto-preference').hidden })`);
+      check('full New Task form shows Auto and its optional harness preference without manual account/model fields', autoFields.selected === 'true' && autoFields.accountHidden && autoFields.modelHidden && autoFields.preferenceVisible, autoFields);
+    }
     await s.screenshot('full-form');
 
     // Untrusted workspace (Restricted Mode, empty window): explained inline with the fix.

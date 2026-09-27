@@ -9,7 +9,7 @@
       "ok": true,
       "detail": {
         "claudeChip": "Agent: Claude Code · Your login",
-        "run": "r-831edf46c14a",
+        "run": "r-7439a40a805c",
         "shown": true
       }
     },
@@ -26,7 +26,7 @@
       "name": "Codex agent started keyboard-only",
       "ok": true,
       "detail": {
-        "run": "r-9b9b5b4f34b9",
+        "run": "r-13dc912b442a",
         "shown": true
       }
     },
@@ -34,8 +34,17 @@
       "name": "generic program started keyboard-only",
       "ok": true,
       "detail": {
-        "run": "r-62f457c6f23c",
+        "run": "r-50d21b36d526",
         "shown": true
+      }
+    },
+    {
+      "name": "composer offers Auto routing with agent and model selection delegated to the daemon",
+      "ok": true,
+      "detail": {
+        "agent": "Agent: Auto routing",
+        "modelHidden": true,
+        "enabled": false
       }
     },
     {
@@ -63,6 +72,16 @@
     {
       "name": "the full New Task form stays one click away",
       "ok": true
+    },
+    {
+      "name": "full New Task form shows Auto and its optional harness preference without manual account/model fields",
+      "ok": true,
+      "detail": {
+        "selected": "true",
+        "accountHidden": true,
+        "modelHidden": true,
+        "preferenceVisible": true
+      }
     },
     {
       "name": "an untrusted workspace is explained inline with its fix (Trust) and nothing can start",

@@ -1,16 +1,20 @@
-[2026-09-27T05:49:22.120Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
-[2026-09-27T05:49:27.618Z] PASS with no agent selected the middle of the dashboard is the new-agent composer
-[2026-09-27T05:49:27.714Z] screenshot docs/verification/evidence/ui/composer/01-composer.png
-[2026-09-27T05:49:30.977Z] PASS Claude agent started keyboard-only from the composer; it becomes selected and streams in place {"claudeChip":"Agent: Claude Code · Your login","run":"r-831edf46c14a","shown":true}
-[2026-09-27T05:49:31.047Z] screenshot docs/verification/evidence/ui/composer/02-claude-started.png
-[2026-09-27T05:49:31.048Z] PASS after starting an agent from the composer: one editor group with its chat, no review [["Overseer"]]
-[2026-09-27T05:49:35.845Z] PASS Codex agent started keyboard-only {"run":"r-9b9b5b4f34b9","shown":true}
-[2026-09-27T05:49:41.793Z] PASS generic program started keyboard-only {"run":"r-62f457c6f23c","shown":true}
-[2026-09-27T05:49:50.595Z] PASS a signed-out account is explained inline with Sign in, and Start is disabled {"note":"ChatGPT Signed Out is not signed in.Sign in","fix":"Sign in","disabled":true}
-[2026-09-27T05:49:50.595Z] PASS a harness that is not installed is shown as such "OpenCode · not installed"
-[2026-09-27T05:49:50.716Z] screenshot docs/verification/evidence/ui/composer/03-problem-inline.png
-[2026-09-27T05:50:01.001Z] PASS defaults remembered across reloads (last agent and repository) {"agent":"Agent: Program","repo":"Repository: composer-repo"}
-[2026-09-27T05:50:01.976Z] PASS the full New Task form stays one click away
-[2026-09-27T05:50:02.143Z] screenshot docs/verification/evidence/ui/composer/04-full-form.png
-[2026-09-27T05:50:10.708Z] PASS an untrusted workspace is explained inline with its fix (Trust) and nothing can start {"note":"Trust this workspace to start agents.Trust","fix":"Trust","disabled":true}
-[2026-09-27T05:50:10.853Z] screenshot docs/verification/evidence/ui/composer/05-untrusted.png
+[2026-09-27T15:15:00.715Z] installed "Installing extensions...\nExtension 'overseer-0.1.0.vsix' was successfully installed."
+[2026-09-27T15:15:04.453Z] PASS with no agent selected the middle of the dashboard is the new-agent composer
+[2026-09-27T15:15:04.522Z] screenshot docs/verification/evidence/ui/composer/01-composer.png
+[2026-09-27T15:15:07.222Z] PASS Claude agent started keyboard-only from the composer; it becomes selected and streams in place {"claudeChip":"Agent: Claude Code · Your login","run":"r-7439a40a805c","shown":true}
+[2026-09-27T15:15:07.286Z] screenshot docs/verification/evidence/ui/composer/02-claude-started.png
+[2026-09-27T15:15:07.287Z] PASS after starting an agent from the composer: one editor group with its chat, no review [["Overseer"]]
+[2026-09-27T15:15:12.795Z] PASS Codex agent started keyboard-only {"run":"r-13dc912b442a","shown":true}
+[2026-09-27T15:15:18.665Z] PASS generic program started keyboard-only {"run":"r-50d21b36d526","shown":true}
+[2026-09-27T15:15:21.657Z] PASS composer offers Auto routing with agent and model selection delegated to the daemon {"agent":"Agent: Auto routing","modelHidden":true,"enabled":false}
+[2026-09-27T15:15:34.358Z] PASS a signed-out account is explained inline with Sign in, and Start is disabled {"note":"ChatGPT Signed Out is not signed in.Sign in","fix":"Sign in","disabled":true}
+[2026-09-27T15:15:34.359Z] PASS a harness that is not installed is shown as such "OpenCode · not installed"
+[2026-09-27T15:15:34.425Z] screenshot docs/verification/evidence/ui/composer/03-problem-inline.png
+[2026-09-27T15:15:44.644Z] PASS defaults remembered across reloads (last agent and repository) {"agent":"Agent: Program","repo":"Repository: composer-repo"}
+[2026-09-27T15:15:45.290Z] PASS the full New Task form stays one click away
+[2026-09-27T15:15:45.296Z] PASS full New Task form shows Auto and its optional harness preference without manual account/model fields {"selected":"true","accountHidden":true,"modelHidden":true,"preferenceVisible":true}
+[2026-09-27T15:15:45.381Z] screenshot docs/verification/evidence/ui/composer/04-full-form.png
+[2026-09-27T15:16:01.712Z] VS Code did not quit on Cmd+Q; sending SIGTERM 9
+[2026-09-27T15:16:23.632Z] killing leftover VS Code helper processes 3
+[2026-09-27T15:16:30.334Z] PASS an untrusted workspace is explained inline with its fix (Trust) and nothing can start {"note":"Trust this workspace to start agents.Trust","fix":"Trust","disabled":true}
+[2026-09-27T15:16:30.409Z] screenshot docs/verification/evidence/ui/composer/05-untrusted.png

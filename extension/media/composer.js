@@ -29,7 +29,7 @@
     const start = ui.iconButton('arrow-up', 'Start agent', { cls: 'primary send', shortcut: 'Enter' }); start.id = 'start';
     row.append(toolsBar, el('span', 'spacer'), more, start);
     box.append(tray, task, generic, row);
-    const tools = window.OverseerPromptTools.create(task, toolsBar, tray, { post, noModel: true, harness: () => form.harness, target: () => form.repo ? { repo: form.repo } : null, notice: t => { note.className = 'composer-note error'; note.replaceChildren(ui.icon('warning', 'sm'), el('span', null, t)); }, onChange: () => {} });
+    const tools = window.OverseerPromptTools.create(task, toolsBar, tray, { post, noModel: true, harness: () => form.routing === 'auto' ? 'auto' : form.harness, target: () => form.repo ? { repo: form.repo } : null, notice: t => { note.className = 'composer-note error'; note.replaceChildren(ui.icon('warning', 'sm'), el('span', null, t)); }, onChange: () => {} });
     const note = el('div', 'composer-note'); note.setAttribute('role', 'status');
     const foot = el('div', 'composer-foot');
     const full = el('button', 'link', 'Full form'); full.type = 'button'; full.title = 'Open the New Task form with every option';
@@ -54,20 +54,27 @@
       const repo = data.repos.find(r => r.path === form.repo);
       setChip(repoChip, 'repo', repo ? repo.name : 'Choose repository', repo ? `${repo.path}${repo.branch ? `\nOn ${repo.branch}` : ''}` : 'Choose a Git repository');
       const hx = harness(), a = account();
-      const agentLabel = form.harness === 'generic' ? 'Program' : `${ui.HARNESS[form.harness] || form.harness || 'Agent'}${a ? ' · ' + a.name : ''}`;
-      setChip(agentChip, ui.harnessMark(form.harness, 14), agentLabel, [hx && `${ui.HARNESS[hx.harness]} ${hx.version || ''}`, a && `${a.name}: ${a.signedIn ? 'signed in' + (a.plan ? ' · ' + a.plan : '') : 'not signed in'}`, a && ui.usageDetail(a.usage)].filter(Boolean).join('\n'));
-      modelChip.hidden = form.harness === 'generic';
+      const agentLabel = form.routing === 'auto' ? `Auto routing${form.preferredHarness ? ' · prefer ' + (ui.HARNESS[form.preferredHarness] || form.preferredHarness) : ''}` : form.harness === 'generic' ? 'Program' : `${ui.HARNESS[form.harness] || form.harness || 'Agent'}${a ? ' · ' + a.name : ''}`;
+      setChip(agentChip, form.routing === 'auto' ? 'sparkle' : ui.harnessMark(form.harness, 14), agentLabel, form.routing === 'auto' ? 'Selects an eligible account, agent, model and effort for each work unit' : [hx && `${ui.HARNESS[hx.harness]} ${hx.version || ''}`, a && `${a.name}: ${a.signedIn ? 'signed in' + (a.plan ? ' · ' + a.plan : '') : 'not signed in'}`, a && ui.usageDetail(a.usage)].filter(Boolean).join('\n'));
+      modelChip.hidden = form.routing === 'auto' || form.harness === 'generic';
       setChip(modelChip, 'sparkle', form.model || 'Default model', form.model ? `Model: ${form.model}` : 'The harness default model');
       setChip(modeChip, form.mode === 'current' ? 'repo' : 'git-branch', form.mode === 'current' ? 'Current checkout' : 'New worktree', form.mode === 'current' ? 'Works directly in your checkout' : `A new branch and worktree${form.ref ? ' from ' + form.ref : ''}; your checkout is untouched`);
-      generic.hidden = form.harness !== 'generic';
+      generic.hidden = form.routing === 'auto' || form.harness !== 'generic';
       tools.refresh();
-      task.placeholder = form.harness === 'generic' ? 'Optional first line for the program' : 'Send off a task';
+      task.placeholder = form.routing !== 'auto' && form.harness === 'generic' ? 'Optional first line for the program' : 'Send off a task';
       validate();
     }
     function problem() {
       if (!data) return {};
       if (!data.trusted) return { text: 'Trust this workspace to start agents.', fix: 'Trust', command: 'workbench.trust.manage' };
       if (!form.repo) return { text: 'Choose a repository.', fix: 'Choose…', action: () => post({ type: 'composerBrowse' }) };
+      if (form.routing === 'auto') {
+        const supported = data.accounts.filter(a => (a.signedIn && (a.harnesses || []).some(h => ['codex', 'claude'].includes(h))) || (a.installed && (a.harnesses || []).includes('opencode')));
+        if (!supported.length) return { text: 'Sign in to an agent account or install local OpenCode for Auto routing.', fix: 'Add account', command: 'overseer.addProfile' };
+        if (supported.length > 8) return { text: 'Auto routing supports up to eight signed-in accounts.' };
+        if (!task.value.trim()) return { soft: true };
+        return {};
+      }
       const hx = harness();
       if (!hx) return { text: 'Choose an agent.' };
       if (!hx.installed) return { text: `${ui.HARNESS[hx.harness] || hx.harness} is not installed.`, fix: 'How to install', url: hx.install_url };
@@ -102,15 +109,20 @@
         'sep', { label: 'Choose folder…', icon: 'folder-opened', run: () => post({ type: 'composerBrowse' }) }], { label: 'Repository' });
     }
     function menuAgent() {
-      const items = [];
+      const items = [{ head: 'Automatic selection' },
+        { label: 'Auto routing · any eligible agent', icon: 'sparkle', checked: form.routing === 'auto' && !form.preferredHarness,
+          run: () => { form.routing = 'auto'; form.preferredHarness = ''; save(); } },
+        ...[['codex-app', 'Codex'], ['claude', 'Claude Code'], ['opencode', 'OpenCode']].map(([value, label]) =>
+          ({ label: `Auto routing · prefer ${label}`, icon: 'sparkle', checked: form.routing === 'auto' && form.preferredHarness === value,
+            run: () => { form.routing = 'auto'; form.preferredHarness = value; save(); } })), 'sep'];
       for (const hx of data.harnesses) {
         if (hx.harness === 'codex-app' && !data.showAppServer) continue;
         items.push({ head: `${ui.HARNESS[hx.harness] || hx.harness}${hx.installed ? '' : ' · not installed'}` });
-        if (hx.harness === 'generic') { items.push({ label: 'Run a program', logo: ui.harnessMark('generic', 14), checked: form.harness === 'generic', run: () => { form.harness = 'generic'; save(); } }); continue; }
+        if (hx.harness === 'generic') { items.push({ label: 'Run a program', logo: ui.harnessMark('generic', 14), checked: form.routing !== 'auto' && form.harness === 'generic', run: () => { form.routing = 'manual'; form.harness = 'generic'; save(); } }); continue; }
         const accts = data.accounts.filter(a => (a.harnesses || []).includes(hx.harness));
         if (!accts.length) items.push({ label: 'Add account…', icon: 'person-add', run: () => post({ type: 'command', command: 'overseer.addProfile' }) });
-        for (const a of accts) items.push({ label: a.name, logo: ui.harnessMark(hx.harness, 14), hint: a.signedIn ? (ui.usageText(a.usage) || a.plan || '') : 'signed out', checked: form.harness === hx.harness && form.account === a.id,
-          title: `${a.name}: ${a.signedIn ? 'signed in' : 'not signed in'}${a.kind === 'follows-app' ? ' · follows the desktop app' : ''}`, run: () => { form.harness = hx.harness; form.account = a.id; if (!MODELS[hx.harness]?.includes(form.model)) form.model = ''; save(); } });
+        for (const a of accts) items.push({ label: a.name, logo: ui.harnessMark(hx.harness, 14), hint: a.signedIn ? (ui.usageText(a.usage) || a.plan || '') : 'signed out', checked: form.routing !== 'auto' && form.harness === hx.harness && form.account === a.id,
+          title: `${a.name}: ${a.signedIn ? 'signed in' : 'not signed in'}${a.kind === 'follows-app' ? ' · follows the desktop app' : ''}`, run: () => { form.routing = 'manual'; form.harness = hx.harness; form.account = a.id; if (!MODELS[hx.harness]?.includes(form.model)) form.model = ''; save(); } });
       }
       ui.menu(agentChip, items, { label: 'Agent' });
     }
@@ -162,7 +174,7 @@
       data(d) {
         data = d;
         const def = d.defaults || {};
-        form = { repo: form.repo || def.repo || d.repos[0]?.path, harness: form.harness || def.harness, account: form.account || def.account, model: form.model ?? def.model ?? '', mode: form.mode || def.mode || 'worktree', approval: form.approval || def.approval, ref: form.ref || '' };
+        form = { repo: form.repo || def.repo || d.repos[0]?.path, routing: form.routing || def.routing || 'manual', preferredHarness: form.preferredHarness ?? def.preferredHarness ?? '', harness: form.harness || def.harness, account: form.account || def.account, model: form.model ?? def.model ?? '', mode: form.mode || def.mode || 'worktree', approval: form.approval || def.approval, ref: form.ref || '' };
         if (form.repo && !d.repos.some(r => r.path === form.repo)) form.repo = d.repos[0]?.path;
         // No remembered agent: prefer an installed harness with a signed-in account.
         if (!d.harnesses.some(h => h.harness === form.harness && h.installed)) {

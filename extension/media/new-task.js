@@ -6,7 +6,7 @@
   const vscode = acquireVsCodeApi();
   const saved = vscode.getState() || {};
   let data = { repos: [], harnesses: [], accounts: [], branches: {}, trusted: true };
-  const form = { repo: saved.repo, harness: saved.harness, account: saved.account, mode: saved.mode || 'worktree', ref: saved.ref || '', model: saved.model || '', approval: saved.approval || 'on-request', prompt: saved.prompt || '', program: saved.program || '', args: saved.args || '[]' };
+  const form = { repo: saved.repo, routing: saved.routing || 'manual', preferredHarness: saved.preferredHarness || '', harness: saved.harness, account: saved.account, mode: saved.mode || 'worktree', ref: saved.ref || '', model: saved.model || '', approval: saved.approval || 'on-request', prompt: saved.prompt || '', program: saved.program || '', args: saved.args || '[]' };
   const $ = id => document.getElementById(id);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   const persist = () => vscode.setState({ ...form });
@@ -62,18 +62,21 @@
     const repoItems = data.repos.map(r => ({ value: r.path, title: r.name, sub: r.branch || 'detached', subTitle: r.path, tip: `${r.path}${r.branch ? ' · ' + r.branch : ''}`, icon: ICON.repo, hints: [r.branch ? 'on ' + r.branch : 'detached', r.source] }));
     repoItems.push({ value: '__browse__', title: 'Choose…', sub: 'Any Git repository', icon: ICON.folder });
     tiles($('repos'), 'Repository', repoItems, form.repo, (v, moving) => { if (v === '__browse__') { if (!moving) vscode.postMessage({ type: 'browse' }); return; } form.repo = v; persist(); vscode.postMessage({ type: 'branches', repo: v }); render(); });
-    tiles($('harnesses'), 'Harness', data.harnesses.map(h => ({ value: h.harness, title: h.label, logo: ui.harnessMark(h.harness, 16), sub: h.installed ? String(h.version || 'installed').split(' ')[0] : 'not installed', tip: [h.label, h.version, ...(h.hints || [])].filter(Boolean).join(' · '),
-      status: h.installed ? { cls: 'ok', text: 'ready' } : { cls: 'off', text: 'missing' }, hints: h.hints, disabled: !h.installed, why: h.installed ? '' : 'Not installed' })), form.harness,
-      v => { form.harness = v; const ok = compatible().some(a => a.id === form.account); if (!ok) form.account = (compatible().find(a => a.signedIn) || {}).id; persist(); render(); });
+    tiles($('harnesses'), 'Agent', [{ value: '__auto__', title: 'Auto routing', icon: 'sparkle', sub: 'Picks the agent, model and effort per work unit', tip: 'Uses available signed-in accounts and local usage evidence' }, ...data.harnesses.map(h => ({ value: h.harness, title: h.label, logo: ui.harnessMark(h.harness, 16), sub: h.installed ? String(h.version || 'installed').split(' ')[0] : 'not installed', tip: [h.label, h.version, ...(h.hints || [])].filter(Boolean).join(' · '),
+      status: h.installed ? { cls: 'ok', text: 'ready' } : { cls: 'off', text: 'missing' }, hints: h.hints, disabled: !h.installed, why: h.installed ? '' : 'Not installed' }))], form.routing === 'auto' ? '__auto__' : form.harness,
+      v => { form.routing = v === '__auto__' ? 'auto' : 'manual'; if (v !== '__auto__') form.harness = v; const ok = compatible().some(a => a.id === form.account); if (!ok) form.account = (compatible().find(a => a.signedIn) || {}).id; persist(); render(); });
     const accounts = compatible();
-    $('account-section').hidden = !form.harness || form.harness === 'generic';
-    $('generic-section').hidden = form.harness !== 'generic';
-    $('approval-section').hidden = form.harness !== 'codex-app';
+    $('account-section').hidden = form.routing === 'auto' || !form.harness || form.harness === 'generic';
+    $('generic-section').hidden = form.routing === 'auto' || form.harness !== 'generic';
+    $('approval-section').hidden = form.routing === 'auto' || form.harness !== 'codex-app';
+    $('auto-preference').hidden = form.routing !== 'auto';
+    $('preferred-harness').value = form.preferredHarness;
+    $('model-wrap').hidden = form.routing === 'auto';
     tiles($('accounts'), 'Account', accounts.map(a => ({ value: a.id, title: a.name, logo: ui.providerMark(a.provider, 16), sub: [a.plan, a.kind === 'follows-app' ? 'desktop login' : ''].filter(Boolean).join(' · ') || (a.signedIn ? 'signed in' : ''),
       tip: `${a.name}: ${a.signedIn ? 'signed in' : 'not signed in'}${a.plan ? ' · ' + a.plan : ''}${a.fingerprint ? ' · id ' + a.fingerprint : ''}${a.kind === 'follows-app' ? '\nFollows the desktop app login and changes when the app switches accounts' : '\nFixed account with its own credential folder'}`,
       status: a.signedIn ? { cls: 'ok', text: 'signed in' } : { cls: 'warn', text: 'not signed in' }, hints: [a.plan, a.fingerprint && 'id ' + a.fingerprint].filter(Boolean),
       disabled: !a.signedIn, why: a.signedIn ? '' : 'Sign in first' })), form.account, v => { form.account = v; persist(); render(); });
-    $('no-accounts').hidden = !form.harness || form.harness === 'generic' || accounts.length > 0;
+    $('no-accounts').hidden = form.routing === 'auto' || !form.harness || form.harness === 'generic' || accounts.length > 0;
     tiles($('modes'), 'Workspace', [
       { value: 'worktree', title: 'New worktree', icon: ICON.worktree, sub: 'Recommended', tip: 'Isolated branch and worktree; your checkout is not touched' },
       { value: 'current', title: 'Current checkout', icon: ICON.current, sub: 'Your working tree', tip: 'Works directly in your checkout. Existing staged, unstaged, untracked and unsaved work is recorded and preserved' },
@@ -89,9 +92,10 @@
       { value: 'untrusted', title: 'Untrusted', icon: ICON.untrusted, sub: 'Ask more often', tip: 'Ask before anything that is not a known read-only command' },
       { value: 'never', title: 'Never ask', icon: ICON.never, sub: 'Sandbox only', tip: 'Sandbox limits apply; no approval requests' },
     ], form.approval, v => { form.approval = v; persist(); render(); });
-    const ready = !!form.repo && !!form.harness && (form.harness === 'generic' ? !!form.program : !!form.account && !!form.prompt.trim()) && data.trusted;
+    const autoAccounts = data.accounts.filter(a => (a.signedIn && (a.harnesses || []).some(h => ['codex', 'claude'].includes(h))) || (a.installed && (a.harnesses || []).includes('opencode')));
+    const ready = !!form.repo && (form.routing === 'auto' ? !!form.prompt.trim() && autoAccounts.length > 0 && autoAccounts.length <= 8 : !!form.harness && (form.harness === 'generic' ? !!form.program : !!form.account && !!form.prompt.trim())) && data.trusted;
     $('start').disabled = !ready;
-    $('start-why').textContent = !data.trusted ? 'Trust this workspace to start agents' : !form.repo ? 'Choose a repository' : !form.harness ? 'Choose an agent' : form.harness !== 'generic' && !form.account ? 'Choose a signed-in account' : form.harness === 'generic' ? (form.program ? '' : 'Enter the program path') : !form.prompt.trim() ? 'Describe the task' : '';
+    $('start-why').textContent = !data.trusted ? 'Trust this workspace to start agents' : !form.repo ? 'Choose a repository' : form.routing === 'auto' ? (!autoAccounts.length ? 'Sign in to an agent account or install local OpenCode' : autoAccounts.length > 8 ? 'Auto routing supports up to eight accounts' : !form.prompt.trim() ? 'Describe the task' : '') : !form.harness ? 'Choose an agent' : form.harness !== 'generic' && !form.account ? 'Choose a signed-in account' : form.harness === 'generic' ? (form.program ? '' : 'Enter the program path') : !form.prompt.trim() ? 'Describe the task' : '';
     document.body.dataset.ready = '1';
   }
   function compatible() { return data.accounts.filter(a => (a.harnesses || []).includes(form.harness)); }
@@ -101,6 +105,7 @@
     $(id).addEventListener('input', () => { form[key] = $(id).value; persist(); render(); });
   }
   $('ref').addEventListener('change', () => { form.ref = $('ref').value; persist(); });
+  $('preferred-harness').addEventListener('change', () => { form.preferredHarness = $('preferred-harness').value; persist(); });
   $('start').addEventListener('click', () => { if (!$('start').disabled) vscode.postMessage({ type: 'start', form: { ...form } }); });
   $('prompt').addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); $('start').click(); } });
   window.addEventListener('message', e => {
