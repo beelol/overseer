@@ -1020,3 +1020,67 @@ fn atlas_s5_two_thousand_duplicate_progress_messages_do_not_starve_stop() {
         "revision":1,"job_id":"j2","attempt_id":attempt["attempt_id"]}));
     assert_eq!(d.call("swarm.get",json!({"id":run}))["status"],"stopped");
 }
+
+// S5: the final Atlas probe and user Stop can commit in either order. The
+// artifact survives both orderings, but neither may publish a final verdict.
+#[test]
+#[ignore = "requires Atlas PostgreSQL fixture, Node.js 24, and local socket permission"]
+fn atlas_s5_stop_as_last_result_arrives_preserves_evidence_without_completion() {
+    assert!(std::env::var("ATLAS_DATABASE_URL").is_ok());
+    for stop_first in [true, false] {
+        let d=Daemon::start(&[]);
+        let created=d.call("swarm.create",json!({"category":"Atlas final-result Stop fault",
+            "objective":"Audit foreign task mutation","allowed_targets":["fixture"]}));
+        let run=created["id"].as_str().unwrap();
+        d.call("swarm.plan",json!({"id":run,"generation":1,"revision":0,"jobs":[
+            {"id":"j2","title":"Tasks","acceptance":"foreign patch before-after rows",
+                "deps":[],"resource_claims":[{"resource":"atlas-db-j2","mode":"write"}]}
+        ]}));
+        let attempt=register(&d,run,"j2");
+        let evidence=atlas_probe("j2");
+        assert_eq!(evidence["foreignPatchStatus"],200);
+        assert_eq!(evidence["taskBefore"],"Bob task");
+        assert_eq!(evidence["taskAfter"],"changed-by-alice");
+        let artifact="atlas-j2-final-stop-proof";
+        d.call("swarm.artifact.put",json!({"run_id":run,"job_id":"j2",
+            "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+            "artifact_id":artifact,"source_revision":1,"kind":"reproduction",
+            "content":evidence.to_string()}));
+        let result=json!({"run_id":run,"job_id":"j2",
+            "attempt_id":attempt["attempt_id"],"token":attempt["token"],
+            "message_id":"atlas-j2-final-stop-result","type":"result","revision":1,
+            "payload":{"audit_outcome":"confirmed_defect","artifact_ids":[artifact]}});
+        if stop_first {
+            assert_eq!(d.call("swarm.stop",json!({"run_id":run}))["status"],"stopping");
+        }
+        assert_eq!(d.call("swarm.report",result.clone())["duplicate"],false);
+        if !stop_first {
+            assert_eq!(d.call("swarm.stop",json!({"run_id":run}))["status"],"stopping");
+        }
+        assert_eq!(d.call("swarm.report",result)["duplicate"],true);
+        assert!(d.try_call("swarm.decide",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":"j2","decision":"accept",
+            "evidence":[artifact]})).is_err());
+        assert!(d.try_call("swarm.complete",json!({"run_id":run,"generation":1,
+            "revision":1,"request_id":"atlas-last-result-stop-complete",
+            "summary":"Task audit complete","verification":"Atlas PostgreSQL probe",
+            "checks":[{"job_id":"j2","outcome":"passed","evidence":[artifact]}]})).is_err());
+        let db=rusqlite::Connection::open(d.home.path().join("overseer.sqlite")).unwrap();
+        let counts:(i64,i64,i64,i64)=db.query_row("SELECT
+            (SELECT COUNT(*) FROM swarm_artifacts WHERE run_id=?1),
+            (SELECT COUNT(*) FROM swarm_messages WHERE run_id=?1 AND kind='result'),
+            (SELECT COUNT(*) FROM swarm_decisions WHERE run_id=?1),
+            (SELECT COUNT(*) FROM swarm_completions WHERE run_id=?1)",
+            [run],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).unwrap();
+        assert_eq!(counts,(1,1,0,0),"stop_first={stop_first}");
+        let mut order=db.prepare("SELECT kind FROM swarm_operation_order
+            WHERE run_id=?1 AND kind IN ('stop','result') ORDER BY seq").unwrap();
+        let order:Vec<String>=order.query_map([run],|r|r.get(0)).unwrap()
+            .collect::<rusqlite::Result<_>>().unwrap();
+        assert_eq!(order,if stop_first { vec!["stop","result"] }
+            else { vec!["result","stop"] },"stop_first={stop_first}");
+        d.call("swarm.attempt.confirm_exit",json!({"run_id":run,"generation":1,
+            "revision":1,"job_id":"j2","attempt_id":attempt["attempt_id"]}));
+        assert_eq!(d.call("swarm.get",json!({"id":run}))["status"],"stopped");
+    }
+}
