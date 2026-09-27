@@ -52,3 +52,14 @@ SWARM-20 remains partial: live harness checkpoint and native-descendant control,
 Linked-director Stop recovery (this revision): `stop_interrupts_linked_director_and_waits_for_confirmed_exit` first failed because Stop immediately reported `stopped` while the supervised director remained live. Stop now durably marks `stopping`, signals the linked director alongside workers, and finalizes only after its terminal process receipt and known native descendants. `restart_retries_a_missed_director_stop_signal` injects an unreachable first signal, restarts the daemon, and observes a retried interruption and eventual `stopped` state. While the director is live, `swarm.get` includes it in the unconfirmed-exit count and details; the sidebar label now covers all Swarm processes. `stop_closes_unreviewed_director_self_attempt_only_after_process_exit` first failed with the self-attempt registered indefinitely. Self-attempt admission now records its exact supervised process ID; after confirmed exit the attempt becomes finished, its reservation remains uncertain, and the job is cancelled without an invented acceptance decision. The focused director-process and director-loop suites passed (12 and 3 tests), as did the adjacent admission, control, owner and runtime suites (31, 6, 3 and 18 tests) and the sidebar unit check. This is scripted local-process evidence. Older unbound self-attempts are not assigned to a director by inference and require separate reconciliation.
 
 The full serialized offline Rust workspace suite (`cargo test --workspace --offline -q -- --test-threads=1`) passed. It regenerated unrelated TUI snapshots, which were restored. `node test/unit/swarm-view.js` and `git diff --check` passed. SWARM-20 remains partial: live harness checkpoints and native-descendant qualification, changed-objective delivery, joined Overseer/phone control paths, and confirmation of exit through actual provider adapters remain open.
+
+Director job deadline follow-up at `f831eac`: after a supervised one-slot director
+admits a job, the fixture persists an expired job deadline without sending its
+interrupt. The persisted transition now includes the linked director process ID.
+The daemon is killed and restarted at that boundary; its timer retries the signal,
+the process reports `interrupted`, and confirmed-dead recovery finishes the attempt
+and fails the job for `job_deadline`. The test failed first because no process ID was
+returned, then passed. The full serialized offline Rust suite passed. This covers a
+scripted local director, not live checkpoint or native-descendant control, so
+SWARM-20 remains partial.
+Replay: `cargo test --offline -q -p overseerd --test swarm_director_loop -- --test-threads=1`.

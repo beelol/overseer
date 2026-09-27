@@ -311,6 +311,9 @@ fn director_death_after_scope_narrowing_supersedes_self_job() {
     let status: String = db.query_row("SELECT status FROM swarm_attempts WHERE id=?1",
         [&attempt],|r|r.get(0)).unwrap();
     assert_eq!(status,"finished");
+    let reservation: String = db.query_row("SELECT status FROM swarm_reservations WHERE attempt_id=?1",
+        [&attempt],|r|r.get(0)).unwrap();
+    assert_eq!(reservation,"uncertain");
     let claims: i64 = db.query_row("SELECT COUNT(*) FROM swarm_claims WHERE run_id=?1 AND job_id='inspect' AND status='active'",
         [run],|r|r.get(0)).unwrap();
     assert_eq!(claims,0);
@@ -364,4 +367,7 @@ fn director_self_job_deadline_retries_interrupt_after_daemon_restart() {
     let attempt_status: String = db.query_row("SELECT status FROM swarm_attempts WHERE id=?1",
         [&attempt],|r|r.get(0)).unwrap();
     assert_eq!(attempt_status,"finished");
+    let reservation: String = db.query_row("SELECT status FROM swarm_reservations WHERE attempt_id=?1",
+        [&attempt],|r|r.get(0)).unwrap();
+    assert_eq!(reservation,"uncertain");
 }

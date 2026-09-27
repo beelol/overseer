@@ -39,3 +39,19 @@ Linked lease refresh follow-up at `c75980d`: `daemon/tests/swarm_director_proces
 Director self-work recovery at `fac2185`: version-1 `fixtures/swarm/director-loop-v1/serial.py` runs one supervised director with `agents.max_active=1` and a synthetic exact `points` quota. It pauses at three crash points: after a self-attempt is admitted but before a result, after a result is durably submitted but before review, and after a side-effect intent is recorded with unknown outcome. `confirmed_director_death_requeues_unsubmitted_self_job_for_replacement` failed first because the dead director's attempt remained registered and the job stayed reserved. After confirmed process exit, recovery now closes an unsubmitted attempt, leaves its allowance reservation uncertain, preserves the original attempt count, releases safe claims, and makes the job eligible for at most its second attempt. It sends a durable terminal notice to the replacement director. `replacement_reviews_submitted_self_result_without_reexecuting_job` keeps a submitted result and attempt intact; a new supervised generation-2 director reviews the original artifact and confirms exit with one total execution attempt. `director_death_with_unknown_effect_blocks_self_job_retry` leaves the effect unknown, finishes the dead attempt, and blocks the job instead of manufacturing a second application. `director_replacement_waits_for_native_descendant_receipts` first refuses replacement while a known child row has no terminal receipt, then advances after that receipt is recorded. No test calls a paid provider. The affected director, owner, process, loop and effects suites passed (11, 3, 13, 6 and 4 tests); `cargo test --workspace --offline -q -- --test-threads=1` and `git diff --check` passed. Unrelated generated TUI snapshots were restored.
 
 SWARM-30 remains partial: these are scripted local processes and an explicit fixture recovery operation. Automatic qualified replacement selection, live model-director turns, provider-path process identity and usage settlement, and shared Auto admission are still unverified. Older self-attempt rows without a bound executor process remain uncertain rather than being assigned to a director by inference.
+
+Cancellation-boundary follow-up at `f831eac`: a supervised one-slot director pauses
+after its own admitted job is excluded by a plan revision, or after that job's
+deadline transition is durably recorded. In each case the fixture confirms process
+exit before calling director recovery. The scope case first failed with a stranded
+`cancel_requested` job; it now finishes the attempt and supersedes the job. The
+deadline case first failed because the persisted timeout did not return the linked
+director process for interruption. The timer now returns that process, retries after
+daemon restart, and recovery marks the job `failed` for `job_deadline` after exit.
+No uncertain usage is counted as free capacity. The affected director, control and
+effects suites and the full serialized offline Rust workspace suite pass. These
+remain local scripted fixtures, not live provider or automatic replacement proof;
+SWARM-30 stays partial.
+
+Replay: `cargo test --offline -q -p overseerd --test swarm_director_loop --test swarm_director_process --test swarm_control --test swarm_director --test swarm_effects -- --test-threads=1`;
+`cargo test --workspace --offline -q -- --test-threads=1`.

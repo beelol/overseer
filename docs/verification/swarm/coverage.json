@@ -207,7 +207,7 @@
         "daemon/tests/swarm_director_process.rs",
         "daemon/tests/swarm_director_loop.rs"
       ],
-      "blocker": "Local fixtures cover durable Stop/Off state, slow-signal lock release, retained reservations and restart reconciliation. Stop now interrupts a linked director, retries a missed signal after daemon restart, reports its unconfirmed exit, and cancels an unreviewed one-slot self-attempt only after confirmed exit. A packaged 100-job/32-live-worker scenario confirms Pause/Resume, active Swarm-off drain without interrupting workers, blocked new admission, owner-confirmed Stop, unconfirmed-exit display and process teardown. Live harness checkpoints, native-descendant control, changed-objective delivery and joined Overseer/phone paths remain unverified."
+      "blocker": "Local fixtures cover durable Stop/Off state, slow-signal lock release, retained reservations and restart reconciliation. Stop now interrupts a linked director, retries a missed signal after daemon restart, reports its unconfirmed exit, and cancels an unreviewed one-slot self-attempt only after confirmed exit. A job-deadline fixture also persists a linked director interruption, restarts the daemon before signaling, and confirms retry and terminalization. A packaged 100-job/32-live-worker scenario confirms Pause/Resume, active Swarm-off drain without interrupting workers, blocked new admission, owner-confirmed Stop, unconfirmed-exit display and process teardown. Live harness checkpoints, native-descendant control, changed-objective delivery and joined Overseer/phone paths remain unverified."
     },
     "SWARM-21": {
       "status": "partial",
@@ -221,9 +221,10 @@
         "docs/verification/swarm/SWARM-21.md",
         "daemon/tests/swarm_effects.rs",
         "daemon/tests/swarm_scenarios.rs",
-        "docs/verification/swarm/S3.md"
+        "docs/verification/swarm/S3.md",
+        "daemon/tests/swarm_director_loop.rs"
       ],
-      "blocker": "Revision CAS, affected-job invalidation and stale-result rejection pass. A joined Catalog replay narrows 24 to 12 routes, supersedes excluded jobs, integrates only retained patches, keeps excluded routes functional under the shared contract, and rejects premature completion. An integrated excluded patch or uncertain external effect cannot be hidden by omission. User-message intake, qualified live delivery and an explicit reversal path for already integrated excluded work remain unimplemented."
+      "blocker": "Revision CAS, affected-job invalidation and stale-result rejection pass. A joined Catalog replay narrows 24 to 12 routes, supersedes excluded jobs, integrates only retained patches, keeps excluded routes functional under the shared contract, and rejects premature completion. A supervised one-slot director job excluded during execution now settles as superseded only after confirmed director exit. An integrated excluded patch or uncertain external effect cannot be hidden by omission. User-message intake, qualified live delivery and an explicit reversal path for already integrated excluded work remain unimplemented."
     },
     "SWARM-22": {
       "status": "partial",
@@ -328,7 +329,7 @@
         "docs/verification/swarm/SWARM-30.md",
         "docs/verification/swarm/milestone-11.md"
       ],
-      "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result and prior Pause state, and requeues an unapplied batch after confirmed replacement. Durable owner-token and lease tests fence plan, directive, review and inbox actions across restart; timeout retains ownership and blocks admission, active unowned turns cannot be taken over, and confirmed replacement waits for a newly bound generation. A supervised local scripted director receives a private credential and requires its recorded process exit before replacement, including after daemon restart. The owner/run link commits before spawn; a durable phase permits explicit recovery of proven no-spawn failures. Startup reattaches a live or exited orphan supervisor only when its private launch identity and process evidence match; missing or mismatched evidence stays stalled and reserved. The daemon refreshes a healthy linked scripted director's lease after a local control ping, including across restart, but will not revive an expired or exited owner. Confirmed death now requeues unsubmitted director self-work within the original attempt cap, preserves submitted evidence for replacement review, blocks unknown effects, and waits for known native descendants. Model-director turns, qualified live process/descendant control, live replacement availability and provider-path death proof remain unverified."
+      "blocker": "A fixture stalls on unknown director termination, preserves worker reservation/result and prior Pause state, and requeues an unapplied batch after confirmed replacement. Durable owner-token and lease tests fence plan, directive, review and inbox actions across restart; timeout retains ownership and blocks admission, active unowned turns cannot be taken over, and confirmed replacement waits for a newly bound generation. A supervised local scripted director receives a private credential and requires its recorded process exit before replacement, including after daemon restart. The owner/run link commits before spawn; a durable phase permits explicit recovery of proven no-spawn failures. Startup reattaches a live or exited orphan supervisor only when its private launch identity and process evidence match; missing or mismatched evidence stays stalled and reserved. The daemon refreshes a healthy linked scripted director's lease after a local control ping, including across restart, but will not revive an expired or exited owner. Confirmed death now requeues unsubmitted director self-work within the original attempt cap, preserves submitted evidence for replacement review, blocks unknown effects, waits for known native descendants, and settles scope-narrowed or expired self-work after confirmed exit. Model-director turns, qualified live process/descendant control, live replacement availability and provider-path death proof remain unverified."
     },
     "SWARM-31": {
       "status": "partial",
@@ -715,9 +716,10 @@
         "docs/verification/swarm/SWARM-62.md",
         "daemon/tests/swarm_runtime.rs",
         "daemon/tests/swarm_atlas.rs",
-        "docs/verification/swarm/S5.md"
+        "docs/verification/swarm/S5.md",
+        "daemon/tests/swarm_director_loop.rs"
       ],
-      "blocker": "A daemon timer checks deadlines without admission requests, records a deadline reason, cancels queued work, interrupts a linked scripted worker and delivers its terminal event. A joined Atlas blocked-deadline replay now queues a checkpoint request and Stop while a PostgreSQL-backed J4 call is held; the checkpoint is not confirmed. A stopping-run readout exposes unconfirmed workers in a Stop fixture; deadline-specific UI, live harness/descendant control and explicit extension remain unverified."
+      "blocker": "A daemon timer checks run deadlines without admission requests, records a deadline reason, cancels queued work, interrupts a linked scripted worker and delivers its terminal event. A joined Atlas blocked-deadline replay now queues a checkpoint request and Stop while a PostgreSQL-backed J4 call is held; the checkpoint is not confirmed. A related job-deadline fixture proves interruption retry for a linked director after daemon restart, but does not qualify the whole-run deadline. A stopping-run readout exposes unconfirmed workers in a Stop fixture; deadline-specific UI, live harness/descendant control and explicit extension remain unverified."
     },
     "SWARM-63": {
       "status": "unverified",

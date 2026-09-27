@@ -17,3 +17,11 @@ Evidence: `daemon/tests/swarm_control.rs`, `daemon/tests/swarm_state.rs`, `daemo
 Remaining: the generic local process is not a qualified live harness, and native descendants are not covered. Deadline-specific unconfirmed-exit readout, UI display, and an explicit extension that preserves the original account allocation remain unverified.
 
 Blocked-deadline follow-up at `4bb688b`: a new Atlas S5 replay starts a supervised J4 worker whose actual PostgreSQL-backed attachment probe returns 200 before holding the command. A newer fixture observation removes all allowed targets and holds queued J2. The original eight-second run deadline then queues a durable checkpoint request and Stop, interrupts J4, cancels J2 and refuses completion. The checkpoint request is not a confirmed artifact, and live harness/descendant control, deadline-specific UI, and explicit extension remain unverified. The focused deadline regression failed before the checkpoint change and passed after it; all 15 disposable Atlas tests plus six control, 18 broker and one non-ignored scenario test passed.
+
+Related job-deadline regression at `f831eac`: a local director's admitted job expires
+at a daemon-restart boundary. The deadline timer retries interruption of the linked
+director process after restart, and confirmed-dead recovery fails the job without a
+second attempt. This is a **job** deadline, not SWARM-62's whole-run deadline; it does
+not verify the run-deadline UI, live harness, native descendants or extension path.
+SWARM-62 remains partial.
+Replay: `cargo test --offline -q -p overseerd --test swarm_director_loop -- --test-threads=1`.

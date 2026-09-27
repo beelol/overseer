@@ -55,3 +55,14 @@ and the twelve-route check passes only after the last patch integrates. The shar
 contract keeps the excluded twelve routes working with their old page parameter.
 User-message intake, live director/worker delivery and reversal of already integrated
 excluded patches remain open; SWARM-21 is partial.
+
+Director self-work follow-up at `f831eac`: a one-slot supervised director admits an
+`inspect` job, then revises the plan to omit it while the job is still running.
+`director_death_after_scope_narrowing_supersedes_self_job` first found the job stuck at
+`cancel_requested` after confirmed director exit. Recovery now finishes that exact
+attempt, retains its quota reservation as uncertain, releases its safe claims, and
+settles the omitted job as `superseded` without scheduling a second attempt. The
+focused `swarm_director_loop` suite and full serialized offline workspace suite pass.
+This is scripted local evidence; user-message intake and qualified live delivery remain
+open, so SWARM-21 stays partial.
+Replay: `cargo test --offline -q -p overseerd --test swarm_director_loop -- --test-threads=1`.
