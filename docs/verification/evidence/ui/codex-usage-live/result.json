@@ -1,0 +1,57 @@
+{
+  "checks": [
+    {
+      "name": "the tiny Codex turn completed",
+      "ok": true,
+      "detail": {
+        "status": "completed",
+        "reply": "ok"
+      }
+    },
+    {
+      "name": "Codex usage in Overseer matches Codex's own account/rateLimits/updated for the same account (used share and reset time per window)",
+      "ok": true,
+      "detail": {
+        "pairs": [
+          {
+            "window": "5 hours",
+            "codex": {
+              "usedPercent": 0,
+              "resetsAt": 1790474011
+            },
+            "overseer": {
+              "used": 0,
+              "resets_at_ms": 1790474011000
+            },
+            "match": true
+          },
+          {
+            "window": "week",
+            "codex": {
+              "usedPercent": 0,
+              "resetsAt": 1791022451
+            },
+            "overseer": {
+              "used": 0,
+              "resets_at_ms": 1791022451000
+            },
+            "match": true
+          }
+        ],
+        "plan": {
+          "codex": "team",
+          "overseer": "team"
+        },
+        "source": "Codex session log"
+      }
+    },
+    {
+      "name": "the plan matches",
+      "ok": true,
+      "detail": {
+        "codex": "team",
+        "overseer": "team"
+      }
+    }
+  ]
+}

@@ -1,0 +1,136 @@
+{
+  "checks": [
+    {
+      "name": "Audio Mode is off on a new install: a finished agent makes no cue and no audio folder exists",
+      "ok": true,
+      "detail": {
+        "enabled": false,
+        "track": "reactor",
+        "played": [],
+        "audioFolder": false
+      }
+    },
+    {
+      "name": "the daemon reports the 12 Reactor cues (31,488 bytes, each under 0.5 s) and three that play by themselves",
+      "ok": true,
+      "detail": {
+        "cues": 12,
+        "bytes": 31488,
+        "longest": 0.365,
+        "auto": [
+          "agent_started",
+          "agent_complete",
+          "agent_needs_attention"
+        ]
+      }
+    },
+    {
+      "name": "the Agents title bar is unchanged (New Agent, Search Agents, Toggle Agent Grid and VS Code's Collapse All) and Audio Mode is in the overflow menu with the rest",
+      "ok": true,
+      "detail": {
+        "icons": [
+          "New Agent (⌥⌘N)",
+          "Search Agents",
+          "Toggle Agent Grid (⌥⌘G)",
+          "Collapse All"
+        ],
+        "overflow": [
+          "Show Archived Agents",
+          "Open Dashboard",
+          "Switch Agent…",
+          "New Task…",
+          "Clean Up Archived Worktrees…",
+          "Refresh",
+          "Show Harness Capabilities",
+          "Audio Mode and Reactor Cues…",
+          "Stop Agents and Daemon…"
+        ]
+      }
+    },
+    {
+      "name": "the Audio Mode menu says Reactor signals · Off, and Turn Audio Mode on enables it in the daemon",
+      "ok": true,
+      "detail": {
+        "placeholder": "Reactor signals · Off",
+        "rows": [
+          "Turn Audio Mode on",
+          "Choose audio track…",
+          "Choose system voice…",
+          "Import private Commander pack…",
+          "Preview cue…"
+        ],
+        "toast": "Overseer Audio Mode on.",
+        "enabled": true
+      }
+    },
+    {
+      "name": "Preview lists the 12 cues with their lengths and the daemon plays the chosen one once",
+      "ok": true,
+      "detail": {
+        "listed": 12,
+        "shown": [
+          "Queued, 0.35s, Waiting to begin.",
+          "Started, 0.36s, A top-level agent begins.",
+          "Resumed, 0.36s, An interrupted session continues.",
+          "Progress, 0.36s, Routine work advances.",
+          "Complete, 0.36s, A top-level turn finishes.",
+          "Stopped, 0.33s, A run pauses or ends without completion.",
+          "Needs attention, 0.33s, A permission, login, or blocker requires you.",
+          "Failed, 0.33s, An operation fails.",
+          "Unblocked, 0.28s, Permission, account, or route becomes available."
+        ],
+        "played": [
+          "reactor:review_ready"
+        ]
+      }
+    },
+    {
+      "name": "choosing System voice and then Reactor signals changes the daemon's track",
+      "ok": true,
+      "detail": {
+        "system": "system",
+        "now": "reactor"
+      }
+    },
+    {
+      "name": "two simultaneous permission requests make one attention cue",
+      "ok": true,
+      "detail": {
+        "bothWaiting": true,
+        "played": [
+          "reactor:agent_started",
+          "reactor:agent_needs_attention"
+        ]
+      }
+    },
+    {
+      "name": "the side bar, the Overseer icon and the status bar each count two",
+      "ok": true,
+      "detail": {
+        "needs": "2",
+        "badge": "2",
+        "statusBar": "Overseer 2 active   2"
+      }
+    },
+    {
+      "name": "with VS Code closed a new agent's start and completion play once each",
+      "ok": true,
+      "detail": [
+        "reactor:agent_started",
+        "reactor:agent_complete"
+      ]
+    },
+    {
+      "name": "no Reactor cache and no private file was written while the daemon only logged cues",
+      "ok": true,
+      "detail": false
+    }
+  ],
+  "played": [
+    "reactor:review_ready",
+    "reactor:agent_started",
+    "reactor:agent_needs_attention",
+    "reactor:agent_started",
+    "reactor:agent_complete"
+  ]
+}

@@ -1,0 +1,10 @@
+[2026-09-26T20:53:28.854Z] owner daemon was not running; started this build for the check
+[2026-09-26T20:53:28.862Z] owner daemon {"pid":74905,"runs":37,"active":0}
+[2026-09-26T20:53:29.619Z] started {"run":"r-6cadb6230854"}
+[2026-09-26T20:53:33.664Z] finished {"status":"completed"}
+[2026-09-26T20:53:33.667Z] PASS the tiny Codex turn completed {"status":"completed","reply":"ok"}
+[2026-09-26T20:53:33.700Z] raw notifications {"count":1,"last":{"limitId":"codex","limitName":null,"normalModelSlug":null,"primary":{"usedPercent":0,"windowDurationMins":300,"resetsAt":1790474011},"secondary":{"usedPercent":0,"windowDurationMins":10080,"resetsAt":1791022451},"credits":{"hasCredits":true,"unlimited":false,"balance":null},"individualLimit":null,"spendControlReached":null,"planType":"team","rateLimitReachedType":null}}
+[2026-09-26T20:53:33.704Z] account.usage {"limited":false,"observed_ms":1790456013080,"plan":"team","reported":true,"source":"Codex session log","windows":[{"label":"5 hours","resets_at_ms":1790474011000,"used":0},{"label":"week","resets_at_ms":1791022451000,"used":0}]}
+[2026-09-26T20:53:33.704Z] PASS Codex usage in Overseer matches Codex's own account/rateLimits/updated for the same account (used share and reset time per window) {"pairs":[{"window":"5 hours","codex":{"usedPercent":0,"resetsAt":1790474011},"overseer":{"used":0,"resets_at_ms":1790474011000},"match":true},{"window":"week","codex":{"usedPercent":0,"resetsAt":1791022451},"overseer":{"used":0,"resets_at_ms":1791022451000},"match":true}],"plan":{"codex":"team","overseer":"team"},"source":"Codex session log"}
+[2026-09-26T20:53:33.704Z] PASS the plan matches {"codex":"team","overseer":"team"}
+[2026-09-26T20:53:33.716Z] stopped the daemon again (it was not running before)

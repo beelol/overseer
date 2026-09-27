@@ -100,10 +100,8 @@ rec(10, "Event replay and bounded output", "verified",
     expected="Cursor-based replay without duplicates or gaps; bounded, redacted, inspectable output with explicit truncation markers.",
     actual="All pass.", evidence="protocol tests; load scenario retention samples (AC-35)", live="Fixtures.")
 
-rec(11, "Account profiles", "partial", commit="1c4c856", date="2026-09-25",
-    harness="LIVE: the owner's two ChatGPT accounts signed in through Overseer's per-account login command (A in the browser, B with a device code; 2026-09-25). Fixtures: synthetic account CLI for missing, expired and renewed logins",
-    proven="add/name/select accounts and sign in through each account's own flow in the UI (ChatGPT browser and device code, live for A/B; Claude via the fixture CLI); folders created at creation (0700); a missing login is shown and blocks the account tile; an expired login fails with a classified auth error and \"Sign in again\" reauthenticates that account, after which the follow-up works; no API keys",
-    deferred="a live re-sign-in (reauthentication) of a ChatGPT account through the UI (needs the owner's browser login; A and B are never signed out). Fixed Claude accounts moved to AC-53",
+rec(11, "Account profiles", "verified", commit="adab32b", date="2026-09-25 (owner-confirmed live on the owner's Mac)",
+    harness="LIVE: a throwaway Overseer ChatGPT account signed in, signed out and signed in again by the owner through the UI (2026-09-25); the owner's two ChatGPT accounts signed in through Overseer's per-account login command (A in the browser, B with a device code; 2026-09-25). Fixtures: synthetic account CLI for missing, expired and renewed logins",
     steps="""1. `cargo test` — `ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_removal` (creation-time folders, sign-in/sign-out/re-sign-in isolation).
 2. `node test/ui/scenario-signin.js` (synthetic account CLI):
    - Add and name "Claude work" without signing in; open New Task → Claude Code.
@@ -111,17 +109,23 @@ rec(11, "Account profiles", "partial", commit="1c4c856", date="2026-09-25",
    - Delete the credential (expired login); send a follow-up.
    - Click **Sign in again** in the conversation; send another follow-up.
 3. `node test/ui/scenario-accounts.js`: provider picker, device-code/browser choice, sign out and sign in again.
-4. Live: `profile.status` for ChatGPT A and B on the owner's daemon ([live-accounts.txt](evidence/ac-46/live-accounts.txt)).""",
+4. Live: `profile.status` for ChatGPT A and B on the owner's daemon ([live-accounts.txt](evidence/ac-46/live-accounts.txt)).
+5. Live re-sign-in with the owner ([session](evidence/ac-13/session.md), shared with AC-13). A throwaway Overseer ChatGPT account was created signed out. The owner signed it in through the UI; the agent signed it out; the owner signed it in again through the UI (right-click → **Sign In…**).""",
     expected="Login and reauthentication through the UI for each claimed supported account path, including a missing/expired login; no API keys.",
     actual="""- **Missing login:** "Claude work" shows "not signed in". Its New Task tile is disabled with "Sign in first (Accounts → Sign In). Account login only; no API keys."
 - **Sign in:** **Overseer: Sign In** → Claude work ran the account's own login in a terminal; the account shows "signed in · max · f03ab3f8" and a task ran with it.
 - **Expired login:** the next turn failed with `[auth]: Failed to authenticate: OAuth session expired and could not be refreshed`. The conversation shows the auth error with a **Sign in again** button.
 - **Reauthentication:** clicking **Sign in again** ran that account's login again ("signed in · max · 55f70cc2"); the follow-up completed ("hello from claudia-again…").
 - **ChatGPT:** Sign In offers "in the browser" and "with a device code" (`codex login --device-auth`).
-- **Live:** ChatGPT A (Team, `2bb3fae1`) signed in through the browser flow and ChatGPT B (Plus, `27e64e3a`) through the device-code flow, each into its own profile folder. Both report ChatGPT-account login and no API key. The device-code attempt for one account first failed until the owner enabled device-code sign-in in ChatGPT security settings; the error text is passed through.""",
-    evidence="[signin scenario](evidence/ui/signin/) (missing login, expired login with Sign in again, after re-sign-in), [accounts scenario](evidence/ui/accounts/), [live account status](evidence/ac-46/live-accounts.txt)",
-    live="Live ChatGPT sign-ins (A browser, B device code). Claude live sign-in and live re-sign-in: deferred.",
-    blocker="Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: sign a throwaway Overseer ChatGPT account in, Sign Out, and Sign In again through the UI (two browser logins). The Claude part is AC-53.")
+- **Live:** ChatGPT A (Team, `2bb3fae1`) signed in through the browser flow and ChatGPT B (Plus, `27e64e3a`) through the device-code flow, each into its own profile folder. Both report ChatGPT-account login and no API key. The device-code attempt for one account first failed until the owner enabled device-code sign-in in ChatGPT security settings; the error text is passed through.
+- **Live re-sign-in (2026-09-25):**
+  - The throwaway account started "not signed in". The owner signed it in through the UI (team, `2bb3fae1`) and the agent signed it out (`logged_in: false`, its auth.json gone). The owner then signed it in again through the UI with another ChatGPT login (plus, `27e64e3a`). Owner: "ok i sigend into a diff acc".
+  - Each login landed only in the throwaway's folder: `chatgpt-account`, no API key.
+  - **Bug found:** a signed-out account's menu offered Sign Out, and Sign In was only an inline icon. The menu now follows the sign-in state (adab32b; checked in `scenario-accounts.js`).
+- **Claude:** the Claude account paths are AC-53.""",
+    evidence="[live re-sign-in session](evidence/ac-13/session.md), [signin scenario](evidence/ui/signin/) (missing login, expired login with Sign in again, after re-sign-in), [accounts scenario](evidence/ui/accounts/), [live account status](evidence/ac-46/live-accounts.txt)",
+    live="Live ChatGPT sign-ins (A browser, B device code) and a live sign-in → sign-out → sign-in again of a throwaway ChatGPT account through the UI. Expiry is exercised with the synthetic CLI. Claude accounts: AC-53.",
+    blocker="not blocked")
 
 rec(12, "Two simultaneous ChatGPT subscriptions", "verified", commit="1c4c856", date="2026-09-25",
     harness="LIVE: Codex 0.155 exec, model gpt-5.6-luna, on the owner's daemon with two fixed accounts: ChatGPT A (Team) and ChatGPT B (Plus), each signed in through Overseer into its own profile folder",
@@ -143,17 +147,16 @@ rec(12, "Two simultaneous ChatGPT subscriptions", "verified", commit="1c4c856", 
     live="Live, two paid ChatGPT subscriptions (Team and Plus).",
     limits="Codex exec transport; the same accounts work with codex-app (shared profile folder).")
 
-rec(13, "Credential isolation on macOS", "partial", commit="1c4c856", date="2026-09-25",
-    harness="LIVE on the owner's daemon: ChatGPT B (Plus) doing real Codex work, ChatGPT A (Team), the desktop-linked login (Pro), and a disposable OpenAI account C. Fixtures: synthetic account CLI for sign-in/out/expiry isolation",
-    proven="while B ran live Codex work, a disposable account C was created, given its own device-code sign-in command, signed out and removed; A, B and the desktop login kept identical identities, including after a daemon restart; B's run and file were unaffected; no token from any Codex credential home appears in Overseer's database, logs or raw outputs; fixture sign-out/sign-in/expiry of one account never changes another",
-    deferred="a live logout/login of a signed-in disposable ChatGPT account during B's work (needs the owner's browser login; A and B are never signed out). The Claude Keychain case moved to AC-53",
+rec(13, "Credential isolation on macOS", "verified", commit="adab32b", date="2026-09-25 (owner-confirmed live on the owner's Mac)",
+    harness="LIVE on the owner's daemon: ChatGPT B (Plus) doing real Codex work, ChatGPT A (Team), the desktop-linked login (Pro), a disposable OpenAI account C, and a throwaway ChatGPT account the owner signed in, the agent signed out, and the owner signed in again (2026-09-25). Fixtures: synthetic account CLI for sign-in/out/expiry isolation",
     steps="""1. `node docs/verification/evidence/ac-13/run-ac13.js` against the owner's daemon (no other runs active):
    - Record the identities of A, B and the desktop login; start B on a Codex task (sleep 25, then write b.txt) in a disposable repository.
    - While it runs: create account C, fetch its sign-in command, sign it out, remove it.
    - After B finishes: restart the daemon and re-check identities.
    - Scan every file under the Overseer data directory, except credential homes and worktrees, for the last 40 characters of each real token and for JWT-like strings. Only counts are printed.
 2. `cargo test` — `ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_removal` (fixture sign-in/sign-out/re-sign-in isolation, including the desktop login switching).
-3. `node test/ui/scenario-signin.js` (fixture expiry of one account and re-sign-in from the UI).""",
+3. `node test/ui/scenario-signin.js` (fixture expiry of one account and re-sign-in from the UI).
+4. Live session with the owner ([session](evidence/ac-13/session.md)): identities recorded; a throwaway Overseer ChatGPT account was created and ChatGPT B started on tiny Codex tasks in a throwaway repository. The owner signed the throwaway in through the UI while B was running. The agent signed it out while B was running. The owner signed it in again through the UI. After B finished, [step-d.js](evidence/ac-13/step-d.js) restarted the daemon (no runs active), re-checked the identities, ran the leak scan (counts only) and removed the throwaway.""",
     expected="Login, logout, refresh and expiry in profile A do not switch profile B's identity or corrupt its credentials/configuration; no leakage in logs/database; unrelated active logins undisturbed.",
     actual="""- **Before:** A team `2bb3fae1`, B plus `27e64e3a`, desktop pro `2e1fa921`. All `chatgpt-account`, no API key.
 - **During B's run** (r-53d79f5a9418, running):
@@ -164,11 +167,18 @@ rec(13, "Credential isolation on macOS", "partial", commit="1c4c856", date="2026
 - **B finished:** completed (exit 0), and b.txt reads "B still works.".
 - **Daemon restart:** pid 63741 → 21639. A, B and the desktop login had identical identities afterwards, and B's run stayed `completed`.
 - **Leak scan:** 9 token suffixes checked against 99 files (database, WAL, logs, launch files, raw output segments): 0 hits, and no JWT-like content.
-- **Fixtures:** signing one account out, in again, or letting it expire only changes that account. The desktop login switching changes only the linked account.""",
-    evidence="[isolation-live.json](evidence/ac-13/isolation-live.json), [run-ac13.js](evidence/ac-13/run-ac13.js), [accounts scenario](evidence/ui/accounts/), [signin scenario](evidence/ui/signin/)",
-    live="Live for B's concurrent work, the disposable account's lifecycle (no login), the daemon restart and the leak scan. Live sign-in/out of a signed-in disposable account: deferred.",
+- **Fixtures:** signing one account out, in again, or letting it expire only changes that account. The desktop login switching changes only the linked account.
+- **Live sign-in / sign-out / sign-in again (2026-09-25):**
+  - **Sign-in:** the owner signed the throwaway in during B's run r-f7dc53c30938 (team `2bb3fae1`, the same ChatGPT account as A, in its own folder). A, B and the desktop login were unchanged, and B completed and wrote b2.txt.
+  - **Sign-out:** the agent signed the throwaway out during B's run r-c180b4e20206. A (the same ChatGPT account) stayed signed in, B and the desktop login were unchanged, and B completed and wrote b3.txt.
+  - **Sign-in again:** the owner signed it in again through the UI with B's ChatGPT account (plus `27e64e3a`). A, B and the desktop login were unchanged.
+  - **Daemon restart:** pid 73218 → 76753, with identical identities afterwards.
+  - **Leak scan:** 12 token suffixes (A, B, throwaway, desktop) checked in 125 Overseer files and 4 extension logs: 0 hits, and no JWT-like content.
+  - **Throwaway removed:** its folder is gone. A, B and the desktop login were never signed out.""",
+    evidence="[live session](evidence/ac-13/session.md), [step-d result](evidence/ac-13/step-d-result.json), [isolation-live.json](evidence/ac-13/isolation-live.json), [run-ac13.js](evidence/ac-13/run-ac13.js), [accounts scenario](evidence/ui/accounts/), [signin scenario](evidence/ui/signin/)",
+    live="Live for B's concurrent work, a throwaway account's sign-in, sign-out and sign-in again through the UI (two real ChatGPT logins), the daemon restart and the leak scan. Token refresh and expiry are exercised with the synthetic CLI.",
     limits="Codex stores credentials in each account's auth.json (file backend). Claude Code on macOS may use the Keychain; its per-account isolation is checked only with fixtures here.",
-    blocker="Skipped by the owner for now (2026-09-25: no sign-out cycles while agents are running). When revisited: sign a throwaway Overseer ChatGPT account in, then Sign Out and Sign In it again while ChatGPT B runs a task (two browser logins); Overseer checks that B and A are unchanged.")
+    blocker="not blocked")
 
 rec(14, "Initial adapters", "verified",
     commit=f"{CODEX_COMMIT} (Codex exec live), 7036cd6 (Codex app-server live), fdf1340 (Claude Code live), b5693b8 (OpenCode)",
@@ -527,14 +537,20 @@ rec(49, "Restore the open session", "verified", commit="8103a2e", date="2026-09-
     live="Fixture runs (generic harness). Restoring is harness-independent: it uses the daemon's run/workspace records and VS Code webview state.",
     limits="Native file editors are restored by VS Code itself. Run panels show the unavailable page if the daemon is unreachable for 20 s at startup (reopen from the Agents view).")
 
-rec(50, "Open a pull request from a run", "partial", commit="b82deac", date="2026-09-25",
-    proven="Open PR (run panel and Agents menu) explains a missing remote, a non-GitHub remote, an active run and a current-checkout task; signed out of GitHub in VS Code it explains and offers VS Code's own GitHub sign-in (no personal access token); signed in (mock GitHub API) it commits the worktree, pushes the branch with an in-memory header, creates the PR with a generated description, reuses an existing PR, records the URL, never merges, and stores no token",
-    deferred="one live pull request on a repository the owner chooses, with the owner approving VS Code's GitHub sign-in",
+rec(50, "Open a pull request from a run", "verified", commit="0cdd312", date="2026-09-25 (owner-confirmed live on the owner's Mac)",
+    harness="codex (ChatGPT A, `p-f262c1bc4958`, gpt-5.6-luna) for the live run; the owner's VS Code GitHub sign-in (account `beelol`) for the push and the pull request",
     steps="""1. `cargo test` — `ac50_pr_plan_explains_refusals_and_prepares_a_github_branch_without_merging` (refusals, owner/repo parsing through an `insteadOf` stand-in, commit without merging, `pull_request` event, bad URLs refused) and the `pr::tests` unit test (github.com remote parsing: https, ssh, scp-like; others rejected).
 2. `node test/ui/scenario-pr.js` (packaged UI; `fixtures/mock-github/server.js` as the API; a local bare repository stands in for `https://github.com/test-owner/pr-demo.git` via `url.<bare>.insteadOf`). A generic run edits a.txt and adds NOTES.md. Then **Open PR…** four times: with no remote; with a GitLab remote; with the GitHub remote while the API is real GitHub and VS Code has no GitHub session; and after pointing `overseer.github.apiUrl` at the mock (test token honored only for a loopback API). Finally open it again.
-3. `node test/unit/webview-scripts.js`; reran `scenario-main.js`.""",
+3. `node test/unit/webview-scripts.js`; reran `scenario-main.js`.
+4. Live with the owner ([session](evidence/ac-50/session.md)): the owner asked for a new repository, so the agent created the private `beelol/overseer-pr-sandbox` and cloned it fresh under /tmp. One tiny Codex run added `OVERSEER.md`. The owner pressed **Open PR…** in their own VS Code, approved VS Code's GitHub sign-in and confirmed. The agent checked GitHub with read-only `gh`.""",
     expected="A PR created from a live run against a repository the owner chooses; missing remote and signed-out cases explained; no automatic merge.",
-    actual="""- **No remote:** "Open PR is unavailable: The repository … has no Git remote. Add a GitHub remote (git remote add origin https://github.com/OWNER/REPO.git) …".
+    actual="""- **Live, owner's Mac (2026-09-25):**
+  - **Bugs found:** the plan targeted `origin/master` in a fresh clone (fixed in 4fa7166, with a regression test). With no run selected, Open PR did nothing (it now asks which run). With VS Code's Do Not Disturb on (as on the owner's Mac), every answer was an invisible toast: the sign-in prompt, the refusals and the result. They are dialogs now (0cdd312), and the scenario runs with Do Not Disturb on.
+  - Then the owner pressed Open PR… on the run and approved VS Code's GitHub sign-in. The extension log showed "no GitHub session with repo access" first, then the PR URL. Owner: "worked! amazing".
+  - [beelol/overseer-pr-sandbox#1](https://github.com/beelol/overseer-pr-sandbox/pull/1): open, not merged; head `overseer/add-overseer-pr-check-note` = the worktree HEAD; base `master` (unchanged); title "Add Overseer PR check note". It has one file (`OVERSEER.md`) and the generated description (run, task, commits, files, "never merges automatically").
+  - The run recorded a `pull_request` event. Token-like strings in Overseer's database, the daemon log and the extension log: 0. `extraheader` in git config: 0.
+- **Scenario (mock API):** the messages are now dialogs; the texts below are from the toast version and read the same.
+- **No remote:** "Open PR is unavailable: The repository … has no Git remote. Add a GitHub remote (git remote add origin https://github.com/OWNER/REPO.git) …".
 - **Non-GitHub remote:** "The remote origin (https://gitlab.example.invalid/…) is not on GitHub; Open PR only supports github.com remotes."
 - **Signed out:** "Open PR uses the GitHub sign-in VS Code already has, and VS Code is not signed in to GitHub. No personal access token is needed." with **Sign in to GitHub**. Nothing was pushed or sent.
 - **Signed in (mock API):** the confirmation read "test-owner/pr-demo: overseer/pr-demo-change → main / Commits 2 uncommitted worktree file(s) … first / Pushes … Nothing is merged." Confirming did the following:
@@ -545,10 +561,10 @@ rec(50, "Open a pull request from a run", "partial", commit="b82deac", date="202
 - **Opened again:** the existing PR #42 was found (422 "already exists" → looked up) instead of failing.
 - **No merge, no stored token:** main never moved; the token is absent from Overseer's database, the daemon log, the mock's log, the worktree's git files and the repository's git config.
 - **Found on the way:** a quote in the new button's tooltip broke the run panel's whole inline script, which rendered as an empty "Run". `test/unit/webview-scripts.js` now parses every shipped webview script, including generated inline ones.""",
-    evidence="[pr scenario](evidence/ui/pr/) (signed-out message, confirmation, PR opened; result.json); `cargo test` ac50 and pr::tests",
-    live="Mock GitHub API and a local stand-in remote; the live PR is the owner's step.",
+    evidence="[owner session](evidence/ac-50/session.md), [GitHub checks](evidence/ac-50/github-checks.txt); [pr scenario](evidence/ui/pr/) (signed-out message, confirmation, PR opened; result.json); `cargo test` ac50 and pr::tests",
+    live="Live: a real pull request on github.com from a live Codex run, with the owner's VS Code GitHub sign-in (no token pasted anywhere). Refusal cases and the reuse of an existing PR are covered with the mock API and a local stand-in remote.",
     limits="github.com remotes only (GitHub Enterprise via the `overseer.github.apiUrl` setting is untested). The first push of a branch that needs extra GitHub permissions (for example a fork) reports GitHub's refusal instead of guessing.",
-    blocker="Owner action: choose a GitHub repository you can push to, run a tiny task on a clone of it, press Open PR…, and approve VS Code's GitHub sign-in when asked; confirm the pull request appears on GitHub and nothing was merged.")
+    blocker="not blocked")
 
 rec(51, "Worktree file hierarchy", "verified", commit="0496e0b", date="2026-09-25",
     steps="""1. `cargo test` — `ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside` (directories first, `.git` hidden, A/M/D marks and per-folder counts against the task-start snapshot, `..`/absolute/`.git` paths refused, a 6,000-entry folder listed in under 2 s and capped at 5,000 with `truncated`).
@@ -600,6 +616,184 @@ rec(53, "Fixed Claude accounts", "partial", date="2026-09-25",
     evidence="[signin scenario](evidence/ui/signin/), [accounts scenario](evidence/ui/accounts/)", live="—",
     blocker="Needs a second Claude account (the owner has one today); not to be tested yet (owner, 2026-09-25). Next: check whether Claude keeps a separate Keychain entry per CLAUDE_CONFIG_DIR, otherwise add Overseer-managed Claude credentials (docs/rfcs/claude-credentials.md); then Add Account → Anthropic → Sign In with it, Sign Out and Sign In again while a Claude run on the desktop login keeps working; confirm both identities and the macOS Keychain entries stay separate.")
 
+# Gate J (added by the owner on 2026-09-26; docs/rfcs/orchestrator-ui.md).
+FIX = "Fixture harnesses only (Claude fixture, synthetic account CLI, generic programs); no paid tokens"
+rec(54, "Clean, calm presentation with less text", "verified", commit="8bcac2f", date="2026-09-26",
+    harness=FIX,
+    steps="""1. `AUDIT_UI=baseline node test/ui/scenario-audit.js` with a VSIX built from ce56432 (the UI before Gate J), then `AUDIT_UI=new node test/ui/scenario-audit.js` with the Gate J VSIX, on the same fixture state (runs in two repositories, a nested Claude run, a permission request, a failure, a streaming run).
+2. Each view (agents, chat, files, review, new agent, accounts; plus dashboard and grid for the new UI) at 1280 and 900 px, in Overseer Dark, Overseer Light and Default Dark Modern (baseline: Dark and Light Modern). The audit (`test/ui/audit.js`) counts visible text outside the Monaco diff, fails on horizontal overflow, on text runs over 80 characters outside code, and on icon-only controls without an accessible name or tooltip.
+3. The odd-looking items in the baseline were listed and fixed ([docs/design/audit.md](../design/audit.md)); the other Gate J scenarios show no function was lost (chat, composer, dashboard, grid, keyboard, history, usage, accounts, review).""",
+    expected="No overflow, no long runs outside code, every icon-only control named; at least 40% less visible text per view than the baseline with no function lost; before/after screenshots; the odd-looking items listed and fixed.",
+    actual="""- **Visible text (characters, same fixture state):** agents 531 → 238 (−55%), chat 2,795 → 1,063 (−62%), files 127 → 59 (−54%), review 350 → 175 (−50%), new agent 1,037 → 133 (−87%), accounts 381 → 189 (−50%). The counts are the same at both widths and in every theme.
+- **Checks:** no overflow, no long runs and no unnamed icon controls in any view, width or theme (the new dashboard and grid included). The baseline new-task form had 68 overflowing elements at 900 px.
+- **Odd-looking items:** 15 found and fixed (full paths, run metadata sentences, five-button rows, raw Markdown, JSON tool calls, duplicate task/run rows, competing pills, the card-page New Task form, long account labels, a separate follow-up button, status-bar text, truncated headers, mixed disclosure glyphs, a crowded review header); see [audit.md](../design/audit.md).""",
+    evidence="[baseline audit](evidence/ui/audit-baseline/) (12 screenshots, result.json), [Gate J audit](evidence/ui/audit/) (24 screenshots, result.json), [audit list](../design/audit.md)",
+    live="Presentation does not depend on the harness; live runs render with the same components (AC-55 live screenshots).",
+    limits="Two items are still open for the owner's review: in the narrow review diff column the hunk Accept/Revert buttons overlap the start of the code line, and at 1280 px with the file list open the chat header shortens the title. Grid tile titles shorten to a letter or two at 3×3 in a 1280 px window.",
+    blocker="not blocked")
+
+rec(56, "Overseer themes, light and dark", "verified", commit="3f8c0f9", date="2026-09-26",
+    harness=FIX,
+    steps="""1. `node extension/design/build-themes.js` generates `themes/overseer-dark-color-theme.json`, `themes/overseer-light-color-theme.json` and `media/tokens.css` from one token set (`extension/design/tokens.js`).
+2. `node test/unit/theme-contrast.js`: every text foreground/background pair both themes define (workbench, editor, diff, terminal, notifications, lists, inputs, buttons, badges, syntax, ANSI) against WCAG AA.
+3. `node test/ui/scenario-look.js`: the dashboard with a chat and a diff, a terminal printing ANSI colors, the grid and the composer menu in Overseer Dark, Overseer Light and High Contrast; switch themes with Overseer views open.
+4. `node test/ui/scenario-theme.js`: the lint for hard-coded colors in webview sources and the accessible-name audit in stock themes.""",
+    expected="WCAG AA for every text pair in both themes; screenshots of the dashboard, a diff and a terminal in both themes; open Overseer views restyle live when the theme changes.",
+    actual="""- **Contrast:** 160 text pairs checked, 0 below AA (normal text 4.5:1, large and UI text 3:1).
+- **Screenshots:** dashboard + diff, terminal and grid in Overseer Dark, Overseer Light and High Contrast.
+- **Live switch:** the open dashboard's background changed from rgb(23, 22, 29) to rgb(251, 250, 253) when the theme changed, with no reload.
+- **Stock themes:** Overseer views use only VS Code theme variables (the lint found no hard-coded colors), so they follow Dark/Light Modern and both High Contrast themes (theme scenario).""",
+    evidence="[look scenario](evidence/ui/look/) (10 screenshots, result.json), [theme scenario](evidence/ui/theme/), `test/unit/theme-contrast.js` output",
+    live="Themes do not depend on the harness.",
+    limits="The themes are optional; Overseer never switches the user's theme.",
+    blocker="not blocked")
+
+rec(57, "Overseer dashboard", "verified", commit="3f8c0f9", date="2026-09-26",
+    harness=FIX,
+    steps="""`node test/ui/scenario-dashboard.js`: a window with no folder, the Explorer side bar, a terminal panel and two editor groups; **Overseer: Open Dashboard**; reload the window; **Overseer: Exit Dashboard**; compare the layout and user settings before and after; then set `overseer.dashboard.openOnStartup` and reload.""",
+    expected="Entering and exiting restores the prior layout; the dashboard survives a reload; it works in a window without a folder; no setting changes unless the user opts in.",
+    actual="""- **Enter:** side bar, panel and secondary side bar hidden; the dashboard fills the editor area and lists agents from a repository that is not open in the window.
+- **Reload:** after Developer: Reload Window the dashboard is back and still in dashboard mode (parts still hidden).
+- **Exit:** side bar, panel, secondary side bar and both editor groups restored (421×468 before, 421×469 after).
+- **Settings:** the user settings file is identical before and after (apart from VS Code's own migration of `extensions.autoUpdate`). Dashboard mode detects which parts were open by measuring its own webview, so it writes no settings.
+- **Open on startup:** with `overseer.dashboard.openOnStartup` the dashboard opens when the window starts.""",
+    evidence="[dashboard scenario](evidence/ui/dashboard/) (before, dashboard, after exit, open on startup; result.json)",
+    live="Layout does not depend on the harness.",
+    limits="VS Code gives extensions no way to hide the minimap or breadcrumbs without changing settings, so dashboard mode leaves them as they are.",
+    blocker="not blocked")
+
+rec(58, "Agent grid", "verified", commit="8bcac2f (grid); 86425bc (Gate K branch, pull request #7) (latency measurement and rerun)", date="2026-09-26",
+    harness=FIX,
+    steps="""`node test/ui/scenario-grid.js` with `overseer.grid.maxTiles` 9: a pinned finished run, a Claude fixture waiting for permission, and seven generic runs printing a millisecond timestamp every 200 ms. A MutationObserver in the webview measures, for each tile line that appears after measuring starts, now − printed time; a 25 ms timer measures event-loop lag; a message listener splits the time by stage (printed → daemon event time → message reaches the webview). Then Allow from the tile, maximum 4, arrow keys and Enter. Rerun against the Gate K build.""",
+    expected="Each tile updates within 250 ms of its event with event-loop lag p95 under 50 ms; permission answered from a tile; pinned finished run stays; screenshots at 4 and 9 tiles in both themes.",
+    actual="""- **Layout:** 9 tiles as 3×3; with a maximum of 4, 2×2.
+- **Timing:** 314 lines; tile latency p95 98 ms, max 105 ms; event-loop lag p95 2 ms.
+- **The 853 ms recorded on 2026-09-26 was the measurement, not the grid:** the observer's first callback counted every line already on the tiles (printed seconds earlier) as if it had just appeared. The measurement now starts from the lines on screen; by stage, lines reach the daemon in 32 ms median (60 ms p95) and the webview 38 ms median (44 ms p95) after that, and appear in the tile in the same task.
+- **Permission:** Allow on the Claude tile → the agent continued and wrote perm.txt.
+- **Pinned:** the finished, pinned run stayed with its pin pressed.
+- **Keyboard:** Right moved to the next tile; Enter opened that agent in the chat.""",
+    evidence="[grid scenario](evidence/ui/grid/) (9 and 4 tiles, dark and light; scenario.log with the timing by stage)",
+    live="Fixture streams; the grid uses the same feed as live runs.",
+    limits="Tile titles shorten to a letter or two at 3×3 in a 1280 px window.")
+
+rec(59, "Start a new agent from the chat", "verified", commit="3f8c0f9 (composer); 86425bc (Gate K branch, pull request #7) (fixes and rerun)", date="2026-09-26",
+    harness="Synthetic account CLI standing in for codex and claude; generic /bin/echo",
+    steps="""`node test/ui/scenario-composer.js` against the Gate K build: with no agent selected the editor area is the composer; for Claude, Codex and a generic program, pick the agent from the agent chip's menu with the keyboard, type the task and press Enter; pick a signed-out account; open the agent menu for OpenCode (not installed); reload and check the remembered defaults; the Full form link; an untrusted workspace.""",
+    expected="Codex, Claude and generic runs started keyboard-only from the composer; defaults remembered across reloads; each problem case shown inline; the full New Task form reachable.",
+    actual="""- **Claude, Codex and a program:** each started from the composer with the keyboard and became the selected agent, streaming in place.
+- **Remembered:** after a reload the composer offers the last agent and repository started (Program, composer-repo).
+- **Problems inline:** "ChatGPT Signed Out is not signed in. Sign in" with Start disabled; OpenCode headed "not installed"; an untrusted workspace says "Trust this workspace to start agents" with Trust.
+- **Fixed:** choices now become the defaults only when an agent starts with them (picking a signed-out account without starting no longer sticks); the generic pick works by keyboard.""",
+    evidence="[composer scenario](evidence/ui/composer/)",
+    live="Fixture accounts; live starts through the same path are in the AC-60 live session.",
+    limits="—")
+
+rec(61, "Needs-you inbox and keyboard control", "verified", commit="3f8c0f9", date="2026-09-26",
+    harness="Claude fixture (two permission requests), generic runs (a failure, a finished edit, a long loop)",
+    steps="""`node test/ui/scenario-keyboard.js`: four runs need the user; then, with the keyboard only, ⌥⌘J (next that needs you), ⌥⌘Y (allow), ⌥⌘J, ⌥⌘⌫ (deny), ⌥⌘J until Needs you is empty, ⌥⌘A (switch agent, searchable), ⌥⌘. (stop), ⌥⌘N (new agent) and Enter, a follow-up with Enter; then an accessible-name audit of every visible control.""",
+    expected="A scripted keyboard-only session over three or more concurrent runs answers permissions, reviews changes and sends follow-ups without a click; all controls have screen-reader labels.",
+    actual="""- **Needs you:** 2 × Approve, 1 × Failed, 1 × Review, badge 4; the status bar reads "Overseer 3 active" with a bell and 4.
+- **Keyboard:** ⌥⌘J selected the first permission request; ⌥⌘Y allowed it (completed); ⌥⌘J moved to the second; ⌥⌘⌫ denied it (`permission_answered` allow=false). ⌥⌘J then visited the failure, the allowed run (now a Review, since it wrote a file) and the finished edit; Needs you emptied.
+- **Switch and stop:** ⌥⌘A → "Long loop" → ⌥⌘. interrupted it.
+- **New agent and follow-up:** ⌥⌘N focused the composer; typing and Enter started an agent that became selected; Enter in the chat sent a follow-up (2 turns).
+- **Labels:** 57 controls checked, none without a name.
+- **Fixed on the way:** ⌥⌘J now goes to the most urgent item that is not already open (it used to cycle past items).""",
+    evidence="[keyboard scenario](evidence/ui/keyboard/)",
+    live="Fixture runs; permissions from live Claude and Codex app-server use the same path (AC-43).",
+    limits="The follow-up step focuses the chat's prompt field from the test before typing (keyboard focus lands there after switching in normal use).",
+    blocker="not blocked")
+
+rec(63, "History that stays tidy", "verified", commit="3f8c0f9", date="2026-09-26",
+    harness="300 generic runs in worktrees, each printing a unique word",
+    steps="""1. `cargo test` — `ac63_search_finds_tasks_by_title_output_and_status_and_archive_hides_without_deleting` (output text, status, LIKE wildcards taken literally, archived tasks stay searchable, archive never deletes, restore).
+2. `node test/ui/scenario-history.js`: create 300 finished runs; search by title and by a word only in one run's output; archive a finished run from the rail with Delete and restore it under Show archived; archive three runs (one with uncommitted work) and run **Clean Up Archived Worktrees…** twice; set `overseer.history.autoArchiveDays` and reload.""",
+    expected="With 300 runs, search answers in under 200 ms; archive, restore and bulk cleanup never discard unmerged work without confirmation.",
+    actual="""- **Search:** by title in 2 ms, by output text in 69 ms (300 runs).
+- **Archive:** hidden from the rail, listed under Show archived, restored with Delete.
+- **Bulk cleanup:** the dialog lists 2 clean worktrees and 1 with uncommitted work; "Remove 2 Clean" removed only the clean ones; the file in the third stayed; branches kept. "Remove All, Discarding Uncommitted Work" asked again ("Discard and Remove") before removing it; its branch stayed.
+- **Automatic archive:** after the chosen age all 300 finished runs were archived after a reload and the rail showed only active and recent runs.
+- **Fixed on the way:** UI tests now use VS Code's in-window dialogs (`window.dialogStyle: custom`); the native macOS dialog is invisible to them.""",
+    evidence="[history scenario](evidence/ui/history/), `cargo test` ac63 tests",
+    live="Fixture runs.",
+    limits="Search also matches prompts, file activity, repository paths and account names (the daemon's search query covers them); only title, output text and status are asserted in tests.",
+    blocker="not blocked")
+
+rec(65, "Provider logos", "verified", commit="3f8c0f9", date="2026-09-26",
+    harness=FIX,
+    steps="""1. `node extension/design/build-logos.js` builds monochrome `currentColor` SVGs from Simple Icons (CC0: Claude, Claude Code, Anthropic, OpenCode, GitHub) and LobeHub Icons (MIT: OpenAI, Codex).
+2. `node test/ui/scenario-look.js`: check the installed VSIX for NOTICE.md and each license; collect the logo on agent rows, the chat header, the composer chip and agent menu, grid tiles and the Accounts view; screenshots in Overseer Dark, Overseer Light and High Contrast.""",
+    expected="The license and source of every bundled logo in a notices file shipped in the VSIX; screenshots of each place a logo appears in both Overseer themes and high contrast.",
+    actual="""- **Notices:** the VSIX ships `NOTICE.md` (source, version and license per logo), `media/vendor/licenses/simple-icons-LICENSE.md` and `lobehub-icons-LICENSE.txt`.
+- **Places:** agent rows (codex, claudecode), chat header (claudecode), composer chip (codex) and menu (codex, claudecode, opencode), Accounts view (openai, claude, opencode, light and dark variants), grid tiles (the Claude tile shows the Claude Code mark; generic tiles keep the terminal codicon).
+- **Themes:** logos are monochrome and follow the text color, so they read in Overseer Dark, Light and High Contrast (screenshots). Every other icon is a codicon.""",
+    evidence="[look scenario](evidence/ui/look/), [grid scenario](evidence/ui/grid/), `extension/NOTICE.md`",
+    live="Logos do not depend on the harness.",
+    limits="No suitably licensed Devin logo was needed (Devin is unavailable). Brand guidelines: marks are used only to identify the provider, unmodified apart from color.",
+    blocker="not blocked")
+
+rec(55, "A chat that feels great", "verified", commit="8bcac2f", date="2026-09-26",
+    harness="Claude fixture (showcase: Markdown, table, code, six tool calls, an edit) and generic streams; LIVE Claude Code (existing login, haiku) and Codex (gpt-5.6-luna, ChatGPT A) on the owner's daemon",
+    steps="""1. `node test/ui/scenario-chat.js` (packaged UI): the showcase conversation at 1600 and 900 px in Overseer Dark and Light; layout of bubbles and the column; Markdown; tool rows; Jump to latest; a 2,000-line stream (positions of the first 50 messages sampled while it streams); a 2,000-event conversation scrolled for frame times; 20 appended events timed.
+2. `node test/ui/scenario-live-gatej.js` (LIVE, owner's daemon, tiny prompts): Claude and Codex runs with an image, a mentioned file, a stopped turn and a resumed turn; each chat captured in Overseer Dark and Light at 1600 and 900 px.""",
+    expected="Live Claude Code and Codex runs and fixture runs rendered in light and dark at 900 and 1600 px; Markdown with code, tables and long lines correct; no layout shift while streaming; a 2,000-event conversation scrolls with p95 frame time under 16 ms and appends a new event in under 100 ms.",
+    actual="""- **Layout:** the user's message is a bubble on the right; agent replies are plain text in a centered column (720 px wide, or the available width when narrower).
+- **Markdown:** heading, list, table (3 rows), highlighted `ts` code with its language and Copy, a link with its URL, and a long path shortened with the full path in the tooltip.
+- **Tools:** six consecutive tool calls fold into "6 steps · Read · Searched · …"; expanded they read "Read README.md", "Ran npm test -- --grep …", "Created session-refresh-coordinator.ts +8 −0"; no raw JSON. Edits are chips; the turn ends with a quiet footer (status, time, tokens, cost).
+- **Scrolling:** scrolled up, Jump to latest appears and returns to the newest message.
+- **Streaming:** 0 of the first 50 messages moved while 2,000 lines streamed.
+- **Performance:** 2,000-event conversation: frame p95 9.6 ms (median 8.3, max 10); appending takes 2.7 ms per event.
+- **Live:** Claude's reply "…the image is red, and the first line of README.md is "# fixture"." and Codex's "Red; # fixture" render with their steps, stop and resume turns, in both themes at both widths (screenshots).""",
+    evidence="[chat scenario](evidence/ui/chat/) (4 screenshots, result.json), [live session](evidence/ui/live-gatej/) (8 live chat screenshots)",
+    live="Live Claude Code (haiku) and Codex (gpt-5.6-luna) runs on the owner's daemon, 2026-09-26.",
+    limits="A stopped Claude turn shows an empty Error card and \"Failed\" in its footer beside \"Stopped\" (the daemon now records the turn as interrupted); one \"Unparsed output\" row appears after a Claude reply. Both are for the owner's review.",
+    blocker="not blocked")
+
+rec(60, "Native-CLI parity for everyday use", "verified", commit="8bcac2f (live); 86425bc (Gate K branch, pull request #7) (composer focus fix, packaged-UI rerun)", date="2026-09-26",
+    harness="LIVE Claude Code 2.1.x (existing login, haiku) and Codex (gpt-5.6-luna) on ChatGPT A, owner's daemon; Claude fixture (echo, slow) for the packaged-UI scenario",
+    steps="""1. `cargo test` — `ac60_turn_options_reach_claude_and_unsupported_ones_are_refused`, `ac60_repo_files_lists_mentionable_files_best_first`, `ac60_an_interrupted_claude_turn_is_interrupted_not_failed`, and the adapter tests for argv per harness.
+2. `node test/ui/scenario-live-gatej.js` (LIVE, 2026-09-26, owner's daemon after checking no runs were active and no window connected): per harness, a first turn; a follow-up with a 32×32 red PNG, "…first line of README.md?" naming the file, effort low and Plan only / Read only; a 60-item list interrupted after 3 s, then "Stop. Reply with exactly: stopped ok"; then `daemon.shutdown`, restart, and "Reply with exactly: resumed ok".
+3. `node test/ui/scenario-parity.js` (packaged UI, Claude echo fixture) against the Gate K build: paste an image, @-mention a file from the popup, choose model/effort/permission in the options menu, queue a message while the agent works, ⌥Enter to stop and send.""",
+    expected="Tiny live Claude Code and Codex runs exercise each capability; support per harness recorded in docs/compatibility.md; a pasted image and an @-mentioned file demonstrably reach the agent (its reply refers to their content).",
+    actual="""- **Options per turn (live):** Claude argv `--model haiku --resume <session> --effort low --permission-mode plan`; Codex argv `exec resume <thread> … -c sandbox_mode="read-only" -m gpt-5.6-luna -c model_reasoning_effort="low" -i <attachment>`.
+- **Image and file (live):** Claude: "the image is red, and the first line of README.md is "# fixture""; Codex: "Red; # fixture".
+- **Stop and send, resume (live):** turn 3 interrupted, turn 4 answered "stopped ok"; after a daemon restart both runs continued their session and replied "resumed ok".
+- **Packaged UI (now passing):** the pasted image reaches the agent as an image block; the @-popup inserts README.md and the message names it; per-turn model, effort and permission reach the harness argv (`--model opus … --effort high --permission-mode plan`); a message sent while the agent works is shown as queued and sent when the turn ends; ⌥Enter stops the turn and sends at once.
+- **Fixed:** after the options menu closes, focus returns to the prompt, so Enter sends.""",
+    evidence="[live session](evidence/ui/live-gatej/) (result.json with argv and replies), [pass 1](evidence/gate-j/live-pass1/), [parity scenario](evidence/ui/parity/), [compatibility](../compatibility.md#everyday-parity-ac-60), `cargo test` ac60 tests",
+    live="Live on the owner's daemon, 2026-09-26 (five tiny turns per harness per pass, one attempt per step). The packaged-UI part uses the Claude fixture; it drives the same daemon calls the live turns used.",
+    limits="Queueing a message while the agent works is done by the extension (it sends when the turn ends).")
+
+rec(62, "Usage and limits", "verified", commit="8bcac2f (usage); 86425bc (Gate K branch, pull request #7) (Codex cross-check)", date="2026-09-26",
+    harness="LIVE Claude Code (existing login, haiku) and Codex (ChatGPT A and B, gpt-5.6-luna) on the owner's daemon; one more tiny Codex app-server turn on ChatGPT A for the Codex cross-check; Claude fixture limits modes and a synthetic Codex session log for the packaged-UI scenario",
+    steps="""1. `cargo test` — `ac62_account_usage_is_what_the_harness_reports` and the `usage.rs` unit tests `codex_session_log_limits_are_read_from_the_newest_token_count`, `claude_rate_limit_info_is_normalized`.
+2. `node test/ui/scenario-usage.js` (packaged UI, Gate K build): a Claude account at 95% of 5 hours and another at 12%, a Codex account at 20%; the Accounts view hover, the chat footer, the composer's warning.
+3. `node test/ui/scenario-live-gatej.js` (LIVE): `account.usage` for claude (existing login), ChatGPT A, ChatGPT B and OpenCode; Claude's last `rate_limit_event` from the run's raw output compared window by window.
+4. `node test/ui/live-codex-usage.js` (LIVE, owner's daemon through its API only; it refuses to run while any run is active; the daemon was not running, so this build's daemon was started for the check and stopped after): one Codex app-server turn on ChatGPT A ("Reply with exactly: ok"); Codex's own `account/rateLimits/updated` notification read from the run's raw output and compared with `account.usage` (which reads the account's session log) window by window.""",
+    expected="Live Codex and Claude runs show the usage their harness reports (or \"not reported\"), matching the harness's own output; the near-limit warning with fixtures.",
+    actual="""- **Claude (live):** `account.usage` → 5 hours 0.17 (resets 1790429400000), week 0.48 (resets 1790568000000); the raw event has five_hour utilization 0.17 / resetsAt 1790429400 and seven_day 0.48 / 1790568000. Match.
+- **Codex (live):** ChatGPT A (team): Codex's own `account/rateLimits/updated` has primary 0% (300 min, resetsAt 1790474011) and secondary 0% (10,080 min, resetsAt 1791022451); `account.usage` (Codex session log) has 5 hours 0 (resets 1790474011000) and week 0 (resets 1791022451000), plan team. Match, window by window.
+- **ChatGPT B (live, Gate J):** plan plus, 5 hours 0%, week 16% (session log).
+- **OpenCode:** not reported.
+- **Fixtures:** the Accounts view hover shows "5 hours 95%, resets …; week 40%, resets …"; the chat footer shows tokens and cost; starting on the 95% account warns and suggests another account without blocking.""",
+    evidence="[live session](evidence/ui/live-gatej/), [Codex cross-check](evidence/ui/codex-usage-live/) (rate-limit notifications and account usage only), [usage scenario](evidence/ui/usage/), `cargo test` ac62 and usage tests",
+    live="Live Claude and Codex (both ChatGPT accounts) on the owner's daemon, 2026-09-26; the Codex cross-check is one more tiny turn on ChatGPT A.",
+    limits="Codex limits appear after a Codex run writes its session log; before that the account says not reported. In the cross-check both windows were at 0% used, so the match rests on the exact reset times and the plan as well as the share.")
+
+rec(64, "Default-to-Overseer session (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate J) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md).",
+    actual="Not started.", live="—", blocker="Owner action after the design review (AC-66): work for an hour using only Overseer for Claude Code and Codex; log friction.")
+rec(66, "Design review against references (owner-confirmed)", "partial", commit="5b41948", date="2026-09-26",
+    proven="the references are studied and what Overseer adopts is written down (docs/design/references.md, the RFC's \"What Overseer adopts\"); the review page shows every view before and after in both Overseer themes and a stock theme, plus the new views (chat, live chats, grid, dashboard mode, composer, Needs you, history, usage, themes and logos), with a Looks right / Needs work mark and a note per view saved for the owner",
+    deferred="the owner's marks, the changes they ask for, and the owner's dated confirmation that the UI looks clean and polished",
+    harness="—",
+    steps="""1. Study the RFC's references (web, read-only) and record what Overseer adopts ([references](../design/references.md), [RFC](../rfcs/orchestrator-ui.md#what-overseer-adopts-research-2026-09-26)).
+2. Publish the review page (a private claude.ai artifact, https://claude.ai/artifact/BX8zPJfgpAvtFvH5FEdXss) from the audit, scenario and live-session screenshots. Marks are stored in the page's own database (`marks/<view>`).""",
+    expected="The reference notes, the review page(s), the owner's marked items with their outcomes, and the owner's dated confirmation.",
+    actual="Reference notes and the review page exist. No marks yet (the owner reviews in the morning of 2026-09-26).",
+    evidence="[references](../design/references.md), [audit list](../design/audit.md), review page (private artifact linked above)",
+    live="—",
+    blocker="Waiting for the owner's marks. Next: read the marks from the page, change each marked item, republish the page and ask for confirmation.")
+
 HEAD = """# AC-{n:02d} — {title}
 Status: {status}{partial}
 Tested implementation commit: {commit}
@@ -644,11 +838,548 @@ def main():
     sync(out)
 
 
+
+# Gate K (added by the owner on 2026-09-26; docs/rfcs/orchestrator-ui.md#gate-k-layout). Built on the
+# claude/gate-k-sidebar branch (its own pull request); evidence from the packaged VSIX of that branch.
+GK = "86425bc (branch claude/gate-k-sidebar, pull request #7)"
+GKFIX = "Fixture harnesses only (Claude fixture, synthetic account CLI, mock OpenCode, generic programs); no paid tokens"
+rec(67, "One agents list: the native side bar", "verified", commit=GK, date="2026-09-26",
+    harness=GKFIX,
+    steps="""`node test/ui/scenario-sidebar.js` over the Gate J audit fixture set (a finished Claude run with changes, one waiting for permission, a nested one with a child and grandchild, a long generic run, a failed one) in two repositories: read the Agents view rows (label, level, description, badge, icon), open the editor-area Overseer view, measure the Agents view's visible text, archive an agent and open Show Archived Agents.""",
+    expected="The side bar shows Needs you first, then agents by repository with native children nested and archived agents behind a filter; the editor-area view has no rail; the side bar's visible text stays within 238 characters for the same fixtures.",
+    actual="""- **Order and nesting:** Needs you is row 1 (Add a changelog entry, Migration dry-run), then web-app and api-server; child task at level 3, grandchild task at level 4.
+- **Archive filter:** an archived agent leaves the list and is listed under Show Archived Agents.
+- **No rail:** the editor-area Overseer view has no agent list of its own (chat, composer or grid only).
+- **Text budget:** 226 characters (Gate J budget 238); the Gate K audit measures 225 for the Agents pane.""",
+    evidence="[sidebar scenario](evidence/ui/sidebar/) (Overseer Dark, Light, High Contrast, hover actions), [Gate K audit](evidence/ui/audit-gatek/)",
+    live="Presentation only; live agents appear in the same list.", limits="Accounts stay a second view in the same side bar.")
+rec(68, "Provider logos in the side bar", "verified", commit=GK, date="2026-09-26",
+    harness=GKFIX,
+    steps="""`node test/ui/scenario-sidebar.js`: read each row's tree icon (background image or codicon) in Overseer Dark, Overseer Light and Default High Contrast; list the installed VSIX for every logo variant and the notices.""",
+    expected="Agent rows, accounts and Needs-you rows show the Claude, Codex, OpenCode and program marks as tree icons with light, dark and high-contrast variants; screenshots in the three themes; the VSIX contains each variant and the notices.",
+    actual="""- **Rows:** agent rows and their Needs-you rows carry the Claude Code mark; program runs the terminal codicon; accounts the OpenAI/Claude/OpenCode marks (or a signed-out codicon).
+- **Themes:** Overseer Dark and High Contrast use the dark variant, Overseer Light the light one.
+- **VSIX:** light and dark SVGs for claudecode, codex and opencode plus NOTICE.md.
+- **Found on the way:** Needs-you rows first showed a reason icon; they now show the provider mark with the reason as text and the status badge.""",
+    evidence="[sidebar scenario](evidence/ui/sidebar/)", live="—", limits="High Contrast uses the dark variant (no separate high-contrast artwork).")
+rec(69, "Search and filter in the side bar", "verified", commit=GK, date="2026-09-26",
+    harness=GKFIX,
+    steps="""`node test/ui/scenario-sidebar-search.js`: 300 finished runs (each printing a unique line, with a unique prompt word) plus a Claude showcase run and a failed run in a second repository; select one agent; then, keyboard only, **Overseer: Search Agents** → type → measure until the tree shows exactly the matches; seven queries; **Overseer: Clear Search**.""",
+    expected="With the 300-run fixture, results appear in under 200 ms, keyboard only; clearing restores the tree and selection.",
+    actual="""- **Timing (keystroke to tree):** 33 to 36 ms for every query (title 36, prompt 34, agent output 34, edited file 34, repository 35, account 34, status 33).
+- **Kinds:** title, prompt, agent output, a file the agent edited, repository, account and status each find their agent through the daemon's search.
+- **Clear:** the tree and the selected agent come back; the header shows "N matches for …" while filtered.
+- **Found on the way:** VS Code sends tree changes at most once per 200 ms; the list now updates once per search and shows the count beside the view title, which brought the time from 240 ms to about 40 ms.""",
+    evidence="[sidebar-search scenario](evidence/ui/sidebar-search/)", live="—",
+    limits="Search looks within the list shown (active agents, or archived ones under Show Archived). VS Code's own tree find (type in the focused list) also filters the visible rows; it is not timed separately.")
+rec(70, "Quiet row actions", "verified", commit=GK, date="2026-09-26",
+    harness=GKFIX,
+    steps="""`node test/ui/scenario-sidebar.js`: hover rows and read their inline actions (names and tooltips); pin by mouse; archive by keyboard (⌘⌫ in the Agents view); open the context menu (custom menus) and read its items; compare the Overseer activity badge with Needs you; read every row's screen-reader label. `node test/ui/scenario-audit.js` (Gate K) checks names and tooltips of the view's own title actions.""",
+    expected="Every action reachable by mouse, context menu and keyboard; the badge matches Needs you; accessible-name audit passes.",
+    actual="""- **Hover:** Stop on a working agent; Archive and Pin to Grid on a finished one; each named.
+- **Mouse, menu, keyboard:** pin by mouse, archive by ⌘⌫, and the context menu offers Open to the Side, Open Review, Send Follow-up, Select Comparison, Merge Back, Open Pull Request and the rest.
+- **Badge:** Overseer activity badge 3 = Needs you 3.
+- **Names:** every row has a label ("Add a changelog entry, Approve: Wants to use Write", …); the title actions show their names in VS Code's hover.""",
+    evidence="[sidebar scenario](evidence/ui/sidebar/), [Gate K audit](evidence/ui/audit-gatek/)", live="—",
+    limits="Actions that do not apply to a row are hidden rather than shown disabled.")
+rec(71, "Take an agent out", "verified", commit=GK, date="2026-09-26",
+    harness=GKFIX,
+    steps="""`node test/ui/scenario-dragout.js`: real HTML drag events (CDP drag interception) from an agent row in the side bar to the middle of the editor area; then Open to the Side from a row's context menu; then Pin to Grid from a row action and open the grid.""",
+    expected="Dragging an agent into the editor area opens its chat (or pins it); Open to the Side and Pin to Grid do the same.",
+    actual="""- **Drag:** the drag carries text/uri-list (overseer-chat:/<run>/…); dropping opens the agent's chat as an editor tab in that group (tab "Drag me", its output shown).
+- **Open to the Side:** opens that agent's chat beside.
+- **Pin to Grid:** the agent appears on the grid.""",
+    evidence="[dragout scenario](evidence/ui/dragout/)", live="—", limits="Dropping on the grid itself is not supported by VS Code's tree drag; Pin to Grid does that.")
+rec(72, "Chat in the middle when there is nothing to review", "verified", commit=GK, date="2026-09-26",
+    harness=GKFIX,
+    steps="""`node test/ui/scenario-arrangement.js`: measure editor groups and their active tabs with no agent selected, after the side bar's **+**, with a fresh agent and after starting one from the composer.""",
+    expected="A single editor group with the chat or composer and no review open.",
+    actual="""- **No agent selected** (New Agent, the command behind the side bar's **+**): one group, the composer, no review.
+- **An agent with no changes:** one group with its chat, no review.
+- **After starting an agent from the composer** (composer scenario): one group with its chat, no review.""",
+    evidence="[arrangement scenario](evidence/ui/arrangement/)", live="—")
+rec(73, "Changes bring the diff forward", "verified", commit=GK, date="2026-09-26",
+    harness=GKFIX,
+    steps="""`node test/ui/scenario-arrangement.js`: a Claude fixture agent writes a file while its chat is shown alone; the time from the file's write (its mtime) to the review being visible on the left with that file, then close the review, select another agent, reload the window; settings compared before and after.""",
+    expected="The layout switches within 500 ms with the review on the changed file; closing the review restores the single chat; no settings change; the arrangement survives a reload.",
+    actual="""- **First edit:** the review came in 488 ms after the file was written (limit 500 ms; the margin is small), on the left at 0.66 with perm.txt listed, the chat on the right at 0.34 as a normal (pinned) tab.
+- **Close the review:** the chat is back in the middle (one group); selecting another agent with changes keeps that; Open Review brings the review back.
+- **Reload:** review left, chat right. **Settings:** none changed.
+- **Found on the way:** moving the chat with reveal() made it a preview tab (the next file would replace it); it is now moved as a pinned tab, which also took the switch from about 1.2 s to under 0.5 s.""",
+    evidence="[arrangement scenario](evidence/ui/arrangement/)", live="—",
+    limits="The chat keeps at least 360 px (its column widens up to half the editor area on small windows).")
+rec(74, "Follow or manual review", "verified", commit=GK, date="2026-09-26",
+    harness="Mock OpenCode (sequence of edits across a.txt, b.txt, c.txt) and a generic agent; no paid tokens",
+    steps="""`node test/ui/scenario-follow.js`: the review comes in following; sample the follow state while edits land in three files; click the Follow icon (manual); sample for six seconds while the agent keeps editing; switch to another agent and back.""",
+    expected="Follow mode moves with each edit across three files; manual mode keeps the file and scroll position unchanged (measured).",
+    actual="""- **Following:** the review moved with the edits through a.txt:240, b.txt:150 and c.txt:200.
+- **Manual (one icon):** for six seconds while the agent made 3 more edits, the view stayed on b.txt at the same offset in every sample.
+- **Per agent:** the other agent is off; coming back, this one is still manual; one click follows again.""",
+    evidence="[follow scenario](evidence/ui/follow/)", live="Codex app-server follow was verified live in Gate I (codex-follow-live).",
+    limits="Manual mode keeps what you see: when an edit adds lines above, the review's scrollTop grows so the same file and line stay in place (measured as the file at the top and its offset). After a reload follow comes back paused (AC-49).")
+rec(75, "One place for changes", "verified", commit=GK, date="2026-09-26",
+    harness=GKFIX + "; mock OpenCode for the AC-22/AC-27 review scenario",
+    steps="""1. `node test/ui/scenario-scopes.js`: a checkout with a staged modify, a staged rename, an unstaged modify, an unstaged deletion, an untracked file, a merge conflict and an unsaved editor; read the review's file list under All, Staged, Unstaged and Untracked; check the Workspace Dirty view is gone.
+2. `node test/ui/scenario-review.js` (the AC-22/AC-27 scenario) against the review: two repositories, live refresh timing (staging measured in the Staged scope), conflict and unsaved markers, reload recovery.
+3. `node test/ui/scenario-main.js` and `node test/ui/scenario-hunks.js` for the rest of the review's behaviour.""",
+    expected="Each file under the right scope; the AC-22 and AC-27 scenarios pass against the review.",
+    actual="""- **Workspace Dirty is gone:** the side bar has Agents and Accounts only.
+- **Staged:** c.txt (M), README.md, b-renamed.txt (A) and b.txt (D), read-only (no Save).
+- **Unstaged:** a.txt (M), gone.txt (D). **Untracked:** notes.txt only. **All changes:** conflict.txt marked conflicted, README.md marked unsaved.
+- **Remembered:** the scope is kept per agent.
+- **AC-22/AC-27 against the review:** 27 checks pass. Two repositories with identical names; attribution; refresh times (write 0.5–0.9 s, staging in the Staged scope, rename, delete, branch change, all under 2 s; a missed watcher event reconciled under 5 s); symlinks, bad encodings and large files; conflict and unsaved markers; draft recovery after reload.
+- **Found on the way:** a Git state change did not refresh status, so staging waited for the 2.5 s poll; a file opened from one agent's chat covered the next agent's review. Both fixed.""",
+    evidence="[scopes scenario](evidence/ui/scopes/), [review scenario](evidence/ui/review/), [main](evidence/ui/main/), [hunks](evidence/ui/hunks/)", live="—",
+    limits="A staged rename shows as an add and a delete in the Staged scope (the index comparison has no rename detection). Unsaved drafts show in every scope that lists the file.")
+rec(76, "Review that stays clean at any width", "verified", commit=GK, date="2026-09-26",
+    harness=GKFIX,
+    steps="""1. `node test/ui/scenario-review-width.js`: the review at 900, 1280 and 1600 px in Overseer Dark and Light: header and file headers on one line, hunk controls against code lines (overlap audit), overflow, codicons on file rows, an 800-line diff.
+2. `node test/ui/scenario-hunks.js` (AC-42).""",
+    expected="Overlap and overflow audit at 900, 1280 and 1600 px in both themes; the AC-42 hunk scenario passes.",
+    actual="""- **Header:** one line (47 px) at every width and theme; file headers one line.
+- **Hunk actions:** sit in a strip above each hunk; none covers code at any width.
+- **Overflow:** none; file rows carry codicons; an 800-line diff starts collapsed ("800 changed lines. Load this diff to review it").
+- **AC-42:** Accept/Reject, undo/redo, staged and untracked files, conflicts and reload all pass.""",
+    evidence="[review-width scenario](evidence/ui/review-width/), [hunks scenario](evidence/ui/hunks/)", live="—")
+rec(77, "Chat that works beside a diff", "verified", commit=GK, date="2026-09-26",
+    harness="Claude fixture (showcase: Markdown, a table, code, six tool calls, two edits); no paid tokens",
+    steps="""`node test/ui/scenario-narrow-chat.js`: the window sized so the chat column is about 640, 480 and 360 px in Overseer Dark and Light; overflow and long-run audit, the header's name, tool steps, code blocks and the composer.""",
+    expected="At 360, 480 and 640 px in both themes: no overflow, no long runs, the name visible.",
+    actual="""- **Widths:** 647, 483 and 373 px (targets 640, 480, 360; 360 is the floor) in both themes.
+- **Audit:** no overflow and no text run over 80 characters at any width; the agent's name fully readable in the header; tool steps folded; code blocks scroll inside themselves; the composer fits.""",
+    evidence="[narrow-chat scenario](evidence/ui/narrow-chat/)", live="—")
+rec(78, "Quiet turn endings", "verified", commit=GK, date="2026-09-26",
+    harness="Claude fixture modes shaped like live output (stop-live, unparsed, failed-reason) and a synthetic Codex exec; no paid tokens",
+    steps="""`node test/ui/scenario-endings.js`: stop a Claude turn and a Codex turn with the chat's Stop button; a run that prints a line the parser does not understand; a failed Claude turn with a reason; screenshots in Overseer Dark and Light.""",
+    expected="Stopped turns read Stopped with no empty error card and no Failed footer; a failed turn shows its reason once; unparsed lines stay in the event log.",
+    actual="""- **Claude stopped:** status interrupted; footer "Stopped"; no error card, no status lines.
+- **Codex stopped:** status interrupted; footer "Stopped"; no "Failed".
+- **Unparsed line:** "Warning: telemetry flush skipped (fixture)" is in the event log, not in the chat.
+- **Failed:** "Migration failed: relation users_v2 does not exist" shown once; footer "Failed".""",
+    evidence="[endings scenario](evidence/ui/endings/)", live="The fixture modes copy the live Claude Code 2.1.x stop shape seen in the AC-60 live session.")
+rec(79, "Grid and dashboard mode in the new layout", "verified", commit=GK, date="2026-09-26",
+    harness=GKFIX,
+    steps="""`node test/ui/scenario-modes.js`: from the chat alone (Explorer and terminal open) and from review and chat: open and close the grid, enter and exit dashboard mode; compare editor groups (shares and active tabs), side bar, panel and secondary side bar before, during and after.""",
+    expected="Each returns exactly to the arrangement before.",
+    actual="""- **Grid:** takes the editor area (one group) and closing it returns the same groups (1.0, or 0.66/0.34 with the review and chat).
+- **Dashboard mode:** hides the panel and secondary side bar, keeps the side bar on Overseer, and Exit returns the same groups, Explorer and terminal.""",
+    evidence="[modes scenario](evidence/ui/modes/)", live="—")
+rec(80, "Remembered place", "verified", commit=GK, date="2026-09-26",
+    harness=GKFIX,
+    steps="""`node test/ui/scenario-place.js`: an agent with changes and a long conversation; scope Unstaged, Follow on, review and chat scrolled; reload the window; then quit VS Code and start it again (the daemon keeps running).""",
+    expected="Reload and quit/relaunch scenarios compare each value (agent, arrangement, follow/manual mode, review scope, scroll positions) before and after.",
+    actual="""- **After a reload and after a restart:** the same agent; review left (0.66) and chat right (0.34); scope Unstaged; review scroll 700 → 700 and chat 1,606 → 1,606 px; Follow was on and comes back paused until resumed (AC-49).""",
+    evidence="[place scenario](evidence/ui/place/)", live="—")
+rec(81, "Gate J still holds", "partial", commit=GK, date="2026-09-26",
+    proven="every fixture scenario passes against the Gate K build: the Gate J scenarios (Gate K audit with a new baseline, chat, parity, composer, grid, dashboard, keyboard with the shortcuts also from the side bar, history, usage, look, theme) and the earlier ones (review, main, center, conversation, files, hunks, pr, notify, signin, accounts, trust); the text budget re-measured per view is no higher than Gate J (agents 225, chat 1,063, files 59, review 150, grid 993, new agent 133, accounts 189)",
+    deferred="the live Gate J scenario (scenario-live-gatej.js: Claude and both ChatGPT accounts, several paid turns) was not rerun on the Gate K build; its fixture counterparts pass and the Codex usage part was rerun live (AC-62)",
+    harness=GKFIX,
+    steps="""Every fixture scenario rerun against the Gate K VSIX: the Gate J set (audit in Gate K mode, chat, parity, composer, grid, dashboard, keyboard, history, usage, look, theme) and the earlier ones (main, center, conversation, review, files, hunks, notify, signin, accounts, trust, pr), plus the Gate K scenarios. Each scenario that used the dashboard's agent rail was ported to the side bar (the checks keep their meaning).""",
+    expected="Every Gate J scenario reruns green against the Gate K build; a new audit baseline is recorded for Gate K.",
+    actual="""- **Rerun:** 34 packaged-VSIX scenarios green on the final build. hunks failed once in the full run (a native-editor redo) and passed on rerun.
+- **Ported:** scenarios that used the dashboard's rail now select agents in the side bar; Workspace Dirty checks moved to the review's scope picker and markers; the grid's latency measurement now ignores lines already on the tiles.
+- **New audit baseline (Gate K):** agents 225, chat 1,063, files 59, review 150, grid 993, new agent 133, accounts 189 characters; no overflow, no long runs, every icon control named (38 checks).
+- **Regressions found and fixed:** the chat became a preview tab when moved; a stale file covered the next agent's review; staging waited for the poll; the Agents tree redrew so often that clicks were lost; Delete on an archived row now restores it; search now looks within the list shown.""",
+    evidence="[Gate K audit](evidence/ui/audit-gatek/) and each scenario folder under evidence/ui/",
+    live="Fixtures; one live Codex turn for AC-62.",
+    limits="restore (AC-49) opens several reviews at once, which Gate K replaced with one review beside the chat; AC-80's place scenario covers restoring in the new layout. merge and background are live scenarios and perf is the 10-minute AC-35 load test; none was rerun.",
+    blocker="Next: rerun scenario-live-gatej.js on the Gate K build when paid turns on both ChatGPT accounts are wanted.")
+rec(82, "Gate K design review (owner-confirmed)", "partial", commit=GK, date="2026-09-26",
+    proven="the review page shows every view in Gate J and Gate K in both Overseer themes; the owner marked all 19 views on 2026-09-26: 16 Looks right (editor area and agents list \"gate k looking great\", chat, chat beside a diff, arrangement, review, scopes, follow, endings, grid, new agent, Needs you, take out, remembered place, themes, and Overall) and 3 Needs work",
+    deferred="the three Needs work items changed and shown again, and the owner's confirmation after them",
+    expected="The published page, the owner's marks with outcomes and the dated confirmation.",
+    actual="""- **Marks (2026-09-26, owner):** 16 Looks right, 3 Needs work; the notes are kept verbatim in [owner-marks-2026-09-26.json](evidence/ac-82/owner-marks-2026-09-26.json).
+- **Needs work, composer (Accounts and usage):** the chips wrap inside the text field (move some underneath); "Codex · codex (existing login)" reads as Codex twice; the headline should say something like "What's next?" or "Send off a task", with the Overseer logo instead of the generic one.
+- **Needs work, history:** in Gate K it is not clear where the search term was typed; search should be visible in the Overseer side bar and reachable by a hotkey and the command palette.
+- **Needs work, grid and dashboard mode:** the empty grid ("No agents running", "New agent") is confusing and should lead back to the home chat; the screenshots had too little data to follow.
+- **Also from the owner's review (spoken):** the review should be where files live, nothing shown twice, a less VS Code-like editor area with a bold third theme, the grid built by dragging (16 at most), tracking an agent from the grid, not losing track of windows, and a chat with Overseer itself. These became Gate M (AC-99 to AC-108).""",
+    evidence="https://claude.ai/artifact/7ohJ5qNE7Wdqt95n1ecavv, [owner marks](evidence/ac-82/owner-marks-2026-09-26.json)", live="—",
+    blocker="Next: the three Needs work items are AC-109 to AC-113 (after the Gate K merge, #7); show them again on the page and get the owner's confirmation.")
+
+# Gate L, Continuity (added by the owner on 2026-09-26; docs/rfcs/offline-mode.md). Not started; built in its own worktree and pull request.
+rec(83, "Offline is not an outage", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(84, "Fail over to the best working provider", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(85, "Local inventory read from the machine", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(86, "Memory budget and fit", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(87, "Verified local catalogue, Qwen coders first", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(88, "Settings the daemon enforces", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(89, "Download models only when allowed", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(90, "Install and run Ollama only when allowed", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(91, "Transition to local when offline", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(92, "Wait and retry, never fail (for 36 hours)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(93, "Back online", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(94, "Local models as a first-class choice", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(95, "Honest offline UI", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(96, "Several local agents", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(97, "Offline session (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(98, "On by default, explained once", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+
+# Gate M, Overseer as the whole surface (added by the owner on 2026-09-26; docs/rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface). Not started; built in its own pull request.
+rec(99, "The review is where files live", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(100, "Nothing shown twice", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(101, "Overseer's own reviewer", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(102, "An immersive editor area", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(103, "The Overseer theme", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(104, "Build the grid by dragging", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(105, "Track an agent from the grid", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(106, "Never lose track of windows", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(107, "Talk to Overseer", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+rec(108, "Gate M design review (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate M) and the [orchestrator UI RFC](../rfcs/orchestrator-ui.md#gate-m-overseer-as-the-whole-surface).",
+    actual="Not started.", live="—", blocker="Not started (Gate M, added by the owner on 2026-09-26; built in its own pull request).")
+
+# Gate K follow-ups from the owner's marks (2026-09-26). Not started; land after the merged Gate K pull request (#7).
+rec(109, "A composer that does not wrap", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+rec(110, "Account names read once", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+rec(111, "The composer says what's next", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+rec(112, "Search you can see", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+rec(113, "No empty grid", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+rec(114, "Gate K in the owner's VS Code (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate K follow-ups) and the owner's marks on AC-82.",
+    actual="Not started.", live="—", blocker="Not started (Gate K follow-up from the owner's marks on 2026-09-26).")
+
+# Gate N, phone remote on the same network (added by the owner on 2026-09-26; docs/rfcs/phone-remote.md). Not started; built in its own worktree and pull request.
+rec(115, "Feasibility and reuse before lock-in", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(116, "A gateway switched on and off on the desktop", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(117, "Pairing needs the Mac", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(118, "Encrypted and mutually authenticated", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(119, "Devices, scopes and revoking", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(120, "Found on the network", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(121, "Never lose the session", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(122, "Sent exactly once", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(123, "The Mac stays awake while it matters", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(124, "See every agent", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(125, "Control every agent", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(126, "Review on the phone", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(127, "Everything else Overseer has", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(128, "Talk to Overseer from the phone", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(129, "Needs-you notifications you can switch", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(130, "Safe without friction", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(131, "One app, iOS and Android, that looks like Overseer", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(132, "Regression coverage for the phone", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(133, "Phone session (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(134, "Platform behaviour behind generic interfaces", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(135, "Hyper fast", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(136, "The door", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+rec(137, "Motion throughout", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+
+# Gate L addition (Continuity): permission modes on handoff.
+rec(138, "Permission modes carry over", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md#permission-modes-carry-over-ac-138).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(139, "OpenCode session transport spike", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+rec(140, "Memory safety guard", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate L) and the [offline mode RFC](../rfcs/offline-mode.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate L, added by the owner on 2026-09-26; design in docs/rfcs/offline-mode.md; built in its own worktree and pull request).")
+# Gate N addition: pair once (the owner's decision of 2026-09-26).
+rec(141, "Pair once", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate N) and the [phone remote RFC](../rfcs/phone-remote.md).",
+    actual="Not started.", live="—", blocker="Not started (Gate N, added by the owner on 2026-09-26; design in docs/rfcs/phone-remote.md; built in its own worktree and pull request).")
+
+# Brand (added by the owner on 2026-09-26; docs/design/brand.md). Built on branch claude/brand-mark (stacked on Gate M);
+# the owner approves the single-colour silhouette and the Mac helper icon.
+rec(142, "One Overseer mark everywhere", "partial", date="2026-09-27", commit="a4473ad (branch claude/brand-mark, stacked on Gate M, not merged yet)",
+    proven="the mark on every VS Code surface on the packaged build (Marketplace icon, activity bar, status bar, tabs, composer heading, the Overseer chat) and the Mac helper's icon; scenario-brand 9 of 9",
+    deferred="the owner's approval of the single-colour silhouette and the Mac helper icon; the phone, menu-bar and Android monochrome icons when those surfaces exist",
+    expected="See the RFC criterion (Brand) and [docs/design/brand.md](../design/brand.md).",
+    actual="The owner's files are in docs/design/brand/ (app icon, colour logo, flat silhouette). On branch claude/brand-mark: a single-colour SVG fitted to the flat silhouette, exported sizes, the Marketplace icon, the activity bar and status bar mark (a one-glyph icon font), the colour logo on Overseer's tabs, the composer heading and the Overseer chat, and the Mac notification helper's icon; scenario-brand passes 9 of 9 on the packaged VSIX (sizes, VSIX icon, helper icon, no old eye mark left, the activity bar in four themes, the status bar glyph, the tab icon, the composer mark under the CSP).",
+    live="—", blocker="Waits for the owner to approve the single-colour silhouette (it reads at 20 to 24 px; at 16 px the centre hole nearly closes, as in the flat PNG) and the Mac helper icon, then merges after the Gate M pull request. The phone app and a menu-bar or Android monochrome icon take their files from docs/design/brand/ when those surfaces are built.")
+
+# Gate O, Audio Mode (added by the owner on 2026-09-26; docs/rfcs/audio-mode.md). The daemon and VS Code came with pull
+# request #5 (merged as e0db692) and the terminal UI (T-23, T-24) with pull request #6 (merged as ea6a6c2).
+rec(143, "Opt-in audio cues owned by the daemon", "verified", date="2026-09-26",
+    commit="106d3e8 (pull request #5, merged into main as e0db692 on 2026-09-27)",
+    harness="Fixture harnesses only (Claude fixture, Codex app-server fixture, generic programs); no paid tokens. Live playback through macOS `afplay` and `say`",
+    fixture="Real Git repositories created per test; isolated OVERSEER_HOME; isolated VS Code profile for the UI scenario. The owner-approved pack was read through a copy the owner made of it, because the agent's tools cannot read the folder the voice lab is in",
+    steps="""1. `CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline -- --test-threads=1` (unit tests in `daemon/src/audio.rs`, protocol tests in `daemon/tests/audio.rs` and `daemon/tests/protocol.rs`).
+2. `npm run check --prefix extension` and `git diff --check origin/main HEAD`.
+3. `python3 docs/verification/evidence/audio-mode/check-pack.py --approved <owner-approved folder>`: decodes every MP3 with ffmpeg, measures it, compares it with the manifest, the pack's README and the approved folder, and lists the audio files Git tracks.
+4. `node docs/verification/evidence/audio-mode/live-playback.js`: a release `overseerd` with its own home and no test sink; the script watches the daemon's child processes while agents run and previews are requested. It plays real sound.
+5. `node extension/scripts/package.js`, then `node test/ui/scenario-audio.js`: the packaged VSIX in VS Code with two Claude fixture agents that ask for permission at the same moment; cues go to a log instead of the speakers so they can be counted.
+6. `git merge-tree --write-tree origin/main HEAD`.""",
+    expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
+    actual="""- **Tests:** 81 passed, 0 failed: 16 unit, 15 audio protocol, 50 protocol.
+- **Off until asked:** off on a new install and kept across a daemon kill; while off a finished agent starts no player and no `audio` folder exists (test, live and in VS Code).
+- **Daemon-owned:** with no UI client a root's start and completion play once each; with two clients attached its failure plays once; with VS Code closed a new agent's start and completion play once each.
+- **What makes a sound:** a nested Codex child completes while its root waits and makes no sound; the run plays start, attention and completion, three cues in all. A permission request and its waiting status play one cue. An authentication failure plays one attention cue and no completion cue.
+- **Simultaneous needs:** two permission requests released together play one cue; `state` holds two waiting roots; VS Code shows 2 on *Needs you*, on the Overseer icon and in the status bar.
+- **Bounds:** routine queue 4, urgent queue 2, attention history at most 1,024 runs. Live: of 40 preview requests in a burst 5 were accepted (one playing, four queued) and 35 refused; never more than one player process; the daemon's resident size was 8,528 KB before the burst and 8,528 KB after.
+- **Reactor:** 12 MP3s, 31,488 bytes, longest 0.365 s, all decode; each is byte-identical to the approved file and to its SHA-256 in the manifest, which a unit test compares with the bytes built into the daemon. Live: `afplay` plays from an owner-only cache (folder 700, files 600) holding only the cues played, identical to the bundled files; a cached cue from another pack is replaced.
+- **System voice:** `say -v Daniel "Agent started."` ran on the Mac (185 installed voices listed); a voice that is not installed is refused.
+- **Commander:** refused before a folder is chosen; a folder that is not a pack is refused with the reason (the missing file is named); then `afplay` played `<private folder>/agent_complete/transmission/commander.wav` where it is; no WAV under the daemon's folder or in the repository; the private files unchanged. Git tracks 12 audio files, all in the pack, and no Commander path.
+- **Failing quietly:** with the cache blocked, or the Commander folder removed, the agent completes and the failure is in the daemon log; an unknown cue key is refused.
+- **Other platforms:** with the players taken away by a test switch the daemon reports `available: false`, refuses to turn on, to preview and to list voices, and an agent completes in silence even when the setting was already on.
+- **VS Code:** the Agents title bar is unchanged from main (New Agent, Search Agents, Toggle Agent Grid, VS Code's Collapse All); *Audio Mode and Reactor Cues…* is in the overflow menu; turning on, choosing a track and a preview go through the daemon. 10 of 10 checks.
+- **Merge:** merged into main as e0db692; main's daemon, extension and fixtures are the tested code.""",
+    evidence="[requirement by requirement](audio-mode.md), [daemon tests](evidence/audio-mode/cargo-test-overseerd.txt), [extension and whitespace checks](evidence/audio-mode/extension-check.txt), [pack check](evidence/audio-mode/pack-check.txt), [live playback](evidence/audio-mode/live-playback.txt), [VS Code scenario](evidence/ui/audio/result.json)",
+    live="Live macOS playback (`afplay`, `say`) and the packaged VSIX in VS Code; agents are fixtures.",
+    limits="macOS only; no other platform was run (the unavailable path is exercised on macOS through a test switch; Linux belongs to AC-41). The Commander check used three generated beeps in a temporary private folder; the owner's recordings were not read. The pack was compared with the owner's copy of the approved folder. Nobody listened: that is AC-145.")
+rec(144, "A lost session asks for attention", "verified", date="2026-09-26",
+    commit="106d3e8 (pull request #5, merged into main as e0db692 on 2026-09-27)",
+    harness="Generic fixture programs; no accounts, no paid tokens",
+    fixture="Real Git repositories created per test; isolated OVERSEER_HOME; the daemon writes each cue it would play to a log",
+    steps="""`CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline --test audio -- --test-threads=1`, three protocol tests:
+1. `a_lost_session_plays_one_attention_cue`: Audio Mode on; a top-level agent runs; its supervisor is killed.
+2. `an_agent_stopped_on_request_stays_silent`: a running agent is interrupted.
+3. `a_session_lost_while_the_daemon_was_down_makes_no_sound`: the daemon, the agent and its supervisor are killed; the daemon starts again.""",
+    expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
+    actual="""- **Lost while the daemon runs:** the run becomes `disconnected`; the log holds the start cue and exactly one `agent_needs_attention`, also 500 ms after the agent itself is gone.
+- **Stopped on request:** `interrupted`; the log holds the start cue only.
+- **Lost while the daemon was down:** after the restart the run reads `disconnected` with "lost" as its reason, Audio Mode is still on, and 800 ms later the log still holds the start cue only.
+- The daemon already behaved this way; nothing in it changed for this criterion.""",
+    evidence="[daemon tests](evidence/audio-mode/cargo-test-overseerd.txt), [requirement by requirement](audio-mode.md)",
+    live="Fixtures with a real daemon.",
+    limits="A lost child agent staying silent is covered by AC-143's nested-child test, not by a test of its own here.")
+rec(145, "Audio Mode by ear (owner-confirmed)", "verified", date="2026-09-27 UTC (the owner's sessions and confirmations)",
+    commit="106d3e8 (pull request #5, merged into main as e0db692 on 2026-09-27)",
+    harness="Fixture agents only (generic programs and the Claude fixture); no accounts, no paid tokens",
+    fixture="`node test/ui/listen-audio.js` on the branch of pull request #5: VS Code with its own profile and its own Overseer home, so the owner's VS Code, daemon and agents are not touched. The build is the VSIX packaged from 106d3e8",
+    steps="""1. The owner's own session: `node test/ui/listen-audio.js`, with the keys typed in its terminal. `o` on; `s` an agent that completes; `n` an agent that asks for permission; `f` off, then `s` and `n` again; `m` plays each of the twelve cues and asks for its mark.
+2. Sessions run by the agent at the owner's request, the owner listening. Each step is said aloud before it is played, and the record lists the players the daemon started:
+   - `--play once,system,closed`, twice: two agents ask for permission at the same moment; System voice; the VS Code window is quit and agents run again.
+   - `--play off,reactor,system`: Audio Mode off; back to Reactor; System voice.
+   - `--play commander=<folder>,off,reactor,system`: the owner's Commander recordings; off; back to Reactor; System voice.""",
+    expected="See the RFC criterion (Gate O) and the [Audio Mode RFC](../rfcs/audio-mode.md).",
+    actual="""- **The twelve cues:** each was played and marked in the owner's session; all twelve are *Right*. Nothing needs replacing.
+- **Audio Mode on, VS Code open:** start, completion and attention heard in the owner's session.
+- **VS Code closed, two agents at the same moment, System voice:** played twice for the owner. The owner: "ok yes it all worked as you described."
+- **Off, then back to Reactor and System voice:** with Audio Mode off the daemon started no player; then `afplay` four times for Reactor and `say -v Daniel` four times for System voice. The owner: "that worked".
+- **The owner's Commander recordings:** the daemon ran `afplay` on `<commander folder>/<key>/transmission/commander.wav` four times (start, complete, start, attention), then nothing while off, then Reactor and System voice again. The owner: "worked".
+- **Nothing copied by Overseer:** after the session the recordings were unchanged, no WAV was under the session's daemon folder and none was in the repository; the record holds a flag that a folder was set, never its path.""",
+    evidence="[the records and what each session did](evidence/ui/audio-listening/README.md), [the owner's marks](evidence/ui/audio-listening/marks.json), [the Commander session](evidence/ui/audio-listening/marks-20260927-055821.json), [the session script](../../test/ui/listen-audio.js)",
+    live="Real sound on the owner's Mac; agents are fixtures.",
+    limits="The owner's confirmations of the played steps were given in conversation, not written by the script; the record of the owner's own session says yes to steps that session did not do, and the evidence says which answers count. The Commander folder that was played is a copy the owner made of the three recordings, in a private folder in the home directory, because macOS does not let a process started by the agent open files in the folder the voice lab is in.")
+
+# Gate P, follow-through (added by the owner on 2026-09-27). Not started.
+rec(146, "Reconcile and merge the work in flight", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(147, "One command runs every test", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(148, "Checks on every pull request", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(149, "A steady UI suite", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(150, "The first click always lands", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(151, "Every live scenario rerun on the current build", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(152, "Performance re-measured", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+rec(153, "A ledger that stays true", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate P).",
+    actual="Not started.", live="—", blocker="Not started (Gate P, added by the owner on 2026-09-27).")
+
+# Gate Q, cover everything and oversee the agents (added by the owner on 2026-09-27). Not started.
+rec(154, "Composer choices fill the row", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(155, "One-line search with a filter menu", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(156, "Every agent works from the same rules", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(157, "Oversee the other agents", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(158, "Gate M's theme and immersive look are back in scope", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(159, "The toolchain works without Xcode's license", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(160, "Owner actions in one place", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+rec(161, "Everything merged into one main", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate Q).",
+    actual="Not started.", live="—", blocker="Not started (Gate Q, added by the owner on 2026-09-27).")
+
+# Gate R, Voice Mode (added by the owner on 2026-09-27). Not started.
+rec(162, "Voice spike before lock-in", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27; the goal's first step).")
+rec(163, "Owned by the daemon, heard in Rust, off until asked", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(164, "Holds the floor", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(165, "A quick answer that it is working on it", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(166, "The right agents, from context", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(167, "Redirect without trampling", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(168, "New agents from a request", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(169, "Evidence for every word sent", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(170, "Correct and cancel", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(171, "What voice may do", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(172, "One speaker at a time", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(173, "Private and bounded", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(174, "Voice in the UI", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(175, "Keeps working when things fail", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(176, "Voice Mode by voice (owner-confirmed)", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+rec(177, "The mark shows it is hearing you", "not started", date="—", commit="—",
+    expected="See the RFC criterion (Gate R).",
+    actual="Not started.", live="—", blocker="Not started (Gate R, added by the owner on 2026-09-27).")
+
 SHORT_BLOCKERS = {
+    154: "not started (Gate Q, added by the owner on 2026-09-27)",
+    155: "not started (Gate Q, added by the owner on 2026-09-27)",
+    156: "not started (Gate Q, added by the owner on 2026-09-27)",
+    157: "not started (Gate Q, added by the owner on 2026-09-27)",
+    158: "not started (Gate Q, added by the owner on 2026-09-27)",
+    159: "not started (Gate Q, added by the owner on 2026-09-27)",
+    160: "not started (Gate Q, added by the owner on 2026-09-27)",
+    161: "not started (Gate Q, added by the owner on 2026-09-27)",
+    146: "not started (Gate P, added by the owner on 2026-09-27)",
+    147: "partial: scripts/test-all on branch claude/gate-p-follow-through, with its evidence; merges after PR #8",
+    148: "not started (Gate P, added by the owner on 2026-09-27)",
+    149: "not started (Gate P, added by the owner on 2026-09-27)",
+    150: "not started (Gate P, added by the owner on 2026-09-27)",
+    151: "not started (Gate P, added by the owner on 2026-09-27)",
+    152: "not started (Gate P, added by the owner on 2026-09-27)",
+    153: "not started (Gate P, added by the owner on 2026-09-27)",
+    142: "partial: built on branch claude/brand-mark; waits for the owner to approve the single-colour mark",
     8: "blocked: rejecting a different local user was never exercised (needs a second macOS account)",
-    11: "blocked: sign-in and reauthentication flows need the owner's logins",
     12: "not yet run: ChatGPT A and B are signed in; concurrent A/B tasks pending",
-    13: "not yet run: isolation check with a disposable extra profile pending",
     41: "deferred: no Linux environment",
     42: "not started (added by the owner on 2026-09-25)",
     43: "not started (added by the owner on 2026-09-25)",
@@ -658,9 +1389,94 @@ SHORT_BLOCKERS = {
     47: "not started (added by the owner on 2026-09-25)",
     48: "not started (added by the owner on 2026-09-25)",
     49: "not started (added by the owner on 2026-09-25)",
-    50: "not started (coming soon; added by the owner on 2026-09-25)",
     51: "not started (added by the owner on 2026-09-25)",
     53: "not started (needs a second Claude account)",
+    54: "not started (added by the owner on 2026-09-26)",
+    55: "not started (added by the owner on 2026-09-26)",
+    56: "not started (added by the owner on 2026-09-26)",
+    57: "not started (added by the owner on 2026-09-26)",
+    61: "not started (added by the owner on 2026-09-26)",
+    63: "not started (added by the owner on 2026-09-26)",
+    64: "owner session after the rest of Gate J",
+    65: "not started (added by the owner on 2026-09-26)",
+    66: "owner design review after the Gate J build",
+    81: "partial: the live Gate J scenario not rerun on the Gate K build",
+    82: "owner marked 19 views: 16 Looks right, 3 Needs work (AC-109 to AC-113)",
+    83: "not started (Gate L, added by the owner on 2026-09-26)",
+    84: "not started (Gate L, added by the owner on 2026-09-26)",
+    85: "not started (Gate L, added by the owner on 2026-09-26)",
+    86: "not started (Gate L, added by the owner on 2026-09-26)",
+    87: "not started (Gate L, added by the owner on 2026-09-26)",
+    88: "not started (Gate L, added by the owner on 2026-09-26)",
+    89: "not started (Gate L, added by the owner on 2026-09-26)",
+    90: "not started (Gate L, added by the owner on 2026-09-26)",
+    91: "not started (Gate L, added by the owner on 2026-09-26)",
+    92: "not started (Gate L, added by the owner on 2026-09-26)",
+    93: "not started (Gate L, added by the owner on 2026-09-26)",
+    94: "not started (Gate L, added by the owner on 2026-09-26)",
+    95: "not started (Gate L, added by the owner on 2026-09-26)",
+    96: "not started (Gate L, added by the owner on 2026-09-26)",
+    97: "not started (Gate L, added by the owner on 2026-09-26)",
+    98: "not started (Gate L, added by the owner on 2026-09-26)",
+    99: "not started (Gate M, added by the owner on 2026-09-26)",
+    100: "not started (Gate M, added by the owner on 2026-09-26)",
+    101: "not started (Gate M, added by the owner on 2026-09-26)",
+    102: "not started (Gate M, added by the owner on 2026-09-26)",
+    103: "not started (Gate M, added by the owner on 2026-09-26)",
+    104: "not started (Gate M, added by the owner on 2026-09-26)",
+    105: "not started (Gate M, added by the owner on 2026-09-26)",
+    106: "not started (Gate M, added by the owner on 2026-09-26)",
+    107: "not started (Gate M, added by the owner on 2026-09-26)",
+    108: "not started (Gate M, added by the owner on 2026-09-26)",
+    109: "not started (Gate K follow-up from the owner's marks)",
+    110: "not started (Gate K follow-up from the owner's marks)",
+    111: "not started (Gate K follow-up from the owner's marks)",
+    112: "not started (Gate K follow-up from the owner's marks)",
+    113: "not started (Gate K follow-up from the owner's marks)",
+    114: "not started (Gate K follow-up from the owner's marks)",
+    115: "not started (Gate N, added by the owner on 2026-09-26)",
+    116: "not started (Gate N, added by the owner on 2026-09-26)",
+    117: "not started (Gate N, added by the owner on 2026-09-26)",
+    118: "not started (Gate N, added by the owner on 2026-09-26)",
+    119: "not started (Gate N, added by the owner on 2026-09-26)",
+    120: "not started (Gate N, added by the owner on 2026-09-26)",
+    121: "not started (Gate N, added by the owner on 2026-09-26)",
+    122: "not started (Gate N, added by the owner on 2026-09-26)",
+    123: "not started (Gate N, added by the owner on 2026-09-26)",
+    124: "not started (Gate N, added by the owner on 2026-09-26)",
+    125: "not started (Gate N, added by the owner on 2026-09-26)",
+    126: "not started (Gate N, added by the owner on 2026-09-26)",
+    127: "not started (Gate N, added by the owner on 2026-09-26)",
+    128: "not started (Gate N, added by the owner on 2026-09-26)",
+    129: "not started (Gate N, added by the owner on 2026-09-26)",
+    130: "not started (Gate N, added by the owner on 2026-09-26)",
+    131: "not started (Gate N, added by the owner on 2026-09-26)",
+    132: "not started (Gate N, added by the owner on 2026-09-26)",
+    133: "not started (Gate N, added by the owner on 2026-09-26)",
+    134: "not started (Gate N, added by the owner on 2026-09-26)",
+    135: "not started (Gate N, added by the owner on 2026-09-26)",
+    136: "not started (Gate N, added by the owner on 2026-09-26)",
+    137: "not started (Gate N, added by the owner on 2026-09-26)",
+    138: "not started (Gate L, added by the owner on 2026-09-26)",
+    139: "not started (Gate L, added by the owner on 2026-09-26; the goal's first step)",
+    140: "not started (Gate L, added by the owner on 2026-09-26)",
+    141: "not started (Gate N, added by the owner on 2026-09-26)",
+    162: "not started (Gate R, added by the owner on 2026-09-27; the goal's first step)",
+    163: "not started (Gate R, added by the owner on 2026-09-27)",
+    164: "not started (Gate R, added by the owner on 2026-09-27)",
+    165: "not started (Gate R, added by the owner on 2026-09-27)",
+    166: "not started (Gate R, added by the owner on 2026-09-27)",
+    167: "not started (Gate R, added by the owner on 2026-09-27)",
+    168: "not started (Gate R, added by the owner on 2026-09-27)",
+    169: "not started (Gate R, added by the owner on 2026-09-27)",
+    170: "not started (Gate R, added by the owner on 2026-09-27)",
+    171: "not started (Gate R, added by the owner on 2026-09-27)",
+    172: "not started (Gate R, added by the owner on 2026-09-27)",
+    173: "not started (Gate R, added by the owner on 2026-09-27)",
+    174: "not started (Gate R, added by the owner on 2026-09-27)",
+    175: "not started (Gate R, added by the owner on 2026-09-27)",
+    176: "not started (Gate R, added by the owner on 2026-09-27)",
+    177: "not started (Gate R, added by the owner on 2026-09-27)",
 }
 TOTAL = 53
 
@@ -684,7 +1500,7 @@ def sync(out):
     root = out.parent.parent
     rfc = root / "docs/overseer-rfc.md"
     text = rfc.read_text()
-    titles = dict(re.findall(r"\*\*AC-(\d\d) — ([^*]+?)\.\*\*", text))
+    titles = dict(re.findall(r"\*\*AC-(\d{2,3}) — ([^*]+?)\.\*\*", text))
     global TOTAL
     TOTAL = max(int(n) for n in titles)
     statuses = {}

@@ -1,0 +1,24 @@
+ ◆ Overseer  page 1/1 · 9 agents · ● 3 active · ◆ 1 needs you       ● connected 
+╭ agents ──────────────────────╮┏ 1 ✓ Write API docs ━━━━━━━━━━━━ generic · 0s ┓
+│ 1 ✓ Write API docs           │┃ step 2 done                                  ┃
+│ 2 ✓ Bump dependencies        │┃                                              ┃
+│ 3 ✓ Tidy lint warnings       │┃                                              ┃
+│ 4 ◆ Add a changelog entry    │┃                                              ┃
+│ 5 ● Watch the build          │┃                                              ┃
+│ 6 ● Refactor the payment ser…│┃                                              ┃
+│ 7 ■ Long soak test           │┃                                              ┃
+│ 8 ✗ Migration dry-run        │┃                                              ┃
+│ 9 ✓ Refresh sessions once    │┃                                              ┃
+│                              │┃                                              ┃
+│                              │┃                                              ┃
+│                              │┃                                              ┃
+│                              │┃                                              ┃
+│                              │┃                                              ┃
+│                              │┃                                              ┃
+│                              │┃                                              ┃
+│                              │┃                                              ┃
+│                              │┃                                              ┃
+│                              │┃                                              ┃
+│                              │┃                                              ┃
+╰──────────────────────────────╯┗ completed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+ i message   z zoom   a/d answer   n new   ? keys   q quit                      

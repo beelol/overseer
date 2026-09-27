@@ -19,6 +19,7 @@ pub const PROTOCOL_VERSION: i64 = 1;
 pub const MAX_REQUEST_BYTES: u64 = 1024 * 1024;
 
 pub async fn serve(daemon: Arc<Daemon>) -> Result<()> {
+    crate::audio::start(daemon.clone())?;
     let path = paths::socket_path();
     if let Some(dir) = path.parent() {
         paths::ensure_private_dir(dir)?;
@@ -120,8 +121,9 @@ async fn connection_loop(
             subscribe(daemon.clone(), id, params, tx.clone());
             continue;
         }
-        if method == "hello" && params["client"] == "vscode" && !*ui {
-            // A VS Code window: counted so closing the last one can surface background agents.
+        if method == "hello" && (params["client"] == "vscode" || params["client"] == "tui") && !*ui {
+            // A VS Code window or an overseer-tui: counted so closing the last one can surface
+            // background agents.
             *ui = true;
             daemon.ui_connected();
         }
@@ -620,6 +622,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
     Ok(match method {
         "hello" => json!({"protocol": PROTOCOL_VERSION, "version": env!("CARGO_PKG_VERSION"), "pid": std::process::id(), "data_dir": paths::data_dir(), "socket": paths::socket_path()}),
         "state" => d.state()?,
+        "audio.get" => crate::audio::get(d)?,
+        "audio.set" => crate::audio::set(d, p)?,
+        "audio.preview" => crate::audio::preview(d, p)?,
+        "audio.import_commander" => crate::audio::import_commander(d, p)?,
+        "audio.voices" => crate::audio::voices()?,
         "harness.list" => {
             let list: Vec<Value> = ["codex", "codex-app", "claude", "opencode", "generic"]
                 .iter()
@@ -1227,7 +1234,7 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 "decision":decision})
         }
         "run.result" => d.delegated_result(s(p, "run_id")?)?,
-        "run.follow_up" => json!(d.start_turn(s(p, "run_id")?, s(p, "prompt")?, true)?),
+        "run.follow_up" => json!(d.start_turn(s(p, "run_id")?, s(p, "prompt")?, true, &crate::daemon::TurnOpts::from_params(p)?)?),
         "run.interrupt" => d.interrupt(s(p, "run_id")?)?,
         "run.permission" => d.answer_permission(s(p, "run_id")?, s(p, "request_id")?, p["allow"].as_bool().unwrap_or(false), p["message"].as_str().unwrap_or(""))?,
         "run.raw_output" => d.raw_output(s(p, "run_id")?, p["max_bytes"].as_u64().unwrap_or(256 * 1024).min(4 * 1024 * 1024) as usize)?,
@@ -1593,6 +1600,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
         }
         "workspace.cleanup_plan" => d.cleanup_plan(s(p, "workspace_id")?)?,
         "workspace.cleanup" => d.cleanup(s(p, "workspace_id")?, p["discard_dirty"].as_bool().unwrap_or(false))?,
+        "account.usage" => d.account_usage(s(p, "id")?)?,
+        "task.archive" => d.task_archive(s(p, "task_id")?, p["archived"].as_bool().unwrap_or(true))?,
+        "search" => d.search(p["query"].as_str().unwrap_or(""), p["limit"].as_i64().unwrap_or(200))?,
+        "repo.files" => d.repo_files(p["workspace_id"].as_str(), p["repo"].as_str(), p["query"].as_str().unwrap_or(""), p["limit"].as_u64().unwrap_or(30) as usize)?,
+        "workspace.changes" => d.workspace_changes(s(p, "workspace_id")?)?,
         "workspace.tree" => d.workspace_tree(s(p, "workspace_id")?, p["dir"].as_str().unwrap_or(""))?,
         "account.list" => d.account_list()?,
         "account.create" => d.account_create(s(p, "provider")?, s(p, "name")?)?,
@@ -1624,7 +1636,11 @@ pub fn dispatch(d: &Arc<Daemon>, method: &str, p: &Value) -> Result<Value> {
                 .optional()?;
             json!({"notice": notice})
         }
-        "daemon.clients" => json!({"vscode": d.ui_clients.load(std::sync::atomic::Ordering::SeqCst)}),
+        // "vscode" is kept for older callers; it counts every watching UI (VS Code windows and TUIs).
+        "daemon.clients" => {
+            let n = d.ui_clients.load(std::sync::atomic::Ordering::SeqCst);
+            json!({"vscode": n, "ui": n})
+        }
         other => return Err(anyhow!("unknown method {other}")),
     })
 }

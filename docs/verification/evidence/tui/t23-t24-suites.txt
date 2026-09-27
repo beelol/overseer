@@ -1,0 +1,170 @@
+$ git rev-parse --short HEAD   # main + pull request #5 + pull request #6
+47312f3
+
+$ CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline -- --test-threads=1
+running 16 tests
+test adapters::tests::base_env_drops_keys ... ok
+test adapters::tests::classify_errors ... ok
+test adapters::tests::forbidden_keys ... ok
+test adapters::turn_option_tests::codex_turn_options_become_cli_arguments ... ok
+test adapters::turn_option_tests::turn_options_are_checked_per_harness ... ok
+test audio::tests::a_cached_cue_from_another_pack_is_replaced ... ok
+test audio::tests::attention_can_queue_when_routine_cues_fill_their_lane ... ok
+test audio::tests::attention_history_stays_bounded_during_long_daemon_uptime ... ok
+test audio::tests::core_transitions_are_broad_and_attention_is_deduped ... ok
+test audio::tests::manifest_describes_the_bundled_bytes ... ok
+test audio::tests::pack_has_twelve_short_original_cues ... ok
+test audio::tests::simultaneous_attention_is_coalesced_even_when_starts_interleave ... ok
+test pr::tests::parses_github_remotes_only ... ok
+test redact::tests::redacts_common_secrets ... ok
+test usage::tests::claude_rate_limit_info_is_normalized ... ok
+test usage::tests::codex_session_log_limits_are_read_from_the_newest_token_count ... ok
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+running 15 tests
+test a_folder_that_is_not_a_commander_pack_is_refused_with_the_reason ... ok
+test a_lost_session_plays_one_attention_cue ... ok
+test a_platform_without_players_reports_unavailable_and_stays_silent ... ok
+test a_session_lost_while_the_daemon_was_down_makes_no_sound ... ok
+test an_agent_stopped_on_request_stays_silent ... ok
+test audio_mode_is_off_until_enabled_and_survives_restart ... ok
+test authentication_failure_makes_one_attention_cue ... ok
+test child_completion_stays_silent_until_root_finishes ... ok
+test disabled_audio_never_materializes_a_player_asset ... ok
+test installed_system_voice_can_be_selected ... ok
+test live_permission_and_waiting_status_share_one_attention_cue ... ok
+test live_root_events_play_once_without_or_with_multiple_ui_clients ... ok
+test missing_local_cache_does_not_interrupt_agents ... ok
+test simultaneous_permissions_make_one_cue_and_two_visible_needs ... ok
+test system_and_private_commander_tracks_are_selectable_without_bundling_voice_files ... ok
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.85s
+running 50 tests
+test ac05_ac07_state_survives_daemon_crash_and_reattaches ... ok
+test ac06_lifecycle_states_follow_real_signals ... ok
+test ac06_structured_harness_silence_is_not_completion ... ok
+test ac07_lost_session_is_reported_not_running ... ok
+test ac08_connections_from_a_foreign_uid_are_rejected_and_logged ... ok
+test ac08_socket_is_owner_only_and_requests_are_not_shell ... ok
+test ac09_follow_up_reaches_only_the_selected_run ... ok
+test ac10_redaction_of_secrets_in_output ... ok
+test ac10_replay_cursor_burst_and_retention ... ok
+test ac13_isolated_profiles_have_separate_homes_and_no_keys ... ok
+test ac14_fixture_claude_background_subagent_keeps_session_open_for_permissions ... ok
+test ac14_fixture_claude_background_task_finishing_before_the_interim_result_still_keeps_the_session_open ... ok
+test ac15_generic_harness_paths_with_spaces_failures_and_unknown_capabilities ... ok
+test ac16_fixture_codex_app_server_approvals_interrupt_and_unsupported_requests ... ok
+test ac16_fixture_error_classes_stay_distinct ... ok
+test ac16_fixture_permission_allow_deny_and_interrupt_waiting_run ... ok
+test ac18_fixture_recursive_tree_duplicates_and_delayed_parent ... ok
+test ac19_fixture_codex_app_child_threads_nest_and_do_not_end_the_parent ... ok
+test ac19_fixture_codex_live_transcript_children ... ok
+test ac20_prose_is_not_a_child_and_unknown_events_are_visible ... ok
+test ac21_parallel_worktrees_are_independent_and_collisions_are_safe ... ok
+test ac22_current_checkout_preserves_preexisting_work ... ok
+test ac23_unrelated_writer_rejected_on_current_checkout ... ok
+test ac24_cleanup_reports_and_preserves_until_confirmed ... ok
+test ac26_snapshots_and_selectable_bases ... ok
+test ac26_unknown_fork_is_reported_unavailable ... ok
+test ac27_complete_change_and_dirty_views ... ok
+test ac28_opposing_layers_remain_inspectable ... ok
+test ac34_merge_conflicts_do_not_break_snapshots_or_diffs ... ok
+test ac43_fixture_tool_calls_carry_inputs_and_results_for_the_conversation_view ... ok
+test ac44_clean_merge_back_commits_the_worktree_and_merges_only_on_request ... ok
+test ac44_conflicts_are_resolved_in_the_worktree_before_the_target_changes ... ok
+test ac44_refuses_dirty_target_active_runs_and_current_checkout_tasks ... ok
+test ac45_last_vscode_window_closing_with_active_runs_posts_a_notice_but_a_reload_does_not ... ok
+test ac45_no_notice_when_nothing_is_running ... ok
+test ac45_one_notice_per_quit_a_brief_reconnect_does_not_repeat_it ... ok
+test ac45_stop_all_interrupts_runs_forces_stragglers_and_exits_the_daemon ... ok
+test ac46_accounts_by_provider_fixed_vs_desktop_linked_and_isolated_resign_in_and_removal ... Successfully logged in (fixture account work).
+test ac50_pr_plan_explains_refusals_and_prepares_a_github_branch_without_merging ... ok
+test ac50_pr_plan_targets_the_branch_name_in_a_fresh_clone ... ok
+test ac51_worktree_tree_lists_one_directory_marks_changes_and_stays_inside ... ok
+test ac52_background_notice_is_delivered_by_the_helper ... ok
+test ac52_notifications_use_the_overseer_helper_and_fall_back_when_denied_or_missing ... ok
+test ac52_the_daemon_finds_the_notifier_app_next_to_its_own_binary ... ok
+test ac60_an_interrupted_claude_turn_is_interrupted_not_failed ... ok
+test ac60_repo_files_lists_mentionable_files_best_first ... ok
+test ac60_turn_options_reach_claude_and_unsupported_ones_are_refused ... ok
+test ac62_account_usage_is_what_the_harness_reports ... ok
+test ac63_search_finds_tasks_by_title_output_and_status_and_archive_hides_without_deleting ... ok
+test t11_an_attached_tui_counts_as_a_watching_ui ... ok
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 105.62s
+
+$ git rev-parse --short HEAD   # main + pull request #5 + pull request #6
+47312f3
+
+$ CARGO_BUILD_JOBS=1 cargo test -p overseer-tui --offline -- --test-threads=1
+running 9 tests
+test feed::tests::claude_tool_input_becomes_a_short_target ... ok
+test feed::tests::codex_command_summary_carries_its_status ... ok
+test feed::tests::events_merge_without_duplicates_and_tools_update_in_place ... ok
+test feed::tests::permissions_are_pending_until_answered ... ok
+test ui::tests::fit_is_width_aware ... ok
+test ui::tests::long_words_break_instead_of_overflowing ... ok
+test ui::tests::markdown_is_light ... ok
+test ui::tests::truecolor_and_256_color_accents ... ok
+test ui::tests::wraps_to_width_and_indents_continuations ... ok
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 7 tests
+test t23_a_daemon_without_audio_methods_says_unavailable_and_changes_nothing ... ok
+test t23_audio_mode_from_the_terminal ... ok
+test t23_the_daemon_is_asked_again_every_second_and_rarely_after_an_error ... ok
+test t23_the_panel_asks_the_daemon_for_every_change ... ok
+test t24_one_signal_when_an_agent_needs_you ... ok
+test t24_the_bell_is_withheld_only_while_the_daemon_says_it_plays ... ok
+test t24_the_real_binary_rings_only_when_the_daemon_does_not_play ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.34s
+running 10 tests
+test t06_answer_permissions_jump_to_waiting_agents_and_interrupt ... ok
+test t07_zoom_shows_the_whole_conversation_with_scrollback ... ok
+test t08_start_agents_from_the_new_agent_form ... ok
+test t14_changes_view_lists_files_and_diffs_like_the_review ... ok
+test t17_zoom_expands_tool_inputs_and_results ... ok
+test t18_merge_back_from_the_terminal_asks_before_each_step ... ok
+test t19_a_new_waiting_agent_rings_and_shows_in_the_window_title ... ok
+test t20_cleanup_removes_a_finished_worktree_and_names_what_would_be_lost ... ok
+test t21_stop_everything_and_start_the_daemon_again ... ok
+test t22_open_a_pull_request_with_the_users_git_and_gh ... ok
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.98s
+running 4 tests
+test t02_pages_of_nine_newest_first ... ok
+test t04_keyboard_navigation_help_and_mouse ... ok
+test t05_messages_go_to_the_focused_agent_only_and_drafts_are_kept ... ok
+test t15_search_filters_agents_as_you_type ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.34s
+running 2 tests
+test t01_the_tui_and_another_client_see_the_same_daemon ... ok
+test t03_tiles_update_live_and_resume_after_a_dropped_connection ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.66s
+running 1 test
+test t13_live_claude_and_codex_stream_in_the_tui ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 7 tests
+test feed_history_is_bounded ... ok
+test t09_readable_at_a_glance_at_three_sizes ... ok
+test t10_nine_busy_agents_stay_responsive ... ok
+test t11_quitting_asks_about_drafts_and_leaves_agents_running ... ok
+test t11_the_terminal_is_restored_after_quit_and_after_a_panic ... ok
+test t12_help_explains_options_and_keys ... ok
+test t16_accounts_panel_and_sign_in_from_the_terminal ... Successfully logged in (fixture account desk).
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.19s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ git rev-parse --short HEAD   # main + pull request #5 + pull request #6; code as at 47312f3
+356ad04
+
+$ npm run check --prefix extension
+
+> overseer@0.1.0 check
+> node --check src/extension.js && node --check src/daemon-client.js && node --check src/views.js && node --check src/review.js && node --check src/output-panel.js && node --check branch-diff/review/panel.js
+
+exit=0
+
+$ git diff --check origin/main HEAD
+exit=0
+
+$ git diff origin/main HEAD -- tui/tests/control.rs | wc -l   # T-19's test is the one on main
+0

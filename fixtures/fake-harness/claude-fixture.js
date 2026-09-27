@@ -36,6 +36,7 @@ if (process.argv.includes('auth') && process.argv.includes('status')) {
 }
 if (!process.argv.includes('-p')) { console.log('claude-fixture 0.0.0 (synthetic)'); process.exit(0); }
 const mode = process.env.CLAUDE_FIXTURE_MODE_FILE
+  && fs.existsSync(process.env.CLAUDE_FIXTURE_MODE_FILE)
   ? fs.readFileSync(process.env.CLAUDE_FIXTURE_MODE_FILE, 'utf8').trim()
   : process.env.CLAUDE_FIXTURE_MODE || process.env.FIXTURE_MODE || 'nested';
 const sid = 'fixture-session-1';
@@ -51,7 +52,7 @@ const next = pred => new Promise(resolve => { const check = () => { const i = li
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
-  await next(m => m.type === 'user');
+  const first = await next(m => m.type === 'user');
   out({ type: 'system', subtype: 'init', session_id: sid, model: 'fixture', cwd: process.cwd(), tools: ['Agent', 'Write'] });
   if (mode === 'nested') {
     // Grandchild traffic arrives before the child's Agent tool_use is reported (delayed parent).
@@ -68,6 +69,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     const file = path.join(process.cwd(), 'perm.txt');
     // Like the live CLI: the tool_use is reported first, then the permission request.
     assistant([{ type: 'tool_use', id: 'toolu_write', name: 'Write', input: { file_path: file, content: 'allowed\n' } }]);
+    if (process.env.FIXTURE_PERMISSION_BARRIER) {
+      const deadline = Date.now() + 30000;
+      while (!fs.existsSync(process.env.FIXTURE_PERMISSION_BARRIER) && Date.now() < deadline) await sleep(10);
+      if (!fs.existsSync(process.env.FIXTURE_PERMISSION_BARRIER)) throw new Error('permission fixture barrier timed out');
+    }
     out({ type: 'control_request', request_id: 'req-1', request: { subtype: 'can_use_tool', tool_name: 'Write', input: { file_path: file, content: 'allowed\n' } } });
     const reply = await next(m => m.type === 'control_response' || (m.type === 'control_request' && m.request?.subtype === 'interrupt'));
     if (reply.type === 'control_request') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
@@ -110,6 +116,85 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   } else if (mode === 'ordinary-failure') {
     assistant([{ type: 'text', text: 'The requested check failed.' }]);
     result(true, 'fixture assertion failed during requested work');
+  } else if (mode === 'showcase' || mode === 'showcase-permission') {
+    // A realistic session for UI checks: reads, a search, an edit, a new file, a test run and a
+    // Markdown summary (heading, list, table, code block, inline code, link, long path).
+    const cwd = process.cwd();
+    const readme = path.join(cwd, 'README.md');
+    const session = path.join(cwd, 'src', 'auth', 'session-refresh-coordinator.ts');
+    const tool = async (id, name, input, content, isError = false) => {
+      assistant([{ type: 'tool_use', id, name, input }]);
+      await sleep(30);
+      user([{ type: 'tool_result', tool_use_id: id, content, is_error: isError }]);
+    };
+    assistant([{ type: 'text', text: "I'll start by reading how sign-in works today, then add a refresh coordinator so expired sessions renew once instead of every tab racing." }]);
+    await tool('toolu_read', 'Read', { file_path: readme }, fs.readFileSync(readme, 'utf8'));
+    await tool('toolu_grep', 'Grep', { pattern: 'refreshToken|validateSession', path: cwd, output_mode: 'files_with_matches' }, 'README.md\na.txt');
+    await tool('toolu_glob', 'Glob', { pattern: 'src/**/*.ts' }, 'No files found');
+    fs.mkdirSync(path.dirname(session), { recursive: true });
+    const code = "export class SessionRefreshCoordinator {\n  private inflight?: Promise<string>;\n\n  refresh(fetchToken: () => Promise<string>): Promise<string> {\n    this.inflight ??= fetchToken().finally(() => { this.inflight = undefined; });\n    return this.inflight;\n  }\n}\n";
+    fs.writeFileSync(session, code);
+    await tool('toolu_write', 'Write', { file_path: session, content: code }, 'File created successfully at: ' + session);
+    const before = fs.readFileSync(readme, 'utf8');
+    fs.writeFileSync(readme, before + '\n## Sessions\n\nExpired sessions refresh once through `SessionRefreshCoordinator`.\n');
+    await tool('toolu_edit', 'Edit', { file_path: readme, old_string: before.trim().split('\n').pop(), new_string: '## Sessions' }, 'The file ' + readme + ' has been updated.');
+    await tool('toolu_bash', 'Bash', { command: 'npm test -- --grep "session refresh"', description: 'Run the session refresh tests' }, '\n  SessionRefreshCoordinator\n    ✓ shares one refresh between callers (4 ms)\n    ✓ clears the in-flight promise after it settles (1 ms)\n\n  2 passing (12 ms)\n');
+    assistant([{ type: 'text', text: [
+      '## Done: sessions refresh once',
+      '',
+      'Expired sessions now go through a single `SessionRefreshCoordinator`, so parallel requests share one refresh instead of each calling the token endpoint.',
+      '',
+      '- **New:** `src/auth/session-refresh-coordinator.ts`',
+      '- **Docs:** added a *Sessions* section to `README.md`',
+      '- **Tests:** 2 passing',
+      '',
+      '| Case | Before | After |',
+      '| --- | --- | --- |',
+      '| 3 tabs expire together | 3 refresh calls | 1 refresh call |',
+      '| Refresh fails | stuck spinner | error surfaces once |',
+      '',
+      '```ts',
+      'const token = await coordinator.refresh(() => api.refreshToken());',
+      '```',
+      '',
+      'Full path for reference: ' + session + ' — see the [refresh token spec](https://datatracker.ietf.org/doc/html/rfc6749#section-6).',
+    ].join('\n') }]);
+    if (mode === 'showcase-permission') {
+      const file = path.join(cwd, 'CHANGELOG.md');
+      assistant([{ type: 'tool_use', id: 'toolu_changelog', name: 'Write', input: { file_path: file, content: '# Changelog\n\n- Sessions refresh once.\n' } }]);
+      out({ type: 'control_request', request_id: 'req-showcase', request: { subtype: 'can_use_tool', tool_name: 'Write', input: { file_path: file, content: '# Changelog\n\n- Sessions refresh once.\n' } } });
+      const reply = await next(m => m.type === 'control_response' || (m.type === 'control_request' && m.request?.subtype === 'interrupt'));
+      if (reply.type === 'control_request') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+      const decision = reply.response.response;
+      if (decision.behavior === 'allow') { fs.writeFileSync(file, decision.updatedInput.content); user([{ type: 'tool_result', tool_use_id: 'toolu_changelog', content: 'File created successfully at: ' + file }]); }
+      else user([{ type: 'tool_result', tool_use_id: 'toolu_changelog', content: 'Permission denied', is_error: true }]);
+    }
+    out({ type: 'result', subtype: 'success', is_error: false, result: 'Sessions refresh once.', session_id: sid, num_turns: 1, duration_ms: 48210, total_cost_usd: 0.0412,
+      usage: { input_tokens: 18423, output_tokens: 1204, cache_read_input_tokens: 9321 } });
+  } else if (mode === 'slow') {
+    // Busy for a few seconds (steering tests); honours an interrupt; each turn echoes its prompt.
+    const content = first.message.content;
+    const text = Array.isArray(content) ? content.filter(c => c.type === 'text').map(c => c.text).join('\n') : content;
+    assistant([{ type: 'text', text: 'working on: ' + text }]);
+    const stop = next(m => m.type === 'control_request' && m.request?.subtype === 'interrupt').then(() => 'interrupt');
+    const done = sleep(Number(process.env.FIXTURE_SLOW_MS || 5000)).then(() => 'done');
+    if ((await Promise.race([stop, done])) === 'interrupt') { result(true, 'interrupted'); await sleep(50); process.exit(130); }
+    assistant([{ type: 'text', text: 'finished: ' + text }]);
+    result(false, 'finished');
+  } else if (mode === 'limits' || mode === 'limits-low') {
+    // Claude's rate_limit_event (shape as streamed by Claude Code 2.1.x): near or far from the 5-hour limit.
+    const used = mode === 'limits' ? 0.95 : 0.12;
+    const reset = Math.floor(Date.now() / 1000) + 3600;
+    out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed', resetsAt: reset, rateLimitType: 'five_hour', unifiedWindows: { five_hour: { utilization: used, resetsAt: reset }, seven_day: { utilization: 0.4, resetsAt: reset + 86400 * 3 } } }, uuid: 'fixture', session_id: sid });
+    assistant([{ type: 'text', text: 'done' }]);
+    result(false, 'done');
+  } else if (mode === 'echo') {
+    // Reports what Overseer sent: arguments (effort, permission mode, model, resume) and the content kinds.
+    const content = first.message.content;
+    const kinds = Array.isArray(content) ? content.map(c => c.type + (c.source ? ':' + c.source.media_type + ':' + c.source.data.length : '')) : ['text'];
+    const text = Array.isArray(content) ? content.filter(c => c.type === 'text').map(c => c.text).join('\n') : content;
+    assistant([{ type: 'text', text: 'ECHO ' + JSON.stringify({ argv: process.argv.slice(2), kinds, text }) }]);
+    result(false, 'echoed');
   } else if (mode === 'ratelimit') {
     out({ type: 'assistant', session_id: sid, error: 'rate_limit', message: { role: 'assistant', content: [{ type: 'text', text: 'API Error: Request rejected (429) · rate limited' }] } });
     result(true, 'API Error: Request rejected (429) · rate limited');
@@ -140,6 +225,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   } else if (mode === 'auth') {
     out({ type: 'assistant', session_id: sid, error: 'authentication_failed', message: { role: 'assistant', content: [{ type: 'text', text: 'Failed to authenticate: OAuth session expired and could not be refreshed' }] } });
     result(true, 'Failed to authenticate: OAuth session expired and could not be refreshed');
+  } else if (mode === 'stop-live') {
+    // Shaped like Claude Code 2.1.x when stopped mid-turn: an error result with no text.
+    assistant([{ type: 'text', text: 'Writing a long list…' }]);
+    const stop = next(m => m.type === 'control_request' && m.request?.subtype === 'interrupt').then(() => 'interrupt');
+    const done = sleep(Number(process.env.FIXTURE_SLOW_MS || 8000)).then(() => 'done');
+    if ((await Promise.race([stop, done])) === 'interrupt') { out({ type: 'result', subtype: 'error_during_execution', is_error: true, session_id: sid, usage: { input_tokens: 3, output_tokens: 0 }, num_turns: 1 }); await sleep(50); process.exit(130); }
+    result(false, 'finished');
+  } else if (mode === 'unparsed') {
+    // A line the parser does not understand, between normal events.
+    process.stdout.write('Warning: telemetry flush skipped (fixture)\n');
+    assistant([{ type: 'text', text: 'done' }]);
+    result(false, 'done');
+  } else if (mode === 'failed-reason') {
+    // A failed turn whose reason arrives once, as the result text.
+    assistant([{ type: 'text', text: 'Trying the migration…' }]);
+    result(true, 'Migration failed: relation users_v2 does not exist');
   } else if (mode === 'prose') {
     assistant([{ type: 'text', text: 'I delegated this to a sub-agent and it finished.' }]);
     result(false, 'I delegated this to a sub-agent and it finished.');

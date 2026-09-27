@@ -1,0 +1,38 @@
+# gh pr view 1 -R beelol/overseer-pr-sandbox (read-only), 2026-09-26 UTC
+number: 1
+url: https://github.com/beelol/overseer-pr-sandbox/pull/1
+state: OPEN
+closed: False
+mergedAt: None
+mergeCommit: None
+isDraft: False
+headRefName: overseer/add-overseer-pr-check-note
+headRefOid: 45f52dd7f07c73ece058170236def8e071389cc9
+baseRefName: master
+title: Add Overseer PR check note
+author: beelol
+files: [('OVERSEER.md', 1, 0)]
+commits: ['Overseer: Add Overseer PR check note']
+
+# body
+Opened by Overseer from run `r-b3a97720b863` (codex, gpt-5.6-luna).
+
+**Task**
+
+> Create a file named OVERSEER.md containing exactly one line: This pull request was opened by Overseer (AC-50 live check). Do not change anything else. Then reply exactly: done
+
+**Commits**
+
+- Overseer: Add Overseer PR check note
+
+**Files changed** (1)
+
+- `A` OVERSEER.md
+
+_Review before merging. Overseer never merges automatically._
+
+# gh api repos/beelol/overseer-pr-sandbox/commits/master
+78db700 Initial commit   (unchanged: nothing merged)
+
+# daemon pull_request event on r-b3a97720b863
+{"branch": "overseer/add-overseer-pr-check-note", "number": 1, "url": "https://github.com/beelol/overseer-pr-sandbox/pull/1"}

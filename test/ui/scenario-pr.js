@@ -27,15 +27,29 @@ const { Session, makeRepo, latestVsix, delay, git, repoRoot } = require('./harne
     const t = s.ctl('task.create', { repo, harness: 'generic', program: '/bin/sh', args: ['-c', `sed -i '' 's/^L4: original$/L4: agent change for the PR/' a.txt; printf 'notes\\n' > NOTES.md`], prompt: 'Change L4 and add NOTES.md', title: 'PR demo change' });
     for (let i = 0; i < 40 && s.ctl('state').runs.find(r => r.id === t.run.id).status !== 'completed'; i++) await delay(300);
     const mainBefore = git(repo, 'rev-parse', 'main');
-    await s.openOverseerView();
-    const pt = await cdp.waitFor(`(() => { const rows = [...document.querySelectorAll('.monaco-list-row')].filter(r => r.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-      const i = rows.findIndex(r => r.textContent.includes('PR demo change')); const r = rows[i + 1]; if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.left + 60, y: b.top + b.height / 2 }; })()`, 20000);
-    await cdp.click(pt.x, pt.y); await delay(1500);
-    const panel = await cdp.webview(`document.body.dataset.runId === ${JSON.stringify(t.run.id)} && !!document.getElementById('pr')`, 30000);
-    const clickPr = async () => { await panel.waitFor(`!document.getElementById('pr').disabled`, 10000); const p = await s.webviewPoint(panel, '#pr'); await cdp.click(p.x, p.y); await delay(1200); };
-    const toast = pattern => cdp.waitFor(`[...document.querySelectorAll('.notification-toast')].map(t => t.innerText).find(t => ${pattern}.test(t)) || null`, 20000).catch(() => null);
-    const clear = async () => { await cdp.command('Notifications: Clear All Notifications'); await delay(300); };
+    // Gate K: select the agent in the side bar; its chat (with the … menu) is in the editor area.
+    await s.selectAgent('PR demo change', { settle: 2000 });
+    const panel = await cdp.webview(`(document.body.dataset.runId === ${JSON.stringify(t.run.id)} || window.__overseer?.selected?.() === ${JSON.stringify(t.run.id)}) && !!document.getElementById('more')`, 30000);
+    // Open pull request lives in the chat's … menu.
+    const clickPr = async () => {
+      for (let i = 0; i < 20; i++) {
+        if (!(await panel.eval(`!!document.getElementById('pr')`))) { const m = await s.webviewPoint(panel, '#more'); await cdp.click(m.x, m.y); await delay(300); }
+        if (await panel.eval(`!document.getElementById('pr').disabled`)) break;
+        await panel.eval(`document.getElementById('more').click()`); await delay(500);
+      }
+      const p = await s.webviewPoint(panel, '#pr'); await cdp.click(p.x, p.y); await delay(1200);
+    };
+    // Open PR answers with dialogs, not toasts (VS Code's Do Not Disturb hides toasts). Read one, then close it.
+    const dialogText = pattern => cdp.waitFor(`(() => { const d = document.querySelector('.monaco-dialog-box'); return d && ${pattern}.test(d.innerText) ? d.innerText : null; })()`, 20000).catch(() => null);
+    const closeDialog = async () => {
+      const b = await cdp.evalWorkbench(`(() => { const d = document.querySelector('.monaco-dialog-box'); const b = d && [...d.querySelectorAll('.monaco-button')].find(b => /^(Cancel|OK)$/.test(b.textContent.trim())); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+      if (b) await cdp.click(b.x, b.y); await delay(500);
+    };
+    const toast = async pattern => { const t = await dialogText(pattern); return t; };
+    const clear = closeDialog;
 
+    // Like the owner's VS Code: Do Not Disturb on, which hides info and warning toasts.
+    await cdp.command('Notifications: Toggle Do Not Disturb Mode'); await delay(500);
     // No remote.
     await clickPr();
     const noRemote = await toast('/no Git remote/');
