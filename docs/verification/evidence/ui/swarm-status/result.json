@@ -98,7 +98,7 @@
       "name": "Pause from the Swarm row changes durable daemon state within 2 seconds",
       "ok": true,
       "detail": {
-        "pause_ms": 602
+        "pause_ms": 591
       }
     },
     {
@@ -126,7 +126,7 @@
       "name": "confirmed Stop cancels queued work within 2 seconds",
       "ok": true,
       "detail": {
-        "stop_ms": 73
+        "stop_ms": 69
       }
     }
   ]

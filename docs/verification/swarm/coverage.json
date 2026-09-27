@@ -195,9 +195,11 @@
         "docs/verification/swarm/milestone-8.md",
         "docs/verification/swarm/SWARM-61.md",
         "daemon/tests/swarm_runtime.rs",
-        "docs/verification/swarm/SWARM-20.md"
+        "docs/verification/swarm/SWARM-20.md",
+        "test/unit/swarm-controls.js",
+        "test/ui/scenario-swarm-status.js"
       ],
-      "blocker": "Stop interrupts linked scripted local workers, blocks pending launch replay, and retries a simulated failed first signal after daemon restart. User Stop accepts a run ID without current director/plan versions. A paused local control shim proves a slow Stop signal does not hold the launch lock against another admission; the timer releases the same lock before worker I/O. A fresh readout exposes unconfirmed linked workers. Local fixtures terminalize idle Stop/Off runs, wait for active worker exit, review and checker completion, release safe cancelled-job claims, and reconcile a checker orphaned by daemon death. Live Pause checkpoints, native descendants and VS Code display remain unverified."
+      "blocker": "Local fixtures cover durable Stop/Off state, slow-signal lock release, unconfirmed exits, retained reservations and restart reconciliation. An isolated packaged VS Code scenario now controls a 100-ready-job category: Pause acknowledges in 591 ms, Resume works, Off cancels its queue, and confirmed Stop acknowledges in 69 ms. It has no active worker, so live Pause checkpoints, active-job drain, native descendants and unconfirmed-exit display remain unverified."
     },
     "SWARM-21": {
       "status": "partial",
@@ -378,7 +380,7 @@
         "test/unit/swarm-view.js",
         "test/ui/scenario-swarm-status.js"
       ],
-      "blocker": "A 100-job daemon fixture verifies aggregate state counts, filtered cursor pages, director owner readout and separate supervised-worker count across restart. A second fixture verifies bounded category-run summary pages over the daemon protocol after restart. The extension renders a 100-job/32-active summary and lazy filtered pages in a JavaScript fixture; an isolated packaged-UI scenario shows 100 ready jobs compact and expanded. A separate one-attempt Atlas replay measured 7 ms Stop acknowledgement during duplicate traffic. No fixture combines 32 launched supervised workers with the required VS Code view, account usage, unconfirmed exits and worker detail; Pause latency remains unmeasured."
+      "blocker": "Daemon and JavaScript fixtures cover bounded 100-job summaries, filtered pages and a synthetic 32-active readout. An isolated packaged VS Code scenario shows 100 ready jobs compact and expanded, and measures Pause/confirmed Stop acknowledgement at 591/69 ms. It does not launch 32 supervised workers or display account usage, limiting constraints, unconfirmed exits and worker detail; that joined UI case remains unverified."
     },
     "SWARM-38": {
       "status": "partial",
