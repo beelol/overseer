@@ -4,6 +4,13 @@ Compared Swarm draft PR #3 with `origin/main` at `7bccc3a` after merging that re
 into `codex/swarm-mode`. This is a compatibility assessment, not acceptance evidence.
 No SWARM or CONTRACT box changes status because of this review.
 
+Re-fetched `origin/main` on 2026-09-27 after the owner's later update; it still resolves
+to `7bccc3a`, which is an ancestor of the Swarm branch. The main checkout's older local
+`main` was left untouched. The latest Auto branch (`a7695fd`) also retains the same
+route/admission division. No further merge or change to the Swarm defaults, worker-count
+policy, or SWARM-01–64 wording is needed. The joined Gate S and Auto checks below remain
+open implementation dependencies, not new standalone Swarm criteria.
+
 | Main addition | Current state on main | Swarm decision and required joined check |
 | --- | --- | --- |
 | Gate K/M agent sidebar, composer, chat, review and grid (AC-99–113) | Merged UI; some owner-review criteria remain partial | Put category/Swarm initiation in the existing launch flow and show director, jobs and workers through existing agent views. The grid's 16 visible tiles do not cap the 32-worker qualification. Exercise S0 and SWARM-01/23/27/28/39/56/63 through the packaged UI. |

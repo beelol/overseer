@@ -10,4 +10,14 @@ Actual: the focused test first failed because integration required the job revis
 
 Replay: `cargo test --offline -p overseerd --test swarm_integration unrelated_plan_revision_preserves_an_accepted_patch_for_integration -q`.
 
+Follow-up at `a44d772`: a revision-1 terminal result that was already queued when its
+job changed to revision 2 stayed in the director inbox after delivery, blocking truthful
+completion. `superseded_result_is_applied_after_delivery_without_accepting_old_evidence`
+first failed with `pending_review=1`; after the fix it passes with `pending_review=0`,
+the original result marked `applied`, and zero acceptance decisions for that job.
+`unreviewed_result_returns_to_director_after_batch_completion_and_restart` still proves
+an unchanged job's unreviewed result remains queued. The Catalog S3 replay now reaches
+completion after its old result is delivered and acknowledged. Exact commands and the
+broader regression results are in [S3](S3.md). Status remains partial.
+
 Remaining: user requirement intake and live director delivery are not connected; job removal still needs a safe cancellation transition. This evidence verifies the local unchanged/affected patch boundary, not the whole criterion. The RFC box remains unchecked.
