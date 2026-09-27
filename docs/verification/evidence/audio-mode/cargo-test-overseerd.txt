@@ -1,5 +1,5 @@
 $ git rev-parse --short HEAD
-d7be0a3
+106d3e8
 
 $ CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline -- --test-threads=1
 running 16 tests
@@ -20,8 +20,12 @@ test redact::tests::redacts_common_secrets ... ok
 test usage::tests::claude_rate_limit_info_is_normalized ... ok
 test usage::tests::codex_session_log_limits_are_read_from_the_newest_token_count ... ok
 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-running 11 tests
+running 15 tests
+test a_folder_that_is_not_a_commander_pack_is_refused_with_the_reason ... ok
+test a_lost_session_plays_one_attention_cue ... ok
 test a_platform_without_players_reports_unavailable_and_stays_silent ... ok
+test a_session_lost_while_the_daemon_was_down_makes_no_sound ... ok
+test an_agent_stopped_on_request_stays_silent ... ok
 test audio_mode_is_off_until_enabled_and_survives_restart ... ok
 test authentication_failure_makes_one_attention_cue ... ok
 test child_completion_stays_silent_until_root_finishes ... ok
@@ -32,7 +36,7 @@ test live_root_events_play_once_without_or_with_multiple_ui_clients ... ok
 test missing_local_cache_does_not_interrupt_agents ... ok
 test simultaneous_permissions_make_one_cue_and_two_visible_needs ... ok
 test system_and_private_commander_tracks_are_selectable_without_bundling_voice_files ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.04s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.81s
 running 50 tests
 test ac05_ac07_state_survives_daemon_crash_and_reattaches ... ok
 test ac06_lifecycle_states_follow_real_signals ... ok
@@ -84,4 +88,4 @@ test ac60_turn_options_reach_claude_and_unsupported_ones_are_refused ... ok
 test ac62_account_usage_is_what_the_harness_reports ... ok
 test ac63_search_finds_tasks_by_title_output_and_status_and_archive_hides_without_deleting ... ok
 test t11_an_attached_tui_counts_as_a_watching_ui ... ok
-test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 115.04s
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 109.65s

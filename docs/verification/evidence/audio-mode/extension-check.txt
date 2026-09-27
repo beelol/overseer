@@ -1,5 +1,5 @@
 $ git rev-parse --short HEAD
-d7be0a3
+106d3e8
 
 $ npm run check --prefix extension
 

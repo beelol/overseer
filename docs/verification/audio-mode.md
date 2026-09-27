@@ -1,15 +1,16 @@
 # Audio Mode verification (pull request #5)
 
-Criterion: AC-143, Gate O in [the RFC](../overseer-rfc.md); its ledger record is on main. What remains is
-AC-144, AC-145, T-23 and T-24 in the [prepared goal](../rfcs/audio-mode-goal.md). Design:
-[side RFC](../rfcs/audio-mode.md). Tested implementation commit: `d7be0a3`; later commits on
-the branch change documents, comments and evidence only. Date: 2026-09-26, macOS 26.6.2 arm64.
+Criteria: AC-143 and AC-144, Gate O in [the RFC](../overseer-rfc.md); their ledger records are
+on main. AC-145 is the owner's confirmation by ear. The terminal UI (T-23, T-24) is pull
+request #6, with its evidence in [evidence/tui](evidence/tui/README.md). Design:
+[side RFC](../rfcs/audio-mode.md). Tested implementation commit: `106d3e8`; later commits on
+the branch change documents and evidence only. Date: 2026-09-26, macOS 26.6.2 arm64.
 
 ## Commands and results
 
 | Command | Result | Log |
 | --- | --- | --- |
-| `CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline -- --test-threads=1` | 77 passed, 0 failed (16 unit, 11 audio protocol, 50 protocol) | [log](evidence/audio-mode/cargo-test-overseerd.txt) |
+| `CARGO_BUILD_JOBS=1 cargo test -p overseerd --offline -- --test-threads=1` | 81 passed, 0 failed (16 unit, 15 audio protocol, 50 protocol) | [log](evidence/audio-mode/cargo-test-overseerd.txt) |
 | `npm run check --prefix extension` | pass | [log](evidence/audio-mode/extension-check.txt) |
 | `git diff --check origin/main HEAD` | pass | same log |
 | `python3 docs/verification/evidence/audio-mode/check-pack.py --approved <folder>` | pass, 46 checks | [log](evidence/audio-mode/pack-check.txt) |
@@ -69,6 +70,10 @@ tools cannot read the folder the voice lab is in.
 | VS Code changes settings and asks for previews; only the daemon plays | VS Code scenario: turn on, choose a track and preview each reach the daemon; the extension has no playback code | Verified |
 | Main's Gate K menus are kept | VS Code scenario: title bar unchanged, *Audio Mode and Reactor Cues…* in the overflow menu; `extension/package.json` differs from main by two lines | Verified |
 | Other platforms report unavailable | `a_platform_without_players_reports_unavailable_and_stays_silent` (a test switch takes the players away on macOS) | Verified on macOS only |
+| A folder that is not a Commander pack is refused with the reason | `a_folder_that_is_not_a_commander_pack_is_refused_with_the_reason`: a folder that does not exist, one without the recordings (the missing file is named), one whose files are not WAV | Verified |
+| AC-144: a lost session plays the attention cue once | `a_lost_session_plays_one_attention_cue`: the supervisor of a running top-level agent is killed, the run becomes `disconnected`, the log holds the start cue and one attention cue | Verified with a real daemon |
+| AC-144: an agent stopped on request stays silent | `an_agent_stopped_on_request_stays_silent`: `interrupted` adds no cue | Verified with a real daemon |
+| AC-144: a session lost while the daemon was down makes no sound | `a_session_lost_while_the_daemon_was_down_makes_no_sound`: after the restart the run reads `disconnected` ("lost"), Audio Mode is still on and no cue is added | Verified with a real daemon |
 
 ## The owner's ledger
 
@@ -89,11 +94,9 @@ The seven checks the owner's cue ledger asks of this pull request:
 - No platform other than macOS was run.
 - The owner's Commander recordings were not read; the live check used three generated beeps
   in a temporary private folder.
-- Nobody listened. The checks prove which files are played, not how they sound.
-- A top-level run whose session is lost (`disconnected`) plays the attention cue. The owner
-  decided on 2026-09-26 that it stays that way; only the unit test
-  `core_transitions_are_broad_and_attention_is_deduped` touches it so far. AC-144 asks for
-  the protocol tests.
-- The owner's confirmation by ear is AC-145.
-- The in-flight pull requests #2 (Auto Mode), #3 (Swarm) and #6 (terminal UI controls) were
-  not rechecked against this branch in this pass.
+- Nobody listened. The checks prove which files are played, not how they sound. That is
+  AC-145: `node test/ui/listen-audio.js` opens VS Code with its own profile and its own
+  Overseer home, plays real sound for the keys typed in its terminal, asks the owner for a
+  mark per cue and writes the record.
+- Pull requests #2 (Auto Mode) and #3 (Swarm) were not rechecked against this branch.
+  Pull request #6 (terminal UI) is built on this branch and tested together with it.
