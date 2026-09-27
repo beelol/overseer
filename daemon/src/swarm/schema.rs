@@ -37,6 +37,14 @@ pub fn migrate(conn: &Connection) -> Result<()> {
           created_ms INTEGER NOT NULL,
           PRIMARY KEY(request_scope,request_id)
         );
+        CREATE TABLE IF NOT EXISTS swarm_revision_requests(
+          run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
+          request_id TEXT NOT NULL,
+          request_sha256 TEXT NOT NULL,
+          result_json TEXT NOT NULL,
+          created_ms INTEGER NOT NULL,
+          PRIMARY KEY(run_id,request_id)
+        );
         CREATE TABLE IF NOT EXISTS swarm_limit_events(
           run_id TEXT NOT NULL REFERENCES swarm_runs(id) ON DELETE CASCADE,
           request_id TEXT NOT NULL,

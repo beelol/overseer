@@ -3,6 +3,7 @@ use crate::store::Store;
 use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone)]
@@ -34,6 +35,33 @@ fn deps_satisfied(
 pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
     let id = required(p, "id")?;
     super::owner::require(store,id,p)?;
+    let request_id = p.get("request_id").map(|v| v.as_str()
+        .ok_or_else(|| anyhow!("invalid revision request id"))).transpose()?;
+    if request_id.is_some_and(|key| key.is_empty() || key.len() > 128
+        || key.chars().any(char::is_control) || crate::redact::redact(key) != key) {
+        bail!("invalid revision request id");
+    }
+    let mut effect = p.clone();
+    if let Value::Object(fields) = &mut effect {
+        fields.remove("request_id");
+        fields.remove("owner_token");
+    }
+    let request_sha256 = format!("{:x}",Sha256::digest(effect.to_string().as_bytes()));
+    if let Some(request_id) = request_id {
+        let prior: Option<(String,String)> = store.conn.query_row(
+            "SELECT request_sha256,result_json FROM swarm_revision_requests
+             WHERE run_id=?1 AND request_id=?2",
+            params![id,request_id],|row| Ok((row.get(0)?,row.get(1)?)),
+        ).optional()?;
+        if let Some((prior_sha256,result_json)) = prior {
+            if prior_sha256 != request_sha256 {
+                bail!("revision request id reused with different input");
+            }
+            let mut result: Value = serde_json::from_str(&result_json)?;
+            result["duplicate"] = json!(true);
+            return Ok(result);
+        }
+    }
     let generation = p["generation"]
         .as_i64()
         .ok_or_else(|| anyhow!("missing generation"))?;
@@ -158,8 +186,16 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         }
     }
     if affected.is_empty() && omitted.is_empty() && jobs.iter().all(|job| old.contains_key(&job.id)) {
-        return Ok(json!({"id":id,"generation":generation,"revision":expected,
-            "affected":0,"redirected":0,"unchanged":true}));
+        let mut result = json!({"id":id,"generation":generation,"revision":expected,
+            "affected":0,"redirected":0,"unchanged":true});
+        if let Some(request_id) = request_id {
+            result["duplicate"] = json!(false);
+            tx.execute("INSERT INTO swarm_revision_requests(run_id,request_id,request_sha256,
+                result_json,created_ms) VALUES(?1,?2,?3,?4,?5)",
+                params![id,request_id,request_sha256,result.to_string(),crate::daemon::now()])?;
+            tx.commit()?;
+        }
+        return Ok(result);
     }
     let now = crate::daemon::now();
     let revision = expected + 1;
@@ -266,9 +302,14 @@ pub fn revise(store: &mut Store, p: &Value) -> Result<Value> {
         params![id, revision, now],
     )?;
     super::materialize_ready(&tx, id, now)?;
+    let mut result = json!({"id":id,"generation":generation,"revision":revision,
+        "affected":affected.len(),"superseded":omitted.len(),"redirected":redirected});
+    if let Some(request_id) = request_id {
+        result["duplicate"] = json!(false);
+        tx.execute("INSERT INTO swarm_revision_requests(run_id,request_id,request_sha256,
+            result_json,created_ms) VALUES(?1,?2,?3,?4,?5)",
+            params![id,request_id,request_sha256,result.to_string(),now])?;
+    }
     tx.commit()?;
-    Ok(
-        json!({"id":id,"generation":generation,"revision":revision,"affected":affected.len(),
-            "superseded":omitted.len(),"redirected":redirected}),
-    )
+    Ok(result)
 }

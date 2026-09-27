@@ -19,3 +19,15 @@ At `52eea97`, the versioned Atlas S5 replay sends one J2 progress envelope after
 Follow-up: `swarm_director::unreviewed_result_returns_to_director_after_batch_completion_and_restart` shows that batch completion requeues an undecided result while applying a neighboring progress message. After daemon restart and an unrelated plan revision, only the result is redelivered; a decision covering its sequence permits application exactly once. Replaying the first turn returns its original receipt. The full offline workspace suite passed 214 non-ignored tests, with 11 ignored; the final revision variant passed separately. This does not establish live director or multi-provider replay.
 
 At `7ee7d0c`, `swarm_broker::directive_delivery_and_application_are_distinct` first reproduced an unauthorized worker-inbox read using only the attempt ID. The broker now requires the matching attempt token for `swarm.messages`; absent and wrong credentials fail while the valid recipient can still read and acknowledge the redirect. Existing scripted workers and fixtures were updated to use their private tokens. The full daemon suite passed serially; the 16 opt-in Atlas PostgreSQL tests passed. Cross-run identity is checked through the attempt's run/job binding, but a live multi-provider reorder and recovery trace remains unverified.
+
+Director revision replay follow-up (this revision): `swarm.revise` now accepts a
+bounded optional request ID. The daemon saves the request fingerprint and exact
+successful result in the same SQLite transaction as a changed plan, or saves a
+no-change result without creating a new revision. In
+`daemon/tests/swarm_revision_replay.rs`, retries after daemon restart return one
+recorded result; changed input under the same ID and a fresh ID with a stale
+expected revision are rejected. A forged owner token is rejected before the
+recorded result can be replayed. Both committed and no-change tests failed on
+the old code, then passed. The focused revision, director, owner, plan and state
+suites passed after the change. This closes a local lost-reply double-plan gap;
+live director transport and reordered cross-harness messages remain unverified.
